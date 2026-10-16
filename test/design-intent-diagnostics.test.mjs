@@ -40,6 +40,7 @@ import {
   DESIGN_INTENT_DIAGNOSTICS_TITLE,
   buildDesignIntentDiagnosticRows,
   canViewDesignIntentDiagnostics,
+  designIntentAcceptanceGate,
   designIntentDiagnosticViolations,
   designIntentDraftText,
   formatDesignIntentDiagnosticsText,
@@ -299,5 +300,58 @@ describe('the session keeps a refusal after the notice is dismissed', () => {
 
     clearDesignIntentDiagnostics('proj-barton', 'ver-original');
     expect(readDesignIntentDiagnostics('proj-barton', 'ver-original')).toBe(null);
+  });
+});
+
+describe('the diagnostic names the gate that refused it', () => {
+  it('never blames validation for a refusal validation did not make', () => {
+    // The Barton shape: the reason says validation failed, the validation beside it
+    // says it passed. The label is not believed.
+    const contradictory = {
+      reason: 'validation_failed',
+      validation: { valid: true, violations: [], contract_version: 2, pack_fingerprint: 'f21824c6' },
+    };
+    const gate = designIntentAcceptanceGate(contradictory);
+
+    expect(gate).toMatch(/passed this draft with no violations/i);
+    expect(gate).toMatch(/after validation/i);
+    expect(gate).not.toMatch(/^Validation/);
+
+    // Read back on screen, and copied, in the same words.
+    const rows = buildDesignIntentDiagnosticRows(contradictory);
+    expect(rows.find((row) => row.key === 'acceptance_gate')?.value).toBe(gate);
+    expect(formatDesignIntentDiagnosticsText(contradictory)).toContain(`Acceptance gate: ${gate}`);
+  });
+
+  it('blames the validator only when the validator refused it, and counts what it reported', () => {
+    const refused = {
+      reason: 'validation_failed',
+      validation: {
+        valid: false,
+        violations: [
+          { code: 'unsupported_claim', section: DESIGN_INTENT_SECTION, detail: 'claim_x', claim_ids: ['claim_x'] },
+          { code: 'schema_violation', section: DESIGN_INTENT_SECTION, detail: 'contract_version_mismatch:1' },
+        ],
+      },
+    };
+    expect(designIntentAcceptanceGate(refused)).toBe('Validation — the validator refused the draft (2 violation(s)).');
+
+    // A result that was never returned is not read as a refusal by the validator.
+    expect(designIntentAcceptanceGate({ reason: 'validation_failed', validation: null }))
+      .toBe('Acceptance — no validation result was returned, so the draft could not be accepted.');
+  });
+
+  it('names the acceptance gate when validation passed and no text could be read', () => {
+    const unreadable = {
+      reason: 'accepted_text_missing',
+      validation: { valid: true, violations: [], pack_fingerprint: 'f21824c6' },
+    };
+    expect(designIntentAcceptanceGate(unreadable))
+      .toBe('Acceptance — the validator passed the draft with no violations, but no section text could be read from it.');
+    // The other gates keep their own plain statement.
+    expect(designIntentAcceptanceGate({ reason: 'provider_failed' })).toMatch(/^Provider/);
+    expect(designIntentAcceptanceGate({ reason: 'writer_flag_off' })).toMatch(/^Writer switch/);
+    expect(designIntentAcceptanceGate({ reason: 'report_evidence_unavailable' })).toMatch(/^Evidence/);
+    expect(designIntentAcceptanceGate({})).toMatch(/unclassified gate/);
   });
 });
