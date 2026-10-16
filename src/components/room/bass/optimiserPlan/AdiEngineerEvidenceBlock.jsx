@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
+import { resolveLimitingFrequency } from "./optimiserLimitingFrequency.js";
 
 function Row({ label, value, mono = false }) {
   if (value == null || value === "") return null;
@@ -37,9 +38,13 @@ export default function AdiEngineerEvidenceBlock({
   appliedCalibration = null,
   className = "",
 }) {
-  const frequency = Number.isFinite(Number(limitingFrequencyHz))
-    ? `${Math.round(Number(limitingFrequencyHz))} Hz`
-    : null;
+  // The limiting frequency is stated through its own authority. A value that is
+  // not a credible frequency — 0 Hz above all — is shown as NOT IDENTIFIED rather
+  // than as a frequency the design does not have. A result that supplied NO value
+  // at all contributes nothing, exactly as before.
+  const frequency = limitingFrequencyHz == null || limitingFrequencyHz === ""
+    ? null
+    : resolveLimitingFrequency(limitingFrequencyHz).text;
   const calibrationStatus = appliedCalibration?.status || null;
   const calibrationFingerprint = appliedCalibration?.fingerprint || null;
 

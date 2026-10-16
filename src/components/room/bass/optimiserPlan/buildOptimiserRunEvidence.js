@@ -52,6 +52,24 @@ const STAGE_FOR_FAMILY = Object.freeze({
 
 const STAGE_NAMES = ["Placement", "Polarity", "Delay", "Gain", "Phase", "Final EQ"];
 
+/**
+ * The terminal failure, in the shape the record keeps it: what failed, its
+ * category, the publication error verbatim and when it happened. A failure the
+ * run did not record is null — never an empty object that reads as one.
+ */
+function normalisedFailure(failure) {
+  if (!failure || typeof failure !== "object") return null;
+  return {
+    status: failure.status || "publication_failed",
+    category: failure.category || null,
+    message: failure.message || null,
+    publicationError: failure.publicationError || null,
+    attempts: Number.isFinite(Number(failure.attempts)) ? Number(failure.attempts) : null,
+    at: failure.at || null,
+    runId: failure.runId || null,
+  };
+}
+
 /** Stated with every stage-operations list so the counters are never read as a total. */
 export const STAGE_OPERATIONS_NOTE =
   "Stage counters describe successive stages of the same search and overlap — they are never added together.";
@@ -198,6 +216,10 @@ export function buildOptimiserRunEvidence({
   identity = {},
   currentDesignUnchanged = true,
   failureReason = null,
+  // A terminal failure that is not a design statement: a run whose result could
+  // not be PUBLISHED. Persisted with the run so the panel states the real cause
+  // and offers the retry, rather than a run that never ends.
+  failure = null,
   terminalOutcome = null,
   notes = [],
   baselineParity = null,
@@ -334,6 +356,8 @@ export function buildOptimiserRunEvidence({
     engineVersion: identity.engineVersion || null,
     // --- terminal outcome ---
     terminalOutcome: outcome,
+    // --- terminal failure, when the run ended in one ---
+    failure: normalisedFailure(failure),
     baselineParity: parityRecord,
     run: {
       runId: runIdentity?.runId || null,
@@ -343,6 +367,7 @@ export function buildOptimiserRunEvidence({
       terminal: true,
       completedAt: savedAt,
       outcome,
+      failure: normalisedFailure(failure),
       canonicalJobsRun: num(selection?.canonicalJobsRun
         ?? diagnostics?.canonicalJobsRun
         ?? diagnostics?.runtimeMetrics?.canonicalJobsRun),

@@ -286,8 +286,7 @@ export default function useRunOptimisationPlan({
       // ONE publication operation, however many snapshots genuinely need it: the
       // evaluated plan is published with the recommendation, and the fingerprint
       // the run itself would have used is preserved when it is a different one.
-      // A publication failure is not a run failure — the saved result stands.
-      await publishOptimiserRecommendation({
+      const publication = await publishOptimiserRecommendation({
         projectId,
         versionId,
         recommendation: result.recommendation,
@@ -297,6 +296,38 @@ export default function useRunOptimisationPlan({
         // under which it has always published.
         savedFingerprint: persistedPlan ? fingerprint : null,
       });
+
+      // ── A PUBLICATION THAT FAILED IS TERMINAL ──
+      // The run STOPS here. It never stays in flight, and it never polls: its own
+      // saved record states the failure — the run id, the failure status, its
+      // category, the publication error and the moment — so the panel can offer
+      // Retry ADI or the designer's own Keep current bass result.
+      //
+      // The evaluated result is kept EXACTLY as saved: nothing is discarded, the
+      // design is unchanged, and the failure travels with the record it belongs
+      // to. What could not be written is the published recommendation, and that
+      // is what the failure states.
+      if (!publication.ok) {
+        const failure = {
+          status: "publication_failed",
+          category: publication.failure?.category || "write_refused",
+          message: publication.failure?.message || "The optimiser result could not be saved.",
+          publicationError: publication.failure?.publicationError || publication.failure?.message || null,
+          attempts: publication.failure?.attempts ?? null,
+          at: publication.failure?.at || new Date().toISOString(),
+          runId: activeRun.runId,
+        };
+        recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
+        setOptimiserPlanAuthority(projectId, versionId, {
+          ...runRecord,
+          failure,
+          timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+          runtimeBreakdown,
+        });
+        setStatus("failed");
+        setError(failure.message);
+        return;
+      }
 
       // The UI-ready authority: the same record, now carrying the completed run
       // timings — including the publication and its retry count.

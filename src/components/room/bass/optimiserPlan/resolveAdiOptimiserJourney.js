@@ -44,6 +44,11 @@ export const ADI_OPTIMISER_JOURNEY_STATE = Object.freeze({
   BASELINE_MISMATCH: "baseline_mismatch",
   /** The run itself failed. A technical failure, never a design statement. */
   FAILED: "failed",
+  /**
+   * The run FINISHED its analysis but its result could not be SAVED. Terminal,
+   * and never presented as a run still in progress.
+   */
+  PUBLICATION_FAILED: "publication_failed",
 });
 
 /** The primary action offered for each state. */
@@ -77,6 +82,20 @@ export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
   [ADI_OPTIMISER_ACTION.CALCULATE]: BASELINE_PARITY_COPY.CTA,
 });
 
+/**
+ * A PUBLICATION THAT COULD NOT BE SAVED — the terminal statement and its two
+ * actions. The analysis DID finish; what failed is saving it. The designer is
+ * told exactly that, and is offered the retry or their own decision to keep the
+ * current bass result — which the failure has not changed.
+ */
+export const ADI_PUBLICATION_FAILURE_MESSAGE =
+  "ADI completed its analysis but could not save the result.";
+export const ADI_PUBLICATION_FAILURE_DETAIL =
+  "The current bass result is unchanged and remains the authoritative result for this design. "
+  + "Retry ADI to save the analysis, or keep the current bass result and carry on.";
+export const ADI_PUBLICATION_FAILURE_RETRY_LABEL = "RETRY ADI";
+export const ADI_PUBLICATION_FAILURE_KEEP_LABEL = "KEEP CURRENT BASS RESULT";
+
 export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: "Optimisation required",
   [ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED]: "Re-evaluation required",
@@ -88,6 +107,9 @@ export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_REQUIRED]: BASELINE_PARITY_COPY.MISSING_STATUS,
   [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_MISMATCH]: BASELINE_PARITY_COPY.MISMATCH_STATUS,
   [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: "Unable To Evaluate",
+  // The analysis finished; the result could not be saved. Stated for exactly
+  // what it is, so it is never confused with an evaluation that did not finish.
+  [ADI_OPTIMISER_JOURNEY_STATE.PUBLICATION_FAILED]: "Unable To Complete Optimisation",
 });
 
 /** Canonical journey copy. Plain professional language, every line actionable. */
@@ -263,13 +285,22 @@ export function resolveAdiOptimiserJourney({
   planView = null,
   limitingFactorSentence = null,
   blockReason = null,
+  // The terminal failure the run recorded when its result could not be published:
+  // { category, message, at }. Null for a run that finished and saved.
+  publicationFailure = null,
+  // True when the designer has already kept the current bass result for THIS
+  // failed run, so its failure is no longer held in front of them.
+  publicationFailureKept = false,
 } = {}) {
   const status = planView?.status || null;
   const lead = limitingFactorSentence ? `${limitingFactorSentence} ` : "";
   const canRun = !blockReason;
   const withLead = (text) => `${lead}${text}`.trim();
 
-  const build = (state, { message, explanation, notes = [], action = null, showPlan = false, canRunOverride = null }) => ({
+  const build = (state, {
+    message, explanation, notes = [], action = null, showPlan = false, canRunOverride = null,
+    primaryLabel = null, keepAction = null,
+  }) => ({
     state,
     statusLabel: ADI_OPTIMISER_STATUS_LABEL[state],
     message,
@@ -277,6 +308,13 @@ export function resolveAdiOptimiserJourney({
     notes,
     action,
     actionLabel: action ? ADI_OPTIMISER_ACTION_LABEL[action] : null,
+    // A state whose ONE control must be worded differently from the shared run
+    // label states it here — the retry after a failure. Null everywhere else, so
+    // every other state keeps the one shared wording.
+    primaryLabel,
+    // The designer's own alternative to the primary action, when the state has
+    // one. Null everywhere else.
+    keepAction,
     showPlan,
     canRun: canRunOverride == null ? canRun : canRunOverride,
     blockReason,
@@ -315,6 +353,25 @@ export function resolveAdiOptimiserJourney({
       explanation: null,
       notes: [],
       action: ADI_OPTIMISER_ACTION.RERUN,
+    });
+  }
+
+  // ── 3a. THE RUN FINISHED, BUT ITS RESULT COULD NOT BE SAVED ──
+  // Terminal, and stated as what it is: the analysis completed, the save did
+  // not. The run is never presented as still in progress, and the designer is
+  // given the retry and their own "keep" — the current bass result is unchanged
+  // either way. Checked before every completed-result state, because this is the
+  // record that failed to publish.
+  if (publicationFailure && !publicationFailureKept) {
+    return build(ADI_OPTIMISER_JOURNEY_STATE.PUBLICATION_FAILED, {
+      message: ADI_PUBLICATION_FAILURE_MESSAGE,
+      explanation: ADI_PUBLICATION_FAILURE_DETAIL,
+      notes: [],
+      // RETRY ADI runs the same optimiser again: the one action that can save it.
+      action: ADI_OPTIMISER_ACTION.RERUN,
+      primaryLabel: ADI_PUBLICATION_FAILURE_RETRY_LABEL,
+      keepAction: { label: ADI_PUBLICATION_FAILURE_KEEP_LABEL },
+      showPlan: false,
     });
   }
 

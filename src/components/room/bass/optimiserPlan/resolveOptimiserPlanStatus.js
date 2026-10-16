@@ -184,6 +184,10 @@ export function resolveOptimiserPlanStatus({
       evidenceMessage: null,
       recordKind: plan.recordKind || null,
       terminalOutcome,
+      // Why the run ended, when it ended in a failure that must be stated:
+      // { status, category, message, publicationError, at }. Null for a run that
+      // finished and saved.
+      failure: plan.failure || plan.run?.failure || null,
       baselineParity: savedBaselineParity(plan),
       run: plan.run || null,
       planVersion: savedVersion,
@@ -337,6 +341,9 @@ export function resolveOptimiserPlanStatus({
     evidenceMessage: null,
     recordKind: plan.recordKind || OPTIMISER_RECORD_KIND.PLAN,
     terminalOutcome: null,
+    // A publication the run could not complete travels with the record it belongs
+    // to, so the panel states the failure rather than a silent success.
+    failure: plan.failure || plan.run?.failure || null,
     run: plan.run || null,
     planVersion: savedVersion,
     projectId: plan.projectId || null,

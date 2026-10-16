@@ -176,7 +176,14 @@ export function buildOptimiserRunProgress({
     || liveStatus === "complete";
   const terminal = !running || runStatus === "failed" || liveTerminal;
 
-  const startedAtMs = Date.parse(run?.startedAt || "") || live?.startedAtMs || null;
+  // ── THE CURRENT RUN'S OWN CLOCK, AND NOTHING ELSE ──
+  // The run's own start is the authority whenever it has one. The engine's
+  // progress store is a SEPARATE authority that a new run does not reset, so its
+  // timestamps may only be read when they belong to THIS run: anything reported
+  // before this run started belongs to the run it replaced.
+  const runStartedAtMs = Date.parse(run?.startedAt || "") || null;
+  const engineStartedAtMs = Number.isFinite(Number(live?.startedAtMs)) ? Number(live.startedAtMs) : null;
+  const startedAtMs = runStartedAtMs ?? engineStartedAtMs;
   const elapsedSeconds = startedAtMs == null || !running || runStatus === "failed"
     ? null
     : Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
@@ -202,7 +209,13 @@ export function buildOptimiserRunProgress({
     ? `${jobsCompleted} of ${jobsTotal} evaluation jobs complete`
     : null;
 
-  const lastProgressAtMs = live?.lastProgressAt || live?.startedAtMs || startedAtMs || null;
+  // A run that has not reported progress yet has been waiting since IT started —
+  // never since the previous run's last report. A fresh run therefore reads
+  // "0 seconds", not the age of the run it replaced.
+  const engineProgressAtMs = Number.isFinite(Number(live?.lastProgressAt)) ? Number(live.lastProgressAt) : null;
+  const lastProgressAtMs = runStartedAtMs != null && engineProgressAtMs != null
+    ? Math.max(engineProgressAtMs, runStartedAtMs)
+    : (engineProgressAtMs ?? startedAtMs);
   const secondsSinceProgress = lastProgressAtMs != null && running
     ? Math.max(0, Math.floor((nowMs - lastProgressAtMs) / 1000))
     : null;
@@ -288,7 +301,13 @@ export function describeOptimiserStatusCheck({
     };
   }
 
-  const current = live?.lastProgressAt || live?.startedAtMs || null;
+  // The same rule as the card: progress that predates this run belongs to the run
+  // it replaced, so the check never reports an earlier run's inactivity.
+  const runStartedAtMs = Date.parse(run?.startedAt || "") || null;
+  const reported = Number.isFinite(Number(live?.lastProgressAt)) ? Number(live.lastProgressAt) : null;
+  const current = runStartedAtMs != null && reported != null
+    ? Math.max(reported, runStartedAtMs)
+    : (reported ?? (Number.isFinite(Number(live?.startedAtMs)) ? Number(live.startedAtMs) : null));
   const newProgress = current != null
     && (previousLastProgressAt == null || current > previousLastProgressAt);
   const stage = resolveOptimiserRunningStage({ state: live, running: true });

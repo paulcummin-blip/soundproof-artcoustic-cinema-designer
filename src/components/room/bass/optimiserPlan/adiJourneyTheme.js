@@ -64,6 +64,15 @@ export const STATE_THEME = {
     icon: AlertTriangle,
     iconColor: "#B91C1C",
   },
+  // The analysis finished; saving it did not. The same technical-failure tone as
+  // a failed run, because it is one — the difference is stated in the words.
+  [ADI_OPTIMISER_JOURNEY_STATE.PUBLICATION_FAILED]: {
+    pill: { background: "#B91C1C", color: "#FFFFFF" },
+    border: "#F0C9C9",
+    background: "#FDF2F2",
+    icon: AlertTriangle,
+    iconColor: "#B91C1C",
+  },
 };
 
 export const PRESENTATION_THEME_KEY = Object.freeze({

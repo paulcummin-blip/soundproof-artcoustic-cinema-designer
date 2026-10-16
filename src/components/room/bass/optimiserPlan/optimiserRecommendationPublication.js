@@ -34,7 +34,11 @@
 // ---------------------------------------------------------------------------
 
 import { publishRecommendation } from "@/components/recommendationEngine";
-import { getPublicationAttempts } from "@/components/recommendationEngine/recommendationPersistence";
+import {
+  PUBLICATION_FAILURE_CATEGORY,
+  getPublicationAttempts,
+  getPublicationFailure,
+} from "@/components/recommendationEngine/recommendationPersistence";
 import {
   RUN_TIMING,
   recordPublicationRetries,
@@ -137,5 +141,28 @@ export async function publishOptimiserRecommendation({
     results.push({ fingerprint: write.fingerprint, withPlan: write.withPlan === true, persisted: persisted === true });
   }
 
-  return { ...decision, results };
+  // ── DID THE PUBLICATION ACTUALLY HAPPEN? ──
+  // The record is the authority: a write that did not persist is a FAILURE the
+  // run must state, never a silent success. The run's own timing milestone is
+  // still recorded above, so a refused publication is diagnosable from the
+  // record it could not write.
+  //
+  // Nothing to publish (no fingerprint) is complete by definition, not failed.
+  const refused = results.find((entry) => entry.persisted !== true) || null;
+  const recorded = refused ? getPublicationFailure(projectId, versionId) : null;
+
+  return {
+    ...decision,
+    results,
+    ok: !refused,
+    failure: refused
+      ? {
+        category: recorded?.category || PUBLICATION_FAILURE_CATEGORY.WRITE_REFUSED,
+        message: recorded?.message || "The optimiser result could not be saved.",
+        publicationError: recorded?.error || recorded?.message || null,
+        attempts: recorded?.attempts ?? null,
+        at: recorded?.at || new Date().toISOString(),
+      }
+      : null,
+  };
 }

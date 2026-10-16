@@ -69,6 +69,14 @@ export function beginOptimiserRun(projectId, versionId) {
   const run = {
     runId,
     startedAt,
+    // ── THIS RUN'S OWN CLOCK BEGINS HERE ──
+    // A new run never inherits a timestamp from the run it replaced. The engine's
+    // own progress store is a SEPARATE authority that starting a run does not
+    // reset, so these are minted with the run and every displayed duration is
+    // derived from them: the panel can never state a run's age, or the time since
+    // its last progress, that belongs to an earlier run.
+    lastProgressAt: startedAt,
+    currentStageStartedAt: startedAt,
     // Durable provenance for the record this run eventually saves. Prefer the
     // prior record's own persisted run id; fall back to the latest in-memory run
     // when the older record predates durable run identity.

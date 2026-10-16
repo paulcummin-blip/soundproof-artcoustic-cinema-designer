@@ -46,8 +46,13 @@ import {
   ADI_BASS_OPTIMISER_LABEL,
   ADI_OPTIMISER_ACTION,
   ADI_OPTIMISER_JOURNEY_STATE,
+  ADI_PUBLICATION_FAILURE_KEEP_LABEL,
   resolveAdiOptimiserJourney,
 } from "./resolveAdiOptimiserJourney.js";
+import {
+  keepCurrentBassResult,
+  useCurrentBassResultKept,
+} from "./optimiserPublicationFailureStore.js";
 import {
   OPTIMISER_OUTCOME,
   OPTIMISER_PRESENTATION_ACTION,
@@ -184,10 +189,22 @@ export default function AdiOptimisationJourney({
   // record of the run is gone.
   const persistedAppliedCalibration = useAppliedCalibrationAuthority(projectId, versionId);
 
+  // ── A RUN WHOSE RESULT COULD NOT BE SAVED ──
+  // The failure the run recorded, and the designer's own acknowledgement of it.
+  // Both are read from the record and from the run that record belongs to, so the
+  // panel states the failure of the run that actually failed — never a newer
+  // run's state, and never a failure it cannot attribute.
+  const publicationFailure = planView?.failure || null;
+  const failedRunId = planView?.failure?.runId || planView?.run?.runId || null;
+  const publicationFailureKept = useCurrentBassResultKept({ projectId, versionId, runId: failedRunId });
+  const publicationFailureActive = Boolean(publicationFailure) && !publicationFailureKept;
+
   const resolved = resolveAdiOptimiserJourney({
     planView,
     limitingFactorSentence,
     blockReason: runBlockReason,
+    publicationFailure,
+    publicationFailureKept,
   });
 
   // The canonical presentation state owns the pill, the headline, the
@@ -203,7 +220,12 @@ export default function AdiOptimisationJourney({
   const parityStatus = planView?.baselineParity?.status || null;
   const parityBlocked = parityStatus === "MISSING" || parityStatus === "MISMATCH" || parityStatus === "UNKNOWN";
 
-  const journey = presentation && !parityBlocked
+  // A publication failure the designer has not yet acknowledged IS the panel's
+  // state: it is resolved before the presentation state, so a copy that describes
+  // the run as evaluated can never override the failure that stopped it.
+  const journey = publicationFailureActive
+    ? resolved
+    : presentation && !parityBlocked
     ? {
       ...resolved,
       state: presentationThemeState(presentation.state) || resolved.state,
@@ -400,7 +422,8 @@ export default function AdiOptimisationJourney({
   // result yet", "the design has changed" and "a re-test is genuinely required",
   // and this state is none of them. Read from the outcome authority, so the
   // trade-off, the physical move and every retry state keep their own controls.
-  const improvementOwnsPanel = presentation?.outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
+  const improvementOwnsPanel = !publicationFailureActive
+    && presentation?.outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
 
   const showAction = !!journey.action && journey.canRun && !isRunning
     && !tradeOffActive && !tradeOffSettled
@@ -932,9 +955,9 @@ export default function AdiOptimisationJourney({
           className={runIsPrimary ? ADI_RUN_PRIMARY_CLASS : ADI_RUN_SECONDARY_CLASS}
         >
           <Sparkles className="h-3.5 w-3.5" />
-          {optimiserRunOwnsRetry && journey.action !== ADI_OPTIMISER_ACTION.CALCULATE
+          {journey.primaryLabel || (optimiserRunOwnsRetry && journey.action !== ADI_OPTIMISER_ACTION.CALCULATE
             ? OPTIMISER_RETEST_LABEL
-            : journey.actionLabel}
+            : journey.actionLabel)}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
 
@@ -949,6 +972,39 @@ export default function AdiOptimisationJourney({
         {retestOwnsPrimary && reoptimiseDisabledReason && (
           <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{reoptimiseDisabledReason}</div>
         )}
+        </div>
+      )}
+
+      {/* THE FAILED PUBLICATION'S OWN SECOND ACTION — the designer's decision,
+          beside the retry. Keeping the current bass result changes nothing (a
+          refused publication changed nothing): it simply stops the failure being
+          held in front of the designer for THIS run. It writes no design value,
+          no bass result and no publication. */}
+      {publicationFailureActive && (
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={() => keepCurrentBassResult(projectId, versionId, failedRunId)}
+            data-adi-keep-current-bass="true"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[12px] font-medium text-[#625143] transition-colors hover:text-[#213428]"
+          >
+            {ADI_PUBLICATION_FAILURE_KEEP_LABEL}
+          </button>
+          <div className="text-[11px] text-[#625143] leading-relaxed">
+            The current bass result stands either way. Keeping it stops this notice being
+            shown again for this run.
+          </div>
+        </div>
+      )}
+
+      {/* THE DESIGNER KEPT THE CURRENT BASS RESULT after a failed publication.
+          Stated once, calmly: the failure is acknowledged, the current bass result
+          is the authority, and the failure itself stays in the saved record and in
+          Engineer details. */}
+      {publicationFailure && publicationFailureKept && (
+        <div className="text-[11px] text-[#625143] leading-relaxed" data-adi-publication-kept="true">
+          ADI could not save its analysis for this run. The current bass result is unchanged and
+          remains the authority.
         </div>
       )}
 

@@ -25,15 +25,26 @@
 // ---------------------------------------------------------------------------
 
 import { OPTIMISER_TERMINAL_OUTCOME } from "./optimiserPlanConstants.js";
-import { OPTIMISER_PLAN_RUN_BLOCK } from "./resolveAdiOptimiserJourney.js";
+import {
+  ADI_PUBLICATION_FAILURE_DETAIL,
+  ADI_PUBLICATION_FAILURE_KEEP_LABEL,
+  ADI_PUBLICATION_FAILURE_MESSAGE,
+  ADI_PUBLICATION_FAILURE_RETRY_LABEL,
+  OPTIMISER_PLAN_RUN_BLOCK,
+} from "./resolveAdiOptimiserJourney.js";
 
-/** The five reasons a run can fail to complete. */
+/** The reasons a run can fail to reach a saved result. */
 export const OPTIMISER_FAILURE_CODE = Object.freeze({
   BASELINE_NOT_VALIDATED: "baseline_not_validated",
   BASS_NOT_CALCULATED: "bass_not_calculated",
   BASS_STALE: "bass_stale",
   WORKER_FAILED: "worker_failed",
   EVIDENCE_MISSING: "evidence_missing",
+  /**
+   * The analysis finished and could not be SAVED. A technical failure of the
+   * save, not of the evaluation, so it is stated — and answered — by itself.
+   */
+  PUBLICATION_FAILED: "publication_failed",
 });
 
 /** Which flow the one button runs: the bass calculation, or the optimiser. */
@@ -94,6 +105,19 @@ export const OPTIMISER_FAILURE_COPY = Object.freeze({
     nextAction: "Recalculate Bass Performance before running the optimiser.",
     actionLabel: "Recalculate Bass Performance",
     fix: OPTIMISER_FAILURE_FIX.BASS_CALCULATION,
+  },
+  /**
+   * THE ANALYSIS FINISHED; THE RESULT COULD NOT BE SAVED. The TWO actions are
+   * the retry and the designer's own decision to keep the current bass result:
+   * the failure changed no design value, so carrying on is a real option, and
+   * the panel never leaves the failure without a way forward.
+   */
+  [OPTIMISER_FAILURE_CODE.PUBLICATION_FAILED]: {
+    reason: ADI_PUBLICATION_FAILURE_MESSAGE,
+    nextAction: `${ADI_PUBLICATION_FAILURE_DETAIL}`,
+    actionLabel: ADI_PUBLICATION_FAILURE_RETRY_LABEL,
+    keepActionLabel: ADI_PUBLICATION_FAILURE_KEEP_LABEL,
+    fix: OPTIMISER_FAILURE_FIX.OPTIMISER_RUN,
   },
   /**
    * A genuine technical failure. The reason is replaced with the real one the
@@ -158,12 +182,20 @@ export function resolveOptimiserFailureCode({
   runBlockCode = null,
   baselineInvalid = false,
   recordedReasons = [],
+  // The failure category the run itself recorded. A publication failure is the
+  // run's own stated cause and is read before any inference about the run.
+  failureCategory = null,
   // True only when this persisted record carries the id and evidence contract
   // minted by the current run lifecycle. A legacy record has neither.
   currentRunRecord = false,
 } = {}) {
   if (runBlockCode && BLOCK_HANDLED_ELSEWHERE.includes(runBlockCode)) return null;
   if (runBlockCode && BLOCK_REASON[runBlockCode]) return BLOCK_REASON[runBlockCode];
+  // A failure the run RECORDED is stated as itself. This comes before every
+  // inference: the run already knows why it could not finish.
+  if (failureCategory === OPTIMISER_FAILURE_CODE.PUBLICATION_FAILED) {
+    return OPTIMISER_FAILURE_CODE.PUBLICATION_FAILED;
+  }
   if (runBlockCode === OPTIMISER_PLAN_RUN_BLOCK.WORKER_FAILED) return OPTIMISER_FAILURE_CODE.WORKER_FAILED;
   if (runStatus === "failed" || terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.FAILED) {
     return OPTIMISER_FAILURE_CODE.WORKER_FAILED;
