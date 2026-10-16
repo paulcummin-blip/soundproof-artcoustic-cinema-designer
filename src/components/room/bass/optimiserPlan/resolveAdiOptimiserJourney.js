@@ -24,7 +24,7 @@
 // and a run-block reason and returns copy.
 // ---------------------------------------------------------------------------
 
-import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
+import { OPTIMISER_FAILURE_STATUS, OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
 import {
   BASELINE_PARITY_COPY,
   BASELINE_PARITY_STATUS,
@@ -95,6 +95,20 @@ export const ADI_PUBLICATION_FAILURE_DETAIL =
   + "Retry ADI to save the analysis, or keep the current bass result and carry on.";
 export const ADI_PUBLICATION_FAILURE_RETRY_LABEL = "RETRY ADI";
 export const ADI_PUBLICATION_FAILURE_KEEP_LABEL = "KEEP CURRENT BASS RESULT";
+
+/**
+ * THE PLAN COULD NOT BE SAVED — the optimiser's own real failure.
+ *
+ * The analysis finished and the result is what is missing, so the failure is
+ * stated for exactly what it is and answered by the same two actions. Records
+ * written before the publication became secondary carry the legacy wording above
+ * and are never rewritten.
+ */
+export const ADI_PLAN_SAVE_FAILURE_MESSAGE =
+  "ADI finished its analysis but could not save the optimiser plan for this design.";
+export const ADI_PLAN_SAVE_FAILURE_DETAIL =
+  "The current bass result is unchanged and remains the authoritative result for this design. "
+  + "Retry ADI to save the plan, or keep the current bass result and carry on.";
 
 export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: "Optimisation required",
@@ -363,9 +377,16 @@ export function resolveAdiOptimiserJourney({
   // either way. Checked before every completed-result state, because this is the
   // record that failed to publish.
   if (publicationFailure && !publicationFailureKept) {
+    // WHICH failure this is: the plan could not be SAVED (the optimiser's own
+    // real failure, which the run records and persists), or a record written
+    // before the recommendation publication became secondary. Both are stated
+    // with the same two actions; only the wording differs, so the panel never
+    // claims an analysis completed when it did not.
+    const planSaveFailed =
+      publicationFailure.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED;
     return build(ADI_OPTIMISER_JOURNEY_STATE.PUBLICATION_FAILED, {
-      message: ADI_PUBLICATION_FAILURE_MESSAGE,
-      explanation: ADI_PUBLICATION_FAILURE_DETAIL,
+      message: planSaveFailed ? ADI_PLAN_SAVE_FAILURE_MESSAGE : ADI_PUBLICATION_FAILURE_MESSAGE,
+      explanation: planSaveFailed ? ADI_PLAN_SAVE_FAILURE_DETAIL : ADI_PUBLICATION_FAILURE_DETAIL,
       notes: [],
       // RETRY ADI runs the same optimiser again: the one action that can save it.
       action: ADI_OPTIMISER_ACTION.RERUN,

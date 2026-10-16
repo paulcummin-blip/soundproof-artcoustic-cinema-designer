@@ -11,9 +11,13 @@
 //      when the bass engine is ready)
 //   2. runs the EXISTING optimiser (runOptimisation) against that design
 //   3. builds and saves the evaluated plan into the ADI Optimisation Plan
-//      persistence layer — the in-memory authority (which project autosave
-//      writes into the version's design_state) and the published
-//      recommendation payload
+//      persistence layer — the in-memory authority, which project autosave writes
+//      into the version's design_state. THE SAVED PLAN IS THE TERMINAL BOUNDARY:
+//      the run is finished for the designer at that instant.
+//   4. publishes the recommendation as SECONDARY background work, after that
+//      boundary. Its outcome is recorded as its own diagnostic and can never hold
+//      the terminal card, turn a saved plan into a failed run, or affect the bass
+//      authority, the reports or the ability to carry on designing.
 //
 // What it never does: accept a recommendation, apply calibration, or write
 // placement, delay, gain or polarity. The design is unchanged unless the
@@ -46,7 +50,11 @@ import {
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
 import { persistOptimiserRunHistory } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
-import { publishOptimiserRecommendation } from "@/components/room/bass/optimiserPlan/optimiserRecommendationPublication.js";
+import {
+  buildRecommendationPublicationRecord,
+  publishOptimiserRecommendation,
+} from "@/components/room/bass/optimiserPlan/optimiserRecommendationPublication.js";
+import { OPTIMISER_FAILURE_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 
 export default function useRunOptimisationPlan({
   projectId,
@@ -110,9 +118,12 @@ export default function useRunOptimisationPlan({
           || live?.currentFingerprint || null,
         startedAt: activeRun.startedAt,
         planSavedAt: runTimingAt(timings, RUN_TIMING.SAVE_COMPLETED),
+        // THE DESIGNER'S OWN TERMINAL INSTANT — the saved plan. The secondary
+        // publication that follows it is recorded separately and never moves it.
+        userTerminalAt: runTimingAt(timings, RUN_TIMING.USER_TERMINAL),
+        terminalAt: runTimingAt(timings, RUN_TIMING.USER_TERMINAL) || new Date().toISOString(),
         publicationStartedAt: runTimingAt(timings, RUN_TIMING.PUBLICATION_STARTED),
         publicationCompletedAt: runTimingAt(timings, RUN_TIMING.PUBLICATION_COMPLETED),
-        terminalAt: new Date().toISOString(),
         publicationAttemptCount: Number.isFinite(timings?.publicationRetries)
           ? timings.publicationRetries
           : 0,
@@ -139,6 +150,22 @@ export default function useRunOptimisationPlan({
         },
         baselineParity: extra.baselineParity || null,
         failureReason: reason,
+        // THE PLAN COULD NOT BE SAVED. This is a real optimiser failure and it is
+        // recorded as itself — the analysis produced no result that could be saved
+        // for this design — with the two actions that answer it (retry, or keep
+        // the current bass result). It is persisted WITH the record, so a reload
+        // restores this same terminal state instead of rebuilding another one.
+        failure: extra.planSaveFailed
+          ? {
+            status: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+            category: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+            message: reason,
+            publicationError: null,
+            attempts: null,
+            at: new Date().toISOString(),
+            runId: activeRun.runId,
+          }
+          : null,
         runIdentity: activeRun,
       });
       if (evidence) setOptimiserPlanAuthority(projectId, versionId, evidence);
@@ -315,7 +342,9 @@ export default function useRunOptimisationPlan({
 
       if (!persistedPlan && !runEvidence) {
         const reason = "The optimiser returned no usable result for this design. Re-run the Optimisation Plan.";
-        saveRunFailure(reason);
+        // The evaluated result could not be saved: the one failure the optimiser
+        // still owns, and the only one that may state itself as a failed run.
+        saveRunFailure(reason, { planSaveFailed: true });
         logRunHistory({
           terminalStatus: "evaluation_incomplete",
           publicationStatus: "not_attempted",
@@ -326,10 +355,12 @@ export default function useRunOptimisationPlan({
         return;
       }
 
-      // ── THE SAVE, THEN THE ONE PUBLICATION ──
-      // The record is saved first, exactly as before, so the result is durable
-      // the moment the run has a verdict. Its own run timing ledger travels with
-      // it, and is completed once the publication has finished.
+      // ── 1. THE SAVE — AND THE DESIGNER'S TERMINAL BOUNDARY ──
+      // The saved plan IS the result. The moment this write lands the run has a
+      // verdict the designer can read and act on, and the terminal card is
+      // rendered from THIS record. Nothing below this boundary may hold the UI:
+      // the recommendation publication is secondary work that happens after the
+      // designer already has the result.
       recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
       const runRecord = persistedPlan || runEvidence;
       // The engine's own existing runtime telemetry, in the budget's named stages,
@@ -341,14 +372,31 @@ export default function useRunOptimisationPlan({
       });
       setOptimiserPlanAuthority(projectId, versionId, {
         ...runRecord,
-        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
         runtimeBreakdown,
       });
       recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
 
-      // ONE publication operation, however many snapshots genuinely need it: the
-      // evaluated plan is published with the recommendation, and the fingerprint
-      // the run itself would have used is preserved when it is a different one.
+      // ── 2. THE TERMINAL AUTHORITY, WRITTEN AT PLAN SAVE ──
+      // The run is terminal here — from its own durable plan, never from a
+      // publication that has not happened yet. `userTerminalAt` is this instant,
+      // and it never waits for the secondary publication below.
+      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
+      recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
+      setOptimiserPlanAuthority(projectId, versionId, {
+        ...runRecord,
+        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+        runtimeBreakdown,
+      });
+      setStatus("complete");
+
+      // ── 3. THE RECOMMENDATION PUBLICATION — SECONDARY, NEVER BLOCKING ──
+      // ONE publication operation per run, exactly as before, and exactly one
+      // chain of attempts for one project · version · run · design fingerprint ·
+      // result fingerprint. It runs AFTER the terminal boundary above, so it can
+      // never hold the designer's card, and its outcome is recorded as its own
+      // secondary diagnostic: a refused publication does not turn a saved,
+      // validated optimiser plan into a failed run. The current bass result, the
+      // reports and the ability to carry on designing are untouched either way.
       const publication = await publishOptimiserRecommendation({
         projectId,
         versionId,
@@ -360,69 +408,31 @@ export default function useRunOptimisationPlan({
         savedFingerprint: persistedPlan ? fingerprint : null,
       });
 
-      // ── A PUBLICATION THAT FAILED IS TERMINAL ──
-      // The run STOPS here. It never stays in flight, and it never polls: its own
-      // saved record states the failure — the run id, the failure status, its
-      // category, the publication error and the moment — so the panel can offer
-      // Retry ADI or the designer's own Keep current bass result.
-      //
-      // The evaluated result is kept EXACTLY as saved: nothing is discarded, the
-      // design is unchanged, and the failure travels with the record it belongs
-      // to. What could not be written is the published recommendation, and that
-      // is what the failure states.
-      if (!publication.ok) {
-        const failure = {
-          status: "publication_failed",
-          category: publication.failure?.category || "write_refused",
-          message: publication.failure?.message || "The optimiser result could not be saved.",
-          publicationError: publication.failure?.publicationError || publication.failure?.message || null,
-          attempts: publication.failure?.attempts ?? null,
-          at: publication.failure?.at || new Date().toISOString(),
-          runId: activeRun.runId,
-        };
-        recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
-        setOptimiserPlanAuthority(projectId, versionId, {
-          ...runRecord,
-          failure,
-          timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
-          runtimeBreakdown,
-        });
-        logRunHistory({
-          terminalStatus: "publication_failed",
-          publicationStatus: "refused",
-          publicationError: failure.publicationError || failure.message,
-          // The attempt count the record itself reported, when it reported one:
-          // the ledger's own count otherwise.
-          ...(failure.attempts != null ? { publicationAttemptCount: failure.attempts } : {}),
-          fingerprintsPublished: [],
-          runtimeBreakdown,
-        });
-        setStatus("failed");
-        setError(failure.message);
-        return;
-      }
+      const recommendationPublication = buildRecommendationPublicationRecord({
+        publication,
+        runId: activeRun.runId,
+      });
 
-      // The UI-ready authority: the same record, now carrying the completed run
-      // timings — including the publication and its retry count.
-      recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
+      // ONE further write — after the terminal boundary, caused once by the
+      // publication and never repeated — carrying what it did. It changes no
+      // result, no design value and no readiness of anything: a reload restores
+      // the same terminal state, with the publication's outcome beside it.
       setOptimiserPlanAuthority(projectId, versionId, {
         ...runRecord,
         timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
         runtimeBreakdown,
+        recommendationPublication,
       });
 
       logRunHistory({
         terminalStatus: persistedPlan ? "actionable_plan" : "no_useful_improvement",
-        publicationStatus: "published",
+        publicationStatus: recommendationPublication.status,
+        publicationError: recommendationPublication.error,
         // The fingerprints the publication actually wrote, from its own result —
         // diagnostic identity only.
-        fingerprintsPublished: (publication.results || [])
-          .map((entry) => entry.fingerprint)
-          .filter(Boolean),
+        fingerprintsPublished: recommendationPublication.fingerprints,
         runtimeBreakdown,
       });
-
-      setStatus("complete");
     } catch (err) {
       const reason = err?.message || "The optimiser could not complete. Re-run the Optimisation Plan.";
       saveRunFailure(reason);
