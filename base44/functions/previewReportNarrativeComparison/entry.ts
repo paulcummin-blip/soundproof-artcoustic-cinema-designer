@@ -5,6 +5,9 @@ import { buildProjectInterpretation, formatInterpretationForPrompt } from '../..
 import { buildEngineeringEvidence, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProposalWritingAuthority } from '../../shared/soundProofWritingAuthority.js';
 import {
+  NATURAL_ALOUD_RULE,
+  NATURAL_PRINCIPLE_EXPLANATION_RULE,
+  NATURAL_SELECTION_RULE,
   NATURAL_WRITING_STANDARD_VERSION,
   NATURAL_VOICE_RULE,
   NATURAL_SENTENCE_RULE,
@@ -60,7 +63,7 @@ const MIN_DESIGN_INTENT_WORDS = 150;
 // Nothing here is a second writing system, and nothing here changes a fact,
 // a figure, a level, a product, a highlight or the production model.
 const REFINED_SEQUENCE = Object.freeze([
-  '1. Open with the recommendation itself, stated as our own professional judgement.',
+  '1. Open on the design itself: name the cinema and explain why this approach is right for this room, as the designer\'s own judgement. Never announce a recommendation and never open on a formulaic phrase.',
   '2. Explain how the room, the picture, the seating and the loudspeaker system work together.',
   '3. Communicate the experience the design is built to deliver.',
   '4. Explain the benefit of each important design decision in the client\'s own terms.',
@@ -78,9 +81,14 @@ function buildRefinedDirection() {
     `=== EDITORIAL DIRECTION (Sound Proof natural writing standard v${NATURAL_WRITING_STANDARD_VERSION}, applied to the Project Report) ===`,
     NATURAL_VOICE_RULE,
     NATURAL_SENTENCE_RULE,
+    // The natural language refinement: how many things are explained, the register
+    // the copy is written in, and how confidently a principle is explained.
+    NATURAL_SELECTION_RULE,
+    NATURAL_ALOUD_RULE,
+    NATURAL_PRINCIPLE_EXPLANATION_RULE,
     NATURAL_RECOMMENDATION_RULE,
     'The Design Intent and the five highlight explanations are read as ONE document: never describe the same benefit in the same words twice, and never restate the opening as the close. A repeated idea is acceptable only where it adds a genuinely different aspect of the design.',
-    NATURAL_WRITING_REVIEW[0],
+    ...NATURAL_WRITING_REVIEW,
     '',
     'THE WRITING SEQUENCE (for the Design Intent)',
     ...REFINED_SEQUENCE,

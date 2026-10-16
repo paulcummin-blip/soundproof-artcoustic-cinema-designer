@@ -201,8 +201,13 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   });
 
   it('is the natural-writing generation, with the contract unchanged', () => {
-    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-25');
+    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-26');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
+    // The natural language refinement reaches the prompt the writer is really
+    // called with, so the refinement is not merely documented.
+    for (const rule of [NATURAL_SELECTION_RULE, NATURAL_ALOUD_RULE, NATURAL_PRINCIPLE_EXPLANATION_RULE]) {
+      expect(prompt).toContain(rule);
+    }
     // The prompt carries the input it was built from, so a historical input is
     // still written under the generation it was filed under.
     expect(prompt).toContain(saved.input.prompt_version);
