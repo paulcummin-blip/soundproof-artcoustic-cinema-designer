@@ -16,7 +16,7 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
-import ComparisonQualityBadges from "@/components/spl/ComparisonQualityBadges";
+import { planCompetitorImport, applyCompetitorImport } from "@/components/utils/spl/competitorSpreadsheetImport";
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 
 const BRAND = {
@@ -447,6 +447,7 @@ export default function SPLCalculatorPage() {
   const [importPreview, setImportPreview] = useState([]);
   const [importFileName, setImportFileName] = useState("");
   const [importStatus, setImportStatus] = useState("");
+  const [importing, setImporting] = useState(false);
   const [loadingCompetitors, setLoadingCompetitors] = useState(true);
 
   useEffect(() => {
@@ -456,9 +457,7 @@ export default function SPLCalculatorPage() {
   const loadCompetitors = useCallback(async () => {
     setLoadingCompetitors(true);
     try {
-      // The comparison list is built from the admin Speaker Database — the source
-      // of truth. Each candidate is mapped and normalised with the same code the
-      // RP22 engine consumes, so the options can never disagree with the grades.
+      // Excel imports and database records share one candidate and grading path.
       const candidates = await loadComparisonCandidates({ includeUnpublished: canManageCompetitors });
       setCompetitorRows(candidates);
       setSelectedCompetitorIds((prev) => prev.filter((id) => candidates.some((c) => c.id === id)));
@@ -670,11 +669,19 @@ export default function SPLCalculatorPage() {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const headers = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] || [];
+      if (!headers.some(h => ["Manufacturer", "manufacturer", "Brand", "brand"].includes(h)) || !headers.some(h => ["Model", "model"].includes(h))) {
+        throw new Error("First row must contain Manufacturer and Model headers. Upload the prepared specifications sheet, not the link collection list.");
+      }
       const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
       const normalized = rawRows.map(normalizeImportedRow).filter((r) => r.record.manufacturer || r.record.model);
-      setImportPreview(normalized);
+      if (!normalized.length) throw new Error("No speaker rows found.");
+      const existing = await base44.entities.CompetitorSpeaker.list("-created_date", 500);
+      if (existing.length >= 500) throw new Error("Library has reached 500 records. Import needs pagination before continuing.");
+      const plan = planCompetitorImport(normalized, existing);
+      setImportPreview(plan);
       const warningCount = normalized.reduce((sum, r) => sum + r.warnings.length, 0);
-      setImportStatus(`${normalized.length} rows ready · ${warningCount} validation warning${warningCount === 1 ? "" : "s"}`);
+      setImportStatus(`${plan.filter(r => r.action === "Add").length} to add · ${plan.filter(r => r.action === "Update").length} to update · ${warningCount} data notes`);
     } catch (error) {
       setImportPreview([]);
       setImportStatus(error?.message || "Could not read spreadsheet");
@@ -682,35 +689,21 @@ export default function SPLCalculatorPage() {
   };
 
   const applyImport = async () => {
-    const validRows = importPreview.filter((r) => r.record.manufacturer && r.record.model);
-    if (!validRows.length) return;
+    if (importing || !importPreview.length) return;
+    setImporting(true);
     setImportStatus("Applying import…");
     try {
       const existing = await base44.entities.CompetitorSpeaker.list("-created_date", 500);
-      // Approved rows published from the Speaker Database are the source of
-      // truth and are never deleted or overwritten by a spreadsheet import.
-      const preserved = (existing || []).filter((r) => r.publish_source === "speaker_database");
-      const replaceable = (existing || []).filter((r) => r.publish_source !== "speaker_database");
-      await Promise.all(replaceable.map((r) => base44.entities.CompetitorSpeaker.delete(r.id)));
-      const batch = new Date().toISOString();
-      for (const row of validRows) {
-        await base44.entities.CompetitorSpeaker.create({
-          ...row.record,
-          import_batch: batch,
-          publish_source: "spreadsheet",
-          published: true,
-          published_at: batch,
-        });
-      }
-      setImportStatus(
-        `Applied ${validRows.length} competitor speakers from ${importFileName}`
-        + (preserved.length ? ` · ${preserved.length} approved Speaker Database row${preserved.length === 1 ? "" : "s"} preserved` : ""),
-      );
+      if (existing.length >= 500) throw new Error("Library has reached 500 records. Import needs pagination before continuing.");
+      const plan = planCompetitorImport(importPreview, existing);
+      const result = await applyCompetitorImport(plan, base44.entities.CompetitorSpeaker, new Date().toISOString());
+      setImportStatus(`Added ${result.added} · updated ${result.updated} · other models kept`);
       setImportPreview([]);
-      setSelectedCompetitorIds([]);
       await loadCompetitors();
     } catch (error) {
-      setImportStatus(error?.message || "Import failed");
+      setImportStatus(`${error?.message || "Import failed"}. Some rows may have saved; retrying updates those models without duplicating them.`);
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -807,7 +800,7 @@ export default function SPLCalculatorPage() {
                 const candidate = candidateById.get(id);
                 const record = candidate?.record;
                 const item = competitorResults.find((x) => x.record.id === id);
-                const compShowDataNote = record && (shouldShowDataWarning(record) || shouldShowOpenBackWarning(record));
+                const compShowDataNote = record && shouldShowOpenBackWarning(record);
                 return (
                   <div key={`${id}-${index}`}>
                     <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gridTemplateRows: compShowDataNote ? "auto auto" : "auto", gap: "8px 12px", alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
@@ -818,8 +811,7 @@ export default function SPLCalculatorPage() {
                         </select>
                         {candidate && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                            <ComparisonQualityBadges confidence={candidate.confidence} label={candidate.badgeLabel} basis={candidate.basisLabel} tone={candidate.tone} />
-                            <span style={{ fontSize: 11, color: BRAND.hint }}>{candidate.statusLabel}</span>
+                            <span title="Open source data for the figures and assumptions used" style={{ fontSize: 11, fontWeight: 700, color: candidate.badgeLabel === "Good Data" ? "#213428" : "#9A6E00" }}>{candidate.badgeLabel}</span>
                           </div>
                         )}
                       </div>
@@ -831,31 +823,11 @@ export default function SPLCalculatorPage() {
                         {record && <SpeakerInfo rows={competitorInfoRows(record, item?.result, candidate)} sourceUrl={candidate?.sourceUrl || record.source_url} datasheetUrl={candidate?.datasheetUrl || record.datasheet_url} />}
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
-                      {compShowDataNote && <DataNote record={record} />}
+                      {compShowDataNote && <div style={{ gridColumn: "4 / 6", fontSize: 11, color: "#7A5C00" }}>Open-back design — installed results vary.</div>}
                     </div>
-                    {candidate?.assumptions?.length > 0 && (
-                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        Assumed: {candidate.assumptions.join(" · ")}
-                      </div>
-                    )}
-                    {record?.normalization_warnings?.length > 0 && (
-                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        Speaker specification needs confirmation
-                      </div>
-                    )}
-                    {candidate?.adiStatement && (
-                      <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        {candidate.adiStatement}
-                      </div>
-                    )}
-                    {candidate?.secondaryStatement && (
-                      <div style={{ padding: "5px 16px", fontSize: 12, color: "#9A6E00" }}>
-                        {candidate.secondaryStatement}
-                      </div>
-                    )}
                     {candidate?.classKey === "D" && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        Insufficient published data — no P12/P13 grade is produced for this speaker.
+                        Missing essential specifications — see source data.
                       </div>
                     )}
                   </div>
@@ -921,9 +893,9 @@ export default function SPLCalculatorPage() {
               <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
                 <label style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "9px 12px", cursor: "pointer", background: "#FFF", fontSize: 13 }}>
                   <Upload size={15} /> Upload Excel / CSV
-                  <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleImportFile(e.target.files?.[0])} style={{ display: "none" }} />
+                  <input type="file" disabled={importing} accept=".xlsx,.xls,.csv" onChange={(e) => handleImportFile(e.target.files?.[0])} style={{ display: "none" }} />
                 </label>
-                {importPreview.length > 0 && <button type="button" onClick={applyImport} style={{ border: 0, borderRadius: 9, padding: "10px 14px", background: BRAND.text, color: "#FFF", cursor: "pointer", fontSize: 13 }}>Apply import</button>}
+                {importPreview.length > 0 && <button type="button" disabled={importing} onClick={applyImport} style={{ border: 0, borderRadius: 9, padding: "10px 14px", background: BRAND.text, color: "#FFF", cursor: "pointer", fontSize: 13 }}>Apply import</button>}
                 <span style={{ color: BRAND.subtext, fontSize: 12 }}>{importStatus}</span>
               </div>
 
@@ -934,12 +906,12 @@ export default function SPLCalculatorPage() {
                       <div style={{ color: BRAND.hint }}>Row {row.rowNumber}</div>
                       <div>{row.record.manufacturer || "—"}</div>
                       <div>{row.record.model || "—"}</div>
-                      <div style={{ color: row.warnings.length ? "#7A1E19" : BRAND.subtext }}>{row.warnings.length ? row.warnings.join(" · ") : row.record.spl_authority}</div>
+                      <div style={{ color: row.warnings?.length ? "#7A1E19" : BRAND.subtext }}>{row.action} · {row.warnings?.length ? row.warnings.join(" · ") : row.record.spl_authority}</div>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>Legacy spreadsheet import — the admin Speaker Database is the source of truth for comparison speakers, so imported rows are not offered on this page. Applying an import replaces the legacy library after preview; rows published from the Speaker Database are never deleted or overwritten.</div>
+              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>Upload the prepared specifications sheet. Matching manufacturer/model records are updated; other models are kept. Excel values replace the comparison values for that model, including any published database snapshot. Blank cells clear that field. Prices are per speaker, including VAT. Website links are stored as sources, not automatically read.</div>
             </div>
           )}
         </div>
