@@ -31,8 +31,11 @@ import {
   GENERIC_CLAIM_PHRASES,
   MECHANICAL_OPENERS,
   MECHANICAL_OPENER_THRESHOLD,
+  NATURAL_ALOUD_RULE,
+  NATURAL_PRINCIPLE_EXPLANATION_RULE,
   NATURAL_RECOMMENDATION_RULE,
   NATURAL_REPETITION_RULE,
+  NATURAL_SELECTION_RULE,
   NATURAL_SENTENCE_RULE,
   NATURAL_VOICE_RULE,
   NATURAL_WRITING_REVIEW,
@@ -70,6 +73,9 @@ const NEW_CODES = [
 const STANDARD_TEXT = [
   NATURAL_VOICE_RULE,
   NATURAL_SENTENCE_RULE,
+  NATURAL_SELECTION_RULE,
+  NATURAL_ALOUD_RULE,
+  NATURAL_PRINCIPLE_EXPLANATION_RULE,
   NATURAL_RECOMMENDATION_RULE,
   NATURAL_REPETITION_RULE,
   ...NATURAL_WRITING_REVIEW,
@@ -87,7 +93,7 @@ describe('A. The standard the proposal is written to', () => {
     expect(STANDARD_TEXT).toMatch(/natural, confident, professional British English/);
     expect(STANDARD_TEXT).toMatch(/never as an engineering report, a marketing brochure, a software generated assessment, a technical validator or an assistant/);
     expect(STANDARD_TEXT).toMatch(/never forcing a contraction into a formal passage/);
-    expect(NATURAL_WRITING_STANDARD_VERSION).toBe(1);
+    expect(NATURAL_WRITING_STANDARD_VERSION).toBe(2);
   });
 
   it('states the sentence craft and the connectives it refuses', () => {
@@ -123,6 +129,50 @@ describe('A. The standard the proposal is written to', () => {
     }
     expect(review).toMatch(/never print the review, a note about a change or any explanation of your own editing/);
     expect(review).toMatch(/Introduce no new engineering fact, product specification or performance claim/);
+  });
+
+  it('states the natural language refinement: a few things, said aloud, principles explained', () => {
+    // SELECTION: a few aspects developed properly, never an equipment list.
+    expect(NATURAL_SELECTION_RULE).toMatch(/three or four aspects that matter most in this particular cinema/);
+    expect(NATURAL_SELECTION_RULE).toMatch(/never an equipment list/);
+    expect(NATURAL_SELECTION_RULE).toMatch(/This copy is a brief overview/);
+    expect(NATURAL_SELECTION_RULE).toMatch(/the specifications are stated in the Project Summary and in the evidence pages beside this copy/);
+
+    // THE REGISTER: the abstract constructions the operator named are rewritten aloud.
+    for (const abstract of [
+      'the rear row retaining an involving view',
+      'substantial musical weight',
+      "preserving each layer's character",
+      "the film's setting extend beyond the front wall",
+    ]) {
+      expect(NATURAL_ALOUD_RULE).toContain(abstract);
+    }
+    expect(NATURAL_ALOUD_RULE).toMatch(/anything that would not be said aloud is rewritten/);
+    expect(NATURAL_ALOUD_RULE).toMatch(/the confidence of someone who believes in it/);
+    expect(NATURAL_ALOUD_RULE).toMatch(/the pleasure of watching films in this room/);
+
+    // THE PRINCIPLE REGISTER: explained confidently, never a promised result.
+    for (const principle of ['six overhead loudspeakers across two rows', 'distributing the subwoofer positions', 'clearance around the seating']) {
+      expect(NATURAL_PRINCIPLE_EXPLANATION_RULE.toLowerCase()).toContain(principle);
+    }
+    expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/never wait for a high Performance Level/);
+    expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/never turn a principle into a promise/);
+    expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/never invent an improvement/);
+    expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/stated once, at its own scope/);
+
+    // THE REVIEW: the writer's own ear, applied silently before it returns the copy.
+    const review = NATURAL_WRITING_REVIEW.join(' ');
+    for (const question of [
+      'would a professional cinema designer actually say this to a client',
+      'sound natural when it is read aloud',
+      'explain why the design matters',
+      'communicate the pleasure and excitement of watching films in this room',
+      'awkward, repetitive or unnecessarily technical',
+    ]) {
+      expect(review).toContain(question);
+    }
+    expect(review).toMatch(/Rewrite every sentence that fails one of those, silently/);
+    expect(review).toMatch(/no second version/);
   });
 
   it('carries no em dash of its own', () => {

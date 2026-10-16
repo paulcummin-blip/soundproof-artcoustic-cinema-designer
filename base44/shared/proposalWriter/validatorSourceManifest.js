@@ -77,7 +77,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The Sound Proof Natural Writing Standard: the editorial instructions the
   // proposal is written to. Hashed so a draft can always be traced to the
   // standard it was written under.
-  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': 'a7eae716113f00ae81b5018fdf5277ca4a3b09c6983ff50a67dd855f33781033',
+  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': '19743eed0ecfe9daf2d7622e147aa8b888b026c441ffbbf5e1eb6dd278075430',
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',

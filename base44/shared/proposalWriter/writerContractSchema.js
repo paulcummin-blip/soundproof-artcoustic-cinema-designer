@@ -204,7 +204,24 @@ export const WRITER_CONTRACT_VERSION = 2;
 // result in front of it. Section identities, word limits, the claim grounding rule
 // and every validation rule are unchanged, so a draft filed under an earlier
 // generation is still read against the agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-25';
+// Bumped to 26 for the natural language refinement pass: the writer is told to find
+// the three or four aspects that matter most in this particular cinema and develop
+// those properly rather than mentioning everything the analysis measured (this copy
+// is a brief overview, not an equipment list, and the specifications are stated in
+// the Project Summary and the evidence pages beside it), to write the way a designer
+// would say it aloud rather than in the abstract register a report uses (with the
+// abstract constructions it replaces, for example "the rear row retaining an
+// involving view" and "making the film's setting extend beyond the front wall"),
+// to explain an established engineering principle confidently without waiting for a
+// high Performance Level while never turning a principle into a promised result, and
+// to review its own copy with the designer's ear: would a professional cinema
+// designer actually say this to a client, does it sound natural read aloud, does it
+// explain why the design matters, does it communicate the pleasure of watching films
+// in this room, and is anything awkward, repetitive or unnecessarily technical.
+// Section identities, every word limit, the claim grounding rule and every
+// validation rule are unchanged, so a draft filed under an earlier generation is
+// still read against the agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-26';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;

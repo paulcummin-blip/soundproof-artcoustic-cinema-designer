@@ -39,8 +39,11 @@ import { clientStoryPillarLines } from '../narrativePillarGrouping.js';
 // module, so the phrases the writer is told to avoid are the same phrases the
 // validator refuses.
 import {
+  NATURAL_ALOUD_RULE,
+  NATURAL_PRINCIPLE_EXPLANATION_RULE,
   NATURAL_RECOMMENDATION_RULE,
   NATURAL_REPETITION_RULE,
+  NATURAL_SELECTION_RULE,
   NATURAL_SENTENCE_RULE,
   NATURAL_VOICE_RULE,
   NATURAL_WRITING_REVIEW,
@@ -284,6 +287,11 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     'DISTINCT SECTION RESPONSIBILITIES: Design Overview explains how the physical system is arranged, covering the display and seating geometry, the loudspeaker positions, the overhead configuration, the subwoofer arrangement and the physical constraints that shaped it, naming acoustic treatment only where the client\'s own brief raises acoustics or it is an important design decision in its own right and never listing treatment products or quantities, and never repeats the Design Summary. Why This Specification explains why the important product and layout decisions suit this cinema and the practical benefit of each choice, never a list of model names. Spatial Resolution explains how the loudspeaker arrangement creates the immersive soundfield, including the viewing geometry and any meaningful difference between the seating rows the evidence supports. Dynamic Range explains how the available capability meets demanding film reproduction, keeping screen-channel output, surround and overhead capability, subwoofer output and bass extension distinct and unexaggerated, with the experience in the room opening the section and each output figure following it as the proof of what has just been described. Timbre Matching explains why tonal consistency matters as voices and effects move around the cinema, keeping every statement to the seat-to-seat tonal consistency the evidence states for its own speaker group and never repeating the Design Summary\'s explanation. Key Performance Highlights introduces the significance of the assessment, because the table beside it is the factual reference, and never restates every strength. Presented Options explains genuine design or lifestyle choices and keeps them distinct from changes to engineering performance. Overall Design is a considered closing assessment of the design\'s most important qualities and why the complete solution makes sense, never a repeat of the introduction: it is a fresh closing judgement and never restates the Design Summary\'s own account of the room, the display, the seating or the system arrangement.',
     naturalVoiceRule,
     NATURAL_SENTENCE_RULE,
+    // THE NATURAL LANGUAGE REFINEMENT: how much the copy explains, the register
+    // it is written in, and how confidently an established principle is stated.
+    NATURAL_SELECTION_RULE,
+    NATURAL_ALOUD_RULE,
+    NATURAL_PRINCIPLE_EXPLANATION_RULE,
     'ONE PRIMARY SECTION PER CHARACTERISTIC: each significant design characteristic is developed in one section. Another section may refer to it only to add new information, never to restate it in different adjectives, and never to repeat the same paragraph.',
     'DO NOT OVER-EXPLAIN A SIMPLE SPECIFICATION: state a simple fact once and move on. A centre channel built from two cabinets, such as 2 x C4-1 (mono), is stated in the specification; its design significance is explained at most once in the narrative, and never by repeatedly explaining that two cabinets are not two independent logical channels.',
     'CLIENT BRIEF RESPONSIBILITY: address every substantive supported request in the section where it belongs, not all of them in the Design Summary. Never silently ignore a supported request, never restate one for the sake of coverage, and where a request is not supported by the frozen evidence, leave it out rather than inventing support for it.',

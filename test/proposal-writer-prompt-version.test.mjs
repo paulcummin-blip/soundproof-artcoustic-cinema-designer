@@ -119,7 +119,15 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // validator is untouched: a recommendation the evidence does not support is still
 // refused. No section identity, word limit, figure, level, product,
 // claim-grounding or validation rule changed.
-const CURRENT = 'proposal-writer-prompt-25';
+// Generation 26 is the natural language refinement: the writer selects the three or
+// four aspects that matter most in this cinema rather than mentioning everything,
+// writes the way a designer would say it aloud rather than in the abstract register
+// a report uses, explains an established engineering principle confidently without
+// waiting for a high Performance Level while never turning a principle into a
+// promised result, and reviews its own copy with the designer's ear. No section
+// identity, word limit, figure, level, product, claim-grounding or validation rule
+// changed.
+const CURRENT = 'proposal-writer-prompt-26';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
