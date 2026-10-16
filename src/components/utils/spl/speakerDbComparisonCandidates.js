@@ -89,9 +89,6 @@ export const COMPARISON_PARITY_STATEMENT =
 // utils/spl/installedSpaceAssumption.js so candidate review, the Speaker Database
 // review list and this comparison panel all state the same thing at confidence C.
 
-const STATUS_RANK = { Published: 0, Approved: 1, "Awaiting Review": 2, Draft: 3, Superseded: 4, Archived: 5, Manual: 6 };
-const CONFIDENCE_RANK = { A: 0, B: 1, C: 2, D: 3 };
-
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== "";
 
 // The ADI sensitivity-basis treatment lives in
@@ -206,16 +203,25 @@ export function buildCandidate({
     secondaryStatement: secondaryCapped ? evidenceStatement(secondary) : null,
     sourceUrl: withId.source_url || product?.official_product_url || "",
     datasheetUrl: withId.datasheet_url || product?.official_pdf_url || "",
-    optionLabel: `${manufacturer} · ${model} — ${badgeLabel}`,
+    // Manufacturer · model only. The evidence-quality label belongs on the
+    // selected row (badgeLabel) and is never repeated in the dropdown.
+    optionLabel: `${manufacturer} · ${model}`,
   };
 }
 
-/** Approved/published first, then Draft; within each status by confidence A→D. */
+/**
+ * Manufacturer A–Z, then model A–Z within each manufacturer. The list order is
+ * deterministic — every load renders the same sequence — so the dropdown reads
+ * as an alphabetical reference rather than by evidence status. Evidence quality
+ * is unchanged and is still shown on the selected row's own quality label.
+ */
 export function sortComparisonCandidates(candidates) {
+  // Locale-pinned so the order is identical on every machine and every load.
+  const compare = (a, b) => String(a || "").localeCompare(String(b || ""), "en", { sensitivity: "base" });
   return [...candidates].sort((a, b) =>
-    (STATUS_RANK[a.statusLabel] ?? 6) - (STATUS_RANK[b.statusLabel] ?? 6)
-    || CONFIDENCE_RANK[a.classKey] - CONFIDENCE_RANK[b.classKey]
-    || `${a.manufacturer} ${a.model}`.localeCompare(`${b.manufacturer} ${b.model}`));
+    compare(a.manufacturer, b.manufacturer)
+    || compare(a.model, b.model)
+    || compare(a.id, b.id));
 }
 
 /**
