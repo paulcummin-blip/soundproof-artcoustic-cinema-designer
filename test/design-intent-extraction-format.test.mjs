@@ -31,11 +31,16 @@ import {
   canonicalDesignIntentDraft,
   runReportDesignIntent,
 } from '../base44/shared/reportDesignIntent/reportDesignIntentRunner.js';
-import { DESIGN_INTENT_SECTION } from '../base44/shared/reportDesignIntent/designIntentBrief.js';
+import {
+  DESIGN_INTENT_SECTION } from '../base44/shared/reportDesignIntent/designIntentBrief.js';
 import {
   DESIGN_INTENT_STATUS,
   readAcceptedDesignIntent,
 } from '../base44/shared/reportDesignIntent/reportDesignIntentRecord.js';
+import {
+  parseWriterOutput,
+  validateWriterOutput,
+} from '../base44/shared/proposalWriter/writerOutputValidator.js';
 import { DESIGN_INTENT_SOURCE, resolveDesignIntent } from '../src/components/report/projectReport/designIntentAuthority.js';
 
 /** The frozen clock the pack and the attempt share, so the fingerprints agree. */
