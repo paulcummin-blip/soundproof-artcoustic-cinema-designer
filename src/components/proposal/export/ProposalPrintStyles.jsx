@@ -329,6 +329,35 @@ export default function ProposalPrintStyles() {
           margin: 4mm 0 0;
         }
 
+        /* The same two weights wherever this block is composed, so the Proposal
+           Editor preview shows the composition the printed pack gives it: a Full
+           Width image at the full content width and its own proportions, a Detail
+           image smaller and side by side with the other supporting images. */
+        .proposal-images__figure--feature img {
+          width: 100%;
+          height: auto;
+          object-fit: contain;
+        }
+
+        .proposal-images__support {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+
+        .proposal-images__support .proposal-images__figure {
+          width: 40%;
+          flex: 0 0 40%;
+          margin: 0;
+        }
+
+        .proposal-images__support .proposal-images__figure img {
+          width: 100%;
+          height: auto;
+          object-fit: contain;
+        }
+
         /* ── Canonical report typography ────────────────────────────────
            The exported proposal document consumes the shared typography
            system, so the PDF matches the Visual and Technical Reports:
