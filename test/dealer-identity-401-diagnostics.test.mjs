@@ -24,6 +24,23 @@ test('401 response bodies produce only fixed non-sensitive diagnostic codes', as
   }
 });
 
+test('gateway 401 error codes are allowlisted without exposing arbitrary headers', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const cases = [
+    [{ 'sb-error-code': 'UNAUTHORIZED_ASYMMETRIC_JWT' }, {}, 'DEALER_IDENTITY_GATEWAY_UNAUTHORIZED_ASYMMETRIC_JWT'],
+    [{}, { code: 'UNAUTHORIZED_INVALID_JWT_FORMAT' }, 'DEALER_IDENTITY_GATEWAY_UNAUTHORIZED_INVALID_JWT_FORMAT'],
+    [{ 'sb-error-code': 'private-token-value' }, { message: 'private-token-value' }, 'DEALER_IDENTITY_HTTP_401'],
+  ];
+  for (const [headers, body, expected] of cases) {
+    globalThis.fetch = async () => new Response(JSON.stringify(body), { status: 401, headers });
+    await assert.rejects(
+      () => resolvePartnerPortalDealerIdentity({ url: ENDPOINT, accessToken: 'opaque-provider-token' }),
+      error => error.message === expected && !error.message.includes('private-token-value'),
+    );
+  }
+});
+
 test('a configured endpoint outside the shared live backend never receives a provider token', async (t) => {
   const oldDeno = globalThis.Deno;
   const oldFetch = globalThis.fetch;
