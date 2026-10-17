@@ -16,9 +16,14 @@
  * authority are not restated here: they travel with the writer's contract, which
  * the prompt carries. This file holds only what is specific to the Design Intent:
  * the three things it explains, the project's own facts it is written from, the
- * plain register it is written in, the editorial references that show that
- * register at its best, the words and phrases it never uses, and the length it
- * may run to on the report's first page.
+ * plain register it is written in, the APPROVED SENTENCE FRAMES this block is
+ * written in and populated from this project's own evidence, the words and phrases
+ * it never uses, and the length it may run to on the report's first page.
+ *
+ * The frames are the approved register rather than a starting point for the
+ * writer's own phrasing: the copy prefers each frame unchanged and adapts it only
+ * where one of this project's facts makes the wording wrong. Variation is not a
+ * quality goal; accuracy, clarity and professional tone are.
  *
  * The length is a real constraint rather than a style note: the block occupies a
  * fixed place in the report's page budget, so the ceiling is set to the width of
@@ -42,37 +47,60 @@ export const DESIGN_INTENT_TARGET_WORDS = '130 to 175';
 export const DESIGN_INTENT_WORD_LIMIT = 200;
 
 /**
- * THE DESIGN INTENT'S APPROVED REFERENCE PASSAGES.
+ * THE DESIGN INTENT'S APPROVED SENTENCE FRAMES.
  *
- * Three short paragraphs of Sound Proof design intent at its best, shown to the
- * writer as EDITORIAL REFERENCES: the voice, the practical design reasoning, the
- * sentence rhythm and the shape this block is written to, so the register is
- * shown rather than described.
+ * Three approved frames, one per paragraph, in the register Sound Proof publishes
+ * this block in: the design reasoning, spatial resolution with timbre matching, and
+ * dynamic capability with the bass. They show the writer exactly what to write
+ * rather than describing a register to write towards, because this block is a
+ * controlled engineering summary: the approved wording is the deliverable, and free
+ * paraphrasing of it is a defect rather than a variation.
  *
- * They are references and never templates, and they carry no figure, product,
- * layout, distance or room of their own: there is nothing in them that could be
- * carried into another design. Every fact in this project's copy comes from that
- * project's own frozen evidence.
+ * Each frame is the approved sentence, and each states which parts of it are
+ * populated from this project's own frozen evidence. None of them carries a figure,
+ * a product, a room, a distance or a project of its own, so no fact can be carried
+ * into another design from them: the brackets are the only variable, and every one
+ * of them is filled from THIS project's evidence.
  */
-export const DESIGN_INTENT_REFERENCE_PASSAGES = Object.freeze([
-  'The seating is deliberately kept clear of the rear wall, leaving useful space for the surround system behind the listeners. This also avoids placing the rear row against a boundary that can make low-frequency performance more difficult to control.',
-  'The front wides, side and rear surrounds, and overhead channels provide strong spatial resolution around and above the seating. The screen channels maintain close level consistency across the primary seats, while the screen, surround and overhead groups each maintain close tonal consistency within their respective layers.',
-  'Dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. The subwoofer arrangement extends the predicted low-frequency response to the published figure, giving film soundtracks the depth and impact expected from a dedicated cinema.',
+export const DESIGN_INTENT_SENTENCE_FRAMES = Object.freeze([
+  {
+    id: 'design_reasoning',
+    label: 'PARAGRAPH ONE: THE DESIGN REASONING',
+    frame: 'The seating is set forward of the rear wall to leave useful space behind the audience for the surround system. Keeping listeners away from that boundary also avoids a position where bass can be more difficult to control, making the clearance a deliberate part of the room layout.',
+    populate: 'the boundary this design actually clears, the surround layers this design actually has, and the room type this design is',
+  },
+  {
+    id: 'spatial_and_timbre',
+    label: 'PARAGRAPH TWO: SPATIAL RESOLUTION AND TIMBRE MATCHING',
+    frame: 'The [loudspeaker layers this design actually has] provide strong spatial resolution around and above the seating. The screen channels maintain close level consistency across the [seat scope the evidence states that result for], while the [authoritative tonal groups the evidence supports] each maintain close tonal consistency within their respective layers.',
+    populate: 'the layers this design actually has, the seat scope the evidence states the level-consistency result for, and the tonal groups the evidence actually supports',
+  },
+  {
+    id: 'dynamic_and_bass',
+    label: 'PARAGRAPH THREE: DYNAMIC RANGE AND BASS',
+    frame: 'Dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. The [this design\'s own subwoofer arrangement] extends the predicted low-frequency response to [this project\'s own authoritative extension figure], giving film soundtracks the depth and impact expected from a dedicated cinema.',
+    populate: 'this design\'s own subwoofer arrangement, this project\'s own extension figure, and the room-type vocabulary that fits this room',
+  },
 ]);
 
 /**
- * The reference passages as the writer reads them, as ONE block: this block
- * written well, with the limit that keeps them references rather than templates.
+ * The approved frames as the writer reads them, as ONE block: the three frames it
+ * writes this block with, and what each bracket is populated from.
  *
  * @returns {string} the block, carried inside the section requirement
  */
-export function designIntentReferenceBlock() {
+export function designIntentSentenceFrameBlock() {
   return [
-    '=== DESIGN INTENT REFERENCE (the register to write to) ===',
-    'These three paragraphs show this block written well: what the room is designed around, why the layout is right for it, and what the system does well, in short active sentences with this project\'s own facts doing the work and no more than one strong adjective in a paragraph.',
-    'They are references and never templates. Every fact in them belongs to the design they describe, so take every figure, layout, product, distance and room fact in your copy from this project\'s own frozen evidence and never carry one of theirs across.',
-    ...DESIGN_INTENT_REFERENCE_PASSAGES.map((passage) => `- ${passage}`),
+    '=== DESIGN INTENT SENTENCE FRAMES (the approved register to write in) ===',
+    'These three frames are the APPROVED WORDING for this block, one frame per paragraph, in the register Sound Proof publishes it in. Write each frame as it stands and populate every bracket from this project\'s own frozen evidence. Prefer the frame unchanged: adapt it only where one of this project\'s facts makes the wording wrong, and where you adapt it, say the same thing in the same register. Variation is not a quality goal: accuracy, clarity and professional tone are.',
+    'No frame carries a figure, a product, a room, a distance or a project of its own, so nothing can be carried across from them, and no bracket is ever left in the copy.',
     '',
+    ...DESIGN_INTENT_SENTENCE_FRAMES.flatMap((entry) => [
+      entry.label,
+      entry.frame,
+      `POPULATE FROM THIS PROJECT: ${entry.populate}.`,
+      '',
+    ]),
   ].join('\n');
 }
 
@@ -100,7 +128,8 @@ export const DESIGN_INTENT_REQUIREMENT = [
   'DO NOT STACK STRONG ADJECTIVES AND NEVER REPEAT ONE. Excellent, exceptional, considerable, powerful and substantial are used only where this project\'s own evidence genuinely justifies them, and no paragraph carries more than one of them. Prefer close, strong, useful and consistent, and keep substantial headroom for headroom the evidence actually shows. PREFER THE EVIDENCE TO THE BENEFIT IT DESCRIBES: where the frozen evidence publishes a measured or modelled result, state that result instead of a general claim about the sound — the layout extends the predicted low-frequency response to the published figure, never the system provides powerful bass output.',
   'KEEP EACH PERFORMANCE POINT PRACTICAL AND GROUNDED. Timbre matching states that the screen, surround and overhead groups each maintain close tonal consistency within their respective layers and stops there. Dynamic range states substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers, never considerable reserve around and overhead. The bass states the published extension and then what it gives the client — giving film soundtracks the depth and impact expected from a dedicated cinema — never supports the low notes and atmosphere of a film soundtrack, and never a sensation the evidence does not state.',
   'BASS IS THE PUBLISHED RESULT, NOT A FEELING. Where the frozen evidence publishes how low this design reaches, state it as the predicted response it is — the layout extends the predicted low-frequency response to the published figure — and then say in one short sentence what that gives the client in a film soundtrack. Never invent room gain, never describe bass as a sensation, and never put a subjective claim about weight or power in place of the extension the evidence publishes.',
-  'STATE EACH OF THE THREE IDEAS DIRECTLY, IN THIS SHAPE. Spatial resolution: the front wides, side and rear surrounds, and overhead channels provide strong spatial resolution around and above the seating — naming only the layers this design actually has, as the rule above requires. Dynamic range: dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. Bass: the front-and-rear subwoofer arrangement extends the predicted low-frequency response to the published figure, giving film soundtracks the depth and impact expected from a dedicated cinema. These are the shapes the sentences take, never sentences to paste: name the layers this design has, and take every arrangement, scope and figure from this project\'s own frozen evidence.',
+  'WRITE THE THREE PARAGRAPHS IN THE APPROVED SENTENCE FRAMES BELOW. The frames are the register this copy is written in: take each frame as it stands and populate its brackets from this project\'s own frozen evidence. Spatial resolution names the layers this design actually has, the seat scope the evidence states that result for, and the tonal groups the evidence supports. Dynamic range states substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. Bass names this design\'s own subwoofer arrangement and this project\'s own extension figure, and uses the room-type vocabulary this room actually has. Prefer the frame unchanged and adapt it only where one of this project\'s facts makes the wording wrong, and then say the same thing in the same register. Variation is not a quality goal: accuracy, clarity and professional tone are.',
+  'NEVER PARAPHRASE A FRAME INTO A WEAKER FORM OF THE SAME STATEMENT. Write "the seating is set forward of the rear wall to leave useful space behind the audience", never "not unused floor space" and never "part of how the room is arranged". Name the layers that provide the resolution and say what they cover, never "covering directions" and never "sound travels around the room". Write "dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers", never "predicted dynamic capability provides". State the arrangement that extends the predicted low-frequency response, never "combining bass depth with output capability" and never "demanding effects their impact". No bracket is ever left in the copy.',
   'RESERVE IS USEFUL RESERVE, AND NEVER A RESERVE TO DRAW ON. Never write "calculated reserve to draw on" and never write "reserve to draw on": the reserve the surround and overhead speakers provide is written as useful reserve, inside the sentence that says what it is there for. Never write "Alongside its low-frequency output capability" and never write "Effects have clear positions": state the capability and the coverage directly instead of attaching either to a noun phrase, and never describe effects as having positions of their own.',
   'THE BASS EXTENSION IS THIS PROJECT\'S OWN PUBLISHED FIGURE. Where the copy states how low this design reaches, take the extension from this project\'s own P18 evidence, state it as the predicted response it is, and name the arrangement it comes from. Never carry a figure across from another project and never state an extension the frozen evidence does not publish for this design.',
   'Translate the established engineering principles this design rests on into client benefits, confidently and in plain language. A principle may be explained confidently without a high Performance Level behind it.',
@@ -109,7 +138,7 @@ export const DESIGN_INTENT_REQUIREMENT = [
   'Never invent a physical loudspeaker position, a designer decision or an achieved performance the frozen evidence does not record.',
   'Be positive, fluent and confident, in natural British English.',
   `Length: ${DESIGN_INTENT_TARGET_WORDS} words in three short paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it states what the design is and what it gives the client and then stops: paragraph one is the design reasoning, why the room is laid out the way it is; paragraph two develops spatial resolution and timbre matching; paragraph three develops dynamic range and the bass capability. Every fact the summary above this block already states stays out of it.`,
-  designIntentReferenceBlock(),
+  designIntentSentenceFrameBlock(),
 ].join(' ');
 
 /** The scope rule the writer reads beside the section it is being given. */

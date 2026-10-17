@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposalEvidenceBuilder.js';
 import { EVIDENCE_AT, option } from './fixtures/proposalEvidenceFixtures.mjs';
 import {
-  DESIGN_INTENT_REFERENCE_PASSAGES,
+  DESIGN_INTENT_SENTENCE_FRAMES,
   DESIGN_INTENT_REQUIREMENT,
   DESIGN_INTENT_SECTION,
   DESIGN_INTENT_WORD_LIMIT,
@@ -111,14 +111,15 @@ describe('the Design Intent brief', () => {
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never invent a physical loudspeaker position/i);
   });
 
-  it('shows the register with references that carry no project fact', () => {
-    // The references demonstrate the copy at its best and hold no figure, product,
-    // layout or distance of their own, so no fact can be carried across from them:
-    // every fact in a report's copy comes from that project's own frozen evidence.
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/DESIGN INTENT REFERENCE/);
-    expect(DESIGN_INTENT_REFERENCE_PASSAGES).toHaveLength(3);
-    for (const passage of DESIGN_INTENT_REFERENCE_PASSAGES) {
-      expect(passage).not.toMatch(/\d/);
+  it('shows the approved sentence frames, which carry no project fact of their own', () => {
+    // The frames state the approved wording and hold no figure, product, layout or
+    // distance of their own, so no fact can be carried across from them: every fact
+    // in a report's copy comes from that project's own frozen evidence.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/DESIGN INTENT SENTENCE FRAMES/);
+    expect(DESIGN_INTENT_SENTENCE_FRAMES).toHaveLength(3);
+    for (const entry of DESIGN_INTENT_SENTENCE_FRAMES) {
+      expect(entry.frame).not.toMatch(/\d/);
+      expect(entry.populate.length).toBeGreaterThan(0);
     }
   });
 

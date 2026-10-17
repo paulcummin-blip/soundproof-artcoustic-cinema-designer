@@ -149,7 +149,7 @@ export const DESIGN_INTENT_WRITING = [
   '',
   'This copy is design intent: an experienced cinema designer explaining a system they believe in.',
   '',
-  'It is never offered as a recommendation and it never opens on one. There is no mandatory opening phrase, no fixed narrative structure and no section shape carried from project to project: explain this design in the order that reads best for it.',
+  'It is never offered as a recommendation and it never opens on one. This copy is a controlled engineering summary. Where the section\'s own brief supplies approved sentence frames, they are the register it is written in: write them as they stand and populate them from this project\'s own evidence, because variation from the approved wording is not a quality goal. Accuracy, clarity and professional tone are.',
   '',
   'WHAT THE COPY COMMUNICATES',
   '- What makes this particular cinema special.',
