@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { readCompleteDocument } from '../../shared/proposalEdit/readCompleteDocument.js';
-import { resolveSectionApproval } from '../../shared/proposalApproval/sectionApprovalAuthority.js';
+import { publishedSectionFingerprint, resolveSectionApproval } from '../../shared/proposalApproval/sectionApprovalAuthority.js';
 
 /**
  * Approve ONE generated narrative section of a proposal.
@@ -81,6 +81,12 @@ export default async function(req) {
 
     const approvedAt = new Date().toISOString();
     const approvedBy = user.full_name || user.email || 'Unknown user';
+    const published = (document.document_sections || []).find((entry) =>
+      entry?.section_id === section_id || entry?.section_type === row.section_type
+    );
+    const revisionId = row.revision_id || document.edit_id || document.generation_id || null;
+    const publishedPageFingerprint = row.published_page_fingerprint
+      || publishedSectionFingerprint(published?.body ?? section.body ?? '');
 
     await base44.entities.ProposalSection.update(section_id, {
       metadata: {
@@ -90,6 +96,10 @@ export default async function(req) {
           approved_at: approvedAt,
           approved_by: approvedBy,
           fingerprint: row.fingerprint,
+          revision_id: revisionId,
+          generation_id: row.generation_id || document.generation_id || null,
+          edit_id: row.edit_id || document.edit_id || null,
+          published_page_fingerprint: publishedPageFingerprint,
         },
       },
     });
@@ -103,6 +113,10 @@ export default async function(req) {
       approved_at: approvedAt,
       approved_by: approvedBy,
       fingerprint: row.fingerprint,
+      revision_id: revisionId,
+      generation_id: row.generation_id || document.generation_id || null,
+      edit_id: row.edit_id || document.edit_id || null,
+      published_page_fingerprint: publishedPageFingerprint,
     });
   } catch (error) {
     return Response.json({ error: error?.message || 'The section could not be approved.' }, { status: 500 });
