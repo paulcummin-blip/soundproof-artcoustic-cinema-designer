@@ -17,7 +17,8 @@
  * the prompt carries. This file holds only what is specific to the Design Intent:
  * the three things it explains, the project's own facts it is written from, the
  * plain register it is written in, the editorial references that show that
- * register at its best, and the length it may run to on the report's first page.
+ * register at its best, the words and phrases it never uses, and the length it
+ * may run to on the report's first page.
  *
  * The length is a real constraint rather than a style note: the block occupies a
  * fixed place in the report's page budget, so the ceiling is set to the width of
@@ -35,7 +36,7 @@
 export const DESIGN_INTENT_SECTION = 'decision_summary';
 
 /** The written target the writer is given. */
-export const DESIGN_INTENT_TARGET_WORDS = '140 to 190';
+export const DESIGN_INTENT_TARGET_WORDS = '130 to 175';
 
 /** The ceiling the draft is validated against: headroom above the target. */
 export const DESIGN_INTENT_WORD_LIMIT = 200;
@@ -54,9 +55,9 @@ export const DESIGN_INTENT_WORD_LIMIT = 200;
  * project's own frozen evidence.
  */
 export const DESIGN_INTENT_REFERENCE_PASSAGES = Object.freeze([
-  'This is a compact dedicated cinema built around a projection screen and a full immersive loudspeaker layout. The seating is kept clear of the rear wall, which gives the surround system useful space behind the audience and avoids one of the more difficult positions for low-frequency performance.',
-  'The layout gives strong spatial resolution across the room. Front wides, surrounds and overhead channels cover the seating continuously from the sides and from above, while the screen channels create a consistent front soundstage across the primary seats. The surround and overhead layers are closely matched within their own groups, so effects keep a consistent tonal balance as they move through the room.',
-  'Dynamic capability is strong for a room of this size. The front stage has substantial headroom at the reference position, with useful reserve from the surround and overhead channels. The subwoofer system extends the low-frequency response, giving film soundtracks the weight and impact expected from a dedicated cinema.',
+  'This dedicated cinema keeps its seating rows clear of the rear wall. That gives the surround system useful space behind the audience and avoids placing the rear seats against one of the more difficult room boundaries for bass performance.',
+  'The immersive layout provides strong spatial resolution around and above the seating. Front wides, surrounds and overhead channels give continuous coverage through the room, while the screen channels create a consistent front soundstage across the primary seats. The screen, surround and overhead groups also maintain close tonal consistency within their respective layers.',
+  'Dynamic capability is strong, with substantial headroom from the screen channels and useful reserve from the surround and overhead speakers. The subwoofer system extends the predicted low-frequency response and gives film soundtracks the weight and impact expected from a dedicated cinema.',
 ]);
 
 /**
@@ -87,17 +88,22 @@ export function designIntentReferenceBlock() {
 export const DESIGN_INTENT_REQUIREMENT = [
   'This block is the report\'s Design Intent: it opens the Project Report above its facts sheet, and it is written for the client as the design team\'s own account of the design.',
   'Explain three things and nothing else: what this room is designed around, why the layout was chosen for it, and what the system does well. Write it as an experienced home cinema designer talking the client through the design, and never announce a recommendation: never open on a formulaic phrase such as "Our recommendation is" or "We recommend".',
+  'OPEN ON THE DESIGN REASONING, NEVER ON THE SPECIFICATION SCHEDULE. Paragraph one answers one question: why is the room laid out this way? Work from where the seating sits and how it relates to the screen, the space the arrangement keeps behind the listeners, the constraints the room itself puts on the design, and the decisions that follow from them. State the decision and then why it is right for this room.',
   'DRIVE THE COPY WITH THIS PROJECT\'S OWN FACTS, taken from the frozen evidence and cited to the claim each one rests on. The Project Summary and the evidence pages state the specification in full, so this block states the few facts it actually explains rather than reciting them, and those facts are the display and its format, the loudspeaker layout, how the seating is arranged in the room, the loudspeaker layers this design actually has, the subwoofer arrangement, and how low the bass system reaches. Name a product model only where the frozen evidence states it for this design.',
+  'NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK. The Project Summary immediately above this copy already states the room dimensions, the display and its format, the seating count, the system format, the screen channels, the surrounds, the overheads and the subwoofers, and the evidence pages beside it state the results in full. Mention one of those facts only where it helps explain why the design works, and leave every other one to the summary: the seating kept clear of the rear wall earns its place because it explains the space behind the audience and one of the more difficult room boundaries for bass performance, where reciting the display size, the seat count and the channel list earns nothing.',
   'Then never recite the specification: no equipment-by-equipment schedule, no repeated room dimensions, no Performance Level, no parameter name or code, no channel-by-channel account, and no output figure the client can already read on the evidence pages beside this block.',
   'Develop the three core performance ideas as prose, never as headings, never as a list and never one paragraph per idea. SPATIAL RESOLUTION is how the loudspeaker arrangement carries sound around and above the seating, and how consistent the front soundstage is across the primary seats. TIMBRE MATCHING is how the loudspeaker layers hold their own tonal balance, so a voice or an effect keeps a consistent character as it moves through the room, and it is stated for the layer and the seats those results cover. DYNAMIC RANGE is how much headroom the front stage, the surround and overhead layers and the bass system have for demanding film soundtracks.',
+  'Make SPATIAL RESOLUTION specific and evidence-led: name the loudspeaker layers and channels THIS design actually has — the front wides, the surrounds, the rear surrounds, the overhead channels — and say what they cover around and above the seating, how the screen channels hold the front soundstage across the primary seats, and what the primary-seat results show. State the resolution, then explain what produces it. TIMBRE MATCHING is written in plain, credible language: the loudspeaker groups maintain close tonal consistency within their respective layers, so an effect or a voice keeps a consistent character as it moves through the room, and a stronger form such as excellent tonal consistency is used only where the authoritative evidence supports it. DYNAMIC RANGE is the whole system\'s capability, explained from the authoritative evidence behind it — the headroom the screen channels have at the reference position, the reserve in the surround and overhead layers, and what the bass system adds — and never as a vague impression of scale or power.',
   'State a measured result only where the frozen evidence states it and only at the scope that result covers. An intention is never written as an achieved result, and a measured or calculated result is never written as an intention.',
   'Write plainly and concretely: short direct sentences, active voice, practical design reasoning, and specifics this project\'s own evidence states. Describe what the loudspeakers do and where the client sits and listens, never what the sound is like as a feeling: no figurative or anthropomorphic language about sound, no metaphor, no cinematic cliche, no vague claim about immersion and no marketing language. Explain each point once, add no filler, and never explain the same idea twice in different words.',
+  'NEVER USE THESE WORDS AND PHRASES: remarkably; exceptional experience; serious cinema-scale; drawn into the action; becomes part of the scene; preserve their own tonal character; stable connection between sound and picture; substantial scale alongside quiet dialogue. Write with these instead: consistent; close; strong; substantial headroom; useful reserve; clear coverage; predicted response; tonal consistency.',
+  'BASS IS THE PUBLISHED RESULT, NOT A FEELING. Where the frozen evidence publishes how low this design reaches, state it as the predicted response it is — the layout extends the predicted low-frequency response to the published figure — and then say in one short sentence what that gives the client in a film soundtrack. Never invent room gain, never describe bass as a sensation, and never put a subjective claim about weight or power in place of the extension the evidence publishes.',
   'Translate the established engineering principles this design rests on into client benefits, confidently and in plain language. A principle may be explained confidently without a high Performance Level behind it.',
   'Where recorded designer intent is supplied, understand the engineering principle it explains and state it professionally in your own words. It is semantic input, never finished prose: never paraphrase the designer, and never reproduce a note, a brief, an instruction or a filename.',
   'Acoustic treatment is supporting evidence, never a selling point: never name a treatment product and never state a treatment quantity.',
   'Never invent a physical loudspeaker position, a designer decision or an achieved performance the frozen evidence does not record.',
   'Be positive, fluent and confident, in natural British English.',
-  `Length: ${DESIGN_INTENT_TARGET_WORDS} words in three short paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it states what the design is and what it gives the client and then stops: paragraph one is what the room is designed around, the display it is built around and how the seating is arranged in the room; paragraph two develops spatial resolution and timbre matching; paragraph three develops dynamic range and the bass capability.`,
+  `Length: ${DESIGN_INTENT_TARGET_WORDS} words in three short paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it states what the design is and what it gives the client and then stops: paragraph one is the design reasoning, why the room is laid out the way it is; paragraph two develops spatial resolution and timbre matching; paragraph three develops dynamic range and the bass capability. Every fact the summary above this block already states stays out of it.`,
   designIntentReferenceBlock(),
 ].join(' ');
 

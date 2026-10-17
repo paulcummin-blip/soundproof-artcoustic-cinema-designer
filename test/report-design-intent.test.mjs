@@ -101,7 +101,7 @@ describe('the Design Intent brief', () => {
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/no figurative or anthropomorphic language/i);
     // The shape and length on the report's first page.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/three short paragraphs/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/140 to 190 words/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/130 to 175 words/i);
     // The safety rules are unchanged.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/translate the established engineering principles/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/recorded designer intent/i);
@@ -119,6 +119,40 @@ describe('the Design Intent brief', () => {
     expect(DESIGN_INTENT_REFERENCE_PASSAGES).toHaveLength(3);
     for (const passage of DESIGN_INTENT_REFERENCE_PASSAGES) {
       expect(passage).not.toMatch(/\d/);
+    }
+  });
+
+  it('writes design reasoning, never the summary again, and never marketing filler', () => {
+    // Paragraph one reasons about the layout instead of restating the schedule.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/OPEN ON THE DESIGN REASONING/);
+    // The facts the Project Summary above the block already states are not recited.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK/);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/only where it helps explain why the design works/i);
+    // Spatial resolution, timbre and dynamic range are made specific.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/name the loudspeaker layers and channels THIS design actually has/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/close tonal consistency/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/excellent tonal consistency/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/only where the authoritative evidence supports it/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/the whole system's capability/i);
+    // The bass is stated from the published extension, and no gain is invented.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/predicted low-frequency response/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never invent room gain/i);
+    // The marketing filler the block refuses is named, so it is never written.
+    for (const phrase of [
+      'remarkably',
+      'exceptional experience',
+      'serious cinema-scale',
+      'drawn into the action',
+      'becomes part of the scene',
+      'preserve their own tonal character',
+      'stable connection between sound and picture',
+      'substantial scale alongside quiet dialogue',
+    ]) {
+      expect(DESIGN_INTENT_REQUIREMENT.toLowerCase()).toContain(phrase);
+    }
+    // And the register it is written with instead.
+    for (const preferred of ['consistent', 'close', 'strong', 'substantial headroom', 'useful reserve', 'clear coverage', 'predicted response', 'tonal consistency']) {
+      expect(DESIGN_INTENT_REQUIREMENT.toLowerCase()).toContain(preferred);
     }
   });
 
