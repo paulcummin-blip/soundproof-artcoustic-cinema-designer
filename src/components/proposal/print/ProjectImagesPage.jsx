@@ -41,6 +41,12 @@ export default function ProjectImagesPage({
   const leadBlock = lead ? (
     <div className="pp-body pp-image-flow__lead" dangerouslySetInnerHTML={{ __html: lead }} />
   ) : null;
+  // A heading is printed only where the document asked for one. The photographs
+  // this page composes are part of the editorial flow, so the page carries no
+  // portfolio heading of its own unless a dedicated gallery was requested.
+  const header = title
+    ? <ProposalPageHeader number={number} kicker={kicker} title={title} />
+    : null;
 
   // A sheet of the designer's supporting images — the ones they marked Detail or
   // Cropped Detail. They are supporting evidence, never the page hero: the sheet
@@ -51,7 +57,7 @@ export default function ProjectImagesPage({
   if (imagePageKind(images) === 'supporting') {
     return (
       <section className="proposal-print-section pp-page pp-page--images pp-page--supporting-images">
-        <ProposalPageHeader number={number} kicker={kicker} title={title} />
+        {header}
         {leadBlock}
         <div className="pp-gallery pp-gallery--supporting">
           {images.map((asset) => (
@@ -69,7 +75,7 @@ export default function ProjectImagesPage({
   if (preserveNatural) {
     return (
       <section className="proposal-print-section pp-page pp-page--images">
-        <ProposalPageHeader number={number} kicker={kicker} title={title} />
+        {header}
         {leadBlock}
         <div className={`pp-gallery pp-gallery--natural pp-gallery--${Math.min(images.length, 4)}`}>
           {images.map((asset) => (
@@ -84,7 +90,7 @@ export default function ProjectImagesPage({
 
   return (
     <section className="proposal-print-section pp-page pp-page--images">
-      <ProposalPageHeader number={number} kicker={kicker} title={title} />
+      {header}
       {leadBlock}
       <div className={`pp-gallery pp-gallery--${images.length}`}>
         <ProposalGalleryFigure asset={hero} className="pp-gallery__hero" />

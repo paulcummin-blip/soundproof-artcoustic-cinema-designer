@@ -507,6 +507,9 @@ export function designRationaleRows(rows = []) {
 /** The parameter family each steer topic speaks about, and its narrative area. */
 export const TOPIC_NARRATIVE_SUBJECT = Object.freeze({
   display: { area: 'display_viewing', keys: ['screen'] },
+  // The room's own design decisions carry no parameter of their own: they are the
+  // deliberate physical decisions the design story is built on, never a result.
+  room_reorientation: { area: 'design_decisions', keys: [] },
   system_approach: { area: 'loudspeaker_configuration', keys: ['p2'] },
   screen_tonal: { area: 'timbre_matching', keys: ['p16'] },
   surround_tonal: { area: 'timbre_matching', keys: ['p17'] },
@@ -555,8 +558,22 @@ export function suppressedAreasFromTopics(topicKeys = []) {
  * @param {boolean} [input.excluded]
  * @returns {{priority: string, reason: string, tier: string, area: string|null}}
  */
+export const DESIGN_DECISION_TOPIC_KEYS = Object.freeze(['room_reorientation']);
+
 export function topicNarrativePriority(topicKey, { level = null, weight = null, relevance = BRIEF_RELEVANCE.STANDARD, excluded = false } = {}) {
   const subject = TOPIC_NARRATIVE_SUBJECT[String(topicKey || '')] || null;
+  // A DELIBERATE DESIGN DECISION is not a result and is never scored as one: it is
+  // what the designer did to this room, it takes the design-rationale role however
+  // the evidence happens to read, and it is never a performance headline. It ranks
+  // above the generic subjects precisely because it is about this room.
+  if (DESIGN_DECISION_TOPIC_KEYS.includes(String(topicKey || ''))) {
+    return {
+      priority: NARRATIVE_PRIORITY.DESIGN_RATIONALE,
+      tier: weightTier(0),
+      area: subject?.area || null,
+      reason: 'a deliberate design decision about this room: explained as reasoning in the narrative, and never a performance headline',
+    };
+  }
   if (!subject || subject.keys.length === 0) {
     const classified = parameterNarrativePriority({ key: null, weight: 0, level: null, relevance, excluded });
     return { ...classified, area: subject?.area || null };

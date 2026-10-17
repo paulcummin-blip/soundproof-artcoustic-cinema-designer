@@ -191,19 +191,17 @@ Say that this is the calculated summary of the design (predicted, not measured),
 
 If no calculated rows are supplied for this design, write 2 to 3 short paragraphs describing the performance this design delivers, using only the results present in the supplied Sound Proof calculated data, and still do not write a table.`,
 
-  overall_design: `Write the Overall Design section: a concise summary of the whole design, and the strongest paragraph in the report.
+  overall_design: `Write the Overall Design section: the designer's closing judgement on the whole design, and the strongest prose in the report.
 
-Bring the room back together: the image scale on the screen, how the loudspeakers are laid out around and above the listener, the dynamic headroom available, the tonal consistency across the system, the seats where the design performs best, and one clear upgrade opportunity where one exists.
+Answer one question: why is this the right design for this room and this client? Bring the design DECISIONS together — how the room itself is laid out and why, the scale of the image, how the seating is arranged in the room it has, how the system is laid out around and above the audience, and how the bass system was arranged to work with the room rather than against it — and say what those decisions give the client as one experience.
 
-Explain why the design works as a complete system. Every major decision has a reason, and the components were chosen to work together.
+Write it as professional judgement rather than as a summary of the report. A decision the earlier sections already explained is referred to, never re-explained and never re-measured: do not restate a value, a Performance Level, a range of levels or a list of the parameters the design scored well on, and do not work through the performance areas again. Do not write a list, a table or a second performance summary, and never repeat the Key Performance Highlights table. Name the strongest part of the design and the one compromise in plain language instead.
 
-Where the design is strongest, say so plainly. State any clear limitation honestly, explain what causes it, and say what a later upgrade would change, only where the supplied data supports it.
+Where the design is strongest, say so plainly and without qualification. Where the room introduces a real variation — a further row, a seat outside the strongest area — state it honestly in one clause, say what causes it, and keep it in proportion: an honest limit stated calmly reads as confidence, and it is never presented as a fault to be corrected.
 
-For a modest system, explain the benefits clearly, do not claim more than the evidence shows, and point to sensible upgrades. For a high performance system, state the quality clearly and do not undersell it.
+Close on the room as a place to be used and shared: this is a cinema meant to be lived in, watched properly and enjoyed with the people who share it. Say it once, in this project's own terms, in a sentence that could only be about this room, and never as a general sentiment about home cinema.
 
-Close by bringing the design together for this particular cinema: why these elements work together here, and what that gives the client. Do not repeat the previous sections, do not summarise the equipment again, and do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
-
-This section is prose only. Never repeat the Key Performance Highlights table, never list its rows, and do not write a list, a table or a second performance summary: that table is the report's one structured evidence section. Name the strongest part of the design and the main compromise in the prose instead.
+Use only the supplied Sound Proof calculated data and the supplied design reasons, and never invent a value or a reason.
 2 to 4 short paragraphs.`,
 
   room_images: `Write a brief introduction for the project images section, in the voice above. The images follow this introduction. 1 paragraph.`,

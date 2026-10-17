@@ -378,7 +378,10 @@ export default function ProposalPackDocument({
     comparisonPagesPlaced = true;
   };
 
-  const pushUnplacedImages = (title = 'Project Images', lead = '') => {
+  // The remaining photographs are part of the editorial flow, so no portfolio
+  // heading is printed over them: a title is passed only where a dedicated
+  // gallery was explicitly asked for.
+  const pushUnplacedImages = (title = '', lead = '') => {
     if (galleryPagesPlaced || !galleryPageImages.length) return;
     imagePagesFor(galleryPageImages).forEach((images, index) => {
       addPage(<ProjectImagesPage key={`selected-images:${index}`} number={takeNumber()}
@@ -491,7 +494,7 @@ export default function ProposalPackDocument({
         // Preserve every unused selected photograph, with its caption and natural
         // proportions — and, where no other page published it, the project's own
         // images copy above them.
-        pushUnplacedImages(displayTitle, takeImageFlowLead());
+        pushUnplacedImages('', takeImageFlowLead());
         return;
       }
 
@@ -788,7 +791,7 @@ export default function ProposalPackDocument({
   }
 
   if (!comparisonPagesPlaced && comparisonGroups.length) pushComparisonPages();
-  pushUnplacedImages('Project Images', takeImageFlowLead());
+  pushUnplacedImages('', takeImageFlowLead());
 
   return (
     <div className="proposal-print-portal" data-selected-images={JSON.stringify(imagePlan.selectedImageUrls)}>

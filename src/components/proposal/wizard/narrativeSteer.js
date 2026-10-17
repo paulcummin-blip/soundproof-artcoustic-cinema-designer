@@ -88,7 +88,16 @@ export const STEER_TITLE = 'Narrative Steer';
  */
 export const TOPIC_LIBRARY = Object.freeze({
   display: { label: 'Display and screen scale', area: 'display_viewing' },
-  system_approach: { label: 'System approach', area: 'loudspeaker_configuration' },
+  // The room's OWN design decisions: what the designer did to this room, which is
+  // what the client actually asks about. A decision is never a parameter, a result
+  // or a channel count, and it outranks every generic system fact.
+  room_reorientation: { label: 'Room reorientation and screen scale', area: 'design_decisions' },
+  // The system subject, named for what it is: an immersive loudspeaker layout. The
+  // design's own configuration ("9.1.6") is its INTERNAL decoder identity and is
+  // never the client-facing format, so no layout number is part of the subject's
+  // name: the client-facing format is read from the one shared client format
+  // authority wherever a report states one.
+  system_approach: { label: 'Immersive loudspeaker layout', area: 'loudspeaker_configuration' },
   // Every label names the SUBJECT, never the verdict. It is the topic that is
   // steered ("Bass performance", "Tonal consistency"), and the assessed result
   // decides later how strongly that subject may be described — so no label ever
@@ -123,6 +132,8 @@ export const TOPIC_LIBRARY = Object.freeze({
 const LEGACY_LABEL_TOPICS = Object.freeze([
   // Ordered most specific first: an evidence example that names a TV is the
   // display topic, not the viewing topic it also mentions.
+  ['room reorientation', 'room_reorientation'],
+  ['reorientation', 'room_reorientation'],
   ['" tv', 'display'],
   [' tv', 'display'],
   ['television', 'display'],
@@ -193,7 +204,12 @@ export function steerStateOf(steer, key) {
 export function steerLabelOf(steer, key) {
   const entry = steer?.[key];
   const label = typeof entry === 'object' && entry ? entry.label : null;
-  return String(label || '').trim() || topicLabel(key) || key;
+  const stored = String(label || '').trim();
+  // A chip saved before the wording changed may carry the layout number. That
+  // number is the design's internal decoder identity and is never client-facing,
+  // so it is read back as the subject's own name.
+  if (key === 'system_approach' && /\d/.test(stored)) return topicLabel(key);
+  return stored || topicLabel(key) || key;
 }
 
 /**
@@ -303,6 +319,9 @@ const SUGGESTED_MIN_LEVEL = Object.freeze({
 
 /** Topics ADI never promotes: they are offered so the designer can steer them. */
 const NEVER_SUGGESTED = Object.freeze(new Set([
+  // A deliberate design decision is explained as reasoning and is never promoted
+  // as a performance result.
+  'room_reorientation',
   'channel_count',
   'seating_arrangement',
   'seating_geometry',
@@ -341,13 +360,11 @@ function refineTopicLabel(key, evidenceLabel, fallback) {
     if (!Number.isFinite(size)) return fallback;
     return /\bTV\b|television/i.test(text) ? `${size}" TV` : `${size} inch screen`;
   }
-  // The configuration the design actually uses becomes part of the subject's own
-  // name — "5.1 system approach" — so the chip is precise about WHAT it covers
-  // while still saying nothing about how good it is.
-  if (key === 'system_approach') {
-    const configuration = /\b([579]\.\d(?:\.\d)?)\b/.exec(text);
-    return configuration ? `${configuration[1]} system approach` : fallback;
-  }
+  // The system subject never carries a configuration number. The design's own
+  // "9.1.6" is its internal decoder identity, and the client-facing format is a
+  // different figure again (the subwoofer count replaces the LFE digit), so the
+  // number is left out of the subject's name entirely rather than quoted wrongly.
+  if (key === 'system_approach') return fallback;
   return fallback;
 }
 
@@ -357,6 +374,9 @@ function refineTopicLabel(key, evidenceLabel, fallback) {
  * as neutral topics and none of them is suggested.
  */
 export const ALWAYS_OFFERED_TOPICS = Object.freeze([
+  // Offered first: the room's own decisions lead the design story, and every
+  // generic system subject follows them.
+  'room_reorientation',
   'display',
   'system_approach',
   'screen_tonal',

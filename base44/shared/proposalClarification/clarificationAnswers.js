@@ -122,7 +122,17 @@ export const CLARIFICATION_ANSWER_RULE =
   + 'and develop it properly with established acoustic knowledge, so the reasoning behind the '
   + 'decision is explained confidently and usefully rather than paraphrased: an intention is '
   + 'never weakened, hedged or apologised for because a parameter scored low, and it is never '
-  + 'given a figure, a level or a guarantee of its own. Where the designer passed a question there is '
+  + 'given a figure, a level or a guarantee of its own. The answer is the REASON and never the copy: never quote it, '
+  + 'never repeat its wording, and never carry its shorthand, abbreviation or engineering jargon into the document. '
+  + 'Restate the reasoning in the document\'s own professional language, as the designer would explain the decision to '
+  + 'the client, so a phrase that is useful between engineers is never printed at the client: a term that names a '
+  + 'mechanism rather than an experience — a gap left in a layer, a hole in the coverage — is replaced by what the '
+  + 'listener hears and what the decision does about it. Where an answer explains '
+  + 'a choice through a practical constraint on the room — how the room is used, the space a furnishing, a thoroughfare '
+  + 'or a storage area occupies, what happens at one end of the room — explain the design\'s RESPONSE to that constraint, '
+  + 'in general terms. The constraint is the context for the decision, never a requirement: never state a furnishing, a '
+  + 'joinery item, a bar or any other interior feature as something the design needs, specifies or depends on. '
+  + 'Where the designer passed a question there is '
   + 'no answer at all, and no reason may be invented for it.';
 
 /**
