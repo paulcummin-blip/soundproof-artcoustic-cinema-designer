@@ -166,6 +166,10 @@ export default function ProposalImagePlacementStyles() {
            its own uncropped treatment: it is never cropped to suit this scale. */
         .pp-closing { margin-top: 6mm; }
         .pp-closing .pp-media img { height: 78mm; }
+        /* One concluding photograph is the page's editorial hero, not half of a
+           pair. It receives the standard full-width feature depth while leaving
+           room for the conclusion above it. */
+        .pp-closing--1 .pp-media img { height: 118mm; }
         .pp-closing .pp-media { margin-bottom: 6mm; }
         .pp-closing .pp-media:last-child { margin-bottom: 0; }
         .pp-closing .pp-media.pp-media--presentation-detail img,
