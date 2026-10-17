@@ -156,25 +156,41 @@ test("Genesis: the strongest genuine stories are selected in rank order", () => 
   assert.ok(estimateHighlightsMm(highlights) <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
 });
 
-test("Genesis: spatial placement names each measure, and the viewing strength is the front row only", () => {
+test("Genesis: the page states exactly four themes, and no placement or seating card", () => {
   const highlights = buildAdiDesignHighlights(GENESIS_SOURCES);
-  const spatial = highlights.find((highlight) => highlight.id === "spatial-resolution");
 
-  assert.ok(spatial, "the room-scope placement strengths are raised");
-  assert.deepEqual(spatial.sources.sort(), ["P11", "P3", "P7"]);
-  assert.equal(spatial.level, "L4");
-  // Each measure carries its own published result rather than one blanket claim.
-  for (const item of spatial.evidence) assert.ok(item.level === "L4" && item.value, JSON.stringify(item));
-  assert.match(spatial.explanation, /each stated on its own published result/);
-  assert.doesNotMatch(spatial.explanation, /every seat|throughout the room|uniformly/i);
+  // EXACTLY FOUR — the four themes, in their own order, and nothing else.
+  assert.deepEqual(
+    highlights.map((highlight) => highlight.id),
+    ["spatial-resolution", "timbre-matching", "dynamic-range", "bass-performance"],
+  );
+  assert.deepEqual(
+    highlights.map((highlight) => highlight.title),
+    ["Spatial Resolution", "Timbre Matching", "Dynamic Range", "Bass Performance"],
+  );
+  // The cards the page used to raise on their own are gone: the placement results
+  // are stated inside Spatial Resolution, and the seating clearance is the
+  // design's own decision rather than a performance theme.
+  for (const gone of ["seating-clearance", "viewing-geometry", "immersive-layout", "bass-output"]) {
+    assert.equal(
+      highlights.some((highlight) => highlight.id === gone),
+      false,
+      `${gone} must not be a card of its own`,
+    );
+  }
 
-  const viewing = highlights.find((highlight) => highlight.id === "viewing-geometry");
-  assert.equal(viewing.level, "L4");
-  assert.equal(viewing.scope, "row");
-  assert.equal(viewing.evidence.length, 1, "only the front row is claimed");
-  assert.match(viewing.title, /Front row viewing immersion/);
-  assert.match(viewing.explanation, /front row views the TV at 57\.3°/);
-  assert.doesNotMatch(viewing.explanation, /every row|all rows|rear row/i);
+  // Every result a theme states travels on its own evidence line as a pill, and
+  // no theme rests on an assumed parameter.
+  for (const highlight of highlights) {
+    assert.ok(highlight.explanation, `${highlight.id} states its own copy`);
+    for (const item of highlight.evidence) {
+      assert.ok(item.key && item.level, JSON.stringify(item));
+      assert.doesNotMatch(String(item.key), /P8|P15|P21/);
+    }
+  }
+
+  // All four themes fit the page's own budget together.
+  assert.ok(estimateHighlightsMm(highlights) <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
 });
 
 test("Genesis: the weaker results are audited, not hidden", () => {

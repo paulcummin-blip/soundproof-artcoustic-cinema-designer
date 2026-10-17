@@ -175,19 +175,21 @@ export function useProjectReportPages({
   // exists: a 5.1 system is a deliberate 5.1 system, not a missing immersive one.
   const overheadLayerInstalled = productEntries(productsSelected, 'overheads').length > 0;
 
-  // The ADI Design Highlights page's content: the highlights ADI selects from
-  // this design's own frozen evidence — the published RP22 and RP23 results and
-  // their seat scope, the products specified, the seating and the architecture.
-  // Only genuine strengths are raised, and the list is already fitted to its
-  // page budget, so the Highlights page can never clip.
+  // The ADI Design Highlights page's content: EXACTLY FOUR Key Performance themes
+  // — Spatial Resolution, Timbre Matching, Dynamic Range and Bass Performance —
+  // each grounded in this design's own frozen evidence: its published RP22 and
+  // RP23 results and their seat scope, the products specified and the architecture.
+  // The four themes are the page's whole content, and the list is already fitted to
+  // its page budget, so the Highlights page can never clip.
   const adiHighlights = useMemo(() => buildAdiDesignHighlights({
     engineeringSummary,
     productsSelected,
     seatingPositions,
-    // The seating clearance highlight explains where this design's seating
-    // actually sits, so the room it was designed in travels with the seating plan.
     roomDims,
     dolbyConfig: projectDetails?.dolby_config,
+    // The design's own 7-channel bed choice, so a 7-bed layout names the layer it
+    // actually holds (rears or wides) instead of guessing.
+    sevenBedLayoutType: projectDetails?.seven_bed_layout_type,
     // How the design's display is named in ADI's own copy: a television or a
     // projection screen, read from the saved design's own authority.
     displayType: resolveDisplayType(projectDetails),

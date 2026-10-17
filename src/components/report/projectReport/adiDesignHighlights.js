@@ -43,6 +43,17 @@
  *
  * The story builders live in adiHighlightStories; the canonical weighting lives
  * in adiHighlightImportance. Read-only and pure throughout.
+ *
+ * THE PAGE'S CONTENT AND THE RANKED SELECTION ARE TWO DIFFERENT THINGS, and this
+ * module holds both on purpose:
+ *
+ *   · buildAdiDesignHighlights — what the page STATES: exactly four themes, from
+ *     adiHighlightThemes (Spatial Resolution, Timbre Matching, Dynamic Range,
+ *     Bass Performance). No separate placement card and no seating-clearance card.
+ *   · selectAdiHighlights — the ranked-evidence selection and its audit: which
+ *     individual results the evidence offered, in canonical rank order, and why
+ *     anything was left out. It is the ranking authority the proposal-side parity
+ *     rules and the diagnostics read; it is no longer the page's card list.
  */
 
 import { fitHighlightsToBudget, PAGE_BLOCK_MM, PROJECT_REPORT_PAGE_BUDGET_MM } from './projectReportPageBudget';
@@ -69,6 +80,8 @@ import {
   withMandatoryStories,
   MANDATORY_STORY_IDS,
 } from './adiHighlightStories';
+// The page's own content authority: the four themes it states, and nothing else.
+import { buildAdiHighlightThemes } from './adiHighlightThemes';
 
 export {
   MIN_STRENGTH_LEVEL,
@@ -322,9 +335,21 @@ function rejectedClaims({ engineeringSummary, productsSelected } = {}, { byKey =
   return rejected;
 }
 
-/** The highlights page's content: this design's own ADI selection. */
+/**
+ * The highlights page's content: this design's own four Key Performance themes.
+ *
+ * The page states EXACTLY FOUR themes — Spatial Resolution, Timbre Matching,
+ * Dynamic Range and Bass Performance — and no other card. There is no separate
+ * placement card and no seating-clearance card: the placement results are stated
+ * inside Spatial Resolution, and the seating decision is the design's own
+ * decision rather than a performance theme.
+ *
+ * The four themes are grounded in the same eligible published evidence the ranked
+ * selection above ranks, so the page can never state a result the publication does
+ * not support.
+ */
 export function buildAdiDesignHighlights(sources = {}) {
-  return selectAdiHighlights(sources).highlights;
+  return buildAdiHighlightThemes(sources);
 }
 
 export default buildAdiDesignHighlights;

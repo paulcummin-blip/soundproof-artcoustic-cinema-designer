@@ -174,8 +174,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'there is strong dynamic capability, letting loud moments arrive with real energy while dialogue and detail stay clear',
     },
     L3: {
-      sentence: 'Serious cinema-level headroom, giving large-scale effects and music substantial impact without sounding strained.',
-      clause: 'the system has serious cinema-level headroom, giving large-scale effects and music substantial impact without sounding strained',
+      sentence: 'Strong headroom across the whole system, so large-scale effects and music arrive with substantial impact without sounding strained.',
+      clause: 'the system has strong headroom across the whole system, so large-scale effects and music arrive with substantial impact without sounding strained',
     },
     L4: {
       sentence: 'Exceptional dynamic headroom, delivering the scale, immediacy and physical impact of the biggest film moments with remarkable authority.',
@@ -210,8 +210,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'a strong sense of placement and movement',
     },
     L3: {
-      sentence: 'A highly precise and enveloping presentation.',
-      clause: 'a highly precise and enveloping presentation',
+      sentence: 'Close placement across the room, so effects arrive from the direction they were mixed for and movement between speakers stays continuous.',
+      clause: 'close placement across the room, with effects arriving from the direction they were mixed for and movement between speakers staying continuous',
     },
     L4: {
       sentence: 'Exceptionally precise placement and seamless movement around the room.',
@@ -224,7 +224,7 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
 export const GENERAL_INTENSITY_SCALE = Object.freeze({
   L1: Object.freeze(['solid', 'convincing', 'clear', 'capable', 'engaging', 'good scale', 'real weight', 'proper surround movement']),
   L2: Object.freeze(['strong', 'deep', 'involving', 'substantial', 'impressive', 'greater scale', 'real impact']),
-  L3: Object.freeze(['very strong', 'very deep', 'powerful', 'highly accomplished', 'substantial authority', 'serious cinema performance', 'considerable headroom']),
+  L3: Object.freeze(['very strong', 'very deep', 'highly accomplished', 'substantial authority', 'substantial headroom', 'considerable headroom']),
   L4: Object.freeze(['exceptional', 'outstanding', 'reference-level', 'extremely consistent', 'huge scale', 'physical impact', 'exceptional authority', 'seamless', 'remarkably controlled']),
 });
 

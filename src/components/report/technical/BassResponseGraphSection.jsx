@@ -23,6 +23,9 @@ import {
   buildReportBassGraphs,
   P19_RSP_EXPLANATION,
 } from "./bassResponseGraphAuthority";
+// The ONE P19 curve-availability authority, shared with the Visual Report's P19
+// page: there is a single answer to "is the P19 curve available?".
+import { resolveP19CurveAvailability } from "@/components/report/p19CurveAvailability";
 import BassResponsePlot from "./BassResponsePlot";
 import P19RspGraphContent from "@/components/report/P19RspGraphContent";
 import {
@@ -86,9 +89,11 @@ function GraphPage({ id, blockName, title, explanation, graph = null, note = nul
         </div>
       </header>
 
-      <p style={{ fontFamily: REPORT_FONT_BODY, fontSize: "10pt", lineHeight: 1.6, color: "#3E4349", margin: "0 0 4mm" }}>
-        {explanation}
-      </p>
+      {explanation ? (
+        <p style={{ fontFamily: REPORT_FONT_BODY, fontSize: "10pt", lineHeight: 1.6, color: "#3E4349", margin: "0 0 4mm" }}>
+          {explanation}
+        </p>
+      ) : null}
 
       {content || (
         <>
@@ -136,6 +141,15 @@ export default function BassResponseGraphSection({
 
   if (!graphs.ready) return null;
 
+  // ONE answer to "is the P19 curve available?", resolved through the same
+  // canonical authority the Visual Report's P19 page reads, over the same frozen
+  // bass evidence — so the two reports can never state a different P19 picture.
+  // With the curve held, the graph is drawn and the explanation that describes
+  // what it plots may be stated. With no curve, the page states the published
+  // result and the missing-evidence note, and describes NO shape: a page may never
+  // claim a curve the report does not hold.
+  const p19Curve = resolveP19CurveAvailability({ graph: graphs.p19 });
+
   const shared = {
     transitionHz: graphs.transitionHz,
     assessmentBand: graphs.assessmentBand,
@@ -152,7 +166,7 @@ export default function BassResponseGraphSection({
         id="pdf-bass-response-p19-rsp"
         blockName="bass-response-p19-rsp"
         title="P19 BASS RESPONSE AT THE RSP"
-        explanation={P19_RSP_EXPLANATION}
+        explanation={p19Curve.available ? P19_RSP_EXPLANATION : null}
         content={<P19RspGraphContent graph={graphs.p19} result={p19Result} chartId="bass-response-p19-rsp" />}
         first={variant !== "print"}
       />
