@@ -458,6 +458,7 @@ export default function ProposalPackDocument({
               comparisonVersions={comparisonVersions}
               comparisonExpected={isComparisonKind}
               viewingResult={isComparison ? null : viewingResult}
+              snapshot={proposal?.engineering_snapshot}
             />
           </section>
         );
