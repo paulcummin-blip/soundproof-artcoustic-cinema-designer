@@ -509,7 +509,7 @@ export function buildClientSummaryRows(snapshot) {
     {
       key: 'client_timbre',
       area: 'Timbre Matching',
-      parameter: 'P16 screen · P17 surround/overhead',
+      parameter: 'P16 screen · P17 immersive',
       result: timbre.join(' · '),
       gain: 'Voices and effects retain a consistent tonal character within each assessed speaker group.',
     },
