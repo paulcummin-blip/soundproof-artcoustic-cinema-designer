@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposalEvidenceBuilder.js';
 import { EVIDENCE_AT, option } from './fixtures/proposalEvidenceFixtures.mjs';
 import {
+  DESIGN_INTENT_REFERENCE_PASSAGES,
   DESIGN_INTENT_REQUIREMENT,
   DESIGN_INTENT_SECTION,
   DESIGN_INTENT_WORD_LIMIT,
@@ -81,16 +82,44 @@ describe('the Design Intent brief', () => {
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/design intent/i);
     expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/Begin with a professional recommendation/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never announce a recommendation/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/why it suits this room/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/picture, the seating and the loudspeaker arrangement/i);
+    // The three things the block explains, and nothing else.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/what this room is designed around/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/why the layout was chosen for it/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/what the system does well/i);
+    // The copy is driven by this project's own facts rather than recited from a
+    // schedule, and the room dimensions are not repeated.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/DRIVE THE COPY WITH THIS PROJECT'S OWN FACTS/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/no equipment-by-equipment schedule/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/no repeated room dimensions/i);
+    // The three core performance ideas, developed as prose and never as headings.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/SPATIAL RESOLUTION is how the loudspeaker arrangement/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/TIMBRE MATCHING is how the loudspeaker layers/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/DYNAMIC RANGE is how much headroom/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never as headings/i);
+    // The plain register, and the rhetoric the block refuses.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/short direct sentences, active voice/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/no figurative or anthropomorphic language/i);
+    // The shape and length on the report's first page.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/three short paragraphs/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/140 to 190 words/i);
+    // The safety rules are unchanged.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/translate the established engineering principles/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/recorded designer intent/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never paraphrase the designer/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/complete cinema experience/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/natural British English/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/RP22 parameters/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never name a treatment product/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never invent a physical loudspeaker position/i);
+  });
+
+  it('shows the register with references that carry no project fact', () => {
+    // The references demonstrate the copy at its best and hold no figure, product,
+    // layout or distance of their own, so no fact can be carried across from them:
+    // every fact in a report's copy comes from that project's own frozen evidence.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/DESIGN INTENT REFERENCE/);
+    expect(DESIGN_INTENT_REFERENCE_PASSAGES).toHaveLength(3);
+    for (const passage of DESIGN_INTENT_REFERENCE_PASSAGES) {
+      expect(passage).not.toMatch(/\d/);
+    }
   });
 
   it('scopes the real writer input to the one Design Intent section', () => {

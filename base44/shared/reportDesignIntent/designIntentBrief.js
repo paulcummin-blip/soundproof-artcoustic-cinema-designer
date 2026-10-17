@@ -37,6 +37,9 @@ export const DESIGN_INTENT_SECTION = 'decision_summary';
 /** The written target the writer is given. */
 export const DESIGN_INTENT_TARGET_WORDS = '140 to 190';
 
+/** The ceiling the draft is validated against: headroom above the target. */
+export const DESIGN_INTENT_WORD_LIMIT = 200;
+
 /**
  * THE DESIGN INTENT'S APPROVED REFERENCE PASSAGES.
  *
