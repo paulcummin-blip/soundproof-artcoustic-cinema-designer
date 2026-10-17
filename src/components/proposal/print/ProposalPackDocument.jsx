@@ -37,7 +37,12 @@ import {
   resolveCoverAssetId,
 } from '@/components/proposal/images/proposalImagePlanner';
 import { validateProposalImagePlan } from '@/components/proposal/images/proposalImagePlanValidator';
-import { EDITORIAL_ROLE, IMAGE_PRESENTATION, makePlacement } from '@/components/proposal/images/proposalImagePlacementAuthority';
+import {
+  EDITORIAL_ROLE,
+  IMAGE_PRESENTATION,
+  imagePresentationOf,
+  makePlacement,
+} from '@/components/proposal/images/proposalImagePlacementAuthority';
 import ClosingPhotographPair from '@/components/proposal/print/ClosingPhotographPair';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
@@ -177,7 +182,26 @@ export default function ProposalPackDocument({
   // A comparison group is not a stored section either: each group takes a page
   // of its own, carrying the designer's message and both options full width.
   const comparisonGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 1);
-  let galleryPagesPlaced = false;
+
+  // A concluding section may carry ONE dominant photograph. If the planner has
+  // already assigned it a landscape/closing feature, that is the photograph. If
+  // not, the first unused Full Width image becomes its hero. Every other unused
+  // image keeps the Library's own presentation weight on dedicated image pages:
+  // Full Width images get one page each and Detail images remain supporting.
+  const closingSection = byType.get('overall_design') || byType.get('conclusion') || null;
+  const plannedClosingMedia = placementsBySection[closingSection?.id] || [];
+  const plannedClosingFeature = plannedClosingMedia.find((placement) => (
+    placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE
+      || placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE
+  )) || null;
+  const closingGalleryAsset = plannedClosingFeature
+    ? null
+    : imagePlan.galleryImages.find((asset) => imagePresentationOf(asset) === IMAGE_PRESENTATION.FULL_WIDTH) || null;
+  const galleryPageImages = imagePlan.galleryImages.filter((asset) => (
+    !closingGalleryAsset || asset?.id !== closingGalleryAsset?.id
+  ));
+  let galleryPagesPlaced = galleryPageImages.length === 0;
+  let closingHeroPlaced = false;
   let comparisonPagesPlaced = false;
 
   // ── ONE carrier for the document's alternatives ──────────────────────────
@@ -304,27 +328,21 @@ export default function ProposalPackDocument({
   };
 
   const pushUnplacedImages = (title = 'Project Images') => {
-    if (galleryPagesPlaced || !imagePlan.galleryImages.length) return;
-    imagePagesFor(imagePlan.galleryImages).forEach((images, index) => {
+    if (galleryPagesPlaced || !galleryPageImages.length) return;
+    imagePagesFor(galleryPageImages).forEach((images, index) => {
       addPage(<ProjectImagesPage key={`selected-images:${index}`} number={takeNumber()}
         title={title} images={images} preserveNatural />);
     });
     galleryPagesPlaced = true;
   };
 
-  // ── The photographs that close the design ────────────────────────────────
-  // The section that concludes the design carries the last photographs IN it:
-  // the photograph the planner already gave that section, followed by every
-  // selected photograph it could not place editorially, composed as one pair
-  // under the conclusion's own copy at the existing full-width editorial scale.
-  // They are never exiled to a page of their own, and no photograph is printed
-  // twice: the pair is built from the plan's own placements, and the planner
-  // never gives one source to two body slots. Where the document has no
-  // concluding section, nothing changes: the photographs keep the Project
-  // Images page this document has always given them.
+  // ── The photograph that closes the design ────────────────────────────────
+  // The conclusion carries one dominant visual idea, never a contact sheet. The
+  // remaining photographs continue afterwards on pages composed from the Image
+  // Library presentation metadata.
   const closingPairTypes = new Set(['overall_design', 'conclusion']);
-  const composesClosingPair = (sectionType) => !galleryPagesPlaced
-    && imagePlan.galleryImages.length > 0
+  const composesClosingPair = (sectionType) => !closingHeroPlaced
+    && Boolean(plannedClosingFeature || closingGalleryAsset)
     && closingPairTypes.has(sectionType);
 
   // One page carries the project, the room and the brief: no second page
@@ -477,23 +495,21 @@ export default function ProposalPackDocument({
         || placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE) || null;
       const portrait = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL) || null;
 
-      // The pair that closes the design, when this is the concluding section: the
-      // photograph the plan already gave it, followed by the selected photographs
-      // the plan could not place editorially, in gallery order. Every image is a
-      // placement the plan's own rules produce, so its crop, focal point,
-      // presentation choice and caption are the ones the designer set.
+      // The single photograph that closes the design. A section placement wins;
+      // otherwise one unused Full Width Library image is handed into this page.
+      // Detail images are never promoted into the closing hero.
+      const sectionClosingFeature = media.find((placement) => (
+        placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE
+          || placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE
+      )) || null;
       const closingPlacements = composesClosingPair(section.section_type)
-        ? [
-          ...media.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE
-            || placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE),
-          ...imagePlan.galleryImages.map((asset, index) => makePlacement({
-            source: asset,
-            role: EDITORIAL_ROLE.CLOSING_FEATURE,
-            sectionId: section.id,
-            pagePosition: 'closing',
-            order: index,
-          })),
-        ]
+        ? [sectionClosingFeature || makePlacement({
+          source: closingGalleryAsset,
+          role: EDITORIAL_ROLE.CLOSING_FEATURE,
+          sectionId: section.id,
+          pagePosition: 'closing',
+          order: 0,
+        })]
         : [];
       // The section's own copy for the images it closes with: the Project Images
       // introduction, published here above the photographs it was written for, so
@@ -682,9 +698,9 @@ export default function ProposalPackDocument({
         sheet.children.push(groupNode);
       }
 
-      // The concluding section now carries the photographs that would otherwise
-      // have had a page of their own, so that page is not composed.
-      if (closingPlacements.length > 0) galleryPagesPlaced = true;
+      // The concluding hero has been used once. Remaining images still flow to
+      // their own metadata-led pages after the narrative.
+      if (closingPlacements.length > 0) closingHeroPlaced = true;
 
       // A seating group too long for one page continues past it, every image
       // still with its own caption and the group's explanation already stated.
