@@ -110,7 +110,7 @@ export const RP22_CLIENT_BENEFIT_INTENT = Object.freeze([
     parameter: 'P13',
     measures: 'the sound pressure capability of the non-screen speakers at the reference position',
     matters: 'the surrounds and overheads need their own reserve. Without it, effects around and above the audience disappear behind the front stage as soon as the soundtrack becomes busy.',
-    establishes: 'a result here describes the reserve the surround and height layers have at the reference position, independently of the screen stage and of bass. As with the screen stage, this is a calculated reserve rather than proof that the system stays free from compression.',
+    establishes: 'a result here describes the reserve the surround and height layers have at the reference position, independently of the screen stage and of bass. As with the screen stage, this is a reserve the design provides rather than proof that the system stays free from compression.',
   }),
   Object.freeze({
     parameter: 'P14',

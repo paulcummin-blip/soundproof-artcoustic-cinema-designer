@@ -19,8 +19,11 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { DESIGN_INTENT_REQUIREMENT } from '../base44/shared/reportDesignIntent/designIntentBrief.js';
-import { buildWritingStyleContract } from '../base44/shared/reportWritingStyleContract.js';
+import {
+  DESIGN_INTENT_REQUIREMENT,
+  DESIGN_INTENT_REFERENCE_PASSAGES,
+} from '../base44/shared/reportDesignIntent/designIntentBrief.js';
+import { buildWritingStyleContract, BANNED_WORDS } from '../base44/shared/reportWritingStyleContract.js';
 import {
   DESIGN_INTENT_WRITING,
   buildProposalWritingAuthority,
@@ -106,5 +109,54 @@ describe('B. The grounding rule is untouched', () => {
     );
     expect(codes(unsupported)).toContain(WRITER_REJECTION.UNSUPPORTED_RECOMMENDATION);
     expect(unsupported.valid).toBe(false);
+  });
+});
+
+describe('C. The final Design Intent language rules reach the prompt', () => {
+  const PROHIBITED = [
+    'calculated reserve to draw on',
+    'reserve to draw on',
+    'alongside its low-frequency output capability',
+    'effects have clear positions',
+  ];
+
+  it('prohibits the four phrases the brief was written to remove', () => {
+    for (const phrase of PROHIBITED) {
+      // The Design Intent's own never-use list names it...
+      expect(DESIGN_INTENT_REQUIREMENT.toLowerCase()).toContain(phrase);
+      // ...and the shared banned-phrase authority refuses it everywhere else.
+      expect(BANNED_WORDS.map((word) => word.toLowerCase())).toContain(phrase);
+    }
+  });
+
+  it('states reserve as useful reserve, and never shows the writer the other wording', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never a reserve to draw on/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/useful reserve/);
+    // The sentence that invited the phrase is gone: the authority states the
+    // reserve as useful reserve, and names the banned wording only to ban it.
+    const authority = buildProposalWritingAuthority();
+    expect(authority).not.toContain('Capacity is a calculated reserve');
+    expect(authority).toContain('never as "calculated reserve to draw on"');
+  });
+
+  it('gives the three ideas a direct shape, in the reference register', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toContain(
+      'the front wides, side and rear surrounds, and overhead channels provide strong spatial resolution around and above the seating',
+    );
+    expect(DESIGN_INTENT_REQUIREMENT).toContain(
+      'dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers',
+    );
+    // The reference paragraph shows that sentence at its best.
+    expect(DESIGN_INTENT_REFERENCE_PASSAGES.join(' ')).toContain('at the reference position');
+  });
+
+  it('takes the bass extension from the project, never from a stored figure', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toContain(
+      'the front-and-rear subwoofer arrangement extends the predicted low-frequency response to the published figure',
+    );
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/this project's own P18 evidence/i);
+    // No hard-coded extension anywhere in the brief, and no figure in a reference.
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/\b\d+\s?Hz\b/);
+    for (const passage of DESIGN_INTENT_REFERENCE_PASSAGES) expect(passage).not.toMatch(/\d/);
   });
 });

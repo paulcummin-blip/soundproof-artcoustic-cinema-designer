@@ -103,6 +103,12 @@ export const BANNED_WORDS = [
   // explanation, and section labels that are never a real section.
   'Reference-grade',
   'Reference grade',
+  // The Design Intent's own language rules, banned on every writing surface:
+  // a reserve is stated as useful reserve, and the layers are named directly.
+  'Calculated reserve to draw on',
+  'Reserve to draw on',
+  'Alongside its low-frequency output capability',
+  'Effects have clear positions',
   'Fluidly',
   'Unified approach',
   'Future considerations',

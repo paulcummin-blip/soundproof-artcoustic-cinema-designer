@@ -266,7 +266,7 @@ export const PROPOSAL_SALES_WRITING_AUTHORITY = [
   'Write:',
   '“The screen stage has substantially more headroom. Dialogue, music and effects can build in scale with the front speakers holding their composure as the film becomes demanding.”',
   '',
-  'Capacity is a calculated reserve, never proof of how the system behaves. Never write that the system cannot compress, that it stays clean at any level, or that it never runs out of headroom: state the reserve the design provides and the demanding material it is there for, and leave unmeasured behaviour unclaimed.',
+  'Capacity is a reserve the design provides, never proof of how the system behaves. It is written as useful reserve, and never as "calculated reserve to draw on" or "reserve to draw on". Never write that the system cannot compress, that it stays clean at any level, or that it never runs out of headroom: state the reserve the design provides and the demanding material it is there for, and leave unmeasured behaviour unclaimed.',
   '',
   'Instead of:',
   '“P13 achieves Level 4.”',
