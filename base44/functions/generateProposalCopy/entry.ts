@@ -9,6 +9,7 @@ import {
 } from '../../shared/proposalGeneration/proposalGenerationRunner.js';
 import { GPT_WRITER_FLAG_FIELD, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 import { readProjectOptionGuidance } from '../../shared/proposalWriter/readProjectOptionGuidance.js';
+import { applyProposalRevision } from '../../shared/proposalEdit/proposalRevisionHandoff.js';
 
 /**
  * Generate one controlled GPT proposal copy — Phase 6.
@@ -134,6 +135,21 @@ export default async function(req) {
     const created = await base44.entities.ProposalGeneration.create(
       generationEntityPayload({ record: attempt.record, accountId: proposalAccountId }),
     );
+
+    // A valid generation becomes the proposal page's current revision in the same
+    // successful operation. The page, approval fingerprints and export validator
+    // therefore read one copy; a later approval can never belong to an older page.
+    if (attempt.valid === true && Array.isArray(attempt.record?.gpt_output?.sections)) {
+      await applyProposalRevision({
+        entities: base44.entities,
+        proposalId: proposal.id,
+        sections: attempt.record.gpt_output.sections,
+        mode: attempt.record?.gpt_input?.section_structure?.proposal_mode || attempt.record?.evidence_pack?.mode || 'single',
+        generationId: attempt.generation_id,
+        appliedAt: attempt.record?.created_at || new Date().toISOString(),
+        source: 'generated',
+      });
+    }
 
     // The provider, model and contract versions are logged so a live attempt can
     // always be traced to exactly what read and wrote it.
