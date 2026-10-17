@@ -53,8 +53,12 @@ describe('Barton proposal client-summary authority', () => {
     expect(dynamic.result).toContain('110 dBC');
     expect(dynamic.result).toContain('102 dBC (FW)');
     expect(dynamic.result).toContain('115 dBC');
+    expect(dynamic.parameter).toBe('P12 screen · P13 non-screen · P14 bass');
     expect(bass.result).toContain('22 Hz');
-    expect(bass.result).toContain('±9.6 dB');
+    // P20 is a lower-is-better deviation, so the client row states the canonical
+    // floored display value. The stored headline above keeps its raw 9.6 dB.
+    expect(bass.result).toContain('±9 dB');
+    expect(bass.result).not.toContain('±9.6 dB');
     expect(bass.gain).toMatch(/greater variation across the other seats/i);
   });
 });

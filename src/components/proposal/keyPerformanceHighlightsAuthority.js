@@ -23,6 +23,9 @@
 
 import { DISPLAY_UNIT, formatResultText } from './displayValueFormat';
 import { excludeClientFacingRows } from './designIndexRowAuthority';
+// The canonical P19/P20 deviation display value: the one authority that floors
+// a lower-is-better bass deviation for user-facing copy.
+import { formatP19P20DeviationText } from '@/components/utils/rp22/resolveRp22DesignValue';
 // The bass-extension register is the writing authority's own (see the mirror's
 // header): the depth a result reached is told in the approved words for its level.
 import { bassExtensionSentence } from '@/shared/bassExtensionLanguage';
@@ -204,6 +207,30 @@ const ROW_PRESENTATION = Object.freeze({
 
 /** Used only for a row that carries no recognised parameter source. */
 const FALLBACK_GAIN = 'Part of how this system performs as a whole in the room.';
+
+/**
+ * The client display value of a lower-is-better bass deviation.
+ *
+ * P19 and P20 are deviations where lower is better, so their canonical display
+ * value is FLOORED to the whole decibel (resolveRp22DesignValue, Group D): a
+ * fraction of a decibel never inflates the variation a client reads, and the
+ * floor is the value the design is graded on. This formats the client-facing
+ * text only — the stored engineering value is untouched, and every other
+ * parameter's text is returned exactly as calculated.
+ *
+ * @param {number|string} parameter - the parameter id, or its key ("P20")
+ * @param {string} text - the calculated result text
+ * @returns {string}
+ */
+function clientDeviationText(parameter, text) {
+  const match = String(parameter ?? '').match(/(\d+)/);
+  const id = match ? Number(match[1]) : null;
+  if (id !== 19 && id !== 20) return text;
+  const deviation = String(text ?? '').match(/±\s*\d+(?:\.\d+)?/);
+  if (!deviation) return text;
+  const floored = formatP19P20DeviationText(deviation[0].replace(/[^\d.]/g, ''));
+  return floored ? String(text).replace(deviation[0], floored) : text;
+}
 
 /**
  * The most rows the printed table carries. The System Design Summary table is
@@ -479,7 +506,9 @@ export function buildClientSummaryRows(snapshot) {
     const row = byId.get(id);
     if (!row) return null;
     const level = String(row.level || row.achieved_level || '').trim();
-    const value = String(row.formatted_value ?? row.value ?? '').trim();
+    // A P19/P20 deviation is stated at the canonical floored display value;
+    // every other parameter's calculated text is carried exactly as it stands.
+    const value = clientDeviationText(id, String(row.formatted_value ?? row.value ?? '').trim());
     return [level, value].filter(Boolean).join(' · ');
   };
   const layout = snapshot?.system?.configuration?.dolby_config || null;
@@ -502,7 +531,7 @@ export function buildClientSummaryRows(snapshot) {
     {
       key: 'client_dynamic',
       area: 'Dynamic Range',
-      parameter: 'P12 screen · P13 surround · P14 bass',
+      parameter: 'P12 screen · P13 non-screen · P14 bass',
       result: dynamic.join(' · '),
       gain: 'The screen, surround and bass systems retain headroom as soundtracks become demanding.',
     },
@@ -552,7 +581,9 @@ export function buildHighlightDisplayRows(rows, options = {}) {
     .map((row, index) => {
       const key = String(row.key || `row_${index}`);
       const presentation = ROW_PRESENTATION[key] || null;
-      const calculated = formatResultText(row.result, presentation?.unit ?? DISPLAY_UNIT.NONE);
+      // The deviation floor is applied before the unit rounding, so a P19/P20
+      // deviation is never pulled back up by the generic whole-dB rule.
+      const calculated = formatResultText(clientDeviationText(key, row.result), presentation?.unit ?? DISPLAY_UNIT.NONE);
       const result = key === 'rp23_viewing' && compactViewing ? compactViewing : calculated;
       const generated = usableGain(row);
       const approved = presentation?.gain || FALLBACK_GAIN;
