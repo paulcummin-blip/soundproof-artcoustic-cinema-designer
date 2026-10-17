@@ -75,7 +75,10 @@ describe("the large-television wording rule", () => {
     expect(classifyProjectIntent({ projectDetails: LOUNGE_65 }).intent).toBe(PROJECT_INTENT.MEDIA_LOUNGE);
     expect(opening.headline).toBe('A relaxed high-performance media room built around a 65" TV');
     expect(opening.intent).toContain('built around a 65" TV');
-    [opening.headline, opening.supportingLine, opening.intent].forEach((text) => {
+    // The opening carries no supporting line: the screen, the room and the
+    // seating are stated by the page's own fact sheet instead.
+    expect(opening.supportingLine).toBeUndefined();
+    [opening.headline, opening.intent].forEach((text) => {
       expect(text).not.toMatch(/\blarge\b/i);
     });
   });

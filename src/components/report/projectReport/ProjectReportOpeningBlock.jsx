@@ -2,8 +2,10 @@
  * ProjectReportOpeningBlock.jsx
  * -----------------------------
  * The Project Report's opening statement, as composed by the report's own
- * opening authority (projectReportOpening): the project-specific headline, and
- * the one supporting line of facts beneath it.
+ * opening authority (projectReportOpening): the project-specific headline. An
+ * optional supporting line is rendered only when the caller supplies one — the
+ * Project Summary states the screen, room and seating in its fact sheet instead,
+ * so it never repeats them here.
  *
  * Left aligned with the rest of the page — it is the page's opening statement,
  * not a floating centred paragraph. It renders nothing when there is no headline

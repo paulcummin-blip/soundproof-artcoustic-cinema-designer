@@ -82,11 +82,16 @@ describe('the product statement states the system that exists', () => {
 describe('every surface omits an absent layer', () => {
   it('omits the absent product fact from the Project Summary', () => {
     const page = read('src/components/report/projectReport/ProjectReportDesignSummary.jsx');
-    expect(page).toMatch(/const PRODUCT_FACT_LABELS = new Set\(\['Key loudspeakers', 'Subwoofers', 'Acoustic treatment'\]\)/);
+    expect(page).toMatch(/const PRODUCT_FACT_LABELS = new Set\(\['LCR', 'Surrounds', 'Overheads', 'Subwoofers'\]\)/);
     expect(page).toMatch(/\.filter\(\(fact\) => !PRODUCT_FACT_LABELS\.has\(fact\.label\) \|\| Boolean\(fact\.value\)\)/);
-    // The key loudspeaker line reads the design's own present layers.
-    expect(page).toMatch(/const keyLoudspeakers = \['lcr', 'surrounds', 'overheads'\]/);
-    expect(page).toMatch(/\.filter\(Boolean\)/);
+    // Each loudspeaker layer is its own row, read from the design's own present
+    // layers and stated as nothing at all when the design specifies none.
+    expect(page).toMatch(/const LOUDSPEAKER_LAYER_ROWS = \[/);
+    expect(page).toMatch(/\{ key: 'lcr', label: 'LCR' \}/);
+    expect(page).toMatch(/\{ key: 'surrounds', label: 'Surrounds' \}/);
+    expect(page).toMatch(/\{ key: 'overheads', label: 'Overheads' \}/);
+    expect(page).toMatch(/const layerFacts = LOUDSPEAKER_LAYER_ROWS\.map/);
+    expect(page).toMatch(/if \(!value\) return null/);
   });
 
   it('states only rows with real speakers in the Technical Report', () => {
