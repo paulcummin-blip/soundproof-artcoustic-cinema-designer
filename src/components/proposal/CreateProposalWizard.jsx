@@ -127,7 +127,6 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const [blockedAttempt, setBlockedAttempt] = useState(false);
   // Which of the four generation states is on screen: preparing, writing,
   // opening the editor, ready. Null when Step 5 has not started.
   const [generationPhase, setGenerationPhase] = useState(null);
@@ -512,8 +511,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   const canProceed = [
     !!selectedProjectId, // step 0
     !!proposalType, // step 1
-    // Choosing versions stays smooth — the readiness table warns while the
-    // designer selects, and the hard block lands when Next is pressed.
+    // Choosing versions stays smooth — the document status card states the
+    // documents while the designer selects, and Next is unavailable until they
+    // are current.
     versionsValid, // step 2
     true, // step 3 — client brief is optional
     true, // step 4 — clarifications are optional: answer, pass, or continue unanswered
@@ -569,11 +569,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   })();
 
   const handleNext = () => {
-    if (step === 2 && versionsValid && !readiness.ready) {
-      setBlockedAttempt(true);
-      return;
-    }
-    setBlockedAttempt(false);
+    // The step's block is stated once — by the document status card above, and by
+    // Next being unavailable. No second warning sentence is placed beside it.
+    if (step === 2 && versionsValid && !readiness.ready) return;
     setStep(step + 1);
   };
 
@@ -661,12 +659,15 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       {/* Step 5 — Review & Generate */}
       {step === 5 && (
         <div>
-          {/* The same per-version readiness result as the Versions step. */}
+          {/* The same per-version readiness result as the Versions step, stated in
+              full here: this is the review step, where the per-version detail
+              belongs. */}
           <VersionReadinessTable
             gate={readiness}
             projectId={selectedProjectId}
             className="mb-8"
             onRetry={readinessError ? retryReadiness : null}
+            detailed
           />
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
@@ -723,17 +724,12 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         {step < STEPS.length - 1 && (
           <button
             onClick={handleNext}
-            disabled={!canProceed[step]}
+            disabled={!canProceed[step] || (step === 2 && !readiness.ready)}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
             Next
           </button>
-        )}
-        {blockedAttempt && step === 2 && !readiness.ready && !readiness.checking && (
-          <span role="alert" className="self-center text-xs text-[#7A2E10]">
-            {readiness.message || 'Fix the blocked versions below to continue.'}
-          </span>
         )}
         {step === STEPS.length - 1 && (
           <button

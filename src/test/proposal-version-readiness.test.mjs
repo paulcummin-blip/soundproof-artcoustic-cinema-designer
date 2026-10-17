@@ -8,7 +8,7 @@
 //   TEST 3  The version count the report type requires is part of readiness
 //   TEST 4  A read in flight reads Checking and blocks nothing yet
 //   TEST 5  The blocking message names every blocked version and its source
-//   TEST 6  Step 3 warns with the table; only Next blocks
+//   TEST 6  Step 3 states the documents calmly; only the unavailable Next blocks
 //   TEST 7  Step 5 shows the same table and gates the Generate button
 //   TEST 8  The server states the same clauses and names the same blockers
 //   TEST 9  The Proposal Library groups by project
@@ -44,6 +44,7 @@ const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 const WIZARD = read('src/components/proposal/CreateProposalWizard.jsx');
 const VERSIONS_STEP = read('src/components/proposal/wizard/VersionSelectStep.jsx');
 const TABLE = read('src/components/proposal/sourceAuthority/VersionReadinessTable.jsx');
+const DOCUMENTS_CARD = read('src/components/proposal/sourceAuthority/ProjectDocumentsStatus.jsx');
 const TAB = read('src/components/proposal/library/ProposalLibraryTab.jsx');
 const GROUP = read('src/components/proposal/library/ProposalLibraryGroup.jsx');
 const ACTIONS = read('src/components/proposal/library/ProposalLibraryActions.jsx');
@@ -171,16 +172,25 @@ test('TEST 5 — the blocking message names every blocked version and the source
 
 /* ── TEST 6 — Step 3 warns, Next blocks ───────────────────────────────── */
 
-test('TEST 6 — Step 3 warns with the per-version table, and only Next blocks the step', () => {
+test('TEST 6 — Step 3 states the documents, and only the unavailable Next blocks the step', () => {
   expect(VERSIONS_STEP).toContain("import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable'");
   expect(VERSIONS_STEP).toContain('<VersionReadinessTable gate={readiness} projectId={projectId} />');
   // The version choice itself is never interrupted.
   expect(WIZARD).toContain('versionsValid, // step 2');
   expect(VERSIONS_STEP).not.toMatch(/disabled=\{!readiness/);
-  // The hard block lands when the step is left, naming the blocked versions.
-  expect(WIZARD).toContain('if (step === 2 && versionsValid && !readiness.ready) {');
-  expect(WIZARD).toContain('setBlockedAttempt(true);');
-  expect(WIZARD).toContain("{readiness.message || 'Fix the blocked versions below to continue.'}");
+  // The step's block is stated ONCE — by the document status card, and by Next
+  // being unavailable. No second warning sentence sits beside the button.
+  expect(WIZARD).toContain('if (step === 2 && versionsValid && !readiness.ready) return;');
+  expect(WIZARD).toContain('disabled={!canProceed[step] || (step === 2 && !readiness.ready)}');
+  expect(WIZARD).not.toContain('Fix the blocked versions below to continue.');
+
+  // The card the step shows states the documents in the designer's own words:
+  // one calm message, one action, and no developer vocabulary on the screen.
+  expect(DOCUMENTS_CARD).toContain("'Update required'");
+  expect(DOCUMENTS_CARD).toContain('Documents current');
+  expect(DOCUMENTS_CARD).toContain('Update project documents');
+  expect(DOCUMENTS_CARD).not.toContain("'Stale'");
+  expect(DOCUMENTS_CARD).toContain('buildProjectReportAction({');
 });
 
 /* ── TEST 7 — Step 5 table and Generate ───────────────────────────────── */

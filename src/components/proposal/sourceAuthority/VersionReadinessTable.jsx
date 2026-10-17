@@ -32,6 +32,7 @@ import {
   SPEAKER_DESIGN_LABEL,
   buildSpeakerDesignAction,
 } from '@/components/proposal/sourceAuthority/speakerDesignChecklistReadiness';
+import ProjectDocumentsStatus from './ProjectDocumentsStatus';
 
 const STATE_COLOUR = {
   [READINESS_STATE.CURRENT]: '#213428',
@@ -166,7 +167,27 @@ function VersionRow({ row, projectId }) {
   );
 }
 
-export default function VersionReadinessTable({ gate, projectId = null, className = '', onRetry = null }) {
+/**
+ * One readiness result, two presentations:
+ *
+ *   · the version selection states the DOCUMENTS, calmly — ProjectDocumentsStatus
+ *     reads the same rows and says Current / Update required / Updating, with the
+ *     one action that updates both documents. This is the default.
+ *   · the review step asks for the detailed table (detailed) — the per-version
+ *     detail, the generated date, the gate sentence and the retry.
+ *
+ * The rows, the states and the action come from the authorities either way.
+ */
+export default function VersionReadinessTable({
+  gate,
+  projectId = null,
+  className = '',
+  onRetry = null,
+  detailed = false,
+}) {
+  if (!detailed) {
+    return <ProjectDocumentsStatus gate={gate} projectId={projectId} className={className} />;
+  }
   if (!gate?.available) return null;
 
   return (

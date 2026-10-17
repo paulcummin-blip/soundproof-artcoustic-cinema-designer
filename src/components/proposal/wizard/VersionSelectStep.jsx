@@ -9,10 +9,11 @@ import VersionCollisionNotice from '@/components/versions/VersionCollisionNotice
  * System Design Summary: exactly one version.
  * System Design Comparison: two or more versions.
  *
- * A proposal cannot be created from stale project data, so the readiness of
- * EVERY selected version is shown here while the designer chooses — warnings
- * first, and the hard block when the step is left. The readiness result itself
- * comes from one shared authority; this step only presents it.
+ * A proposal cannot be created from out-of-date project data, so the state of
+ * EVERY selected version's documents is shown here while the designer chooses —
+ * one calm card, one action, and Next unavailable until they are current. The
+ * readiness result itself comes from one shared authority; this step only
+ * presents it.
  *
  * The canonical, duplicate-free version list is read ONCE for the whole wizard
  * (useCanonicalProjectVersions) and passed in, so this step and the Type step's
@@ -116,7 +117,8 @@ export default function VersionSelectStep({
 
       <VersionCollisionNotice collisions={collisions} className="mt-4" />
 
-      {/* Per-version readiness — the proposal is built from current sources only. */}
+      {/* Per-version document status — the proposal is built from current sources
+          only, and this card is where the designer sees it. */}
       <VersionReadinessTable gate={readiness} projectId={projectId} />
     </div>
   );
