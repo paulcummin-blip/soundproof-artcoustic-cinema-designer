@@ -9,6 +9,7 @@ import {
 } from '../../shared/proposalEdit/proposalEditEditorModel.js';
 import { plainIssues } from '../../shared/proposalEdit/proposalEditEditorCopy.js';
 import { EDIT_SOURCE, EDIT_SOURCES, EDIT_VALIDATION_STATUS } from '../../shared/proposalEdit/editStatuses.js';
+import { applyProposalRevision } from '../../shared/proposalEdit/proposalRevisionHandoff.js';
 
 /**
  * Append one edit of a proposal's generated copy — the only write path into the
@@ -106,6 +107,25 @@ export default async function(req) {
     const created = await base44.entities.ProposalEdit.create(
       editEntityPayload({ record, accountId: generation.account_id ?? null }),
     );
+
+    // A validated edit is the page revision immediately. The editor, approval
+    // state and export validator therefore cannot observe different copies.
+    if (record.validation_status === EDIT_VALIDATION_STATUS.VALID && generation.proposal_id) {
+      await applyProposalRevision({
+        entities: base44.entities,
+        proposalId: generation.proposal_id,
+        sections: record.edited_sections,
+        mode: frozenProposalMode(generation),
+        generationId: generation.generation_id,
+        editId: record.edit_id,
+        appliedAt: record.edited_at || new Date().toISOString(),
+        source: record.edit_source || 'manual',
+      });
+      const proposal = await base44.entities.Proposal.get(generation.proposal_id).catch(() => null);
+      if (String(proposal?.status || '').toLowerCase() === 'generated') {
+        await base44.entities.Proposal.update(generation.proposal_id, { status: 'edited' });
+      }
+    }
 
     return Response.json({
       ok: true,
