@@ -4,6 +4,7 @@ import { getAgeDays, formatAge } from "@/components/utils/projectAge";
 import { normalizeStatusId } from "@/components/projects/statusDefaults";
 import OpenVersionDropdown from "@/components/versions/OpenVersionDropdown";
 import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
+import { dolbySystemLabel } from "@/shared/systemFormat";
 
 // Refined prototype card — lighter, calmer, more architectural.
 // Only used for the "Bass Test" project to assess the design before rollout.
@@ -104,6 +105,16 @@ function getStatusColorLocal(status, statuses) {
 // P2/L results, or compliance fragments — those belong in the report.
 function buildSystemSummary(p, dolbyLabelMap) {
   if (!p.dolby_config) return "";
+  // The format the card states is the design's own: bed channels . ACTIVE
+  // subwoofers . overhead channels, from the one shared format authority. The
+  // stored label map remains the fallback for a format that states no layout.
+  const stated = dolbySystemLabel({
+    layout: p.dolby_config,
+    subwooferInstances: p.subwooferInstances,
+    frontSubsCfg: p.front_subs_cfg,
+    rearSubsCfg: p.rear_subs_cfg,
+  });
+  if (stated) return stated;
   const label = dolbyLabelMap[p.dolby_config] || p.dolby_config;
   // Labels may carry RP22 fragments (e.g. "7.1.4 Atmos — P2 - L2").
   // Extract just the format number + "Atmos" and normalise to

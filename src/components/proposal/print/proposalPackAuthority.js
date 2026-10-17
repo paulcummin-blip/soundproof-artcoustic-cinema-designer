@@ -24,6 +24,7 @@ import {
   formatDisplayPhrase,
 } from '@/components/models/screen/displayTypeAuthority';
 import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
+import { systemFormat } from '@/shared/systemFormat';
 import { unresolvedQuantities } from './equipmentQuantityAuthority';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
@@ -618,7 +619,17 @@ export function buildAtAGlance({ snapshot, projectName, projectReference, genera
   ];
 
   const systemCards = [
-    { label: 'System layout', value: configuration.dolby_config || null },
+    // The system layout the client reads: bed channels . ACTIVE subwoofers .
+    // overhead channels, from the one shared format authority — the same value the
+    // Room Designer, the Project Report and the Speaker Design state.
+    {
+      label: 'System layout',
+      value: systemFormat({
+        layout: configuration.dolby_config,
+        subwooferInstances: system.subwoofer_strategy?.instances,
+        subwooferCount: system.subwoofer_strategy?.count,
+      }) || configuration.dolby_config || null,
+    },
   ];
 
   // A card with no value is left out rather than printed empty.

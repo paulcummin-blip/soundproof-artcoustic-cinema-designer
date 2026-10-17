@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { frozenReportAppState } from '@/components/report/frozenReportAppState';
+import { systemFormat } from '@/shared/systemFormat';
 import { useAppState } from '../components/AppStateProvider';
 // TEMP DEBUG: remove after sub persistence proven
 import { useActiveProjectId } from '@/components/state/project-session';
@@ -988,13 +989,19 @@ function RP22ReportInner({ embed = false } = {}) {
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility, app?.acousticTreatmentEnabled, app?.selectedAbfuserQty]);
 
     const exportSystemConfiguration = React.useMemo(() => {
-        // The system format is the canonical Dolby layout identity and nothing
-        // else. The physical subwoofer count is a hardware fact: three
-        // subwoofers do not make a 9.3.6 system, so the label is never rebuilt
-        // from the sub count.
-        const dolbyPreset = app?.dolbyLayout || "5.1";
-        return String(dolbyPreset).split(" ")[0];
-    }, [app?.dolbyLayout]);
+        // The system format a client reads: bed channels . ACTIVE subwoofers .
+        // overhead channels, from the one shared client-facing format authority
+        // (src/shared/systemFormat.js). The middle figure is the number of
+        // subwoofers this design actually has. The canonical Dolby/codec identity
+        // — the .1 LFE channel, the RP22 parameter results and the saved
+        // engineering authority — is untouched and is never derived from it.
+        return systemFormat({
+            layout: app?.dolbyLayout,
+            subwooferInstances: app?.subwooferInstances,
+            frontSubsCfg: app?.frontSubsCfg,
+            rearSubsCfg: app?.rearSubsCfg,
+        }) || String(app?.dolbyLayout || "5.1").split(" ")[0];
+    }, [app?.dolbyLayout, app?.subwooferInstances, app?.frontSubsCfg, app?.rearSubsCfg]);
 
     const exportDateLabel = React.useMemo(() => {
         const generatedAt = savedReport.saved?.generated_at || reportAuthority.publication?.published_at;

@@ -46,8 +46,12 @@ export function buildProjectReportOpening({
   productsSelected = null,
   seatingPositions = [],
   engineeringSummary = null,
+  // The design's client-facing system format, resolved by the report page from
+  // the one shared format authority (bed . ACTIVE subs . overheads). The project's
+  // own Dolby configuration is the fallback, never a second construction rule.
+  systemFormat = null,
 } = {}) {
-  const architecture = String(projectDetails?.dolby_config || '').trim() || null;
+  const architecture = String(systemFormat || projectDetails?.dolby_config || '').trim() || null;
 
   // The headline leads with the design's intent — the cinema this room is and
   // the display it is built around — rather than with a channel count. The

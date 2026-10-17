@@ -116,6 +116,10 @@ export default function ProjectReportDesignSummary({
   productsSelected = null,
   summaryOpening = null,
   opening = null,
+  // The design's client-facing system format — bed channels . ACTIVE subwoofers .
+  // overhead channels — resolved once by the report page from the one shared format
+  // authority. Null falls back to the project's own Dolby configuration.
+  systemFormat = null,
   print = false,
   // Which Design Intent is on the page — the report's own, or a validated Astra
   // narrative — and the optional on-screen action that asks the writer for one.
@@ -153,7 +157,7 @@ export default function ProjectReportDesignSummary({
     { label: 'Room', value: roomFact },
     { label: displayFactLabel(projectDetails), value: screenFact(projectDetails) },
     { label: 'Seating', value: seatingFact },
-    { label: 'System format', value: String(projectDetails?.dolby_config || '').trim() || null },
+    { label: 'System format', value: String(systemFormat || projectDetails?.dolby_config || '').trim() || null },
     ...layerFacts,
     { label: 'Subwoofers', value: productValue(productsSelected, 'subwoofers') },
   ]

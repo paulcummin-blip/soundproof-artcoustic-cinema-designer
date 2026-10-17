@@ -95,6 +95,11 @@ export function useProjectReportPages({
   seatingPositions,
   placedSpeakers,
   subwooferInstances,
+  // The design's client-facing system format — bed channels . ACTIVE subwoofers .
+  // overhead channels, resolved once by the report page from the one shared
+  // format authority and passed in, so every page that states it states the same
+  // value. Null falls back to the project's own Dolby configuration.
+  systemFormat,
   p19Graph,
   coverageSentence,
   reportGeometry,
@@ -113,7 +118,8 @@ export function useProjectReportPages({
     roomDims,
     productsSelected,
     seatingPositions,
-  }), [projectDetails, roomDims, productsSelected, seatingPositions]);
+    systemFormat,
+  }), [projectDetails, roomDims, productsSelected, seatingPositions, systemFormat]);
 
   // THE DESIGN INTENT THE REPORT SHOWS. The report's own composed paragraph is the
   // floor; an Astra narrative that was validated for THIS report, and written
@@ -161,7 +167,8 @@ export function useProjectReportPages({
     productsSelected,
     seatingPositions,
     engineeringSummary,
-  }), [projectDetails, roomDims, productsSelected, seatingPositions, engineeringSummary]);
+    systemFormat,
+  }), [projectDetails, roomDims, productsSelected, seatingPositions, engineeringSummary, systemFormat]);
 
   // Whether this design actually specifies a height / overhead layer, read from
   // its own product schedule. The P17 page names the overhead layer only where it
@@ -698,6 +705,7 @@ export function useProjectReportPages({
         productsSelected,
         summaryOpening: designIntent.text,
         opening,
+        systemFormat,
       },
       visual: (
         <ProjectReportDesignSummary
@@ -708,6 +716,7 @@ export function useProjectReportPages({
           productsSelected={productsSelected}
           summaryOpening={designIntent.text}
           opening={opening}
+          systemFormat={systemFormat}
           intentSource={designIntent.source}
           projectId={projectId}
           versionId={versionId}
@@ -752,6 +761,7 @@ export function useProjectReportPages({
         engineeringSummary,
         rows: screenSeating.rows,
         viewingNarrative,
+        systemFormat,
       },
       visual: (
         <ProjectReportSystemOverview
@@ -760,6 +770,7 @@ export function useProjectReportPages({
           engineeringSummary={engineeringSummary}
           rows={screenSeating.rows}
           viewingNarrative={viewingNarrative}
+          systemFormat={systemFormat}
         />
       ),
     };

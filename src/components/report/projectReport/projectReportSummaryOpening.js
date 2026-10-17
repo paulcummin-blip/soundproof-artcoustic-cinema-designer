@@ -213,6 +213,10 @@ export function buildProjectReportSummaryOpening({
   roomDims = null,
   productsSelected = null,
   seatingPositions = [],
+  // The design's client-facing system format, resolved by the report page from the
+  // one shared format authority (bed . ACTIVE subs . overheads). Null falls back to
+  // the project's own Dolby configuration.
+  systemFormat = null,
 } = {}) {
   const mountMode = String(projectDetails?.screen_mount_mode || '').trim().toLowerCase();
   const projection = !isTvDisplay(projectDetails);
@@ -236,7 +240,11 @@ export function buildProjectReportSummaryOpening({
   // the display and the seating the room is built around, and what carries the
   // sound. A layer the design does not have is never described: a 5.1 system is
   // a deliberate 5.1 system, not an immersive one with something missing.
-  const architecture = String(projectDetails?.dolby_config || '').trim() || null;
+  // The system format is the design's own client-facing one — bed channels .
+  // ACTIVE subwoofers . overhead channels — resolved by the report page from the
+  // one shared format authority. The project's own Dolby configuration is the
+  // fallback, never a second construction rule.
+  const architecture = String(systemFormat || projectDetails?.dolby_config || '').trim() || null;
   const vision = [];
   const rowPhrase = seatingRowPhrase(seatingPositions);
   const display = displayPhrase(projectDetails);

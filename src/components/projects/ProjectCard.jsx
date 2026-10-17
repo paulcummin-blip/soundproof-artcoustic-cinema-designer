@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { systemFormat } from '@/shared/systemFormat';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Ruler, 
@@ -112,7 +113,12 @@ function ProjectCard({ project, onDelete }) {
         <div className="flex items-center gap-2 text-sm text-[#3E4349]">
           <Volume2 className="w-4 h-4 text-[#3E4349]" />
           <span>
-            Config: {text(project?.dolby_config, 'N/A')}
+            Config: {systemFormat({
+              layout: project?.dolby_config,
+              subwooferInstances: project?.subwooferInstances,
+              frontSubsCfg: project?.front_subs_cfg,
+              rearSubsCfg: project?.rear_subs_cfg,
+            }) || text(project?.dolby_config, 'N/A')}
           </span>
         </div>
       </CardContent>

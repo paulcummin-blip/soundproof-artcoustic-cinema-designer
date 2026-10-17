@@ -77,6 +77,10 @@ export default function ProjectReportSystemOverview({
   // audience, set beside the geometry table it explains. Null when the report has
   // already made the point, so nothing is ever said twice.
   viewingNarrative = null,
+  // The design's client-facing system format — bed channels . ACTIVE subwoofers .
+  // overhead channels — resolved once by the report page from the one shared format
+  // authority. Null falls back to the project's own Dolby configuration.
+  systemFormat = null,
   print = false,
 }) {
   const connections = buildSpecificationConnections({ productsSelected, engineeringSummary, dolbyConfig: projectDetails?.dolby_config });
@@ -87,7 +91,7 @@ export default function ProjectReportSystemOverview({
     // The display is named as the design's own authority states it — a television
     // by its own size. A projection screen states it exactly as before.
     isTvDisplay(projectDetails) ? displayPhrase(projectDetails) : null,
-    String(projectDetails?.dolby_config || '').trim() || null,
+    String(systemFormat || projectDetails?.dolby_config || '').trim() || null,
     speakerCount > 0 ? `${speakerCount} speakers` : null,
     counts.subwoofers > 0 ? `${counts.subwoofers} subwoofers` : null,
     counts.acoustic_treatment > 0 ? `${counts.acoustic_treatment} × Abfuser` : null,

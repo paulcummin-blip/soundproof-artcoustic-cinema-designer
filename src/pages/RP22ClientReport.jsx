@@ -80,6 +80,7 @@ import {
   PROJECT_REPORT_DOCUMENT_TYPE,
 } from "@/components/report/projectReport/projectReportIdentity";
 import { buildProductsSelected, layoutVisibilityFilter } from "@/components/report/reportProductsSelected";
+import { systemFormat } from "@/shared/systemFormat";
 import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speakerDesignRows";
 import { reportDateLabel } from "@/components/report/reportFirstPageMeta";
 
@@ -325,6 +326,18 @@ export default function RP22ClientReport() {
       .filter((sub) => sub && sub.enabled !== false).length,
   }), [subwooferInstances]);
 
+  // The design's client-facing system format, resolved ONCE for this report from
+  // the one shared format authority: bed channels . ACTIVE subwoofers . overhead
+  // channels. Every page of the document states this one value, so the fact sheet,
+  // the opening statements and the system page can never disagree. The canonical
+  // Dolby/codec identity and the published engineering authority are untouched.
+  const reportSystemFormat = useMemo(() => systemFormat({
+    layout: appState?.dolbyLayout,
+    subwooferInstances,
+    frontSubsCfg: appState?.frontSubsCfg,
+    rearSubsCfg: appState?.rearSubsCfg,
+  }), [appState?.dolbyLayout, subwooferInstances, appState?.frontSubsCfg, appState?.rearSubsCfg]);
+
   // The document's closing About Sound Proof page is the Technical Report's own,
   // mounted with the Technical pages below: the consolidated report states About
   // Sound Proof exactly once.
@@ -505,6 +518,7 @@ export default function RP22ClientReport() {
     seatingPositions,
     placedSpeakers,
     subwooferInstances,
+    systemFormat: reportSystemFormat,
     p19Graph,
     coverageSentence,
     reportGeometry,

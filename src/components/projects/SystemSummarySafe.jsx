@@ -1,5 +1,6 @@
 import React from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { systemFormat } from "@/shared/systemFormat";
 
 /** Text-only printer: never returns objects/arrays to React */
 function t(v, fb = "—") {
@@ -24,7 +25,10 @@ export default function SystemSummarySafe({ activeProjectId, summary }) {
     : t(s?.lcrModel, "Not set yet");
 
   const rows = [
-    ["Layout",                     t(s?.dolbyLayout)],
+    ["Layout",                     systemFormat({
+      layout: s?.dolbyLayout,
+      subwooferCount: s?.subCount,
+    }) || t(s?.dolbyLayout)],
     ["Target SPL (dB) LCR",        s?.targetSPL_LCR_dB != null ? `${t(s?.targetSPL_LCR_dB)} dB LCR` : "—"],
     ["LCR",                        lcrSummaryValue],
     ["Surround",                   t(s?.surroundModel, "Not set yet")],

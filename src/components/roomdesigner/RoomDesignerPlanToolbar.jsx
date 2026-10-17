@@ -5,6 +5,7 @@ import { ChevronDown, Crosshair } from "lucide-react";
 import { setMlpGrab } from "@/components/state/mlpGrabStore";
 import { getSeatInfoMode, setSeatInfoMode as persistSeatInfoMode, subscribeSeatInfoMode } from "@/components/state/seatInfoModeStore";
 import SeatInfoModeToggle from "@/components/roomdesigner/SeatInfoModeToggle";
+import { systemFormat } from "@/shared/systemFormat";
 
 export default function RoomDesignerPlanToolbar({
   allowExtraSurrounds,
@@ -12,6 +13,7 @@ export default function RoomDesignerPlanToolbar({
   dolbyPreset,
   frontSubsCfg,
   rearSubsCfg,
+  subwooferInstances = [],
   overlayRelevance,
   overlays,
   setOverlays,
@@ -85,20 +87,16 @@ export default function RoomDesignerPlanToolbar({
             marginLeft: "12px"
           }}>
 
-          {(() => {
-           const extraN = allowExtraSurrounds ? Number(extraSurroundCount || 0) : 0;
-           const parts = dolbyPreset.split('.');
-           const displayMajor = (parseInt(parts[0], 10) || 0) + extraN;
-
-           const frontCount = Number(frontSubsCfg?.count ?? 0);
-           const rearCount = Number(rearSubsCfg?.count ?? 0);
-           const totalSubs = frontCount + rearCount;
-
-           const heights = parts[2] || ""; // may be missing for "5.1"
-
-           // If there are heights, show displayMajor.sub.heights. If not, show displayMajor.sub.
-           return heights ? `${displayMajor}.${totalSubs}.${heights}` : `${displayMajor}.${totalSubs}`;
-          })()}
+          {/* The design's system format, from the one client-facing format
+              authority: bed channels . ACTIVE subwoofers . overhead channels.
+              The codec's own .1 LFE identity is untouched. */}
+          {systemFormat({
+            layout: dolbyPreset,
+            extraBedChannels: allowExtraSurrounds ? Number(extraSurroundCount || 0) : 0,
+            subwooferInstances,
+            frontSubsCfg,
+            rearSubsCfg,
+          }) || ""}
         </strong>
 
       </div>

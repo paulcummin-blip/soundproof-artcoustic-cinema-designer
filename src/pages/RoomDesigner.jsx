@@ -2167,6 +2167,7 @@ function RoomDesignerWithState() {
             dolbyPreset={dolbyPreset}
             frontSubsCfg={_frontSubsCfg}
             rearSubsCfg={_rearSubsCfg}
+            subwooferInstances={appState?.subwooferInstances}
             overlayRelevance={overlayRelevance}
             overlays={_overlays}
             setOverlays={_setOverlays}

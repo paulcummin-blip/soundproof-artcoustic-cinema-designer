@@ -5,6 +5,7 @@ import { RotateCcw, ExternalLink, FileText } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import { useAppState } from "@/components/AppStateProvider";
+import { systemFormat } from "@/shared/systemFormat";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
 import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
 import CurrentSpeakerDesignButton from "@/components/roomdesigner/CurrentSpeakerDesignButton";
@@ -77,7 +78,15 @@ export default function RoomDesignerHeader({
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
   const speakerDesign = React.useMemo(
     () => ({
-      layout: dolbyLayout,
+      // The Speaker Design schedule states the design's own system format:
+      // bed channels . ACTIVE subwoofers . overhead channels, from the one
+      // client-facing format authority. The codec's .1 LFE identity is untouched.
+      layout: systemFormat({
+        layout: dolbyLayout,
+        subwooferInstances: appState?.subwooferInstances,
+        frontSubsCfg: appState?.frontSubsCfg,
+        rearSubsCfg: appState?.rearSubsCfg,
+      }) || dolbyLayout,
       ...buildSpeakerDesignRows({
         placedSpeakers,
         frontSubsCfg: appState?.frontSubsCfg || null,

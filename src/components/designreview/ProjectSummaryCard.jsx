@@ -9,6 +9,7 @@
  */
 
 import React from "react";
+import { systemFormat } from "@/shared/systemFormat";
 
 const COLORS = {
   primary: "#213428",
@@ -101,7 +102,14 @@ export default function ProjectSummaryCard({ project }) {
 
   const room = parseRoomDims(project);
   const seating = countSeating(project);
-  const dolbyConfig = project?.dolby_config || "—";
+  // The system format the summary states: bed channels . ACTIVE subwoofers .
+  // overhead channels, from the one shared format authority.
+  const dolbyConfig = systemFormat({
+    layout: project?.dolby_config,
+    subwooferInstances: project?.subwooferInstances,
+    frontSubsCfg: project?.front_subs_cfg,
+    rearSubsCfg: project?.rear_subs_cfg,
+  }) || project?.dolby_config || "—";
   const screenSize = project?.screen_size ? `${project.screen_size}"` : "—";
   const aspectRatio = project?.aspect_ratio || "16:9";
 

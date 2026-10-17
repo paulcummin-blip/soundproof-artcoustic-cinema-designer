@@ -178,6 +178,7 @@ export default function ClientReportPage({
             productsSelected={printData.productsSelected}
             summaryOpening={printData.summaryOpening}
             opening={printData.opening || null}
+            systemFormat={printData.systemFormat}
             print
           />
         )}
@@ -195,6 +196,7 @@ export default function ClientReportPage({
             productsSelected={printData.productsSelected}
             engineeringSummary={printData.engineeringSummary}
             rows={printData.rows}
+            systemFormat={printData.systemFormat}
             print
           />
         )}
