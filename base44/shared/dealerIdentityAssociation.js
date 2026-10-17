@@ -62,8 +62,13 @@ export async function associateDealerIdentityCore(base44, userId) {
   let accessToken;
   try {
     accessToken = await providerAccessToken(base44, userId);
-  } catch {
-    return { resolved: false, reason: 'NO_PORTAL_TOKEN' };
+  } catch (error) {
+    return {
+      resolved: false,
+      reason: error?.message === 'PROVIDER_ACCESS_TOKEN_NOT_JWT'
+        ? 'PROVIDER_ACCESS_TOKEN_NOT_JWT'
+        : 'NO_PORTAL_TOKEN',
+    };
   }
 
   // Resolve dealer identity from the Partner Portal Dealer Identity Service.
