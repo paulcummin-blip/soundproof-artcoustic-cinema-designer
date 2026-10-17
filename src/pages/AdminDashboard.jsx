@@ -72,6 +72,13 @@ const CORE_CARDS = [
 
 const ADVANCED_CARDS = [
   {
+    title: "Design Intent Preview",
+    description: "Engineering tool. Run the production Project Report Design Intent writer against any project and version, read what it produced and which evidence it used, and save nothing.",
+    status: "Read-only",
+    count: "No writes",
+    href: "/admin/design-intent-preview",
+  },
+  {
     title: "Measured Datasets",
     description: "Measured polar dataset platform, ingestion wizards and health checks.",
     status: "Healthy",

@@ -37,6 +37,9 @@ export default async function(req) {
 
     const body = await req.json().catch(() => ({}));
     const { project_id, version_id } = body || {};
+    if (!project_id || !version_id) {
+      return Response.json({ error: 'project_id and version_id are required.' }, { status: 400 });
+    }
 
     const accessContext = await resolveAccountAccess(base44, user);
     if (accessContext?.allowed !== true || accessContext.capabilities?.soundProof !== true) {
