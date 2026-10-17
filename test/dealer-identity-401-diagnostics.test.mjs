@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { associateDealerIdentityCore } from '../base44/shared/dealerIdentityAssociation.js';
 import { resolvePartnerPortalDealerIdentity } from '../base44/shared/partnerPortalIdentityClient.js';
+import { providerAccessToken } from '../base44/shared/portalBridgeTransport.js';
 
 const ENDPOINT = 'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/dealer-identity-resolve';
 
@@ -39,6 +40,21 @@ test('gateway 401 error codes are allowlisted without exposing arbitrary headers
       error => error.message === expected && !error.message.includes('private-token-value'),
     );
   }
+});
+
+test('provider access token unwraps JSON safely and rejects non-JWT values', async () => {
+  const token = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.c2ln';
+  for (const raw of [
+    { access_token: token },
+    { data: { access_token: token } },
+    JSON.stringify({ access_token: token }),
+    JSON.stringify({ data: { access_token: `Bearer ${token}` } }),
+  ]) {
+    const base44 = { asServiceRole: { sso: { async getAccessToken() { return raw; } } } };
+    assert.equal(await providerAccessToken(base44, 'pilot-user'), token);
+  }
+  const invalid = { asServiceRole: { sso: { async getAccessToken() { return { access_token: 'opaque-token' }; } } } };
+  await assert.rejects(() => providerAccessToken(invalid, 'pilot-user'), /PROVIDER_ACCESS_TOKEN_NOT_JWT/);
 });
 
 test('a configured endpoint outside the shared live backend never receives a provider token', async (t) => {
