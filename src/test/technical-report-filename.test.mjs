@@ -2,9 +2,9 @@
 // ---------------------------------------------------------------------------
 // ACCEPTANCE — Technical Report PDF filename.
 //
-//   TEST 1  The required filename, exactly
+//   TEST 1  The required concise filename, exactly
 //   TEST 2  Required tokens present, forbidden tokens absent
-//   TEST 3  A blank project reference is omitted cleanly
+//   TEST 3  The excluded identity is never written into the name
 //   TEST 4  Illegal filename characters sanitised, readable hyphen separators
 //   TEST 5  Every Technical Report print path prints from the app-owned window
 //   TEST 6  No path falls back to the browser/app tab title or a generic name
@@ -24,13 +24,14 @@ import {
 const ROOT = path.resolve(process.cwd());
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
+// Identity the export still resolves and logs — deliberately NOT part of the name.
 const MARQUEE_DETAILS = { dealerName: 'Sound Proof', projectReference: '34 AR' };
 
 // ── TEST 1 — the required filename ─────────────────────────────────────────
 test('TEST 1 — the Technical Report filename matches the required format', () => {
   assert.equal(
     buildTechnicalReportTitle('Marquee Home', null, MARQUEE_DETAILS),
-    'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - 34 AR',
+    'Sound Proof Technical - Marquee Home',
   );
 });
 
@@ -38,9 +39,16 @@ test('TEST 1 — the Technical Report filename matches the required format', () 
 test('TEST 2 — required tokens present, forbidden tokens absent', () => {
   const filename = buildTechnicalReportTitle('Marquee Home', null, MARQUEE_DETAILS);
 
-  for (const token of ['Sound Proof', 'Artcoustic Cinema Designer', 'Technical', 'Marquee Home', '34 AR']) {
+  for (const token of ['Sound Proof', 'Technical', 'Marquee Home']) {
     assert.ok(filename.includes(token), `includes ${token}`);
   }
+
+  // The concise-filename rules: no product name, no project reference, and no
+  // repeated brand or document wording.
+  assert.equal(/artcoustic|cinema designer/i.test(filename), false, 'the product name is never written');
+  assert.equal(filename.includes('34 AR'), false, 'the project reference is never written');
+  assert.equal((filename.match(/Sound Proof/g) || []).length, 1, 'the brand is stated once');
+  assert.equal((filename.match(/Technical/g) || []).length, 1, 'the document type is stated once');
 
   assert.ok(!/base\s*44/i.test(filename), 'never names the platform');
   assert.ok(!filename.includes('SoundProof'), 'brand is always spaced "Sound Proof"');
@@ -49,8 +57,8 @@ test('TEST 2 — required tokens present, forbidden tokens absent', () => {
 
   // Not a generic browser/app title.
   for (const generic of [
-    'SoundProof - Artcoustic Cinema Designer',
-    'Sound Proof - Artcoustic Cinema Designer',
+    'SoundProof',
+    'Sound Proof Technical',
     'RP22Report',
     'Technical Report',
     'Document',
@@ -66,23 +74,23 @@ test('TEST 2 — required tokens present, forbidden tokens absent', () => {
 
 // ── TEST 3 — blank reference omitted cleanly ───────────────────────────────
 test('TEST 3 — a blank project reference is omitted cleanly', () => {
-  const expected = 'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home';
+  const expected = 'Sound Proof Technical - Marquee Home';
 
   for (const blank of [null, undefined, '', '   ']) {
     const filename = buildTechnicalReportTitle('Marquee Home', null, {
       dealerName: 'Sound Proof',
       projectReference: blank,
     });
-    assert.equal(filename, expected, `reference ${JSON.stringify(blank)} leaves no segment`);
+    assert.equal(filename, expected, `reference ${JSON.stringify(blank)} is never written`);
     assert.ok(!filename.includes(' -  - '), 'no empty segment');
     assert.ok(!filename.endsWith('-') && !filename.endsWith(' '), 'no dangling separator');
     assert.ok(!filename.includes('null') && !filename.includes('undefined'));
   }
 
-  // A dealer-less project still names brand, product, type and project.
+  // A dealer-less project still names the brand, the document type and the project.
   assert.equal(
     buildTechnicalReportTitle('Marquee Home', null, {}),
-    'Sound Proof - Artcoustic Cinema Designer - Technical - Marquee Home',
+    'Sound Proof Technical - Marquee Home',
   );
 });
 
@@ -96,7 +104,7 @@ test('TEST 4 — illegal characters are sanitised and separators are readable hy
 
   assert.ok(!/[\\/:*?"<>|]/.test(filename), 'no illegal filename characters survive');
   assert.ok(filename.includes(' - '), 'segments are joined with spaced hyphens');
-  assert.ok(filename.startsWith('Sound Proof - Artcoustic Cinema Designer - Technical - '), 'fixed prefix intact');
+  assert.ok(filename.startsWith('Sound Proof Technical - '), 'fixed prefix intact');
 });
 
 // ── TEST 5 — every print path uses the app-owned window ────────────────────
@@ -186,24 +194,25 @@ test('TEST 6 — no path names the file after the browser or app tab', () => {
 test('TEST 7 — Technical, Visual and Proposal share one filename helper', () => {
   const helper = read('src/components/report/reportPdfTitle.js');
   assert.ok(helper.includes('const BRAND = "Sound Proof"'));
-  assert.ok(helper.includes('const PRODUCT = "Artcoustic Cinema Designer"'));
+  assert.equal(/const PRODUCT\s*=/.test(helper), false, 'no product token is part of the format');
 
   const details = MARQUEE_DETAILS;
   assert.equal(
     buildVisualReportTitle('Marquee Home', null, details),
-    'Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - 34 AR',
+    'Sound Proof Visual - Marquee Home',
   );
   assert.equal(
     buildProposalReportTitle('Marquee Home', 'single', details),
-    'Sound Proof - Artcoustic Cinema Designer - Proposal - Sound Proof - Marquee Home - 34 AR',
+    'Sound Proof Proposal - Marquee Home',
   );
 
-  // Every report names itself with the same prefix and the same separators.
-  for (const title of [
-    buildTechnicalReportTitle('Marquee Home', null, details),
-    buildVisualReportTitle('Marquee Home', null, details),
-    buildProposalReportTitle('Marquee Home', 'single', details),
+  // Every document names itself with the same brand, the same separators and its
+  // own document type, stated once.
+  for (const [type, title] of [
+    ['Technical', buildTechnicalReportTitle('Marquee Home', null, details)],
+    ['Visual', buildVisualReportTitle('Marquee Home', null, details)],
+    ['Proposal', buildProposalReportTitle('Marquee Home', 'single', details)],
   ]) {
-    assert.ok(title.startsWith('Sound Proof - Artcoustic Cinema Designer - '), 'shared prefix');
+    assert.equal(title, `Sound Proof ${type} - Marquee Home`, `${type} states one concise name`);
   }
 });

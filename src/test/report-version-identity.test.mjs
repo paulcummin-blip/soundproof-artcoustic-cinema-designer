@@ -44,18 +44,18 @@ const ORIGINAL = { number: 1, name: 'Original Design' };
 const LEVEL_4 = { number: 4, name: 'Level 4 version' };
 const DETAILS = { dealerName: 'Sound Proof', projectReference: '34 AR' };
 
-const VISUAL_PREFIX = 'Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home';
-const TECHNICAL_PREFIX = 'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home';
+const VISUAL_PREFIX = 'Sound Proof Visual - Marquee Home';
+const TECHNICAL_PREFIX = 'Sound Proof Technical - Marquee Home';
 
 // ── TEST 1 — Visual Report ─────────────────────────────────────────────────
 test('TEST 1 — the Visual Report states its design version on the front page and in the filename', () => {
   assert.equal(
     buildVisualReportTitle(MARQUEE, ORIGINAL, DETAILS),
-    `${VISUAL_PREFIX} - 34 AR - Original Design`,
+    `${VISUAL_PREFIX} - Original Design`,
   );
   assert.equal(
     buildVisualReportTitle(MARQUEE, LEVEL_4, DETAILS),
-    `${VISUAL_PREFIX} - 34 AR - Level 4 version`,
+    `${VISUAL_PREFIX} - Level 4 version`,
   );
 
   const line = clientReportHeaderMeta(PROJECT, LEVEL_4);
@@ -69,11 +69,11 @@ test('TEST 1 — the Visual Report states its design version on the front page a
 test('TEST 2 — the Technical Report states the same version on its front page and in the filename', () => {
   assert.equal(
     buildTechnicalReportTitle(MARQUEE, ORIGINAL, DETAILS),
-    `${TECHNICAL_PREFIX} - 34 AR - Original Design`,
+    `${TECHNICAL_PREFIX} - Original Design`,
   );
   assert.equal(
     buildTechnicalReportTitle(MARQUEE, LEVEL_4, DETAILS),
-    `${TECHNICAL_PREFIX} - 34 AR - Level 4 version`,
+    `${TECHNICAL_PREFIX} - Level 4 version`,
   );
 
   // Both reports read ONE first-page line, so they can never state different
@@ -92,7 +92,7 @@ test('TEST 2 — the Technical Report states the same version on its front page 
 
 // ── TEST 3 — the version segment rules ─────────────────────────────────────
 test('TEST 3 — the version segment states the saved name exactly, and never goes blank', () => {
-  const barePrefix = 'Sound Proof - Artcoustic Cinema Designer - Technical - Marquee Home - ';
+  const barePrefix = 'Sound Proof Technical - Marquee Home - ';
   const segment = (version) => buildTechnicalReportTitle(MARQUEE, version, {})
     .replace(barePrefix, '');
 
@@ -116,28 +116,31 @@ test('TEST 3 — the version segment states the saved name exactly, and never go
   }
 });
 
-// ── TEST 4 — the rest of the identity is still stated ──────────────────────
-test('TEST 4 — filenames still carry dealer, project, client and reference, with the version last', () => {
+// ── TEST 4 — the identity a filename leaves out ────────────────────────────
+test('TEST 4 — a filename states the project and the version, and leaves dealer, client and reference out', () => {
   const withClient = { dealerName: 'Ribble AV', clientName: 'Noble Projects', projectReference: 'LH-001' };
   assert.equal(
     buildTechnicalReportTitle('Lords Hall', LEVEL_4, withClient),
-    'Sound Proof - Artcoustic Cinema Designer - Technical - Ribble AV - Lords Hall - Noble Projects - LH-001 - Level 4 version',
+    'Sound Proof Technical - Lords Hall - Level 4 version',
   );
   assert.equal(
     buildVisualReportTitle(MARQUEE, LEVEL_4, { dealerName: 'Sound Proof', clientName: 'Noble Projects', projectReference: '34 AR' }),
-    `${VISUAL_PREFIX} - Noble Projects - 34 AR - Level 4 version`,
+    `${VISUAL_PREFIX} - Level 4 version`,
   );
 
-  // An identical client name and reference are still written once.
-  assert.equal(
-    buildTechnicalReportTitle(MARQUEE, LEVEL_4, { dealerName: 'Sound Proof', clientName: '34 AR', projectReference: '34 AR' }),
-    `${TECHNICAL_PREFIX} - 34 AR - Level 4 version`,
-  );
+  // None of the excluded identity is written into the name — not the dealer, not
+  // the client name, not the reference.
+  const filename = buildTechnicalReportTitle(MARQUEE, LEVEL_4, withClient);
+  for (const excluded of ['Ribble AV', 'Noble Projects', 'LH-001']) {
+    assert.equal(filename.includes(excluded), false, `"${filename}" must not name ${excluded}`);
+  }
 
-  // A project with no reference keeps its project name and its version.
+  // A project with no reference keeps its project name and its version, and the
+  // version is always the last segment.
   const noReference = buildTechnicalReportTitle(MARQUEE, LEVEL_4, { dealerName: 'Sound Proof' });
   assert.equal(noReference, `${TECHNICAL_PREFIX} - Level 4 version`);
   assert.ok(noReference.includes(MARQUEE) && noReference.includes('Level 4 version'));
+  assert.ok(filename.endsWith('Level 4 version'), 'the version closes the name');
 });
 
 // ── TEST 5 — the first-page line ───────────────────────────────────────────
@@ -217,8 +220,7 @@ test('TEST 8 — a System Design Summary states no version on its cover, and nam
   assert.equal(buildProposalVersionSegment(versionNames), 'Level 4 version');
   assert.equal(
     buildProposalReportTitle(MARQUEE, 'system_summary', { ...DETAILS, versionNames }),
-    'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Sound Proof - Marquee Home'
-      + ' - 34 AR - Level 4 version',
+    'Sound Proof System Design Summary - Marquee Home - Level 4 version',
   );
 
   // The DESIGN VERSION is not on a single-design cover: no version slot, no slot
@@ -261,8 +263,8 @@ test('TEST 9 — a System Design Comparison names every version, on the cover an
   assert.equal(buildProposalVersionSegment(versionNames), 'Comparing Level 4 version and Level 1 version');
   assert.equal(
     buildProposalReportTitle(MARQUEE, 'comparison', { ...DETAILS, versionNames }),
-    'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Sound Proof - Marquee Home'
-      + ' - 34 AR - Comparing Level 4 version and Level 1 version',
+    'Sound Proof System Design Comparison - Marquee Home'
+      + ' - Comparing Level 4 version and Level 1 version',
   );
   assert.ok(
     buildProposalReportTitle(MARQUEE, 'comparison', { ...DETAILS, versionNames }).includes('Level 4 version')
@@ -286,7 +288,7 @@ test('TEST 9 — a System Design Comparison names every version, on the cover an
   assert.equal(buildProposalVersionSegment([]), '');
   assert.equal(
     buildProposalReportTitle(MARQUEE, 'comparison', DETAILS),
-    'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Sound Proof - Marquee Home - 34 AR',
+    'Sound Proof System Design Comparison - Marquee Home',
   );
 
   // Several versions are listed one per line under a "Comparing" label, and that

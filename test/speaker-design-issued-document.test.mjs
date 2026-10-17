@@ -95,7 +95,7 @@ test('the schedule is its own document type, listed with the reports', () => {
 
 /* ── 2 — the filename ─────────────────────────────────────────────────────── */
 
-test('the filename states the document, the project identity and the version', () => {
+test('the filename states the document, the project and the version, and nothing else', () => {
   assert.equal(
     buildSpeakerDesignFilename({
       projectName: 'Genesis AV',
@@ -103,13 +103,14 @@ test('the filename states the document, the project identity and the version', (
       projectReference: 'AC-2026-014',
       versionName: 'Original Design',
     }),
-    'Sound Proof - Artcoustic Cinema Designer - Speaker Design - Genesis AV - Noble Projects - AC-2026-014 - Original Design',
+    'Sound Proof Speaker Design - Genesis AV - Original Design',
   );
 
-  // A missing client or reference is omitted cleanly, never placeholdered.
+  // The client name and the project reference are never written into the name:
+  // the project and the version identify the file.
   assert.equal(
     buildSpeakerDesignFilename({ projectName: 'Genesis AV', versionName: 'Original Design' }),
-    'Sound Proof - Artcoustic Cinema Designer - Speaker Design - Genesis AV - Original Design',
+    'Sound Proof Speaker Design - Genesis AV - Original Design',
   );
 
   // It is the SAME shared authority the Project Report names itself with.

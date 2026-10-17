@@ -3,7 +3,7 @@
  * --------------------------
  * Prints the Technical Report from a top-level window the app owns, so the saved
  * PDF is named by the report —
- * "Sound Proof - Artcoustic Cinema Designer - Technical - [Dealer] - …" —
+ * "Sound Proof Technical Report - [Project] - [Version]" —
  * rather than by the host tab the app happens to be running in.
  *
  * Printing in place cannot name the file: the browser derives the saved filename

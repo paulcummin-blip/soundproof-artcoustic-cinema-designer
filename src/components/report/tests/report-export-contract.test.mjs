@@ -19,15 +19,15 @@ for (const [type, title] of [
   ['Visual', buildVisualReportTitle(project.name, null, details)],
   ['System Design Summary', buildProposalReportTitle(project.name, 'system_summary', details)],
 ]) {
-  test(`${type}: exact project/account/reference filename`, () => {
-    assert.equal(`${title}.pdf`, `Sound Proof - Artcoustic Cinema Designer - ${type} - Sound Proof - Marquee Home - 34 AR.pdf`);
+  test(`${type}: concise document / project filename`, () => {
+    assert.equal(`${title}.pdf`, `Sound Proof ${type} - Marquee Home.pdf`);
   });
 }
 test('blank reference never falls back to the client or ID', () => {
   for (const blank of [null, undefined, '', '   ']) {
     const identity = resolveReportFilenameDetails({ ...project, project_reference: blank }, account);
     assert.equal(identity.projectReference, null);
-    assert.equal(buildTechnicalReportTitle(project.name, null, identity), 'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home');
+    assert.equal(buildTechnicalReportTitle(project.name, null, identity), 'Sound Proof Technical - Marquee Home');
   }
 });
 test('dealer stamp takes precedence; unrelated account never supplies a filename', () => {
@@ -67,11 +67,11 @@ test('exports wait for identity; proposal filename does not use cover branding',
   assert.ok(read('src/pages/ProposalEditor.jsx').includes('dealerName: projectContext.filenameDealerName'));
   assert.ok(!read('src/components/proposal/export/useProposalExport.js').includes("projectName || proposal?.title"));
 });
-// ── Every populated project identity field reaches the filename ─────────────
+// ── The filename is concise: document, project and version, nothing else ────
 const MARQUEE = 'Marquee Home';
 const MARQUEE_IDENTITY = { dealerName: 'Sound Proof' };
 
-test('the resolver carries every project identity field into the export context', () => {
+test('the resolver still carries every project identity field into the export context', () => {
   assert.deepEqual(
     resolveReportFilenameDetails(
       { account_id: 'a1', name: ' Marquee Home ', client_name: ' 34 AR ', project_reference: ' MH-001 ' },
@@ -86,66 +86,67 @@ test('the resolver carries every project identity field into the export context'
   );
 });
 
-test('client name and project reference are both stated when both are populated', () => {
+test('the identity fields a filename excludes never reach the name', () => {
   assert.equal(
     buildTechnicalReportTitle(MARQUEE, null, { ...MARQUEE_IDENTITY, clientName: '34 AR', projectReference: 'MH-001' }),
-    'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - 34 AR - MH-001',
+    'Sound Proof Technical - Marquee Home',
   );
-});
-
-test('an identical client name and reference are written once', () => {
-  assert.equal(
-    buildTechnicalReportTitle(MARQUEE, null, { ...MARQUEE_IDENTITY, clientName: '34 AR', projectReference: '34 AR' }),
-    'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - 34 AR',
-  );
-  assert.equal((buildReportFilename('Technical', MARQUEE, null, { clientName: '34 AR', projectReference: '34 AR' }).match(/34 AR/g) || []).length, 1);
-});
-
-test('blank client name and blank reference leave both segments out', () => {
   for (const blank of [null, undefined, '', '   ']) {
     assert.equal(
       buildTechnicalReportTitle(MARQUEE, null, { ...MARQUEE_IDENTITY, clientName: blank, projectReference: blank }),
-      'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home',
+      'Sound Proof Technical - Marquee Home',
     );
   }
 });
 
-test('a blank client is never filled from the reference, or the reverse', () => {
-  assert.equal(
-    buildVisualReportTitle(MARQUEE, null, { ...MARQUEE_IDENTITY, clientName: 'Noble Projects', projectReference: '' }),
-    'Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - Noble Projects',
-  );
-  assert.equal(
-    buildVisualReportTitle(MARQUEE, null, { ...MARQUEE_IDENTITY, clientName: '', projectReference: 'MH-001' }),
-    'Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - MH-001',
-  );
+test('no filename repeats the brand, the document type or the product name', () => {
+  const filename = buildTechnicalReportTitle(MARQUEE, null, { ...MARQUEE_IDENTITY, clientName: '34 AR', projectReference: 'MH-001' });
+  assert.equal((filename.match(/Sound Proof/g) || []).length, 1, 'the brand is stated once');
+  assert.equal((filename.match(/Technical/g) || []).length, 1, 'the document type is stated once');
+  assert.equal(/artcoustic/i.test(filename), false, 'the product name is never written');
 });
 
-test('every report type states the same populated identity segments', () => {
-  const details = { dealerName: 'Ribble AV', clientName: 'Noble Projects', projectReference: 'LH-001' };
+test('every report type states the same concise shape', () => {
+  const typeDetails = { dealerName: 'Ribble AV', clientName: 'Noble Projects', projectReference: 'LH-001' };
   assert.equal(
-    buildVisualReportTitle("Lord's Hall", null, details),
-    'Sound Proof - Artcoustic Cinema Designer - Visual - Ribble AV - Lords Hall - Noble Projects - LH-001',
+    buildVisualReportTitle("Lord's Hall", null, typeDetails),
+    'Sound Proof Visual - Lords Hall',
+  );
+  assert.equal(
+    buildReportFilename('Technical', MARQUEE, null, typeDetails),
+    'Sound Proof Technical - Marquee Home',
   );
   assert.equal(
     buildProposalReportTitle(MARQUEE, 'system_summary', { ...MARQUEE_IDENTITY, clientName: '34 AR', projectReference: 'MH-001' }),
-    'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Sound Proof - Marquee Home - 34 AR - MH-001',
+    'Sound Proof System Design Summary - Marquee Home',
   );
   assert.equal(
     buildProposalReportTitle(MARQUEE, 'comparison', MARQUEE_IDENTITY),
-    'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Sound Proof - Marquee Home',
+    'Sound Proof System Design Comparison - Marquee Home',
   );
 });
 
-test('every export consumer passes its client name to the shared helper', () => {
+test('every report type still names the design version it documents', () => {
+  const version = { number: 1, name: 'Original Design' };
+  assert.equal(
+    buildVisualReportTitle(MARQUEE, version, MARQUEE_IDENTITY),
+    'Sound Proof Visual - Marquee Home - Original Design',
+  );
+  assert.equal(
+    buildProposalReportTitle(MARQUEE, 'system_summary', { ...MARQUEE_IDENTITY, versionNames: ['Original Design'] }),
+    'Sound Proof System Design Summary - Marquee Home - Original Design',
+  );
+});
+
+test('every export consumer still resolves the full identity for the shared helper', () => {
   assert.ok(read('src/pages/RP22ClientReport.jsx').includes('clientName: filenameIdentity.clientName'),
-    'the Visual Report passes the client name');
-  assert.ok(read('src/components/report/client/useClientReportPdfExport.js').includes('{ dealerName, clientName, projectReference }'),
-    'the Visual export builds one filename from all three');
-  assert.ok(read('src/components/proposal/export/useProposalExport.js').includes('{ dealerName, clientName, projectReference }'),
-    'the proposal export builds one filename from all three');
+    'the Visual Report resolves the client name');
+  assert.ok(read('src/components/report/client/useClientReportPdfExport.js').includes('buildProjectReportTitle('),
+    'the Visual export builds its filename with the shared helper');
+  assert.ok(read('src/components/proposal/export/useProposalExport.js').includes('buildProposalReportTitle('),
+    'the proposal export builds its filename with the shared helper');
   assert.ok(read('src/pages/ProposalEditor.jsx').includes('clientName: projectContext.filenameClientName'),
-    'the proposal passes the client name');
+    'the proposal resolves the client name');
   assert.ok(read('src/pages/RP22Report.jsx').includes('filenameIdentity'),
     'the Technical Report takes the whole resolved identity as its details');
 });

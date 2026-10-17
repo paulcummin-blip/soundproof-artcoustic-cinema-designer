@@ -6,7 +6,7 @@
  * The export prints from a top-level window the app owns (see
  * `@/components/report/reportPrintWindow`), opened on the shared report
  * filename. That is what names the saved PDF after the report —
- * "Sound Proof - Artcoustic Cinema Designer - Visual - …" — instead of the host
+ * "Sound Proof Project Report - [Project] - [Version]" — instead of the host
  * tab the app happens to be running in. When the browser refuses the window
  * (a pop-up blocker), the export falls back to printing in place with the
  * report title applied to the app and host documents.

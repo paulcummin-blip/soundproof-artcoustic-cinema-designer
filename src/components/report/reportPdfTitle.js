@@ -1,16 +1,26 @@
 /**
  * Shared Sound Proof report PDF filename helper.
  *
- * Every report export path — the Visual Report, the Technical Report and any
- * future report or download button — MUST use this module. Individual report
- * generators must never build their own filenames.
+ * Every export path — the consolidated Project Report, the Current Speaker
+ * Design schedule, the Technical Report, a Proposal and any future download
+ * button — MUST use this module. Individual report generators must never build
+ * their own filenames.
  *
  * Required format:
- *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>] - <Version Name>
+ *   Sound Proof <Document Type> - <Project Name> - <Version>
  *
  * Examples:
- *   Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - 34 AR - Level 4 version
- *   Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - Noble Projects - 34 AR - Original Design
+ *   Sound Proof Speaker Design - Barton Solutions - Original Design
+ *   Sound Proof Project Report - Barton Solutions - Original Design
+ *   Sound Proof Proposal - Barton Solutions - Original Design
+ *
+ * A filename states the document and the design it documents, and nothing else:
+ * the project name and the design version are enough to identify the file. The
+ * dealer/account name, the client name and the project reference are deliberately
+ * NOT part of it, the product name ("Artcoustic Cinema Designer") is never
+ * written, and the document type is stated once — a name never repeats
+ * "Sound Proof" or the document type. Callers still pass `details`; the identity
+ * those fields carry is used for export logging, never for the name.
  *
  * The design version is ALWAYS stated when a version is supplied: a project can
  * hold several versions and Proposal Centre compares them, so an exported report
@@ -25,14 +35,9 @@
  * "Comparing Level 4 version and Level 1 version", shortened to "A vs B" when
  * that is too long. A caller that supplies neither states no version.
  *
- * The dealer, client name and project reference are optional: when they are not
- * available the segment is omitted entirely rather than filled with a
- * placeholder. Client name and project reference are independent — a blank one
- * never borrows the other's value — and an identical value repeated in the two
- * adjacent fields is written once only. A document token ("Project Report",
- * "Visual", "Technical") is ALWAYS present, and the project name is always
- * present (falling back to "Untitled
- * Project").
+ * The document type always opens the filename and the project name is always
+ * present (falling back to "Untitled Project"), so a name can never state a
+ * version with no document and no project to belong to.
  *
  * The browser's "Save as PDF" dialog uses document.title as the default
  * filename and appends the .pdf extension itself, so the title helpers return
@@ -48,13 +53,13 @@
 import { reportVersionFilenameSegment } from './reportVersionIdentity.js';
 
 const BRAND = "Sound Proof";
-const PRODUCT = "Artcoustic Cinema Designer";
 const SEPARATOR = " - ";
 const FALLBACK_PROJECT = "Untitled Project";
 
 /**
- * The fixed report-type token. Every exported report states which document it
- * is: the consolidated Project Report, or the internal Technical Report.
+ * The fixed document-type token. Every exported document states which document
+ * it is: the consolidated Project Report, the Current Speaker Design schedule,
+ * a Proposal, or the internal Technical Report.
  */
 export const REPORT_PDF_TYPE = Object.freeze({
   PROJECT_REPORT: "Project Report",
@@ -145,26 +150,25 @@ function appendSegment(segments, value) {
 }
 
 /**
- * Build the standardised Sound Proof report filename (without the extension).
+ * Build the standardised Sound Proof report filename (without the extension):
  *
- * @param {string} reportType - "Visual", "Technical", "Proposal", …
+ *   Sound Proof <Document Type> - <Project Name> - <Version>
+ *
+ * The dealer name, client name and project reference carried in `details` are
+ * deliberately not written — see the module header. `details.versionSegment`
+ * stands in for the design version of a document built from several versions.
+ *
+ * @param {string} reportType - "Project Report", "Speaker Design", "Proposal", …
  * @param {string} projectName - the project's name
  * @param {{ number: number, name: string } | null | undefined} [version] - the design version this report documents
- * @param {{ dealerName?: string, projectReference?: string } | null} [details] - optional segments
+ * @param {{ dealerName?: string, clientName?: string, projectReference?: string, versionSegment?: string } | null} [details] - caller context (identity is never written into the name)
  * @returns {string} filename title (no .pdf extension)
  */
 export function buildReportFilename(reportType, projectName, version, details = {}) {
   const type = sanitiseFilenameSegment(reportType, "");
-  const segments = [BRAND, PRODUCT];
-  if (type) segments.push(type);
+  const segments = [type ? `${BRAND} ${type}` : BRAND];
 
-  appendSegment(segments, details?.dealerName);
   appendSegment(segments, sanitiseProjectName(projectName));
-  // Client name and project reference are separate project fields: each is
-  // written only when it holds a value of its own.
-  appendSegment(segments, details?.clientName);
-  appendSegment(segments, details?.projectReference);
-
   appendSegment(segments, buildVersionSegment(version));
   // A proposal document states the design versions it was built from, in place of
   // the report's own single design version. See buildProposalVersionSegment.
@@ -176,7 +180,9 @@ export function buildReportFilename(reportType, projectName, version, details = 
 /**
  * The same filename WITH the .pdf extension, for a real download (an <a download>
  * attribute or a generated blob). The print dialog adds the extension itself,
- * so this is only for paths that name a file directly.
+ * so this is only for paths that name a file directly — and it is the same name
+ * the Project Library stores, so a stored document is listed under exactly the
+ * filename it was downloaded as.
  *
  * @returns {string} filename ending in ".pdf"
  */

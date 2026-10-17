@@ -2,9 +2,9 @@
 // ---------------------------------------------------------------------------
 // ACCEPTANCE — Visual Report PDF filename and first page.
 //
-//   TEST 1  Filename uses the shared project-aware format, matching the example
-//   TEST 2  Filename rules: never Base44, never a generic app title, optional
-//           dealer and project reference omitted when blank
+//   TEST 1  Filename uses the shared concise format, matching the example
+//   TEST 2  Filename rules: never Base44, never a generic app title, never the
+//           product name, the dealer, the client name or the reference
 //   TEST 3  The Visual Report prints from the app-owned window under the shared
 //           filename, so the browser cannot name the file after the host tab
 //   TEST 4  The proposal pack and the Visual Report share ONE print-window
@@ -35,10 +35,7 @@ test('TEST 1 — the Visual Report filename matches the required format', () => 
     { dealerName: 'Sound Proof', projectReference: '34 AR' },
   );
 
-  assert.equal(
-    filename,
-    'Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - 34 AR',
-  );
+  assert.equal(filename, 'Sound Proof Visual - Marquee Home');
   assert.equal(`${filename}.pdf`, buildReportPdfFilename(
     'Visual', 'Marquee Home', null, { dealerName: 'Sound Proof', projectReference: '34 AR' },
   ));
@@ -46,26 +43,29 @@ test('TEST 1 — the Visual Report filename matches the required format', () => 
   // The Technical Report keeps the same shape with its own type token.
   assert.equal(
     buildTechnicalReportTitle('Marquee Home', null, { dealerName: 'Sound Proof', projectReference: '34 AR' }),
-    'Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - 34 AR',
+    'Sound Proof Technical - Marquee Home',
   );
 });
 
 // ── TEST 2 — filename rules ────────────────────────────────────────────────
 test('TEST 2 — no platform name, no generic title, optional segments omitted', () => {
   const withoutOptionals = buildVisualReportTitle('Marquee Home', null, {});
-  assert.equal(withoutOptionals, 'Sound Proof - Artcoustic Cinema Designer - Visual - Marquee Home');
+  assert.equal(withoutOptionals, 'Sound Proof Visual - Marquee Home');
 
-  // A blank dealer or reference leaves no empty segment and no placeholder.
+  // No empty segment, no placeholder, and none of the excluded identity.
   assert.ok(!withoutOptionals.includes(' -  - '), 'no empty segment');
   assert.ok(!withoutOptionals.includes('null'));
   assert.ok(!withoutOptionals.includes('undefined'));
 
-  // Every required token is present in every filename.
+  // Every required token is present in every filename — and the excluded ones
+  // never are.
   for (const value of [withoutOptionals, buildVisualReportTitle('Marquee Home', null, { dealerName: 'Ribble AV' })]) {
     assert.ok(value.includes('Sound Proof'), 'Sound Proof always present');
-    assert.ok(value.includes('Artcoustic Cinema Designer'), 'product always present');
     assert.ok(value.includes('Visual'), 'report type always present');
     assert.ok(value.includes('Marquee Home'), 'project name always present');
+    assert.equal(value.includes('Ribble AV'), false, 'the dealer is never named');
+    assert.equal(/artcoustic|cinema designer/i.test(value), false, 'the product is never named');
+    assert.equal((value.match(/Sound Proof/g) || []).length, 1, 'the brand is stated once');
     assert.ok(!/base\s*44/i.test(value), 'the platform is never named');
   }
 
@@ -76,7 +76,7 @@ test('TEST 2 — no platform name, no generic title, optional segments omitted',
   // A missing project name still states the report type — never a generic tab title.
   const unnamed = buildVisualReportTitle('', null, {});
   assert.ok(unnamed.includes('Visual') && unnamed.includes('Untitled Project'));
-  assert.notEqual(unnamed, 'SoundProof - Artcoustic Cinema Designer');
+  assert.notEqual(unnamed, 'SoundProof');
 });
 
 // ── TEST 3 — the Visual Report prints from the app-owned window ────────────
@@ -112,7 +112,7 @@ test('TEST 4 — proposal and Visual Report share the print window and helper', 
   // One filename helper owns the whole format.
   const helper = read('src/components/report/reportPdfTitle.js');
   assert.ok(helper.includes('const BRAND = "Sound Proof"'));
-  assert.ok(helper.includes('const PRODUCT = "Artcoustic Cinema Designer"'));
+  assert.equal(/const PRODUCT\s*=/.test(helper), false, 'one format, with no product token in it');
 });
 
 // ── TEST 5 — no separate cover page, no oversized cover image ──────────────
