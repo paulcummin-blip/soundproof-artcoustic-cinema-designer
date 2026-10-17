@@ -26,6 +26,9 @@
 import { providerAccessToken } from './portalSsoAuthority.js';
 import { resolvePartnerPortalDealerIdentity } from './partnerPortalIdentityClient.js';
 
+const EXPECTED_IDENTITY_ENDPOINT =
+  'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/dealer-identity-resolve';
+
 function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -33,7 +36,18 @@ function hasText(value) {
 function identityEndpointUrl() {
   const raw = globalThis.Deno?.env?.get?.('PARTNER_PORTAL_DEALER_IDENTITY_URL');
   if (!hasText(raw)) throw new Error('DEALER_IDENTITY_URL_UNAVAILABLE');
-  return raw.trim();
+  let endpoint;
+  try {
+    endpoint = new URL(raw.trim());
+  } catch {
+    throw new Error('DEALER_IDENTITY_URL_INVALID');
+  }
+  // Never send a provider token to a different project, path or URL query.
+  // A mismatch is reported as a fixed code; the configured value stays secret.
+  if (endpoint.toString() !== EXPECTED_IDENTITY_ENDPOINT) {
+    throw new Error('DEALER_IDENTITY_URL_TARGET_MISMATCH');
+  }
+  return EXPECTED_IDENTITY_ENDPOINT;
 }
 
 /**
