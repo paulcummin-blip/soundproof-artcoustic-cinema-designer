@@ -15,6 +15,17 @@
  * can never overfill or clip — the sections that used to be stacked onto it
  * have moved to the page that gives them room.
  *
+ * The opening is the project-specific headline alone. The screen, the room and
+ * the seating are stated once, by the fact sheet directly below it, so the same
+ * facts are never read twice on one page.
+ *
+ * The fact sheet states the room the design is built in, then the system it
+ * specifies: the architecture, EACH loudspeaker layer on its own row — LCR,
+ * Surrounds, Overheads — carrying the models and quantities that layer is built
+ * from, and the subwoofers. Acoustic treatment is not a fact here: it belongs to
+ * the room-and-system picture only as supporting evidence, and it states its own
+ * quantity and recommendation in full on its own page.
+ *
  * Presentation only. Every fact comes from the saved project, the report's own
  * canonical product derivation and the published engineering summary. Nothing is
  * graded, recalculated or inferred.
@@ -46,6 +57,18 @@ function productValue(productsSelected, key) {
   return value || null;
 }
 
+/** One layer's models and quantities, exactly as that layer's own product row
+ *  states them. A layer specifying two models reads as the pair it is
+ *  ("C4-1 × 1 and Evolve 3-1 × 2"), never as one identical package. Null when the
+ *  design specifies nothing for that layer. */
+function layerValue(productsSelected, key) {
+  const value = productValue(productsSelected, key);
+  if (!value) return null;
+  const models = value.split(',').map((part) => part.trim()).filter(Boolean);
+  if (models.length <= 1) return models[0] || null;
+  return `${models.slice(0, -1).join(', ')} and ${models[models.length - 1]}`;
+}
+
 /**
  * How the design's display is stated. THE screen-size display rule, read from
  * the one display authority: a television by its nominal diagonal alone
@@ -59,14 +82,17 @@ function screenFact(projectDetails) {
 
 /** The facts that state the system's own products: each is shown only when the
  *  design actually specifies that layer, so an absent one is never stated. */
-const PRODUCT_FACT_LABELS = new Set(['Key loudspeakers', 'Subwoofers', 'Acoustic treatment']);
+const PRODUCT_FACT_LABELS = new Set(['LCR', 'Surrounds', 'Overheads', 'Subwoofers']);
 
-/** The role each loudspeaker layer is stated under in the fact sheet. */
-const LOUDSPEAKER_LAYER_LABELS = {
-  lcr: 'Screen channels',
-  surrounds: 'Surrounds',
-  overheads: 'Overheads',
-};
+/** The loudspeaker layers the fact sheet states, each on its own row, in the
+ *  order a cinema is built: the screen wall first, then around and above the
+ *  listener. The label is the design's own layer name, and the models and
+ *  quantities come from that layer's own product row — never from a summary. */
+const LOUDSPEAKER_LAYER_ROWS = [
+  { key: 'lcr', label: 'LCR' },
+  { key: 'surrounds', label: 'Surrounds' },
+  { key: 'overheads', label: 'Overheads' },
+];
 
 /** The facts that describe the room, as opposed to the system built into it. */
 // 'TV' is the display fact's label when the design's display is a television, so
@@ -112,33 +138,24 @@ export default function ProjectReportDesignSummary({
     ? `${seatRows.length} row${seatRows.length === 1 ? '' : 's'} · ${seatCount} seat${seatCount === 1 ? '' : 's'}`
     : null;
 
-  // The loudspeaker families the design is built on, stated by the ROLE each is
-  // specified for: "Screen channels: C4-1 and Evolve 3-1 × 2 · Surrounds: …". A
-  // layer the design does not specify states nothing, and a front stage built on
-  // more than one model reads as a role rather than as one identical package.
-  const keyLoudspeakers = ['lcr', 'surrounds', 'overheads']
-    .map((key) => {
-      const models = String(productValue(productsSelected, key) || '')
-        .split(',')
-        .map((part) => part.trim())
-        .filter(Boolean);
-      if (models.length === 0) return null;
-      const phrase = models.length === 1
-        ? models[0]
-        : `${models.slice(0, -1).join(', ')} and ${models[models.length - 1]}`;
-      return `${LOUDSPEAKER_LAYER_LABELS[key]}: ${phrase}`;
-    })
-    .filter(Boolean)
-    .join(' · ') || null;
+  // One row per loudspeaker layer, each carrying that layer's own models and
+  // quantities. The layers are stated separately rather than folded into one
+  // sentence, so the screen wall, the surrounds and the overheads are read as the
+  // distinct layers they are.
+  const layerFacts = LOUDSPEAKER_LAYER_ROWS.map((row) => ({
+    label: row.label,
+    value: layerValue(productsSelected, row.key),
+  }));
 
+  // Acoustic treatment is deliberately not a fact on this page: it states its own
+  // quantity and recommendation in full on its own page.
   const facts = [
     { label: 'Room', value: roomFact },
     { label: displayFactLabel(projectDetails), value: screenFact(projectDetails) },
     { label: 'Seating', value: seatingFact },
     { label: 'System format', value: String(projectDetails?.dolby_config || '').trim() || null },
-    { label: 'Key loudspeakers', value: keyLoudspeakers },
+    ...layerFacts,
     { label: 'Subwoofers', value: productValue(productsSelected, 'subwoofers') },
-    { label: 'Acoustic treatment', value: productValue(productsSelected, 'acoustic_treatment') },
   ]
     // A product fact the design does not have is left out altogether: the page
     // never states an absent speaker layer, not even as a dash.
@@ -165,9 +182,11 @@ export default function ProjectReportDesignSummary({
         </h1>
       </div>
 
+      {/* The opening is the project-specific headline alone: the screen, the room
+          and the seating are stated once by the fact sheet immediately below,
+          never a second time under the headline. */}
       <ProjectReportOpeningBlock
         headline={opening?.headline || null}
-        supportingLine={opening?.supportingLine || null}
         print={print}
       />
 
