@@ -8,6 +8,8 @@ import ResetDesignerDialog from "@/components/roomdesigner/ResetDesignerDialog";
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { useCanonicalProject } from "@/components/state/projectHydrationStore";
+import buildEngineeringPublicationDesignState from "@/components/roomdesigner/utils/buildEngineeringPublicationDesignState";
 import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
