@@ -64,7 +64,7 @@ test('a configured endpoint outside the shared live backend never receives a pro
   globalThis.Deno = { env: { get: () => 'https://other-project.example/functions/v1/dealer-identity-resolve' } };
   globalThis.fetch = async () => { throw new Error('FETCH_MUST_NOT_RUN'); };
   const base44 = { asServiceRole: { sso: {
-    async getAccessToken() { return { access_token: 'opaque-provider-token' }; },
+    async getAccessToken() { return { access_token: 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.c2ln' }; },
   } } };
   const result = await associateDealerIdentityCore(base44, 'pilot-user');
   assert.deepEqual(result, { resolved: false, reason: 'DEALER_IDENTITY_URL_TARGET_MISMATCH' });
