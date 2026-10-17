@@ -273,6 +273,42 @@ export default function ProposalImagePlacementStyles() {
           page-break-inside: avoid;
         }
       }
+
+      /* ── FULL WIDTH: THE UPLOADED IMAGE IS THE COMPOSITION ────────────────
+         A FULL WIDTH image is shown exactly as it was uploaded: the full content
+         width, its own height and its own proportions. No fixed height, no
+         template ratio, no crop and no object-fit: cover — the uploaded
+         composition is intentional, so a taller source stays taller and a
+         shorter source stays shorter. The height is never derived from the page
+         template; the page is composed around the image instead.
+
+         The selector carries the class twice (and the export mode's own prefix
+         on the sheet) so it outranks every role treatment above whatever the
+         order: the presentation is the designer's instruction, not a style, so
+         an image marked Full Width never takes a role's fixed frame.
+
+         Where the copy and the image cannot share a sheet, the measured
+         compositor moves the copy and the image keeps its area; an image too
+         tall for the printable area is scaled as a whole to fit it, which is a
+         scale and never a crop. An image with no presentation recorded keeps the
+         established treatment exactly as it was. ── */
+      .pp-media.pp-media--presentation-full-width img {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        object-fit: contain;
+        background: transparent;
+      }
+
+      @media print {
+        body.proposal-export-mode .proposal-print-portal .pp-media.pp-media--presentation-full-width img {
+          width: 100%;
+          height: auto;
+          max-height: none;
+          object-fit: contain;
+          background: transparent;
+        }
+      }
     `}</style>
   );
 }
