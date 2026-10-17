@@ -402,24 +402,54 @@ const PACKAGE_GROUP_ORDER = Object.freeze([
  * the same layer rows the version's equipment checklist prints.
  *
  * A role states its own count where the snapshot carries one. A snapshot frozen
- * before the roles carried it still states what the version is specified with,
- * so the Qty column reads the count from the version's own specification rather
- * than printing a blank cell beside a real model. Nothing is invented: a model
- * with no resolved count anywhere leaves its cell unstated, and the equipment
- * quantity invariant refuses the document.
+ * before the roles carried theirs states the model once per LAYER — "Evolve 2-1 ×
+ * 6" for the surround layer — and that figure is the whole layer's loudspeakers,
+ * never one position's. It is therefore shared among the positions of that layer
+ * that carry the model, so three two-loudspeaker positions state two each and the
+ * layer's own total is still six. Reading the layer total onto every position is
+ * what once stated six at the front wides, the side surrounds and the rear
+ * surrounds alike. Nothing is invented: a position whose count resolves nowhere
+ * leaves its cell unstated, and the equipment quantity invariant refuses the
+ * document.
  */
-function layerQuantityByModel(system) {
-  const byModel = new Map();
-  const layer = system?.products_selected_by_layer || {};
-  for (const rows of Object.values(layer)) {
-    for (const row of Array.isArray(rows) ? rows : []) {
-      const model = row?.model ? String(row.model).trim() : '';
-      const quantity = Number(row?.quantity) || 0;
-      if (!model || quantity <= 0) continue;
-      byModel.set(model, (byModel.get(model) || 0) + quantity);
+const ROLE_LAYER_KEY = Object.freeze({
+  lcr: 'lcr',
+  centre_soundbar: 'lcr',
+  surround: 'surrounds',
+  rear_surround: 'surrounds',
+  front_wide: 'surrounds',
+  overhead: 'overheads',
+});
+
+/** The same product however its name is punctuated. */
+const modelToken = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function layerPositionQuantities(groups, layerRows) {
+  // Which positions of which layer carry which model.
+  const byLayerModel = new Map();
+  for (const [label, entry] of groups) {
+    const layerKey = ROLE_LAYER_KEY[entry.roleKey];
+    if (!layerKey) continue;
+    for (const key of entry.modelKeys) {
+      const bucket = `${layerKey}|${key}`;
+      const labels = byLayerModel.get(bucket) || [];
+      if (!labels.includes(label)) labels.push(label);
+      byLayerModel.set(bucket, labels);
     }
   }
-  return byModel;
+
+  const shares = new Map();
+  for (const [bucket, labels] of byLayerModel) {
+    const [layerKey, model] = bucket.split('|');
+    const rows = Array.isArray(layerRows?.[layerKey]) ? layerRows[layerKey] : [];
+    const total = rows.reduce((sum, row) => (modelToken(row?.model) === model
+      ? sum + (Number(row?.quantity) || 0)
+      : sum), 0);
+    if (total <= 0 || labels.length === 0) continue;
+    const share = Math.max(1, Math.floor(total / labels.length));
+    for (const label of labels) shares.set(label, share);
+  }
+  return shares;
 }
 
 /** The package row a subwoofer side is stated as, from its own recorded side. */
@@ -438,7 +468,6 @@ function subwooferSideRole(side) {
 export function buildPackageRows(snapshot) {
   const system = snapshot?.system || {};
   const groups = new Map();
-  const layerQuantities = layerQuantityByModel(system);
 
   for (const role of Array.isArray(system.product_roles) ? system.product_roles : []) {
     if (isSubwooferRole(role)) continue;
@@ -452,13 +481,20 @@ export function buildPackageRows(snapshot) {
     // dual-centre stage) prints as stated; every other role prints its model.
     const model = role?.model_statement || role?.model_label || role?.model_key || null;
     if (!label || !model) continue;
-    const entry = groups.get(label) || { models: [], quantity: 0 };
+    const entry = groups.get(label) || { models: [], modelKeys: [], roleKey: null, quantity: 0 };
     if (!entry.models.includes(model)) entry.models.push(model);
+    const modelKey = role?.model_key || role?.model_label || null;
+    if (modelKey && !entry.modelKeys.includes(modelToken(modelKey))) entry.modelKeys.push(modelToken(modelKey));
+    entry.roleKey = entry.roleKey || key;
     // The physical loudspeakers the position holds, so the Qty column states the
     // same count the version's own equipment checklist states.
     entry.quantity += Number(role?.quantity) || 0;
     groups.set(label, entry);
   }
+
+  // The count each position states where its own roles carry none — resolved per
+  // position, never as one layer total repeated on every row of that layer.
+  const layerShares = layerPositionQuantities(groups, system?.products_selected_by_layer);
 
   const rank = (label) => {
     const index = PACKAGE_GROUP_ORDER.indexOf(label);
@@ -470,12 +506,12 @@ export function buildPackageRows(snapshot) {
     .flatMap((label) => {
       const entry = groups.get(label);
       const model = entry.models.join(' · ');
-      // The position's own count leads; where the roles carry none, the count is
-      // read from the version's own specified layer rows for the model chosen
-      // there. A position with no resolved count anywhere stays unstated.
+      // The position's own count leads; where the roles carry none, the position's
+      // own share of its layer is stated. A position with no resolved count
+      // anywhere stays unstated.
       const stated = entry.quantity > 0
         ? entry.quantity
-        : entry.models.reduce((sum, each) => sum + (layerQuantities.get(String(each).trim()) || 0), 0);
+        : (layerShares.get(label) || 0);
       const qty = stated > 0 ? stated : null;
       // The left/right pair is stated as the two positions it is, one cabinet
       // each — the rows the version's equipment checklist prints.

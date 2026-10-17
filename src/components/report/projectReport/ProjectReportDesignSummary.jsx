@@ -157,7 +157,9 @@ export default function ProjectReportDesignSummary({
     { label: 'Room', value: roomFact },
     { label: displayFactLabel(projectDetails), value: screenFact(projectDetails) },
     { label: 'Seating', value: seatingFact },
-    { label: 'System format', value: String(systemFormat || projectDetails?.dolby_config || '').trim() || null },
+    // The decoder layout is never a fallback in client-facing copy: the summary
+    // states the client's system format (9.3.6) or states nothing.
+    { label: 'System format', value: String(systemFormat || '').trim() || null },
     ...layerFacts,
     { label: 'Subwoofers', value: productValue(productsSelected, 'subwoofers') },
   ]

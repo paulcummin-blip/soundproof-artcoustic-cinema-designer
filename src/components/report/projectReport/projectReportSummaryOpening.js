@@ -244,7 +244,9 @@ export function buildProjectReportSummaryOpening({
   // ACTIVE subwoofers . overhead channels — resolved by the report page from the
   // one shared format authority. The project's own Dolby configuration is the
   // fallback, never a second construction rule.
-  const architecture = String(systemFormat || projectDetails?.dolby_config || '').trim() || null;
+  // The decoder layout is never a fallback in client-facing copy: the report
+  // states the client's system format (9.3.6) or states nothing.
+  const architecture = String(systemFormat || '').trim() || null;
   const vision = [];
   const rowPhrase = seatingRowPhrase(seatingPositions);
   const display = displayPhrase(projectDetails);

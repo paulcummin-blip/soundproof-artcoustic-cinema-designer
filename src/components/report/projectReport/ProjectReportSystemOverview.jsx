@@ -91,7 +91,9 @@ export default function ProjectReportSystemOverview({
     // The display is named as the design's own authority states it — a television
     // by its own size. A projection screen states it exactly as before.
     isTvDisplay(projectDetails) ? displayPhrase(projectDetails) : null,
-    String(systemFormat || projectDetails?.dolby_config || '').trim() || null,
+    // The decoder layout is never a fallback in client-facing copy: the page
+    // states the client's system format (9.3.6) or states nothing.
+    String(systemFormat || '').trim() || null,
     speakerCount > 0 ? `${speakerCount} speakers` : null,
     counts.subwoofers > 0 ? `${counts.subwoofers} subwoofers` : null,
     counts.acoustic_treatment > 0 ? `${counts.acoustic_treatment} × Abfuser` : null,

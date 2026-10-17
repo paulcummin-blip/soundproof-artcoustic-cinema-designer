@@ -51,7 +51,9 @@ export function buildProjectReportOpening({
   // own Dolby configuration is the fallback, never a second construction rule.
   systemFormat = null,
 } = {}) {
-  const architecture = String(systemFormat || projectDetails?.dolby_config || '').trim() || null;
+  // The decoder layout is never a fallback in client-facing copy: the report
+  // states the client's system format (9.3.6) or states nothing.
+  const architecture = String(systemFormat || '').trim() || null;
 
   // The headline leads with the design's intent — the cinema this room is and
   // the display it is built around — rather than with a channel count. The
