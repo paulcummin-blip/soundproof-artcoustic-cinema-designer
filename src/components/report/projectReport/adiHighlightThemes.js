@@ -318,10 +318,24 @@ function buildBassTheme({ byKey, summary }) {
     };
   }
 
-  const parts = [
-    p18 ? `predicted in-room extension reaches ${p18.value}` : null,
-    p19 ? 'at the reference seating position the corrected response is assessed against the target across the P19 band, which is the reference-seat result this design carries' : null,
-    p20 ? `seat-to-seat consistency is the main limitation: the balance at the reference seat is not held equally across${p20.assessed ? ` the ${p20.assessed}` : ''} assessed seats` : null,
+  // Each sentence starts on its own capital: the extension, the reference-seat
+  // result stated with the level it actually achieved, then the seat-to-seat
+  // limitation with the level it actually has. A sentence is only written for a
+  // result this design's publication carries, and the levels are the published
+  // ones, never restated from memory.
+  const p19Level = p19?.level ? String(p19.level).replace(/^L/i, '') : null;
+  const p20Level = p20?.level ? String(p20.level).replace(/^L/i, '') : null;
+
+  const sentences = [
+    p18 ? `Predicted in-room extension reaches ${p18.value}.` : null,
+    p19
+      ? (p19Level
+        ? `At the reference seating position, the corrected response achieves P19 Level ${p19Level}, against the target across the assessed band.`
+        : 'At the reference seating position, the corrected response is assessed against the target across the assessed band.')
+      : null,
+    p20
+      ? `Seat-to-seat consistency remains the principal limitation, with P20 at Level ${p20Level} across the${p20.assessed ? ` ${p20.assessed}` : ''} assessed seats.`
+      : null,
   ].filter(Boolean);
 
   return {
@@ -332,7 +346,7 @@ function buildBassTheme({ byKey, summary }) {
     level: [p18, p19, p20].filter(Boolean)
       .reduce((weakest, item) => (levelRank(item.level) < levelRank(weakest) ? item.level : weakest), 'L4'),
     evidence,
-    explanation: `${parts.join('. ').replace(/^([a-z])/, (m) => m.toUpperCase())}.`,
+    explanation: sentences.join(' '),
     sources: ['P18', 'P19', 'P20'].filter((key) => (key === 'P18' ? Boolean(p18) : key === 'P19' ? Boolean(p19) : Boolean(p20))),
   };
 }
