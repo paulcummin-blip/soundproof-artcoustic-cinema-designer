@@ -14,8 +14,8 @@
  *   1. binding target is SOUND_PROOF
  *   2. account is the known iCubed Sound Proof account, active
  *   3. binding subject/profile match the active ExternalAccountLink
- *   4. exactly one unclaimed dealer-administrator seat exists
- *   5. that seat is pending
+ *   4. exactly one dealer-administrator seat exists
+ *   5. that seat is pending, or active for this same verified Base44 user
  *   6. no conflicting PortalIdentity exists
  *   7. the Base44 user is an authenticated, non-disabled, is_verified record
  *   8. the binding is complete and unexpired
@@ -155,29 +155,37 @@ export async function claimPilotPortalAdministratorSeat({ service, base44User, b
   // ── 6. No conflicting PortalIdentity ────────────────────────────────────
   await assertNoPilotPortalIdentityConflict(service, base44User, binding, link.account_id);
 
-  // ── 4, 5. Exactly one pending administrator seat ────────────────────────
+  // ── 4, 5. One administrator seat; an active seat may be reused only by
+  // the very same verified Base44 user on a repeat Portal launch. ──────────
   const memberships = await uniqueRows(service.entities.AccountMembership, {
     account_id: link.account_id,
   });
+  const administratorSeats = memberships.filter(isAdministratorSeat);
+  if (administratorSeats.length === 0) throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
+  if (administratorSeats.length > 1) throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
 
-  const otherSeatsForUser = memberships.filter(
-    (membership) => membership?.user_id === base44User.id,
-  );
-  if (otherSeatsForUser.some((membership) => membership.status !== 'pending')) {
-    throw new Error('PORTAL_MEMBERSHIP_ALREADY_CLAIMED');
+  const seat = administratorSeats[0];
+  if (memberships.some(
+    (membership) => membership?.id !== seat.id && membership?.user_id === base44User.id,
+  )) {
+    throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
   }
-  if (otherSeatsForUser.length > 1) throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
 
-  const pendingAdministratorSeats = memberships.filter(
-    (membership) => membership?.status === 'pending' && isAdministratorSeat(membership),
-  );
-  if (pendingAdministratorSeats.length === 0) {
-    // No administrator seat is waiting: the seat still has to be assigned.
-    throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
+  const verifiedDealerName = binding.account_name.trim();
+  const userPatch = {};
+  if (user.account_id !== link.account_id) userPatch.account_id = link.account_id;
+  if (user.dealer_name !== verifiedDealerName) userPatch.dealer_name = verifiedDealerName;
+
+  if (seat.status === 'active') {
+    if (seat.user_id !== base44User.id) {
+      throw new Error('PORTAL_MEMBERSHIP_ALREADY_CLAIMED');
+    }
+    if (Object.keys(userPatch).length > 0) {
+      await service.entities.User.update(user.id, userPatch);
+    }
+    return { membership: seat, claimed: false, previousUserId: null };
   }
-  if (pendingAdministratorSeats.length > 1) throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
-
-  const seat = pendingAdministratorSeats[0];
+  if (seat.status !== 'pending') throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
 
   // The seat may already be parked on the invited Base44 user (the invitation
   // stamps user_id when the invited email already had a user record). The
@@ -202,12 +210,6 @@ export async function claimPilotPortalAdministratorSeat({ service, base44User, b
     full_name: seat.full_name || user.full_name || null,
   });
 
-  const verifiedDealerName = hasText(binding.account_name) ? binding.account_name.trim() : null;
-  const userPatch = {};
-  if (user.account_id !== link.account_id) userPatch.account_id = link.account_id;
-  if (verifiedDealerName && user.dealer_name !== verifiedDealerName) {
-    userPatch.dealer_name = verifiedDealerName;
-  }
   if (Object.keys(userPatch).length > 0) {
     await service.entities.User.update(user.id, userPatch);
   }
