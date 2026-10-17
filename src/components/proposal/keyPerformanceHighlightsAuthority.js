@@ -26,6 +26,7 @@ import { excludeClientFacingRows } from './designIndexRowAuthority';
 // The bass-extension register is the writing authority's own (see the mirror's
 // header): the depth a result reached is told in the approved words for its level.
 import { bassExtensionSentence } from '@/shared/bassExtensionLanguage';
+import { systemFormat } from '@/shared/systemFormat';
 
 /** The performance areas a client-facing row may belong to, in table order. */
 export const HIGHLIGHT_AREA = Object.freeze({
@@ -211,7 +212,7 @@ const FALLBACK_GAIN = 'Part of how this system performs as a whole in the room.'
  * A concise table that holds together reads as designed; a longer one that
  * breaks across two pages reads as an accident.
  */
-export const HIGHLIGHT_DISPLAY_LIMIT = 8;
+export const HIGHLIGHT_DISPLAY_LIMIT = 4;
 
 /**
  * The smallest summary the table is ever trimmed to when the complete section
@@ -219,7 +220,7 @@ export const HIGHLIGHT_DISPLAY_LIMIT = 8;
  * bass result. A smaller table would stop being a summary of the design, so a
  * section that still does not fit at this size is reported rather than cut.
  */
-export const HIGHLIGHT_MIN_PRINTED_ROWS = 5;
+export const HIGHLIGHT_MIN_PRINTED_ROWS = 4;
 
 /**
  * The order rows are chosen in when a design has more results than the table
@@ -462,6 +463,65 @@ export function highlightParameterFor(key, fallbackArea = null) {
   const presentation = ROW_PRESENTATION[String(key || '').trim()];
   if (presentation) return presentation.parameter;
   return fallbackArea || 'Design result';
+}
+
+/**
+ * Four client-facing headlines from the exact frozen snapshot used by this proposal.
+ * No value is calculated or regraded here: related current parameters are grouped
+ * so the table tells the design story once instead of becoming a miniature report.
+ */
+export function buildClientSummaryRows(snapshot) {
+  const headlines = Array.isArray(snapshot?.rp22?.parameter_headlines)
+    ? snapshot.rp22.parameter_headlines
+    : [];
+  const byId = new Map(headlines.map((row) => [Number(row?.parameter_id), row]));
+  const stated = (id) => {
+    const row = byId.get(id);
+    if (!row) return null;
+    const level = String(row.level || row.achieved_level || '').trim();
+    const value = String(row.formatted_value ?? row.value ?? '').trim();
+    return [level, value].filter(Boolean).join(' · ');
+  };
+  const layout = snapshot?.system?.configuration?.dolby_config || null;
+  const subwooferCount = snapshot?.system?.channel_layout?.subwoofer_count;
+  const format = systemFormat({ layout, subwooferCount });
+  const p2 = stated(2);
+  const dynamic = [12, 13, 14].map(stated).filter(Boolean);
+  const timbre = [16, 17].map(stated).filter(Boolean);
+  const bass = [18, 19, 20].map(stated).filter(Boolean);
+  if (!format || !p2 || dynamic.length !== 3 || timbre.length !== 2 || bass.length !== 3) return [];
+
+  return [
+    {
+      key: 'client_system_spatial',
+      area: 'System / Spatial Resolution',
+      parameter: 'System format · P2',
+      result: `${format} · ${p2}`,
+      gain: 'Fifteen discrete speaker positions place sound around and above both seating rows.',
+    },
+    {
+      key: 'client_dynamic',
+      area: 'Dynamic Range',
+      parameter: 'P12 screen · P13 surround · P14 bass',
+      result: dynamic.join(' · '),
+      gain: 'The screen, surround and bass systems retain headroom as soundtracks become demanding.',
+    },
+    {
+      key: 'client_timbre',
+      area: 'Timbre Matching',
+      parameter: 'P16 screen · P17 surround/overhead',
+      result: timbre.join(' · '),
+      gain: 'Voices and effects retain a consistent tonal character within each assessed speaker group.',
+    },
+    {
+      key: 'client_bass',
+      area: 'Bass Performance',
+      parameter: 'P18 extension · P19 response · P20 consistency',
+      result: bass.join(' · '),
+      gain: 'Deep extension and accurate bass at the reference seat, with greater variation across the other seats.',
+      limitation: true,
+    },
+  ];
 }
 
 /** A generated "What the room gains" cell, or null when it is not usable. */
