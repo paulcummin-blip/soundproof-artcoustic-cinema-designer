@@ -218,6 +218,14 @@ export default function ProposalPackDocument({
     flowGroupsBySection[group.section_id] = flowGroupsBySection[group.section_id] || [];
     flowGroupsBySection[group.section_id].push(group);
   });
+  // ── The photograph that closes the design ────────────────────────────────
+  // The conclusion carries one dominant photograph. Declare this helper before
+  // the lead-copy decision below consumes it, so rendering never crosses a TDZ.
+  const closingPairTypes = new Set(['overall_design', 'conclusion']);
+  const composesClosingPair = (sectionType) => !closingHeroPlaced
+    && Boolean(plannedClosingFeature || closingGalleryAsset)
+    && closingPairTypes.has(sectionType);
+
   // The validated copy written for the project's images is published ONCE, above
   // the first photographs the document carries — on the page that closes the
   // design where it composes them, otherwise above the first photographs
@@ -378,15 +386,6 @@ export default function ProposalPackDocument({
     });
     galleryPagesPlaced = true;
   };
-
-  // ── The photograph that closes the design ────────────────────────────────
-  // The conclusion carries one dominant visual idea, never a contact sheet. The
-  // remaining photographs continue afterwards on pages composed from the Image
-  // Library presentation metadata.
-  const closingPairTypes = new Set(['overall_design', 'conclusion']);
-  const composesClosingPair = (sectionType) => !closingHeroPlaced
-    && Boolean(plannedClosingFeature || closingGalleryAsset)
-    && closingPairTypes.has(sectionType);
 
   // One page carries the project, the room and the brief: no second page
   // restates the same facts.
