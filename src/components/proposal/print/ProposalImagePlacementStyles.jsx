@@ -126,10 +126,13 @@ export default function ProposalImagePlacementStyles() {
                       point, which is the one mode where the focal controls
                       apply. ── */
       .pp-media.pp-media--presentation-full-width { width: 100%; }
+      /* The supporting share of the content column: about 40 per cent, so a
+         detail reads as supporting evidence beside the copy rather than as a
+         second hero. It is never the full content width. */
       .pp-media.pp-media--presentation-detail,
       .pp-media.pp-media--presentation-cropped-detail {
-        width: 58%;
-        max-width: 58%;
+        width: 40%;
+        max-width: 40%;
         margin-bottom: 6mm;
       }
       .pp-media.pp-media--presentation-detail img {
@@ -177,11 +180,20 @@ export default function ProposalImagePlacementStyles() {
            room for a tall plan, and never cropped. The height is bounded rather
            than fixed, so a dimensioned plan is reduced only as far as it stays
            readable. */
-        .pp-media.pp-media--presentation-detail { width: 60%; max-width: 60%; }
-        .pp-media.pp-media--presentation-detail img { max-height: 104mm; }
+        .pp-media.pp-media--presentation-detail { width: 40%; max-width: 40%; }
+        .pp-media.pp-media--presentation-detail img { max-height: 88mm; }
         /* The cropped detail on the sheet: a compact editorial crop, framed on
            the focal point the designer chose. */
-        .pp-media.pp-media--presentation-cropped-detail { width: 60%; max-width: 60%; }
+        .pp-media.pp-media--presentation-cropped-detail { width: 40%; max-width: 40%; }
+        /* A DIMENSIONED DRAWING keeps the legible share rather than the supporting
+           share: at 40 per cent its dimensions, symbols and annotations stop
+           being readable. It is still shown whole and still never leads a page —
+           this is legibility, not prominence. A Full Width choice is untouched. */
+        .pp-media.pp-media--presentation-detail[data-purpose="layout_drawing"],
+        .pp-media.pp-media--presentation-cropped-detail[data-purpose="layout_drawing"] {
+          width: 58%;
+          max-width: 58%;
+        }
         .pp-media.pp-media--presentation-cropped-detail img { height: 62mm; }
         .pp-media.pp-media--presentation-full-width { width: 100%; }
         /* The comparison page: two full-width options and their captions share

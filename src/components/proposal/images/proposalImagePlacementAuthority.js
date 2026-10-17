@@ -64,12 +64,13 @@ export const DEFAULT_FOCAL_POINT = Object.freeze({
  *   FULL WIDTH      the large editorial image: cinema photographs, interior
  *                   renders, hero images. The treatment the document has always
  *                   given a landscape feature.
- *   DETAIL          a smaller, UNGROUPED presentation at roughly 50 to 65 per
- *                   cent of the usable width: dimensioned floor plans, seating
- *                   arrangements, technical drawings, equipment details. A
- *                   detail image is NEVER cropped, so the whole drawing stays
- *                   visible and its dimensions, labels and annotations are
- *                   never cut off.
+ *   DETAIL          a deliberately SMALLER, supporting presentation at about 40
+ *                   per cent of the usable content width (30 to 45 per cent is
+ *                   the band): dimensioned floor plans, seating arrangements,
+ *                   technical drawings, equipment details. It is never composed
+ *                   as the page hero, is never promoted to the full content
+ *                   width, and is NEVER cropped, so the whole drawing stays
+ *                   visible with its dimensions, labels and annotations.
  *   CROPPED DETAIL  a smaller editorial presentation where cropping IS
  *                   permitted, framed on the image's own focal point.
  *
@@ -98,11 +99,41 @@ export const IMAGE_PRESENTATION_HELP = Object.freeze({
 
 const PRESENTATION_VALUES = Object.values(IMAGE_PRESENTATION);
 
-/** The share of the usable content width each presented image is composed at. */
+/**
+ * The share of the usable content width each presented image is composed at.
+ *
+ * The two supporting modes take a deliberately SMALLER share of the content
+ * column — the band is 30 to 45 per cent — so a detail reads as supporting
+ * evidence beside the copy rather than as a second hero, and the difference
+ * between a Full Width image and a Detail image is obvious on the sheet. No
+ * image is ever normalised to the same size as another: each is composed at the
+ * share its own recorded presentation states, and where a page cannot hold a
+ * composition properly the document paginates rather than resizing against the
+ * designer's choice.
+ */
 export const PRESENTATION_WIDTH_PERCENT = Object.freeze({
   [IMAGE_PRESENTATION.FULL_WIDTH]: 100,
-  [IMAGE_PRESENTATION.DETAIL]: 58,
-  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 58,
+  [IMAGE_PRESENTATION.DETAIL]: 40,
+  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 40,
+});
+
+/**
+ * The share a DIMENSIONED DRAWING keeps. A drawing that must be shown whole is
+ * not reduced to the supporting share: at that size its dimensions, symbols and
+ * annotations stop being readable, so it keeps the established legible frame on
+ * the same supporting weight. This is about legibility, never prominence — a
+ * drawing is still never promoted to the page hero and never leads a page.
+ */
+export const DRAWING_WIDTH_PERCENT = 58;
+
+/** The two composition weights a recorded presentation choice maps to. */
+export const COMPOSITION_WEIGHT = Object.freeze({
+  /** The designer's Full Width choice: the prominent, image-first treatment. */
+  PRIMARY: 'primary',
+  /** A Detail or Cropped Detail choice: deliberately secondary, never the hero. */
+  SUPPORTING: 'supporting',
+  /** Nothing recorded: composed exactly as the document always composed it. */
+  UNSTATED: 'unstated',
 });
 
 /**
@@ -240,6 +271,67 @@ export function presentationCropAllowed(presentation) {
 /** Whether the focal point controls apply to this presentation. */
 export function presentationFocalApplies(presentation) {
   return presentationCropAllowed(presentation);
+}
+
+/** Whether the designer recorded a presentation choice for this image. */
+export function hasRecordedPresentation(asset) {
+  return imagePresentationOf(asset) !== null;
+}
+
+/**
+ * ── The one composition reading of the designer's choice ────────────────────
+ * How the presentation recorded on an image composes it in the document, in ONE
+ * place, so every surface — the image pages, the section block and the printed
+ * pack — reads exactly the same answer and none of them decides for itself.
+ *
+ *   Full Width        PRIMARY: the prominent image, full content width, its own
+ *                     natural proportions, eligible to lead a page.
+ *   Detail / Cropped  SUPPORTING: smaller, never the hero, never promoted to the
+ *     Detail          full content width; a drawing shown whole keeps the
+ *                     legible drawing share.
+ *   nothing recorded  UNSTATED: composed exactly as the document always did.
+ *
+ * @returns {{presentation: string|null, weight: string, widthPercent: number|null,
+ *   cropAllowed: boolean, drawing: boolean, heroEligible: boolean}}
+ */
+export function presentationComposition(asset) {
+  const presentation = imagePresentationOf(asset);
+  const purpose = imagePurposeOf(asset);
+  const drawing = isDrawingPurpose(purpose);
+  if (presentation === null) {
+    return {
+      presentation: null,
+      weight: COMPOSITION_WEIGHT.UNSTATED,
+      widthPercent: null,
+      cropAllowed: true,
+      drawing,
+      heroEligible: !drawing,
+    };
+  }
+  const primary = presentation === IMAGE_PRESENTATION.FULL_WIDTH;
+  return {
+    presentation,
+    weight: primary ? COMPOSITION_WEIGHT.PRIMARY : COMPOSITION_WEIGHT.SUPPORTING,
+    widthPercent: drawing && !primary
+      ? DRAWING_WIDTH_PERCENT
+      : PRESENTATION_WIDTH_PERCENT[presentation],
+    cropAllowed: placementCropAllowed({ presentation, purpose }),
+    drawing,
+    // Only the Full Width choice may lead a page. A Detail image is supporting
+    // evidence and is never promoted to the page hero, whatever the page has
+    // room for.
+    heroEligible: primary,
+  };
+}
+
+/** Whether this image carries the document's prominent treatment. */
+export function isPrimaryComposition(asset) {
+  return presentationComposition(asset).weight === COMPOSITION_WEIGHT.PRIMARY;
+}
+
+/** Whether this image is deliberately composed smaller than the content column. */
+export function isSupportingComposition(asset) {
+  return presentationComposition(asset).weight === COMPOSITION_WEIGHT.SUPPORTING;
 }
 
 /** The two seating styles a Library image may be grouped as. */
@@ -480,7 +572,16 @@ export function makePlacement({ source, role, sectionId, pagePosition, order, co
     // Stated so the renderer and the composer can say WHY an image is shown
     // whole rather than appearing to ignore the presentation that was selected.
     crop_protected: isDrawingPurpose(purpose),
-    presentation_width_percent: presentation ? PRESENTATION_WIDTH_PERCENT[presentation] : null,
+    // The share the composer and the renderer compose this image at. A
+    // dimensioned drawing that must be shown whole keeps the legible drawing
+    // share rather than the supporting share, because at the supporting size its
+    // dimensions and annotations stop being readable. A Full Width choice always
+    // keeps the full content width.
+    presentation_width_percent: presentation
+      ? (isDrawingPurpose(purpose) && presentation !== IMAGE_PRESENTATION.FULL_WIDTH
+        ? DRAWING_WIDTH_PERCENT
+        : PRESENTATION_WIDTH_PERCENT[presentation])
+      : null,
     section_id: sectionId ?? null,
     page_position: pagePosition ?? null,
     placement_order: order ?? null,

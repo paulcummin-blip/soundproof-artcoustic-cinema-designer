@@ -283,6 +283,44 @@ export default function ProposalPrintStyles() {
           height: 74mm;
         }
 
+        /* ── The designer's presentation choice in this block ─────────────────
+           A Full Width image is the block's dominant visual: the full content
+           width, at its own natural proportions, never reduced to a supporting
+           slot. A Detail image is supporting evidence: it is composed at the
+           supporting share of the content width, side by side with the other
+           supporting images, shown whole and never promoted to the full width. */
+        body.proposal-export-mode .proposal-images__figure--feature img {
+          width: 100%;
+          height: auto;
+          max-height: 150mm;
+          object-fit: contain;
+          background: transparent;
+        }
+
+        body.proposal-export-mode .proposal-images__support {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6mm;
+          margin: 0 0 6mm;
+        }
+
+        body.proposal-export-mode .proposal-images__support .proposal-images__figure {
+          width: 40%;
+          flex: 0 0 40%;
+          margin: 0;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        body.proposal-export-mode .proposal-images__support .proposal-images__figure img {
+          width: 100%;
+          height: auto;
+          max-height: 74mm;
+          object-fit: contain;
+          background: transparent;
+        }
+
         body.proposal-export-mode .proposal-images__caption {
           margin-top: 2mm;
         }

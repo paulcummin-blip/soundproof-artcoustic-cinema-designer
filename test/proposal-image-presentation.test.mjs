@@ -69,7 +69,7 @@ test('the two smaller modes sit between half and two thirds of the width', () =>
   assert.equal(PRESENTATION_WIDTH_PERCENT[IMAGE_PRESENTATION.FULL_WIDTH], 100);
   for (const mode of [IMAGE_PRESENTATION.DETAIL, IMAGE_PRESENTATION.CROPPED_DETAIL]) {
     const share = PRESENTATION_WIDTH_PERCENT[mode];
-    assert.ok(share >= 50 && share <= 65, `${mode} must be composed between 50 and 65 per cent, got ${share}`);
+    assert.ok(share >= 30 && share <= 45, `${mode} must be composed between 30 and 45 per cent, got ${share}`);
   }
 });
 
@@ -80,7 +80,7 @@ test('DETAIL never crops, whatever room the page has', () => {
   assert.equal(placement.crop_allowed, false, 'a detail image is shown whole');
   assert.equal(presentationCropAllowed(IMAGE_PRESENTATION.DETAIL), false);
   assert.equal(presentationFocalApplies(IMAGE_PRESENTATION.DETAIL), false, 'the focal point has no effect on a detail image');
-  assert.equal(placement.presentation_width_percent, 58);
+  assert.equal(placement.presentation_width_percent, 40, 'a detail is composed at the supporting share, never the full width');
   // The caption travels with the placement, so the caption stays attached.
   assert.equal(placement.source_caption, 'Dimensioned plan');
 });
@@ -96,7 +96,7 @@ test('CROPPED DETAIL is the mode that permits cropping, and reads the focal poin
   assert.equal(presentationCropAllowed(IMAGE_PRESENTATION.CROPPED_DETAIL), true);
   assert.equal(presentationFocalApplies(IMAGE_PRESENTATION.CROPPED_DETAIL), true);
   assert.deepEqual(placement.focal_point, { horizontal: 'right', vertical: 'bottom' });
-  assert.equal(placement.presentation_width_percent, 58);
+  assert.equal(placement.presentation_width_percent, 40);
 });
 
 test('FULL WIDTH keeps the prominent editorial treatment at the full width', () => {

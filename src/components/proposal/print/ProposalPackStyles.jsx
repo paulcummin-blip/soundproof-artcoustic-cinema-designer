@@ -423,6 +423,26 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-gallery__support {
         margin-bottom: 2mm;
       }
+
+      /* ── A sheet of the designer's supporting images ──────────────────────
+         The images the designer marked Detail or Cropped Detail are supporting
+         evidence, never the page hero. The sheet composes them at the supporting
+         share of the content column, side by side, each shown whole at its own
+         proportions and each keeping its own caption. A detail is never promoted
+         to the full content width, and a sheet that genuinely cannot hold its
+         details is continued rather than resized against the choice. */
+      .proposal-print-portal .pp-gallery--supporting {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6mm;
+        margin-top: 6mm;
+      }
+      .proposal-print-portal .pp-gallery--supporting .pp-gallery__figure--supporting {
+        width: 40%;
+        flex: 0 0 40%;
+        margin: 0;
+      }
       .proposal-print-portal .pp-page--images .pp-header {
         margin-bottom: 6mm;
       }
@@ -659,6 +679,27 @@ ${proposalPackPageBreakCss()}
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 6mm;
+        }
+        /* The supporting images keep their own proportions on the sheet: they are
+           shown whole at the supporting share of the content width, never cropped
+           to a fixed frame and never promoted to the full width. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--supporting {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--supporting .pp-gallery__figure--supporting {
+          width: 40%;
+          flex: 0 0 40%;
+          margin: 0;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--supporting .pp-gallery__figure--supporting img {
+          width: 100%;
+          height: auto;
+          max-height: 74mm;
+          object-fit: contain;
+          background: transparent;
         }
         /* The image heights are a page budget, not a preference: the page frame
            is 297mm with 12mm above and 14mm below, the heading takes about 30mm,

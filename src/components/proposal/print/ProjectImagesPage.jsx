@@ -22,8 +22,9 @@
 import React from 'react';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import ProposalGalleryFigure from '@/components/proposal/print/ProposalGalleryFigure';
+import { imagePageKind } from '@/components/proposal/print/imagePageLayout';
 
-export { IMAGES_PER_PAGE, imagePagesFor } from '@/components/proposal/print/imagePageLayout';
+export { IMAGES_PER_PAGE, imagePagesFor, imagePageKind } from '@/components/proposal/print/imagePageLayout';
 
 export default function ProjectImagesPage({
   number,
@@ -33,6 +34,26 @@ export default function ProjectImagesPage({
   preserveNatural = false,
 }) {
   if (!images.length) return null;
+
+  // A sheet of the designer's supporting images — the ones they marked Detail or
+  // Cropped Detail. They are supporting evidence, never the page hero: the sheet
+  // composes them smaller than the content column, side by side, each shown whole
+  // at its own proportions and each keeping its own caption. A detail image is
+  // never promoted to the full content width, and a sheet that genuinely cannot
+  // hold its details is continued rather than resized against the choice.
+  if (imagePageKind(images) === 'supporting') {
+    return (
+      <section className="proposal-print-section pp-page pp-page--images pp-page--supporting-images">
+        <ProposalPageHeader number={number} kicker={kicker} title={title} />
+        <div className="pp-gallery pp-gallery--supporting">
+          {images.map((asset) => (
+            <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset}
+              className="pp-gallery__figure--supporting" preserveNatural />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   // The designer's own photographs print at their own proportions in one
   // full-width column, so a sheet carries only the photographs that actually fit
