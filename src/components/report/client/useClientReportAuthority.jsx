@@ -697,7 +697,16 @@ export function useClientReportAuthority(projectId, requestedVersionId = null, {
   // in the display dropdown or in the manual size workflow. It is never inferred
   // from an aspect ratio or a dimension: resolveDisplayType is the one authority.
   const reportProjectDetails = useMemo(() => {
-    const merged = frozenPublicationProject(engineeringAuthority.publication, savedSnapshot) || projectDetails;
+    // The pinned publication is the authority for the report's DESIGN facts, and
+    // its facts win. Its project IDENTITY — the client, the reference, the dates
+    // and the owning account — is project metadata: where the publication pinned
+    // none, the project's own record supplies it, so a report generated from a
+    // publication frozen before that identity travelled with it still prints the
+    // client and the reference the project holds instead of a dash. An identity
+    // the publication did pin is never overwritten, and no design fact is read
+    // from the live project here.
+    const frozen = frozenPublicationProject(engineeringAuthority.publication, savedSnapshot);
+    const merged = frozen ? { ...(projectDetails || {}), ...frozen } : projectDetails;
     if (!merged) return merged;
     return { ...merged, display_type: resolveDisplayType({ ...merged, ...(screen || {}) }) };
   }, [projectDetails, engineeringAuthority.publication, screen, savedSnapshot]);

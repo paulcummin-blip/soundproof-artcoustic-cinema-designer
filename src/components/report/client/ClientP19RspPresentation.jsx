@@ -21,6 +21,7 @@
 
 import React from "react";
 import P19RspGraphContent from "@/components/report/P19RspGraphContent";
+import { resolveP19CurveAvailability } from "@/components/report/p19CurveAvailability";
 import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
@@ -59,6 +60,14 @@ const LEVEL_INTERPRETATION = {
   L1: "The response at the reference seat shows a clear deviation from the target curve. Calibration is doing useful work, but the seat still benefits from a design change.",
   FAIL: "The response at the reference seat departs from the target curve beyond the P19 window. A design change is required before calibration can resolve it.",
 };
+
+/**
+ * Stated instead of the level wording above when this report does not hold the
+ * saved post-EQ response curve. The published result stands and is stated above;
+ * nothing describes the shape of a curve the report cannot show.
+ */
+const CURVE_NOT_HELD_NOTE =
+  "The published result for the reference seating position is stated above. The saved response curve for this report is not held, so the shape of the response is not shown or described.";
 
 function levelToLabel(level) {
   if (level == null) return null;
@@ -244,7 +253,14 @@ export default function ClientP19RspPresentation({
     }));
 
   const grade = getSeatGradeColors(result.level);
-  const interpretation = LEVEL_INTERPRETATION[result.level] || null;
+  // The curve-shape wording is stated ONLY when the saved P19 curve is genuinely
+  // held by this report, read through the one canonical availability authority
+  // every P19 surface consumes. With no curve, the page states the published
+  // result and says nothing about the shape of the response.
+  const curveAvailable = resolveP19CurveAvailability({ graph: p19Graph }).available;
+  const interpretation = curveAvailable
+    ? (LEVEL_INTERPRETATION[result.level] || null)
+    : CURVE_NOT_HELD_NOTE;
   // P19 deviation shown to the client is a whole number, rounded down.
   const deviationText = result.displayedValue
     || (result.deviationDb != null ? formatP19P20DeviationText(result.deviationDb) : null);

@@ -21,6 +21,7 @@
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import AsdrCategorySection from "./AsdrCategorySection";
+import { buildSeatScopeConclusion } from "./seatScopeConclusionAuthority";
 
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -74,6 +75,8 @@ export default function TechnicalPerformanceSummary({
   const totalSeatParameters = reportCounts.seatParameterCount || 0;
   const primaryCategories = engineeringSummary.primary?.categories || [];
   const secondaryCategories = engineeringSummary.secondary?.categories || null;
+  // The seat-scope conclusion, from the published P19 and P20 results only.
+  const seatScopeConclusion = buildSeatScopeConclusion(engineeringSummary);
 
   return (
     <div
@@ -192,16 +195,17 @@ export default function TechnicalPerformanceSummary({
         </div>
       </div>
 
-      {/* ── Seat comparison summary line ── */}
-      {reportCounts.compromisedSeatCount === 0 ? (
+      {/* ── Seat comparison summary line ──
+          The published P19 and P20 results, stated for the scope each one is
+          assessed at: response quality at the reference position, and bass
+          consistency from seat to seat. No categorical all-seat claim is made —
+          a design with a strong reference-position response and a low
+          seat-to-seat bass result states that limitation here. */}
+      {seatScopeConclusion ? (
         <div style={{ marginTop: "2.5mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
-          No listening position shows material compromise across the calculated seat-scope RP22 parameters.
+          {seatScopeConclusion.statement}
         </div>
-      ) : (
-        <div style={{ marginTop: "2.5mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
-          Some positions show material compromise across multiple calculated seat-scope RP22 parameters.
-        </div>
-      )}
+      ) : null}
 
       {/* ── Explanatory note ── */}
       <div
