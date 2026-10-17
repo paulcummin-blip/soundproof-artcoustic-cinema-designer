@@ -440,11 +440,23 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
       add(source, EDITORIAL_ROLE.FLOW_IMAGE, group.section_id, group.page);
     });
   });
-  const flowGroups = flow.groups.map((group) => ({
-    ...group,
-    placements: placements.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.FLOW_IMAGE
-      && placement.section_id === group.section_id),
-  }));
+  // The pair is composed in the order the LAYOUT asked for, not in the order the
+  // placements happened to be created. Where a Full Width photograph shares a page
+  // with a supporting one, the Full Width photograph leads it — so the group's own
+  // sources are read back one by one. Filtering the placement list by section
+  // instead hands the page whatever order the placements were made in, which puts
+  // the designer's Full Width photograph into the supporting column and reduces it
+  // to a supporting share: the one thing its presentation forbids.
+  const flowGroups = flow.groups.map((group) => {
+    const ordered = (Array.isArray(group.sources) ? group.sources : [])
+      .map((source) => placements.find((placement) => (
+        placement.editorial_role === EDITORIAL_ROLE.FLOW_IMAGE
+        && placement.section_id === group.section_id
+        && placement.source_asset_id === source?.id
+      )))
+      .filter(Boolean);
+    return { ...group, placements: ordered };
+  });
 
   // 7c. What is left is the image section's own: it is carried only when every
   //     narrative page is full, which is the one case in which integrating more

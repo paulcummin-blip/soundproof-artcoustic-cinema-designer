@@ -408,6 +408,29 @@ export default function ProposalImagePlacementStyles() {
         background: transparent;
       }
 
+      /* ── FULL WIDTH OUTRANKS THE CONTAINER IT LANDED IN ───────────────────
+         FULL WIDTH is a composition instruction, not a suggestion. Wherever such
+         a photograph is composed it keeps the WHOLE content width: the supporting
+         column, the side-by-side pair, the copy row and the closing pair may each
+         narrow a supporting image, and none of them may narrow this one, reduce
+         it to a supporting share, hold it in a portrait frame or turn it into the
+         smaller half of a large-and-small pair. Where the container and the
+         presentation disagree, the PRESENTATION WINS and the container adapts.
+
+         The selector names the container AND the frame AND the presentation, so
+         it outranks every container rule above however the two are ordered. The
+         image's own height stays derived from its uploaded proportions by the
+         rule above: no fixed frame, no ratio, no crop. ── */
+      .pp-image-flow__support .pp-media.pp-media--presentation-full-width,
+      .pp-image-flow--side_by_side .pp-gallery > .pp-media.pp-media--presentation-full-width,
+      .pp-media-row .pp-media.pp-media--presentation-full-width,
+      .pp-closing .pp-media.pp-media--presentation-full-width,
+      .pp-media.pp-media--presentation-full-width.pp-media--portrait {
+        width: 100%;
+        max-width: 100%;
+        flex: 1 1 100%;
+      }
+
       @media print {
         body.proposal-export-mode .proposal-print-portal .pp-media.pp-media--presentation-full-width img {
           width: 100%;
@@ -415,6 +438,17 @@ export default function ProposalImagePlacementStyles() {
           max-height: none;
           object-fit: contain;
           background: transparent;
+        }
+        /* The same authority on the exported sheet: the container an exported
+           photograph landed in never narrows the Full Width presentation. */
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow__support .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--side_by_side .pp-gallery > .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-media-row .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-closing .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-media.pp-media--presentation-full-width.pp-media--portrait {
+          width: 100%;
+          max-width: 100%;
+          flex: 1 1 100%;
         }
       }
     `}</style>
