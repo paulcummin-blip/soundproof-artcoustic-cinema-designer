@@ -61,17 +61,42 @@ export async function providerIdToken(base44, base44UserId) {
 }
 
 function providerAccessTokenValue(response) {
-  const candidate = response?.access_token
-    ?? response?.accessToken
-    ?? response?.data?.access_token
-    ?? response?.data?.accessToken
-    ?? response?.data
-    ?? response;
-  if (typeof candidate !== 'string' || !candidate.trim()) {
-    throw new Error('PROVIDER_ACCESS_TOKEN_UNAVAILABLE');
+  const candidate = (value, depth = 0) => {
+    if (depth > 4) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed !== trimmed) return candidate(parsed, depth + 1);
+      } catch {
+        return trimmed;
+      }
+      return trimmed;
+    }
+    if (value && typeof value === 'object') {
+      return candidate(
+        value.access_token
+        ?? value.accessToken
+        ?? value.data?.access_token
+        ?? value.data?.accessToken
+        ?? value.data,
+        depth + 1,
+      );
+    }
+    return null;
+  };
+
+  let token = candidate(response);
+  if (typeof token === 'string' && /^Bearer\s+/i.test(token)) {
+    token = token.replace(/^Bearer\s+/i, '');
   }
-  const token = candidate.trim();
-  return token.startsWith('Bearer ') ? token.slice(7) : token;
+  if (!hasText(token)) throw new Error('PROVIDER_ACCESS_TOKEN_UNAVAILABLE');
+  // Supabase OAuth access tokens are JWTs. An opaque or wrongly wrapped value
+  // must never be sent as a dealer-identity credential.
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+    throw new Error('PROVIDER_ACCESS_TOKEN_NOT_JWT');
+  }
+  return token;
 }
 
 export async function providerAccessToken(base44, base44UserId) {
