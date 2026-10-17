@@ -187,6 +187,11 @@ export function designIntentTextFromOutput(output) {
  *   instead of the reader.
  * @param {Object} [input.user]
  * @param {string} [input.now]
+ * @param {Function} [input.onEvidencePack] — called once with `{ pack, writerInput }`
+ *   after the frozen pack and the scoped writer input have been built and before the
+ *   provider is called, so a caller can report the exact evidence an attempt wrote
+ *   from. Observability only: its failure is swallowed, nothing it returns is read,
+ *   and it can neither accept a draft nor refuse one.
  * @param {Function} [input.validate] — injected for tests; the shared validator otherwise
  * @returns {Promise<Object>} the accepted narrative and its record, or a refusal
  */
@@ -206,6 +211,7 @@ export async function runReportDesignIntent({
   visualContext = null,
   user = null,
   now = null,
+  onEvidencePack = null,
   validate = validateWriterOutput,
 } = {}) {
   // 1. The writer's own switch, checked before anything is read or sent.
@@ -280,6 +286,19 @@ export async function runReportDesignIntent({
       visualContext: visual,
     });
     assertWriterInputCarriesNoLiveState(writerInput);
+
+    // OBSERVABILITY ONLY, and never a second evidence path: a caller that wants to
+    // report which frozen pack this attempt wrote from is handed the very objects the
+    // writer was given, after they were built and before the provider is called. It
+    // cannot change the attempt — the callback's own failure is swallowed and nothing
+    // it returns is read — so reporting can never fail a writing attempt.
+    if (typeof onEvidencePack === 'function') {
+      try {
+        onEvidencePack({ pack, writerInput });
+      } catch (error) {
+        // Reporting must never fail a writing attempt.
+      }
+    }
   } catch (error) {
     return refusal(DESIGN_INTENT_REFUSAL.NO_EVIDENCE, error?.message || 'The frozen evidence pack could not be built.');
   }

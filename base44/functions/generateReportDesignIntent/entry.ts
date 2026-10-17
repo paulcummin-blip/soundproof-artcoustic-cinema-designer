@@ -1,13 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
-import { readProposalReportEvidence } from '../../shared/proposalReportEvidenceReader.js';
-import { GPT_WRITER_FLAG_FIELD, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 import {
-  DESIGN_INTENT_REFUSAL,
-  runReportDesignIntent,
-} from '../../shared/reportDesignIntent/reportDesignIntentRunner.js';
-import { buildReportGeometryContext } from '../../shared/reportDesignIntent/reportGeometryContext.js';
-import { buildReportVisualContext } from '../../shared/reportDesignIntent/reportVisualContext.js';
+  DESIGN_INTENT_ATTEMPT_BLOCK,
+  runProductionDesignIntentAttempt,
+} from '../../shared/reportDesignIntent/designIntentProductionAttempt.js';
 
 /**
  * Generate the Project Report's Design Intent with the Astra writer — OPTIONAL.
@@ -17,17 +13,21 @@ import { buildReportVisualContext } from '../../shared/reportDesignIntent/report
  * whatever happens here. This is one failure-isolated operation that, when it
  * succeeds, saves an accepted narrative beside the report it was written for.
  *
- * The writer is given the report's own FROZEN evidence — the saved Project Report
- * and its published engineering, read through the existing evidence path — and the
- * existing writer contract, scoped to the one section the Design Intent is written
- * as. The provider is the platform AI gateway, called with the server session:
- * there is no API key in this app, in the browser bundle or in any client payload.
+ * THE ATTEMPT ITSELF IS NOT BUILT HERE. It is run by
+ * runProductionDesignIntentAttempt — the same shared path the admin-only read-only
+ * preview runs — so the narrative this function saves and the narrative a preview
+ * shows are produced by one writer, one evidence read, one interpretation input and
+ * one prompt version, and the two can never drift apart. This function adds the two
+ * things only production does: the access decision, and the single write.
+ *
+ * The provider is the platform AI gateway, called with the server session: there is
+ * no API key in this app, in the browser bundle or in any client payload.
  *
  * Nothing is written unless the draft passed validation. A refused, failed or
  * timed-out attempt returns the reason and stores nothing, so an incomplete draft
  * can never reach the page. The saved narrative is written against the exact
- * version and the exact evidence fingerprints it was written from, and it is
- * never regenerated on opening a report.
+ * version and the exact evidence fingerprints it was written from, and it is never
+ * regenerated on opening a report.
  */
 export default async function(req) {
   try {
@@ -37,115 +37,31 @@ export default async function(req) {
 
     const body = await req.json().catch(() => ({}));
     const { project_id, version_id } = body || {};
-    if (!project_id || !version_id) {
-      return Response.json({ error: 'project_id and version_id are required.' }, { status: 400 });
-    }
 
     const accessContext = await resolveAccountAccess(base44, user);
     if (accessContext?.allowed !== true || accessContext.capabilities?.soundProof !== true) {
       return Response.json({ error: 'Sound Proof access is required to write a report narrative.' }, { status: 403 });
     }
 
-    const project = await base44.entities.Project.get(project_id).catch(() => null);
-    if (!project?.id) return Response.json({ error: 'That project was not found.' }, { status: 404 });
-
-    const version = await base44.entities.ProjectVersion.get(version_id).catch(() => null);
-    if (!version?.id || String(version.project_id || '') !== String(project_id)) {
-      return Response.json({ error: 'That design version is not part of this project.' }, { status: 404 });
-    }
-
-    // The saved Project Report this narrative belongs to. A report that has not
-    // been generated has no frozen evidence to write from, so nothing is written.
-    const snapshotPage = await base44.entities.ReportSnapshot.filter(
-      { project_id, version_id, report_type: 'project' },
-      { limit: 1 },
-    );
-    const snapshot = (snapshotPage?.items || [])[0] || null;
-    if (!snapshot) {
-      return Response.json({
-        error: 'The Project Report has not been generated for this version yet, so there is no frozen evidence to write from.',
-        reason: DESIGN_INTENT_REFUSAL.NO_EVIDENCE,
-      }, { status: 409 });
-    }
-
-    // ── THE PROJECT LIBRARY'S OWN PICTURES, for the writer's visual context ──
-    // Read with the DESIGNER'S OWN session, never the service role, so the same
-    // record-level access that governs the Library governs this read: only this
-    // project's images are visible to this login, and one dealer's images can never
-    // reach another dealer's narrative. A library that cannot be read is simply no
-    // visual context at all — the attempt continues and writes the text-only
-    // narrative it has always written.
-    const assetPage = await base44.entities.ProposalAsset
-      .filter({ project_id }, { limit: 100 })
-      .catch(() => null);
-    const libraryImages = assetPage?.items || [];
-
-    // ── The writer's own switch, before any evidence is read ──
-    const configResult = await base44.asServiceRole.entities.SystemConfig.filter({}, { limit: 1 });
-    const configRecord = (Array.isArray(configResult) ? configResult : (configResult?.items || []))[0] || null;
-    const flag = resolveGptWriterFlag({
-      config: configRecord?.[GPT_WRITER_FLAG_FIELD] || null,
-      accountId: project.account_id || accessContext.user?.account_id || accessContext.account?.id || null,
-      email: user.email || null,
-      isMasterAdmin: accessContext.isMasterAdmin === true,
-    });
-
-    const attempt = await runReportDesignIntent({
-      flag,
-      versionIds: [version.id],
-      project,
-      // The evidence the narrative is saved against: the exact source inputs the
-      // saved Project Report was generated from.
-      sourceFingerprints: snapshot.source_fingerprints || null,
-      user,
-      now: new Date().toISOString(),
-      readEvidence: async ({ versionIds }) => {
-        const page = await base44.entities.ProjectVersion.filter(
-          { project_id, id: { $in: versionIds } },
-          { limit: 50 },
-        );
-        const rows = page?.items || [];
-        const versions = versionIds.map((id) => rows.find((row) => row.id === id));
-        if (versions.some((row) => !row)) {
-          throw new Error('That design version could not be read, so its saved report evidence is unavailable.');
-        }
-        return readProposalReportEvidence(base44.entities, project_id, versions, {
-          authorityEntities: base44.asServiceRole.entities,
-        });
-      },
+    const outcome = await runProductionDesignIntentAttempt({
+      entities: base44.entities,
+      authorityEntities: base44.asServiceRole.entities,
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
-      // ── THE REPORT'S OWN GEOMETRY, CONFIRMED ──
-      // The room and the seat coordinates that produced this saved report and its
-      // drawings, read from the report's own frozen geometry and confirmed against
-      // the saved design version. It is design context for explaining where the
-      // seating sits, and never engineering evidence. Where the saved version has
-      // moved to a different room, it is not used at all: the writer is then given
-      // the pack and the interpretation exactly as before, and the report keeps its
-      // own deterministic Design Intent.
-      readGeometryContext: async ({ evidence }) => buildReportGeometryContext({
-        reportEvidence: evidence?.[0]?.evidence?.project || null,
-        version,
-        projectId: project_id,
-        versionId: version.id,
-        reportSnapshotId: snapshot.id,
-      }),
-      // ── THE PROJECT LIBRARY'S OWN IMAGES, AS VISUAL CONTEXT ──
-      // The pictures the designer has already uploaded, chosen by the shared
-      // selection authority: whole-room views first, never an image the designer has
-      // hidden, never an option the client is being offered (a seating or comparison
-      // alternative is not the selected design), and never a plan or dimensioned
-      // drawing. At most four, and only from this project and this version. They are
-      // EDITORIAL context — atmosphere, interior character, visual scale, seating
-      // style — and never engineering evidence: no figure, distance, loudspeaker
-      // position, capability or RP22 result is ever read from a photograph, and the
-      // frozen evidence remains the only authority for every claim. The fetch
-      // addresses are attached to the ONE existing writer call; nothing is uploaded,
-      // copied or re-stored, and no second model analyses the images.
-      readVisualContext: async () => buildReportVisualContext({
-        assets: libraryImages,
-        versionId: version.id,
-      }),
+      projectId: project_id || null,
+      versionId: version_id || null,
+      user,
+      accountIdFallback: accessContext.user?.account_id || accessContext.account?.id || null,
+      isMasterAdmin: accessContext.isMasterAdmin === true,
+      now: new Date().toISOString(),
     });
+
+    // A project, a version or a report that cannot be used is stated plainly and
+    // nothing is written.
+    if (!outcome.ok) {
+      return Response.json({ error: outcome.block.error, reason: outcome.block.reason }, { status: outcome.block.status });
+    }
+
+    const { snapshot, attempt } = outcome;
 
     // ── The one write, and only for an accepted narrative ──
     if (!attempt.ok) {
