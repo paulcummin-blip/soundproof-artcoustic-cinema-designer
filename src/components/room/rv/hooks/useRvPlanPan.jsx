@@ -2,8 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { getMlpGrab } from "@/components/state/mlpGrabStore";
-import { clearCompletedSeatDrag } from "@/components/room/rv/utils/rvDragGesture";
-import { usePanZoomHandlers, PAN_CLICK_SLOP_PX } from "@/components/room/rv/hooks/usePanZoomHandlers";
+import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 
 /**
  * useRvPlanPan — the Plan View's canvas panning gesture.
@@ -21,6 +20,11 @@ import { usePanZoomHandlers, PAN_CLICK_SLOP_PX } from "@/components/room/rv/hook
  * Panning writes the viewport offset and nothing else — room geometry, object
  * positions, calculations and saved project data are untouched, and the offset
  * is view state that is never saved with the design.
+ *
+ * Panning dismisses nothing and carries no click token: the Seat HUD is
+ * dismissed by the press that starts an interaction outside the seat and the
+ * HUD (see seatHudSelectionAuthority), and a release is never read as a
+ * click-away.
  */
 export function useRvPlanPan({
   viewOffsetPx,
@@ -30,8 +34,6 @@ export function useRvPlanPan({
 }) {
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-  // Set once a pan has travelled far enough to be a pan and not a click.
-  const panMovedRef = useRef(false);
   // Reactive so the pan surface's grab → grabbing cursor follows the gesture.
   const [isPanning, setIsPanning] = useState(false);
 
@@ -47,11 +49,6 @@ export function useRvPlanPan({
   });
 
   const onPanPointerDown = useCallback((e) => {
-    // A fresh press on the plan begins a new gesture, so any suppression left by
-    // a seat drag whose release produced no click is cleared here: a stale token
-    // must never swallow this press's own click-away.
-    clearCompletedSeatDrag();
-
     // Never pan if the event was already handled (sub/speaker drag)
     if (e.defaultPrevented) return;
 
@@ -71,22 +68,11 @@ export function useRvPlanPan({
     // Only proceed if the pan surface itself is the hit element
     if (e.currentTarget !== e.target) return;
 
-    panMovedRef.current = false;
     setIsPanning(true);
     hookOnPanDown(e);
   }, [hookOnPanDown, isDraggingSpeakerRef, dragging]);
 
-  // A gesture that moved the drawing is a pan and not a click, so the plan must
-  // not also read it as a background click.
   const onPanPointerMove = useCallback((e) => {
-    if (isPanningRef.current && !panMovedRef.current) {
-      const start = panStartRef.current || {};
-      const dx = (e.clientX ?? 0) - (start.x ?? 0);
-      const dy = (e.clientY ?? 0) - (start.y ?? 0);
-      if (dx * dx + dy * dy > PAN_CLICK_SLOP_PX * PAN_CLICK_SLOP_PX) {
-        panMovedRef.current = true;
-      }
-    }
     hookOnPanMove(e);
   }, [hookOnPanMove]);
 
@@ -95,23 +81,11 @@ export function useRvPlanPan({
     hookOnPanUp(e);
   }, [hookOnPanUp]);
 
-  /**
-   * True once, when the click that follows a release belongs to a pan that
-   * actually moved the drawing. The plan uses it to keep a pan from dismissing
-   * the pinned HUD or clearing the active seat.
-   */
-  const consumePanClick = useCallback(() => {
-    if (!panMovedRef.current) return false;
-    panMovedRef.current = false;
-    return true;
-  }, []);
-
   return {
     onPanPointerDown,
     onPanPointerMove,
     onPanPointerUp,
     isPanning,
-    consumePanClick,
   };
 }
 

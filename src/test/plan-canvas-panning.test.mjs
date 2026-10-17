@@ -121,7 +121,7 @@ test('TEST 4 — a click without meaningful movement is not a drag', () => {
   api.onPanPointerUp(pointerDown(300, 300));
 
   assert.deepEqual(written, [], 'no movement, no viewport change');
-  assert.equal(api.consumePanClick(), false, 'a click stays a click, so the plan may clear the pin');
+  assert.doesNotMatch(PAN_SRC, /consumePanClick|panMovedRef/, 'the pan carries no click token of its own');
 });
 
 test('TEST 5 — panning works at any zoom level and combines with zoom', () => {
@@ -149,7 +149,6 @@ test('TEST 6 — repeated pans never jump, reset or drop the inspection', () => 
   first.api.onPanPointerDown(pointerDown(100, 100));
   first.api.onPanPointerMove(pointerDown(120, 140));
   assert.deepEqual(first.written, [{ x: 50, y: 60 }]);
-  assert.equal(first.api.consumePanClick(), true, 'a pan is consumed as a pan, not a click');
 
   first.api.onPanPointerUp(pointerDown(120, 140));
   first.api.onPanPointerMove(pointerDown(400, 400));
@@ -162,9 +161,10 @@ test('TEST 6 — repeated pans never jump, reset or drop the inspection', () => 
   afterReset.api.onPanPointerMove(pointerDown(508, 400));
   assert.deepEqual(afterReset.written, [{ x: 8, y: 0 }], 'a small pan moves a small amount');
 
-  // And the pan must not be read as a background click, which would clear the
-  // pinned HUD and the active seat.
-  assert.match(RV_SRC, /if \(consumePanClick\(\)\) return;/, 'a pan never dismisses the inspection');
+  // Dismissal is not a click decision at all: the plan decides it when an
+  // interaction starts, from the element under the pointer.
+  assert.match(RV_SRC, /if \(!isSeatHudDismissalPointerDown\(e\?\.target\)\) return;/, 'the one click-away authority');
+  assert.doesNotMatch(RV_SRC, /consumePanClick/, 'no click-based suppression survives in the plan');
   assert.ok(PAN_CLICK_SLOP_PX >= 2 && PAN_CLICK_SLOP_PX <= 6, 'a click slop is used to tell a pan from a click');
 });
 

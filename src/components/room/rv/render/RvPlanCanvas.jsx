@@ -33,7 +33,7 @@ export default function RvPlanCanvas({
   planBoundsRef,
   rvWrapRef,
   aspect,
-  handlePlanClick,
+  handlePlanPointerDown,
   lastPointerRef,
   onResetView,
   showResetView,
@@ -140,6 +140,7 @@ export default function RvPlanCanvas({
   tooltipData,
   hudDynamicStyle,
   onHudHeaderMouseDown,
+  onHudClose,
   hudElRef,
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
@@ -289,7 +290,11 @@ export default function RvPlanCanvas({
           lastPointerRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         }
       }}
-      onClick={handlePlanClick}
+      // The plan's one dismissal decision is made when an interaction STARTS:
+      // a press that belongs to a seat or to the Seat HUD keeps the selection,
+      // a press that belongs to neither closes it. No click is read as a
+      // click-away, so a release can never dismiss anything.
+      onPointerDown={handlePlanPointerDown}
     >
       {/* Toolbar has been moved to the parent component's accordion */}
 
@@ -775,6 +780,7 @@ export default function RvPlanCanvas({
           hudPosition={hudPosition}
           hudDynamicStyle={hudDynamicStyle}
           onHudHeaderMouseDown={onHudHeaderMouseDown}
+          onHudClose={onHudClose}
           hudElRef={hudElRef}
           setHudHiddenWhenPinned={setHudHiddenWhenPinned}
           hudHiddenWhenPinned={hudHiddenWhenPinned}

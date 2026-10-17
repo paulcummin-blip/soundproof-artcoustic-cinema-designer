@@ -198,6 +198,6 @@ test('TEST 8 — the block still moves as one, and panning and other objects are
   assert.match(RV_SRC, /mode: seatInfoMode/, 'the HUD / Dimensions toggle still drives the gesture');
 
   assert.match(RV_SRC, /useRvPlanPan\(/, 'canvas panning is untouched');
-  assert.match(RV_SRC, /if \(consumePanClick\(\)\) return;/, 'and a pan still never clears the inspection');
+  assert.match(RV_SRC, /isSeatHudDismissalPointerDown\(e\?\.target\)/, 'and only an outside press clears the inspection');
   assert.match(CANVAS_SRC, /onPanPointerDown=\{onPanPointerDown\}/, 'the pan surface is still wired to the canvas');
 });

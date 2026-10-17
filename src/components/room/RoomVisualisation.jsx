@@ -65,7 +65,8 @@ import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMet
 import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
 import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
 import { useSeatGesture } from "@/components/room/rv/hooks/useSeatGesture";
-import { finishPointerDrag, isDragPointer, primaryButtonHeld, releaseDragCapture, markSeatDragCompleted, consumeCompletedSeatDragClick } from "@/components/room/rv/utils/rvDragGesture";
+import { finishPointerDrag, isDragPointer, primaryButtonHeld, releaseDragCapture } from "@/components/room/rv/utils/rvDragGesture";
+import { isSeatHudDismissalPointerDown } from "@/components/room/rv/utils/seatHudSelectionAuthority";
 import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
@@ -1158,7 +1159,7 @@ const byId = useEntitiesById({
   // space repositions the whole drawing at every zoom level, including the
   // fitted default view; seats, speakers, subwoofers and room elements keep
   // their own drag because they sit above the pan surface.
-  const { onPanPointerDown, onPanPointerMove, onPanPointerUp, isPanning, consumePanClick } = useRvPlanPan({
+  const { onPanPointerDown, onPanPointerMove, onPanPointerUp, isPanning } = useRvPlanPan({
     viewOffsetPx,
     setViewOffsetPx,
     isDraggingSpeakerRef,
@@ -1581,10 +1582,8 @@ const byId = useEntitiesById({
   const handleMouseUp = useCallback((e) => {
     const gesture = finishPointerDrag(activeDragRef, e);
     if (!gesture) return;
-    // The drag's completion is the one authority for the click the browser then
-    // dispatches at the release point. A seat drag's own completion arms it, so
-    // that click is read as the end of the drag and never as a click-away.
-    markSeatDragCompleted(gesture);
+    // A drag ending dismisses nothing: the Seat HUD is dismissed by the press
+    // that starts an outside interaction, never by a release.
     isAnyDraggingRef.current = false;
     if (!getMlpGrab()) mlpDragActiveRef.current = false;
     try {
@@ -1710,26 +1709,30 @@ const byId = useEntitiesById({
   // during render, so consuming clearSeatSelection above the hook that
   // declares it crashed the Room Designer in its temporal dead zone. Hook
   // results are only consumed below the hook that produces them.
-  const handlePlanClickWithSelection = useCallback((e) => {
-    // A drag across the plan panned the drawing: it is not a click, so it must
-    // not dismiss the pinned HUD or clear the active seat.
-    if (consumePanClick()) return;
-    // A seat that was dragged and released is not a click-away either. The drag
-    // lifecycle owns whether the gesture that just completed was a seat drag,
-    // and this consumes that one click — so the HUD and the active seat stay
-    // exactly as they were through the drag and after the release, even when the
-    // seat ends up outside its original seating block, and only a later genuine
-    // click on empty plan closes them.
-    if (consumeCompletedSeatDragClick()) return;
+  // ── Seat HUD dismissal — the one normal dismissal authority ──────────────
+  // Dismissal is decided when an interaction STARTS, not when it ends: a press
+  // that belongs to a seat or to the Seat HUD keeps the pinned seat and the HUD
+  // exactly as they are, and a press that belongs to neither is a genuine
+  // click-away. Nothing else dismisses them — not pointerup, not a drag ending,
+  // not a seat save or a recalculation, not hover loss, and not the click the
+  // browser dispatches after a release, so where the pointer is RELEASED never
+  // matters.
+  const handlePlanPointerDown = useCallback((e) => {
+    if (!isSeatHudDismissalPointerDown(e?.target)) return;
     if (!justSelectedOverheadRef.current) {
       setSelectedOverheadRow(null);
     }
     justSelectedOverheadRef.current = false;
-    // A click on the empty plan clears everything a seat click produced: the
-    // pinned HUD and the active seat's dimensions both go.
     dismissSeatHud();
     clearSeatSelection();
-  }, [consumePanClick, dismissSeatHud, clearSeatSelection]);
+  }, [dismissSeatHud, clearSeatSelection]);
+
+  // The HUD's own close control — an explicit close, kept separate from the
+  // click-away authority above.
+  const handleHudClose = useCallback(() => {
+    dismissSeatHud();
+    clearSeatSelection();
+  }, [dismissSeatHud, clearSeatSelection]);
 
   // Dimensions mode: the three measurements for the active seat only, taken from
   // that seat's own listening position through the same authorities the seat drag
@@ -2298,7 +2301,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         planBoundsRef={planBoundsRef}
         rvWrapRef={rvWrapRef}
         aspect={aspect}
-        handlePlanClick={handlePlanClickWithSelection}
+        handlePlanPointerDown={handlePlanPointerDown}
         lastPointerRef={lastPointerRef}
         onResetView={resetView}
         showResetView={viewIsNonDefault}
@@ -2407,6 +2410,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         tooltipData={tooltipData}
         hudDynamicStyle={hudDynamicStyle}
         onHudHeaderMouseDown={onHudHeaderMouseDown}
+        onHudClose={handleHudClose}
         hudElRef={hudElRef}
         setHudHiddenWhenPinned={setHudHiddenWhenPinned}
         hudHiddenWhenPinned={hudHiddenWhenPinned}

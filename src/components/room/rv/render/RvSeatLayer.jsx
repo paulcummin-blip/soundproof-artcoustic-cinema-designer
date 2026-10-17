@@ -82,8 +82,8 @@ export default function RvSeatLayer({
         const hitTargetProps = hasSeatGesture
           ? {
               onPointerDown: (e) => seatGesture.onSeatPointerDown(e, seat),
-              // The seat's own click must never reach the plan background
-              // handler, which dismisses the pinned HUD.
+              // The seat's activation stays with the seat: no click dismisses
+              // the HUD, so this only keeps the seat's own click local.
               onClick: (e) => e.stopPropagation(),
               onDoubleClick: (e) => e.stopPropagation(),
             }
@@ -95,8 +95,10 @@ export default function RvSeatLayer({
               },
             };
 
+        // data-seat: a press on this seat belongs to the seat itself, so it is
+        // never a click-away — see seatHudSelectionAuthority.
         return (
-          <g key={seat.id}>
+          <g key={seat.id} data-seat={seat.id}>
             {/* Invisible hit target (2× larger for easier hover) */}
             <ellipse
               cx={seatX}

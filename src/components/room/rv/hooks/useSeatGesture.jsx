@@ -56,9 +56,9 @@ export function useSeatGesture({ handleMouseDown, handleMouseMove, handleMouseUp
       if (dx * dx + dy * dy <= SEAT_DRAG_THRESHOLD_PX * SEAT_DRAG_THRESHOLD_PX) return;
       pending.dragStarted = true;
       setDimensionSeatId(null);
-      // The shared drag lifecycle owns the gesture from here. On completion it
-      // arms the one-shot suppression for the click the browser dispatches after
-      // the release — this hook keeps no drag authority of its own.
+      // The shared drag lifecycle owns the gesture from here; this hook keeps no
+      // drag authority of its own, and nothing in the release path dismisses the
+      // Seat HUD (see seatHudSelectionAuthority).
       // Freeze the baseline at the original press, not the threshold-crossing
       // frame, and preserve pointer identity. Capture belongs to the shared SVG.
       handlersRef.current.handleMouseDown?.({

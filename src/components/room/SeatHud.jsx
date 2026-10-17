@@ -6,6 +6,7 @@ import { getLevelColors } from '@/components/utils/rp22Colors';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import SeatRp22Metrics from '@/components/room/SeatRp22Metrics';
+import { SEAT_HUD_INTERACTION_ATTRIBUTE } from '@/components/room/rv/utils/seatHudSelectionAuthority';
 
 export default function SeatHud({
   tooltipData,
@@ -17,6 +18,8 @@ export default function SeatHud({
   hudElRef,
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
+  // Explicit close — separate from the plan's click-away authority.
+  onHudClose,
   splPowerW,
   splRadiationMode,
 }) {
@@ -111,9 +114,12 @@ export default function SeatHud({
         />
       )}
       
+      {/* A press inside this card belongs to the HUD, never to the plan
+          background: the selection authority reads this attribute on pointerdown. */}
       <div
         ref={hudElRef}
         className="seat-hud"
+        {...{ [SEAT_HUD_INTERACTION_ATTRIBUTE]: 'true' }}
         style={{
           position: 'absolute',
           left: hudPosition.x,
@@ -161,6 +167,7 @@ export default function SeatHud({
         </div>
 
         {isHudPinned && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button
             type="button"
             onClick={(e) => {
@@ -180,6 +187,30 @@ export default function SeatHud({
           >
             {hudHiddenWhenPinned ? '👁️‍🗨️' : '👁️'}
           </button>
+
+          {/* The HUD's own close control — deliberate, and the only thing in the
+              HUD that closes it. */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onHudClose?.();
+            }}
+            aria-label="Close seat HUD"
+            title="Close seat HUD"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              padding: '2px 4px',
+              lineHeight: 1,
+              fontSize: 13,
+              color: '#625143'
+            }}
+          >
+            ✕
+          </button>
+          </div>
         )}
       </div>
 

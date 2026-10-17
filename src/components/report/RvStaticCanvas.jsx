@@ -548,7 +548,7 @@ export default function RvStaticCanvas({
       rvWrapRef={rvWrapRef}
       aspect={aspect}
       zoomMode="off"
-      handlePlanClick={NO_OP}
+      handlePlanPointerDown={NO_OP}
       lastPointerRef={lastPointerRef}
       canvasStyle={canvasStyle}
       svgWSafe={svgWSafe}

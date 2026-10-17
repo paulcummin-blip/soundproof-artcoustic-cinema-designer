@@ -8,6 +8,7 @@ export default function RvSeatHudLayer({
   hudPosition,
   hudDynamicStyle,
   onHudHeaderMouseDown,
+  onHudClose,
   hudElRef,
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
@@ -25,6 +26,7 @@ export default function RvSeatHudLayer({
       hudPosition={hudPosition}
       hudDynamicStyle={hudDynamicStyle}
       onHudHeaderMouseDown={onHudHeaderMouseDown}
+      onHudClose={onHudClose}
       hudElRef={hudElRef}
       setHudHiddenWhenPinned={setHudHiddenWhenPinned}
       hudHiddenWhenPinned={hudHiddenWhenPinned}
