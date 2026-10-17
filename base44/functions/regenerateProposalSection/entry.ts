@@ -8,6 +8,7 @@ import { isCompleteComparisonTable, comparisonSectionMetadata, verifyComparisonP
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
+import { clientSystemFormat } from '../../shared/clientSystemFormat.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { sanitizeNarrativeHtml } from '../../shared/proposalNarrativeSanitizer.js';
 import { comparisonFramingRequested } from '../../shared/proposalWriter/absentFeatureFraming.js';
@@ -331,11 +332,18 @@ function buildProjectContext(project, brandAsset, snapshot = null) {
   const roomHeight = project.room_height || '';
   const screenSize = project.screen_size || '';
   const aspectRatio = project.aspect_ratio || '';
-  const dolbyConfig = project.dolby_config || '';
   // PRODUCT GROUNDING: this version's own frozen system authority wins, so the
   // prompt can never carry a product the selected version does not have. The
   // legacy project-level fields are a fallback only.
   const snapshotSystem = snapshot?.system || {};
+  // THE CLIENT READS THE SYSTEM FORMAT, NOT THE DECODER LAYOUT: the format is
+  // resolved from this version's own frozen channel counts, so a report frozen
+  // before the format authority existed still states "9.3.6" to the writer and
+  // never puts an unexplained "9.1.6" in front of a client.
+  const dolbyConfig = clientSystemFormat({
+    layout: snapshotSystem.configuration?.dolby_config || project.dolby_config,
+    subwooferCount: snapshotSystem.channel_layout?.subwoofer_count,
+  }) || project.dolby_config || '';
   const snapshotRoles = Array.isArray(snapshotSystem.product_roles) ? snapshotSystem.product_roles : [];
   const speakersByRole = project.selected_speakers_by_role || {};
   const speakerInfo = snapshotRoles.length > 0

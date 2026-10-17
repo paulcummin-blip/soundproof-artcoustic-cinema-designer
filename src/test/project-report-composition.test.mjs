@@ -78,7 +78,8 @@ test('TEST 1 — the Project Report opens on three pages: Project Summary, ADI D
   assert.match(hook, /id: "project-report-design-summary"/);
   assert.match(hook, /type: "design-summary"/);
   assert.match(hook, /<ProjectReportDesignSummary/);
-  assert.ok(hook.includes('summaryOpening={summaryOpening}'), 'the summary page carries the report’s own paragraph');
+  assert.ok(/summaryOpening=\{(?:summaryOpening|designIntent\.text)\}/.test(hook),
+    'the summary page carries the report’s own paragraph');
   assert.ok(!hook.includes('highlights={highlights}'), 'the summary page must not carry the highlights');
 
   // Page 02 — the ADI Design Highlights: the highlights ADI selects from this
@@ -237,16 +238,10 @@ test('TEST 4 — the Technical pages follow the Visual pages with the card block
   // then the primary-seat bass curves and the closing About page.
   assertInOrder(print, [
     'id="pdf-cover"',
-    'id="pdf-room-plan"',
-    'id="pdf-room-plan-dims"',
-    'id="pdf-room-plan-positions"',
+    '<TechnicalReportDrawings section="plans"',
     '<section id="pdf-room-parameters">',
     '<RP22ReportParameterGrid {...parameterGridProps} variant="print" />',
-    'id="pdf-elevation-front"',
-    'id="pdf-elevation-left"',
-    'id="pdf-elevation-right"',
-    'id="pdf-sightlines"',
-    'id="pdf-screen-wall-construction"',
+    '<TechnicalReportDrawings section="elevations"',
     '<TechnicalAboutSoundProofSection />',
   ]);
 
@@ -260,27 +255,32 @@ test('TEST 4 — the Technical pages follow the Visual pages with the card block
   );
   const cardBlock = print.slice(
     print.indexOf('<section id="pdf-room-parameters">'),
-    print.indexOf('id="pdf-elevation-front"'),
+    print.indexOf('<TechnicalReportDrawings section="elevations"'),
   );
   assert.ok(cardBlock.includes('<RP22ReportParameterGrid'), 'the card block must hold the parameter grid');
   assert.ok(
-    print.indexOf('id="pdf-elevation-front"') > print.indexOf('<RP22ReportParameterGrid {...parameterGridProps} variant="print" />'),
+    print.indexOf('<TechnicalReportDrawings section="elevations"') > print.indexOf('<RP22ReportParameterGrid {...parameterGridProps} variant="print" />'),
     'no drawing may be printed inside the parameter-card block',
   );
 
-  // The drawings stay together as the Technical Report's own drawing set.
+  // The drawings stay together as the Technical Report's own drawing set. The
+  // sheets' own identities live in that set's authority, which is where the
+  // drawing set is defined, so they are asserted there.
   const drawings = print.slice(
-    print.indexOf('id="pdf-elevation-front"'),
+    print.indexOf('<TechnicalReportDrawings section="elevations"'),
     print.indexOf('<TechnicalAboutSoundProofSection />'),
   );
+  const drawingSheets = read('src/components/report/technical/TechnicalReportDrawings.jsx');
   for (const needle of [
+    'pdf-room-plan',
+    'pdf-room-plan-dims',
+    'pdf-room-plan-positions',
     'id="pdf-elevation-front"',
-    'id="pdf-elevation-left"',
-    'id="pdf-elevation-right"',
+    'id={`pdf-elevation-${wall}`}',
     'id="pdf-sightlines"',
     'id="pdf-screen-wall-construction"',
   ]) {
-    assert.ok(drawings.includes(needle), `the drawing set must keep ${needle}`);
+    assert.ok(drawingSheets.includes(needle), `the drawing set must keep ${needle}`);
   }
 
   // The primary-seat bass curves stay with the technical pages.

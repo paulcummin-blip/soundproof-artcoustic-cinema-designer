@@ -30,6 +30,7 @@ import {
 } from '../clientFacingParameterAuthority.js';
 import { savedVersionIdentity } from './proposalEvidenceIdentity.js';
 import { stripBassWordingDeep } from './proposalEvidenceWording.js';
+import { frozenClientSystemFormat } from '../clientSystemFormat.js';
 
 const NONE = 'None specified';
 
@@ -68,9 +69,19 @@ function roomReading(room) {
   };
 }
 
-/** The short system format ("9.1.6") as the reports state it. */
+/**
+ * The short system format as the client reads it ("9.3.6" — the design's own
+ * bed, subwoofer and overhead channels), never the decoder notation.
+ *
+ * The configuration's own client-facing text is the statement; the decoder
+ * layout is only the fallback for a report saved before the format existed.
+ * Nothing internal changes: the decoder layout stays on the design and in the
+ * analysis, it is simply not the format the client is told.
+ */
 function formatText(system) {
-  return asText(system?.configuration?.dolby_config) || asText(system?.configuration?.text);
+  return frozenClientSystemFormat(system)
+    || asText(system?.configuration?.text)
+    || asText(system?.configuration?.dolby_config);
 }
 
 /** The screen as the Visual Report states it, in the comparison table's words. */
@@ -98,9 +109,11 @@ function seatingText(seating) {
   return `${seats} seat${seats === 1 ? '' : 's'}${rowText}`;
 }
 
-/** The system format, with its discrete channel count when the report states it. */
+/** The client-facing system format, with its discrete channel count when the report states it. */
 function layoutText(system) {
-  const text = asText(system?.configuration?.dolby_config) || asText(system?.configuration?.text);
+  const text = frozenClientSystemFormat(system)
+    || asText(system?.configuration?.text)
+    || asText(system?.configuration?.dolby_config);
   const total = Number(system?.channel_layout?.total_discrete);
   const channels = Number.isFinite(total) && total > 0 ? `${total} discrete channels` : null;
   if (!text) return channels;

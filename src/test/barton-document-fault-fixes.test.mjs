@@ -181,8 +181,8 @@ test('5. a failed page raster is recorded and left out — it never cancels the 
 test('5. a 0 × 0 raster is a page that paints nothing, never a failed page', () => {
   const capture = read('src/components/library/capturePagePng.js');
 
-  assert.equal((capture.match(/diagnostics\.zeroSize = true;/g) || []).length, 2,
-    'both the empty canvas and the zero-dimension PNG are named as nothing to draw');
+  assert.equal((capture.match(/diagnostics\.zeroSize = true;/g) || []).length, 3,
+    'a page that measures nothing, a 0 × 0 canvas and a zero-dimension PNG are each named as nothing to draw');
   assert.match(read('src/components/library/compositionCapture.js'), /if \(!raster\) continue;/,
     'the PDF is assembled from the pages that resolved, so the valid PDF is stored');
 });

@@ -148,18 +148,23 @@ describe('Project Library capture resilience', () => {
   });
 
   it('6b. a document with NO usable page is still refused — a copy is never invented', async () => {
-    await expect(collectPageRasters({
+    const failure = await collectPageRasters({
       pages,
       rasterPage: async (_page, index) => {
         throw pageFailure('png_validation', { message: `page ${index + 1} produced nothing` });
       },
       rasterAll: async () => [null, null, null],
-    })).rejects.toMatchObject({
-      message: expect.stringContaining('No page of this composition could be rasterised'),
-      captureDiagnostics: {
-        failed: expect.arrayContaining([expect.objectContaining({ page: null, operation: 'no_page_rasterised' })]),
-      },
-    });
+    }).catch((error) => error);
+
+    // Nothing was usable, so there is genuinely no document to store: the capture
+    // stops, naming the first sheet that failed as well as the fact that no page
+    // of the composition could be rasterised.
+    expect(failure).toBeTruthy();
+    expect(failure.captureDiagnostics.failed[0]).toMatchObject({ page: 1 });
+    expect(failure.captureDiagnostics.failed).toEqual(expect.arrayContaining([
+      expect.objectContaining({ page: null, operation: 'no_page_rasterised' }),
+    ]));
+    expect(failure.captureDiagnostics.incomplete).toBeUndefined();
   });
 
   it('7. a zero-size failure is told apart from a real raster failure', () => {

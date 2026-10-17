@@ -50,6 +50,7 @@ import { DESIGN_LED_VOICE_RULES, DESIGN_INDEX_HARD_RULES, isDesignIndexRow } fro
 import { excludeExcludedClientParameterRows } from './clientFacingParameterAuthority.js';
 import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
 import { canonicalScreenDescription } from './canonicalScreenDescription.js';
+import { frozenClientSystemFormat } from './clientSystemFormat.js';
 
 function compose(...parts) {
   const clean = parts
@@ -96,7 +97,13 @@ export function buildEngineeringEvidence(snapshot) {
 
   // ── System and products ──
   const system = snapshot.system || {};
-  if (system.configuration?.text) lines.push(`System: ${system.configuration.text}`);
+  // THE CLIENT READS THE SYSTEM FORMAT, NOT THE DECODER LAYOUT. The format is
+  // resolved from this version's own frozen channel counts, so a report frozen
+  // before the format authority existed states "9.3.6" to the writer rather than
+  // the "9.1.6 … 1 subwoofer" decoder wording it stored; the stored text is only
+  // the fallback for a design that states no layout at all.
+  const systemStatement = frozenClientSystemFormat(system) || system.configuration?.text;
+  if (systemStatement) lines.push(`System: ${systemStatement}`);
   if (system.channel_layout?.total_discrete) {
     lines.push(`Discrete channels: ${system.channel_layout.total_discrete}`);
   }
@@ -282,8 +289,9 @@ export function selectHighlightRows(snapshot) {
   if (viewing?.available && viewing.summary && !/not calculated/i.test(viewing.summary)) {
     push('rp23_viewing', 'RP23 viewing', viewing.summary);
   }
-  if (snapshot.system?.configuration?.text) {
-    push('system_layout', 'System layout', snapshot.system.configuration.text);
+  const systemLayout = frozenClientSystemFormat(snapshot.system) || snapshot.system?.configuration?.text;
+  if (systemLayout) {
+    push('system_layout', 'System layout', systemLayout);
   }
 
   // Evidence inside the three structures, in client usefulness order. Excluded
