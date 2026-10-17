@@ -170,6 +170,51 @@
             "fingerprint": {
               "type": "string",
               "description": "The fingerprint of the content that was on screen when the approval was given. Compared against the section's current content on every read; a mismatch means the wording changed, so the approval no longer counts."
+            },
+            "revision_id": {
+              "type": "string",
+              "nullable": true,
+              "description": "The exact generated or edited revision whose displayed wording was approved."
+            },
+            "generation_id": {
+              "type": "string",
+              "nullable": true
+            },
+            "edit_id": {
+              "type": "string",
+              "nullable": true
+            },
+            "published_page_fingerprint": {
+              "type": "string",
+              "nullable": true,
+              "description": "Fingerprint of the exact body used by the published page and PDF when approved."
+            }
+          }
+        },
+        "publication_revision": {
+          "type": "object",
+          "nullable": true,
+          "description": "The validated writer revision currently handed into this proposal-page section.",
+          "properties": {
+            "revision_id": {
+              "type": "string",
+              "nullable": true
+            },
+            "generation_id": {
+              "type": "string",
+              "nullable": true
+            },
+            "edit_id": {
+              "type": "string",
+              "nullable": true
+            },
+            "source": {
+              "type": "string"
+            },
+            "applied_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
             }
           }
         }
