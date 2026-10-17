@@ -15,8 +15,9 @@
  * The voice, the natural-writing standard and the shared Sound Proof writing
  * authority are not restated here: they travel with the writer's contract, which
  * the prompt carries. This file holds only what is specific to the Design Intent:
- * what it leads with, what it must explain, what it must never recite, and the
- * length it may run to on the report's first page.
+ * the three things it explains, the project's own facts it is written from, the
+ * plain register it is written in, the editorial references that show that
+ * register at its best, and the length it may run to on the report's first page.
  *
  * The length is a real constraint rather than a style note: the block occupies a
  * fixed place in the report's page budget, so the ceiling is set to the width of
@@ -34,30 +35,67 @@
 export const DESIGN_INTENT_SECTION = 'decision_summary';
 
 /** The written target the writer is given. */
-export const DESIGN_INTENT_TARGET_WORDS = '140 to 180';
-
-/** The ceiling the draft is validated against: headroom above the target. */
-export const DESIGN_INTENT_WORD_LIMIT = 200;
+export const DESIGN_INTENT_TARGET_WORDS = '140 to 190';
 
 /**
- * The Design Intent's own instruction. It states what the block leads with, the
- * order it develops in, what it must explain and what it must never carry, and it
- * is written as the shape of the copy rather than as a sentence to paste: the
- * room, the display, the seating and the system all come from this project's own
- * frozen evidence.
+ * THE DESIGN INTENT'S APPROVED REFERENCE PASSAGES.
+ *
+ * Three short paragraphs of Sound Proof design intent at its best, shown to the
+ * writer as EDITORIAL REFERENCES: the voice, the practical design reasoning, the
+ * sentence rhythm and the shape this block is written to, so the register is
+ * shown rather than described.
+ *
+ * They are references and never templates, and they carry no figure, product,
+ * layout, distance or room of their own: there is nothing in them that could be
+ * carried into another design. Every fact in this project's copy comes from that
+ * project's own frozen evidence.
+ */
+export const DESIGN_INTENT_REFERENCE_PASSAGES = Object.freeze([
+  'This is a compact dedicated cinema built around a projection screen and a full immersive loudspeaker layout. The seating is kept clear of the rear wall, which gives the surround system useful space behind the audience and avoids one of the more difficult positions for low-frequency performance.',
+  'The layout gives strong spatial resolution across the room. Front wides, surrounds and overhead channels cover the seating continuously from the sides and from above, while the screen channels create a consistent front soundstage across the primary seats. The surround and overhead layers are closely matched within their own groups, so effects keep a consistent tonal balance as they move through the room.',
+  'Dynamic capability is strong for a room of this size. The front stage has substantial headroom at the reference position, with useful reserve from the surround and overhead channels. The subwoofer system extends the low-frequency response, giving film soundtracks the weight and impact expected from a dedicated cinema.',
+]);
+
+/**
+ * The reference passages as the writer reads them, as ONE block: this block
+ * written well, with the limit that keeps them references rather than templates.
+ *
+ * @returns {string} the block, carried inside the section requirement
+ */
+export function designIntentReferenceBlock() {
+  return [
+    '=== DESIGN INTENT REFERENCE (the register to write to) ===',
+    'These three paragraphs show this block written well: what the room is designed around, why the layout is right for it, and what the system does well, in short active sentences with this project\'s own facts doing the work.',
+    'They are references and never templates. Every fact in them belongs to the design they describe, so take every figure, layout, product, distance and room fact in your copy from this project\'s own frozen evidence and never carry one of theirs across.',
+    ...DESIGN_INTENT_REFERENCE_PASSAGES.map((passage) => `- ${passage}`),
+    '',
+  ].join('\n');
+}
+
+/**
+ * The Design Intent's own instruction. It states the three things the block
+ * explains, the project facts it is written from, the three performance ideas it
+ * develops as prose, the plain register it is written in, what it never recites
+ * and what it never invents, and the shape and length it may run to on the
+ * report's first page. It is written as the shape of the copy rather than as a
+ * sentence to paste: the room, the display, the seating and the system all come
+ * from this project's own frozen evidence.
  */
 export const DESIGN_INTENT_REQUIREMENT = [
   'This block is the report\'s Design Intent: it opens the Project Report above its facts sheet, and it is written for the client as the design team\'s own account of the design.',
-  'Open on the design intent itself: name the cinema being proposed and explain why this design is the right approach for this particular room, in the design team\'s own voice. Never announce a recommendation and never open on a formulaic phrase such as "Our recommendation is" or "We recommend": the design is explained and reasoned rather than offered as an opinion, and the opening states what this cinema is and why it suits this room.',
-  'Then explain why it suits this room, and what the picture, the seating and the loudspeaker arrangement give the client: what they will see, where they will sit, how the sound is carried around and across the room, and what that arrangement is intended to deliver for them. Select the three or four most interesting and relevant aspects of this particular project and develop those properly, rather than working through everything the design contains.',
-  'Translate the established engineering principles this design rests on into client benefits, confidently and in plain language. A principle may be explained confidently without a high Performance Level behind it. An intention is never written as an achieved result, and a measured or calculated result is never written as an intention.',
+  'Explain three things and nothing else: what this room is designed around, why the layout was chosen for it, and what the system does well. Write it as an experienced home cinema designer talking the client through the design, and never announce a recommendation: never open on a formulaic phrase such as "Our recommendation is" or "We recommend".',
+  'DRIVE THE COPY WITH THIS PROJECT\'S OWN FACTS, taken from the frozen evidence and cited to the claim each one rests on. The Project Summary and the evidence pages state the specification in full, so this block states the few facts it actually explains rather than reciting them, and those facts are the display and its format, the loudspeaker layout, how the seating is arranged in the room, the loudspeaker layers this design actually has, the subwoofer arrangement, and how low the bass system reaches. Name a product model only where the frozen evidence states it for this design.',
+  'Then never recite the specification: no equipment-by-equipment schedule, no repeated room dimensions, no Performance Level, no parameter name or code, no channel-by-channel account, and no output figure the client can already read on the evidence pages beside this block.',
+  'Develop the three core performance ideas as prose, never as headings, never as a list and never one paragraph per idea. SPATIAL RESOLUTION is how the loudspeaker arrangement carries sound around and above the seating, and how consistent the front soundstage is across the primary seats. TIMBRE MATCHING is how the loudspeaker layers hold their own tonal balance, so a voice or an effect keeps a consistent character as it moves through the room, and it is stated for the layer and the seats those results cover. DYNAMIC RANGE is how much headroom the front stage, the surround and overhead layers and the bass system have for demanding film soundtracks.',
+  'State a measured result only where the frozen evidence states it and only at the scope that result covers. An intention is never written as an achieved result, and a measured or calculated result is never written as an intention.',
+  'Write plainly and concretely: short direct sentences, active voice, practical design reasoning, and specifics this project\'s own evidence states. Describe what the loudspeakers do and where the client sits and listens, never what the sound is like as a feeling: no figurative or anthropomorphic language about sound, no metaphor, no cinematic cliche, no vague claim about immersion and no marketing language. Explain each point once, add no filler, and never explain the same idea twice in different words.',
+  'Translate the established engineering principles this design rests on into client benefits, confidently and in plain language. A principle may be explained confidently without a high Performance Level behind it.',
   'Where recorded designer intent is supplied, understand the engineering principle it explains and state it professionally in your own words. It is semantic input, never finished prose: never paraphrase the designer, and never reproduce a note, a brief, an instruction or a filename.',
-  'Write the room, the picture, the sound and the seating as one design rather than as a list of parts, so the block reads as the complete cinema experience rather than as a summary of everything the design contains. It does not have to mention every loudspeaker category, every RP22 strength, every seating consideration or every acoustic principle, and forcing them all in is what makes the passage read as a list.',
-  'Be positive, fluent and confident, in natural British English.',
-  'Do not recite specifications or RP22 parameters: no channel count, no figure, no Performance Level, no parameter name and no product-by-product account. The Project Summary and the evidence pages beside this block already carry the equipment specification, so it is never repeated here.',
-  'Acoustic treatment is supporting evidence, never a selling point: never name a treatment product and never state a treatment quantity. Where the client\'s own brief or notes raise acoustics, state the listening benefit the room gains and stop there.',
+  'Acoustic treatment is supporting evidence, never a selling point: never name a treatment product and never state a treatment quantity.',
   'Never invent a physical loudspeaker position, a designer decision or an achieved performance the frozen evidence does not record.',
-  `Length: ${DESIGN_INTENT_TARGET_WORDS} words in two or three developed paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it must not run longer than that: say what the design is and what it gives the client, and stop.`,
+  'Be positive, fluent and confident, in natural British English.',
+  `Length: ${DESIGN_INTENT_TARGET_WORDS} words in three short paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it states what the design is and what it gives the client and then stops: paragraph one is what the room is designed around, the display it is built around and how the seating is arranged in the room; paragraph two develops spatial resolution and timbre matching; paragraph three develops dynamic range and the bass capability.`,
+  designIntentReferenceBlock(),
 ].join(' ');
 
 /** The scope rule the writer reads beside the section it is being given. */
