@@ -125,25 +125,48 @@ describe('Project Library capture resilience', () => {
     });
   });
 
-  it('6. a page neither pass can rasterise stops storage, naming the page and the operation', async () => {
-    await expect(collectPageRasters({
+  it('6. a page neither pass can rasterise does NOT cost the designer the document', async () => {
+    // THE PDF IS THE DELIVERABLE. The page that failed is named and left out of
+    // the stored copy; the rest of the document is still stored, so a single bad
+    // sheet — a 0 × 0 raster, an untitled capture — never cancels the save.
+    const result = await collectPageRasters({
       pages,
       rasterPage: async (_page, index) => {
         if (index === 2) throw pageFailure('png_validation', { message: 'Canvas did not return PNG data.' });
         return raster(index);
       },
       rasterAll: async () => [raster(0), raster(1), null],
+    });
+
+    expect(result.rasters[0]?.dataUrl).toBeTruthy();
+    expect(result.rasters[1]?.dataUrl).toBeTruthy();
+    expect(result.rasters[2]).toBeNull();
+    expect(result.diagnostics.incomplete).toBe(true);
+    expect(result.diagnostics.failed).toEqual([
+      { page: 3, operation: 'png_validation', heading: null, message: 'Library capture page 1 (untitled), png_validation: Canvas did not return PNG data.' },
+    ]);
+  });
+
+  it('6b. a document with NO usable page is still refused — a copy is never invented', async () => {
+    await expect(collectPageRasters({
+      pages,
+      rasterPage: async (_page, index) => {
+        throw pageFailure('png_validation', { message: `page ${index + 1} produced nothing` });
+      },
+      rasterAll: async () => [null, null, null],
     })).rejects.toMatchObject({
-      message: expect.stringContaining('Library capture page 3'),
+      message: expect.stringContaining('No page of this composition could be rasterised'),
       captureDiagnostics: {
-        failed: [{ page: 3, operation: 'png_validation' }],
-        recovered: [],
+        failed: expect.arrayContaining([expect.objectContaining({ page: null, operation: 'no_page_rasterised' })]),
       },
     });
   });
 
   it('7. a zero-size failure is told apart from a real raster failure', () => {
     expect(isZeroSizePageFailure(pageFailure('page_dimensions', { zeroSize: true }))).toBe(true);
+    // A 0 × 0 canvas or an encoded PNG with a zero dimension is the same "nothing
+    // to draw": it is skipped, never counted as a page that failed the document.
+    expect(isZeroSizePageFailure(pageFailure('canvas_dimensions', { zeroSize: true }))).toBe(true);
     expect(isZeroSizePageFailure(pageFailure('png_validation'))).toBe(false);
     expect(isZeroSizePageFailure(new Error('no diagnostics'))).toBe(false);
   });

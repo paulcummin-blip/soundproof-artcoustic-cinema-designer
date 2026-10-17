@@ -219,14 +219,16 @@ test('TEST 4 — the Technical pages follow the Visual pages with the card block
   const page = read(PROJECT_REPORT_PAGE);
 
   // The Technical pages are mounted AFTER the Visual pages, by the report page.
-  assertInOrder(page, ['orderedPages.map(', '<TechnicalReportDocument />']);
-  assert.match(page, /\{reportReady && orderedPages\.length > 0 && <TechnicalReportDocument \/>\}/);
+  assertInOrder(page, ['orderedPages.map(', '<TechnicalReportDocument']);
+  // The document's ONE saved P19 curve payload travels into the Technical pages,
+  // so the Project Report's own P19 page and the Technical page draw one curve.
+  assert.match(page, /\{reportReady && orderedPages\.length > 0 && <TechnicalReportDocument p19Graph=\{p19Graph\} \/>\}/);
 
   // …and the mounted document is the Technical Report's own component.
   const embed = read(TECHNICAL_DOCUMENT);
   assert.match(embed, /import \{ TechnicalReportEmbedded \} from '@\/pages\/RP22Report';/);
-  assert.match(embed, /<TechnicalReportEmbedded \/>/);
-  assert.match(read(TECHNICAL_REPORT_PAGE), /export function TechnicalReportEmbedded\(\) \{\s*return <RP22ReportInner embed \/>;\s*\}/);
+  assert.match(embed, /<TechnicalReportEmbedded p19Graph=\{p19Graph\} \/>/);
+  assert.match(read(TECHNICAL_REPORT_PAGE), /export function TechnicalReportEmbedded\(\{ p19Graph = null \} = \{\}\) \{\s*return <RP22ReportInner embed p19Graph=\{p19Graph\} \/>;\s*\}/);
 
   const print = technicalPrintLayout();
 
