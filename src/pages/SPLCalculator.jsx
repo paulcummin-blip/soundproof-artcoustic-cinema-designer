@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
 import ComparisonDataQualitySection from "@/components/spl/ComparisonDataQualitySection";
+import CompetitorPriceManager from "@/components/spl/CompetitorPriceManager";
 import { planCompetitorImport, applyCompetitorImport } from "@/components/utils/spl/competitorSpreadsheetImport";
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 
@@ -697,6 +698,16 @@ export default function SPLCalculatorPage() {
     }
   };
 
+  // A price saved in Manage Prices shows in the comparison above immediately,
+  // without reloading the candidate set or disturbing the selection.
+  const handlePriceSaved = useCallback((recordId, price) => {
+    setCompetitorRows((rows) => rows.map((row) => (
+      row.id === recordId || row.record?.id === recordId
+        ? { ...row, record: { ...row.record, retail_price_inc_vat: price } }
+        : row
+    )));
+  }, []);
+
   const applyImport = async () => {
     if (importing || !importPreview.length) return;
     setImporting(true);
@@ -932,6 +943,8 @@ export default function SPLCalculatorPage() {
           )}
         </div>
         )}
+
+        {canManageCompetitors && <CompetitorPriceManager onPriceSaved={handlePriceSaved} />}
       </div>
     </div>
   );
