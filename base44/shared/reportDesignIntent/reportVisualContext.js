@@ -11,13 +11,23 @@
  * there. Nothing is re-uploaded, nothing is re-selected, and no new image store or
  * second library is created.
  *
- * WHAT AN IMAGE MAY AND MAY NOT DO. An image is EDITORIAL CONTEXT ONLY: it tells
- * the writer about atmosphere, interior character, visual scale, seating style,
- * architectural appearance and the way the room is intended to be experienced. It
- * is NEVER engineering evidence. No figure, distance, loudspeaker position, output
- * capability, performance level or RP22 result may be read from a picture, and no
- * visual observation ever overrides the saved engineering. That rule is stated in
- * the block the writer receives, in the words it is meant to follow.
+ * WHAT AN IMAGE MAY AND MAY NOT DO. A library image is a CONCEPT VISUAL of the
+ * finished room: something to give the client a tangible sense of the space, to help
+ * them picture spending time in it, and to make the design feel like a complete room
+ * rather than a list of equipment. It is NOT approved interior design, not a
+ * construction or interiors specification, and never engineering evidence.
+ *
+ * NO TECHNICAL FACT IS EVER TAKEN FROM A PICTURE. Nothing this project already holds
+ * may be established or overridden by a render: not the room type, not the display,
+ * not the seating, not a loudspeaker count or position, not a dimension and not an
+ * architectural constraint. Sound Proof already knows those, and a second visual
+ * authority for them is exactly what must not be created. No colour, finish,
+ * material, furniture choice, lighting choice or interior style is read from one
+ * either, and nothing seen in a picture may suggest that an interior has been
+ * approved, specified or built. CANONICAL PROJECT AND ENGINEERING DATA ALWAYS WINS;
+ * the client brief defines the room's intended use; the render sits beneath both as
+ * soft experiential context. Those rules are stated in the block the writer receives,
+ * in the words it is meant to follow.
  *
  * WHICH IMAGES ARE CHOSEN, and why. The selection is deterministic and reads only
  * the designer's own recorded metadata — never the pixels, never a caption's
@@ -84,20 +94,68 @@ export const VISUAL_SELECTION_RULE = 'Whole-room views first, then interior deta
   + 'Chosen only from the images this project already holds, and never an image the designer has hidden, '
   + 'an alternative the client is being offered, or a plan or dimensioned drawing.';
 
-/** The rule the writer must follow when it is shown pictures. */
-export const VISUAL_CONTEXT_RULE = 'The attached images are VISUAL CONTEXT ONLY. '
-  + 'Use them to understand the intended atmosphere, the interior character, the visual scale of the cinema, '
-  + 'the seating style, the architectural appearance and how the room is meant to be experienced.';
+/** What these images ARE. Every use of them states this, so their status cannot drift. */
+export const CONCEPT_RENDER_PURPOSE = 'concept_render';
 
-/** What the writer must never do with them. */
-export const VISUAL_NEVER_RULE = 'Never read a figure, a distance, a loudspeaker position, a product or a '
-  + 'performance result out of an image, and never let anything you can see override the saved engineering. '
-  + 'Every dimension, capability, level and result comes from the frozen evidence alone.';
+/** The authority a concept visual carries of its own: none. */
+export const NON_AUTHORITATIVE_AUTHORITY = 'non_authoritative';
 
-/** What the writer is being asked to write ABOUT, given the pictures. */
-export const VISUAL_WRITING_RULE = 'Do not describe the photographs and do not list what is visible. '
-  + 'Write about the cinema: what it is intended to feel like, why the important choices make sense, '
-  + 'how picture and sound work together, and what will make films enjoyable in this room.';
+/** What they are for. */
+export const CLIENT_EXPERIENCE_CONTEXT_USE = 'client_experience_context';
+
+/**
+ * The small label a client-facing render carries, so its status is clear on the page
+ * without the narrative carrying a disclaimer. Held here, beside the rules the writer
+ * follows, so the words printed with the picture and the words the writer reads can
+ * never drift apart.
+ */
+export const CONCEPT_RENDER_LABEL = 'Concept visual — shown to illustrate the room experience.';
+
+/** The same statement for a render offered as an interior or seating alternative. */
+export const CONCEPT_RENDER_FINISHES_LABEL = 'Concept visual — interior finishes shown for illustration.';
+
+/**
+ * The rule the writer must follow when it is shown the room's concept visuals: soft
+ * context only, and not any of the things a picture is easily mistaken for.
+ */
+export const VISUAL_CONTEXT_RULE = 'The attached images are CONCEPT VISUALS of this room, given to you as soft '
+  + 'experiential context: they are there so the client can picture the finished cinema as a complete space. '
+  + 'They are not approved interior design, not a construction or an interiors specification, not a furniture, '
+  + 'lighting or finishes schedule, and not engineering authority.';
+
+/** Canonical data always wins, and the brief says why the room exists. */
+export const VISUAL_AUTHORITY_RULE = 'CANONICAL PROJECT AND ENGINEERING DATA ALWAYS WINS. This project\'s own room '
+  + 'geometry, seating, display, loudspeaker and subwoofer assignments, RP22 results, bass results and recorded '
+  + 'brief are the authority for every fact in this copy. The brief defines the room\'s intended use. The renders '
+  + 'sit beneath both as soft experiential context, and nothing visible in a picture may ever override or '
+  + 'establish a technical fact this project already holds.';
+
+/**
+ * What the writer must never do with them. The first sentence is the deliberate
+ * prohibition on a second visual authority: the facts it names are the ones Sound
+ * Proof already holds, and none of them is ever derived from a picture.
+ */
+export const VISUAL_NEVER_RULE = 'Never read a technical fact out of a picture: not the room type, not the '
+  + 'display, not a seating count or arrangement, not a loudspeaker count or position, not a dimension, and not '
+  + 'an architectural constraint. Sound Proof already holds those, and no second visual authority is created for '
+  + 'them. Never describe colours, fabrics, timber, stone, wall finishes, furniture, lighting, a luxury aesthetic '
+  + 'or a contemporary or traditional style, and never present an interior shown in a render as approved, final, '
+  + 'specified or built. No figure, distance, product or performance result comes from an image either.';
+
+/** What the writer is asked to do with them, given they are experience context. */
+export const VISUAL_WRITING_RULE = 'The renders may gently help you remember that the client is buying a ROOM and '
+  + 'an EXPERIENCE, not only technical performance. Where this project\'s own brief supports it, acknowledge at '
+  + 'most one of these, subtly: time spent with family and friends; films, sport, games or music as a shared '
+  + 'experience; the room as a comfortable place to spend time; the scale and physical presence of the finished '
+  + 'cinema; the design as a complete environment. Keep it to at most one restrained idea, only where it '
+  + 'genuinely improves the sentence, and keep the copy an experienced cinema designer explaining the design. '
+  + 'Do not describe a picture, do not list what is visible, and never let this idea carry a claim the '
+  + 'engineering does not support.';
+
+/** Where the visuals' status reaches the client, and where it never does. */
+export const VISUAL_DISCLAIMER_RULE = 'The status of these visuals is carried by the label printed with the '
+  + 'images in the document, not by your copy: "' + CONCEPT_RENDER_LABEL + '". Never write a disclaimer about '
+  + 'them into the narrative and never repeat their status in prose.';
 
 function asText(value) {
   if (typeof value !== 'string') return null;
@@ -264,9 +322,18 @@ export function selectVisualImages(assets, { versionId = null, limit = MAX_VISUA
  * @param {Array|Object} input.assets — the project's Project Library images
  * @param {string|null} [input.versionId] — the version this report documents
  * @param {number} [input.limit]
+ * @param {boolean} [input.briefSupplied] — whether this project records its own
+ *   brief. It gates ONE thing and nothing else: whether the writer may acknowledge
+ *   the room's intended use and the shared experience it is for. It changes no fact,
+ *   no image and no fingerprint.
  * @returns {Object} { version, available, reason, images, fingerprint, selection_rule }
  */
-export function buildReportVisualContext({ assets = [], versionId = null, limit = MAX_VISUAL_IMAGES } = {}) {
+export function buildReportVisualContext({
+  assets = [],
+  versionId = null,
+  limit = MAX_VISUAL_IMAGES,
+  briefSupplied = false,
+} = {}) {
   const library = asItems(assets).filter((asset) => asset && typeof asset === 'object');
   const selection = selectVisualImages(library, { versionId, limit });
 
@@ -279,6 +346,10 @@ export function buildReportVisualContext({ assets = [], versionId = null, limit 
     rejected: [],
     fingerprint: null,
     selection_rule: VISUAL_SELECTION_RULE,
+    // The project's own brief, which decides whether an intended use is stated at
+    // all. Deliberately outside the fingerprint: the images a narrative was written
+    // from are what it is pinned to, and a brief edited later does not rewrite them.
+    brief_supplied: briefSupplied === true,
   };
 
   if (library.length === 0) {
@@ -386,20 +457,59 @@ export function visualContextIdentity(context) {
 }
 
 /**
- * The visual block the writer reads, or null when there is nothing to show. It
- * states what the images are for, what they may never be used for, and what the
- * writer is being asked to write about — and it carries no address, because the
- * images themselves are attached to the request.
+ * The notes the writer reads beside the two flags: what these images are, what they
+ * are not, and — from the project's own brief — whether an intended use may be
+ * acknowledged at all. Every line is a statement about the RENDER, never a
+ * description of one, so nothing here is derived from a picture.
+ */
+function visualNotes({ wholeRoom, socialAllowed }) {
+  return [
+    'These are concept visuals of the finished room, to help the client picture spending time in it.',
+    'They are not approved interior design, not a construction or an interiors specification, and not evidence.',
+    wholeRoom
+      ? 'Views of the room as a whole are attached.'
+      : 'What is attached shows details of the room rather than views of it as a whole.',
+    socialAllowed
+      ? 'This project records its own brief, so the room\'s intended use and the shared experience it is for may be acknowledged where the brief supports it.'
+      : 'This project records no client brief, so write about the room and the design only: no intended use is stated and none is ever invented.',
+  ];
+}
+
+/**
+ * The visual block the writer reads, or null when there is nothing to show.
+ *
+ * It states WHAT the images are for, never what they contain: purpose, authority and
+ * intended use are named for what they are, the whole-room and social-experience
+ * flags are read from the designer's own recorded metadata and from the project's own
+ * brief, and nothing here describes a colour, a finish, a material or a technical
+ * fact. It carries no address either, because the images themselves are attached to
+ * the request.
  */
 export function writerVisualBlock(context) {
   if (context?.available !== true) return null;
   const images = asItems(context.images);
   if (images.length === 0) return null;
 
+  const wholeRoom = images.some((image) => (image.role ?? 'other') === 'whole_room');
+  const socialAllowed = context.brief_supplied === true;
+
   return {
+    purpose: CONCEPT_RENDER_PURPOSE,
+    authority: NON_AUTHORITATIVE_AUTHORITY,
+    intended_use: CLIENT_EXPERIENCE_CONTEXT_USE,
+    // Read from the designer's own recorded role for each picture, never from the
+    // pixels: it says what kind of view is available, not what the room contains.
+    whole_room_context_available: wholeRoom,
+    // Allowed only where this project records its own brief, because a shared
+    // experience is the brief's to state and never the writer's to assume.
+    social_experience_allowed: socialAllowed,
+    client_label: CONCEPT_RENDER_LABEL,
+    notes: visualNotes({ wholeRoom, socialAllowed }),
     rule: VISUAL_CONTEXT_RULE,
+    authority_rule: VISUAL_AUTHORITY_RULE,
     never: VISUAL_NEVER_RULE,
     writing: VISUAL_WRITING_RULE,
+    disclaimer_rule: VISUAL_DISCLAIMER_RULE,
     available: true,
     fingerprint: context.fingerprint ?? null,
     image_count: images.length,

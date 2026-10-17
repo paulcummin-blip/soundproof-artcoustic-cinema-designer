@@ -20,6 +20,11 @@
  * images when a Design Intent is written for this report. So this notice states
  * plainly that ADI writing draws on them, and never that a picture is required —
  * the report, its engineering and its assessment are complete without one.
+ *
+ * WHAT THE NOTICE MAY NOT CLAIM. These images are concept visuals, not evidence:
+ * the notice never says ADI reads a room type, a finish, a seating arrangement or
+ * any technical fact out of them, because it does not. They are non-authoritative
+ * client experience context beside the engineering, and the wording says so.
  */
 
 import React, { useMemo } from 'react';
@@ -65,18 +70,20 @@ const ACTION = {
 
 /** The invite, when this version has no images the writing could use yet. */
 const INVITE = [
-  'For a more personalised and engaging Project Report, add your cinema renders and other room images '
-  + 'to the Project Library before generating the report.',
-  'ADI writing draws on the visual character of the room, the way the seating is arranged and the design '
-  + 'intentions, so it can explain your cinema in the terms you would use yourself.',
+  'For a Project Report that reads like a room rather than a list of equipment, add your cinema renders and '
+  + 'other room images to the Project Library before generating the report.',
+  'ADI writing uses them as concept visuals only: they help it describe the cinema as a complete space the '
+  + 'client can picture spending time in. They are never read as evidence of finishes, furniture, style or '
+  + 'engineering, and they change no technical fact.',
   'Your engineering results and RP22 assessments remain unchanged.',
 ];
 
 /** The confirmation, when usable images are already there. */
 const CONFIRMED = [
-  'ADI writing will draw on the images this version holds — the visual character of the room, the way '
-  + 'the seating is arranged and the design intentions.',
-  'Your engineering results and RP22 assessments remain unchanged.',
+  'ADI writing will use the images this version holds as concept visuals only, to describe the cinema as a '
+  + 'complete space the client can picture spending time in.',
+  'They change no technical fact: the room, the seating, the display and the system stay exactly as this '
+  + 'project records them, and your engineering results and RP22 assessments remain unchanged.',
 ];
 
 function libraryHref(projectId) {

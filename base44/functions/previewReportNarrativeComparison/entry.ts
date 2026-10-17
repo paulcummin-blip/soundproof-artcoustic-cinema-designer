@@ -311,7 +311,13 @@ async function designIntentVisualComparison({ base44, user, projectId, versionId
       versionId: version.id,
       reportSnapshotId: snapshot.id,
     }),
-    readVisualContext: async () => buildReportVisualContext({ assets: libraryImages, versionId: version.id }),
+    readVisualContext: async () => buildReportVisualContext({
+      assets: libraryImages,
+      versionId: version.id,
+      // The same gate the production preview applies: the project's own brief decides
+      // whether an intended use may be acknowledged at all.
+      briefSupplied: Boolean(String(project?.notes || '').trim()),
+    }),
     // The one provider call, the same integration the production writer uses.
     invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
   });

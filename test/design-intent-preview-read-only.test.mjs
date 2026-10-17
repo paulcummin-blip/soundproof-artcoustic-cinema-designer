@@ -142,8 +142,8 @@ const SEED = {
  * mutation is recorded AND performed, so a write by anything under test changes the
  * store and the before/after comparison fails rather than passing silently.
  */
-function makeStore() {
-  const state = JSON.parse(JSON.stringify(SEED));
+function makeStore(seed = SEED) {
+  const state = JSON.parse(JSON.stringify(seed));
   const calls = [];
   const mutations = [];
 
@@ -344,6 +344,82 @@ describe('the production save flow still works', () => {
     expect(outcome.saved).toBe(false);
     expect(store.serialised()).toBe(before);
     expect(store.mutations()).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE PROJECT RENDERS: non-authoritative, and gated on the project's own brief
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RENDERS = [{
+  id: 'r1',
+  project_id: 'p1',
+  scope: 'project',
+  slot: 'image_1',
+  asset_type: 'gallery',
+  file_url: 'https://files.test/public/aa11_room.jpg',
+  caption: 'The finished room',
+  usage: 'gallery',
+  image_purpose: 'whole_room',
+}];
+
+describe('the renders reach the writer as non-authoritative client experience context', () => {
+  it('carries the concept-visual block on the real core, and lets the brief gate the one experience allowance', async () => {
+    // NO BRIEF RECORDED: nothing about an intended use may be written.
+    const withoutBrief = makeStore({ ...SEED, ProposalAsset: RENDERS });
+    const first = await buildReportDesignIntentAttempt(input(withoutBrief, async () => acceptedDraft()));
+
+    const blockWithout = first.writerInput.design_visual_context;
+    expect(blockWithout.purpose).toBe('concept_render');
+    expect(blockWithout.authority).toBe('non_authoritative');
+    expect(blockWithout.intended_use).toBe('client_experience_context');
+    expect(blockWithout.social_experience_allowed).toBe(false);
+    expect(blockWithout.images).toEqual([{ role: 'whole_room', caption: 'The finished room' }]);
+    // The engineering the draft stands on is untouched by the pictures.
+    expect(first.writerInput.evidence_pack.pack_fingerprint).toBe(referencePack().pack_fingerprint);
+    expect(withoutBrief.counts()).toEqual({ CREATE: 0, UPDATE: 0, DELETE: 0 });
+
+    // THE PROJECT'S OWN BRIEF RECORDED: the room's intended use may be acknowledged.
+    const withBrief = makeStore({
+      ...SEED,
+      Project: [{ ...PROJECT, notes: 'A family cinema for films, sport and shared evenings.' }],
+      ProposalAsset: RENDERS,
+    });
+    const second = await buildReportDesignIntentAttempt(input(withBrief, async () => acceptedDraft()));
+
+    const blockWith = second.writerInput.design_visual_context;
+    expect(blockWith.social_experience_allowed).toBe(true);
+    // The brief moves the one flag and nothing else: the image identity the accepted
+    // narrative is pinned to is the same either way.
+    expect(blockWith.fingerprint).toBe(blockWithout.fingerprint);
+    expect(blockWith.never).toBe(blockWithout.never);
+    expect(withBrief.counts()).toEqual({ CREATE: 0, UPDATE: 0, DELETE: 0 });
+  });
+
+  it('attaches the pictures to the ONE provider call and derives no fact from them', async () => {
+    const store = makeStore({ ...SEED, ProposalAsset: RENDERS });
+    const requests = [];
+
+    const outcome = await buildReportDesignIntentAttempt(input(store, async (request) => {
+      requests.push(request);
+      return acceptedDraft();
+    }));
+
+    expect(outcome.ok).toBe(true);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].file_urls).toEqual(['https://files.test/public/aa11_room.jpg']);
+
+    const block = outcome.writerInput.design_visual_context;
+    // The block is instructions about status and one bounded experience allowance: no
+    // colour, no finish, no material and no technical fact taken from the picture.
+    expect(Object.keys(block).sort()).toEqual([
+      'authority', 'authority_rule', 'available', 'client_label', 'disclaimer_rule', 'fingerprint',
+      'image_count', 'images', 'intended_use', 'never', 'notes', 'purpose', 'rule', 'selection',
+      'social_experience_allowed', 'whole_room_context_available', 'writing',
+    ]);
+    expect(JSON.stringify(block)).not.toMatch(/#[0-9A-Fa-f]{3,6}/);
+    expect(block.never).toMatch(/not the room type, not the display/);
+    expect(block.authority_rule).toMatch(/CANONICAL PROJECT AND ENGINEERING DATA ALWAYS WINS/);
   });
 });
 

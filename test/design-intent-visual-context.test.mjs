@@ -19,6 +19,13 @@
  * capability or RP22 result may be read from a photograph, and the visual block the
  * writer receives says exactly that.
  *
+ * REFRAMED: the pictures are CONCEPT RENDERS, and the block says so. They are
+ * non-authoritative client experience context — not approved interior design, not a
+ * construction or interiors specification, and never a second authority for a
+ * technical fact this project already holds. No colour, finish, material, furniture,
+ * lighting or interior style is read from one, canonical project data always wins,
+ * and the one thing they may support is the room as an experience.
+ *
  * The provider and the validator are injected so the test is decisive about the
  * WIRING and the IDENTITY rather than about prose quality or model behaviour.
  */
@@ -88,8 +95,12 @@ import { DESIGN_INTENT_SECTION } from '../base44/shared/reportDesignIntent/desig
 import { assertWriterInputCarriesNoLiveState } from '../base44/shared/proposalWriter/writerPromptBuilder.js';
 import { validateWriterOutput } from '../base44/shared/proposalWriter/writerOutputValidator.js';
 import {
+  CONCEPT_RENDER_FINISHES_LABEL,
+  CONCEPT_RENDER_LABEL,
   MAX_VISUAL_IMAGES,
+  VISUAL_AUTHORITY_RULE,
   VISUAL_CONTEXT_RULE,
+  VISUAL_NEVER_RULE,
   buildReportVisualContext,
   visualContextSources,
 } from '../base44/shared/reportDesignIntent/reportVisualContext.js';
@@ -105,6 +116,10 @@ import {
 // suite proves it by watching the one call the page could make.
 import { base44 } from '@/api/base44Client';
 import ProjectReportDesignSummary from '../src/components/report/projectReport/ProjectReportDesignSummary.jsx';
+// The two client-facing surfaces a render is actually printed on: the Project Images
+// page of the pack and every editorial image placement.
+import ProjectImagesBlock from '../src/components/proposal/ProjectImagesBlock.jsx';
+import ProposalImagePlacement from '../src/components/proposal/print/ProposalImagePlacement.jsx';
 
 const AT = MARQUEE_GENERATED_AT;
 const VERSION_ID = 'version-1';
@@ -289,12 +304,18 @@ describe('Stage 3 — the Project Library images reach the one existing Astra wr
     expect(request.response_json_schema.type).toBe('object');
     expect(request.model).toBe('injected-test-model');
 
-    // The writer is told what the pictures are for, in the words it must follow, and
-    // that they are never evidence.
+    // The writer is told what the pictures are FOR, in the words it must follow: soft
+    // experience context, non-authoritative, and never evidence of anything factual.
     expect(request.prompt).toContain('design_visual_context');
     expect(request.prompt).toContain(VISUAL_CONTEXT_RULE);
-    expect(request.prompt).toContain('Never read a figure, a distance, a loudspeaker position');
-    expect(request.prompt).toContain('VISUAL CONTEXT ONLY');
+    expect(request.prompt).toContain(VISUAL_AUTHORITY_RULE);
+    expect(request.prompt).toContain(VISUAL_NEVER_RULE);
+    expect(request.prompt).toContain('Never read a technical fact out of a picture');
+    expect(request.prompt).toContain('CANONICAL PROJECT AND ENGINEERING DATA ALWAYS WINS');
+    // The status travels in the block itself: what it is, and whose word counts.
+    expect(request.prompt).toContain('"purpose":"concept_render"');
+    expect(request.prompt).toContain('"authority":"non_authoritative"');
+    expect(request.prompt).toContain('"intended_use":"client_experience_context"');
 
     // The accepted narrative is bound to that exact selection.
     expect(attempt.ok).toBe(true);
@@ -758,5 +779,49 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
     // reached no model and no endpoint at all. The pictures are attached when the
     // dealer ASKS for a narrative, never when the report is opened.
     expect(base44.functions.invoke).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * THE REFRAME, ON THE PAGE. A render's status has to be clear to the CLIENT, and the
+ * design is that the page carries it: the narrative never carries a disclaimer. Both
+ * client-facing surfaces are composed here and must state it.
+ */
+describe('the concept-visual status is carried by the page the client reads', () => {
+  const IMAGE_URL = 'https://files.soundproof.test/public/aa11_genesis-room.jpg';
+
+  it('labels the Project Images page of the pack', () => {
+    const gallery = renderToStaticMarkup(React.createElement(ProjectImagesBlock, {
+      images: [{
+        id: 'i1',
+        slot: 'image_1',
+        asset_type: 'gallery',
+        file_url: IMAGE_URL,
+        caption: 'The finished cinema',
+      }],
+    }));
+
+    expect(gallery).toContain('The finished cinema');
+    expect(gallery).toContain(CONCEPT_RENDER_LABEL);
+  });
+
+  it('labels every placed render, and states an offered option as an illustrated finish', () => {
+    const room = renderToStaticMarkup(React.createElement(ProposalImagePlacement, {
+      placement: {
+        id: 'p1',
+        source_file_url: IMAGE_URL,
+        editorial_role: 'landscape_feature',
+        source_caption: 'The room as the client will see it',
+      },
+    }));
+    expect(room).toContain(CONCEPT_RENDER_LABEL);
+    expect(room).not.toContain(CONCEPT_RENDER_FINISHES_LABEL);
+
+    // An option the client is being offered is an interior illustration, and says so.
+    const option = renderToStaticMarkup(React.createElement(ProposalImagePlacement, {
+      placement: { id: 'p2', source_file_url: IMAGE_URL, editorial_role: 'seating_option' },
+    }));
+    expect(option).toContain(CONCEPT_RENDER_FINISHES_LABEL);
+    expect(option).not.toContain(CONCEPT_RENDER_LABEL);
   });
 });

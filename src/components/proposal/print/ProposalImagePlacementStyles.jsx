@@ -44,6 +44,16 @@ export default function ProposalImagePlacementStyles() {
         line-height: 1.45;
         color: #625143;
       }
+      /* The concept-visual status line every render carries, so the client can see
+         what the picture is without the narrative carrying a disclaimer. Small and
+         quiet: it states the file's status, never what the picture shows. */
+      .pp-media__note {
+        margin: 1.5mm 0 0;
+        font-family: var(--pp-body, "Didact Gothic", "Century Gothic", sans-serif);
+        font-size: 8pt;
+        line-height: 1.4;
+        color: #8A8477;
+      }
 
       /* ── The portrait editorial accent, beside the copy ── */
       .pp-media-row {

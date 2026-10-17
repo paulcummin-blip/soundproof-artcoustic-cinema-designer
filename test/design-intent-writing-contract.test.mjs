@@ -245,3 +245,68 @@ describe('D. The approved sentence frames govern the copy', () => {
     expect(authority).not.toMatch(/no fixed narrative structure/i);
   });
 });
+
+/**
+ * E. THE PROJECT RENDERS ARE EXPERIENCE CONTEXT, NEVER EVIDENCE.
+ *
+ * The Design Intent is where a render could most easily drift into the copy, so the
+ * brief states the boundary itself: what a render may add — at most one restrained
+ * experience idea — and everything it may never be read for. The block's own shape is
+ * untouched: three paragraphs, three approved frames, engineering-led.
+ */
+describe('E. The project renders are experience context, never evidence', () => {
+  it('DESIGN INTENT REMAINS ENGINEERING-LED: three paragraphs, three frames, unchanged', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/three short paragraphs/i);
+    expect(DESIGN_INTENT_SENTENCE_FRAMES).toHaveLength(3);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/APPROVED SENTENCE FRAMES/);
+    // The render's influence is bounded to ONE restrained place, and the block is
+    // still the design explanation.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/at most ONE restrained place in this block/);
+    expect(DESIGN_INTENT_REQUIREMENT)
+      .toMatch(/Keep the block what it is: an experienced cinema designer explaining the design/);
+  });
+
+  it('NO DUPLICATE ENGINEERING FACTS: a technical fact is never read out of a render', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/NEVER READ A FACT OUT OF A CONCEPT VISUAL/);
+    for (const fact of [
+      'the room type', 'the display', 'the seating count or arrangement',
+      'a loudspeaker count or position', 'a dimension', 'an architectural constraint',
+    ]) {
+      expect(DESIGN_INTENT_REQUIREMENT.toLowerCase()).toContain(fact);
+    }
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/canonical project and engineering data always wins/i);
+  });
+
+  it('NO COLOUR, STYLE, MATERIAL OR APPROVAL CLAIM FROM A RENDER', () => {
+    const requirement = DESIGN_INTENT_REQUIREMENT.toLowerCase();
+    for (const subject of [
+      'colours', 'fabrics', 'timber', 'stone', 'wall finishes', 'furniture', 'lighting', 'style',
+      'a luxury aesthetic', 'a contemporary or traditional look',
+    ]) {
+      expect(requirement).toContain(subject);
+    }
+    expect(DESIGN_INTENT_REQUIREMENT)
+      .toMatch(/never imply that an interior shown is approved, final, specified or built/i);
+    // Where a finish genuinely belongs to the design, it comes from the brief.
+    expect(DESIGN_INTENT_REQUIREMENT)
+      .toMatch(/its wording comes from this project's own brief and never from a visual/i);
+  });
+
+  it('VISUAL CONTEXT MAY SUPPORT ROOM AND EXPERIENCE, and only that', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/THE PROJECT RENDERS ARE EXPERIENCE CONTEXT, NOT EVIDENCE/);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/the system designed as part of a complete cinema room/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/the room intended to work as a place people want to spend time in/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/help the client picture the room/i);
+  });
+
+  it('NO RENDER DISCLAIMER IN THE COPY, and no describing a picture', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/NO RENDER DISCLAIMER IN THE COPY/);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never state in prose what a picture is or is not/i);
+    for (const phrase of [
+      'the render shows', 'the visual confirms', 'shown in the visual',
+      'the approved interior', 'the finishes shown',
+    ]) {
+      expect(DESIGN_INTENT_REQUIREMENT.toLowerCase()).toContain(phrase);
+    }
+  });
+});

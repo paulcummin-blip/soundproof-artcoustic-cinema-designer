@@ -19,19 +19,33 @@
  *   - a picture is identified by its record and its file, NEVER by its storage
  *     URL, so a re-signed link cannot move the identity and replacing the file
  *     does;
- *   - the block the writer reads states what the images may and may not be used
- *     for, and carries no address.
+ *   - the block the writer reads states what the images are FOR — concept visuals,
+ *     non-authoritative client experience context — never what they contain, and
+ *     carries no address.
+ *
+ * REFRAMED, and asserted below: the renders are NOT design evidence. Nothing
+ * technical is taken from one, no colour, finish, material, furniture, lighting or
+ * interior style is read from one, and canonical project data always wins. They exist
+ * to help the client picture the finished room and to keep the design a complete
+ * space rather than a list of equipment.
  */
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  CLIENT_EXPERIENCE_CONTEXT_USE,
+  CONCEPT_RENDER_LABEL,
+  CONCEPT_RENDER_PURPOSE,
   MAX_VISUAL_IMAGES,
+  NON_AUTHORITATIVE_AUTHORITY,
   REPORT_VISUAL_CONTEXT_VERSION,
+  VISUAL_AUTHORITY_RULE,
   VISUAL_CONTEXT_RULE,
+  VISUAL_DISCLAIMER_RULE,
   VISUAL_EXCLUSION,
   VISUAL_NEVER_RULE,
   VISUAL_REFUSAL,
+  VISUAL_WRITING_RULE,
   buildReportVisualContext,
   selectVisualImages,
   visualContextSources,
@@ -223,14 +237,28 @@ describe('Stage 2 — Project Library image selection', () => {
     expect(other.fingerprint).not.toBe(context.fingerprint);
   });
 
-  it('gives the writer the images as context, never as evidence, and gives it no address', () => {
+  it('tells the writer what the images are FOR, never what they contain, and gives it no address', () => {
     const context = buildReportVisualContext({ assets: GENESIS_ASSETS, versionId: 'v1' });
     const block = writerVisualBlock(context);
 
     console.log('[visual] writer block', JSON.stringify(block));
 
+    // WHAT THEY ARE, stated by the block itself: a concept render, non-authoritative,
+    // client experience context.
+    expect(block.purpose).toBe(CONCEPT_RENDER_PURPOSE);
+    expect(block.authority).toBe(NON_AUTHORITATIVE_AUTHORITY);
+    expect(block.intended_use).toBe(CLIENT_EXPERIENCE_CONTEXT_USE);
+    // The two flags are read from the designer's own recorded roles and from the
+    // project's own brief — never from the pixels.
+    expect(block.whole_room_context_available).toBe(true);
+    expect(block.social_experience_allowed).toBe(false);
+    expect(block.client_label).toBe(CONCEPT_RENDER_LABEL);
+
     expect(block.rule).toBe(VISUAL_CONTEXT_RULE);
+    expect(block.authority_rule).toBe(VISUAL_AUTHORITY_RULE);
     expect(block.never).toBe(VISUAL_NEVER_RULE);
+    expect(block.writing).toBe(VISUAL_WRITING_RULE);
+    expect(block.disclaimer_rule).toBe(VISUAL_DISCLAIMER_RULE);
     expect(block.image_count).toBe(3);
     expect(block.fingerprint).toBe(context.fingerprint);
     expect(block.images).toEqual([
@@ -243,8 +271,13 @@ describe('Stage 2 — Project Library image selection', () => {
     expect(text).not.toContain('http');
     expect(text).not.toContain('base44.app');
     expect(Object.keys(block).sort()).toEqual([
-      'available', 'fingerprint', 'image_count', 'images', 'never', 'rule', 'selection', 'writing',
+      'authority', 'authority_rule', 'available', 'client_label', 'disclaimer_rule', 'fingerprint',
+      'image_count', 'images', 'intended_use', 'never', 'notes', 'purpose', 'rule', 'selection',
+      'social_experience_allowed', 'whole_room_context_available', 'writing',
     ]);
+    // No interior specification, no colour and no technical fact is offered to the
+    // writer: the block is instructions about status, not observations about a room.
+    expect(text).not.toMatch(/#[0-9A-Fa-f]{3,6}/);
 
     // And the block survives the writer input's own live-state guard, which exists to
     // stop live design state reaching a draft.
@@ -258,5 +291,118 @@ describe('Stage 2 — Project Library image selection', () => {
     expect(considered).toHaveLength(GENESIS_ASSETS.length);
     expect(considered.filter((row) => row.eligible)).toHaveLength(3);
     expect(considered.filter((row) => !row.eligible).every((row) => row.reason === VISUAL_EXCLUSION.SEATING_OPTION)).toBe(true);
+  });
+});
+
+/**
+ * THE REFRAME, ASSERTED. The acceptance below is the whole point of this suite: a
+ * render states nothing technical, nothing about an interior, and never has the last
+ * word over the project's own data. The rules come from the block the writer is
+ * genuinely given, so the assertions are about what reaches the model.
+ */
+describe('the renders are non-authoritative client experience context', () => {
+  const blockFor = (options = {}) => writerVisualBlock(
+    buildReportVisualContext({ assets: GENESIS_ASSETS, versionId: 'v1', ...options }),
+  );
+
+  /** Every rule sentence the writer reads, as one string. */
+  const rulesOf = (block) => [
+    block.rule, block.authority_rule, block.never, block.writing, block.disclaimer_rule, ...block.notes,
+  ].join(' ');
+
+  it('RENDERS MARKED NON-AUTHORITATIVE: purpose, authority and intended use are named', () => {
+    const block = blockFor();
+    expect(block.purpose).toBe(CONCEPT_RENDER_PURPOSE);
+    expect(block.authority).toBe(NON_AUTHORITATIVE_AUTHORITY);
+    expect(block.intended_use).toBe(CLIENT_EXPERIENCE_CONTEXT_USE);
+    expect(rulesOf(block)).toMatch(/not approved interior design, not a construction or an interiors specification/);
+  });
+
+  it('NO COLOUR, STYLE OR MATERIAL CLAIMS FROM IMAGES: every one of them is banned by name', () => {
+    const rules = rulesOf(blockFor()).toLowerCase();
+    for (const subject of [
+      'colours', 'fabrics', 'timber', 'stone', 'wall finishes', 'furniture', 'lighting',
+      'a luxury aesthetic', 'a contemporary or traditional style',
+    ]) {
+      expect(rules).toContain(subject);
+    }
+  });
+
+  it('NO DUPLICATE ENGINEERING FACTS: the facts Sound Proof already holds are named, and refused', () => {
+    const rules = rulesOf(blockFor());
+    for (const fact of [
+      'the room type', 'the display', 'a seating count or arrangement',
+      'a loudspeaker count or position', 'a dimension', 'an architectural constraint',
+    ]) {
+      expect(rules).toContain(fact);
+    }
+    expect(rules).toMatch(/Sound Proof already holds those, and no second visual authority is created for them/);
+  });
+
+  it('CANONICAL PROJECT DATA ALWAYS WINS: the hierarchy is stated, with the brief between them', () => {
+    const rules = rulesOf(blockFor());
+    expect(rules).toContain('CANONICAL PROJECT AND ENGINEERING DATA ALWAYS WINS');
+    expect(rules).toMatch(/The brief defines the room's intended use/);
+    expect(rules).toMatch(/may ever override or establish a technical fact this project already holds/);
+    // The canonical list is the project's own: geometry, seating, display, system,
+    // results and brief — and the render is beneath all of it.
+    for (const authority of ['geometry', 'seating', 'display', 'loudspeaker and subwoofer assignments', 'RP22 results', 'bass results', 'recorded brief']) {
+      expect(rules).toContain(authority);
+    }
+    expect(rules).toMatch(/The renders sit beneath both/);
+  });
+
+  it('NO BUILD OR INTERIOR APPROVAL IMPLIED: an interior shown is never approved, final, specified or built', () => {
+    const rules = rulesOf(blockFor());
+    expect(rules)
+      .toMatch(/never present an interior shown in a render as approved, final, specified or built/);
+    expect(rules).toMatch(/not approved interior design/);
+  });
+
+  it('VISUAL CONTEXT MAY SUPPORT ROOM AND SOCIAL EXPERIENCE, subtly and where the brief supports it', () => {
+    const rules = rulesOf(blockFor());
+    expect(rules).toMatch(/the client is buying a ROOM and an EXPERIENCE/);
+    for (const acknowledged of [
+      'time spent with family and friends',
+      'films, sport, games or music as a shared experience',
+      'the room as a comfortable place to spend time',
+      'the scale and physical presence of the finished cinema',
+      'the design as a complete environment',
+    ]) {
+      expect(rules).toContain(acknowledged);
+    }
+    expect(rules).toMatch(/at most one restrained idea/);
+    // Keep it subtle: the design explanation stays the writer's job.
+    expect(rules).toMatch(/keep the copy an experienced cinema designer explaining the design/);
+  });
+
+  it('gates the experience acknowledgement on the project\'s own brief, and on nothing else', () => {
+    const withoutBrief = blockFor();
+    expect(withoutBrief.social_experience_allowed).toBe(false);
+    expect(withoutBrief.notes.join(' ')).toMatch(/records no client brief/);
+    expect(withoutBrief.notes.join(' ')).toMatch(/no intended use is stated and none is ever invented/);
+
+    const withBrief = blockFor({ briefSupplied: true });
+    expect(withBrief.social_experience_allowed).toBe(true);
+    expect(withBrief.notes.join(' ')).toMatch(/records its own brief/);
+
+    // The gate is not part of the identity: the same selection fingerprints the same,
+    // so a brief edited later never moves a narrative's own image identity.
+    expect(withBrief.fingerprint).toBe(withoutBrief.fingerprint);
+  });
+
+  it('CONCEPT-RENDER STATUS IS CARRIED BY THE PAGE, never by the copy', () => {
+    expect(CONCEPT_RENDER_LABEL).toBe('Concept visual — shown to illustrate the room experience.');
+    expect(VISUAL_DISCLAIMER_RULE).toContain(CONCEPT_RENDER_LABEL);
+    expect(VISUAL_DISCLAIMER_RULE).toMatch(/Never write a disclaimer about them into the narrative/);
+    expect(VISUAL_DISCLAIMER_RULE).toMatch(/never repeat their status in prose/);
+    expect(blockFor().client_label).toBe(CONCEPT_RENDER_LABEL);
+  });
+
+  it('never asks the copy to describe a picture or to list what is visible', () => {
+    const rules = rulesOf(blockFor());
+    expect(rules).toMatch(/Do not describe a picture/);
+    expect(rules).toMatch(/do not list what is visible/);
+    expect(rules).toMatch(/never let this idea carry a claim the engineering does not support/);
   });
 });

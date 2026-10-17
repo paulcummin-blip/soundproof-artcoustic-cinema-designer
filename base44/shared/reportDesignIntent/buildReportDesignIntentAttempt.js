@@ -110,11 +110,13 @@ export async function buildReportDesignIntentAttempt({
     );
   }
 
-  // ── THE PROJECT LIBRARY'S OWN PICTURES, for the writer's visual context ──
+  // ── THE PROJECT LIBRARY'S CONCEPT VISUALS, for the writer's experience context ──
   // Read with the DESIGNER'S OWN session, never the service role, so the same
   // record-level access that governs the Library governs this read. A library that
   // cannot be read is simply no visual context at all: the attempt continues and
-  // writes the text-only narrative it has always written.
+  // writes the text-only narrative it has always written. The renders are
+  // NON-AUTHORITATIVE: they add no fact, override no canonical value, and are read
+  // only as soft context for the room the client is buying.
   const assetPage = await entities.ProposalAsset
     .filter({ project_id: projectId }, { limit: 100 })
     .catch(() => null);
@@ -177,6 +179,12 @@ export async function buildReportDesignIntentAttempt({
     readVisualContext: async () => buildReportVisualContext({
       assets: libraryImages,
       versionId: version.id,
+      // THE PROJECT'S OWN BRIEF GATES THE EXPERIENCE ACKNOWLEDGEMENT. Where this
+      // project records a brief, the room's intended use and the shared experience it
+      // is for may be acknowledged gently; where it records none, the writer is told
+      // plainly that no intended use is stated and none is invented. It changes no
+      // fact, no image and no fingerprint.
+      briefSupplied: Boolean(String(project?.notes || '').trim()),
     }),
     onEvidencePack,
   });
