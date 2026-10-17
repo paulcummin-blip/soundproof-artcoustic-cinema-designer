@@ -29,6 +29,13 @@
  * soft experiential context. Those rules are stated in the block the writer receives,
  * in the words it is meant to follow.
  *
+ * WHAT A RENDER MAY STILL DO FOR THE WRITING. It may let the writer remember that the
+ * client is buying a complete room they will spend time in: day to day with family, and
+ * in more social use with friends. What travels into the copy is the POSSIBILITY the
+ * picture helps the client imagine, never the object in the frame: a bar, a large sofa
+ * or decorative lighting is illustrative, and never a requirement, a furniture
+ * specification or a lighting design.
+ *
  * WHICH IMAGES ARE CHOSEN, and why. The selection is deterministic and reads only
  * the designer's own recorded metadata — never the pixels, never a caption's
  * wording, never a filename. Whole-room renders come first, then interior detail,
@@ -145,12 +152,53 @@ export const VISUAL_NEVER_RULE = 'Never read a technical fact out of a picture: 
 /** What the writer is asked to do with them, given they are experience context. */
 export const VISUAL_WRITING_RULE = 'The renders may gently help you remember that the client is buying a ROOM and '
   + 'an EXPERIENCE, not only technical performance. Where this project\'s own brief supports it, acknowledge at '
-  + 'most one of these, subtly: time spent with family and friends; films, sport, games or music as a shared '
+  + 'most one of these, subtly: time spent with family and friends; films, television, sport, music and concerts, or gaming as a shared '
   + 'experience; the room as a comfortable place to spend time; the scale and physical presence of the finished '
   + 'cinema; the design as a complete environment. Keep it to at most one restrained idea, only where it '
   + 'genuinely improves the sentence, and keep the copy an experienced cinema designer explaining the design. '
   + 'Do not describe a picture, do not list what is visible, and never let this idea carry a claim the '
   + 'engineering does not support.';
+
+/**
+ * WHAT IS SHOWN IN A PICTURE IS NEVER WHAT IS BEING SOLD.
+ *
+ * A render may show a rear bar, casual secondary seating, cabinetry or a social space
+ * behind the main seats. None of it is a requirement, a recommendation or a promise:
+ * the object in the frame is illustrative, and the copy sells the POSSIBILITY the
+ * picture helps the client imagine rather than the object itself. That is the line
+ * between experience context and an interior specification, and it is why a render
+ * never turns into "the client should have a bar" or "the rear bar will...".
+ */
+export const VISUAL_OBJECT_PRINCIPLE = 'Never sell and never specify the object shown in a picture. A render may '
+  + 'show a bar, casual secondary seating, cabinetry or a social space behind the main seats, and none of that is '
+  + 'a requirement, a recommendation or a promise: it is illustrative only. Write about the POSSIBILITY the '
+  + 'picture helps the client imagine, never about the object in the frame: a bar may suggest social flexibility, '
+  + 'never a bar requirement; a large sofa may suggest relaxed family use, never a furniture specification; '
+  + 'decorative lighting may suggest a room that feels special to spend time in, never a lighting design. Never '
+  + 'write "the client should have", never write "the rear bar will", and never present anything shown as '
+  + 'approved, final, specified or built.';
+
+/**
+ * WHAT THE ROOM IS FOR, and how far the copy may say so.
+ *
+ * The client is buying a complete room they will spend time in, not a specification:
+ * day to day with family, and in more social use with friends — films, television,
+ * sport, music and concerts, gaming, and time spent together. The register is set by
+ * what the project itself records, in this order: the client or dealer brief where one
+ * exists, then the project's own intent, then the renders as a SOFT CUE ONLY. Where
+ * nothing records a social or family use, the copy stays general rather than inventing
+ * one, and it stays restrained: this is an engineering report, not lifestyle marketing.
+ */
+export const VISUAL_EXPERIENCE_REGISTER = 'The client is buying a complete room they will spend time in, not a '
+  + 'list of equipment: day to day with family, and in more social use with friends. Where this project says so, '
+  + 'that shared use may be written as films, television, sport, music and concerts, gaming, or simply time spent '
+  + 'together. Take the intended use from the client or dealer brief where one exists, then from the project\'s '
+  + 'own intent, and read a render only as a soft cue for it: a picture never invents a client preference. Where '
+  + 'nothing records a social or family use, keep the wording general, such as a room designed to be enjoyed '
+  + 'regularly, and never invent family movie nights or entertaining friends. For your own understanding, a '
+  + 'well-designed kitchen is the same idea: its technical purpose is cooking, and its value to the client is '
+  + 'that it becomes a place family and friends spend time together. Never put that comparison in the copy. Keep '
+  + 'this register restrained and credible: this is an engineering report, not lifestyle marketing.';
 
 /** Where the visuals' status reaches the client, and where it never does. */
 export const VISUAL_DISCLAIMER_RULE = 'The status of these visuals is carried by the label printed with the '
@@ -484,6 +532,10 @@ function visualNotes({ wholeRoom, socialAllowed }) {
  * brief, and nothing here describes a colour, a finish, a material or a technical
  * fact. It carries no address either, because the images themselves are attached to
  * the request.
+ *
+ * The object principle travels with it, and so does the experience register: what a
+ * picture SHOWS is never what is sold, and an intended social or family use comes from
+ * the brief and the project's own intent before any picture is allowed to suggest it.
  */
 export function writerVisualBlock(context) {
   if (context?.available !== true) return null;
@@ -509,6 +561,11 @@ export function writerVisualBlock(context) {
     authority_rule: VISUAL_AUTHORITY_RULE,
     never: VISUAL_NEVER_RULE,
     writing: VISUAL_WRITING_RULE,
+    // The object principle and the experience register travel with the images: what a
+    // picture SHOWS is never what is sold, and the room's intended social or family use
+    // is the brief's to state before a picture is allowed to suggest it at all.
+    object_principle: VISUAL_OBJECT_PRINCIPLE,
+    experience_register: VISUAL_EXPERIENCE_REGISTER,
     disclaimer_rule: VISUAL_DISCLAIMER_RULE,
     available: true,
     fingerprint: context.fingerprint ?? null,

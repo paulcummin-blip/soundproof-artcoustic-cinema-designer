@@ -271,9 +271,9 @@ describe('Stage 2 — Project Library image selection', () => {
     expect(text).not.toContain('http');
     expect(text).not.toContain('base44.app');
     expect(Object.keys(block).sort()).toEqual([
-      'authority', 'authority_rule', 'available', 'client_label', 'disclaimer_rule', 'fingerprint',
-      'image_count', 'images', 'intended_use', 'never', 'notes', 'purpose', 'rule', 'selection',
-      'social_experience_allowed', 'whole_room_context_available', 'writing',
+      'authority', 'authority_rule', 'available', 'client_label', 'disclaimer_rule', 'experience_register',
+      'fingerprint', 'image_count', 'images', 'intended_use', 'never', 'notes', 'object_principle', 'purpose',
+      'rule', 'selection', 'social_experience_allowed', 'whole_room_context_available', 'writing',
     ]);
     // No interior specification, no colour and no technical fact is offered to the
     // writer: the block is instructions about status, not observations about a room.
@@ -364,7 +364,7 @@ describe('the renders are non-authoritative client experience context', () => {
     expect(rules).toMatch(/the client is buying a ROOM and an EXPERIENCE/);
     for (const acknowledged of [
       'time spent with family and friends',
-      'films, sport, games or music as a shared experience',
+      'films, television, sport, music and concerts, or gaming as a shared experience',
       'the room as a comfortable place to spend time',
       'the scale and physical presence of the finished cinema',
       'the design as a complete environment',
