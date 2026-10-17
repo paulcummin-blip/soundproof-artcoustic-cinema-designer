@@ -122,18 +122,6 @@ export function useEngineeringPublicationEffect({
     }).catch(() => {});
     return () => { active = false; };
   }, [projectId, versionId]);
-  const designState = useMemo(() => ({ ...assessmentDesignState,
-    // PROJECT IDENTITY TRAVELS WITH THE PUBLICATION. The client name and the
-    // project reference are frozen with the report facts so the report can print
-    // them. The design state's own identity is used when it states one; the
-    // project record is the source when it does not, so a design pinned before
-    // the identity reached the designer is never frozen with an empty one — which
-    // is what left the cover and the technical overview reading a dash.
-    clientName: assessmentDesignState?.clientName || projectIdentity?.clientName || null,
-    projectReference: assessmentDesignState?.projectReference || projectIdentity?.projectReference || null,
-    versionName: selectedVersion?.id === versionId ? selectedVersion.version_name : null,
-  }), [assessmentDesignState, selectedVersion, projectIdentity, versionId]);
-  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || 'free');
   // The project's own identity, read from the authoritative project record. Used
   // only to complete the frozen identity when the loaded design state states none.
   const [projectIdentity, setProjectIdentity] = useState(null);
@@ -150,6 +138,18 @@ export function useEngineeringPublicationEffect({
     }).catch(() => {});
     return () => { active = false; };
   }, [projectId]);
+  const designState = useMemo(() => ({ ...assessmentDesignState,
+    // PROJECT IDENTITY TRAVELS WITH THE PUBLICATION. The client name and the
+    // project reference are frozen with the report facts so the report can print
+    // them. The design state's own identity is used when it states one; the
+    // project record is the source when it does not, so a design pinned before
+    // the identity reached the designer is never frozen with an empty one — which
+    // is what left the cover and the technical overview reading a dash.
+    clientName: assessmentDesignState?.clientName || projectIdentity?.clientName || null,
+    projectReference: assessmentDesignState?.projectReference || projectIdentity?.projectReference || null,
+    versionName: selectedVersion?.id === versionId ? selectedVersion.version_name : null,
+  }), [assessmentDesignState, selectedVersion, projectIdentity, versionId]);
+  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || 'free');
   const [retrySequence, setRetrySequence] = useState(0);
   const attempt = usePublicationAttempt(projectId, versionId);
   const lastPublishedFingerprintRef = useRef(null);
