@@ -78,6 +78,7 @@ Deno.serve(async (req: Request) => {
       return json(403, { ok: false, reason: 'PORTAL_TARGET_MISMATCH' });
     }
 
+    // The verified iCubed seat claim also accepts this same user's repeat launch.
     const result = await consumePilotPortalLaunch(base44, user, launchPass, {
       associateDealerIdentity: () => associateDealerIdentityCore(base44, user.id),
     });
