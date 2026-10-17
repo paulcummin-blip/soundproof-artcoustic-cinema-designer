@@ -1190,6 +1190,7 @@ export default function ProposalEditor() {
                     comparisonExpected={proposal?.proposal_type === 'comparison'}
                     proposalComparisonTable={comparisonTableForDisplay}
                     viewingResult={compactViewingResult(proposal?.engineering_snapshot)}
+                    snapshot={proposal?.engineering_snapshot}
                     className="mt-4"
                   />
                 )}
