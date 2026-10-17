@@ -1958,78 +1958,20 @@ function RoomDesignerWithState() {
   // the entire published engineering summary, not just bass. Built from the
   // curated design state below (room, seating, speakers, subs, screen, RSP,
   // RP22 assumptions, engine/RP22/algorithm revisions).
-  const engineeringPublicationDesignState = React.useMemo(() => {
-    if (!appState) return null;
-    return {
-      // Verified loaded assessment metadata and explicit report facts.
-      name: projectName,
-      dolbyLayout: dolbyPreset,
-      seatingRows: appState.seatingRows,
-      seatsPerRow: appState.seatsPerRow,
-      rowEarHeights: appState.rowEarHeights,
-      seatSpacing: appState.seatSpacing,
-      viewingPriority: appState.viewingPriority,
-      roomElements: appState.roomElements,
-      manualExtras: appState.manualExtras,
-      priceMode: appState.priceMode,
-      showPrices: appState.showPrices,
-      difficultyMultiplier: appState.difficultyMultiplier,
-      // Room geometry
-      roomDims: appState.roomDims,
-      roomOrientation: appState.roomOrientation,
-      screenWall: appState.screenWall,
-      // Seating
-      seatingPositions: appState.seatingPositions,
-      rowSpacingM: appState.rowSpacingM,
-      seatsPerRowByRow: appState.seatsPerRowByRow,
-      seatingBlockOffset: appState.seatingBlockOffset,
-      mlpBasis: appState.mlpBasis,
-      linkEarPlatformHeights: appState.linkEarPlatformHeights,
-      // Speakers
-      selectedSpeakersByRole: appState.selectedSpeakersByRole,
-      globalSurroundModel: appState.globalSurroundModel,
-      sevenBedLayoutType: appState.sevenBedLayoutType,
-      enableFrontWides: appState.enableFrontWides,
-      extraSurroundCount: appState.extraSurroundCount,
-      // Overheads
-      overheadGlobalModel: appState.overheadGlobalModel,
-      overheadFrontOverride: appState.overheadFrontOverride,
-      overheadMidOverride: appState.overheadMidOverride,
-      overheadRearOverride: appState.overheadRearOverride,
-      useFrontGlobal: appState.useFrontGlobal,
-      useMidGlobal: appState.useMidGlobal,
-      useRearGlobal: appState.useRearGlobal,
-      // Freeze report facts at the assessment producer, never at report read time.
+  // Project identity for the frozen publication facts, read from the same
+  // canonical hydration source the rest of the app reads.
+  const publicationIdentity = useCanonicalProject()?.identity || null;
+
+  const engineeringPublicationDesignState = React.useMemo(
+    () => buildEngineeringPublicationDesignState({
+      appState,
+      projectName,
+      dolbyPreset,
       placedSpeakers,
-      frontSubsCfg: appState.frontSubsCfg,
-      rearSubsCfg: appState.rearSubsCfg,
-      // Subwoofers
-      subwooferInstances: appState.subwooferInstances,
-      // Screen
-      screen: appState.screen,
-      screenFrontPlaneM: appState.screenFrontPlaneM,
-      lcrAimMode: appState.lcrAimMode,
-      // RSP
-      rspMode: appState.rspMode,
-      manualRspX_m: appState.manualRspX_m,
-      manualRspY_m: appState.manualRspY_m,
-      designatedRspSeatId: appState.designatedRspSeatId,
-      // SPL config
-      splConfig: appState.splConfig,
-      targetSpl: appState.targetSpl,
-      // RP22 assumptions
-      assumedP15Level: appState.assumedP15Level,
-      assumedP21Level: appState.assumedP21Level,
-      p15ConstructionLevel: appState.p15ConstructionLevel,
-      // Acoustic treatment
-      acousticTreatmentEnabled: appState.acousticTreatmentEnabled,
-      selectedAbfuserQty: appState.selectedAbfuserQty,
-      // Aiming
-      aimFrontWidesAtMLP: appState.aimFrontWidesAtMLP,
-      aimRearSurroundsAtMLP: appState.aimRearSurroundsAtMLP,
-      aimSideSurroundsAtMLP: appState.aimSideSurroundsAtMLP,
-    };
-  }, [appState, placedSpeakers, projectName, dolbyPreset]);
+      identity: publicationIdentity,
+    }),
+    [appState, placedSpeakers, projectName, dolbyPreset, publicationIdentity],
+  );
 
   const engineeringPublication = useEngineeringPublicationEffect({
     projectId: resolvedProjectId || projectIdState || null,

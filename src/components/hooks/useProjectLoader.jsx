@@ -369,6 +369,7 @@ appState, // Pass appState directly for setters
       completeDesignHydration(id, {
         name: mergedP?.name || null,
         clientName: mergedP?.client_name || null,
+        projectReference: mergedP?.project_reference || null,
         activeVersionId: mergedP?.active_version_id || null,
       });
       // Only enable saving after successful same-project hydration.

@@ -8,9 +8,9 @@ export default function frozenPublicationProject(publication, saved = null) {
   return {
     ...p,
     id: p.project_id || p.id,
-    client_name: p.client_name ?? null,
-    project_reference: p.project_reference ?? null,
-    dealer_name: p.dealer_name ?? null,
+    // Identity travels with the publication when it pinned it. An explicit null
+    // here would erase the project's own client and reference wherever these
+    // frozen facts are merged over live ones, so absent identity is left absent.
     version_number: p.version_number ?? saved?.payload?.proposalSource?.version?.number ?? null,
     created_date: saved?.generated_at || p.created_date || publication.published_at,
     account_id: saved?.account_id ?? p.account_id ?? null,

@@ -55,6 +55,9 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
   // Explicit field mapping only. All facts belong to the selected, loaded assessment.
   const reportProject = {
     project_id:projectId, version_id:versionId, version_name:d.versionName, name:d.name,
+    // Project identity travels with the frozen facts: without it the report has
+    // no client or reference to print.
+    client_name:d.clientName ?? null, project_reference:d.projectReference ?? null,
     roomDims:JSON.stringify(d.roomDims), room_width:Number(d.roomDims.widthM),
     room_length:Number(d.roomDims.lengthM), room_height:Number(d.roomDims.heightM),
     report_screen:copy(d.screen),

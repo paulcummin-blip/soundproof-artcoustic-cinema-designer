@@ -56,7 +56,7 @@ export function buildViewingExperienceNarrative({
       : 'The screen is sized to the seating, so the picture carries the same presence in either framing and the image is never pushed below the height the rows are set for.';
 
   const wholeAudience = severalRows
-    ? 'The result is a room judged on how the whole audience sees the film: every row keeps a viewing distance that suits the screen, and no seat is treated as the compromise.'
+    ? 'The result is a room judged on how the whole audience sees the film: the seating is arranged around the screen so the picture reads at its intended scale from the rows rather than from a single favoured seat.'
     : 'The result is a viewing distance worked out from the screen size and the seating rather than chosen by eye, so the picture reads at its intended scale from the seats.';
 
   return [fromTheSeats, screen, wholeAudience].join(' ');

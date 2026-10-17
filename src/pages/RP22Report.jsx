@@ -988,14 +988,13 @@ function RP22ReportInner({ embed = false } = {}) {
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility, app?.acousticTreatmentEnabled, app?.selectedAbfuserQty]);
 
     const exportSystemConfiguration = React.useMemo(() => {
+        // The system format is the canonical Dolby layout identity and nothing
+        // else. The physical subwoofer count is a hardware fact: three
+        // subwoofers do not make a 9.3.6 system, so the label is never rebuilt
+        // from the sub count.
         const dolbyPreset = app?.dolbyLayout || "5.1";
-        const base = String(dolbyPreset).split(" ")[0];
-        const parts = base.split(".");
-        const bed = parts[0] || "5";
-        const heights = parts[2] || "";
-        const totalSubs = Number(app?.frontSubsCfg?.count ?? 0) + Number(app?.rearSubsCfg?.count ?? 0);
-        return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
+        return String(dolbyPreset).split(" ")[0];
+    }, [app?.dolbyLayout]);
 
     const exportDateLabel = React.useMemo(() => {
         const generatedAt = savedReport.saved?.generated_at || reportAuthority.publication?.published_at;
