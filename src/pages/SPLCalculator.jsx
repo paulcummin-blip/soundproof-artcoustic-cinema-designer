@@ -150,10 +150,12 @@ function evidenceStanding(record) {
   if (record.evidence_source === "secondary" || record.secondary_evidence) {
     return "ADI estimate from an admin-approved secondary manufacturer document";
   }
-  if (record.data_confidence === "A") return "Published measured capability";
-  if (record.data_confidence === "B") return "Calculated from published specifications";
-  if (record.data_confidence === "C") return "ADI estimate based on available manufacturer data";
-  return "Insufficient published data";
+  if (record.p12_p13_eligible !== true) return "Insufficient published data";
+  // The standing states where the graded SPL figure came from — manufacturer
+  // measured, manufacturer calculated, a manufacturer figure whose basis is not
+  // stated, or a Sound Proof estimate. A calculated figure never reads as
+  // published measured capability.
+  return record.spl_evidence_statement || record.spl_evidence_label || "—";
 }
 
 // The C-class comparison statement is defined once, alongside the confidence
@@ -232,6 +234,7 @@ function competitorInfoRows(record, result = null, candidate = null) {
     ["Power authority", record.power_authority || "—"],
     ["Power authority figure", infoValue(record.power_authority_w, " W")],
     ["Capability basis", record.capability_basis || "—"],
+    ["Capability source", record.spl_evidence_label || "—"],
     ["Evidence quality", record.source_evidence_quality || record.evidence_quality || "—"],
     ["Evidence standing", evidenceStanding(record)],
     ["Confidence class", candidate ? `${candidate.confidence} · ${candidate.label}` : "—"],

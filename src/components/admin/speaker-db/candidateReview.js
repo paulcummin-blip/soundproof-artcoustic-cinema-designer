@@ -59,7 +59,10 @@ export function candidateReadiness(candidate, manufacturerName) {
 export function candidateBadgeLabel(readiness, sourceType = null) {
   if (!readiness) return "—";
   if (readiness.confidence === "A") return "Comparable";
-  if (readiness.confidence === "B") return "Calculated";
+  // A B-class row names where the capability came from — a manufacturer-calculated
+  // figure, a manufacturer figure whose basis is unstated, or our own calculation —
+  // rather than reading as published measured capability.
+  if (readiness.confidence === "B") return readiness.splEvidenceLabel || "Calculated";
   if (readiness.confidence === "C") return sourceType?.trusted ? "Trusted secondary" : "ADI estimate";
   return "Insufficient";
 }

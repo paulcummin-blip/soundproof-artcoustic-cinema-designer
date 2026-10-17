@@ -163,6 +163,11 @@ export function comparisonReadiness({ product, specification }) {
     secondaryTrusted: normalized.secondary_trusted === true,
     secondarySourceName: normalized.secondary_source_name || "",
     splAuthority: normalized.spl_authority,
+    // Where the graded SPL figure came from, so the review list states the
+    // provenance of the evidence instead of implying measured capability.
+    splEvidenceSource: normalized.spl_evidence_source || "",
+    splEvidenceLabel: normalized.spl_evidence_label || "",
+    splEvidenceStatement: normalized.spl_evidence_statement || "",
     warnings: normalized.normalization_warnings || [],
   };
 }
@@ -196,8 +201,15 @@ export function evidenceText(readiness) {
       ? `${readiness.confidence} · trusted secondary evidence`
       : `${readiness.confidence} · secondary evidence`;
   }
-  if (readiness.confidence === "A") return "A · published capability";
-  if (readiness.confidence === "B") return "B · calculated";
+  // The wording names the provenance of the graded SPL figure: A is only reachable
+  // with a manufacturer-measured figure, and a calculated one says so.
+  const source = String(readiness.splEvidenceSource || "");
+  if (readiness.confidence === "A") return "A · manufacturer measured";
+  if (readiness.confidence === "B") {
+    if (source === "manufacturer_unverified") return "B · manufacturer published (unstated)";
+    if (source === "manufacturer_calculated") return "B · manufacturer calculated";
+    return "B · calculated";
+  }
   if (readiness.confidence === "C") return "C · ADI estimate";
   return "D · insufficient";
 }

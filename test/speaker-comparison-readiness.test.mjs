@@ -87,7 +87,7 @@ test('D. published capability reaches Comparable and is marked as published evid
   assert.equal(r.label, 'Comparable');
   assert.equal(r.capabilityBasis, 'Published');
   assert.equal(r.evidenceQuality, 'Manufacturer Published');
-  assert.equal(evidenceText(r), 'A · published capability');
+  assert.equal(evidenceText(r), 'A · manufacturer measured');
   assert.deepEqual(r.missingCriticalLabels, []);
   // Every critical field is present; the remaining gaps are supporting fields.
   assert.deepEqual(r.missingUsefulLabels, [

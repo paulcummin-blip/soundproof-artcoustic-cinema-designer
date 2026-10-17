@@ -11,6 +11,10 @@ import {
   TRUSTED_SECONDARY_BASIS,
   trustedSecondarySource,
 } from './trustedSecondarySources.js';
+import {
+  capEvidenceConfidence,
+  resolveSplEvidenceSource,
+} from './splEvidenceSourceAuthority.js';
 
 export const FULL_TO_HALF_SPACE_DB = 6;
 
@@ -149,9 +153,21 @@ export function normalizeCompetitor(record) {
 
   const eligible = warnings.length === 0;
 
+  // --- where the graded SPL figure came from ------------------------------
+  // A populated continuous SPL field is never on its own taken as measured
+  // capability: the manufacturer's own declaration decides. The figure that is
+  // graded does not change — provenance sets the evidence label and, at most,
+  // holds the confidence class back.
+  const evidenceSource = resolveSplEvidenceSource({
+    publishedSpl: continuous,
+    splBasis: record.max_spl_test_conditions,
+    declaredEvidenceQuality: record.source_evidence_quality,
+  });
+
   // Data confidence classification:
-  // A — published continuous SPL + confirmed space basis
-  // B — calculated continuous SPL from confirmed sensitivity/power/basis
+  // A — manufacturer-measured continuous SPL + confirmed space basis
+  // B — calculated continuous SPL from confirmed sensitivity/power/basis, or a
+  //     manufacturer figure whose evidence is not documented as measured
   // C — partial/inferred (basis assumed)
   // INSUFFICIENT — cannot make reliable RP22 comparison
   const hasConfirmedBasis = sensitivityBasis.provenance !== 'half_space_assumed' && maxSplBasis.provenance !== 'half_space_assumed';
@@ -168,6 +184,17 @@ export function normalizeCompetitor(record) {
   // Capability resting on a recommended amplifier maximum is sound engineering but
   // is not a published power rating, so it can never reach confidence A.
   if (!powerIsPublishedRating && dataConfidence === 'A') dataConfidence = 'B';
+  // Evidence provenance: a manufacturer-calculated SPL, or a figure whose basis is
+  // not stated, is never classified as measured capability.
+  dataConfidence = capEvidenceConfidence(dataConfidence, evidenceSource.confidenceCap);
+  // The specification's own declared data-quality letter (A published, B calculated,
+  // C estimated, D engineering estimate) states the reliability of the source, so it
+  // holds the computed class back as well. Only a specification-backed row carries a
+  // declaration: on a legacy spreadsheet row the stored letter is this engine's own
+  // earlier computation, not a statement about the evidence.
+  if (record.source_specification_id) {
+    dataConfidence = capEvidenceConfidence(dataConfidence, record.data_confidence);
+  }
 
   // Admin-approved secondary evidence — a manufacturer document copied by a
   // third-party host. It is usable for comparison but is never published measured
@@ -221,7 +248,14 @@ export function normalizeCompetitor(record) {
     halfspace_published_max_continuous_spl_db_1m: continuous,
     halfspace_published_max_peak_spl_db_1m: peak,
     halfspace_calculated_max_continuous_spl_db_1m: calculated,
-    spl_authority: !eligible ? 'Incomplete' : continuous !== null ? 'Published continuous SPL' : 'Calculated from sensitivity + power',
+    spl_authority: !eligible
+      ? 'Incomplete'
+      : continuous !== null ? evidenceSource.authority : 'Calculated from sensitivity + power',
+    // Evidence provenance of the graded SPL figure, so every surface that describes
+    // the evidence states where the figure came from rather than implying measurement.
+    spl_evidence_source: evidenceSource.key,
+    spl_evidence_label: evidenceSource.label,
+    spl_evidence_statement: evidenceSource.statement,
     data_confidence: dataConfidence,
     // Power authority behind the capability figure (published rating, or the
     // manufacturer's recommended amplifier maximum) and how it was obtained.

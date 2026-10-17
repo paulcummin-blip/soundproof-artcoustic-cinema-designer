@@ -16,10 +16,15 @@
 // the selected-row grade can never disagree. Nothing is invented and nothing is
 // upgraded: an assumption can only ever hold a figure at C or below.
 //
-//   A  Published measured capability     → normal P12/P13 pills
+//   A  Manufacturer-measured capability  → normal P12/P13 pills
 //   B  Calculated from published data    → pills labelled "Calculated"
 //   C  ADI estimate from partial data    → pills labelled "ADI estimate"
 //   D  Insufficient published data       → no grade is produced
+//
+// The label on each row states the PROVENANCE of the graded SPL figure
+// (Manufacturer Measured / Manufacturer Calculated / Manufacturer Published
+// (unstated) / Sound Proof Estimate), so a manufacturer-calculated figure can
+// never read as published measured capability.
 // ---------------------------------------------------------------------------
 
 import { base44 } from "@/api/base44Client";
@@ -56,7 +61,7 @@ export const COMPARISON_CLASSES = {
     basis: "Calculated",
     pill: "Calculated",
     tone: "#2C5AA0",
-    meaning: "Calculated from published sensitivity, impedance and a stated power authority.",
+    meaning: "Calculated capability — either a manufacturer-calculated SPL figure or one derived from the manufacturer's published sensitivity, impedance and power authority.",
   },
   C: {
     confidence: "C",
@@ -165,7 +170,13 @@ export function buildCandidate({
   const secondaryCapped = Boolean(secondary) && secondary.is_official !== true;
   const trustedSecondary = secondaryCapped && isTrustedEvidence(secondary);
   const badgeLabel = comparisonDataQuality(record, assumptions);
-  const basisLabel = secondaryCapped ? (secondary.basis || klass.basis) : klass.basis;
+  // The basis label states where the graded SPL figure came from. An approved
+  // secondary document keeps its own wording; otherwise the row carries the
+  // provenance the normalizer resolved for the figure.
+  const provenanceLabel = eligible ? String(record.spl_evidence_label || "").trim() : "";
+  const basisLabel = secondaryCapped
+    ? (secondary.basis || klass.basis)
+    : (provenanceLabel || klass.basis);
   const evidenceSourceLine = trustedSecondary ? trustedSourceLine(secondary.host || secondary.url) : "";
 
   return {
@@ -180,6 +191,9 @@ export function buildCandidate({
     label: klass.label,
     badgeLabel,
     basisLabel,
+    splEvidenceSource: record.spl_evidence_source || "",
+    splEvidenceLabel: record.spl_evidence_label || "",
+    splEvidenceStatement: record.spl_evidence_statement || "",
     pillLabel: null,
     tone: klass.tone,
     meaning: klass.meaning,

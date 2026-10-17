@@ -50,6 +50,11 @@ function powerAuthorityText(record) {
 }
 
 function finalCapabilityText(record) {
+  // A manufacturer SPL figure is described by its provenance, so a
+  // manufacturer-calculated figure never reads as a published measured figure.
+  const source = String(record.spl_evidence_source || "").trim();
+  const label = String(record.spl_evidence_label || "").trim();
+  if (label && source.startsWith("manufacturer")) return label;
   const basis = String(record.capability_basis || "").trim();
   if (basis === "Calculated") return "Calculated from published sensitivity and amplifier data";
   if (basis === "Published") return "Published continuous SPL figure";

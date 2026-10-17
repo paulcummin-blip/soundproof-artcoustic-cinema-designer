@@ -90,12 +90,16 @@ test('4. the same values from an official manufacturer CDN are not capped', () =
   assert.equal(n.secondary_trusted, false);
 });
 
-test('5. a trusted host can never reach A, even with a published continuous SPL', () => {
+test('5. a trusted host can never reach A, even with a manufacturer-measured continuous SPL', () => {
+  // The measured provenance is stated, as the corrected classification requires:
+  // a populated continuous SPL field alone is never taken as measured evidence.
   const published = {
     ...values,
     continuous_power_w: 500,
     power_rating_type: 'Continuous',
     published_max_continuous_spl_db_1m: 116,
+    max_spl_test_conditions: 'continuous',
+    source_evidence_quality: 'Manufacturer Published',
   };
   assert.equal(normalizeCompetitor(published).data_confidence, 'A');
   const capped = normalizeCompetitor({ ...published, secondary_evidence: accepted('cavd.co.uk') });

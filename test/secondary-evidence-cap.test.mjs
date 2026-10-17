@@ -52,12 +52,16 @@ test('2. the same values without secondary evidence reach B — the cap is what 
   assert.equal(n.secondary_evidence, null);
 });
 
-test('3. a published continuous SPL would reach A, and secondary evidence still holds it at C', () => {
+test('3. a manufacturer-measured continuous SPL would reach A, and secondary evidence still holds it at C', () => {
+  // The measured provenance is stated, as the corrected classification requires:
+  // a populated continuous SPL field alone is never taken as measured evidence.
   const published = {
     ...base,
     continuous_power_w: 500,
     power_rating_type: 'Continuous',
     published_max_continuous_spl_db_1m: 116,
+    max_spl_test_conditions: 'continuous',
+    source_evidence_quality: 'Manufacturer Published',
   };
   assert.equal(normalizeCompetitor(published).data_confidence, 'A');
   assert.equal(normalizeCompetitor({ ...published, secondary_evidence: evidence() }).data_confidence, 'C');
