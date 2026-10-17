@@ -14,9 +14,6 @@
 import React from 'react';
 import { ASSET_SLOT, imagesInSlotOrder } from '@/components/proposal/assetSlotAuthority';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
-// The client-facing status of these visuals, from the one authority that also states
-// it to the writer, so the label on the page and the rule the copy follows agree.
-import { CONCEPT_RENDER_LABEL } from '@/shared/reportVisualContext';
 
 export const NO_PROJECT_IMAGES_MESSAGE = 'No project images selected.';
 
@@ -63,13 +60,6 @@ export default function ProjectImagesBlock({ images = [], className = '' }) {
           ))}
         </div>
       )}
-
-      {/* WHOSE STATUS IS CLEAR TO THE CLIENT: the images on this page are concept
-          visuals, not approved interiors. One quiet line states it, so the narrative
-          never has to carry a disclaimer. */}
-      <p className="proposal-images__concept-note text-[#8A8477]" style={proposalRoleStyle('caption')}>
-        {CONCEPT_RENDER_LABEL}
-      </p>
     </div>
   );
 }

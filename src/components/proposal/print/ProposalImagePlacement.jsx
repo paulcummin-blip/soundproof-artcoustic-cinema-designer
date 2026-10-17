@@ -19,8 +19,6 @@ import {
   IMAGE_PRESENTATION,
   objectPositionForFocalPoint,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
-// The concept-visual status, from the one authority that also states it to the writer.
-import { CONCEPT_RENDER_FINISHES_LABEL, CONCEPT_RENDER_LABEL } from '@/shared/reportVisualContext';
 
 /** How each editorial role is composed on the page. */
 const TREATMENT = Object.freeze({
@@ -54,14 +52,6 @@ export default function ProposalImagePlacement({
   const presentationClass = effectivePresentation ? ` pp-media--presentation-${effectivePresentation}` : '';
   const detail = effectivePresentation === IMAGE_PRESENTATION.DETAIL;
 
-  // The status of this visual, stated on the page: an option the client is being
-  // offered shows interior finishes for illustration, and any other render is the
-  // room experience. It is a statement about the file, never about what it contains.
-  const conceptLabel = placement.editorial_role === EDITORIAL_ROLE.SEATING_OPTION
-    || placement.editorial_role === EDITORIAL_ROLE.COMPARISON_OPTION
-    ? CONCEPT_RENDER_FINISHES_LABEL
-    : CONCEPT_RENDER_LABEL;
-
   return (
     <figure className={`pp-media pp-media--${treatment}${closingClass}${presentationClass} ${className}`.trim()}>
       <img
@@ -81,7 +71,6 @@ export default function ProposalImagePlacement({
         data-crops={detail ? 'no' : 'yes'}
       />
       {captionText ? <figcaption className="pp-media__caption">{captionText}</figcaption> : null}
-      <p className="pp-media__note">{conceptLabel}</p>
     </figure>
   );
 }
