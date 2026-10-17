@@ -1,9 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
-import {
-  DESIGN_INTENT_ATTEMPT_BLOCK,
-  runProductionDesignIntentAttempt,
-} from '../../shared/reportDesignIntent/designIntentProductionAttempt.js';
+import { generateAndSaveReportDesignIntent } from '../../shared/reportDesignIntent/generateAndSaveReportDesignIntent.js';
 
 /**
  * Generate the Project Report's Design Intent with the Astra writer — OPTIONAL.
@@ -13,12 +10,11 @@ import {
  * whatever happens here. This is one failure-isolated operation that, when it
  * succeeds, saves an accepted narrative beside the report it was written for.
  *
- * THE ATTEMPT ITSELF IS NOT BUILT HERE. It is run by
- * runProductionDesignIntentAttempt — the same shared path the admin-only read-only
- * preview runs — so the narrative this function saves and the narrative a preview
- * shows are produced by one writer, one evidence read, one interpretation input and
- * one prompt version, and the two can never drift apart. This function adds the two
- * things only production does: the access decision, and the single write.
+ * THE GENERATION IS NOT BUILT HERE. It is built by buildReportDesignIntentAttempt —
+ * the pure generation core the admin-only read-only preview also calls — and saved by
+ * generateAndSaveReportDesignIntent, the production save wrapper that is the only part
+ * of the path allowed to write. This function adds the two things only production
+ * does: the access decision, and the response.
  *
  * The provider is the platform AI gateway, called with the server session: there is
  * no API key in this app, in the browser bundle or in any client payload.
@@ -46,7 +42,7 @@ export default async function(req) {
       return Response.json({ error: 'Sound Proof access is required to write a report narrative.' }, { status: 403 });
     }
 
-    const outcome = await runProductionDesignIntentAttempt({
+    const outcome = await generateAndSaveReportDesignIntent({
       entities: base44.entities,
       authorityEntities: base44.asServiceRole.entities,
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
@@ -66,19 +62,19 @@ export default async function(req) {
 
     const { snapshot, attempt } = outcome;
 
-    // ── The one write, and only for an accepted narrative ──
+    // ── Nothing was saved: the refused attempt's diagnostic, for a MASTER ADMIN alone ──
+    // A refusal is never silent: the reason, the exact validation response and the draft
+    // it refused travel back with the attempt, so the next refusal is diagnosable from
+    // the response itself instead of being reconstructed from a console line. An
+    // ordinary dealer is given the reason and the safe fallback, and no violation, claim
+    // ID, sentence or draft reaches them. Nothing is stored: this is the response to the
+    // attempt, not a record.
     if (!attempt.ok) {
       console.log(
         `[generateReportDesignIntent] refused reason=${attempt.reason} project=${project_id} version=${version_id} `
         + `by=${user.email || user.id} detail=${attempt.detail || 'none'}`,
       );
-      // ── The refused attempt's diagnostic, for a MASTER ADMIN alone ──
-      // A refusal is never silent: the reason, the exact validation response and
-      // the draft it refused travel back with the attempt, so the next refusal is
-      // diagnosable from the response itself instead of being reconstructed from
-      // a console line. An ordinary dealer is given the reason and the safe
-      // fallback, and no violation, claim ID, sentence or draft reaches them.
-      // Nothing is stored: this is the response to the attempt, not a record.
+
       const diagnostics = accessContext.isMasterAdmin === true
         ? {
           reason: attempt.reason,
@@ -90,7 +86,7 @@ export default async function(req) {
           draft: attempt.draft ?? null,
           provider: attempt.provider_identity || null,
           source_fingerprints: snapshot.source_fingerprints || null,
-          input_fingerprint: attempt.input_fingerprint ?? attempt.record?.input_fingerprint ?? null,
+          input_fingerprint: outcome.generation?.input_fingerprint ?? null,
           // Which pictures the refused attempt was shown, when it was shown any:
           // identity only, and never a storage address.
           visual_context: attempt.visual_context || null,
@@ -111,12 +107,6 @@ export default async function(req) {
       });
     }
 
-    const payload = {
-      ...(snapshot.payload && typeof snapshot.payload === 'object' ? snapshot.payload : {}),
-      design_intent: attempt.record,
-    };
-    const saved = await base44.entities.ReportSnapshot.update(snapshot.id, { payload });
-
     console.log(
       `[generateReportDesignIntent] accepted project=${project_id} version=${version_id} `
       + `provider=${attempt.provider || 'none'} model=${attempt.model || 'none'} prompt=${attempt.prompt_version} `
@@ -131,7 +121,7 @@ export default async function(req) {
       status: attempt.record.status,
       text: attempt.text,
       metadata: attempt.record,
-      snapshot_id: saved?.id || snapshot.id,
+      snapshot_id: outcome.snapshot_id,
       // The geometry the narrative was written from, where one was confirmed against
       // this saved report. Null states honestly that no geometry was used.
       geometry_fingerprint: attempt.geometry_fingerprint ?? null,

@@ -1,25 +1,30 @@
 /**
- * designIntentProductionAttempt.js (shared)
- * ----------------------------------------
- * ONE production Project Report Design Intent attempt, end to end, in exactly the
- * order the production generator runs it: the saved project, the saved design
- * version, the Project Report the narrative belongs to, the writer's own switch,
- * the frozen report evidence, the confirmed report geometry, the Project Library's
- * pictures, and then runReportDesignIntent — the ONE writer.
+ * buildReportDesignIntentAttempt.js (shared)
+ * ------------------------------------------
+ * THE PURE GENERATION CORE: one Project Report Design Intent attempt, end to end, in
+ * exactly the order production runs it — the saved project, the saved design version,
+ * the Project Report the narrative belongs to, the writer's own switch, the frozen
+ * report evidence, the confirmed report geometry, the Project Library's pictures, and
+ * then runReportDesignIntent, the ONE writer.
  *
- * It exists so that the production generator and a read-only preview cannot drift
- * apart into two writers. Both call this, so a preview is the real production path
- * with the real evidence read, the real interpretation input, the real writing
- * contract and the real prompt version — and not a second, simplified writer. The
- * only difference between the two callers is what they do with the result: the
- * generator saves an accepted narrative beside the report, and the preview saves
- * nothing at all.
+ * IT CANNOT WRITE. There is no create, no update, no delete, no publish, no approval,
+ * no readiness change and no snapshot save anywhere in this module, and it imports no
+ * persistence helper. Every entity client it uses is INJECTED rather than constructed,
+ * so the caller decides what it is physically able to reach. It reads, it writes with
+ * the model, and it returns.
  *
- * It READS ONLY. There is no write, no publish, no approval, no readiness change
- * and no snapshot update anywhere in this module. Its entity clients and its
- * provider call are injected rather than constructed, so a preview can hand it
- * clients that physically refuse to write, and the module is then incapable of
- * writing even if it tried.
+ * It is the single generation authority both callers share, so the narrative the
+ * production save wrapper saves and the narrative the admin preview shows are produced
+ * by one writer, one evidence read, one interpretation input and one prompt version,
+ * and the two can never drift apart:
+ *
+ *   generateAndSaveReportDesignIntent()  →  this core  →  the one production write
+ *   previewReportDesignIntent()          →  this core  →  nothing at all
+ *
+ * It returns the writer's own result AND the generation result built from it — the
+ * generated text, the word count, the prompt and its fingerprint, the validation
+ * result, the evidence used and the evidence excluded — so a caller that must never
+ * write can report the full outcome without reaching for anything else.
  *
  * Pure apart from the injected calls: no React, no SDK, no runtime-specific APIs.
  */
@@ -29,8 +34,9 @@ import { GPT_WRITER_FLAG_FIELD, resolveGptWriterFlag } from '../proposalWriter/p
 import { DESIGN_INTENT_REFUSAL, runReportDesignIntent } from './reportDesignIntentRunner.js';
 import { buildReportGeometryContext } from './reportGeometryContext.js';
 import { buildReportVisualContext } from './reportVisualContext.js';
+import { buildDesignIntentGenerationReport } from './reportDesignIntentGenerationReport.js';
 
-/** Why a production attempt could not be set up at all. */
+/** Why a generation attempt could not be set up at all. */
 export const DESIGN_INTENT_ATTEMPT_BLOCK = Object.freeze({
   INVALID_REQUEST: 'invalid_request',
   PROJECT_NOT_FOUND: 'project_not_found',
@@ -44,10 +50,10 @@ function blocked(code, status, error, reason = null) {
 }
 
 /**
- * Run one production attempt.
+ * Build one generation attempt.
  *
  * @param {Object} input
- * @param {Object} input.entities — the user-scoped entity client
+ * @param {Object} input.entities — the user-scoped entity client (read-only use)
  * @param {Object} input.authorityEntities — the engineering-authority entity client
  * @param {Function} input.invokeLLM — the server-side provider call
  * @param {string} input.projectId
@@ -57,13 +63,14 @@ function blocked(code, status, error, reason = null) {
  *   project itself states none
  * @param {boolean} [input.isMasterAdmin]
  * @param {string} [input.now]
- * @param {Function} [input.onEvidencePack] — observability only: handed the very
- *   pack and writer input the writer was given, so a caller can report the exact
- *   evidence an attempt wrote from without building a second evidence path.
- * @returns {Promise<Object>} `{ ok: true, project, version, snapshot, flag, attempt }`
- *   or `{ ok: false, block }`
+ * @param {Function} [input.evidenceReader] — an injected evidence read, for tests
+ *   that exercise the whole core without a live project. A caller that supplies none
+ *   (production and the preview both supply none) gets the canonical reader below, so
+ *   the evidence a preview writes from is the production evidence and not a second path.
+ * @returns {Promise<Object>} `{ ok: true, project, version, snapshot, flag, attempt,
+ *   pack, writerInput, generation }` or `{ ok: false, block }`
  */
-export async function runProductionDesignIntentAttempt({
+export async function buildReportDesignIntentAttempt({
   entities,
   authorityEntities,
   invokeLLM,
@@ -73,7 +80,7 @@ export async function runProductionDesignIntentAttempt({
   accountIdFallback = null,
   isMasterAdmin = false,
   now = null,
-  onEvidencePack = null,
+  evidenceReader = null,
 } = {}) {
   if (!projectId || !versionId) {
     return blocked(DESIGN_INTENT_ATTEMPT_BLOCK.INVALID_REQUEST, 400, 'project_id and version_id are required.');
@@ -123,6 +130,14 @@ export async function runProductionDesignIntentAttempt({
     isMasterAdmin: isMasterAdmin === true,
   });
 
+  // The exact pack and writer input the writer is given, captured through the
+  // runner's own observability hook so the generation result below describes what
+  // this attempt actually read rather than a second evidence path.
+  let captured = { pack: null, writerInput: null };
+  const onEvidencePack = ({ pack, writerInput }) => {
+    captured = { pack, writerInput };
+  };
+
   const attempt = await runReportDesignIntent({
     flag,
     versionIds: [version.id],
@@ -132,7 +147,7 @@ export async function runProductionDesignIntentAttempt({
     sourceFingerprints: snapshot.source_fingerprints || null,
     user,
     now,
-    readEvidence: async ({ versionIds }) => {
+    readEvidence: evidenceReader || (async ({ versionIds }) => {
       const page = await entities.ProjectVersion.filter(
         { project_id: projectId, id: { $in: versionIds } },
         { limit: 50 },
@@ -145,7 +160,7 @@ export async function runProductionDesignIntentAttempt({
       return readProposalReportEvidence(entities, projectId, versions, {
         authorityEntities,
       });
-    },
+    }),
     invokeLLM,
     // ── THE REPORT'S OWN GEOMETRY, CONFIRMED ──
     // The room and the seat coordinates that produced this saved report and its
@@ -166,7 +181,22 @@ export async function runProductionDesignIntentAttempt({
     onEvidencePack,
   });
 
-  return { ok: true, project, version, snapshot, flag, attempt };
+  return {
+    ok: true,
+    project,
+    version,
+    snapshot,
+    flag,
+    attempt,
+    pack: captured.pack,
+    writerInput: captured.writerInput,
+    generation: buildDesignIntentGenerationReport({
+      attempt,
+      writerInput: captured.writerInput,
+      pack: captured.pack,
+      snapshot,
+    }),
+  };
 }
 
-export default runProductionDesignIntentAttempt;
+export default buildReportDesignIntentAttempt;
