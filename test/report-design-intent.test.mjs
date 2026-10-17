@@ -163,6 +163,11 @@ describe('the Design Intent brief', () => {
     expect(input.section_requirements).toHaveLength(1);
     expect(input.section_requirements[0].section).toBe(DESIGN_INTENT_SECTION);
     expect(input.section_requirements[0].word_limit).toBe(DESIGN_INTENT_WORD_LIMIT);
+    // The tightened brief is the requirement the writer is actually called with,
+    // never a second copy of it.
+    expect(input.section_requirements[0].requirement).toBe(DESIGN_INTENT_REQUIREMENT);
+    expect(input.section_requirements[0].requirement).toMatch(/OPEN ON THE DESIGN REASONING/);
+    expect(input.section_requirements[0].requirement).toMatch(/NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK/);
     expect(Object.keys(input.word_limits)).toEqual([DESIGN_INTENT_SECTION]);
     expect(input.output.sections).toHaveLength(1);
     expect(input.design_intent_scope.section).toBe(DESIGN_INTENT_SECTION);
