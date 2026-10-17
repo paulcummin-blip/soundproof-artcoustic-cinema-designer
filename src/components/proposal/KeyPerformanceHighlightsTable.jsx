@@ -3,6 +3,7 @@ import { resolveComparisonDisplay } from '@/components/proposal/comparisonDispla
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import { excludeClientFacingRows } from '@/components/proposal/designIndexRowAuthority';
 import {
+  buildClientSummaryRows,
   buildHighlightDisplayRows,
   changeCellText,
   comparisonClientMeaning,
@@ -87,6 +88,7 @@ export default function KeyPerformanceHighlightsTable({
   comparisonExpected = false,
   proposalComparisonTable = null,
   viewingResult = null,
+  snapshot = null,
   className = '',
 }) {
   const display = resolveComparisonDisplay(comparisonRows, comparisonVersions, proposalComparisonTable);
@@ -162,7 +164,10 @@ export default function KeyPerformanceHighlightsTable({
   // assessed: the design's own facts, then the results that earned a highlight by
   // their ASDR importance, their area's relevance and the result they reached.
   // The selection is a presentation decision — the stored rows are never modified.
-  const list = buildHighlightDisplayRows(curateSummaryHighlights(rows), { viewingResult });
+  const frozenSummary = buildClientSummaryRows(snapshot);
+  const list = frozenSummary.length > 0
+    ? frozenSummary
+    : buildHighlightDisplayRows(curateSummaryHighlights(rows), { viewingResult });
   if (list.length === 0) return null;
 
   return (
