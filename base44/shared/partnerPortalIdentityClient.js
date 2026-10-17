@@ -19,13 +19,29 @@ function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+const GATEWAY_401_CODES = new Set([
+  'UNAUTHORIZED_NO_AUTH_HEADER',
+  'UNAUTHORIZED_ASYMMETRIC_JWT',
+  'UNAUTHORIZED_LEGACY_JWT',
+  'UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM',
+  'UNAUTHORIZED_INVALID_JWT_FORMAT',
+]);
+
 async function classifiedHttpError(response) {
   if (response.status !== 401) return `DEALER_IDENTITY_HTTP_${response.status}`;
 
-  // Only fixed codes leave this module. Never return or log the response body,
-  // headers, provider token or deployment URL.
+  // Only allowlisted, fixed codes leave this module. Never return or log a
+  // response body, header value, provider token or deployment URL verbatim.
+  const gatewayHeader = response.headers.get('sb-error-code');
+  if (GATEWAY_401_CODES.has(gatewayHeader)) {
+    return `DEALER_IDENTITY_GATEWAY_${gatewayHeader}`;
+  }
+
   const payload = await response.json().catch(() => null);
   if (!isPlainObject(payload)) return 'DEALER_IDENTITY_HTTP_401';
+  if (GATEWAY_401_CODES.has(payload.code)) {
+    return `DEALER_IDENTITY_GATEWAY_${payload.code}`;
+  }
   if (payload.error === 'unauthorized') return 'DEALER_IDENTITY_FUNCTION_UNAUTHORIZED';
 
   const message = String(payload.message || '').toLowerCase();
