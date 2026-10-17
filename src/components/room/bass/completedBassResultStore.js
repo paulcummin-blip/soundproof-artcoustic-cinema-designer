@@ -627,6 +627,27 @@ export function retryCompletedBassAuthority(projectId, versionId) {
   return startProjectHydration(key, { force: true });
 }
 
+/**
+ * Offer the current authoritative result to durable storage again after a failed
+ * write.
+ *
+ * The write signature guard exists to stop the same authority being written
+ * twice in a burst; a genuine FAILURE must still be retryable, so the guard for
+ * this version is cleared first. Nothing is recalculated, regraded or
+ * recompacted — the identical authoritative contract is handed to the identical
+ * write path, and its outcome is reported through the same reconciliation status
+ * the failure came from.
+ */
+export function retryBassAuthorityPersistence(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
+  const authority = memoryByProject.get(key);
+  const contract = authority?.contract || null;
+  const fingerprint = contract?.job?.resultFingerprint || authority?.currentFingerprint || null;
+  if (!contract || !fingerprint || authority?.authoritative !== true) return Promise.resolve(false);
+  syncSignatures.delete(key);
+  return syncPersistentBassAuthority(projectId, versionId, fingerprint, contract);
+}
+
 export function getCompletedBassAuthority(projectId, versionId) {
   const key = projectKey(projectId, versionId);
   if (!memoryByProject.has(key)) memoryByProject.set(key, emptyAuthority(projectId, versionId));

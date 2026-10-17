@@ -65,7 +65,7 @@ test('A / F — a non-bass blocker never names a parameter inside the bass band'
   });
 
   expect(p4.label).toBe('Performance Current');
-  expect(p4.message).toBeNull();
+  expect(p4.message).toBe('Calculated and saved.');
   expect(p4.attention).not.toBe(true);
   expect(p4.actionLabel).toBeNull();
   // The real items are named from the attempt's own gate verdicts and recorded
@@ -96,9 +96,11 @@ test('B — an incomplete P14 is named', () => {
     missing: [{ key: 'engineering_summary.p14', label: 'engineering_summary.p14' }],
     gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p14')],
   });
-  expect(state.label).toBe('Assessment needs attention');
+  expect(state.label).toBe('Bass result could not be saved');
   expect(state.message).toBe('P14 assessment needs updating.');
-  expect(state.actionLabel).toBe('Save Assessment');
+  expect(state.actionLabel).toBe('Retry save');
+  expect(state.actionLabel).not.toBe('Save Assessment');
+  expect(state.secondaryActionLabel).toBe('Recalculate');
   expect(state.attention).toBe(true);
 });
 
@@ -107,7 +109,7 @@ test('C — an incomplete P18 is named', () => {
     gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p4, p18')],
   });
   expect(state.message).toBe('P18 assessment needs updating.');
-  expect(state.label).toBe('Assessment needs attention');
+  expect(state.label).toBe('Bass result could not be saved');
 });
 
 test('D — an unresolved P19 is named from the bass gate itself', () => {
@@ -143,9 +145,10 @@ test('a bass-domain gate with no nameable parameter keeps the bass attention sta
     // No parameter number anywhere: a bass identity that has not settled.
     gates: [gate('bass_identity', 'Completed bass assessment matches the selected target', 'Wait for the selected target assessment to settle, then retry.')],
   });
-  expect(state.label).toBe('Assessment needs attention');
-  expect(state.message).toBe('This assessment needs updating before it can be saved.');
+  expect(state.label).toBe('Bass result could not be saved');
+  expect(state.message).toBe('The bass result could not be saved, so reports and proposals cannot use it yet.');
   expect(state.note).toBeUndefined();
+  expect(state.actionLabel).toBe('Retry save');
   expect(state.attention).toBe(true);
 });
 
@@ -173,8 +176,10 @@ test('P15 and P21 are assumed design values: never named, never outstanding', ()
   expect(state.label).toBe('Performance Current');
   expect(state.note).toBe('Overall project assessment complete.');
   expect(state.waitingItems).toBeUndefined();
-  expect(state.message).toBeNull();
+  expect(state.message).toBe('Calculated and saved.');
   expect(state.actionLabel).toBeNull();
+  // There is no manual save step to offer, in any state.
+  expect(JSON.stringify(state)).not.toMatch(/save assessment/i);
 });
 
 test('the canonical completeness authority never counts an assumed P15/P21 as missing', async () => {

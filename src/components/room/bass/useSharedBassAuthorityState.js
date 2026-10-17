@@ -10,6 +10,7 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { usePublicationAttempt } from "@/components/engineering/publicationAcknowledgementStore";
 import { resolveBassAuthorityState } from "@/components/room/bass/bassAuthorityState";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
+import { useBassReconciliationStatus } from "@/components/room/bass/bassReconciliationStatus";
 
 export default function useSharedBassAuthorityState() {
   const shared = useSharedBassResults();
@@ -17,6 +18,10 @@ export default function useSharedBassAuthorityState() {
     shared?.scopeId || null,
     shared?.versionId || null,
   );
+  // The outcome of the durable write of this version's result. A failed write
+  // must never be reported as current, so the band reads it here — it is the
+  // same status the write queue publishes, not a second record of it.
+  const durableWrite = useBassReconciliationStatus(shared?.scopeId, shared?.versionId);
 
   const effectiveLifecycle = useEffectiveBassLifecycleState(shared?.scopeId, shared?.versionId, shared?.bassLifecycleState);
   const publication = shared?.engineeringPublication;
@@ -31,6 +36,7 @@ export default function useSharedBassAuthorityState() {
       engineeringFingerprint: publication?.fingerprint,
       publicationBassFingerprint: publication?.bassFingerprint,
       durable: publication?.durable,
+      durableWrite,
       lifecycleState: effectiveLifecycle,
       calculationInProgress: shared?.calculationInProgress,
       placementPreviewActive: shared?.placementPreviewActive,

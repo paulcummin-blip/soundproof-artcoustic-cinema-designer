@@ -42,12 +42,12 @@ export function queueBassAuthorityWrite(key, signature, record, payload) {
   if (rowSignature && rowSignature === rowAuthoritySignature(payload)) {
     writtenSignatures.set(key, signature);
     const [projectId, versionId] = String(key).split("::");
-    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeDisposition: "already-persisted" });
+    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeFailedFingerprint: null, writeDisposition: "already-persisted" });
     return Promise.resolve(true);
   }
   if (writtenSignatures.get(key) === signature) {
     const [projectId, versionId] = String(key).split("::");
-    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeDisposition: "already-persisted" });
+    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeFailedFingerprint: null, writeDisposition: "already-persisted" });
     return Promise.resolve(true);
   }
 
@@ -90,14 +90,17 @@ async function flushQueuedBassAuthorityWrite(key) {
       writtenSignatures.set(key, signature);
       // Runtime proof: the authority reached the database, and the shared read
       // cache was invalidated so the next report read sees it.
-      publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null });
+      publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeFailedFingerprint: null });
       return true;
     } catch (e) {
       // The promotion did not persist: the in-memory authority stays current for
       // this session, and the next open must reconcile again. Never silent.
+      // The result the write failed to store is named, so a failure for an older
+      // result can never be read as a failure of the result now in hand.
       publishBassReconciliationStatus(projectId, versionId, {
         writeSucceeded: false,
         writeError: e?.message || String(e),
+        writeFailedFingerprint: payload?.current_fingerprint || null,
       });
       return false;
     }

@@ -28,10 +28,9 @@ import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAut
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
-import { recordPublicationAttempt, PUBLICATION_ATTEMPT } from "@/components/engineering/publicationAcknowledgementStore";
 import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
 import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
-import { readEngineeringPublishTrigger } from "@/components/engineering/engineeringPublishTrigger";
+import useBassAuthorityAutoPublication from "@/components/room/bass/bda/useBassAuthorityAutoPublication";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -52,21 +51,22 @@ export default function BassPerformanceStrip() {
   const [clock, setClock] = useState(Date.now());
 
   // The state of the band, from the shared authority: preview only, needs
-  // calculation, calculated but not published, or current. The label replaces
-  // the old vague "Out of date", and carries the one action that resolves it.
-  const stateAction = authorityState.code === BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED
-    // The publish action is the one the publication effect already owns, read
-    // from its registration seam — never a second publication path.
-    ? () => {
-        const publish = readEngineeringPublishTrigger(shared?.scopeId, shared?.versionId);
-        if (publish) publish();
-        else recordPublicationAttempt(shared?.scopeId, shared?.versionId, {
-          status: PUBLICATION_ATTEMPT.FAILED,
-          fingerprint: shared?.engineeringPublication?.fingerprint,
-          message: "Publication is unavailable for this version. Reopen the version and retry.",
-        });
-      }
-    : (typeof shared?.onCalculate === "function" ? shared.onCalculate : null);
+  // calculation, saving, or current. A completed result needs no action at all —
+  // it saves and publishes itself (useBassAuthorityAutoPublication) — so the
+  // band only ever asks for a calculation, or, after a save that genuinely did
+  // not land, for that save to be tried again or the result to be recalculated.
+  const autoPublication = useBassAuthorityAutoPublication({
+    projectId: shared?.scopeId,
+    versionId: shared?.versionId,
+    stateCode: authorityState.code,
+    resultFingerprint: shared?.completedBassAuthority?.currentFingerprint || null,
+  });
+  const saveFailed = authorityState.code === BASS_AUTHORITY_STATE.SAVE_FAILED;
+  const canRecalculate = typeof shared?.onCalculate === "function";
+  const stateAction = saveFailed
+    ? autoPublication.retrySave
+    : (canRecalculate ? shared.onCalculate : null);
+  const secondaryAction = saveFailed && canRecalculate ? shared.onCalculate : null;
 
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
@@ -168,6 +168,8 @@ export default function BassPerformanceStrip() {
         state={authorityState}
         onPrimaryAction={stateAction}
         primaryDisabled={shared?.calculationInProgress === true}
+        onSecondaryAction={secondaryAction}
+        secondaryDisabled={shared?.calculationInProgress === true}
       />
     </div>
   );

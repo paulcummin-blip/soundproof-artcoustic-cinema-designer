@@ -3,16 +3,26 @@
  * ---------------------
  * THE one state vocabulary for the bass result band.
  *
- * A bass result can be in four honest states, and the UI must say which one it
+ * A bass result can be in five honest states, and the UI must say which one it
  * is in rather than a single vague "Out of date":
  *
  *   PREVIEW ONLY              a previous result is retained while the design has
  *                             moved on — the values shown are a preview
  *   NEEDS CALCULATION         no result exists for the current design yet
- *   READY TO SAVE             the completed result is saved but the engineering
- *                             publication has not acknowledged it yet — shown as
- *                             "Assessment needs attention" when saving is blocked
+ *   SAVING                    the completed result is saved and the engineering
+ *                             publication is being written automatically
  *   PERFORMANCE CURRENT       the completed result is saved AND published
+ *   SAVE FAILED               the result did not reach durable storage or the
+ *                             publication refused it — reported together with
+ *                             Retry save / Recalculate
+ *
+ * THERE IS NO MANUAL SAVE STEP. A completed authoritative bass result is saved
+ * and published automatically (see useBassAuthorityAutoPublication), so the band
+ * never asks the designer to save or publish anything: it reports SAVING while
+ * that happens, PERFORMANCE CURRENT once it has, and SAVE FAILED — never a
+ * pretended CURRENT — when it has not. ATOMIC: PERFORMANCE CURRENT is only
+ * reached when the result is saved, current and published; a known failed
+ * persistence for the result in hand always wins over a CURRENT claim.
  *
  * This module reads state only. It changes no score, threshold, fingerprint or
  * calculation: it compares the SAME completion/fingerprint conditions the bass
@@ -40,6 +50,7 @@ export const BASS_AUTHORITY_STATE = Object.freeze({
   CALCULATED_NOT_PUBLISHED: "calculated_not_published",
   PUBLISHING: "publishing",
   CURRENT: "current",
+  SAVE_FAILED: "save_failed",
 });
 
 /** The one copy for each state. Labels are rendered uppercase by the UI. */
@@ -59,10 +70,13 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
     message: "No bass result exists for the current design — calculate bass performance to produce RP22 results.",
     actionLabel: "Calculate Bass Performance",
   },
+  // The completed result is saved and its publication is being written. This is
+  // a transient state the designer watches, never a step they perform: there is
+  // no action, because the save happens by itself.
   [BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED]: {
-    label: "Ready to save",
-    message: "Calculated — save so reports and proposals can use it.",
-    actionLabel: "Save Assessment",
+    label: "Saving",
+    message: "Calculated — saving so reports and proposals can use it.",
+    actionLabel: null,
   },
   [BASS_AUTHORITY_STATE.PUBLISHING]: {
     label: "Publishing",
@@ -71,20 +85,32 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
   },
   [BASS_AUTHORITY_STATE.CURRENT]: {
     label: "Performance Current",
-    message: null,
+    message: "Calculated and saved.",
     actionLabel: null,
   },
 });
 
 /**
- * The one designer-facing status when saving is blocked: one label, one short
- * explanation, and the same retry action as "Ready to save".
+ * The one designer-facing status when the result did not become usable: one
+ * label, one short explanation, and the two honest ways forward — save it again,
+ * or recalculate it. It is never shown as an invitation to save by hand; the
+ * save is automatic, so reaching this state means the automatic save did not
+ * land and must not be presented as if it had.
  */
-export const BASS_AUTHORITY_BLOCKED_COPY = Object.freeze({
-  label: "Assessment needs attention",
-  actionLabel: "Save Assessment",
-  message: "This assessment needs updating before it can be saved.",
+export const BASS_AUTHORITY_SAVE_FAILED_COPY = Object.freeze({
+  label: "Bass result could not be saved",
+  actionLabel: "Retry save",
+  secondaryActionLabel: "Recalculate",
+  message: "The bass result could not be saved, so reports and proposals cannot use it yet.",
 });
+
+/** Whether the durable write that failed belongs to the saved result in hand. */
+function bassPersistenceFailed(durableWrite, resultFingerprint) {
+  if (durableWrite?.writeSucceeded !== false) return false;
+  const failedFingerprint = durableWrite?.writeFailedFingerprint || null;
+  if (!failedFingerprint || !resultFingerprint) return true;
+  return failedFingerprint === resultFingerprint;
+}
 
 /**
  * The bass domain: the ONLY parameters the bass panel may name as blockers.
@@ -187,6 +213,7 @@ export function resolveBassAuthorityState({
   engineeringFingerprint = null,
   publicationBassFingerprint = null,
   durable = null,
+  durableWrite = null,
   lifecycleState = null,
   calculationInProgress = false,
   placementPreviewActive = false,
@@ -220,6 +247,17 @@ export function resolveBassAuthorityState({
     && currentFingerprint === resultFingerprint;
 
   if (resultIsCurrent) {
+    // ATOMIC SAVE, first: a result whose persistence is known to have failed is
+    // never called current, whatever any publication receipt says. The failed
+    // write names the result it failed to store, so a failure for an older
+    // result can never block a newer one.
+    if (bassPersistenceFailed(durableWrite, currentFingerprint)) {
+      return {
+        code: BASS_AUTHORITY_STATE.SAVE_FAILED,
+        ...BASS_AUTHORITY_SAVE_FAILED_COPY,
+        attention: true,
+      };
+    }
     // Completion is not engineering publication. A receipt must name this
     // engineering assessment AND the same completed bass calculation.
     const identityMatches = !!engineeringFingerprint
@@ -249,9 +287,9 @@ export function resolveBassAuthorityState({
       // P14/P18/P19/P20 is not a bass problem, so it is never presented as one.
       if (hasBassDomainBlocker(matchingAttempt)) {
         return {
-          code: BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED,
-          ...BASS_AUTHORITY_BLOCKED_COPY,
-          message: bassDomainBlockNote(matchingAttempt) || BASS_AUTHORITY_BLOCKED_COPY.message,
+          code: BASS_AUTHORITY_STATE.SAVE_FAILED,
+          ...BASS_AUTHORITY_SAVE_FAILED_COPY,
+          message: bassDomainBlockNote(matchingAttempt) || BASS_AUTHORITY_SAVE_FAILED_COPY.message,
           attention: true,
         };
       }
@@ -276,8 +314,9 @@ export function resolveBassAuthorityState({
         waitingItems: waiting.items,
       };
     }
-    // Saved, current, but the publication has not acknowledged it yet: the values
-    // are correct, saving is what is outstanding.
+    // Saved and current, but the publication has not acknowledged it yet: the
+    // values are correct and saving is what is outstanding. That save is
+    // automatic, so the band reports it as in progress with no action.
     return withCopy(BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED);
   }
 

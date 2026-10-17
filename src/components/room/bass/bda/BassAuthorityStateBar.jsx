@@ -2,9 +2,11 @@
 // one action that resolves it.
 //
 // PRESENTATION ONLY. It renders the state the shared authority resolved and
-// calls back for the single action that state needs — Calculate Bass
-// Performance, or Save Assessment. It computes nothing, changes no value, and
-// holds no state of its own.
+// calls back for the action that state needs: Calculate Bass Performance when a
+// result must be produced, and Retry save / Recalculate when one could not be
+// saved. A completed result needs no action at all — it saves and publishes
+// itself — so the steady state and the saving state carry no buttons. It
+// computes nothing, changes no value, and holds no state of its own.
 import React from "react";
 import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
 
@@ -21,12 +23,19 @@ const TONES = {
 // attention, never repeated on the individual parameter results.
 const ATTENTION_TONE = { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" };
 
-export default function BassAuthorityStateBar({ state = null, onPrimaryAction = null, primaryDisabled = false }) {
+export default function BassAuthorityStateBar({
+  state = null,
+  onPrimaryAction = null,
+  primaryDisabled = false,
+  onSecondaryAction = null,
+  secondaryDisabled = false,
+}) {
   if (!state?.label) return null;
   const tone = state.attention
     ? ATTENTION_TONE
     : (TONES[state.code] || TONES[BASS_AUTHORITY_STATE.NEEDS_CALCULATION]);
   const showAction = !!state.actionLabel && typeof onPrimaryAction === "function";
+  const showSecondary = !!state.secondaryActionLabel && typeof onSecondaryAction === "function";
 
   return (
     <div
@@ -53,9 +62,13 @@ export default function BassAuthorityStateBar({ state = null, onPrimaryAction = 
             ))}
           </ul>
         </span>
-      ) : (state.message || state.note) && (
+      ) : (state.note || state.message) && (
+        // The note is the specific outstanding fact (which items the overall
+        // assessment is still waiting for); the message is the state's own line
+        // ("Calculated and saved."). A specific note always wins, so the current
+        // state never hides a real waiting item behind its own sentence.
         <span className="min-w-0 flex-1" style={{ fontSize: "11.5px", color: "#3E4349", lineHeight: 1.4 }}>
-          {state.message || state.note}
+          {state.note || state.message}
         </span>
       )}
       {showAction && (
@@ -67,6 +80,17 @@ export default function BassAuthorityStateBar({ state = null, onPrimaryAction = 
           style={{ fontSize: "12px", background: "#213428", color: "#FFFFFF" }}
         >
           {state.actionLabel}
+        </button>
+      )}
+      {showSecondary && (
+        <button
+          type="button"
+          onClick={onSecondaryAction}
+          disabled={secondaryDisabled}
+          className="shrink-0 rounded-md px-3 py-1.5 font-semibold transition-colors hover:bg-[#213428]/8 disabled:cursor-not-allowed disabled:opacity-45"
+          style={{ fontSize: "12px", color: "#213428", border: "1px solid #213428", background: "transparent" }}
+        >
+          {state.secondaryActionLabel}
         </button>
       )}
     </div>

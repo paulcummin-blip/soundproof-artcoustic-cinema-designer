@@ -15,16 +15,19 @@ const TONES = {
   publishing: { dot: '#B7791F', label: 'Saving…' },
   failed: { dot: '#B3261E', label: 'Assessment needs attention' },
   'not-ready': { dot: '#B7791F', label: 'Complete design assessment' },
-  'not-saved': { dot: '#B7791F', label: 'Ready to save' },
+  // There is no manual save step: a completed, ready assessment saves itself, so
+  // this state reports the automatic save in progress rather than asking for one.
+  'not-saved': { dot: '#B7791F', label: 'Saving…' },
 };
 
 // The one client-facing label per state. Generic by design: it names no
 // gate, parameter, workflow or code, and the click routes internally to the
-// right one. Never put internal wording in this row.
+// right one. Never put internal wording in this row. A ready assessment has no
+// action at all — it saves automatically — so only a blocked or failed state
+// offers one.
 const ACTIONS = {
   'not-ready': { label: 'Complete Assessment' },
   failed: { label: 'Try Again' },
-  'not-saved': { label: 'Save Assessment' },
 };
 
 export default function EngineeringPublicationStatus({ publication, projectId, versionId }) {
@@ -82,7 +85,7 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
   // carries no action noise in front of a client.
   const action = state === 'published' || state === 'publishing' ? null
     : state === 'failed' ? { ...ACTIONS.failed, onClick: publish }
-    : preflight.ready ? { ...ACTIONS['not-saved'], onClick: publish }
+    : preflight.ready ? null
     : {
         ...ACTIONS['not-ready'],
         onClick: () => bass?.onCalculate?.({ collectDiagnostics: true }),

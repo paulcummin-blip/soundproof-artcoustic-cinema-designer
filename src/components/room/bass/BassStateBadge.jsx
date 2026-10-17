@@ -13,6 +13,7 @@ const TONES = {
   [BASS_AUTHORITY_STATE.PREVIEW_ONLY]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
   [BASS_AUTHORITY_STATE.NEEDS_CALCULATION]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
   [BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
+  [BASS_AUTHORITY_STATE.SAVE_FAILED]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
   [BASS_AUTHORITY_STATE.CALCULATING]: { color: "#3E4349", background: "#F8F8F7", border: "#DCDBD6" },
 };
 

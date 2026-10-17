@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveBassAuthorityState as resolve } from '../src/components/room/bass/bassAuthorityState.js';
+import { resolveBassAuthorityState as resolve, BASS_AUTHORITY_COPY } from '../src/components/room/bass/bassAuthorityState.js';
 import { publicationBassIdentityMatches } from '../src/components/engineering/engineeringPublicationPreflight.js';
 import { createBassResultsScope } from '../src/components/room/bass/bassResultsStore.js';
 import { registerEngineeringPublishTrigger, readEngineeringPublishTrigger } from '../src/components/engineering/engineeringPublishTrigger.js';
@@ -45,15 +45,67 @@ test('changed design needs calculation and retains prior evidence', () => {
   assert.equal(resolve({ ...current, completedBassAuthority:stale, durable }).code, 'needs_calculation');
   assert.equal(stale.contract.job.resultFingerprint, 'cal:a');
 });
-test('a blocked save is one status with a short reason, and stays retryable', () => {
+test('a blocked save is named as a save failure, and stays retryable', () => {
   for (const status of ['not_ready','failed']) {
     const state=resolve({ ...current, publicationAttempt:{ status, fingerprint:'eng:a', message:'P9 is incomplete' } });
-    assert.equal(state.code,'calculated_not_published');
-    assert.equal(state.label,'Assessment needs attention');
+    assert.equal(state.code,'save_failed');
+    assert.equal(state.label,'Bass result could not be saved');
     assert.match(state.message,/P9 assessment needs updating/);
     assert.doesNotMatch(state.message,/engineering_summary|parameter_index/);
-    assert.equal(state.actionLabel,'Save Assessment');
+    assert.equal(state.actionLabel,'Retry save');
+    assert.equal(state.secondaryActionLabel,'Recalculate');
   }
+});
+
+test('a completed result saves itself: the band reports Saving and asks for nothing', () => {
+  const saving = resolve(current);
+  assert.equal(saving.code, 'calculated_not_published');
+  assert.equal(saving.label, 'Saving');
+  assert.equal(saving.message, 'Calculated — saving so reports and proposals can use it.');
+  assert.equal(saving.actionLabel, null, 'no manual save step exists');
+
+  const saved = resolve({ ...current, publicationAttempt: acknowledged });
+  assert.equal(saved.code, 'current');
+  assert.equal(saved.label, 'Performance Current');
+  assert.equal(saved.message, 'Calculated and saved.');
+  assert.equal(saved.actionLabel, null);
+});
+
+test('no manual save copy survives anywhere in the vocabulary', () => {
+  const vocabulary = JSON.stringify(BASS_AUTHORITY_COPY);
+  assert.doesNotMatch(vocabulary, /ready to save/i);
+  assert.doesNotMatch(vocabulary, /save assessment/i);
+  for (const entry of Object.values(BASS_AUTHORITY_COPY)) {
+    assert.doesNotMatch(String(entry?.actionLabel || ''), /save/i, 'no state offers a manual save');
+  }
+});
+
+test('a failed persistence for the saved result is never named Current', () => {
+  const state = resolve({
+    ...current, publicationAttempt: acknowledged, durable,
+    durableWrite: { writeSucceeded: false, writeFailedFingerprint: 'cal:a' },
+  });
+  assert.equal(state.code, 'save_failed');
+  assert.equal(state.label, 'Bass result could not be saved');
+  assert.equal(state.actionLabel, 'Retry save');
+  assert.equal(state.secondaryActionLabel, 'Recalculate');
+  assert.equal(state.attention, true);
+});
+
+test('a failure that belongs to another result cannot hold this one back', () => {
+  const state = resolve({
+    ...current, publicationAttempt: acknowledged, durable,
+    durableWrite: { writeSucceeded: false, writeFailedFingerprint: 'cal:older' },
+  });
+  assert.equal(state.code, 'current');
+});
+
+test('a completed result whose write has landed is Current, not Saving', () => {
+  const state = resolve({
+    ...current, publicationAttempt: acknowledged,
+    durableWrite: { writeSucceeded: true, writeFailedFingerprint: null },
+  });
+  assert.equal(state.code, 'current');
 });
 test('publication refuses an earlier target while selected-target presentation advances', () => {
   const authority={currentFingerprint:'cal:a',contract:{job:{resultFingerprint:'cal:a'},requestedP14TargetDb:118,requestedP14Basis:'minimum',requestedP14Level:4}};
