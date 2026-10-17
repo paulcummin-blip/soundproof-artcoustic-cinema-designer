@@ -19,6 +19,28 @@ function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+async function classifiedHttpError(response) {
+  if (response.status !== 401) return `DEALER_IDENTITY_HTTP_${response.status}`;
+
+  // Only fixed codes leave this module. Never return or log the response body,
+  // headers, provider token or deployment URL.
+  const payload = await response.json().catch(() => null);
+  if (!isPlainObject(payload)) return 'DEALER_IDENTITY_HTTP_401';
+  if (payload.error === 'unauthorized') return 'DEALER_IDENTITY_FUNCTION_UNAUTHORIZED';
+
+  const message = String(payload.message || '').toLowerCase();
+  if (/(invalid|expired).*(jwt|token)|(jwt|token).*(invalid|expired)/.test(message)) {
+    return 'DEALER_IDENTITY_GATEWAY_TOKEN_REJECTED';
+  }
+  if (message.includes('authorization header')) {
+    return 'DEALER_IDENTITY_GATEWAY_AUTH_HEADER_MISSING';
+  }
+  if (/api.?key/.test(message)) {
+    return 'DEALER_IDENTITY_GATEWAY_API_KEY_MISSING';
+  }
+  return 'DEALER_IDENTITY_HTTP_401';
+}
+
 function validatedEndpoint(value) {
   if (!hasText(value)) {
     throw new Error('DEALER_IDENTITY_URL_UNAVAILABLE');
@@ -82,7 +104,7 @@ export async function resolvePartnerPortalDealerIdentity({ url, accessToken }) {
   });
 
   if (!response.ok) {
-    throw new Error(`DEALER_IDENTITY_HTTP_${response.status}`);
+    throw new Error(await classifiedHttpError(response));
   }
 
   const payload = await response.json().catch(() => null);
