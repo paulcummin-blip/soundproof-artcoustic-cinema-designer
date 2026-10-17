@@ -330,7 +330,7 @@ function buildBassTheme({ byKey, summary }) {
     p18 ? `Predicted in-room extension reaches ${p18.value}.` : null,
     p19
       ? (p19Level
-        ? `At the reference seating position, the corrected response achieves P19 Level ${p19Level}, against the target across the assessed band.`
+        ? `At the reference seating position, the corrected response achieves P19 Level ${p19Level} against the target across the assessed band.`
         : 'At the reference seating position, the corrected response is assessed against the target across the assessed band.')
       : null,
     p20
