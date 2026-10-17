@@ -26,6 +26,13 @@ export const EDITORIAL_ROLE = Object.freeze({
   COMPARISON_OPTION: 'comparison_option',
   /** The closing full-width landscape. */
   CLOSING_FEATURE: 'closing_feature',
+  /**
+   * A photograph INTEGRATED INTO A NARRATIVE SECTION'S PAGE: it follows the copy
+   * of the section it supports, so the document reads as one brochure instead of
+   * carrying a gallery appendix. One or two of these share a page — two only when
+   * they are composed together by their own layout (proposalImageFlow).
+   */
+  FLOW_IMAGE: 'flow_image',
 });
 
 export const CROP_ORIENTATION = Object.freeze({

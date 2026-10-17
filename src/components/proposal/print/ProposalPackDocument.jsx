@@ -44,6 +44,7 @@ import {
   makePlacement,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import ClosingPhotographPair from '@/components/proposal/print/ClosingPhotographPair';
+import ImageFlowBlock from '@/components/proposal/print/ImageFlowBlock';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
 import DecisionSummaryPage from '@/components/proposal/print/DecisionSummaryPage';
@@ -203,6 +204,30 @@ export default function ProposalPackDocument({
   let galleryPagesPlaced = galleryPageImages.length === 0;
   let closingHeroPlaced = false;
   let comparisonPagesPlaced = false;
+
+  // ── THE PHOTOGRAPHS INTEGRATED INTO THE NARRATIVE ────────────────────────
+  // A selected photograph is not held back for a page of its own: the plan places
+  // every one it can between the sections it supports, one or two to a page, and
+  // each of those pages renders them inside itself below. What is left for an
+  // image page is only what the flow genuinely could not carry, so the document
+  // reads as one brochure instead of a narrative with a gallery bolted onto the
+  // end of it.
+  const flowGroupsBySection = {};
+  (imagePlan.flowGroups || []).forEach((group) => {
+    if (!group?.section_id) return;
+    flowGroupsBySection[group.section_id] = flowGroupsBySection[group.section_id] || [];
+    flowGroupsBySection[group.section_id].push(group);
+  });
+  // The validated copy written for the project's images is published ONCE, above
+  // the first photographs the document carries — on the page that closes the
+  // design where it composes them, otherwise above the first photographs
+  // integrated into the narrative — so none of the document's copy is dropped for
+  // want of an image page.
+  const closingSectionWillPrint = closingSection
+    ? Boolean(closingSection.section_type && isClientVisibleSection(closingSection.section_type)
+      && composesClosingPair(closingSection.section_type))
+    : false;
+  let imageFlowLeadPending = !closingSectionWillPrint;
 
   // ── ONE carrier for the document's alternatives ──────────────────────────
   // Whether the designer grouped them as seating styles or as a comparison set,
@@ -515,15 +540,25 @@ export default function ProposalPackDocument({
       // introduction, published here above the photographs it was written for, so
       // none of the document's validated copy is lost when that section prints no
       // page of its own.
-      const closingLead = closingPlacements.length > 0
-        ? prepareSectionBody(byType.get('room_images')?.body, {
-          title: byType.get('room_images')?.title || '',
-          sectionType: 'room_images',
-          proseOnly: true,
-          highChannel,
-          proposalType: reportType,
-        })
+      const roomImagesLead = prepareSectionBody(byType.get('room_images')?.body, {
+        title: byType.get('room_images')?.title || '',
+        sectionType: 'room_images',
+        proseOnly: true,
+        highChannel,
+        proposalType: reportType,
+      });
+      const closingLead = closingPlacements.length > 0 ? roomImagesLead : '';
+
+      // The photographs the plan integrated into THIS section: they follow its
+      // copy, so they read between this section's text and the next section's.
+      // Where the design does not close with a photograph, the first of them
+      // carries the Project Images introduction instead, so the copy is published
+      // once wherever the photographs actually are.
+      const imageFlow = flowGroupsBySection[section.id] || [];
+      const imageFlowLead = imageFlow.length > 0 && imageFlowLeadPending && roomImagesLead
+        ? roomImagesLead
         : '';
+      if (imageFlowLead) imageFlowLeadPending = false;
 
       // The seating images this page carries, when the validated Presented
       // Options section leads the seating group this document has.
@@ -685,6 +720,20 @@ export default function ProposalPackDocument({
               {blockCopy(continuingBlocks)}
             </div>
           ) : null}
+          {/* The project photographs the plan integrated into this page, composed
+              after its copy: a photograph that would have had a gallery page of
+              its own takes its place in the narrative instead, one or two to a
+              page. The block is one composition, so a pair is kept together on the
+              sheet where the sheet can hold both and continues onto the section's
+              own next sheet rather than being shrunk or cropped to fit. */}
+          {imageFlow.map((group, index) => (
+            <ImageFlowBlock
+              key={group.id}
+              placements={group.placements}
+              layout={group.layout}
+              lead={index === 0 ? imageFlowLead : ''}
+            />
+          ))}
         </div>
       );
 

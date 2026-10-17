@@ -272,6 +272,114 @@ export default function ProposalImagePlacementStyles() {
           break-inside: avoid;
           page-break-inside: avoid;
         }
+
+        /* ── Photographs integrated into the narrative: on the sheet, the layout
+             the plan chose is the layout the page carries. These rules carry the
+             export mode's own prefix so they outrank the image-page gallery
+             treatment above, and an image marked Full Width or Detail still takes
+             its own mode's treatment unchanged. ── */
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow .pp-gallery {
+          display: flex;
+          flex-direction: column;
+          gap: 8mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow .pp-media {
+          margin: 0;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--side_by_side .pp-gallery {
+          flex-direction: row;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--side_by_side .pp-gallery > .pp-media,
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow__support .pp-media {
+          width: 40%;
+          max-width: 40%;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow__support {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--feature_and_support .pp-image-flow__support {
+          margin-top: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow .pp-media[data-presentation="unstated"] img {
+          width: 100%;
+          height: auto;
+          max-height: none;
+          object-fit: contain;
+          background: transparent;
+        }
+      }
+
+      /* ── PHOTOGRAPHS INTEGRATED INTO THE NARRATIVE ────────────────────────
+         A project photograph that would otherwise have had a gallery page of
+         its own is composed INSIDE the section it supports, below that
+         section's copy, so the document reads as one brochure rather than a
+         narrative with a gallery bolted onto the end of it. One photograph
+         follows the copy; two that share a page are composed by the layout the
+         plan chose from the designer's own presentation metadata:
+
+           stacked              two Full Width photographs — or two with nothing
+                                recorded — each at the full content width and in
+                                its own proportions, one under the other;
+           side_by_side         two supporting photographs, each at the
+                                supporting share of the content width;
+           feature_and_support  the prominent photograph at the full content
+                                width, the supporting one beneath it smaller.
+
+         The block is one composition, so the measured compositor keeps a pair
+         together on its sheet where the sheet can hold both and continues the
+         second photograph onto the section's own next sheet where it cannot.
+         Nothing is cropped to make a pair fit, nothing is promoted, and nothing
+         is reduced below the share its presentation reserves. ── */
+      .pp-image-flow {
+        margin: 8mm 0 0;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .pp-image-flow__lead { margin: 0 0 6mm; }
+      .pp-image-flow .pp-gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 8mm;
+      }
+      .pp-image-flow .pp-media { margin: 0; }
+      .pp-image-flow--side_by_side .pp-gallery {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 6mm;
+      }
+      .pp-image-flow--side_by_side .pp-gallery > .pp-media,
+      .pp-image-flow__support .pp-media {
+        width: 40%;
+        max-width: 40%;
+      }
+      .pp-image-flow__support {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6mm;
+      }
+      .pp-image-flow--feature_and_support .pp-image-flow__support { margin-top: 6mm; }
+      /* A photograph with no presentation recorded is composed here at its own
+         proportions. The established role frame crops to a fixed height, which
+         belongs on a page the photograph has to itself; on a page it shares with
+         the copy it supports, the photograph is shown as it was uploaded. A
+         recorded choice is untouched: Full Width and Detail keep their own rules
+         exactly as they are. */
+      .pp-image-flow .pp-media[data-presentation="unstated"] img {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        object-fit: contain;
+        background: transparent;
       }
 
       /* ── FULL WIDTH: THE UPLOADED IMAGE IS THE COMPOSITION ────────────────

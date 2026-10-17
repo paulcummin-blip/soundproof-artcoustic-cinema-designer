@@ -180,11 +180,17 @@ test('the photograph chosen for the cover is not consumed by it, and no image is
     );
   });
 
-  // The photograph the editorial rhythm had no slot for is the one kept for the
-  // image page — the cover photograph, and only it. The drawing stays with its
-  // text and never becomes a page of its own.
-  assert.deepEqual(PLAN.galleryImages.map((image) => image.id), ['cover']);
-  assert.equal(PLAN.retainedGallery, true);
+  // The photograph the editorial rhythm had no slot for JOINS the narrative: it
+  // is integrated between the sections it supports rather than sent to an image
+  // page of its own, so no gallery spread is composed for it. The drawing stays
+  // with its text either way.
+  assert.deepEqual(PLAN.galleryImages.map((image) => image.id), []);
+  assert.equal(PLAN.retainedGallery, false);
+  assert.deepEqual(
+    PLAN.flowImages.map((placement) => placement.source_asset_id),
+    ['cover'],
+    'the whole-room photograph is integrated into the narrative',
+  );
   assert.equal(PLAN.galleryImages.some((image) => image.id === DRAWING), false);
   assert.equal(PLAN.selectedImageUrls.length, JOOCED_IMAGES.length);
 });

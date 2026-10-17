@@ -26,6 +26,7 @@ import {
   resolveCoverAssetId,
 } from '../src/components/proposal/images/proposalImagePlanner.js';
 import { validateProposalImagePlan } from '../src/components/proposal/images/proposalImagePlanValidator.js';
+import { FLOW_IMAGE_LAYOUT } from '../src/components/proposal/images/proposalImageFlow.js';
 
 const SECTION_TYPES = [
   'cover',
@@ -154,16 +155,36 @@ test('seating-style images are grouped on their own page, before the closing sec
 });
 
 // ── 7. A spread is only kept when genuinely unused strong images remain. ──
-test('a dedicated gallery spread is kept only for images the document did not place', () => {
+test('the photographs the narrative did not place are integrated into it, not sent to a gallery spread', () => {
   const { planned } = plan(8);
-  assert.equal(planned.retainedGallery, true);
+  assert.equal(planned.retainedGallery, false, 'the narrative carries them all');
+  assert.equal(planned.galleryImages.length, 0, 'no gallery spread is composed');
+  assert.equal(planned.flowImages.length, 4, 'the four photographs the rhythm did not place are integrated');
   const placed = new Set(planned.placements.map((p) => p.source_asset_id));
-  planned.galleryImages.forEach((image) => assert.equal(placed.has(image.id), false));
+  assert.equal(placed.size, 8, 'every selected photograph still prints');
   assert.equal(
     validateProposalImagePlan(planned, { galleryImages: planned.galleryImages }).valid,
     true,
   );
-  return `${planned.placements.length} placements, ${planned.galleryImages.length} images left for a spread`;
+  return `${planned.placements.length} placements, ${planned.flowImages.length} integrated, no gallery spread`;
+});
+
+// ── 7b. Two photographs that would each have taken a page of their own share
+//       ONE page instead, and neither takes a page of its own.
+test('two photographs the document has not placed share one page instead of taking two', () => {
+  const { planned } = plan(6);
+  assert.equal(planned.flowGroups.length, 1, 'they travel on one page together');
+  const [group] = planned.flowGroups;
+  assert.equal(group.sources.length, 2, 'the page carries both photographs');
+  assert.equal(group.placements.length, 2);
+  assert.equal(group.layout, FLOW_IMAGE_LAYOUT.STACKED, 'two photographs with nothing recorded are stacked');
+  group.placements.forEach((placement) => {
+    assert.equal(placement.editorial_role, EDITORIAL_ROLE.FLOW_IMAGE);
+    assert.equal(placement.section_id, group.section_id, 'both sit on the same section page');
+    assert.equal(placement.page_position, group.page);
+  });
+  assert.equal(planned.retainedGallery, false);
+  return `${group.section_type} carries both photographs on one page (${group.layout})`;
 });
 
 // ── 8. Every placement names its source, its section and its page. ──

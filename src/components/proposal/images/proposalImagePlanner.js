@@ -18,6 +18,14 @@
  *   - the closing page takes a full-width landscape from the source least
  *     recently used.
  *
+ * EVERY OTHER SELECTED PHOTOGRAPH JOINS THE NARRATIVE. There is no gallery
+ * appendix by default: the photographs the opening rhythm above had no slot for
+ * are integrated between the sections they support (proposalImageFlow), a pair to
+ * a page, so the document reads as one brochure rather than a narrative with a
+ * gallery bolted onto the end of it. A dedicated gallery spread carries only what
+ * the flow genuinely cannot hold — the remainder once every narrative page is
+ * full — and nothing a gallery holds is ever a repeat of a placed source.
+ *
  * A source may appear twice at most, in two different crops, at least one full
  * page apart. Where no source satisfies the spacing rule for a page, that page
  * simply carries no image: the planner never fills a page to make a gallery.
@@ -37,6 +45,7 @@
  * be run from a plain node script.
  */
 
+import { planImageFlow } from './proposalImageFlow.js';
 import {
   COMPARISON_SECTION_ID,
   CROP_ORIENTATION,
@@ -344,30 +353,76 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
 
   // 6. The closing page: a full-width landscape from the source least recently used.
   const closingEntry = closingIndex >= 0 ? entries[closingIndex] : null;
-  if (closingEntry) {
-    add(pickLandscape(closingEntry.page), EDITORIAL_ROLE.CLOSING_FEATURE, closingEntry.section_id, closingEntry.page);
-  }
+  const closingFeature = closingEntry
+    ? add(pickLandscape(closingEntry.page), EDITORIAL_ROLE.CLOSING_FEATURE, closingEntry.section_id, closingEntry.page)
+    : null;
 
-  // Every selected source the document has not placed in the body is retained for
-  // the image page. An image's explicit Do Not Use flag is the only exclusion,
-  // never a count threshold.
+  // Every selected source the document has not placed in the body. An image's
+  // explicit Do Not Use flag is the only exclusion, never a count threshold.
   //
   // A photograph chosen for the cover is not consumed by that choice: the cover
   // takes the portrait crop on page 1, and the same source still takes its own
   // place in the body. Only the body placements are counted here — the cover
   // page's own use is not one of them — so a cover photograph the editorial
-  // rhythm had no slot for is retained rather than silently dropped, and no
-  // source is ever listed twice.
+  // rhythm had no slot for is integrated or retained rather than silently
+  // dropped, and no source is ever listed twice.
   const bodyPlacedIds = new Set(
     placements
       .filter((placement) => placement.editorial_role !== EDITORIAL_ROLE.COVER)
       .map((placement) => placement.source_asset_id)
       .filter(Boolean),
   );
-  const galleryImages = usable.filter(
+  const unplaced = usable.filter(
     (asset) => asset.id && !bodyPlacedIds.has(asset.id)
       && !seatingStyleOf(asset) && !isCompared(asset),
   );
+
+  // 7. THE PHOTOGRAPHS THAT WOULD HAVE HAD A PAGE OF THEIR OWN JOIN THE
+  // NARRATIVE INSTEAD. The rhythm above is the document's opening rhythm; every
+  // other selected photograph is integrated between the sections it supports, at
+  // most a pair to a page, so the pack reads as one brochure.
+  //
+  // 7a. Where the rhythm had no landscape left for the closing page, the
+  //     designer's own prominent photograph closes the design: it is placed on
+  //     that page rather than left for a spread, so the document still closes
+  //     with a photograph and the spread carries only what the flow cannot hold.
+  const closingPageTaken = placements.some(
+    (placement) => placement.section_id === closingEntry?.section_id,
+  );
+  if (closingEntry && !closingFeature && !closingPageTaken) {
+    const closingChoice = unplaced.find(isFullWidthPreference) || null;
+    if (closingChoice) {
+      add(closingChoice, EDITORIAL_ROLE.CLOSING_FEATURE, closingEntry.section_id, closingEntry.page);
+    }
+  }
+
+  // 7b. The integration. The pages it may join are the document's own narrative
+  //     pages, in publication order, and the plan states how many of each page's
+  //     places are already taken — so a page that already carries a photograph
+  //     takes one more, and a page that carries none may take a pair.
+  const placedIds = new Set(placements.map((placement) => placement.source_asset_id).filter(Boolean));
+  const flow = planImageFlow({
+    sources: unplaced.filter((asset) => !placedIds.has(asset.id)),
+    targets: entries.map((entry) => ({
+      ...entry,
+      placed_count: placements.filter((placement) => placement.section_id === entry.section_id).length,
+    })),
+  });
+  flow.groups.forEach((group) => {
+    group.sources.forEach((source) => {
+      add(source, EDITORIAL_ROLE.FLOW_IMAGE, group.section_id, group.page);
+    });
+  });
+  const flowGroups = flow.groups.map((group) => ({
+    ...group,
+    placements: placements.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.FLOW_IMAGE
+      && placement.section_id === group.section_id),
+  }));
+
+  // 7c. What is left is the image section's own: it is carried only when every
+  //     narrative page is full, which is the one case in which integrating more
+  //     photographs would harm the document's flow.
+  const galleryImages = flow.remainder;
 
   const bySection = {};
   placements.forEach((placement) => {
@@ -398,6 +453,11 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
         && placement.comparison_group === group.name),
     })),
     galleryImages,
+    // The photographs integrated into the narrative, one entry per page that
+    // received them: the section they joined, the layout the pair is composed
+    // in, and the placements themselves, in reading order.
+    flowGroups,
+    flowImages: placements.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.FLOW_IMAGE),
     selectedImageUrls: usable.map((asset) => asset.file_url),
     // The images the designer marked as comparison options, so the plan can be
     // checked against where they actually landed.

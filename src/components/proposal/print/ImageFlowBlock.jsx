@@ -28,6 +28,9 @@ export default function ImageFlowBlock({ placements = [], layout = FLOW_IMAGE_LA
     ? layout
     : FLOW_IMAGE_LAYOUT.SINGLE;
   const [leading, ...rest] = images;
+  const renderPlacement = (placement) => (
+    <ProposalImagePlacement key={placement.id} placement={placement} />
+  );
 
   return (
     <div
@@ -42,14 +45,13 @@ export default function ImageFlowBlock({ placements = [], layout = FLOW_IMAGE_LA
         />
       ) : null}
       <div className={`pp-gallery pp-gallery--flow pp-gallery--flow-${resolved}`}>
-        <ProposalImagePlacement placement={leading} />
-        {rest.length > 0 ? (
-          <div className="pp-image-flow__support">
-            {rest.map((placement) => (
-              <ProposalImagePlacement key={placement.id} placement={placement} />
-            ))}
-          </div>
+        {renderPlacement(leading)}
+        {rest.length > 0 && resolved === FLOW_IMAGE_LAYOUT.FEATURE_AND_SUPPORT ? (
+          <div className="pp-image-flow__support">{rest.map(renderPlacement)}</div>
         ) : null}
+        {rest.length > 0 && resolved !== FLOW_IMAGE_LAYOUT.FEATURE_AND_SUPPORT
+          ? rest.map(renderPlacement)
+          : null}
       </div>
     </div>
   );
