@@ -18,6 +18,7 @@ import {
 } from './resolveFrontStageRoles';
 import { buildProductsSelected, layoutVisibilityFilter } from '@/components/report/reportProductsSelected';
 import { speakerRoleQuantities } from './speakerRoleQuantities';
+import { systemFormat } from '@/shared/systemFormat';
 
 function parseDolbyConfig(config) {
   if (!config || typeof config !== 'string') return { bed: 0, sub: 0, overhead: 0, text: 'Not configured' };
@@ -64,6 +65,12 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   const enabledSubs = subwooferInstances.filter((s) => s.enabled !== false);
   const ampPower = Number(project?.amplifier_power) || null;
   const overhead = resolveOverheadModel(project);
+  // The client-facing system format for THIS version's own loudspeakers.
+  const clientFormat = systemFormat({
+    layout: project?.dolby_config,
+    subwooferInstances,
+    subwooferCount: enabledSubs.length,
+  });
 
   // Build channel layout from dolby config. The subwoofer count is the number of
   // subwoofers this version actually has, taken from its own instances — the same
@@ -75,7 +82,16 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
     dolby_subwoofer_channels: dolbyConfig.sub,
     overhead_channels: dolbyConfig.overhead,
     total_discrete: dolbyConfig.bed + dolbyConfig.overhead,
-    configuration_text: dolbyConfig.text,
+    // The format a CLIENT or dealer reads: bed channels . ACTIVE subwoofers .
+    // overhead channels, from the one shared format authority. The decoder
+    // identity — the layout's own "9.1.6" and its single LFE channel digit — stays
+    // in `dolby_config` above, is never stated as the client's system format and is
+    // never read as a subwoofer count.
+    configuration_text: clientFormat
+      ? `${clientFormat} Dolby Atmos configuration (${dolbyConfig.bed} bed channels, `
+        + `${enabledSubs.length} subwoofer${enabledSubs.length === 1 ? '' : 's'}, `
+        + `${dolbyConfig.overhead} overhead channel${dolbyConfig.overhead === 1 ? '' : 's'})`
+      : dolbyConfig.text,
   };
 
   // The screen stage, read from the version's own physical speakers. A

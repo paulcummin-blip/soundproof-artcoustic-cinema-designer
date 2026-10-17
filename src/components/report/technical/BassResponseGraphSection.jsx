@@ -126,6 +126,7 @@ export default function BassResponseGraphSection({
   seats = [],
   roomDims = null,
   p19Result = null,
+  p19Graph = null,
   variant = "print",
 }) {
   // The report passes a fresh dimensions object on every render, so the memo is
@@ -148,7 +149,14 @@ export default function BassResponseGraphSection({
   // what it plots may be stated. With no curve, the page states the published
   // result and the missing-evidence note, and describes NO shape: a page may never
   // claim a curve the report does not hold.
-  const p19Curve = resolveP19CurveAvailability({ graph: graphs.p19 });
+  // ONE saved P19 curve payload for the whole document. Where the document has
+  // already resolved the curve from the saved canonical bass contract it hands
+  // the SAME payload in, so the Visual Report's P19 page and the Technical
+  // Report's P19 page draw one curve rather than two separately rebuilt graphs.
+  // A standalone Technical Report is handed nothing and keeps resolving it from
+  // its own saved authority.
+  const savedP19 = p19Graph?.series?.length ? p19Graph : null;
+  const p19Curve = resolveP19CurveAvailability({ graph: savedP19 || graphs.p19 });
 
   const shared = {
     transitionHz: graphs.transitionHz,
@@ -167,7 +175,7 @@ export default function BassResponseGraphSection({
         blockName="bass-response-p19-rsp"
         title="P19 BASS RESPONSE AT THE RSP"
         explanation={p19Curve.available ? P19_RSP_EXPLANATION : null}
-        content={<P19RspGraphContent graph={graphs.p19} result={p19Result} chartId="bass-response-p19-rsp" />}
+        content={<P19RspGraphContent graph={p19Curve.graph} result={p19Result} chartId="bass-response-p19-rsp" />}
         first={variant !== "print"}
       />
       <GraphPage

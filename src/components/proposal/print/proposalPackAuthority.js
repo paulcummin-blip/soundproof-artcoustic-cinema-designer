@@ -624,11 +624,14 @@ export function buildAtAGlance({ snapshot, projectName, projectReference, genera
     // Room Designer, the Project Report and the Speaker Design state.
     {
       label: 'System layout',
+      // The decoder layout is deliberately NOT a fallback here: a surface that
+      // cannot state the client's system format states nothing at all, rather than
+      // printing the codec notation the client does not read.
       value: systemFormat({
         layout: configuration.dolby_config,
         subwooferInstances: system.subwoofer_strategy?.instances,
         subwooferCount: system.subwoofer_strategy?.count,
-      }) || configuration.dolby_config || null,
+      }) || null,
     },
   ];
 

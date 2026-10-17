@@ -82,13 +82,25 @@ export default async function capturePagePng(element, pageNumber, options) {
     // The raster itself is checked before it is encoded: an empty canvas is
     // reported as an empty canvas, not as a mysterious missing PNG.
     if (!(canvas.width > 0) || !(canvas.height > 0)) {
+      // A 0 × 0 canvas is the same "nothing to draw" as a page that measures
+      // nothing: it paints no sheet, so it is skipped rather than counted as a
+      // failed page that would cost the designer their stored document.
+      diagnostics.zeroSize = true;
       throw new Error(`The page raster came back as a ${canvas.width} × ${canvas.height} canvas.`);
     }
     diagnostics.operation = 'png_encoding';
     dataUrl = canvas.toDataURL('image/png');
     diagnostics.operation = 'png_validation';
     diagnostics.png = inspectCanvasPng(dataUrl);
-    if (!diagnostics.png.valid) throw new Error(diagnostics.png.reason);
+    if (!diagnostics.png.valid) {
+      // An encoded PNG with a zero dimension is a sheet that paints nothing, not
+      // a failed page: it is named as such so no capture is cancelled over it.
+      if (!(Number(diagnostics.png.width) > 0) || !(Number(diagnostics.png.height) > 0)) {
+        diagnostics.zeroSize = true;
+        diagnostics.operation = 'canvas_dimensions';
+      }
+      throw new Error(diagnostics.png.reason);
+    }
   } catch (error) {
     throw pageCaptureFailure(error, diagnostics);
   }

@@ -987,7 +987,7 @@ export default function RP22ClientReport() {
             detail, the primary-seat bass curves and the single closing About
             Sound Proof page. Nothing about those pages is edited, re-sectioned,
             split apart or given a competing presentation. */}
-        {reportReady && orderedPages.length > 0 && <TechnicalReportDocument />}
+        {reportReady && orderedPages.length > 0 && <TechnicalReportDocument p19Graph={p19Graph} />}
         {exportError && (
           <div className="client-report-screen-only" style={{
             marginTop: 16,

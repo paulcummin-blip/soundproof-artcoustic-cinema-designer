@@ -37,10 +37,15 @@ const COLORS = {
   label: "#9B8E82",
 };
 
+/**
+ * A stated date, in the words this report prints. Null when the report holds no
+ * date at all: an identity field the report knows is never printed as a dash, so
+ * a field with no value is left out of the card rather than shown as "—".
+ */
 function formatDateShort(value) {
-  if (!value) return "—";
+  if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 }
 
@@ -121,7 +126,7 @@ export default function TechnicalProjectOverview({
           PROJECT &amp; SYSTEM OVERVIEW
         </div>
         <div style={reportBodyStyle("10pt", { color: COLORS.secondary, marginTop: "2mm" })}>
-          System Configuration · {exportSystemConfiguration || "—"}
+          {exportSystemConfiguration ? `System Configuration · ${exportSystemConfiguration}` : null}
         </div>
       </div>
 
@@ -135,11 +140,13 @@ export default function TechnicalProjectOverview({
           }}
         >
           {[
-            { label: "PROJECT", value: projectDetails?.name || "—" },
-            { label: "CLIENT", value: projectDetails?.client_name || "—" },
+            { label: "PROJECT", value: projectDetails?.name || null },
+            { label: "CLIENT", value: projectDetails?.client_name || null },
             { label: "DATE", value: formatDateShort(projectDetails?.created_date) },
+            // The report's own update timestamp, persisted with the frozen report
+            // identity, so a known date is stated rather than dashed.
             { label: "LAST UPDATED", value: formatDateShort(projectDetails?.updated_date) },
-          ].map((item) => (
+          ].filter((item) => item.value).map((item) => (
             <div key={item.label}>
               <div
                 style={{

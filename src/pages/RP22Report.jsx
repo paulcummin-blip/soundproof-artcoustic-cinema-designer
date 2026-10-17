@@ -134,7 +134,7 @@ function isCapturedPlan(value) {
  *   belong to this route, never to the merged document. Nothing about the
  *   report's pages changes; only the chrome around them is left to the route.
  */
-function RP22ReportInner({ embed = false } = {}) {
+function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
     const liveApp = useAppState();
 
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
@@ -1337,6 +1337,7 @@ function RP22ReportInner({ embed = false } = {}) {
                     <BassResponseGraphSection
                         contract={completedBassAuthority?.contract || null}
                         authoritative={completedBassAuthority?.authoritative === true}
+                        p19Graph={p19Graph}
                         seats={seats}
                         roomDims={{
                             widthM: stableDimensions.width,
@@ -1445,6 +1446,7 @@ function RP22ReportInner({ embed = false } = {}) {
                         <BassResponseGraphSection
                             contract={completedBassAuthority?.contract || null}
                             authoritative={completedBassAuthority?.authoritative === true}
+                            p19Graph={p19Graph}
                             seats={seats}
                             roomDims={{
                                 widthM: stableDimensions.width,
@@ -1489,6 +1491,6 @@ export default function RP22Report() {
  * consolidated Project Report. It is the same report, the same pages and the
  * same print layout; see TechnicalReportDocument.
  */
-export function TechnicalReportEmbedded() {
-    return <RP22ReportInner embed />;
+export function TechnicalReportEmbedded({ p19Graph = null } = {}) {
+    return <RP22ReportInner embed p19Graph={p19Graph} />;
 }

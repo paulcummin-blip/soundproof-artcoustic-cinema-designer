@@ -127,8 +127,16 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null }
       heading: null,
       message: 'No page of this composition could be rasterised, so there is no document to store.',
     });
+    throw buildResilienceFailure(diagnostics);
   }
-  if (diagnostics.failed.length > 0) throw buildResilienceFailure(diagnostics);
+
+  // THE PDF IS THE DELIVERABLE, the page rasters are how it is made. A page that
+  // could not be rasterised is recorded and left out of the stored copy — the
+  // reader is told which sheet is missing and the designer keeps the document
+  // they exported, with the Library showing the document's own PDF. Only a
+  // composition with NO usable page is refused, because then there is genuinely
+  // no document to store.
+  diagnostics.incomplete = diagnostics.failed.length > 0;
 
   return { rasters, diagnostics };
 }

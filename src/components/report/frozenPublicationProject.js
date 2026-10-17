@@ -38,6 +38,12 @@ export default function frozenPublicationProject(publication, saved = null) {
     id: p.project_id || p.id,
     version_number: p.version_number ?? saved?.payload?.proposalSource?.version?.number ?? null,
     created_date: saved?.generated_at || p.created_date || publication.published_at,
+    // The REAL report update timestamp travels with the frozen identity. A frozen
+    // report has no live project record behind it, so without this the identity's
+    // own dates are the only dates it has — and a field the report knows must
+    // never print as a dash.
+    updated_date: saved?.generated_at || p.updated_date || p.created_date
+      || publication.published_at || null,
     report_frozen: true,
     display_type: resolveDisplayType(screen || p),
     screen_manual_config: screen?.manualSize || p.screen_manual_config || null,

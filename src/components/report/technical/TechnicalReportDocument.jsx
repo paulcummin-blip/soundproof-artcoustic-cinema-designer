@@ -24,7 +24,7 @@
 import React from 'react';
 import { TechnicalReportEmbedded } from '@/pages/RP22Report';
 
-export default function TechnicalReportDocument() {
+export default function TechnicalReportDocument({ p19Graph = null } = {}) {
   return (
     <div className="project-report-technical-document">
       <style>{`
@@ -46,7 +46,10 @@ export default function TechnicalReportDocument() {
           }
         }
       `}</style>
-      <TechnicalReportEmbedded />
+      {/* The document's ONE saved P19 curve payload travels in, so the Technical
+          Report's P19 page and the Project Report's own P19 page draw the same
+          curve instead of each rebuilding it from its own reading. */}
+      <TechnicalReportEmbedded p19Graph={p19Graph} />
     </div>
   );
 }
