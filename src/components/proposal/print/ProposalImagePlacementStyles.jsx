@@ -67,11 +67,38 @@ export default function ProposalImagePlacementStyles() {
          them. The frame follows the image's own proportions and nothing is
          cropped, so a dimensioned drawing keeps every dimension, label and
          annotation it carries. The row keeps its established keep-together
-         rule. ── */
-      .pp-media-row .pp-media--presentation-detail,
-      .pp-media-row .pp-media--presentation-cropped-detail {
-        flex: 0 0 46%;
-        max-width: 46%;
+         rule.
+
+         The image takes the SUPPORTING share of the content column — the same
+         share the portrait accent takes, about 38 per cent, and never the whole
+         column — so a detail reads as supporting evidence rather than as a
+         second hero beside the copy. The selector carries the class twice so it
+         outranks the standalone detail treatment's own width wherever the two
+         disagree. ── */
+      .pp-media-row .pp-media.pp-media--presentation-detail,
+      .pp-media-row .pp-media.pp-media--presentation-cropped-detail {
+        flex: 0 0 38%;
+        max-width: 38%;
+        width: 38%;
+      }
+      /* ── No card around an inline detail image ───────────────────────────
+         A detail beside the copy sits on the page as an editorial image: no
+         frame, no border, no background box and no padding around it. Its label
+         stays beneath it, as the quiet caption it already is.
+
+         The frame follows the image's own proportions — height: auto — so the
+         top of the frame and the top of the photograph are one and the same
+         line, and that line is the first line of the copy beside it: the two
+         columns begin together and the picture is never letterboxed down away
+         from the text. Nothing is stretched: object-fit keeps the image whole.
+
+         The selector carries the class twice so it outranks the fixed accent
+         height a detail may inherit from the role it landed on, and the hairline
+         frame the standalone treatment draws, whatever the order of the sheet. */
+      .pp-pillar .pp-media-row .pp-media.pp-media--presentation-detail img {
+        height: auto;
+        border: 0;
+        background: transparent;
       }
       .pp-media-row .pp-media--presentation-detail img {
         height: auto;

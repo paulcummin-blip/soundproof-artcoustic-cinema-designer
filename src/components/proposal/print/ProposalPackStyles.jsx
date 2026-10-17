@@ -34,6 +34,28 @@ export default function ProposalPackStyles() {
         --pp-slate: #3E4349;
         --pp-heading: var(--report-font-heading, "Futura PT Light", "Century Gothic", sans-serif);
         --pp-body: var(--report-font-body, "Didact Gothic", "Century Gothic", sans-serif);
+
+        /* ── ONE SECTION SPACING RHYTHM ─────────────────────────────────────
+           Every sheet of the pack is composed to these four steps, so the space
+           around a section is one deliberate decision rather than a value tuned
+           per section:
+
+             --pp-gap-section   a paragraph → the next major section's eyebrow
+             --pp-gap-eyebrow   the eyebrow ("The Sound Experience") → the heading
+             --pp-gap-rule      the heading → the rule that closes it
+             --pp-gap-divider   that rule → the content it introduces
+
+           Each step is applied as PADDING on the block that FOLLOWS it, so the
+           gap is part of that block's own measured height: a sheet allocation
+           can never close it up, and copy that runs a line longer, wraps
+           differently, or a photograph taller than expected simply pushes what
+           follows further down the sheet. Nothing here is positioned absolutely
+           and no gap is ever compressed to keep a composition on one sheet: a
+           composition that no longer fits continues on the next sheet instead. */
+        --pp-gap-section: 14mm;
+        --pp-gap-eyebrow: 6mm;
+        --pp-gap-rule: 4mm;
+        --pp-gap-divider: 10mm;
       }
 
       /* ── Page header: number, kicker, tracked title, lead, rule. The rule is
@@ -521,8 +543,15 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-page--flow .pp-header {
         margin-bottom: 10mm;
       }
+      /* A section continuing on a sheet the section before it opened is still a
+         NEW major section, so it takes the full section step above it. The step
+         is padding, not a margin: the gap is then part of the block that is
+         measured, so a sheet allocation can never place the heading against the
+         copy above it, and a longer paragraph above pushes it further down
+         instead of crowding it. */
       .proposal-print-portal .pp-header--continued {
-        margin-top: 14mm;
+        margin-top: 0;
+        padding-top: var(--pp-gap-section);
       }
       .proposal-print-portal .pp-header--continued .pp-header__title {
         font-size: 15pt !important;
@@ -552,6 +581,17 @@ export default function ProposalPackStyles() {
          heading, then each structure's own heading and its complete explanation,
          then the photograph that supports it. The structures are the same editorial
          weight as each other, so none of them reads as an unrelated page. */
+      /* The group opens a major section of the sheet, so it takes the full
+         section step above it — wherever it follows something on the sheet it
+         shares. The step is padding on the group itself, so it is measured with
+         the group and can never be closed up by an allocation; where the group
+         opens a sheet of its own, the sheet's own top margin is the space above
+         it and no second gap is added. */
+      .proposal-print-portal .pp-pillars:not(:first-child) {
+        padding-top: var(--pp-gap-section);
+      }
+      /* The eyebrow that names the group, and the controlled step down to the
+         heading it introduces. */
       .proposal-print-portal .pp-pillars__title {
         font-family: var(--pp-heading) !important;
         font-size: 9pt !important;
@@ -559,14 +599,22 @@ export default function ProposalPackStyles() {
         letter-spacing: 0.24em !important;
         text-transform: uppercase !important;
         color: var(--pp-warm) !important;
-        margin: 0 0 6mm !important;
+        margin: 0 0 var(--pp-gap-eyebrow) !important;
         padding-bottom: 3mm;
         border-bottom: 1px solid var(--pp-rule);
         break-after: avoid;
         page-break-after: avoid;
       }
+      /* A structure's own heading inside the group: the step above it is the one
+         the boundary already carries, and the heading keeps the group's own
+         step down to its rule and then to the copy the rule introduces — the
+         same three steps as every other section of the pack. */
       .proposal-print-portal .pp-pillar .pp-header--continued {
         margin-top: 0;
+        padding-top: 0;
+      }
+      .proposal-print-portal .pp-pillar .pp-header {
+        margin-bottom: var(--pp-gap-divider);
       }
       .proposal-print-portal .pp-pillar .pp-header__title {
         font-size: 14pt !important;
