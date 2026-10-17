@@ -5,7 +5,7 @@ import { associateDealerIdentityCore } from '../base44/shared/dealerIdentityAsso
 import { consumePilotPortalLaunch, PILOT_EXTERNAL_SUBJECT, PILOT_SOUND_PROOF_ACCOUNT_ID } from '../base44/shared/portalSsoAuthority.js';
 
 const DEALER_ID = '11111111-2222-4333-8444-555555555555';
-const ENDPOINT = 'https://identity.example/functions/v1/dealer-identity-resolve';
+const ENDPOINT = 'https://jzwuhrmbshfyybxbeckf.supabase.co/functions/v1/dealer-identity-resolve';
 
 function fixture() {
   const user = { id: 'base44-user-1', email: 'dealer@example.com', role: 'user', account_id: PILOT_SOUND_PROOF_ACCOUNT_ID };
