@@ -32,8 +32,15 @@ export default function ProjectImagesPage({
   kicker = 'Visualisation',
   images = [],
   preserveNatural = false,
+  lead = '',
 }) {
   if (!images.length) return null;
+  // The images copy the writer wrote for this project, when no other page has
+  // published it above the photographs. It is printed once, under the heading, so
+  // no approved wording is lost when the project's photographs are composed here.
+  const leadBlock = lead ? (
+    <div className="pp-body pp-image-flow__lead" dangerouslySetInnerHTML={{ __html: lead }} />
+  ) : null;
 
   // A sheet of the designer's supporting images — the ones they marked Detail or
   // Cropped Detail. They are supporting evidence, never the page hero: the sheet
@@ -45,6 +52,7 @@ export default function ProjectImagesPage({
     return (
       <section className="proposal-print-section pp-page pp-page--images pp-page--supporting-images">
         <ProposalPageHeader number={number} kicker={kicker} title={title} />
+        {leadBlock}
         <div className="pp-gallery pp-gallery--supporting">
           {images.map((asset) => (
             <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset}
@@ -62,6 +70,7 @@ export default function ProjectImagesPage({
     return (
       <section className="proposal-print-section pp-page pp-page--images">
         <ProposalPageHeader number={number} kicker={kicker} title={title} />
+        {leadBlock}
         <div className={`pp-gallery pp-gallery--natural pp-gallery--${Math.min(images.length, 4)}`}>
           {images.map((asset) => (
             <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset} preserveNatural />
@@ -76,6 +85,7 @@ export default function ProjectImagesPage({
   return (
     <section className="proposal-print-section pp-page pp-page--images">
       <ProposalPageHeader number={number} kicker={kicker} title={title} />
+      {leadBlock}
       <div className={`pp-gallery pp-gallery--${images.length}`}>
         <ProposalGalleryFigure asset={hero} className="pp-gallery__hero" />
         {supporting.length > 0 && (

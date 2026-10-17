@@ -150,11 +150,24 @@ export function flowImagePair(layout, a, b) {
  * @param {Array}  args.sources the photographs, in gallery order
  * @param {Array}  args.targets the document's narrative pages, in publication
  *   order: {section_id, section_type, page, placed_count}
+ * @param {Object} args.usedPages the pages each source is already used on, keyed
+ *   by source id, so an integrated photograph is never placed within the
+ *   document's minimum page gap of its own earlier use — the cover page's use
+ *   included. A photograph that has nowhere to go within that rule is kept for
+ *   the image section rather than placed too close to itself.
+ * @param {number} args.minPageGap the caller's own minimum page gap, passed in so
+ *   the two rules can never drift apart.
  * @returns {{groups: Array, remainder: Array}} the pages that received
  *   photographs — {id, section_id, section_type, page, layout, sources} — and
  *   the photographs left over, which is what a gallery spread would carry.
  */
-export function planImageFlow({ sources = [], targets = [] } = {}) {
+export function planImageFlow({
+  sources = [],
+  targets = [],
+  usedPages = {},
+  minPageGap = 2,
+} = {}) {
+  const pageGap = Math.max(1, Number(minPageGap) || 2);
   const list = (Array.isArray(sources) ? sources : []).filter((asset) => asset?.id);
   const pages = (Array.isArray(targets) ? targets : [])
     .filter((target) => target?.section_id && acceptsFlowImage(target.section_type))
@@ -173,13 +186,33 @@ export function planImageFlow({ sources = [], targets = [] } = {}) {
   // The page a photograph joins: the one its own purpose belongs with where the
   // document has such a page, then a page that carries no photograph yet — the
   // natural home for a new one — and only then a page that already carries one.
+  // Whether a page is far enough from this source's own earlier uses — the cover
+  // page's use included — for the source to be composed on it again.
+  const clearOfEarlierUses = (page, asset) => (usedPages[asset?.id] || [])
+    .every((used) => Math.abs(Number(page.page) - Number(used)) >= pageGap);
+  const canTake = (page, asset, minimumCapacity = 1) => page.capacity >= minimumCapacity
+    && clearOfEarlierUses(page, asset);
+
   const pageFor = (asset, minimumCapacity = 1) => {
     const preferred = purposeSectionTypes(imagePurposeOf(asset));
-    const purposePage = pages.find((page) => page.capacity >= minimumCapacity
+    const purposePage = pages.find((page) => canTake(page, asset, minimumCapacity)
       && preferred.includes(page.section_type));
-    const emptyPage = pages.find((page) => page.capacity >= FLOW_IMAGES_PER_PAGE);
-    const anyPage = pages.find((page) => page.capacity >= minimumCapacity);
+    const emptyPage = pages.find((page) => canTake(page, asset, FLOW_IMAGES_PER_PAGE));
+    const anyPage = pages.find((page) => canTake(page, asset, minimumCapacity));
     return purposePage || emptyPage || anyPage || null;
+  };
+
+  // The page two photographs can share: one that has room for both and is far
+  // enough from each of their own earlier uses, preferring a section either of
+  // them belongs with.
+  const sharedPageFor = (a, b) => {
+    const preferred = [
+      ...purposeSectionTypes(imagePurposeOf(a)),
+      ...purposeSectionTypes(imagePurposeOf(b)),
+    ];
+    const shared = pages.filter((page) => canTake(page, a, FLOW_IMAGES_PER_PAGE)
+      && canTake(page, b, FLOW_IMAGES_PER_PAGE));
+    return shared.find((page) => preferred.includes(page.section_type)) || shared[0] || null;
   };
 
   const openGroup = (page, layout, sources) => {
@@ -198,28 +231,27 @@ export function planImageFlow({ sources = [], targets = [] } = {}) {
 
   while (index < list.length) {
     const asset = list[index];
+    const next = list[index + 1] || null;
+    // TWO PHOTOGRAPHS THAT WOULD EACH TAKE A PAGE OF THEIR OWN SHARE ONE PAGE.
+    // This is decided first: where such a page exists, both photographs are
+    // composed on it, and only what cannot share a page takes a page alone.
+    const sharedPage = next ? sharedPageFor(asset, next) : null;
+    if (sharedPage) {
+      const layout = flowImageLayoutFor(asset, next);
+      openGroup(sharedPage, layout, flowImagePair(layout, asset, next));
+      index += 2;
+      continue;
+    }
     const page = pageFor(asset);
     if (!page) {
-      // Every narrative page is full: what is left is the image section's own,
-      // and nothing is dropped for want of a page.
+      // Every narrative page is full, or used too recently by this source: what
+      // is left is the image section's own, and nothing is dropped for want of a
+      // page.
       remainder.push(...list.slice(index));
       break;
     }
-    const next = list[index + 1] || null;
-    // Two photographs that would each take a page of their own share this one,
-    // unless the second belongs with a section of its own.
-    const second = next && page.capacity >= FLOW_IMAGES_PER_PAGE
-      && pageFor(next, FLOW_IMAGES_PER_PAGE) === page
-      ? next
-      : null;
-    if (!second) {
-      openGroup(page, FLOW_IMAGE_LAYOUT.SINGLE, [asset]);
-      index += 1;
-      continue;
-    }
-    const layout = flowImageLayoutFor(asset, second);
-    openGroup(page, layout, flowImagePair(layout, asset, second));
-    index += 2;
+    openGroup(page, FLOW_IMAGE_LAYOUT.SINGLE, [asset]);
+    index += 1;
   }
 
   return { groups, remainder };

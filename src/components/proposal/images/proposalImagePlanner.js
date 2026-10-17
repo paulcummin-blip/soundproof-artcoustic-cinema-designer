@@ -400,13 +400,40 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   //     pages, in publication order, and the plan states how many of each page's
   //     places are already taken — so a page that already carries a photograph
   //     takes one more, and a page that carries none may take a pair.
-  const placedIds = new Set(placements.map((placement) => placement.source_asset_id).filter(Boolean));
+  // The cover page's own use is not a body placement: a photograph chosen for the
+  // cover is never consumed by that choice, so the same source is still
+  // integrated here when the rhythm had no body slot for it — it is never
+  // dropped, and it is never kept out of the body for having been the cover.
+  const placedIds = new Set(
+    placements
+      .filter((placement) => placement.editorial_role !== EDITORIAL_ROLE.COVER)
+      .map((placement) => placement.source_asset_id)
+      .filter(Boolean),
+  );
+  // A photograph the document has already shown on its cover is still available
+  // to the narrative — the cover selection never consumes it — but among the
+  // photographs that share a page it takes the later place, so the page two
+  // photographs share carries the ones the client has not seen yet.
+  const shownOnCover = new Set(
+    placements
+      .filter((placement) => placement.editorial_role === EDITORIAL_ROLE.COVER)
+      .map((placement) => placement.source_asset_id)
+      .filter(Boolean),
+  );
   const flow = planImageFlow({
-    sources: unplaced.filter((asset) => !placedIds.has(asset.id)),
+    sources: unplaced
+      .filter((asset) => !placedIds.has(asset.id))
+      .sort((a, b) => Number(shownOnCover.has(a.id)) - Number(shownOnCover.has(b.id))),
     targets: entries.map((entry) => ({
       ...entry,
       placed_count: placements.filter((placement) => placement.section_id === entry.section_id).length,
     })),
+    // Every use already committed, so an integrated photograph is never composed
+    // within the minimum page gap of its own earlier use.
+    usedPages: Object.fromEntries(
+      [...history.entries()].map(([id, uses]) => [id, uses.map((use) => use.pagePosition)]),
+    ),
+    minPageGap: MIN_PAGE_GAP,
   });
   flow.groups.forEach((group) => {
     group.sources.forEach((source) => {

@@ -201,7 +201,12 @@ test('the plan stays inside the editorial rules', () => {
     comparisonImageIds: PLAN.comparisonImageIds,
   });
   assert.equal(validation.valid, true, JSON.stringify(validation.violations));
-  assert.equal(validation.checked, JOOCED_IMAGES.length);
+  // Every placement is checked, the cover page's own use included. The cover
+  // photograph now takes its own place in the narrative as well as on the cover,
+  // in a different crop and a full page clear of it, so the count is the
+  // placements rather than the images — and nothing was dropped to achieve it.
+  assert.equal(validation.checked, PLAN.placements.length);
+  assert.equal(PLAN.placements.length, JOOCED_IMAGES.length + 1);
 });
 
 /** The live generation record the writer prompt is built from: the pack only. */

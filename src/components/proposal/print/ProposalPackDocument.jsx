@@ -229,6 +229,24 @@ export default function ProposalPackDocument({
     : false;
   let imageFlowLeadPending = !closingSectionWillPrint;
 
+  // The copy the writer wrote for the project's images, prepared once. It is
+  // published ONCE, above the photographs the project actually carries, whichever
+  // page composes them first — the pair that closes the design, the first section
+  // a photograph is integrated into, or the image page the remainder keeps. It is
+  // never printed twice and never dropped for want of a page to print it on.
+  const roomImagesLead = prepareSectionBody(byType.get('room_images')?.body, {
+    title: byType.get('room_images')?.title || '',
+    sectionType: 'room_images',
+    proseOnly: true,
+    highChannel,
+    proposalType: reportType,
+  });
+  const takeImageFlowLead = () => {
+    if (!imageFlowLeadPending || !roomImagesLead) return '';
+    imageFlowLeadPending = false;
+    return roomImagesLead;
+  };
+
   // ── ONE carrier for the document's alternatives ──────────────────────────
   // Whether the designer grouped them as seating styles or as a comparison set,
   // the alternatives and the validated Presented Options prose that explains them
@@ -352,11 +370,11 @@ export default function ProposalPackDocument({
     comparisonPagesPlaced = true;
   };
 
-  const pushUnplacedImages = (title = 'Project Images') => {
+  const pushUnplacedImages = (title = 'Project Images', lead = '') => {
     if (galleryPagesPlaced || !galleryPageImages.length) return;
     imagePagesFor(galleryPageImages).forEach((images, index) => {
       addPage(<ProjectImagesPage key={`selected-images:${index}`} number={takeNumber()}
-        title={title} images={images} preserveNatural />);
+        title={title} images={images} preserveNatural lead={index === 0 ? lead : ''} />);
     });
     galleryPagesPlaced = true;
   };
@@ -456,16 +474,25 @@ export default function ProposalPackDocument({
           // No images page: either the document places its images editorially,
           // or there are no images at all — which is stated, once.
           if (imagePlan.usableCount > 0) return;
+          // This section states that the project carries no imagery. Its own
+          // approved copy prints with that statement — once, here — rather than
+          // being left behind by a page that composes no photographs.
+          const emptyLead = takeImageFlowLead();
           addPage(
             <section key={section.id} className="proposal-print-section pp-page pp-page--images">
               <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={displayTitle} />
+              {emptyLead ? (
+                <div className="pp-body pp-image-flow__lead" dangerouslySetInnerHTML={{ __html: emptyLead }} />
+              ) : null}
               <ProjectImagesBlock images={projectImages} />
             </section>
           );
           return;
         }
-        // Preserve every unused selected photograph, with its caption and natural proportions.
-        pushUnplacedImages(displayTitle);
+        // Preserve every unused selected photograph, with its caption and natural
+        // proportions — and, where no other page published it, the project's own
+        // images copy above them.
+        pushUnplacedImages(displayTitle, takeImageFlowLead());
         return;
       }
 
@@ -536,29 +563,15 @@ export default function ProposalPackDocument({
           order: 0,
         })]
         : [];
-      // The section's own copy for the images it closes with: the Project Images
-      // introduction, published here above the photographs it was written for, so
-      // none of the document's validated copy is lost when that section prints no
-      // page of its own.
-      const roomImagesLead = prepareSectionBody(byType.get('room_images')?.body, {
-        title: byType.get('room_images')?.title || '',
-        sectionType: 'room_images',
-        proseOnly: true,
-        highChannel,
-        proposalType: reportType,
-      });
-      const closingLead = closingPlacements.length > 0 ? roomImagesLead : '';
+      // The section's copy for the images it closes with: the Project Images
+      // introduction, published above the photographs it was written for. The lead
+      // is taken once, so it is never printed twice and never lost.
+      const closingLead = closingPlacements.length > 0 ? takeImageFlowLead() : '';
 
       // The photographs the plan integrated into THIS section: they follow its
       // copy, so they read between this section's text and the next section's.
-      // Where the design does not close with a photograph, the first of them
-      // carries the Project Images introduction instead, so the copy is published
-      // once wherever the photographs actually are.
       const imageFlow = flowGroupsBySection[section.id] || [];
-      const imageFlowLead = imageFlow.length > 0 && imageFlowLeadPending && roomImagesLead
-        ? roomImagesLead
-        : '';
-      if (imageFlowLead) imageFlowLeadPending = false;
+      const imageFlowLead = imageFlow.length > 0 ? takeImageFlowLead() : '';
 
       // The seating images this page carries, when the validated Presented
       // Options section leads the seating group this document has.
@@ -776,7 +789,7 @@ export default function ProposalPackDocument({
   }
 
   if (!comparisonPagesPlaced && comparisonGroups.length) pushComparisonPages();
-  pushUnplacedImages();
+  pushUnplacedImages('Project Images', takeImageFlowLead());
 
   return (
     <div className="proposal-print-portal" data-selected-images={JSON.stringify(imagePlan.selectedImageUrls)}>
