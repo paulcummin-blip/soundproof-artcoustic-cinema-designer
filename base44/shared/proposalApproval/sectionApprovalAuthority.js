@@ -68,6 +68,11 @@ function contentDigest(text) {
   return hash.toString(16).padStart(8, '0');
 }
 
+/** The identity of the exact words printed on one published page. */
+export function publishedSectionFingerprint(value) {
+  return contentDigest(approvalPlainText(value));
+}
+
 /**
  * The fingerprint of the content a designer approved.
  *
@@ -122,6 +127,8 @@ export function resolveSectionApproval({ sections = [], publishedSections = [] }
   const rows = document.map((published, index) => {
     const record = storedById.get(published?.id) || storedByType.get(published?.section_type) || null;
     const approval = record?.metadata?.approval || null;
+    const publicationRevision = record?.metadata?.publication_revision || null;
+    const publishedPageFingerprint = publishedSectionFingerprint(published?.body ?? record?.body ?? '');
     const fingerprint = sectionApprovalFingerprint({
       publishedBody: published?.body ?? record?.body ?? '',
       storedBody: record?.body ?? '',
@@ -143,6 +150,12 @@ export function resolveSectionApproval({ sections = [], publishedSections = [] }
       approved_by: approved ? (approval.approved_by ?? null) : null,
       approved_fingerprint: approval?.fingerprint ?? null,
       fingerprint,
+      published_page_fingerprint: publishedPageFingerprint,
+      revision_id: publicationRevision?.revision_id ?? null,
+      generation_id: publicationRevision?.generation_id ?? null,
+      edit_id: publicationRevision?.edit_id ?? null,
+      approved_revision_id: approved ? (approval?.revision_id ?? publicationRevision?.revision_id ?? null) : null,
+      approved_published_page_fingerprint: approved ? (approval?.published_page_fingerprint ?? publishedPageFingerprint) : null,
       // An approval that no longer matches: the section was changed after it was
       // approved, so it is awaiting approval again.
       content_changed: Boolean(approval) && !approved,
