@@ -783,14 +783,17 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
 });
 
 /**
- * THE REFRAME, ON THE PAGE. A render's status has to be clear to the CLIENT, and the
- * design is that the page carries it: the narrative never carries a disclaimer. Both
- * client-facing surfaces are composed here and must state it.
+ * THE CLIENT-FACING PAGE SHOWS THE IMAGE AND NOTHING ELSE. A render is not
+ * over-explained to the client: no concept-visual status line and no explanatory
+ * caption is printed with it. The status itself is unchanged and stays behind the
+ * scenes — the writing authority still states it to the writer and still forbids
+ * the narrative from carrying a disclaimer — so the rule survives while the
+ * client-facing document stays quiet.
  */
-describe('the concept-visual status is carried by the page the client reads', () => {
+describe('the client-facing page shows the render without a status caption', () => {
   const IMAGE_URL = 'https://files.soundproof.test/public/aa11_genesis-room.jpg';
 
-  it('labels the Project Images page of the pack', () => {
+  it('prints the Project Images page with no status line under the images', () => {
     const gallery = renderToStaticMarkup(React.createElement(ProjectImagesBlock, {
       images: [{
         id: 'i1',
@@ -801,27 +804,37 @@ describe('the concept-visual status is carried by the page the client reads', ()
       }],
     }));
 
+    // The designer's own caption and the image itself are untouched...
     expect(gallery).toContain('The finished cinema');
-    expect(gallery).toContain(CONCEPT_RENDER_LABEL);
+    expect(gallery).toContain(IMAGE_URL);
+    // ...and no concept-visual status line is printed with it.
+    expect(gallery).not.toContain(CONCEPT_RENDER_LABEL);
+    expect(gallery).not.toContain(CONCEPT_RENDER_FINISHES_LABEL);
+    expect(gallery).not.toContain('proposal-images__concept-note');
   });
 
-  it('labels every placed render, and states an offered option as an illustrated finish', () => {
-    const room = renderToStaticMarkup(React.createElement(ProposalImagePlacement, {
-      placement: {
-        id: 'p1',
-        source_file_url: IMAGE_URL,
-        editorial_role: 'landscape_feature',
-        source_caption: 'The room as the client will see it',
-      },
-    }));
-    expect(room).toContain(CONCEPT_RENDER_LABEL);
-    expect(room).not.toContain(CONCEPT_RENDER_FINISHES_LABEL);
+  it('prints no status line beside any placed render, whatever it is there for', () => {
+    const placements = [
+      { id: 'p1', source_file_url: IMAGE_URL, editorial_role: 'landscape_feature', source_caption: 'The room as the client will see it' },
+      { id: 'p2', source_file_url: IMAGE_URL, editorial_role: 'seating_option' },
+      { id: 'p3', source_file_url: IMAGE_URL, editorial_role: 'comparison_option' },
+      { id: 'p4', source_file_url: IMAGE_URL, editorial_role: 'portrait_editorial' },
+    ];
 
-    // An option the client is being offered is an interior illustration, and says so.
-    const option = renderToStaticMarkup(React.createElement(ProposalImagePlacement, {
-      placement: { id: 'p2', source_file_url: IMAGE_URL, editorial_role: 'seating_option' },
+    for (const placement of placements) {
+      const printed = renderToStaticMarkup(React.createElement(ProposalImagePlacement, { placement }));
+      // The image is still placed, unchanged...
+      expect(printed).toContain(IMAGE_URL);
+      // ...with no explanatory commentary of any kind printed with it.
+      expect(printed).not.toContain(CONCEPT_RENDER_LABEL);
+      expect(printed).not.toContain(CONCEPT_RENDER_FINISHES_LABEL);
+      expect(printed).not.toContain('pp-media__note');
+    }
+
+    // A caption the designer supplied still prints; only the status line is gone.
+    const captioned = renderToStaticMarkup(React.createElement(ProposalImagePlacement, {
+      placement: { id: 'p5', source_file_url: IMAGE_URL, editorial_role: 'landscape_feature', source_caption: 'The finished room' },
     }));
-    expect(option).toContain(CONCEPT_RENDER_FINISHES_LABEL);
-    expect(option).not.toContain(CONCEPT_RENDER_LABEL);
+    expect(captioned).toContain('The finished room');
   });
 });
