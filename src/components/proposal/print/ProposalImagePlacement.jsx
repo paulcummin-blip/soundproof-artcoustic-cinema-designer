@@ -17,6 +17,7 @@ import React from 'react';
 import {
   EDITORIAL_ROLE,
   IMAGE_PRESENTATION,
+  SOURCE_PROPORTION_STYLE,
   objectPositionForFocalPoint,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
 
@@ -51,6 +52,14 @@ export default function ProposalImagePlacement({
   const effectivePresentation = protectedDrawing ? IMAGE_PRESENTATION.DETAIL : presentation;
   const presentationClass = effectivePresentation ? ` pp-media--presentation-${effectivePresentation}` : '';
   const detail = effectivePresentation === IMAGE_PRESENTATION.DETAIL;
+  // FULL WIDTH means THE UPLOADED IMAGE IS THE COMPOSITION: the full content
+  // width, the image's own height and its own proportions. The uploaded
+  // composition is intentional, so it is never re-cropped, never given a fixed
+  // height and never fitted to a template ratio. An image too tall for the
+  // printable area is scaled as a whole by the measured compositor — a scale,
+  // never a crop — and where the copy and the image cannot share a sheet, the
+  // copy moves and the image keeps its area.
+  const fullWidth = effectivePresentation === IMAGE_PRESENTATION.FULL_WIDTH;
 
   return (
     <figure className={`pp-media pp-media--${treatment}${closingClass}${presentationClass} ${className}`.trim()}>
@@ -64,11 +73,13 @@ export default function ProposalImagePlacement({
         // framed on: centre / middle unless the designer chose otherwise.
         style={detail
           ? { objectFit: 'contain', objectPosition: '50% 50%' }
-          : { objectPosition: objectPositionForFocalPoint(placement.focal_point) }}
+          : fullWidth
+            ? { ...SOURCE_PROPORTION_STYLE, objectPosition: objectPositionForFocalPoint(placement.focal_point) }
+            : { objectPosition: objectPositionForFocalPoint(placement.focal_point) }}
         data-presentation={effectivePresentation || 'unstated'}
         data-selected-presentation={presentation || 'unstated'}
         data-purpose={purpose || 'unstated'}
-        data-crops={detail ? 'no' : 'yes'}
+        data-crops={detail || fullWidth ? 'no' : 'yes'}
       />
       {captionText ? <figcaption className="pp-media__caption">{captionText}</figcaption> : null}
     </figure>

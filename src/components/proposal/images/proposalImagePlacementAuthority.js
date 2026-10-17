@@ -118,6 +118,25 @@ export const PRESENTATION_WIDTH_PERCENT = Object.freeze({
 });
 
 /**
+ * HOW AN IMAGE IS SHOWN WHEN THE SOURCE ITSELF IS THE COMPOSITION.
+ *
+ * FULL WIDTH means the uploaded image is used AS UPLOADED: the full content
+ * width, the image's own height and its own proportions. The uploaded
+ * composition is intentional, so the renderer never re-crops it, never gives it
+ * a fixed height and never imposes a template aspect ratio on it — a taller
+ * source stays taller and a shorter source stays shorter. A source too tall for
+ * the printable area is scaled as a whole to fit it, which is a scale and never
+ * a crop. This is the one authority for that treatment, used by every surface
+ * that composes a full-width image.
+ */
+export const SOURCE_PROPORTION_STYLE = Object.freeze({
+  width: '100%',
+  height: 'auto',
+  maxHeight: 'none',
+  objectFit: 'contain',
+});
+
+/**
  * The share a DIMENSIONED DRAWING keeps. A drawing that must be shown whole is
  * not reduced to the supporting share: at that size its dimensions, symbols and
  * annotations stop being readable, so it keeps the established legible frame on

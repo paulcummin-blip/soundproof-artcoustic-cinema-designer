@@ -21,6 +21,7 @@ import { ASSET_SLOT, imagesInSlotOrder } from '@/components/proposal/assetSlotAu
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import {
   COMPOSITION_WEIGHT,
+  SOURCE_PROPORTION_STYLE,
   presentationComposition,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
 
@@ -49,11 +50,12 @@ export function imageCompositionRuns(gallery = []) {
   return runs;
 }
 
-function GalleryFigure({ entry, className = '' }) {
+function GalleryFigure({ entry, className = '', sourceProportions = false }) {
   const { asset } = entry;
   return (
     <figure className={`proposal-images__figure ${className}`.trim()}>
-      <img src={asset.file_url} alt={asset.caption || 'Project image'} />
+      <img src={asset.file_url} alt={asset.caption || 'Project image'}
+        style={sourceProportions ? SOURCE_PROPORTION_STYLE : undefined} />
       {asset.caption ? (
         <figcaption className="proposal-images__caption text-[#625143]" style={proposalRoleStyle('caption')}>
           {asset.caption}
@@ -81,8 +83,12 @@ export default function ProjectImagesBlock({ images = [], className = '' }) {
         // The designer's Full Width choice: a dominant block of its own, at the
         // full content width, never reduced to a supporting slot.
         if (run.weight === COMPOSITION_WEIGHT.PRIMARY) {
+          // FULL WIDTH: the uploaded image is the composition — the full content
+          // width and its own height, at its own proportions. The renderer never
+          // re-crops it and never imposes a fixed template ratio on it.
           return run.entries.map((entry) => (
             <GalleryFigure key={entry.asset.id || entry.asset.file_url} entry={entry}
+              sourceProportions
               className="proposal-images__figure--feature proposal-images__lead" />
           ));
         }
