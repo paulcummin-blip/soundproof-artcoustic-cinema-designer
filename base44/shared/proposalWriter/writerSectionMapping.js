@@ -175,4 +175,85 @@ export function composeWriterSectionBodies({ output = null, mode = 'comparison',
   return { bodies, unmapped };
 }
 
+const HTML_ENTITIES = Object.freeze({
+  nbsp: ' ',
+  amp: '&',
+  quot: '"',
+  apos: "'",
+  lt: '<',
+  gt: '>',
+});
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&#(x[0-9a-f]+|\d+);/gi, (_, code) => String.fromCodePoint(
+      Math.min(0x10ffff, code[0].toLowerCase() === 'x' ? parseInt(code.slice(1), 16) : Number(code)),
+    ))
+    .replace(/&(nbsp|amp|quot|apos|lt|gt);/gi, (_, name) => HTML_ENTITIES[name.toLowerCase()]);
+}
+
+/** Turn the stored proposal HTML back into writer prose without losing paragraphs. */
+export function writerTextFromNarrativeHtml(value) {
+  return decodeHtmlEntities(String(value || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p\s*>/gi, '\n\n')
+    .replace(/<\/li\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, ' '))
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function escapedPattern(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Recover the writer-section drafts represented by one proposal section body.
+ *
+ * Most proposal sections contain one writer section. The opening section carries
+ * three, separated by the exact headings used when the validated copy was handed
+ * to the page. Refusing a missing or reordered heading prevents an editorial pass
+ * from silently assigning prose to the wrong writer section.
+ */
+export function writerDraftsFromProposalSectionBody({
+  sectionType = null,
+  body = '',
+  mode = 'comparison',
+} = {}) {
+  const writerSections = WRITER_SECTION_IDS.filter(
+    (id) => PROPOSAL_SECTION_FOR_WRITER_SECTION[id] === sectionType,
+  );
+  if (writerSections.length === 0) {
+    throw new Error(`Proposal section has no writer authority: ${sectionType || 'unknown'}.`);
+  }
+  if (writerSections.length === 1) {
+    return { [writerSections[0]]: writerTextFromNarrativeHtml(body) };
+  }
+
+  const titleById = new Map(writerSectionsForMode(mode).map((entry) => [entry.section, entry.title]));
+  const headings = writerSections.map((id) => {
+    const title = titleById.get(id) || id;
+    const expression = new RegExp(`<h2[^>]*>\\s*${escapedPattern(title)}\\s*<\\/h2>`, 'i');
+    const match = expression.exec(String(body || ''));
+    if (!match) throw new Error(`Proposal section is missing the validated heading: ${title}.`);
+    return { id, title, index: match.index, end: match.index + match[0].length };
+  });
+
+  for (let index = 1; index < headings.length; index += 1) {
+    if (headings[index].index <= headings[index - 1].index) {
+      throw new Error('Proposal section headings are not in the validated writer order.');
+    }
+  }
+
+  return Object.fromEntries(headings.map((heading, index) => {
+    const next = headings[index + 1];
+    const html = String(body || '').slice(heading.end, next ? next.index : undefined);
+    const text = writerTextFromNarrativeHtml(html);
+    if (!text) throw new Error(`Proposal section has no wording beneath: ${heading.title}.`);
+    return [heading.id, text];
+  }));
+}
+
 export default composeWriterSectionBodies;
