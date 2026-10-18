@@ -80,11 +80,16 @@ function byWhom(user) {
   return user?.full_name || user?.email || null;
 }
 
-/** The section's metadata without its editorial marker, so an undo leaves no trace. */
+/**
+ * The section's metadata without its editorial marker, so an undo leaves no trace.
+ * The marker is omitted as the copy is rebuilt — the same metadata the previous
+ * in-place removal produced, with no key removal at all.
+ */
 function withoutMarker(metadata) {
-  const next = { ...(metadata && typeof metadata === 'object' ? metadata : {}) };
-  delete next.adi_editorial;
-  return next;
+  const { adi_editorial: _marker, ...rest } = (metadata && typeof metadata === 'object')
+    ? metadata
+    : {};
+  return rest;
 }
 
 /** Is this copy fit to be saved: every product it names is one this version specifies. */
