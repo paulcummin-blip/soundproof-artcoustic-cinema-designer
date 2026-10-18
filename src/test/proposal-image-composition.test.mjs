@@ -84,12 +84,12 @@ describe('the recorded presentation is read as one composition weight', () => {
 });
 
 describe('cover and body placement stay independent', () => {
-  it('does not reuse a cover-only asset in the body merely because it has an image purpose', () => {
+  it('uses an included cover source once on the cover and once in the body', () => {
     const cover = asset('cover', {
       slot: 'cover',
       usage: 'gallery',
       image_purpose: 'whole_room',
-      image_presentation: null,
+      image_presentation: IMAGE_PRESENTATION.FULL_WIDTH,
     });
     const body = fullWidth('body');
     const plan = planProposalImages({
@@ -103,10 +103,38 @@ describe('cover and body placement stay independent', () => {
       ],
     });
 
+    const coverUses = plan.placements.filter((placement) => placement.source_asset_id === cover.id);
+    const bodyUses = coverUses.filter((placement) => placement.editorial_role !== 'cover');
     expect(plan.coverPlacement.source_asset_id).toBe(cover.id);
-    expect(plan.placements.filter((placement) => placement.source_asset_id === cover.id)).toHaveLength(1);
-    expect(plan.flowImages.some((placement) => placement.source_asset_id === cover.id)).toBe(false);
+    expect(coverUses).toHaveLength(2);
+    expect(bodyUses).toHaveLength(1);
+    expect(bodyUses[0].source_file_url).toBe(cover.file_url);
+    expect(bodyUses[0].crop_orientation).toBe('landscape_full');
+    expect(bodyUses[0].image_presentation).toBe(IMAGE_PRESENTATION.FULL_WIDTH);
     expect(plan.placements.some((placement) => placement.source_asset_id === body.id)).toBe(true);
+  });
+
+  it('keeps legacy Use in proposal cover sources eligible for one body placement', () => {
+    const cover = asset('legacy-cover', {
+      slot: 'cover',
+      usage: 'gallery',
+      image_purpose: 'whole_room',
+      image_presentation: null,
+    });
+    const plan = planProposalImages({
+      assets: [cover, fullWidth('body-a'), fullWidth('body-b')],
+      coverAssetId: cover.id,
+      sectionSlots: [
+        { section_type: 'system_design_summary', section_id: 'summary' },
+        { section_type: 'spatial_resolution', section_id: 'spatial' },
+        { section_type: 'dynamic_range', section_id: 'dynamic' },
+        { section_type: 'timbre_matching', section_id: 'timbre' },
+      ],
+    });
+
+    expect(plan.placements.filter((placement) => placement.source_asset_id === cover.id)).toHaveLength(2);
+    expect(plan.placements.filter((placement) => placement.source_asset_id === cover.id
+      && placement.editorial_role !== 'cover')).toHaveLength(1);
   });
 });
 
