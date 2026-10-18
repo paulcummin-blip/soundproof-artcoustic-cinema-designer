@@ -107,6 +107,7 @@ export function buildAdiEditorialPrompt({
     ...ADI_AUTHORITY_BOUNDARY.map((entry) => `  - ${entry}`),
     '',
     'It may only improve the wording of meaning that is already in the copy above.',
+    'Do not make the text more impressive by adding plausible benefits or explanations. If an idea is not already expressed in the source copy, do not introduce it. Better wording may be simpler than the original.',
     'Every number, every level, every product name, every seating scope, every limitation and every assumption stays exactly as it is. If a sentence states a limit, a caveat or an assumption, the improved sentence states it too.',
     `Never add a sentence, and never drop a sentence: the copy is the same copy, said better.`,
     RULE,
