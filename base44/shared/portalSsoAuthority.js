@@ -27,8 +27,9 @@ export { providerAccessToken, providerIdToken };
 
 // The pilot gate's reads, its binding check and its verdict live in
 // portalSessionGateRead.js, so a caller that may only read resolves the gate without
-// this module's bookkeeping. The mapping reader is re-exported here unchanged, so
-// every existing entry point stays exactly where it was.
+// this module's bookkeeping. This module keeps the gate's own writes and re-exports
+// the mapping reader unchanged, so every existing entry point stays where it was.
+export { resolvePilotPortalMapping };
 
 export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   bridgeUrl,
