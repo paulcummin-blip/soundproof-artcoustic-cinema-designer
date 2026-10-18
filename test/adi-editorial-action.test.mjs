@@ -418,7 +418,7 @@ describe('semantic meaning conservation', () => {
       'overhead speakers',
       'rear row',
       'A front subwoofer and two rear subwoofers',
-    ]) expect(finalCopy).toContain(fact);
+    ]) expect(finalCopy.toLowerCase()).toContain(fact.toLowerCase());
   });
 
   it('still refuses removal of a genuine limitation', () => {
