@@ -55,13 +55,14 @@ export async function applyProposalRevision({
     const record = stored.find((row) => row.section_type === body.section_type) || null;
     if (!record) throw new Error(`Proposal section is missing: ${body.section_type}`);
     const targetedPatch = sectionPatchByType?.[record.section_type] || null;
-    const baseMetadata = targetedPatch?.metadata ?? record.metadata;
+    const { body: _untrustedBody, metadata: targetedMetadata, ...targetedFields } = targetedPatch || {};
+    const baseMetadata = targetedMetadata ?? record.metadata;
     await entities.ProposalSection.update(record.id, {
       body: body.html,
       // Normal editor saves retain their existing behaviour. A caller that is
       // publishing one generated editorial change supplies the exact section
       // patch instead, so unchanged sections keep their approval timestamps.
-      ...(targetedPatch || (editId
+      ...(targetedPatch ? targetedFields : (editId
         ? { last_user_edited_at: appliedAt }
         : { last_gpt_generated_at: appliedAt })),
       metadata: publicationRevisionMetadata(baseMetadata, {
