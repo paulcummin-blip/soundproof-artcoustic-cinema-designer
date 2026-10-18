@@ -166,10 +166,34 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   const comparisonIds = new Set(comparisonGroupList.flatMap((group) => group.images.map((image) => image.id)));
   const isCompared = (asset) => Boolean(asset?.id) && comparisonIds.has(asset.id);
 
+  /** Whether the designer placed this source in the body, on its own card. */
+  const hasBodyPlacement = (asset) => Boolean(imagePresentationOf(asset) || imagePurposeOf(asset));
+
+  /**
+   * Whether the designer composed this source as a SUPPORTING image. Only a
+   * deliberate supporting choice is ever given the smaller portrait accent: a
+   * photograph with nothing recorded is never converted into a portrait, and a
+   * photograph the designer marked Full Width is never reduced to one.
+   */
+  const isSupportingPresentation = (asset) => {
+    const presentation = imagePresentationOf(asset);
+    return presentation === IMAGE_PRESENTATION.DETAIL
+      || presentation === IMAGE_PRESENTATION.CROPPED_DETAIL;
+  };
+
   // A seating-style image is a lifestyle alternative: it belongs to the seating
   // page and is never scattered through the narrative as a design feature.
   const seatingSources = usable.filter((asset) => asset !== coverAsset && !isCompared(asset) && seatingStyleOf(asset));
-  const narrativeSources = usable.filter((asset) => !isCompared(asset) && !seatingStyleOf(asset));
+  // THE DESIGNER PLACES A PHOTOGRAPH IN THE BODY, NOT THE CHOICE OF A COVER. An
+  // asset has a body placement only where its own card says so: how it is
+  // presented (Full Width / Detail / Cropped Detail) or what it is for. A cover
+  // selection is not one of those — a photograph chosen for the cover is composed
+  // on the cover, and the same source joins the narrative only when the designer
+  // placed it there as well. Nothing is dropped by this: a photograph with nothing
+  // recorded is still composed inside the narrative at its own proportions by the
+  // flow below.
+  const narrativeSources = usable.filter((asset) => !isCompared(asset) && !seatingStyleOf(asset)
+    && (hasBodyPlacement(asset) || asset !== coverAsset));
 
   // ── Page order. The cover is page 1; each composed section takes the next
   // page; the seating-style page sits immediately before the closing section,
@@ -272,16 +296,19 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   const isFullWidthPreference = (asset) => imagePresentationOf(asset) === IMAGE_PRESENTATION.FULL_WIDTH;
 
   /**
-   * The source for a portrait accent. It is a source of its own: returning the
-   * cover source here would repeat the cover treatment rather than add an accent
-   * to it, so no portrait is placed when no such source exists. A source the
-   * designer marked FULL WIDTH is passed over for the same reason — a prominent
-   * photograph is never reduced to an accent.
+   * The source for a portrait accent — and ONLY a source the designer composed as
+   * a supporting image. The accent is a smaller crop of a photograph, so it is
+   * placed only where the designer's own card asks for that treatment (Detail or
+   * Cropped Detail). A photograph with nothing recorded is never turned into a
+   * narrow portrait, and a photograph marked Full Width is never reduced to one:
+   * where no such source exists, the page carries its copy and no accent at all.
+   * Returning the cover source here would repeat the cover treatment rather than
+   * add an accent to it, so it is passed over for the same reason.
    */
   const pickPortrait = (pagePosition) => narrativeSources.find(
     (asset) => asset.id
       && asset.id !== coverAsset?.id
-      && !isFullWidthPreference(asset)
+      && isSupportingPresentation(asset)
       && usesOf(asset) === 0
       && eligible(asset, pagePosition, CROP_ORIENTATION.PORTRAIT),
   ) || null;
@@ -374,7 +401,11 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   );
   const unplaced = usable.filter(
     (asset) => asset.id && !bodyPlacedIds.has(asset.id)
-      && !seatingStyleOf(asset) && !isCompared(asset),
+      && !seatingStyleOf(asset) && !isCompared(asset)
+      // The cover source is composed on the cover, and is composed in the body
+      // only where the designer placed it there as well: choosing a photograph for
+      // the cover never puts it back into the narrative on its own.
+      && (hasBodyPlacement(asset) || asset !== coverAsset),
   );
 
   // 7. THE PHOTOGRAPHS THAT WOULD HAVE HAD A PAGE OF THEIR OWN JOIN THE

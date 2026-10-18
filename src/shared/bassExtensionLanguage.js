@@ -22,7 +22,7 @@ export const BASS_EXTENSION_LANGUAGE = Object.freeze({
   L1: 'Solid bass depth that gives films and music a fuller foundation.',
   L2: 'Deep bass that adds body and atmosphere to films and music.',
   L3: 'Very deep bass, extending into the lowest notes of a soundtrack.',
-  L4: 'Exceptional low-frequency extension, into the very deepest parts of a soundtrack.',
+  L4: 'Low-frequency extension that reaches the deepest notes a soundtrack carries.',
 });
 
 /**

@@ -146,6 +146,8 @@ Do not open with an equipment list, and do not describe a product in isolation u
 
 Use the supplied Sound Proof calculated data wherever it applies, and never invent a value.
 
+Where the brief records no reason for a decision, describe the arrangement plainly and supply no reason for it: state what has been specified and how the system is arranged, and leave the design reasoning to the brief and the clarifications that record it.
+
 This section is prose only. Do not write a list, a table, a highlights list or a performance summary of any kind, and do not introduce the Key Performance Highlights table: the report has one structured evidence section, and this is not it.
 3 to 4 short paragraphs.`,
 
@@ -159,6 +161,8 @@ Evidence to choose from, where it was assessed reliably: discrete channel count 
 
 Explain the listening result first, then the result that supports it. For example: the largest gap between adjacent speakers is 50 degrees, reaching RP22 Level 4, so effects have more physical positions to move through and movement around the room feels continuous rather than jumping between speakers.
 
+Describe the architecture itself, never its arrangement in praise: never write that the speakers are well spaced or that the spacing is great. State how many discrete positions the system has, where they sit around and above the audience, and what the client hears because of that, with the achieved level and the supplied value attached.
+
 Lead with the strongest area of the design. Mention one clear limitation honestly, in client-friendly language, without undermining the design, and say what causes it. Where the data supports it, note a sensible upgrade path.
 Do not list parameters mechanically and do not include a table.
 3 to 4 short paragraphs.`,
@@ -170,6 +174,8 @@ Choose the results that matter most for this room from the Dynamic Range results
 Let the listening experience carry the section: how quiet detail is resolved, how a powerful soundtrack moment arrives, and the contrast between the two in this room. Lead with what the client hears, then with what each part of the system gives that experience — the front stage for dialogue and screen action, the surrounds as the mix becomes demanding, the bass system underneath those moments — and leave the numbers to the evidence table, which prints every dBC value and RP22 level the client can read for themselves. Do not write an output figure into the prose: no sentence makes "99 dBC" or "109 dBC" its point. A measurement appears here only where the number itself genuinely helps the client understand the design, such as how low the bass system reaches.
 
 Explain in plain language how that headroom benefits dialogue, music and film effects at the listening level the design assumes.
+
+Do not lean on the same adjectives: exceptional, remarkably, powerful, considerable and cinema-scale appear at most once in the whole document, and wherever a result exists the result is written in their place (a dBC figure, a bass extension frequency, an achieved Performance Level). Prefer strong, close, consistent, useful or clear.
 
 Screen Dynamic Range (P12) and Non-screen Dynamic Range (P13) are the main evidence. Use the LFE and subwoofer result (P14) only where the bass output is reliable and relevant. Never reference P15.
 
@@ -194,6 +200,8 @@ Make it practical, for example: a voice or effect may begin on the screen, move 
 
 Where a reliable bass result exists, add a short bass performance paragraph explaining why the subwoofer positions were chosen. For a four-subwoofer design, explain that the main gain is usually consistency across seats rather than extra volume. Where a bass consistency result is supplied, explain it as more even bass across the seating area and less difference between the strongest and weakest seat. Do not raise a bass change of any kind: the layout was chosen deliberately, and a weak or missing consistency result is left out rather than reported.
 
+Keep every statement inside the group the evidence assessed: a tonal consistency result covers the seats that group\'s own result covers, it is never extended to the whole system, and it is never turned into a comparison between speaker groups.
+
 Keep it practical. Mention a clear limitation honestly where the data shows one, and note a sensible upgrade path where the data supports it.
 3 to 4 short paragraphs, no table.`,
 
@@ -215,7 +223,7 @@ Where the design is strongest, say so plainly and without qualification. Where t
 
 Close on the room as a place to be used and shared: this is a cinema meant to be lived in, watched properly and enjoyed with the people who share it. Say it once, in this project's own terms, in a sentence that could only be about this room, and never as a general sentiment about home cinema.
 
-Use only the supplied Sound Proof calculated data and the supplied design reasons, and never invent a value or a reason.
+Use only the supplied Sound Proof calculated data and the supplied design reasons, and never invent a value or a reason. Where the brief records no reason for a decision, state the decision and what it gives the client rather than a rationale, and keep this closing section modest while the brief is incomplete: it summarises the strengths of the design as it stands and builds no project-specific design-decision story the brief does not carry.
 2 to 4 short paragraphs.`,
 
   room_images: `Write a brief introduction for the project images section, in the voice above. The images follow this introduction. 1 paragraph.`,

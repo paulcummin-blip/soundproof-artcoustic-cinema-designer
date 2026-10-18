@@ -122,8 +122,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'very deep bass, extending into the lowest notes of a soundtrack',
     },
     L4: {
-      sentence: 'Exceptional low-frequency extension, into the very deepest parts of a soundtrack.',
-      clause: 'exceptional low-frequency extension, into the very deepest parts of a soundtrack',
+      sentence: 'Low-frequency extension that reaches the deepest notes a soundtrack carries.',
+      clause: 'low-frequency extension that reaches the deepest notes a soundtrack carries',
     },
   },
   [PERFORMANCE_AREAS.BASS_OUTPUT]: {
@@ -138,12 +138,12 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
     // As with bass extension, L3 states the scale and impact the output gives the
     // soundtrack, not a standard the system is expected to meet.
     L3: {
-      sentence: 'Powerful low-frequency output with the scale and impact a film soundtrack asks for.',
-      clause: 'the low end is powerful, with the scale and impact a film soundtrack asks for',
+      sentence: 'Strong low-frequency output with the scale and impact a film soundtrack asks for.',
+      clause: 'the low end is strong, with the scale and impact a film soundtrack asks for',
     },
     L4: {
-      sentence: 'Exceptional low-frequency authority, with huge scale and genuine physical impact.',
-      clause: 'the low end has exceptional authority, with huge scale and genuine physical impact',
+      sentence: 'Low-frequency output with substantial headroom behind the largest effects.',
+      clause: 'the low end carries substantial headroom behind the largest effects',
     },
   },
   [PERFORMANCE_AREAS.BASS_CONTROL]: {
@@ -160,8 +160,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'the bass is tightly controlled, giving depth without boom',
     },
     L4: {
-      sentence: 'A remarkably controlled, composed bass response, so the deepest effects arrive cleanly.',
-      clause: 'the response remains remarkably controlled and composed, so the deepest effects arrive cleanly',
+      sentence: 'A closely controlled, composed bass response, so the deepest effects arrive cleanly.',
+      clause: 'the response stays closely controlled and composed, so the deepest effects arrive cleanly',
     },
   },
   [PERFORMANCE_AREAS.DYNAMIC_RANGE]: {
@@ -178,8 +178,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'the system has strong headroom across the whole system, so large-scale effects and music arrive with substantial impact without sounding strained',
     },
     L4: {
-      sentence: 'Exceptional dynamic headroom, delivering the scale, immediacy and physical impact of the biggest film moments with remarkable authority.',
-      clause: 'the system has exceptional dynamic headroom, delivering the scale, immediacy and physical impact of the biggest film moments with remarkable authority',
+      sentence: 'Substantial headroom across the whole system, so the biggest film moments arrive with scale, immediacy and physical impact.',
+      clause: 'the system has substantial headroom, so the biggest film moments arrive with scale, immediacy and physical impact',
     },
   },
   [PERFORMANCE_AREAS.TIMBRE]: {
@@ -196,8 +196,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'very consistent tonal character',
     },
     L4: {
-      sentence: 'Exceptional tonal consistency, with a remarkably stable tonal character across the assessed seats.',
-      clause: 'exceptional tonal consistency',
+      sentence: 'Strong tonal consistency, with a stable tonal character across the assessed seats.',
+      clause: 'strong tonal consistency across the assessed seats',
     },
   },
   [PERFORMANCE_AREAS.SPATIAL_RESOLUTION]: {

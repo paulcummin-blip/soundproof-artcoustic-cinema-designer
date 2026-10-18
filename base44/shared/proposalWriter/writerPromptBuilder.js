@@ -40,7 +40,9 @@ import { clientStoryPillarLines } from '../narrativePillarGrouping.js';
 // validator refuses.
 import {
   NATURAL_ALOUD_RULE,
+  NATURAL_MEASURED_LANGUAGE_RULE,
   NATURAL_PRINCIPLE_EXPLANATION_RULE,
+  NATURAL_RECORDED_REASON_RULE,
   NATURAL_RECOMMENDATION_RULE,
   NATURAL_REPETITION_RULE,
   NATURAL_SELECTION_RULE,
@@ -293,6 +295,11 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     NATURAL_SELECTION_RULE,
     NATURAL_ALOUD_RULE,
     NATURAL_PRINCIPLE_EXPLANATION_RULE,
+    // THE MEASURED VOCABULARY and the recorded-reason rule: the register the copy
+    // is written in, and the one thing it never supplies for a decision whose
+    // reason the brief does not record.
+    NATURAL_MEASURED_LANGUAGE_RULE,
+    NATURAL_RECORDED_REASON_RULE,
     // THE APPROVED REFERENCE PASSAGES: the standard shown at its best, carried as
     // editorial references and never as templates. No negative example of wording
     // to avoid is shown anywhere in this prompt.

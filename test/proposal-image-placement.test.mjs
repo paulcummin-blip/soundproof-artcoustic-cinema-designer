@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import {
   CROP_ORIENTATION,
   EDITORIAL_ROLE,
+  IMAGE_PRESENTATION,
   SEATING_STYLE,
   SEATING_STYLE_SECTION_ID,
 } from '../src/components/proposal/images/proposalImagePlacementAuthority.js';
@@ -74,38 +75,75 @@ const test = (name, fn) => {
   }
 };
 
-// ── 1. Three sources: the intended rhythm, with the cover source returning. ──
-test('three sources: cover, landscape, portrait accent, cover source returning', () => {
+// ── 1. Three sources, none placed by the designer: the body carries the two
+//       landscapes the rhythm asks for, and NO portrait is invented. ──
+test('three sources with nothing recorded: no portrait accent, and the cover never returns to the body', () => {
   const { planned, validation } = plan(3);
   assert.deepEqual(rolesOf(planned), [
     'cover:asset-1',
     'landscape_feature:asset-2',
-    'portrait_editorial:asset-3',
-    'landscape_feature:asset-1',
-    'closing_feature:asset-3',
+    'landscape_feature:asset-3',
   ]);
   assert.equal(validation.valid, true, JSON.stringify(validation.violations));
   assert.equal(planned.retainedGallery, false, 'three images must not keep a gallery spread');
+  assert.equal(
+    planned.placements.some((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL),
+    false,
+    'a photograph with nothing recorded is never composed as a narrow portrait',
+  );
+  assert.equal(
+    planned.placements.some((placement) => placement.source_asset_id === 'asset-1'
+      && placement.editorial_role !== EDITORIAL_ROLE.COVER),
+    false,
+    'the cover source has no body placement of its own',
+  );
   return rolesOf(planned).join(' → ');
 });
 
-// ── 2. Two sources: cover and one landscape, with the cover returning later. ──
-test('two sources: cover, landscape, and no portrait accent invented', () => {
+// ── 2. Two sources: the cover and one landscape, and no body placement for the
+//       cover source, which the designer never placed in the body. ──
+test('two sources: the cover and one landscape, and the cover source is not placed in the body', () => {
   const { planned, validation } = plan(2);
-  assert.deepEqual(rolesOf(planned), ['cover:asset-1', 'landscape_feature:asset-2', 'landscape_feature:asset-1']);
+  assert.deepEqual(rolesOf(planned), ['cover:asset-1', 'landscape_feature:asset-2']);
   assert.equal(validation.valid, true, JSON.stringify(validation.violations));
   return rolesOf(planned).join(' → ');
 });
 
-// ── 3. One source: it may still return, never adjacent to its cover use. ──
-test('one source: cover and one well-separated return', () => {
+// ── 3. One source: it is composed on the cover and nowhere else. ──
+test('one source: composed on the cover only, never converted into a body image', () => {
   const { planned, validation } = plan(1);
-  assert.deepEqual(rolesOf(planned), ['cover:asset-1', 'landscape_feature:asset-1']);
-  const [cover, feature] = planned.placements;
-  assert.ok(feature.page_position - cover.page_position >= MIN_PAGE_GAP);
-  assert.notEqual(cover.crop_orientation, feature.crop_orientation);
+  assert.deepEqual(rolesOf(planned), ['cover:asset-1']);
   assert.equal(validation.valid, true, JSON.stringify(validation.violations));
-  return rolesOf(planned).join(' → ');
+  return 'a cover-only selection is never placed in the body';
+});
+
+// ── 3b. The designer's own placement leads: a Full Width photograph is composed
+//       full width, a Detail photograph takes the smaller supporting treatment,
+//       and every placement points at the uploaded source, never a derived crop. ──
+test('the designer\'s own placements lead: Full Width leads the page, Detail supports it', () => {
+  const { planned } = plan(4, {
+    2: { image_presentation: IMAGE_PRESENTATION.FULL_WIDTH },
+    3: { image_presentation: IMAGE_PRESENTATION.DETAIL },
+  });
+  const fullWidth = planned.placements.find((placement) => placement.source_asset_id === 'asset-2');
+  assert.ok(fullWidth, 'the Full Width photograph is placed in the body');
+  assert.equal(fullWidth.image_presentation, IMAGE_PRESENTATION.FULL_WIDTH);
+  assert.equal(fullWidth.crop_allowed === true || fullWidth.crop_allowed === false, true);
+
+  const detail = planned.placements.find(
+    (placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL,
+  );
+  assert.equal(detail?.source_asset_id, 'asset-3', 'the Detail photograph takes the supporting accent');
+  assert.equal(detail?.image_presentation, IMAGE_PRESENTATION.DETAIL);
+  assert.notEqual(detail?.crop_orientation, CROP_ORIENTATION.COVER_PORTRAIT, 'never the cover crop');
+
+  planned.placements.forEach((placement) => {
+    assert.ok(
+      String(placement.source_file_url).startsWith('https://example.test/'),
+      'every placement points at the uploaded source, never at a derived cover crop',
+    );
+  });
+  return `full width ${fullWidth.editorial_role}, supporting ${detail?.editorial_role}`;
 });
 
 // ── 4. The spacing and crop rules hold for every source, at every count. ──
@@ -159,6 +197,9 @@ test('the photographs the narrative did not place are integrated into it, not se
   const { planned } = plan(8);
   assert.equal(planned.retainedGallery, false, 'the narrative carries them all');
   assert.equal(planned.galleryImages.length, 0, 'no gallery spread is composed');
+  // The rhythm places three landscapes (the design overview, the visual break and
+  // the closing feature); the cover source is not placed in the body unless the
+  // designer placed it there, so four photographs are integrated.
   assert.equal(planned.flowImages.length, 4, 'the four photographs the rhythm did not place are integrated');
   const placed = new Set(planned.placements.map((p) => p.source_asset_id));
   assert.equal(placed.size, 8, 'every selected photograph still prints');
