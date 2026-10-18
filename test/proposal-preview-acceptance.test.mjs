@@ -248,9 +248,9 @@ describe('G. raw dealer notes never reach the client document', () => {
 describe('H. document order', () => {
   it('opens with the cover and closes with the design, never an Appendix', () => {
     expect(canonicalSectionTypes('system_summary')[0]).toBe('cover');
-    // The stored report still carries its Appendix section: the pack simply has
-    // no page for it, because the Project Report already prints that evidence.
-    expect(canonicalSectionTypes('system_summary').at(-1)).toBe('appendix');
+    // The Appendix has been WITHDRAWN: it is no longer part of the document's own
+    // vocabulary at all, and the stored row is kept exactly as it is.
+    expect(canonicalSectionTypes('system_summary')).not.toContain('appendix');
 
     const html = renderGenesis();
     const cover = html.indexOf('proposal-print-cover');

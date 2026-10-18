@@ -7,7 +7,7 @@
  *
  * Covers:
  *   A  random database section order      -> canonical publication order
- *   B  Presented Options / Appendix       -> never before the cover
+ *   B  Presented Options                  -> never before the cover
  *   C  Editor and PDF ordering authority  -> identical section sequence
  *   D  centre-channel sentence            -> preserved through publication
  *   E  required paragraph missing         -> reported, so the gate blocks
@@ -149,7 +149,7 @@ it('A. a random database section order becomes the canonical publication order',
   assert.deepEqual(types, expected, `expected ${expected.join(', ')} but got ${types.join(', ')}`);
 });
 
-it('B. the cover opens the document and the Appendix closes it', () => {
+it('B. the cover opens the document and the design closes it, with no Appendix', () => {
   const types = validation.document_sections.map((section) => section.section_type);
   // The cover page is composed by the pack itself and is never one of the
   // stored section rows: the published rows open with the first narrative
@@ -163,11 +163,16 @@ it('B. the cover opens the document and the Appendix closes it', () => {
   );
 
   const optionsAt = types.indexOf('presented_options');
-  const appendixAt = types.indexOf('appendix');
   assert.ok(optionsAt >= 0, 'Presented Options is published');
-  assert.ok(appendixAt >= 0, 'the Appendix is published');
-  assert.ok(optionsAt < appendixAt, 'Presented Options precedes the Appendix');
-  assert.equal(appendixAt, types.length - 1, 'the Appendix closes the document');
+  // The Appendix has been WITHDRAWN. Its stored row is kept exactly as it is, but
+  // it is never published: it cannot appear in the document, it cannot close it,
+  // and nothing is printed in its place.
+  assert.equal(types.includes('appendix'), false, 'the withdrawn Appendix is not published');
+  assert.equal(
+    types[types.length - 1],
+    fixtureTypes.filter((type) => type !== 'cover' && types.includes(type)).pop(),
+    'the document closes with its own last narrative section',
+  );
 });
 
 it('C. the Editor authority and the server authority agree, section for section', () => {

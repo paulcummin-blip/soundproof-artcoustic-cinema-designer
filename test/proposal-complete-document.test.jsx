@@ -63,9 +63,26 @@ test('stored unvalidated manual wording stays readable but blocks issue', () => 
 });
 test('latest approved edit reaches the document instead of stale generated wording', () => {
   const fixture = completeFixture({ historical: true }); const edited = structuredClone(fixture.generationRecords[0].gpt_output.sections);
-  edited.find(section => section.section === 'appendix_notes').text = 'Read the accompanying frozen report for the detailed evidence.';
+  edited.find(section => section.section === 'dynamic_range').text = 'The design keeps its dynamic range intact across every row.';
   fixture.editRecords.push({ generation_id: 'fixture-generation', edit_id: 'valid-edit', edit_number: 1, edited_at: '2026-10-11T13:00:00Z', validation_status: 'valid', edited_sections: edited });
-  const result = validate(fixture); expect(result.edit_id).toBe('valid-edit'); expect(result.document_sections.find(row => row.section_type === 'appendix').body).toContain('Read the accompanying frozen report');
+  const result = validate(fixture); expect(result.edit_id).toBe('valid-edit'); expect(result.document_sections.find(row => row.section_type === 'dynamic_range').body).toContain('keeps its dynamic range intact');
+});
+test('a stored legacy Appendix row is withdrawn: not published, not approved, never blocking', () => {
+  const fixture = completeFixture();
+  const legacy = {
+    id: 'legacy-appendix', section_key: 'legacy_appendix', section_type: 'appendix',
+    title: 'Appendix', body: '<p>Legacy appendix copy.</p>', is_enabled: true,
+  };
+  fixture.sections = [...fixture.sections, legacy];
+  const result = validate(fixture);
+  // The stored row is left exactly as it was: nothing migrated, nothing deleted.
+  expect(fixture.sections).toContain(legacy);
+  expect(legacy.body).toBe('<p>Legacy appendix copy.</p>');
+  // It has no page in the document, it is never asked to be approved, and it
+  // cannot raise a validation error of its own.
+  expect(result.document_sections.some(row => row.section_type === 'appendix')).toBe(false);
+  expect(codes(result)).not.toContain('unvalidated_document_text');
+  expect(codes(result)).not.toContain('section_approval_missing');
 });
 test('tampered evidence fingerprint or wrong engineering snapshot blocks publication', () => {
   const fixture = completeFixture(); fixture.generationRecords[0].evidence_pack.options[0].version_name = 'Tampered'; expect(codes(validate(fixture))).toContain('frozen_evidence_mismatch');

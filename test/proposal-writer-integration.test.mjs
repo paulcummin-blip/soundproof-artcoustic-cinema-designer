@@ -17,6 +17,7 @@ import {
 } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import {
   PROPOSAL_SECTION_FOR_WRITER_SECTION,
+  RETIRED_WRITER_SECTIONS,
   composeWriterSectionBodies,
   narrativeHtml,
 } from '../base44/shared/proposalWriter/writerSectionMapping.js';
@@ -54,7 +55,11 @@ test('every writer section is published into the proposal and none is dropped', 
   // The approved document order is SECTION_TYPES, not the writer's JSON order.
   // Every writer section still reaches exactly one published home.
   const published = bodies.flatMap((body) => body.writer_sections);
-  assert.deepEqual([...published].sort(), [...WRITER_SECTION_IDS].sort());
+  // Every ACTIVE writer section reaches exactly one published home. The writer's
+  // retired closing source note reaches none: the document has withdrawn the
+  // section it used to close with, so it is never written into a proposal.
+  const active = WRITER_SECTION_IDS.filter((id) => !RETIRED_WRITER_SECTIONS.includes(id));
+  assert.deepEqual([...published].sort(), [...active].sort());
   assert.equal(published.length, new Set(published).size);
   assert.deepEqual(bodies.map((body) => body.section_type), SECTION_TYPES.filter((type) => bodies.some((body) => body.section_type === type)));
 
@@ -138,10 +143,17 @@ test('a comparison draft keeps the report’s comparison section for its highlig
   for (const body of bodies) assert.deepEqual(Object.keys(body), ['section_type', 'html', 'writer_sections']);
 });
 
-test('every writer section has one published home', () => {
-  const homes = WRITER_SECTION_IDS.map((id) => PROPOSAL_SECTION_FOR_WRITER_SECTION[id]);
-  assert.equal(homes.filter(Boolean).length, WRITER_SECTION_IDS.length, 'a writer section has no home');
+test('every active writer section has one published home, and a retired one has none', () => {
+  const active = WRITER_SECTION_IDS.filter((id) => !RETIRED_WRITER_SECTIONS.includes(id));
+  const homes = active.map((id) => PROPOSAL_SECTION_FOR_WRITER_SECTION[id]);
+  assert.equal(homes.filter(Boolean).length, active.length, 'a writer section has no home');
   for (const home of homes) assert.ok(SECTION_TYPES.includes(home), `${home} is not a section of the report`);
+  // The document has WITHDRAWN its Appendix, so the writer's closing source note
+  // is explicitly retired instead of being pointed at a section that no longer
+  // exists — it can never be written into a proposal again.
+  for (const id of RETIRED_WRITER_SECTIONS) {
+    assert.equal(PROPOSAL_SECTION_FOR_WRITER_SECTION[id], undefined, `${id} is retired and must have no home`);
+  }
 });
 
 /* ── The live path goes through the approved writer, and only it ─────────── */
@@ -223,5 +235,8 @@ test('the report section vocabulary and its frontend mirror agree', () => {
   // section the generator writes and the mirror does not know would be saved and
   // never shown.
   assert.deepEqual(frontend, backend);
-  assert.ok(backend.includes('appendix'), 'the writer’s closing source note has no section to be published into');
+  // The document has WITHDRAWN its Appendix: neither mirror defines it any more,
+  // so no withdrawn section can be written back into a proposal.
+  assert.equal(backend.includes('appendix'), false, 'the withdrawn Appendix is still in the report vocabulary');
+  assert.ok(RETIRED_WRITER_SECTIONS.includes('appendix_notes'), 'the writer names its closing source note as retired');
 });

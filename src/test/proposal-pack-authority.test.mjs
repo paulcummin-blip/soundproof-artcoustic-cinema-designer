@@ -3,7 +3,7 @@
  *
  * Covers: the at-a-glance page (project, room, screen, viewing, system and the
  * package, stated once), the per-structure evidence cards (correct parameters
- * only, whole numbers, every gain populated), the approved method and appendix
+ * only, whole numbers, every gain populated) and the approved method
  * copy, and the rule that no pack copy invents a value or names the platform.
  *
  * Pure: no React, no database, no browser.
@@ -15,11 +15,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
-  APPENDIX_PAGE,
   METHOD_PAGE,
   buildAtAGlance,
   buildEvidenceCards,
-  parameterReferenceList,
   ukDate,
 } from '../../src/components/proposal/print/proposalPackAuthority.js';
 
@@ -293,8 +291,7 @@ describe('approved explainer copy', () => {
 
   const text = [
     methodText,
-    ...APPENDIX_PAGE.notes.flatMap((note) => [note.title, note.text]),
-  ].join(' ');
+      ].join(' ');
 
   it('explains the method in plain English', () => {
     assert.ok(/what makes great cinema sound/i.test(METHOD_PAGE.title));
@@ -314,20 +311,16 @@ describe('approved explainer copy', () => {
   it('explains the principles rather than reporting a result', () => {
     // No engineering result, no parameter reference, no grading scale and no
     // verification statement: the design's own results belong to the evidence
-    // pages, and the appendix states the prediction basis once.
+    // pages.
     assert.ok(!/Level [1-4]\b/i.test(methodText), 'the grading scale is not explained here');
     assert.ok(!/calibration|commissioning|verified|confirmed/i.test(methodText));
     assert.ok(!/P\d{1,2}\b/.test(methodText), 'no parameter is referenced on this page');
   });
 
-  it('keeps the appendix factual and separate', () => {
-    assert.ok(APPENDIX_PAGE.notes.some((note) => /predicted from the room model/i.test(note.text)), 'the appendix states the prediction basis');
+  it('keeps the fixed copy factual and separate', () => {
     // The proposal states the design and its expected performance confidently:
     // no fixed copy appends a verification disclaimer to a result.
     assert.ok(!/calibration|commissioning/i.test(text), 'the fixed copy carries no verification disclaimer');
-    assert.ok(APPENDIX_PAGE.notes.some((note) => /internal design diagnostic/i.test(note.text)));
-    assert.equal(parameterReferenceList().length, 15);
-    assert.equal(parameterReferenceList()[0].label, 'P2 Discrete channels');
   });
 
   it('avoids em dashes and the banned marketing phrases', () => {

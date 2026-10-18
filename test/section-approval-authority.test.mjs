@@ -56,11 +56,14 @@ const approvalFor = (stored, published, sectionId, at = '2026-10-15T10:00:00.000
 };
 
 test('only the sections the client reads generated narrative in have to be approved', () => {
+  // The Appendix is WITHDRAWN: no generated copy is written into it, so it is not
+  // in the approval vocabulary at all.
   assert.deepEqual(
     [...GENERATED_NARRATIVE_SECTION_TYPES].sort(),
-    ['appendix', 'dynamic_range', 'key_performance_highlights', 'overall_design',
+    ['dynamic_range', 'key_performance_highlights', 'overall_design',
       'presented_options', 'spatial_resolution', 'system_design_summary', 'timbre_matching'],
   );
+  assert.equal(GENERATED_NARRATIVE_SECTION_TYPES.includes('appendix'), false);
   const approval = resolveSectionApproval({ sections: storedSections(), publishedSections: publishedSections() });
   const byType = Object.fromEntries(approval.sections.map((row) => [row.section_type, row]));
   assert.equal(byType.system_design_summary.requires_approval, true);
@@ -70,6 +73,18 @@ test('only the sections the client reads generated narrative in have to be appro
   assert.equal(byType.products.requires_approval, false);
   assert.equal(byType.cover.status, null);
   assert.equal(approval.required_count, 2);
+
+  // A stored legacy Appendix row: the document has withdrawn the section, so the
+  // row is shown with its history intact and is never counted as needing
+  // approval. It can therefore never hold an export back.
+  const legacy = [...storedSections(), {
+    id: 's5', section_key: 'k5', section_type: 'appendix', title: 'Appendix',
+    body: '<p>Legacy appendix copy.</p>',
+  }];
+  const withLegacy = resolveSectionApproval({ sections: legacy, publishedSections: publishedSections(legacy) });
+  assert.equal(approvalRowForSection(withLegacy, 's5').requires_approval, false);
+  assert.equal(approvalRowForSection(withLegacy, 's5').status, null);
+  assert.equal(withLegacy.required_count, 2);
 });
 
 test('a freshly generated document starts with every generated section needing review', () => {

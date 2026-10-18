@@ -13,11 +13,18 @@ import { orderPublicationSections } from './publicationOrder.js';
 import { preparePublishedSectionBody, missingPublishedContent } from './publishedSectionPreparation.js';
 
 import { containsPrivateNote, publicationText as plain } from './privateNoteAuthority.js';
+import { isRetiredSectionType } from '../systemDesignSummarySections.js';
 
 /** Read-only publication boundary. Historical contracts are never upgraded. */
 export function validateCompleteDocument({ proposal, sections = [], generationRecords = [], editRecords = [], optionGuidance = null, privateNotes = [], publishedAssetText = [] }) {
   const errors = [];
   const reject = (code, detail) => errors.push({ code, detail });
+  // The document's own stored sections, read WITHOUT any section the document has
+  // WITHDRAWN. A retired row keeps its record exactly as it is — nothing is
+  // migrated, rewritten or deleted — but it is not part of the document, so it
+  // never appears in it, never needs approval and can never block its issue.
+  const storedDocumentSections = (Array.isArray(sections) ? sections : [])
+    .filter((section) => !isRetiredSectionType(section?.section_type));
   const generation = latestValidGeneration(generationRecords, null);
   const selected = renderableProposalCopy({ generation, edits: editRecords });
   const gate = proposalIssueGate({ generationRecords, editRecords, generationId: generation?.generation_id });
@@ -63,15 +70,15 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
     if (!snapshot || snapshot.valid === false || snapshot.available === false) reject('engineering_snapshot_missing', 'A frozen engineering snapshot is required.');
     if (snapshot?.identity?.projectId !== proposal.project_id || snapshot?.identity?.versionId !== ids[0]) reject('engineering_snapshot_identity', 'The frozen equipment specification belongs to a different project or version.');
   }
-  const notes = [...privateNotes, ...groups.map(group => group.note), ...frozenGroups.map(group => group.note), ...sections.map(section => section.dealer_notes)].filter(Boolean);
+  const notes = [...privateNotes, ...groups.map(group => group.note), ...frozenGroups.map(group => group.note), ...storedDocumentSections.map(section => section.dealer_notes)].filter(Boolean);
   const narrative = [...copy.map(entry => entry.text), ...publishedAssetText,
-    ...sections.filter(section => section.is_enabled !== false).flatMap(section => [section.title, section.body])];
+    ...storedDocumentSections.filter(section => section.is_enabled !== false).flatMap(section => [section.title, section.body])];
   if (narrative.some(text => containsPrivateNote(text, notes))) reject('raw_dealer_notes', 'Private design instructions cannot be published verbatim.');
   const safeOptionsText = containsPrivateNote(optionsText, notes) ? '' : optionsText;
   const mapped = composeWriterSectionBodies({ output: { sections: copy }, mode: input?.proposal_mode || generation?.evidence_pack?.mode });
   const bodyByType = new Map(mapped.bodies.map(body => [body.section_type, body.html]));
   const originalBodies = new Map(composeWriterSectionBodies({ output: generation?.gpt_output, mode: input?.evidence?.proposal_mode || generation?.evidence_pack?.mode }).bodies.map(body => [body.section_type, body.html]));
-  const documentSections = sections.map(section => {
+  const documentSections = storedDocumentSections.map(section => {
     if (!bodyByType.has(section.section_type)) return section;
     const approved = bodyByType.get(section.section_type);
     const original = originalBodies.get(section.section_type);
