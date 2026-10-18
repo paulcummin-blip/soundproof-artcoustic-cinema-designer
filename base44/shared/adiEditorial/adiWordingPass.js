@@ -100,10 +100,21 @@ export const ADI_MAX_CANDIDATES = 2;
  * @returns {Promise<null|{stage: string, violations: Array}>} null when it passes
  */
 async function refusalFor({ original, proposed, validate, validateStage }) {
+  // The editorial smell test is read alongside the authority gates so the one
+  // permitted correction receives every exact defect already present in this
+  // candidate. Meaning remains the deciding stage whenever meaning is wrong.
+  const quality = checkAdiEditorialQuality(proposed);
+
   // ── THE MEANING GATE: the same facts, and no more than the same facts ──
   const conservation = checkWordingConservation({ original, improved: proposed });
   if (!conservation.ok) {
-    return { stage: ADI_REJECTION_STAGE.MEANING_CONSERVATION, violations: conservation.violations };
+    return {
+      stage: ADI_REJECTION_STAGE.MEANING_CONSERVATION,
+      violations: [
+        ...conservation.violations,
+        ...(quality.ok ? [] : quality.violations),
+      ],
+    };
   }
 
   // ── THE SURFACE'S OWN VALIDATOR, run again on the improved wording ──
@@ -117,7 +128,10 @@ async function refusalFor({ original, proposed, validate, validateStage }) {
     if (checked?.ok !== true) {
       return {
         stage: validateStage,
-        violations: Array.isArray(checked?.violations) ? checked.violations : [],
+        violations: [
+          ...(Array.isArray(checked?.violations) ? checked.violations : []),
+          ...(quality.ok ? [] : quality.violations),
+        ],
       };
     }
   }
@@ -126,7 +140,6 @@ async function refusalFor({ original, proposed, validate, validateStage }) {
   // A candidate can preserve every engineering fact and still retain wording the
   // client-copy audit has already identified as filler or unsupported inference.
   // Name the exact phrase so the existing one-correction path can remove it.
-  const quality = checkAdiEditorialQuality(proposed);
   if (!quality.ok) {
     return {
       stage: ADI_REJECTION_STAGE.EDITORIAL_QUALITY,
