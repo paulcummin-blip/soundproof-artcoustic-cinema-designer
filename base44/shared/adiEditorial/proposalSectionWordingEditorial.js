@@ -384,6 +384,65 @@ export async function improveProposalSectionWording({
   return result({ ...write, action, mode });
 }
 
+function rejectedByRevision({
+  action,
+  mode,
+  originalText,
+  proposedText,
+  persisted,
+  canUndo,
+}) {
+  const violations = Array.isArray(persisted?.violations) ? persisted.violations : [];
+  return {
+    applied: false,
+    action,
+    mode,
+    outcome: ADI_WORDING_OUTCOME.REJECTED,
+    improvedText: null,
+    previousText: originalText,
+    canUndo,
+    reason: violations[0]?.code || 'writer_validation_failed',
+    diagnostics: buildAdiRejectionDiagnostics({
+      originalText,
+      proposedText,
+      stage: ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
+      violations,
+    }),
+  };
+}
+
+async function persistSectionChange({
+  entities,
+  persistRevision,
+  proposalId,
+  sectionId,
+  section,
+  body,
+  patch,
+  now,
+  user,
+  source,
+}) {
+  if (typeof persistRevision === 'function') {
+    return persistRevision({
+      entities,
+      proposalId,
+      sectionId,
+      section,
+      body,
+      sectionPatch: patch,
+      now,
+      user,
+      source,
+    });
+  }
+  return {
+    accepted: true,
+    violations: [],
+    section: await entities.ProposalSection.update(sectionId, patch),
+  };
+}
+
 /**
  * The single write: the improved body, the moved generated stamp, and the copy
  * that was replaced held in the section's own metadata.
