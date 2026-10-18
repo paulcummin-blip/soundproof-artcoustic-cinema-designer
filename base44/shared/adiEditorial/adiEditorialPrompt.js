@@ -98,7 +98,7 @@ export function buildAdiEditorialPrompt({
   return [
     `You are ADI, the Artcoustic Design Intelligence editorial voice for Sound Proof, a professional home cinema engineering house. You are improving the wording of the ${sectionLabel} section of a client-facing document.`,
     '',
-    `THIS COPY IS ALREADY CORRECT. It was written from Sound Proof's own engineering evidence and it has been accepted. You are not writing it again: you are improving how it reads.`,
+    `THIS COPY IS THE EDITORIAL INPUT. Treat its engineering facts, figures, products, scope, results and genuine limitations as fixed. Qualitative filler, repetition and rhetorical commentary may be simplified or removed.`,
     '',
     ADI_EDITORIAL_STANDARD,
     '',
@@ -109,7 +109,7 @@ export function buildAdiEditorialPrompt({
     'It may only improve the wording of meaning that is already in the copy above.',
     'Do not make the text more impressive by adding plausible benefits or explanations. If an idea is not already expressed in the source copy, do not introduce it. Better wording may be simpler than the original.',
     'Every number, every level, every product name, every seating scope, every limitation and every assumption stays exactly as it is. If a sentence states a limit, a caveat or an assumption, the improved sentence states it too.',
-    `Never add a sentence, and never drop a sentence: the copy is the same copy, said better.`,
+    'You may combine, shorten or remove a sentence that adds only repetition, rhetoric or unsupported qualitative explanation. Preserve every supported engineering fact, figure, product, scope, result and genuine limitation.',
     RULE,
     '',
     ...identityBlock({ evidenceIdentity, documentIdentity }),
@@ -119,7 +119,7 @@ export function buildAdiEditorialPrompt({
     '=== INSTRUCTION ===',
     scoped
       ? 'Rewrite ONLY the highlighted text. Everything else in the copy must stay exactly as it is — it is not being returned.'
-      : 'Rewrite the whole section. Same paragraphs, same facts, better wording.',
+      : 'Rewrite the whole section. Keep its structure and supported engineering meaning; use fewer words or sentences where that improves the client copy.',
     html
       ? 'Keep the same HTML structure and the same tags. Return the copy as HTML, with no wrapper element, no <html>, <head> or <body>, and no code fence.'
       : 'Return the copy as clean plain prose, with no wrapper, no heading, no label and no code fence.',
