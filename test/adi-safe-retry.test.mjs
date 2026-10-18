@@ -32,6 +32,7 @@ import {
   improveProposalSectionWording,
 } from '../base44/shared/adiEditorial/proposalSectionWordingEditorial.js';
 import { ADI_REJECTION_STAGE } from '../base44/shared/adiEditorial/adiRejectionDiagnostics.js';
+import { buildAdiEditorialPrompt } from '../base44/shared/adiEditorial/adiEditorialPrompt.js';
 import {
   ADI_KEPT_ORIGINAL_MESSAGE,
   checkAdiEditorialQuality,
@@ -67,6 +68,20 @@ async function livePass(...answers) {
   });
   return { pass, provider };
 }
+
+describe('the source-specific final cut', () => {
+  it('names weak phrases already in the source before asking for the first candidate', () => {
+    const prompt = buildAdiEditorialPrompt({
+      sectionLabel: 'System Design Summary',
+      currentText: '<p>The room has a reference-style cinema intent and allows music and effects to build in scale.</p>',
+    });
+
+    expect(prompt).toContain('=== REQUIRED FINAL CUT IN THIS SOURCE ===');
+    expect(prompt).toContain('  - reference-style cinema intent');
+    expect(prompt).toContain('  - allows music and effects to build in scale');
+    expect(prompt).toContain('Do not perform a broad rewrite while any cited phrase remains.');
+  });
+});
 
 describe('the one correction attempt', () => {
   it('refuses the invented reason, feeds the exact violation back, and accepts the correction', async () => {
