@@ -9,10 +9,10 @@
  * version says something the original did not.
  *
  * It is deliberately a comparison of two texts rather than a second evidence
- * reader. The original copy is the grounded authority — it was written from the
- * frozen evidence and it passed validation — so a rewrite that carries the same
- * numbers, levels, scope words, products, limitations and claim types carries the
- * same meaning. What this gate catches:
+ * reader. Frozen evidence remains the authority; the original copy is the editing
+ * input. This gate protects the input's engineering facts, scope and genuine
+ * limitations while allowing unsupported qualitative filler and rhetoric to be
+ * removed. What this gate catches:
  *
  *   - a figure, a level, a parameter number or a quantity that was ADDED;
  *   - a figure, a level, a product or a quantity that was DROPPED;
@@ -90,9 +90,20 @@ export function numericTokens(value) {
 /** The words that state a limitation, a caveat or an assumption. */
 const LIMITATION = /\b(?:not|never|cannot|can't|isn't|aren't|doesn't|don't|won't|without|lacks?|lacking|limits?|limiting|limited|only|up to|at most|remains?|requires? (?:attention|work)|to be (?:addressed|confirmed)|assum\w*|estimat\w*|approximately|about)\b/gi;
 
-/** Every limitation word a text states, lowercased, so a refusal can name the ones that went. */
+/**
+ * Contrastive sales rhetoric is not an engineering limitation. Removing “not
+ * simply/just/merely/only” may make client copy cleaner without hiding a caveat.
+ * The remaining limitation vocabulary is still protected exactly as before.
+ */
+const RHETORICAL_NEGATION = /\bnot\s+(?:simply|just|merely|only)\b/gi;
+
+function materialLimitationText(value) {
+  return String(value || '').replace(RHETORICAL_NEGATION, '');
+}
+
+/** Every material limitation word a text states, lowercased, so a refusal can name the ones that went. */
 function limitationWords(value) {
-  const found = String(value || '').match(new RegExp(LIMITATION.source, LIMITATION.flags)) || [];
+  const found = materialLimitationText(value).match(new RegExp(LIMITATION.source, LIMITATION.flags)) || [];
   return found.map((word) => word.toLowerCase());
 }
 
@@ -377,8 +388,8 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
   }
 
   // ── A material limitation is never removed ──────────────────────────────
-  const limitationsBefore = matchCount(before, LIMITATION);
-  const limitationsAfter = matchCount(after, LIMITATION);
+  const limitationsBefore = matchCount(materialLimitationText(before), LIMITATION);
+  const limitationsAfter = matchCount(materialLimitationText(after), LIMITATION);
   if (limitationsAfter < limitationsBefore) {
     const gone = difference(limitationWords(before), limitationWords(after)).dropped;
     violations.push(violation(
