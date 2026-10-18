@@ -214,8 +214,8 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       clause: 'close placement across the room, with effects arriving from the direction they were mixed for and movement between speakers staying continuous',
     },
     L4: {
-      sentence: 'Exceptionally precise placement and seamless movement around the room.',
-      clause: 'exceptionally precise placement and seamless movement around the room',
+      sentence: 'Strong speaker placement supports clear movement around the room.',
+      clause: 'strong speaker placement, supporting clear movement around the room',
     },
   },
 });
