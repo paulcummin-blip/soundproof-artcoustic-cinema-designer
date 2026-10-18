@@ -197,6 +197,12 @@ export function buildAdiCorrectionPrompt({
     '',
     '=== INSTRUCTION ===',
     'Correct only the listed validation violations. Preserve the intended editorial improvements. Do not restore weak wording unnecessarily.',
+    ...(stage === 'editorial_quality'
+      ? [
+        'This refusal concerns editorial quality alone. Start from the refused rewrite and change only the exact phrase spans named above.',
+        'Keep every other word, sentence, HTML tag and paragraph in the refused rewrite unchanged.',
+      ]
+      : []),
     'Repair the wording itself: remove or rephrase only the change each violation names, and keep every fact, figure, level, product, scope and limitation the copy already supports.',
     'Deleting supported engineering content is not a correction, and adding a new fact, benefit, reason or claim is not a correction.',
     '',
