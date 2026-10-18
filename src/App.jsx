@@ -24,6 +24,7 @@ import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminProjectIntelligence from './pages/AdminProjectIntelligence';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
 import AdminSpeakerDatabase from './pages/AdminSpeakerDatabase';
+import SpeakerComparisonLibrary from './pages/SpeakerComparisonLibrary';
 import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
 import AdminAddSpeaker from './pages/AdminAddSpeaker';
 import AdminModelFirstSpeaker from './pages/AdminModelFirstSpeaker';
@@ -154,7 +155,8 @@ const AuthenticatedApp = () => {
         <Route path="/admin/content" element={<AccessGate masterAdmin><AdminPublicationContent /></AccessGate>} />
         <Route path="/admin/proposal-diagnostics" element={<AccessGate masterAdmin><AdminProposalDiagnostics /></AccessGate>} />
         <Route path="/admin/design-intent-preview" element={<AccessGate masterAdmin><AdminDesignIntentPreview /></AccessGate>} />
-        <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><AdminSpeakerDatabase /></AccessGate>} />
+        <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><SpeakerComparisonLibrary /></AccessGate>} />
+        <Route path="/admin/speaker-database/advanced" element={<AccessGate masterAdmin><AdminSpeakerDatabase /></AccessGate>} />
         <Route path="/admin/speaker-database/product/:productId" element={<AccessGate masterAdmin><AdminSpeakerProductDetail /></AccessGate>} />
         <Route path="/admin/speaker-database/add-speaker" element={<AccessGate masterAdmin><AdminAddSpeaker /></AccessGate>} />
         <Route path="/admin/speaker-database/model-first" element={<AccessGate masterAdmin><AdminModelFirstSpeaker /></AccessGate>} />
