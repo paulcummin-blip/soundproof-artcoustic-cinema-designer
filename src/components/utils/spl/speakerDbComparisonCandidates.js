@@ -142,7 +142,8 @@ function valuesUsedText(record) {
 
 /**
  * Build one selectable comparison candidate.
- * @param {object} params { row, id, productId, specificationId, approvalStatus, published, sourceLabel, product }
+ * @param {object} params { row, id, productId, specificationId, approvalStatus,
+ *   published, priceRecordId, sourceLabel, product }
  */
 export function buildCandidate({
   row,
@@ -151,6 +152,7 @@ export function buildCandidate({
   specificationId = null,
   approvalStatus = "",
   published = false,
+  priceRecordId = null,
   sourceLabel = "Speaker Database",
   product = null,
 }) {
@@ -186,6 +188,10 @@ export function buildCandidate({
     model,
     productId,
     specificationId,
+    // The comparison row that holds this speaker's retail price, or null when no
+    // price has ever been set for it. Prices are presentation only: this is never
+    // read by the SPL engine or by any grade.
+    priceRecordId,
     classKey,
     confidence: klass.confidence,
     label: klass.label,
@@ -250,6 +256,38 @@ export async function loadComparisonCandidates({ includeUnpublished = false } = 
   // same candidate builder and grader. An Excel row wins a matching identity.
   const publishedRows = selectComparisonLibraryRows(live);
 
+  // Every candidate is resolved to the exact row that holds its price, so the
+  // price list and the selection list cannot drift apart. A published row is its
+  // own price record; a Speaker Database product that is not published yet is
+  // resolved to the price row already held for its identity, and reports none
+  // when no price has ever been set for it.
+  const priceRowByProductId = new Map();
+  const priceRowByIdentity = new Map();
+  const holdsPrice = (row) => row?.retail_price_inc_vat !== null
+    && row?.retail_price_inc_vat !== undefined
+    && String(row.retail_price_inc_vat).trim() !== "";
+
+  for (const row of rows || []) {
+    if (row.source_product_id && !priceRowByProductId.has(row.source_product_id)) {
+      priceRowByProductId.set(row.source_product_id, row);
+    }
+    if (row.active === false) continue;
+    const key = competitorIdentityKey(row);
+    if (!key) continue;
+    const held = priceRowByIdentity.get(key);
+    if (!held || (holdsPrice(row) && !holdsPrice(held))) priceRowByIdentity.set(key, row);
+  }
+
+  const priceRowForProduct = (product) => {
+    if (!product) return null;
+    return priceRowByProductId.get(product.id)
+      || priceRowByIdentity.get(competitorIdentityKey({
+        manufacturer: product.manufacturer_name,
+        model: product.model,
+      }))
+      || null;
+  };
+
   const candidates = publishedRows.map((row) => buildCandidate({
     row,
     id: row.id,
@@ -257,6 +295,7 @@ export async function loadComparisonCandidates({ includeUnpublished = false } = 
     specificationId: row.source_specification_id || null,
     approvalStatus: row.approval_status || "Approved",
     published: true,
+    priceRecordId: row.id,
     sourceLabel: row.publish_source === "spreadsheet" ? "Excel import" : "Speaker Database · published",
   }));
 
@@ -280,10 +319,14 @@ export async function loadComparisonCandidates({ includeUnpublished = false } = 
       || specList.find((s) => s.product_id === product.id)
       || null;
     // Mapped exactly as the publish path maps it; the candidate is not persisted,
-    // so it is not marked published.
+    // so it is not marked published. A price already held for this speaker is
+    // carried onto the candidate, so a price set before the speaker was published
+    // still reads against it.
+    const priceRow = priceRowForProduct(product);
     const row = specification
       ? { ...buildComparisonRow({ product, specification, manufacturerName: product.manufacturer_name }), published: false }
       : { manufacturer: product.manufacturer_name || "", model: product.model || "" };
+    if (priceRow) row.retail_price_inc_vat = priceRow.retail_price_inc_vat ?? null;
 
     candidates.push(buildCandidate({
       row,
@@ -292,6 +335,7 @@ export async function loadComparisonCandidates({ includeUnpublished = false } = 
       specificationId: specification?.id || null,
       approvalStatus: specification?.approval_status || "Draft",
       published: false,
+      priceRecordId: priceRow?.id || null,
       sourceLabel: "Speaker Database",
       product,
     }));
