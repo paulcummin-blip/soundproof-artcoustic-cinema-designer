@@ -360,6 +360,10 @@ describe('semantic meaning conservation', () => {
       original: 'Eight seats are arranged across two rows in a clear and straightforward layout.',
       improved: 'Eight seats are arranged across two rows.',
     }).ok).toBe(true);
+    expect(checkWordingConservation({
+      original: 'Eight seats are arranged across two rows in a shared film-watching space.',
+      improved: 'Eight seats are arranged across two rows.',
+    }).ok).toBe(true);
   });
 
   it('does not mistake contrastive rhetoric for an engineering limitation', () => {
