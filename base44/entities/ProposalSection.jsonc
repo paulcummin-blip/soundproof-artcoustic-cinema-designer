@@ -146,6 +146,53 @@
             }
           }
         },
+        "adi_editorial": {
+          "type": "object",
+          "nullable": true,
+          "description": "The complete, durable record of an accepted ADI wording change. Stored atomically with the improved body so Undo can restore the exact prior wording and timestamps.",
+          "properties": {
+            "previous_body": {
+              "type": "string"
+            },
+            "previous_last_user_edited_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            },
+            "previous_last_gpt_generated_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true
+            },
+            "improved_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "improved_by": {
+              "type": "string",
+              "nullable": true
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "section",
+                "selection"
+              ]
+            },
+            "source_fingerprint": {
+              "type": "string"
+            },
+            "improved_fingerprint": {
+              "type": "string"
+            },
+            "source_revision": {
+              "type": "string"
+            },
+            "improved_revision": {
+              "type": "string"
+            }
+          }
+        },
         "approval": {
           "type": "object",
           "description": "The designer's approval of this section's wording. Written only by approveProposalSection, never by a save, a generation, a preview or a read. Absent = the section has never been approved. It stops counting automatically when the section's content no longer matches fingerprint.",
