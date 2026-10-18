@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { improveReportDesignIntentWording } from '../../shared/reportDesignIntent/improveReportDesignIntentWording.js';
 import { improveProposalSectionWording } from '../../shared/adiEditorial/proposalSectionWordingEditorial.js';
+import { readOnlyEntities } from '../../shared/reportDesignIntent/readOnlyEntities.js';
 import { buildProductGrounding, isGroundingUsable } from '../../shared/proposalProductGrounding.js';
 import {
   ADI_KEPT_ORIGINAL_MESSAGE,
@@ -45,6 +46,11 @@ import {
  * line, that the revised version changed the supported meaning. Undo puts back the
  * exact copy the pass replaced, and with it the approval identity of that wording.
  *
+ * WHAT IT MAY TOUCH. It reads the project, its versions, the report the narrative
+ * lives on and the proposal's own images, and it writes the one record whose wording
+ * it improves. Its entity surface is narrowed to exactly that, so no create and no
+ * delete exists anywhere in its path.
+ *
  * The provider is the platform AI gateway, called with the server session: there is
  * no API key in this app, in the browser bundle or in any client payload.
  */
@@ -77,6 +83,14 @@ export default async function (req) {
       return Response.json({ error: 'Sound Proof access is required to improve this wording.' }, { status: 403 });
     }
 
+    // ── WHAT THIS ACTION MAY TOUCH ──
+    // The editorial client is the action's own entity surface, narrowed to the reads
+    // it makes and the one write it performs, and the writer switch is read through a
+    // read-only authority door. Nothing below is handed a client that can create or
+    // delete a record.
+    const editorial = editorialEntities(base44.entities);
+    const authority = readOnlyEntities(base44.asServiceRole.entities).entities;
+
     const now = new Date().toISOString();
     const common = {
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
@@ -94,8 +108,8 @@ export default async function (req) {
     const outcome = surface === 'report_design_intent'
       ? await improveReportDesignIntentWording({
         ...common,
-        entities: base44.entities,
-        authorityEntities: base44.asServiceRole.entities,
+        entities: editorial,
+        authorityEntities: authority,
         projectId: project_id || null,
         versionId: version_id || null,
         accountIdFallback: accessContext.user?.account_id || accessContext.account?.id || null,
@@ -104,11 +118,11 @@ export default async function (req) {
       })
       : await improveProposalSectionWording({
         ...common,
-        entities: base44.entities,
+        entities: editorial,
         proposalId: proposal_id || null,
         sectionId: section_id || null,
         bodyHtml: body_text,
-        grounding: await sectionGrounding(base44, proposal_id),
+        grounding: await sectionGrounding(editorial, proposal_id),
       });
 
     // A surface, a project, a report or a section that cannot be used is stated
@@ -162,6 +176,42 @@ export default async function (req) {
   }
 }
 
+/**
+ * THE ACTION'S ENTITY SURFACE, NARROWED TO WHAT IT ACTUALLY DOES.
+ *
+ * The editorial action reads the project, its versions, the report the narrative
+ * lives on and the proposal's own images, and writes the one record whose wording it
+ * improves. Everything else is out of reach, so the action is never handed a client
+ * that can create or delete: the capability it needs is the capability it holds.
+ *
+ * The authority door is read-only for the same reason — the writer switch is the only
+ * thing read through it.
+ */
+const EDITORIAL_READ = Object.freeze(['get', 'list', 'filter', 'count', 'aggregate']);
+const EDITORIAL_SURFACE = Object.freeze({
+  Project: EDITORIAL_READ,
+  ProjectVersion: EDITORIAL_READ,
+  ReportSnapshot: Object.freeze([...EDITORIAL_READ, 'update']),
+  ProposalAsset: EDITORIAL_READ,
+  Proposal: EDITORIAL_READ,
+  ProposalSection: Object.freeze([...EDITORIAL_READ, 'update']),
+});
+
+function editorialEntities(entities) {
+  const surface = {};
+  for (const [name, methods] of Object.entries(EDITORIAL_SURFACE)) {
+    const entity = entities?.[name];
+    if (!entity) continue;
+    surface[name] = methods.reduce((allowed, method) => {
+      if (typeof entity[method] === 'function') {
+        allowed[method] = (...args) => entity[method](...args);
+      }
+      return allowed;
+    }, {});
+  }
+  return surface;
+}
+
 /** The plain line for a pass that ended without a change. */
 function messageFor(outcome) {
   if (outcome === 'unchanged') return ADI_UNCHANGED_MESSAGE;
@@ -185,10 +235,10 @@ function refusalMessage() {
  * where a comparison's table is not complete enough to ground names against, no
  * grounding is imposed rather than a wrong one.
  */
-async function sectionGrounding(base44, proposalId) {
+async function sectionGrounding(entities, proposalId) {
   if (!proposalId) return null;
   try {
-    const proposals = await base44.entities.Proposal.filter({ id: proposalId });
+    const proposals = await entities.Proposal.filter({ id: proposalId });
     const proposal = proposals?.[0];
     if (!proposal) return null;
     const grounding = buildProductGrounding({
