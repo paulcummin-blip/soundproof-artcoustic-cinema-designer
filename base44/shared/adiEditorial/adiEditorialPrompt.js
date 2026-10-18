@@ -22,6 +22,7 @@
 import {
   ADI_AUTHORITY_BOUNDARY,
   ADI_EDITORIAL_STANDARD,
+  checkAdiEditorialQuality,
   looksLikeHtml,
 } from './adiEditorialStandard.js';
 import { normaliseDiagnosticViolation } from './adiRejectionDiagnostics.js';
@@ -93,8 +94,19 @@ export function buildAdiEditorialPrompt({
   evidenceIdentity = null,
   documentIdentity = null,
 } = {}) {
-  const html = looksLikeHtml(mode === 'selection' ? selectionText : currentText);
+  const sourceCopy = mode === 'selection' ? selectionText : currentText;
+  const html = looksLikeHtml(sourceCopy);
   const scoped = mode === 'selection';
+  const sourceQuality = checkAdiEditorialQuality(sourceCopy);
+  const requiredFinalCut = sourceQuality.ok
+    ? []
+    : [
+      '=== REQUIRED FINAL CUT IN THIS SOURCE ===',
+      'The current copy contains the exact weak phrases below. Removing or naturally rewriting these phrases is the priority for this pass:',
+      ...sourceQuality.violations.map((entry) => `  - ${entry.matched_substring}`),
+      'Do not perform a broad rewrite while any cited phrase remains. Keep the surrounding supported meaning, structure and detail intact.',
+      '',
+    ];
 
   return [
     `You are ADI, the Artcoustic Design Intelligence editorial voice for Sound Proof, a professional home cinema engineering house. You are improving the wording of the ${sectionLabel} section of a client-facing document.`,
@@ -115,6 +127,7 @@ export function buildAdiEditorialPrompt({
     '',
     ...identityBlock({ evidenceIdentity, documentIdentity }),
     '',
+    ...requiredFinalCut,
     ...copyBlock({ mode, selectionText, currentText }),
     '',
     '=== INSTRUCTION ===',
