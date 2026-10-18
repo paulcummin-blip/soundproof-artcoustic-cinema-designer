@@ -148,7 +148,9 @@ test('a heavily weighted L4 earns flagship language, and only when it is a lead 
   assert.equal(classified.priority, NARRATIVE_PRIORITY.LEAD_STORY);
   assert.equal(mayUseFlagshipLanguage(classified.priority), true);
   const phrase = phraseAfterRelevance({ key: 'p18', level: 'L4', priority: classified.priority });
-  assert.match(phrase, /exceptional/);
+  // The strongest language an L4 earns, in the measured register the authority
+  // writes in: extension that reaches the deepest notes a soundtrack carries.
+  assert.match(phrase, /deepest/);
   assert.notEqual(phrase, phraseAfterRelevance({ key: 'p18', level: 'L2', priority: classified.priority }));
 });
 
@@ -212,9 +214,9 @@ test('the achieved level chooses the strength of the words, and only after relev
   const at = (priority) => phraseAfterRelevance({ key: 'p12', level: 'L4', priority });
   assert.equal(at(NARRATIVE_PRIORITY.TECHNICAL_ONLY), null, 'technical evidence carries no narrative language');
   assert.equal(at(NARRATIVE_PRIORITY.DO_NOT_DISCUSS), null);
-  assert.match(at(NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE), /exceptional/);
-  assert.match(at(NARRATIVE_PRIORITY.WORTH_MENTIONING), /exceptional/);
-  assert.match(at(NARRATIVE_PRIORITY.LEAD_STORY), /exceptional/);
+  assert.match(at(NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE), /substantial headroom/i);
+  assert.match(at(NARRATIVE_PRIORITY.WORTH_MENTIONING), /substantial headroom/i);
+  assert.match(at(NARRATIVE_PRIORITY.LEAD_STORY), /substantial headroom/i);
 
   // The order itself is the rule: a level with no earned relevance produces nothing.
   const topic = topicNarrativePriority('speaker_positioning', { level: 'L4', relevance: BRIEF_RELEVANCE.NONE });

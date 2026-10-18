@@ -291,12 +291,13 @@ test('a comparison image that landed anywhere else is reported', () => {
 
 test('normal, non-comparison placement is unchanged', () => {
   const { planned, validation } = plan(3);
+  // Non-comparison images keep the narrative rhythm: the cover is composed on the
+  // cover only (it has no body placement of its own), and no portrait accent is
+  // invented from a photograph with nothing recorded.
   assert.deepEqual(rolesOf(planned), [
     'cover:asset-1',
     'landscape_feature:asset-2',
-    'portrait_editorial:asset-3',
-    'landscape_feature:asset-1',
-    'closing_feature:asset-3',
+    'landscape_feature:asset-3',
   ]);
   assert.deepEqual(planned.comparisonPages, [], 'no comparison page is invented');
   assert.deepEqual(planned.comparisonPlacements, []);

@@ -422,12 +422,12 @@ test('Dynamic Range is read across the whole system, never as the subwoofers alo
   assert.match(screen.question, /Can dialogue and quiet detail remain clear/);
   assert.match(screen.notices, /front stage takes the biggest peaks/);
   assert.equal(screen.level, 'L4');
-  assert.match(screen.clause, /exceptional dynamic headroom/, 'the screen channel result is told in the system register');
+  assert.match(screen.clause, /substantial headroom/i, 'the screen channel result is told in the system register');
   assert.deepEqual(dynamic.system_parts.find((part) => part.part === 'surround_channels').parameter_ids, ['P13']);
 
   // Every capability the client is buying leads the pillar together.
   assert.deepEqual([...dynamic.lead_evidence.ids].sort(), ['P12', 'P13', 'P14', 'P18']);
-  assert.ok(dynamic.client_clauses.some((clause) => /exceptional dynamic headroom/.test(clause)));
+  assert.ok(dynamic.client_clauses.some((clause) => /substantial headroom/i.test(clause)));
 
   // The other pillars carry no system readings: their story is one story each.
   const others = buildClientStoryPillars({ rows: rowsOf([row(12, 'L4'), row(4, 'L3'), row(16, 'L3')]) });
