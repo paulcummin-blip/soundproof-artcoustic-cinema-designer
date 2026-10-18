@@ -620,7 +620,7 @@ export default function RP22ClientReport() {
         state: REPORT_STATE.FAILED,
         missing: [],
         nextAction: "Retry the saved engineering read, or return to the project.",
-        reason: savedReport.error || authority.readError || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.",
+        reason: savedReport.error || authority.readError || "Saved engineering results could not be read.",
         canExport: false,
       }
     : exportError

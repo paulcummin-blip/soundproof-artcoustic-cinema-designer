@@ -1037,11 +1037,11 @@ function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
     if (!embed && (authorityReadFailed || bassRestoreFailed)) {
         const readFailureMessage = reportAuthority.readError
             || reportAuthority.bassRestoreError
-            || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.";
+            || "Saved engineering results could not be read.";
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
-                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Saved engineering authority could not be read</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Saved engineering results could not be read</CardTitle></CardHeader>
                     <CardContent className="text-center py-10">
                         <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                         <p className="text-[#3E4349] mb-6">{readFailureMessage}</p>

@@ -46,7 +46,7 @@ export const OPTIMISER_SEARCH_STEPS = Object.freeze({
 /** Stated with the estimate so it is never read as a measured count. */
 export const ESTIMATE_BASIS_NOTE =
   "Estimated from the optimiser's declared search space for this design. It counts the candidate "
-  + "options the searches generate; the finalists are then confirmed canonically.";
+  + "options the searches generate; the finalists are then confirmed in full.";
 
 /** Stated so no family is silently missing from the estimate. */
 export const ESTIMATE_SCOPE_NOTE =

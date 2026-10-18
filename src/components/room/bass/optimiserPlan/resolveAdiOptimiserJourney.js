@@ -91,7 +91,7 @@ export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
 export const ADI_PUBLICATION_FAILURE_MESSAGE =
   "ADI completed its analysis but could not save the result.";
 export const ADI_PUBLICATION_FAILURE_DETAIL =
-  "The current bass result is unchanged and remains the authoritative result for this design. "
+  "Your current bass result is unchanged. "
   + "Retry ADI to save the analysis, or keep the current bass result and carry on.";
 export const ADI_PUBLICATION_FAILURE_RETRY_LABEL = "RETRY ADI";
 export const ADI_PUBLICATION_FAILURE_KEEP_LABEL = "KEEP CURRENT BASS RESULT";
@@ -107,7 +107,7 @@ export const ADI_PUBLICATION_FAILURE_KEEP_LABEL = "KEEP CURRENT BASS RESULT";
 export const ADI_PLAN_SAVE_FAILURE_MESSAGE =
   "ADI finished its analysis but could not save the optimiser plan for this design.";
 export const ADI_PLAN_SAVE_FAILURE_DETAIL =
-  "The current bass result is unchanged and remains the authoritative result for this design. "
+  "Your current bass result is unchanged. "
   + "Retry ADI to save the plan, or keep the current bass result and carry on.";
 
 export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({

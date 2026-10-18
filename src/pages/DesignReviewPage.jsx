@@ -273,7 +273,7 @@ export default function DesignReviewPage() {
   if (!!projectId && (asdrAuthority.readFailed || asdrAuthority.bassRestoreFailed)) {
     return (
       <ReportReadinessPanel
-        title="Saved engineering authority could not be read"
+        title="Saved engineering results could not be read"
         message={asdrAuthority.readError || asdrAuthority.bassRestoreError || "The saved engineering results could not be read. Nothing has been treated as missing or uncalculated."}
         projectId={projectId}
         onRetry={asdrAuthority.retry}

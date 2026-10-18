@@ -130,7 +130,7 @@ export function buildPreparationAction({ need, reportState = null, projectId = n
         key: need,
         label: 'Record the current assessment',
         href: roomDesignerHref(projectId, versionId),
-        note: 'Sound Proof records it automatically when the design opens, then finishes the proposal.',
+        note: 'Open the design to record it, then finish the proposal.',
         line: PREPARATION_RECORD_LINE,
       };
     case PREPARATION_ACTION.UPDATE_REPORT: {

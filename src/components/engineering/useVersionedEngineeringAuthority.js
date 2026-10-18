@@ -176,7 +176,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const state = classifyAuthorityState({ durable, localSnapshot });
   const readFailed = durable?.status === 'read_failed';
   const readError = readFailed
-    ? (durable?.error || 'Saved engineering authority could not be read.')
+    ? (durable?.error || 'Saved engineering results could not be read.')
     : null;
   const summaryCompleteness = assessEngineeringReportCompleteness(extractEngineeringSummary(snapshot));
   const finalAuthorityGate = finalReport ? auditFinalReportAuthority(durable?.publication) : { allowed: true };

@@ -166,7 +166,7 @@ test("J — shared reads are single-flight and read failures stay explicit", () 
   assert.match(cache, /const existing = map\.get\(key\)/);
   assert.match(authority, /READ_FAILED/);
   assert.match(authority, /durablePublicationReads/);
-  assert.match(technical, /Saved engineering authority could not be read/);
+  assert.match(technical, /Saved engineering results could not be read/);
   assert.match(technical, /onClick=\{reportAuthority\.retry\}/);
   assert.match(visual, /authorityReadFailed/);
   assert.match(visual, /authority\.retry/);

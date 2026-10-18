@@ -62,9 +62,9 @@ export const BASELINE_PARITY_REASON = Object.freeze({
 export const BASELINE_PARITY_COPY = Object.freeze({
   MISSING_STATUS: "Bass calculation required",
   MISSING_MESSAGE: "ADI needs the current bass calculation before it can optimise this design.",
-  MISMATCH_STATUS: "Current authority mismatch",
+  MISMATCH_STATUS: "Current result mismatch",
   MISMATCH_MESSAGE: "The optimiser baseline does not match the published bass result. Recalculate bass performance before running ADI.",
-  UNKNOWN_STATUS: "Baseline parity not recorded",
+  UNKNOWN_STATUS: "Baseline not recorded",
   CTA: "Calculate Bass Performance",
 });
 

@@ -113,7 +113,7 @@ export function fetchDurablePublication(
       });
       const data = response?.data || response || null;
       if (!data || data.error) {
-        throw new Error(data?.message || data?.error || 'Saved engineering authority could not be read.');
+        throw new Error(data?.message || data?.error || 'Saved engineering results could not be read.');
       }
       return {
         publication: data.publication || null,
@@ -126,7 +126,7 @@ export function fetchDurablePublication(
         error: null,
       };
     } catch (error) {
-      const message = error?.message || 'Saved engineering authority could not be read.';
+      const message = error?.message || 'Saved engineering results could not be read.';
       console.warn('[engineeringAuthority] durable publication read failed:', message);
       return {
         publication: null,

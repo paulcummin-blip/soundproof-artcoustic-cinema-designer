@@ -86,7 +86,7 @@ export default function ComplianceReportPrint() {
     return (
       <div className="flex items-center justify-center min-h-screen px-6 text-center" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
         <div>
-          <p className="text-lg">{engineeringAuthority.readError || engineeringAuthority.bassRestoreError || 'Saved engineering authority could not be read. No partial compliance report was generated.'}</p>
+          <p className="text-lg">{engineeringAuthority.readError || engineeringAuthority.bassRestoreError || 'Saved engineering results could not be read, so no compliance report was generated.'}</p>
           <button type="button" className="mt-4 px-4 py-2 text-white rounded" style={{ backgroundColor: '#213428' }} onClick={engineeringAuthority.retry}>Retry</button>
         </div>
       </div>

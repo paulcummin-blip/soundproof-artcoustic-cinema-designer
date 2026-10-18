@@ -72,7 +72,7 @@ export const TRADE_OFF_METRIC = Object.freeze({
 /** The terminal state of a trade-off the designer did not take. */
 export const TRADE_OFF_KEPT_LABEL = "Current Design Kept";
 export const TRADE_OFF_KEPT_SENTENCE =
-  "The trade-off was not taken. Nothing has been applied, and the current design, its published bass result and its saved calibration are unchanged.";
+  "The trade-off was not taken. Your current design is unchanged.";
 
 /** The protected metric that worsens when no single seat is named. */
 export const TRADE_OFF_METRIC_NOTE =

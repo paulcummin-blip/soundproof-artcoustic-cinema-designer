@@ -61,7 +61,7 @@ export function selectPracticalRecommendation(candidates, quantity) {
       recommendationKind: hasSideWallInvolvement(acousticWinner) ? "side-wall-alternative" : "practical",
       practicalReason: hasSideWallInvolvement(acousticWinner)
         ? "The room-scored single-sub option uses an RP22-style side-wall quarter point."
-        : "Highest-ranked practical canonical layout for this room and seating area.",
+        : "Highest-ranked practical layout for this room and seating area.",
     };
   }
 

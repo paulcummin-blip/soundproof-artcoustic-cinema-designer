@@ -147,9 +147,9 @@ test("TEST 10 — report gates are route-owned and never blank-render incomplete
   const designReview = read("src/pages/DesignReviewPage.jsx");
   const visual = read("src/pages/RP22ClientReport.jsx");
   assert.match(technical, /Technical Report not ready/);
-  assert.match(technical, /Saved engineering authority could not be read/);
+  assert.match(technical, /Saved engineering results could not be read/);
   assert.match(designReview, /Technical Report not ready/);
-  assert.match(designReview, /Saved engineering authority could not be read/);
+  assert.match(designReview, /Saved engineering results could not be read/);
   assert.match(visual, /ReportStatePanel/);
   assert.match(visual, /authorityReadFailed/);
 });

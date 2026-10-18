@@ -324,12 +324,12 @@ export function buildStage2RecommendationLayout({
           ? "practical-preferred"
           : "practical",
     practicalReason: isSideWallResult(result, roomDims)
-      ? "Acoustic alternative — less practical placement. The canonical improvement is material."
+      ? "Acoustic alternative — less practical placement. The improvement is material."
       : isTradeOff
         ? selection.tradeOffDescription || "Trade-off: improves one metric while worsening another. Not an unconditional improvement."
         : result !== quantityResult?.bestFinalist
           ? "Preferred front/rear-wall result; the side-wall improvement was too small to justify the installation compromise."
-          : "Highest-ranked practical authoritative layout for this room and seating area.",
+          : "Highest-ranked practical layout for this room and seating area.",
     isTradeOff,
     tradeOffDescription: isTradeOff ? selection.tradeOffDescription : null,
     mutedSubInfo: mutedInfo,

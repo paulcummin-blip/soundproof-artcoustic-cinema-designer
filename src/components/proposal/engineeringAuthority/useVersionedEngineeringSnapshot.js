@@ -98,7 +98,7 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
   });
 
   const finalError = authority.readFailed
-    ? (authority.readError || 'Saved engineering authority could not be read.')
+    ? (authority.readError || 'Saved engineering results could not be read.')
     : error || snapshotResult.error;
   return {
     snapshot: snapshotResult.snapshot,

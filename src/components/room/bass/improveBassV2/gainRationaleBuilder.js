@@ -113,7 +113,7 @@ export function buildGainRationale(currentResult, candidateResult, grouping) {
         "Net RP22 improvement: a level improvement for Secondary seats outranks a same-level raw-dB change at the Primary seat, while Primary safety is preserved.",
       );
     } else if (improvedSeats.length > 0) {
-      parts.push("Net RP22 improvement: level improvements dominate the canonical ranking.");
+      parts.push("Net RP22 improvement: level improvements dominate the ranking.");
     }
   }
 

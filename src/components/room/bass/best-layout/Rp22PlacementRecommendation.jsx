@@ -137,12 +137,12 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
 
   const renderOption = (title, applyLabel, layout) => {
     if (!layout && recommendationStatus !== "ready") return <UpdatingOption title={title} phase={recommendationPhase} />;
-    if (!layout) return <Unavailable title={title} message="No recognised canonical layout of this quantity is available for the current room." />;
+    if (!layout) return <Unavailable title={title} message="No standard layout of this quantity is available for this room." />;
     // Gate on confirmed canonical seat authority — a layout must not be
     // presented as "BEST" without completed P19/P20 seat-scoped authority.
     if (!layout.metrics?.hasConfirmedSeatAuthority) {
-      if (recommendationStatus !== "ready") return <UpdatingOption title={title} phase="Calculating canonical seat authority…" />;
-      return <Unavailable title={title} message="No confirmed result available — canonical seat authority has not completed." />;
+      if (recommendationStatus !== "ready") return <UpdatingOption title={title} phase="Calculating seat results…" />;
+      return <Unavailable title={title} message="No confirmed result available — seat results are still being calculated." />;
     }
     return (
       <Rp22RecommendationCard
@@ -219,14 +219,14 @@ function CurrentLayout({ layout }) {
     <div className="rounded-lg border border-[#D9D5CE] bg-white/70 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Current subwoofer layout</div>
       <div className="mt-1 text-sm font-semibold text-[#1B1A1A]">Current positions</div>
-      <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"} · canonical authority</div>
+      <div className="text-[11px] text-[#625143]">{metrics.sourceCount} {metrics.sourceCount === 1 ? "subwoofer" : "subwoofers"}</div>
       <div className="mt-3 grid gap-2">
         <div>
-          <div className="text-[10px] font-medium text-[#625143]">P19 · Canonical seat coverage</div>
+          <div className="text-[10px] font-medium text-[#625143]">P19 · Seat coverage</div>
           <div className="mt-0.5"><CurrentCoverageRow results={metrics.perSeatP19} /></div>
         </div>
         <div>
-          <div className="text-[10px] font-medium text-[#625143]">P20 · Canonical seat coverage</div>
+          <div className="text-[10px] font-medium text-[#625143]">P20 · Seat coverage</div>
           <div className="mt-0.5"><CurrentCoverageRow results={metrics.perSeatP20} /></div>
         </div>
       </div>
