@@ -114,6 +114,27 @@ describe('the one correction attempt', () => {
     expect(pass.corrected).toBe(true);
   });
 
+  it('feeds meaning and editorial-quality violations from the same candidate into the one correction', async () => {
+    const original = 'The contrast between quiet dialogue and sudden musical or effects peaks is central to this reference-style dedicated cinema.';
+    const first = 'This reference-style dedicated cinema is designed to convey the contrast between quiet dialogue and sudden musical or effects peaks.';
+    const corrected = 'The contrast between quiet dialogue and sudden musical or effects peaks is central to this cinema.';
+    const provider = scriptedProvider(first, corrected);
+
+    const pass = await runAdiWordingPass({
+      invokeLLM: provider.invokeLLM,
+      prompt: 'editorial prompt',
+      original,
+      mode: 'section',
+    });
+
+    expect(provider.prompts).toHaveLength(2);
+    expect(provider.prompts[1]).toContain('a_reason_was_invented');
+    expect(provider.prompts[1]).toContain('reference-style dedicated cinema');
+    expect(pass.outcome).toBe(ADI_WORDING_OUTCOME.IMPROVED);
+    expect(pass.text).toBe(corrected);
+    expect(pass.attempts).toBe(2);
+  });
+
   it('names every surviving audited phrase without changing the copy', () => {
     const checked = checkAdiEditorialQuality(
       '<p>The room has a reference-style cinema intent and allows music and effects to build in scale.</p>',
