@@ -42,6 +42,12 @@ export const DESIGN_INTENT_ATTEMPT_BLOCK = Object.freeze({
   PROJECT_NOT_FOUND: 'project_not_found',
   VERSION_NOT_FOUND: 'version_not_found',
   NO_REPORT: 'project_report_missing',
+  /**
+   * A PREPARE-ONLY read could not be set up: the writer's switch is off for this
+   * login, or the frozen report evidence could not be read. No narrative was
+   * written and nothing was saved.
+   */
+  PREPARE_FAILED: 'report_evidence_unavailable',
 });
 
 /** A setup refusal, in the shape every caller reports. */
@@ -81,6 +87,14 @@ export async function buildReportDesignIntentAttempt({
   isMasterAdmin = false,
   now = null,
   evidenceReader = null,
+  /**
+   * PREPARE ONLY: read the project, the version, the flag, the frozen report
+   * evidence and the scoped writer input, and make NO provider call and NO write.
+   * It is how a caller that needs the very same evidence and the very same contract
+   * for another purpose gets them from this one authority. Default false: the
+   * production save and the admin preview generate exactly as they always have.
+   */
+  prepareOnly = false,
 } = {}) {
   if (!projectId || !versionId) {
     return blocked(DESIGN_INTENT_ATTEMPT_BLOCK.INVALID_REQUEST, 400, 'project_id and version_id are required.');
@@ -187,7 +201,33 @@ export async function buildReportDesignIntentAttempt({
       briefSupplied: Boolean(String(project?.notes || '').trim()),
     }),
     onEvidencePack,
+    prepareOnly,
   });
+
+  // ── PREPARE ONLY: the frozen pack and the scoped writer input, and no narrative ──
+  // Nothing was generated, so there is no attempt to report and no generation to
+  // build. The switch and the evidence are the only two ways this can fail, and
+  // both are stated as a block exactly as every other setup failure is.
+  if (prepareOnly === true) {
+    if (attempt?.prepared !== true) {
+      return blocked(
+        DESIGN_INTENT_ATTEMPT_BLOCK.PREPARE_FAILED,
+        409,
+        attempt?.detail || 'The frozen report evidence could not be prepared for writing.',
+        attempt?.reason || null,
+      );
+    }
+    return {
+      ok: true,
+      prepared: true,
+      project,
+      version,
+      snapshot,
+      flag,
+      pack: captured.pack,
+      writerInput: captured.writerInput,
+    };
+  }
 
   return {
     ok: true,

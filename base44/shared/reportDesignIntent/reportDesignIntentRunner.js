@@ -212,6 +212,13 @@ export async function runReportDesignIntent({
   user = null,
   now = null,
   onEvidencePack = null,
+  // PREPARE ONLY: build the frozen pack and the scoped writer input and stop,
+  // making no provider call and writing nothing. It exists so a caller that needs
+  // the very same evidence and the very same contract for another purpose — the
+  // ADI editorial pass reads them to revalidate improved wording — reads them from
+  // this one authority rather than assembling a second evidence path of its own.
+  // Default false: every existing caller runs exactly as it always has.
+  prepareOnly = false,
   validate = validateWriterOutput,
 } = {}) {
   // 1. The writer's own switch, checked before anything is read or sent.
@@ -301,6 +308,24 @@ export async function runReportDesignIntent({
     }
   } catch (error) {
     return refusal(DESIGN_INTENT_REFUSAL.NO_EVIDENCE, error?.message || 'The frozen evidence pack could not be built.');
+  }
+
+  // ── PREPARE ONLY: the frozen evidence and the contract, and no writing ──
+  // The one place the pack and the scoped writer input exist together is here, so
+  // a caller that needs them without a generation takes them from here. Nothing
+  // downstream of this line runs: no provider is called, no record is built and
+  // nothing is written.
+  if (prepareOnly === true) {
+    return {
+      ok: true,
+      prepared: true,
+      pack,
+      writerInput,
+      geometry: geometry || null,
+      visual: visual || null,
+      project,
+      flag,
+    };
   }
 
   // 4. The provider call. A timeout, a refusal or an empty answer is a result.

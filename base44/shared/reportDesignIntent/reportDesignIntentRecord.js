@@ -153,6 +153,13 @@ export function isCompleteNarrative(text) {
  * @param {string} [input.generatedBy]
  * @param {string} [input.generatedAt]
  * @param {Object|null} [input.rejection] — the refusal, when there is one
+ * @param {Object|null} [input.editorial] — the ADI editorial act, where the wording
+ *   of an already-accepted narrative was improved: when it was improved, by whom,
+ *   and the wording it replaced. Wording only: the evidence identity, the geometry
+ *   and the image fingerprints are carried across unchanged, so an improved
+ *   narrative is pinned to exactly what the narrative it replaces was pinned to.
+ *   Absent — not null — on every record that was not editorially improved, so a
+ *   record written before this existed is unchanged.
  * @returns {Object} the saved metadata
  */
 export function buildDesignIntentRecord({
@@ -168,6 +175,7 @@ export function buildDesignIntentRecord({
   generatedBy = null,
   generatedAt = null,
   rejection = null,
+  editorial = null,
 } = {}) {
   const accepted = status === DESIGN_INTENT_STATUS.ACCEPTED;
   return {
