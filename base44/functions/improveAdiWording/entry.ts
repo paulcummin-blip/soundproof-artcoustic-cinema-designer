@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { readOnlyAccountEntities, resolveAccountAccessReadOnly } from '../../shared/accountAccessReadOnly.js';
 import { improveReportDesignIntentWording } from '../../shared/reportDesignIntent/improveReportDesignIntentWording.js';
 import { improveProposalSectionWording } from '../../shared/adiEditorial/proposalSectionWordingEditorial.js';
+import { persistAdiProposalSectionRevision } from '../../shared/proposalEdit/persistAdiProposalSectionRevision.js';
 import { readOnlyEntities } from '../../shared/reportDesignIntent/readOnlyEntities.js';
 import { buildProductGrounding, isGroundingUsable } from '../../shared/proposalProductGrounding.js';
 import {
@@ -131,6 +132,7 @@ export default async function (req) {
         sectionId: section_id || null,
         bodyHtml: body_text,
         grounding: await sectionGrounding(editorial, proposal_id),
+        persistRevision: persistAdiProposalSectionRevision,
       });
 
     // A surface, a project, a report or a section that cannot be used is stated
@@ -228,6 +230,8 @@ const EDITORIAL_SURFACE = Object.freeze({
   ReportSnapshot: Object.freeze([...EDITORIAL_READ, 'update']),
   ProposalAsset: EDITORIAL_READ,
   Proposal: EDITORIAL_READ,
+  ProposalGeneration: EDITORIAL_READ,
+  ProposalEdit: Object.freeze([...EDITORIAL_READ, 'create']),
   ProposalSection: Object.freeze([...EDITORIAL_READ, 'update']),
 });
 
