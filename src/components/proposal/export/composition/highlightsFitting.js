@@ -14,10 +14,10 @@
  *      that is how a table once passed as fitting and then overflowed the sheet
  *      it printed on, and the closing note with it;
  *   2. the WHOLE composition is measured every time — the heading, the
- *      introduction, the table header, every selected row, the closing note and
- *      all the spacing between them. A composition that carries a table but not
- *      its closing note is refused rather than accepted, because the note is part
- *      of what the one sheet has to carry;
+ *      introduction, the table header, every selected row, any client-facing
+ *      closing note that is present, and all the spacing between them. The note
+ *      is optional because client-only proposals no longer print internal
+ *      reassurance copy; when present, it remains part of the measured sheet;
  *   3. the table's own spacing is tightened first — its type is untouched and
  *      never reduced, because a table a client has to squint at is not a summary;
  *   4. only then are the least valuable rows withdrawn, one at a time, the
@@ -134,9 +134,8 @@ export function fitHighlightsSection(page, measure = pageMeasurement) {
   naturalFrame(page);
   const table = typeof page.querySelector === 'function' ? page.querySelector('table') : null;
   const note = closingNote(page);
-  // (2) A table without its closing note is an incomplete composition: it is
-  // never accepted, because the note is part of what the one sheet carries.
-  if (table && !note) return finish(false);
+  // (2) A client-facing closing note is optional. When present it is already part
+  // of the measured page; when absent, the table remains a complete client summary.
   let fitted = fitsCompleteComposition(page, measure);
   // (3) Spacing first — the table's own padding, then the gaps around it.
   if (!fitted && tightenTablePadding(table)) fitted = fitsCompleteComposition(page, measure);
