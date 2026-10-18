@@ -443,14 +443,12 @@ export default function ProposalPackDocument({
       }
       // The concluding section composes the photographs that would otherwise
       // have had a page of their own, so they are not sent to one here.
-      if ((!hasImagesSection || !byType.has('room_images')) && ['overall_design', 'conclusion', 'appendix'].includes(def.type) && !composesClosingPair(def.type)) pushUnplacedImages();
+      if ((!hasImagesSection || !byType.has('room_images')) && ['overall_design', 'conclusion'].includes(def.type) && !composesClosingPair(def.type)) pushUnplacedImages();
       const section = byType.get(def.type);
       if (!section) return;
-      // A section a client-facing document does not print — the Appendix, whose
-      // evidence the Project Report already carries — keeps its stored record
-      // exactly as it is and simply has no page here. Nothing is left behind it:
-      // no empty sheet, no leftover rule, and no generic closing note in its
-      // place.
+      // A WITHDRAWN section keeps its stored record exactly as it is and simply
+      // has no page here. Nothing is left behind it: no empty sheet, no leftover
+      // rule, and no generic closing note in its place.
       if (!isClientVisibleSection(section.section_type)) return;
       const title = section.title || def.title;
       // A comparison names its own sections — the report presents system options

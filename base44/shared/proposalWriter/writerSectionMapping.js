@@ -30,7 +30,10 @@
  *
  * A writer section the proposal's own section set has no home for is reported
  * rather than dropped: a caller that cannot publish the whole draft must fail
- * visibly instead of printing a proposal with copy missing from it.
+ * visibly instead of printing a proposal with copy missing from it. The one
+ * exception is a writer section the document has deliberately RETIRED (below):
+ * it is not reported, because there is nothing to publish it into and nothing is
+ * missing from the document.
  *
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
@@ -44,8 +47,10 @@ import { WRITER_SECTION_IDS, writerSectionsForMode } from './writerContractSchem
  * exactly what that section is for: the summary of the design being offered, the
  * overview of what it is, and why this specification was chosen — in a
  * comparison that same section is where the options are introduced before they
- * are contrasted. `appendix_notes` is the source-only note, so it is published
- * into the report's Appendix section.
+ * are contrasted.
+ *
+ * A writer section with no entry here is not published into any document
+ * section. `appendix_notes` is the case: see RETIRED_WRITER_SECTIONS below.
  */
 export const PROPOSAL_SECTION_FOR_WRITER_SECTION = Object.freeze({
   decision_summary: 'system_design_summary',
@@ -60,8 +65,20 @@ export const PROPOSAL_SECTION_FOR_WRITER_SECTION = Object.freeze({
   // section, which exists only where the project states such alternatives.
   presented_options: 'presented_options',
   overall_design: 'overall_design',
-  appendix_notes: 'appendix',
 });
+
+/**
+ * The writer's sections the document no longer publishes.
+ *
+ * The document has withdrawn its Appendix, so the writer's closing source-only
+ * note has no section to be published into. It is still written and still
+ * validated — the writer's own contract is unchanged — so a draft generated
+ * under the earlier structure stays valid and re-validates exactly as it did.
+ * What changes is only that arriving copy is no longer written into a document
+ * section, never printed and never approved, and it is therefore not reported as
+ * an unmapped section: nothing is missing from the document.
+ */
+export const RETIRED_WRITER_SECTIONS = Object.freeze(['appendix_notes']);
 
 /**
  * The proposal sections a writer draft is published into, in document order.
@@ -75,7 +92,6 @@ export const WRITER_TARGET_SECTION_ORDER = Object.freeze([
   'timbre_matching',
   'overall_design',
   'presented_options',
-  'appendix',
 ]);
 
 /** A markup character in a draft is written as text, never as markup. */
@@ -152,7 +168,9 @@ export function composeWriterSectionBodies({ output = null, mode = 'comparison',
   }
 
   const published = new Set(bodies.flatMap((body) => body.writer_sections));
-  const unmapped = WRITER_SECTION_IDS.filter((id) => bodyById.has(id) && !published.has(id));
+  const unmapped = WRITER_SECTION_IDS.filter((id) => bodyById.has(id)
+    && !published.has(id)
+    && !RETIRED_WRITER_SECTIONS.includes(id));
 
   return { bodies, unmapped };
 }

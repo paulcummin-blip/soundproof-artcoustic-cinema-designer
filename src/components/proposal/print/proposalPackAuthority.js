@@ -9,7 +9,7 @@
  *   - the calculated Key Performance Highlights rows for the evidence cards.
  *
  * No value is calculated, rounded or invented here. The approved explainer copy
- * on the method and appendix pages is fixed text, held in this one place.
+ * on the method page is fixed text, held in this one place.
  *
  * Pure: no React, no fetching, no side effects.
  */
@@ -43,25 +43,6 @@ export function ukDate(value) {
   if (Number.isNaN(date.getTime())) return null;
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
-
-/** Plain-language name for each parameter, for the appendix reference list. */
-export const PARAMETER_NAMES = Object.freeze({
-  2: 'Discrete channels',
-  4: 'Screen consistency',
-  5: 'Horizontal spacing',
-  6: 'Surround level consistency',
-  7: 'Front wide position',
-  9: 'Overhead spacing',
-  10: 'Overhead level consistency',
-  12: 'Screen Dynamic Range',
-  13: 'Non-screen Dynamic Range',
-  14: 'LFE and subwoofer Dynamic Range',
-  16: 'Screen timbre',
-  17: 'Surround and overhead timbre',
-  18: 'Bass extension',
-  19: 'Bass response',
-  20: 'Bass consistency',
-});
 
 /** The parameters each design structure section shows as evidence. */
 export const STRUCTURE_PARAMETER_KEYS = Object.freeze({
@@ -145,34 +126,6 @@ export const SEATING_STYLE_PAGE = Object.freeze({
     },
   ]),
 });
-
-/** Appendix: method notes, references and the prediction disclaimer. */
-export const APPENDIX_PAGE = Object.freeze({
-  title: 'Method and notes',
-  notes: Object.freeze([
-    {
-      title: 'Assessment basis',
-      text: 'Performance is assessed against CEDIA/CTA-RP22 for audio and RP23 for viewing geometry. RP22 grades each design structure from Level 1 to Level 4.',
-    },
-    {
-      title: 'Predicted performance',
-      text: 'Every result in this document is predicted from the room model and the published product data for the design as specified.',
-    },
-    {
-      title: 'Design Index',
-      text: 'The Design Index is an internal design diagnostic used by the designer to compare options. It is not a client-facing performance result and is not reported here.',
-    },
-  ]),
-  parameters_title: 'Parameters referenced in this document',
-});
-
-/** The parameter reference list shown in the appendix, in parameter order. */
-export function parameterReferenceList() {
-  return Object.keys(PARAMETER_NAMES)
-    .map(Number)
-    .sort((a, b) => a - b)
-    .map((id) => ({ id, label: `P${id} ${PARAMETER_NAMES[id]}` }));
-}
 
 /**
  * The screen as the client-facing statement, so no page can state one figure

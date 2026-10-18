@@ -16,7 +16,6 @@ const SECTIONS = [
   { type: 'products', key: 'products', title: 'Products', canEditBody: true },
   { type: 'comparison', key: 'comparison', title: 'Comparison', canEditBody: true },
   { type: 'conclusion', key: 'conclusion', title: 'Conclusion', canEditBody: true },
-  { type: 'appendix', key: 'appendix', title: 'Appendix', canEditBody: true },
 ];
 export function resolveSections(type) { return type === 'single' ? SECTIONS : SYSTEM_SUMMARY_SECTIONS; }
 const GOAL_LABELS = { luxury_cinema: 'Luxury Cinema', family_media_room: 'Family Media Room', reference_performance: 'Reference Performance', best_value: 'Best Value', future_proof: 'Future Proof' };
@@ -29,7 +28,6 @@ const SECTION_PROMPTS = {
   products: 'Write the products section describing the key products in the system. Use a bullet list for each product category. 2-3 paragraphs plus bullet lists.',
   comparison: 'Write the comparison section comparing this design to typical alternatives, explaining the advantages of this approach. 2-3 paragraphs.',
   conclusion: 'Write the conclusion section summarising the proposal, restating the value, and including a call to action. 2-3 paragraphs.',
-  appendix: 'Write the appendix introduction. This section will contain technical specifications and detailed data. 1 paragraph.',
 };
 export function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = [], sourceIdentity = null, versionEvidenceText = '') {
   const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';

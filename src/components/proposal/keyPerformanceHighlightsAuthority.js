@@ -226,7 +226,10 @@ function clientDeviationText(parameter, text) {
   const match = String(parameter ?? '').match(/(\d+)/);
   const id = match ? Number(match[1]) : null;
   if (id !== 19 && id !== 20) return text;
-  const deviation = String(text ?? '').match(/±\s*\d+(?:\.\d+)?/);
+  // The figure is matched WITH the unit it is written in, and replaced whole.
+  // Matching the number alone left the unit the text already carried standing
+  // next to the floored figure's own unit, which is what printed "±9 dB dB".
+  const deviation = String(text ?? '').match(/±\s*\d+(?:\.\d+)?\s*dB/);
   if (!deviation) return text;
   const floored = formatP19P20DeviationText(deviation[0].replace(/[^\d.]/g, ''));
   return floored ? String(text).replace(deviation[0], floored) : text;

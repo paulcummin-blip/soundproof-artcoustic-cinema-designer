@@ -30,7 +30,6 @@ const SECTION_TITLES: Record<string, string> = {
   products: 'Products',
   comparison: 'Comparison',
   conclusion: 'Conclusion',
-  appendix: 'Appendix',
   // System Design Summary sections
   system_design_summary: 'System Design Summary',
   spatial_resolution: 'Spatial Resolution',

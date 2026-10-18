@@ -23,19 +23,23 @@
  *     heading, in that order, with one hierarchy and one rhythm, and a supporting
  *     photograph BELOW the explanation it supports.
  *
- *  3. The Appendix is not part of a client-facing document. The Project Report
- *     carries the supporting technical evidence, so the pack prints neither the
- *     Appendix heading nor a generic closing note in its place, and the stored
- *     section is left exactly as it is in the database.
+ *  3. A WITHDRAWN section is not part of a client-facing document. The Project
+ *     Report carries the supporting technical evidence, so the pack prints
+ *     neither the withdrawn heading nor a generic closing note in its place, and
+ *     the stored section is left exactly as it is in the database.
  *
  * Pure: no React, no DOM, no runtime reads.
  */
 
+import { RETIRED_SECTION_TYPES } from '@/components/proposal/proposalSections';
+
 /**
- * Section types a client-facing document does not print. The stored record is
- * never touched — it simply has no place in the pack.
+ * Section types a client-facing document does not print: the sections the
+ * document has WITHDRAWN. The list is read from the same retirement registry the
+ * section definitions use, so no surface keeps a second list of names, and the
+ * stored record is never touched — it simply has no place in the pack.
  */
-export const CLIENT_EXCLUDED_SECTION_TYPES = Object.freeze(['appendix']);
+export const CLIENT_EXCLUDED_SECTION_TYPES = RETIRED_SECTION_TYPES;
 
 /** Whether a section belongs in the client-facing document at all. */
 export function isClientVisibleSection(sectionType) {

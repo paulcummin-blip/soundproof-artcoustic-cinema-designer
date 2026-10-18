@@ -7,7 +7,8 @@
  *
  * The order a client reads a proposal in is decided from the report type's own
  * section definitions — never from the order a database read returned rows in.
- * Presented Options and the Appendix therefore cannot appear before the cover.
+ * Presented Options therefore cannot appear before the cover, and a WITHDRAWN
+ * section forms no part of the document at all.
  *
  * The legacy 'single' report set is listed here because the frontend's legacy set
  * is UI-only and is not shared to the backend.
@@ -15,7 +16,7 @@
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
-import { SYSTEM_SUMMARY_SECTIONS } from '../systemDesignSummarySections.js';
+import { SYSTEM_SUMMARY_SECTIONS, isRetiredSectionType } from '../systemDesignSummarySections.js';
 
 /** The legacy ten-section set, in order. Readable history only. */
 export const LEGACY_PROPOSAL_SECTION_TYPES = Object.freeze([
@@ -28,7 +29,6 @@ export const LEGACY_PROPOSAL_SECTION_TYPES = Object.freeze([
   'products',
   'comparison',
   'conclusion',
-  'appendix',
 ]);
 
 /** The canonical section types of a report type, in published order. */
@@ -49,6 +49,11 @@ export function orderPublicationSections({ sections = [], proposalType = null } 
   const rankOf = (section) => (rank.has(section?.section_type) ? rank.get(section.section_type) : order.length);
 
   return (Array.isArray(sections) ? sections : [])
+    // A WITHDRAWN section forms no part of the document. Its stored record is left
+    // exactly as it is — nothing is migrated, rewritten or deleted — but it is
+    // never ordered into the document, and so is never published, never printed
+    // and never approved.
+    .filter((section) => !isRetiredSectionType(section?.section_type))
     .map((section, position) => ({ section, position }))
     .sort((a, b) => {
       const rankA = rankOf(a.section);

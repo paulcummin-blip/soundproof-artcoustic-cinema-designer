@@ -7,7 +7,7 @@
  * section definitions — never from the order a database read happened to return
  * rows in. The cover is first because it is first in the definitions; the
  * narrative follows the definitions' own sequence; Presented Options keeps its
- * defined place; the Appendix stays last.
+ * defined place. A WITHDRAWN section is not part of the document at all.
  *
  * A section type the definitions do not list is placed after every known one, by
  * its stored order_index, so a legacy or duplicated record can never displace the
@@ -20,7 +20,7 @@
  * Pure: no React, no fetching, no side effects.
  */
 
-import { getSectionsForProposalType } from './proposalSections';
+import { getSectionsForProposalType, isRetiredSectionType } from './proposalSections';
 
 /** The canonical section types of a report type, in published order. */
 export function canonicalSectionTypes(proposalType) {
@@ -39,6 +39,12 @@ export function orderPublicationSections({ sections = [], proposalType = null } 
   const rankOf = (section) => (rank.has(section?.section_type) ? rank.get(section.section_type) : order.length);
 
   return (Array.isArray(sections) ? sections : [])
+    // A WITHDRAWN section forms no part of the document. Its stored record is left
+    // exactly as it is — nothing is migrated, rewritten or deleted — but it is
+    // never ordered into the document, and so is never published, never printed
+    // and never approved. Every surface downstream reads the document this
+    // function returns, so this is the only place that has to know.
+    .filter((section) => !isRetiredSectionType(section?.section_type))
     .map((section, position) => ({ section, position }))
     .sort((a, b) => {
       const rankA = rankOf(a.section);

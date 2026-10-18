@@ -37,6 +37,25 @@ export const HIGHLIGHTS_SECTION_TYPE = 'key_performance_highlights';
 export const PRESENTED_OPTIONS_SECTION_TYPE = 'presented_options';
 
 /**
+ * The sections the report has WITHDRAWN.
+ *
+ * A retired section is not part of the document any more: it has no place in the
+ * structure below, is never ordered into a document, never printed and never
+ * approved. The name is kept here so a record stored before the change is
+ * RECOGNISED as withdrawn rather than treated as an unknown type, and so no
+ * surface has to test a section name by hand. Such a record keeps its body and
+ * its own metadata exactly as they are — nothing is migrated or deleted.
+ *
+ * The frontend mirrors this list in src/components/proposal/proposalSections.js.
+ */
+export const RETIRED_SECTION_TYPES = Object.freeze(['appendix']);
+
+/** Whether a section has been withdrawn from the document. */
+export function isRetiredSectionType(type) {
+  return RETIRED_SECTION_TYPES.includes(String(type || ''));
+}
+
+/**
  * The section titles a COMPARISON report uses in place of the single-system
  * ones.
  *
@@ -82,11 +101,6 @@ export const SYSTEM_SUMMARY_SECTIONS = [
   // project states such alternatives, so a project of ordinary room images never
   // gains an options page.
   { type: PRESENTED_OPTIONS_SECTION_TYPE, key: PRESENTED_OPTIONS_SECTION_TYPE, title: 'Presented Options', canEditBody: true },
-  // The source-only note the approved writer closes its draft with: what the
-  // proposal was written from, with no performance claim. It is the report's own
-  // Appendix section, so the note is published into the document rather than
-  // left out of it.
-  { type: 'appendix', key: 'appendix', title: 'Appendix', canEditBody: true },
 ];
 
 /**

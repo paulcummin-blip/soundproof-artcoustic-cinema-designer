@@ -2,10 +2,33 @@
  * Section definitions for the Proposal Editor.
  * Dealers can hide and reorder but cannot add custom sections.
  *
- * PROPOSAL_SECTIONS below is the legacy ten-section set. It is no longer
- * offered for new reports, and is kept only so proposals saved before the two
- * report types were merged still open correctly.
+ * PROPOSAL_SECTIONS below is the legacy set. It is no longer offered for new
+ * reports, and is kept only so proposals saved before the two report types were
+ * merged still open correctly.
  */
+
+/**
+ * The sections the document has WITHDRAWN.
+ *
+ * A retired section is not part of the document any more: it is not defined, not
+ * ordered, not published, not printed and NEVER approved — nothing is left
+ * hidden behind an approval the designer cannot see. It is named here for one
+ * reason: a record stored before the change is recognised as withdrawn rather
+ * than treated as an unknown type, and no surface has to test a section name by
+ * hand. Such a record keeps its body and its own metadata exactly as they are —
+ * nothing is migrated, rewritten or deleted.
+ *
+ * Mirrored on the backend in base44/shared/systemDesignSummarySections.js.
+ */
+export const RETIRED_SECTION_TYPES = Object.freeze(['appendix']);
+
+/** Whether a section has been withdrawn from the document. */
+export function isRetiredSectionType(type) {
+  return RETIRED_SECTION_TYPES.includes(String(type || ''));
+}
+
+/** The name a withdrawn section is read back by, where history has to be read. */
+export const RETIRED_SECTION_LABELS = Object.freeze({ appendix: 'Appendix (retired)' });
 
 export const PROPOSAL_SECTIONS = [
   { type: 'cover', key: 'cover', label: 'Cover', defaultTitle: 'Cover', canHide: false, canEditBody: false },
@@ -17,7 +40,6 @@ export const PROPOSAL_SECTIONS = [
   { type: 'products', key: 'products', label: 'Products', defaultTitle: 'Products', canHide: true, canEditBody: true },
   { type: 'comparison', key: 'comparison', label: 'Comparison', defaultTitle: 'Comparison', canHide: true, canEditBody: true },
   { type: 'conclusion', key: 'conclusion', label: 'Conclusion', defaultTitle: 'Conclusion', canHide: true, canEditBody: true },
-  { type: 'appendix', key: 'appendix', label: 'Appendix', defaultTitle: 'Appendix', canHide: true, canEditBody: true },
 ];
 
 /**
@@ -40,9 +62,6 @@ export const SYSTEM_SUMMARY_SECTIONS = [
   // own client-facing prose for the seating or layout alternatives the designer
   // marked. It exists only where the project states such alternatives.
   { type: 'presented_options', key: 'presented_options', label: 'Presented Options', defaultTitle: 'Presented Options', canHide: true, canEditBody: true },
-  // Mirrors base44/shared/systemDesignSummarySections.js: the Appendix carries the
-  // approved writer's closing source-only note. A test asserts the two agree.
-  { type: 'appendix', key: 'appendix', label: 'Appendix', defaultTitle: 'Appendix', canHide: true, canEditBody: true },
 ];
 
 /** Every section definition, from both report types. */
@@ -91,6 +110,9 @@ export function getSectionLabel(sectionType, proposalType) {
   if (proposalType === 'comparison' && COMPARISON_SECTION_TITLES[sectionType]) {
     return COMPARISON_SECTION_TITLES[sectionType];
   }
+  // A withdrawn section is never offered for editing. Where history has to be
+  // read back by name it is named as withdrawn, never as live copy.
+  if (isRetiredSectionType(sectionType)) return RETIRED_SECTION_LABELS[sectionType] || sectionType;
   return getSectionDef(sectionType)?.label || sectionType;
 }
 
