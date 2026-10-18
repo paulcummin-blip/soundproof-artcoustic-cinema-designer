@@ -17,6 +17,7 @@ import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposa
 import { EVIDENCE_AT, option } from './fixtures/proposalEvidenceFixtures.mjs';
 import {
   DESIGN_INTENT_SENTENCE_FRAMES,
+  DESIGN_INTENT_DECISION_SENTENCE,
   DESIGN_INTENT_REQUIREMENT,
   DESIGN_INTENT_SECTION,
   DESIGN_INTENT_WORD_LIMIT,
@@ -123,9 +124,36 @@ describe('the Design Intent brief', () => {
     }
   });
 
+  it('opens on the cinema experience and keeps the detailed decisions until last', () => {
+    // Paragraph one is the cinema the client is buying: the display and its format,
+    // and the seat count and row arrangement, both filled from this project's own
+    // evidence rather than from any stored figure.
+    const [experience, spatial, capability] = DESIGN_INTENT_SENTENCE_FRAMES;
+    expect(experience.id).toBe('cinema_experience');
+    expect(experience.label).toMatch(/PARAGRAPH ONE: THE CINEMA EXPERIENCE/);
+    expect(experience.frame).toMatch(/this project's own display and its format/);
+    expect(experience.frame).toMatch(/this project's own seat count and row arrangement/);
+    // The system that carries the experience follows it, and the capability closes
+    // the block: spatial resolution and timbre matching, then dynamic range and bass.
+    expect(spatial.label).toMatch(/PARAGRAPH TWO/);
+    expect(capability.label).toMatch(/PARAGRAPH THREE/);
+    expect(capability.frame).toMatch(/substantial headroom from the screen channels/);
+    expect(capability.frame).toMatch(/extends the predicted low-frequency response to/);
+    // The detailed design decision is neither an opening frame nor a fourth
+    // paragraph: it is the one OPTIONAL sentence of paragraph three, written only
+    // where this project's own geometry records the clearance.
+    expect(DESIGN_INTENT_DECISION_SENTENCE.frame).toMatch(/seating is set forward of the rear wall/);
+    expect(DESIGN_INTENT_DECISION_SENTENCE.include_when).toMatch(/never add it because the frame exists/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/DETAILED DESIGN DECISIONS COME LAST/);
+    // The hierarchy and the experience rule reach the requirement the writer reads.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/THE ORDER IS THE HIERARCHY/);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never claim the same experience at every seat/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never a figure, a size or a seat count from any other project/i);
+  });
+
   it('writes design reasoning, never the summary again, and never marketing filler', () => {
-    // Paragraph one reasons about the layout instead of restating the schedule.
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/OPEN ON THE DESIGN REASONING/);
+    // Paragraph one is the cinema experience instead of a detailed constraint.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/OPEN ON THE CINEMA EXPERIENCE/);
     // The facts the Project Summary above the block already states are not recited.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK/);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/only where it helps explain why the design works/i);
@@ -167,7 +195,7 @@ describe('the Design Intent brief', () => {
     // The tightened brief is the requirement the writer is actually called with,
     // never a second copy of it.
     expect(input.section_requirements[0].requirement).toBe(DESIGN_INTENT_REQUIREMENT);
-    expect(input.section_requirements[0].requirement).toMatch(/OPEN ON THE DESIGN REASONING/);
+    expect(input.section_requirements[0].requirement).toMatch(/OPEN ON THE CINEMA EXPERIENCE/);
     expect(input.section_requirements[0].requirement).toMatch(/NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK/);
     expect(Object.keys(input.word_limits)).toEqual([DESIGN_INTENT_SECTION]);
     expect(input.output.sections).toHaveLength(1);
