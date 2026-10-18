@@ -1,5 +1,5 @@
 import React from 'react';
-import { PenLine, Plus, Minus, Wrench, Home, RefreshCw, Lock, Unlock, StickyNote, Pencil, Check, X, Loader2, ShieldCheck } from 'lucide-react';
+import { PenLine, Plus, Minus, Wrench, Home, RefreshCw, Lock, Unlock, StickyNote, Pencil, Check, X, Loader2, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
 import { REGENERATION_ACTIONS } from '@/components/proposal/proposalSections';
 import { MANUAL_EDIT_LABEL } from '@/components/proposal/proposalManualEdit';
 import {
@@ -33,6 +33,16 @@ const ICONS = { PenLine, Plus, Minus, Wrench, Home, RefreshCw };
  *   no generated copy and so has nothing to approve
  * - isApproving: the approval is being written
  * - onApprove: () => void — the one action that approves this section
+ * - onImproveWording: () => void — the editorial pass over this section's wording.
+ *   It improves how the copy reads and changes nothing else: the facts, the figures,
+ *   the levels, the scope and the products stay exactly as they are, and the copy it
+ *   replaces is kept. Null for a section with no generated copy. A whole section is
+ *   improved from here; a sentence or a paragraph is improved from the editor's own
+ *   toolbar, where the highlighted text is.
+ * - onUndoWording: () => void — puts back the wording the editorial pass replaced.
+ * - isImprovingWording: the editorial pass is running
+ * - canUndoAdi: the copy on screen is an ADI improvement whose earlier wording is
+ *   still held behind it
  *
  * Approval is the designer's own decision about this section's generated wording.
  * It is given by the Approve action and by nothing else — not by generating the
@@ -55,6 +65,10 @@ export default function SectionToolbar({
   approvalStatus = null,
   isApproving = false,
   onApprove,
+  onImproveWording = null,
+  onUndoWording = null,
+  isImprovingWording = false,
+  canUndoAdi = false,
 }) {
   const approved = approvalStatus === APPROVAL_STATUS.APPROVED;
   const approvalChip = approvalChipStyle(approvalStatus);
@@ -131,6 +145,45 @@ export default function SectionToolbar({
             )}
             {isApproving ? 'Approving…' : 'Approve section'}
           </button>
+          <div className="w-px h-5 bg-[#DCDBD6]" />
+        </>
+      )}
+
+      {/* ── IMPROVE THE WORDING WITH ADI ──
+          The editorial pass on the copy that is already here: the same facts said
+          better. It is not writing this section again and it is not a regeneration —
+          the engineering writer is not asked, and no figure, level, scope or product
+          changes. The wording it replaces is kept, so Undo puts it back exactly. */}
+      {onImproveWording && (
+        <>
+          <button
+            type="button"
+            onClick={() => onImproveWording()}
+            disabled={isImprovingWording}
+            title="Improve this section's wording with ADI — the same facts, better said"
+            data-adi-improve="section"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-[#3E4349] hover:bg-[#F5F4F0] rounded transition-colors disabled:opacity-50"
+          >
+            {isImprovingWording ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            Improve wording with ADI
+          </button>
+          {canUndoAdi && (
+            <button
+              type="button"
+              onClick={() => onUndoWording?.()}
+              disabled={isImprovingWording}
+              title="Put back the wording ADI replaced"
+              data-adi-undo="section"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-[#3E4349] hover:bg-[#F5F4F0] rounded transition-colors disabled:opacity-50"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              Undo
+            </button>
+          )}
           <div className="w-px h-5 bg-[#DCDBD6]" />
         </>
       )}

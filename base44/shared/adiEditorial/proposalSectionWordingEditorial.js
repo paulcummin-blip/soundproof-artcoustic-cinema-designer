@@ -104,7 +104,10 @@ function result({ applied, action, outcome = null, mode, improvedText = null, pr
     mode,
     outcome,
     kept_original: outcome !== null && outcome !== ADI_WORDING_OUTCOME.IMPROVED,
-    improved_text: improvedText,
+    // The wording to apply: the improved copy for a whole-section edit, and the
+    // improved highlighted text for the half of a selection edit that has not been
+    // saved yet. The editor reads exactly one field either way.
+    improved_text: improvedText ?? text,
     previous_text: previousText,
     text,
     can_undo: Boolean(canUndo),
@@ -333,9 +336,8 @@ async function save({ entities, sectionId, section, body, now, user, mode, previ
   return {
     applied: true,
     outcome: ADI_WORDING_OUTCOME.IMPROVED,
-    text: improvedText,
-    previous_text: previousText,
-    improved_text: improvedText,
+    improvedText,
+    previousText,
     canUndo: true,
   };
 }

@@ -19,18 +19,36 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
  * - editable: boolean (default true)
  * - saveStatus: 'idle' | 'saving' | 'saved' | 'failed' | 'unsaved'
  */
-export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSave, editable = true, saveStatus = 'idle' }) {
+export default function InlineRichTextEditor({
+  html,
+  onSave,
+  onDirty,
+  onUnloadSave,
+  editable = true,
+  saveStatus = 'idle',
+  // The two halves of a highlighted ADI edit. The editor asks for the highlighted
+  // wording to be improved, puts the improved wording back in its place itself, and
+  // then hands the editor's own copy over to be saved — so nothing outside the
+  // highlighted text is ever touched by anything but this editor.
+  onImproveSelection = null,
+  onApplyAdiSelection = null,
+}) {
   const editorRef = useRef(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
+  const [adiBusy, setAdiBusy] = useState(false);
   const latestDraftRef = useRef({ html: html || '', editedAt: null });
   const dirtySinceSaveRef = useRef(false);
   const onSaveRef = useRef(onSave);
   const onDirtyRef = useRef(onDirty);
   const onUnloadSaveRef = useRef(onUnloadSave);
+  const onImproveSelectionRef = useRef(onImproveSelection);
+  const onApplyAdiSelectionRef = useRef(onApplyAdiSelection);
   onSaveRef.current = onSave;
   onDirtyRef.current = onDirty;
   onUnloadSaveRef.current = onUnloadSave;
+  onImproveSelectionRef.current = onImproveSelection;
+  onApplyAdiSelectionRef.current = onApplyAdiSelection;
 
   // Set initial content
   React.useEffect(() => {
@@ -79,6 +97,48 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
       }
     };
   }, []);
+
+  // ── IMPROVE THE HIGHLIGHTED TEXT (ADI) ──
+  // Only the highlighted span is improved. The range is held before the call and
+  // restored after it, because the provider takes long enough for the browser to
+  // drop the selection; the improved wording is then inserted in that one place, and
+  // the copy around it is not rewritten. The server proves exactly that against the
+  // stored copy before it saves anything, so an edit that changed anything else is
+  // refused with the copy as it was.
+  const runAdiSelection = useCallback(async () => {
+    if (adiBusy || !onImproveSelectionRef.current || !editorRef.current) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0).cloneRange();
+    const selectionText = range.toString();
+    if (!selectionText.trim()) return;
+
+    setAdiBusy(true);
+    try {
+      const outcome = await onImproveSelectionRef.current(selectionText);
+      const improved = outcome?.improved_text;
+      // A refusal keeps the copy that is already here: nothing is inserted, and the
+      // designer reads why in the notice beside the toolbar.
+      if (!improved || outcome?.kept_original === true || outcome?.applied === true) return;
+
+      const restored = window.getSelection();
+      restored.removeAllRanges();
+      restored.addRange(range);
+      document.execCommand('insertText', false, improved);
+
+      const body = editorRef.current?.innerHTML || '';
+      if (onApplyAdiSelectionRef.current) {
+        await onApplyAdiSelectionRef.current({
+          selectionText,
+          improvedSelection: improved,
+          body,
+        });
+      }
+    } finally {
+      setAdiBusy(false);
+      setShowToolbar(false);
+    }
+  }, [adiBusy]);
 
   const markDirty = () => {
     const currentHtml = editorRef.current?.innerHTML || '';
@@ -159,6 +219,26 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
           {toolbarBtn('1. List', 'insertOrderedList')}
           <div className="w-px h-4 bg-white/20" />
           {toolbarBtn('Link', 'createLink')}
+          {/* The editorial action for a sentence or a paragraph: the highlighted
+              text alone is improved, in place, and nothing else is touched. */}
+          {onImproveSelection && (
+            <>
+              <div className="w-px h-4 bg-white/20" />
+              <button
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  runAdiSelection();
+                }}
+                disabled={adiBusy}
+                title="Improve the highlighted wording with ADI"
+                data-adi-improve="selection"
+                className="px-2 py-1 text-xs text-white/90 hover:bg-white/20 rounded transition-colors disabled:opacity-50"
+              >
+                {adiBusy ? 'ADI is improving…' : 'Improve with ADI'}
+              </button>
+            </>
+          )}
         </div>
       )}
 
