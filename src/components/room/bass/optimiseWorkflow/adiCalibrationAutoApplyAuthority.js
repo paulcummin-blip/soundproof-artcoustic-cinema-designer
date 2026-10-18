@@ -666,7 +666,7 @@ export function resolveCalibrationAutoApply({
   const materiality = isMaterialImprovement(baseline, candidate);
   if (materiality?.valid === false) {
     return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.AMBIGUOUS_EVIDENCE,
-      `A calibration change was evaluated but its canonical P19/P20 evidence could not be confirmed (${materiality.reason}). Nothing has been applied — your approval is required.`,
+      `A calibration change was evaluated but its result could not be confirmed (${materiality.reason}). Nothing has been applied — your approval is required.`,
       context);
   }
 
