@@ -57,6 +57,9 @@ export const ADI_CONSERVATION_REJECTION = Object.freeze({
   REMOVED_LIMITATION: 'a_material_limitation_was_removed',
   INVENTED_REASON: 'a_reason_was_invented',
   NEW_CLAIM: 'a_claim_the_original_never_made_was_added',
+  NEW_EXPERIENTIAL_CLAIM: 'a_new_experiential_claim_was_added',
+  NEW_ROOM_USE_CLAIM: 'a_new_room_use_was_added',
+  NEW_DESIGN_RATIONALE: 'a_new_design_rationale_was_added',
   SELECTION_NOT_CONSERVED: 'the_copy_outside_the_selection_changed',
 });
 
@@ -168,6 +171,58 @@ function scopeTokens(text) {
 function rationaleWords(text) {
   const found = String(text || '').match(RATIONALE) || [];
   return new Set(found.map((word) => word.toLowerCase()));
+}
+
+/**
+ * Meaning that can be added without adding a protected figure or one of the
+ * writer vocabulary's structural claim types. These are semantic families, not
+ * fixed phrases: a source may be paraphrased freely inside a family it already
+ * expresses, but a rewrite may not introduce a family the source never carried.
+ */
+const SEMANTIC_CLAIM = Object.freeze([
+  {
+    key: 'experiential_view',
+    code: ADI_CONSERVATION_REJECTION.NEW_EXPERIENTIAL_CLAIM,
+    category: 'experiential claim',
+    explanation: 'The rewritten copy adds a benefit about the viewing experience or sightlines that the source copy never states.',
+    patterns: [
+      /\b(?:involving|immersive|engaging|compelling)\s+(?:view|viewing|picture|experience)\b/i,
+      /\b(?:improv\w*|better|clear(?:er)?)\s+(?:the\s+)?(?:view|viewing|sightlines?)\b/i,
+      /\b(?:view|picture)\b[^.]{0,48}\bfeels?\s+(?:close|involving|immersive|engaging)\b/i,
+    ],
+  },
+  {
+    key: 'room_use',
+    code: ADI_CONSERVATION_REJECTION.NEW_ROOM_USE_CLAIM,
+    category: 'room use',
+    explanation: 'The rewritten copy assigns a use or audience purpose to the room that the source copy never states.',
+    patterns: [
+      /\b(?:shared|family|social|multi[- ]?purpose)\s+(?:use|room|cinema|space)\b/i,
+      /\b(?:use|used)\s+(?:by|for)\s+(?:the\s+)?(?:family|friends|guests)\b/i,
+    ],
+  },
+  {
+    key: 'design_rationale',
+    code: ADI_CONSERVATION_REJECTION.NEW_DESIGN_RATIONALE,
+    category: 'design rationale',
+    explanation: 'The rewritten copy adds an engineering or design rationale that the source copy never states.',
+    patterns: [
+      /\b(?:established|recognised|proven|standard|accepted)\s+(?:design\s+)?approach\b/i,
+      /\b(?:manage|manages|managing|control|controls|controlling|smooth|smooths|smoothing|reduce|reduces|reducing)\b[^.]{0,80}\b(?:room modes?|bass behaviour|low[- ]frequency (?:behaviour|variation|resonances?))\b/i,
+    ],
+  },
+]);
+
+function semanticClaimSentences(text) {
+  const claims = new Map();
+  for (const sentence of sentenceParts(text)) {
+    for (const claim of SEMANTIC_CLAIM) {
+      if (!claims.has(claim.key) && claim.patterns.some((pattern) => pattern.test(sentence))) {
+        claims.set(claim.key, { claim, sentence });
+      }
+    }
+  }
+  return claims;
 }
 
 /**
@@ -348,6 +403,23 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
         proposedValue: word,
         proposedExcerpt: excerptFor(after, word),
         explanation: 'The rewritten copy gives a reason, with a connector the original copy never used.',
+      }));
+    }
+  }
+
+  // ── Plausible benefits and explanations are still new meaning ───────────
+  // These phrases were previously invisible because they add no protected
+  // figure, product, seat scope or recognised structural claim, and because
+  // noun-phrase rationales need no connector such as “because” or “to ensure”.
+  const semanticBefore = semanticClaimSentences(before);
+  const semanticAfter = semanticClaimSentences(after);
+  for (const [key, found] of semanticAfter.entries()) {
+    if (!semanticBefore.has(key)) {
+      violations.push(violation(found.claim.code, `added:${key}`, {
+        category: found.claim.category,
+        proposedValue: key,
+        proposedExcerpt: found.sentence,
+        explanation: found.claim.explanation,
       }));
     }
   }
