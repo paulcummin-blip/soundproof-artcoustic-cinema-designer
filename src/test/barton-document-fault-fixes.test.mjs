@@ -171,11 +171,18 @@ test('3. the Project Report hands its one saved payload to the Technical pages',
 test('5. a failed page raster is recorded and left out — it never cancels the PDF', () => {
   const resilience = read('src/components/library/libraryCaptureResilience.js');
 
-  assert.match(resilience, /diagnostics\.incomplete = diagnostics\.failed\.length > 0;/);
-  assert.ok(!/if \(diagnostics\.failed\.length > 0\) throw buildResilienceFailure\(diagnostics\);\n\n  return/.test(resilience),
-    'an incomplete capture is stored, not thrown away');
-  assert.match(resilience, /if \(stored === 0\) \{[\s\S]*?throw buildResilienceFailure\(diagnostics\);/,
-    'only a document with no usable page is refused');
+  assert.match(resilience, /diagnostics\.incomplete = diagnostics\.pageFailures\.length > 0;/,
+    'a copy is incomplete when a sheet has no page image, and says which');
+  assert.ok(!/throw buildResilienceFailure\(diagnostics\)/.test(resilience),
+    'no page-image condition throws: storage is never refused for want of a preview');
+  assert.match(resilience, /diagnostics\.previewStatus = stored === 0[\s\S]*?PREVIEW_STATUS\.UNAVAILABLE/,
+    'zero painted sheets is stated as a preview that is unavailable, never as a missing document');
+
+  const capture = read('src/components/library/compositionCapture.js');
+  assert.match(capture, /if \(rendering === PDF_RENDERING\.TEXT_VECTOR\) \{[\s\S]*?renderTextPagesToPdf\(pdf, pages, paper\)/,
+    'the same composed pages are rendered as text when no sheet can be painted');
+  assert.match(capture, /const artifact = await assertPdfArtifact\(blob\);/,
+    'the document stored is the verified PDF, and only the PDF decides it exists');
 });
 
 test('5. a 0 × 0 raster is a page that paints nothing, never a failed page', () => {

@@ -4,14 +4,26 @@
  * Price entry for the RP22 comparison: find a speaker, type its retail price,
  * click Save.
  *
- * The price is written to the comparison row itself — CompetitorSpeaker
- * .retail_price_inc_vat — which is the field the comparison already displays as
- * "Retail inc VAT". So a saved price appears in the comparison straight away
- * and survives a refresh, with one authoritative price per product and no
- * duplicate speaker record. Nothing here creates a product, touches a
- * specification, changes an approval or publication state, or reaches the SPL
- * engine: the graded SPL and the RP22 levels are computed from published
- * acoustic data, never from a price.
+ * The list shown here IS the RP22 comparison selection list. It is built by the
+ * same candidate builder the comparison dropdown uses, so the two can never
+ * drift apart: every speaker that can be selected for comparison appears here
+ * exactly once, under the same manufacturer and model names, and a speaker added
+ * to the database becomes priceable with no separate maintenance. Legacy records
+ * that cannot be selected for comparison are not mixed into this list and keep
+ * their existing prices untouched.
+ *
+ * Each row is resolved to that speaker's own price row, and the price is written
+ * to CompetitorSpeaker.retail_price_inc_vat — the field the comparison already
+ * displays as "Retail inc VAT". So a saved price appears in the comparison
+ * straight away, survives a refresh and stays attached through a specification
+ * update or a republication, which updates the same row in place. A speaker with
+ * no comparison row yet (a database product not yet published) gets its single
+ * price row on first save; that row carries no publish provenance, so it never
+ * changes which speakers the comparison offers.
+ *
+ * Nothing here creates a product, touches a specification, changes an approval
+ * or publication state, or reaches the SPL engine: the graded SPL and the RP22
+ * levels are computed from published acoustic data, never from a price.
  *
  * Basis: retail price including VAT, per speaker, GBP — the comparison's own
  * convention (its import note states "Prices are per speaker, including VAT").
@@ -24,9 +36,10 @@
  * comparison shows and cannot change them.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Search } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
+import { saveCandidatePrice } from "@/components/spl/comparisonPriceRecord";
 
 const BRAND = {
   panel: "#FFFFFF",
@@ -38,7 +51,6 @@ const BRAND = {
 };
 
 const TABLE_GRID = "minmax(150px, 1fr) minmax(220px, 1.6fr) 150px 96px";
-const PAGE_SIZE = 100;
 
 export const PRICE_BASIS_LABEL = "Retail price including VAT, per speaker · GBP (£)";
 
@@ -64,121 +76,101 @@ export function parsePriceEntry(raw) {
 
 export default function CompetitorPriceManager({ onPriceSaved = null }) {
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState([]);
-  const [manufacturers, setManufacturers] = useState([]);
+  const [candidates, setCandidates] = useState([]);
   const [search, setSearch] = useState("");
   const [manufacturerFilter, setManufacturerFilter] = useState("");
-  const [cursor, setCursor] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [drafts, setDrafts] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [savedId, setSavedId] = useState(null);
   const [rowError, setRowError] = useState(null);
   const [error, setError] = useState("");
 
-  const buildQuery = useCallback(() => {
-    const query = {};
-    if (manufacturerFilter) query.manufacturer = manufacturerFilter;
-    const term = search.trim();
-    if (term) {
-      query.$or = [
-        { manufacturer: { $regex: term, $options: "i" } },
-        { model: { $regex: term, $options: "i" } },
-      ];
-    }
-    return query;
-  }, [manufacturerFilter, search]);
-
-  // The manufacturer list is a column value, so it comes from the database
-  // rather than from the page currently loaded.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await base44.entities.CompetitorSpeaker.filter({}, { distinct: "manufacturer" });
-        const values = Array.isArray(result) ? result : result?.items || [];
-        if (!cancelled) setManufacturers(values.filter(Boolean).sort((a, b) => String(a).localeCompare(String(b))));
-      } catch {
-        if (!cancelled) setManufacturers([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Every search term and filter choice is a fresh server query: the table shows
-  // what the database matched, not a subset of whatever happened to be loaded.
+  // The list is the RP22 selection list itself — the same candidate builder the
+  // comparison dropdown uses, including the database products a master admin can
+  // select before they are published — so no selectable speaker can be missing.
   useEffect(() => {
     if (!open) return undefined;
     let cancelled = false;
     setLoading(true);
     setError("");
-    const timer = setTimeout(async () => {
+    (async () => {
       try {
-        const page = await base44.entities.CompetitorSpeaker.filter(buildQuery(), { sort: "manufacturer", limit: PAGE_SIZE });
-        const items = Array.isArray(page) ? page : page?.items || [];
+        const list = await loadComparisonCandidates({ includeUnpublished: true });
         if (cancelled) return;
-        setRows(items);
-        setCursor(Array.isArray(page) ? null : page?.next_cursor || null);
-        setHasMore(Array.isArray(page) ? false : page?.has_more === true);
+        setCandidates(list);
         setDrafts({});
         setRowError(null);
       } catch (e) {
         if (cancelled) return;
-        setRows([]);
-        setError(e?.message || "Could not load the comparison library.");
+        setCandidates([]);
+        setError(e?.message || "Could not load the comparison speakers.");
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }, search.trim() ? 300 : 0);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [open, buildQuery, search]);
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
-  const loadMore = async () => {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await base44.entities.CompetitorSpeaker.filter(buildQuery(), { sort: "manufacturer", limit: PAGE_SIZE, cursor });
-      const items = Array.isArray(page) ? page : page?.items || [];
-      setRows((prev) => [...prev, ...items]);
-      setCursor(Array.isArray(page) ? null : page?.next_cursor || null);
-      setHasMore(Array.isArray(page) ? false : page?.has_more === true);
-    } catch (e) {
-      setError(e?.message || "Could not load more speakers.");
-    } finally {
-      setLoadingMore(false);
+  // Manufacturer names come from the list itself, so they are the comparison's
+  // own names rather than whatever a raw record happens to spell.
+  const manufacturers = useMemo(() => (
+    [...new Set(candidates.map((candidate) => candidate.manufacturer).filter(Boolean))]
+      .sort((a, b) => String(a).localeCompare(String(b), "en", { sensitivity: "base" }))
+  ), [candidates]);
+
+  // The list already reads manufacturer A–Z then model A–Z, so a manufacturer
+  // group is a run of one manufacturer and the models inside it are alphabetical.
+  const groups = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const grouped = [];
+    for (const candidate of candidates) {
+      if (manufacturerFilter && candidate.manufacturer !== manufacturerFilter) continue;
+      if (term && !`${candidate.manufacturer || ""} ${candidate.model || ""}`.toLowerCase().includes(term)) continue;
+      const name = candidate.manufacturer || "Unattributed";
+      const last = grouped[grouped.length - 1];
+      if (last && last.manufacturer === name) last.rows.push(candidate);
+      else grouped.push({ manufacturer: name, rows: [candidate] });
     }
-  };
+    return grouped;
+  }, [candidates, search, manufacturerFilter]);
 
-  const valueFor = (row) => (row.id in drafts ? drafts[row.id] : (row.retail_price_inc_vat ?? ""));
-  const isDirty = (row) => row.id in drafts
-    && String(drafts[row.id]).trim().replace(/[£,\s]/g, "") !== String(row.retail_price_inc_vat ?? "").trim();
+  const shownCount = groups.reduce((total, group) => total + group.rows.length, 0);
 
-  const savePrice = async (row) => {
-    const parsed = parsePriceEntry(valueFor(row));
+  const priceOf = (candidate) => (candidate.record?.retail_price_inc_vat ?? "");
+  const valueFor = (candidate) => (candidate.id in drafts ? drafts[candidate.id] : priceOf(candidate));
+  const isDirty = (candidate) => candidate.id in drafts
+    && String(drafts[candidate.id]).trim().replace(/[£,\s]/g, "") !== String(priceOf(candidate)).trim();
+
+  const savePrice = async (candidate) => {
+    const parsed = parsePriceEntry(valueFor(candidate));
     if (!parsed.valid) {
-      setRowError({ id: row.id, message: "Enter a price as a number, or leave it blank." });
+      setRowError({ id: candidate.id, message: "Enter a price as a number, or leave it blank." });
       return;
     }
-    setSavingId(row.id);
+    setSavingId(candidate.id);
     setRowError(null);
     try {
-      await base44.entities.CompetitorSpeaker.update(row.id, {
-        retail_price_inc_vat: parsed.value,
-        currency: "GBP",
-      });
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, retail_price_inc_vat: parsed.value, currency: "GBP" } : r)));
+      const { recordId } = await saveCandidatePrice({ candidate, value: parsed.value });
+      setCandidates((prev) => prev.map((c) => (c.id === candidate.id
+        ? {
+          ...c,
+          priceRecordId: recordId ?? c.priceRecordId,
+          record: { ...c.record, retail_price_inc_vat: parsed.value, currency: "GBP" },
+        }
+        : c)));
       setDrafts((prev) => {
         const next = { ...prev };
-        delete next[row.id];
+        delete next[candidate.id];
         return next;
       });
-      setSavedId(row.id);
-      onPriceSaved?.(row.id, parsed.value);
-      setTimeout(() => setSavedId((current) => (current === row.id ? null : current)), 2500);
+      setSavedId(candidate.id);
+      // The candidate id is the key the comparison itself selects by, so the row
+      // on screen is refreshed without reloading the list or losing a selection.
+      onPriceSaved?.(candidate.id, parsed.value);
+      setTimeout(() => setSavedId((current) => (current === candidate.id ? null : current)), 2500);
     } catch (e) {
-      setRowError({ id: row.id, message: e?.message || "Could not save this price." });
+      setRowError({ id: candidate.id, message: e?.message || "Could not save this price." });
     } finally {
       setSavingId(null);
     }
@@ -242,80 +234,79 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
               <div style={{ padding: 16, color: BRAND.subtext, fontSize: 13 }}>Loading speakers…</div>
             ) : error ? (
               <div style={{ padding: 16, color: "#7A1E19", fontSize: 13 }}>{error}</div>
-            ) : rows.length === 0 ? (
-              <div style={{ padding: 16, color: BRAND.subtext, fontSize: 13 }}>No speaker matches this search.</div>
-            ) : rows.map((row, index) => (
-              <div
-                key={row.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: TABLE_GRID,
-                  gap: 8,
-                  alignItems: "center",
-                  padding: "10px 12px",
-                  borderTop: index === 0 ? 0 : `1px solid ${BRAND.soft}`,
-                  background: savedId === row.id ? "#F4F8F3" : "#FFF",
-                }}
-              >
-                <div style={{ fontSize: 14, color: BRAND.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{row.manufacturer || "—"}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, minWidth: 0 }}>{row.model || "—"}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: BRAND.hint, fontSize: 14 }}>£</span>
-                  <input
-                    value={valueFor(row)}
-                    onChange={(e) => setDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === "Enter") savePrice(row); }}
-                    inputMode="numeric"
-                    placeholder="Not set"
-                    aria-label={`Retail price including VAT for ${row.manufacturer || ""} ${row.model || ""}`.trim()}
-                    style={inputStyle}
-                  />
+            ) : shownCount === 0 ? (
+              <div style={{ padding: 16, color: BRAND.subtext, fontSize: 13 }}>
+                {candidates.length === 0 ? "No speaker is available to price yet." : "No speaker matches this search."}
+              </div>
+            ) : groups.map((group) => (
+              <div key={group.manufacturer}>
+                <div style={{ padding: "8px 12px", background: BRAND.soft, borderTop: `1px solid ${BRAND.border}`, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: BRAND.hint }}>
+                  {group.manufacturer}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
-                  {savedId === row.id && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#213428" }}>
-                      <Check size={14} /> Saved
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => savePrice(row)}
-                    disabled={savingId === row.id || !isDirty(row)}
+                {group.rows.map((candidate, index) => (
+                  <div
+                    key={candidate.id}
                     style={{
-                      border: 0,
-                      borderRadius: 9,
-                      padding: "8px 14px",
-                      fontSize: 13,
-                      fontFamily: "inherit",
-                      cursor: isDirty(row) ? "pointer" : "default",
-                      background: isDirty(row) ? BRAND.text : BRAND.soft,
-                      color: isDirty(row) ? "#FFF" : BRAND.hint,
+                      display: "grid",
+                      gridTemplateColumns: TABLE_GRID,
+                      gap: 8,
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      borderTop: index === 0 ? 0 : `1px solid ${BRAND.soft}`,
+                      background: savedId === candidate.id ? "#F4F8F3" : "#FFF",
                     }}
                   >
-                    {savingId === row.id ? "Saving…" : "Save"}
-                  </button>
-                </div>
-                {rowError?.id === row.id && (
-                  <div style={{ gridColumn: "3 / 5", fontSize: 12, color: "#7A1E19" }}>{rowError.message}</div>
-                )}
+                    <div style={{ fontSize: 14, color: BRAND.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{candidate.manufacturer || "—"}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, minWidth: 0 }}>{candidate.model || "—"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: BRAND.hint, fontSize: 14 }}>£</span>
+                      <input
+                        value={valueFor(candidate)}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [candidate.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === "Enter") savePrice(candidate); }}
+                        inputMode="numeric"
+                        placeholder="Not set"
+                        aria-label={`Retail price including VAT for ${candidate.manufacturer || ""} ${candidate.model || ""}`.trim()}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                      {savedId === candidate.id && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#213428" }}>
+                          <Check size={14} /> Saved
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => savePrice(candidate)}
+                        disabled={savingId === candidate.id || !isDirty(candidate)}
+                        style={{
+                          border: 0,
+                          borderRadius: 9,
+                          padding: "8px 14px",
+                          fontSize: 13,
+                          fontFamily: "inherit",
+                          cursor: isDirty(candidate) ? "pointer" : "default",
+                          background: isDirty(candidate) ? BRAND.text : BRAND.soft,
+                          color: isDirty(candidate) ? "#FFF" : BRAND.hint,
+                        }}
+                      >
+                        {savingId === candidate.id ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                    {rowError?.id === candidate.id && (
+                      <div style={{ gridColumn: "3 / 5", fontSize: 12, color: "#7A1E19" }}>{rowError.message}</div>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
 
           <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontSize: 12, color: BRAND.hint }}>
-              {rows.length} speaker{rows.length === 1 ? "" : "s"} shown · leave a price blank to clear it
+              {shownCount} speaker{shownCount === 1 ? "" : "s"} shown · {candidates.length} selectable in RP22 Comparison · leave a price blank to clear it
             </div>
-            {hasMore && (
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={loadingMore}
-                style={{ border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "8px 14px", background: "#FFF", color: BRAND.text, fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}
-              >
-                {loadingMore ? "Loading…" : "Load more"}
-              </button>
-            )}
           </div>
         </div>
       )}

@@ -102,6 +102,10 @@ export default function ExportedDocumentRow({
             {versionText && <span>{versionText}</span>}
             {exportedDate && <span>Exported {exportedDate}</span>}
             <span>{record.page_count ? `${record.page_count} pages` : 'PDF'}</span>
+            {/* The document is stored and openable whatever this says: a copy kept
+                without page images carries the PDF and no preview of it. */}
+            {record.preview_status === 'unavailable' && <span>No page preview</span>}
+            {record.preview_status === 'partial' && <span>Some pages have no preview</span>}
           </div>
           {failure && <p className="mt-1 text-xs text-[#7A2E10]">{failure}</p>}
           {note && !failure && (

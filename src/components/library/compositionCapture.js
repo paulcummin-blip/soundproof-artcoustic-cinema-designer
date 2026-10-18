@@ -33,6 +33,8 @@ import {
   resolveCaptureScale,
 } from './compositionPageRaster';
 import { collectPageRasters } from './libraryCaptureResilience';
+import { renderTextPagesToPdf } from './compositionTextPdf';
+import { PDF_RENDERING, assertPdfArtifact } from './pdfArtifactAuthority';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
 import { resolvePageComposer } from '@/components/library/issuedDocument/issuedDocumentPageComposers';
 import { pageFitRecords } from '@/components/library/issuedDocument/capturePageFitDiagnostics';
@@ -531,12 +533,44 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       pageCount += 1;
     }
 
+    // THE DOCUMENT IS THE PDF; the page images above are how its sheets are
+    // painted. A composition whose every sheet failed to paint is therefore NOT a
+    // missing document: the SAME composed pages are rendered as text — no raster,
+    // no invented sheet, the document's own wording on its own sheets — and named
+    // as a copy without page images. Storage is never refused for want of a
+    // preview, and the preview is never allowed to decide whether a document
+    // exists.
+    const rendering = pageCount === 0 ? PDF_RENDERING.TEXT_VECTOR : PDF_RENDERING.PAGE_IMAGE;
+    let textRender = null;
+    if (rendering === PDF_RENDERING.TEXT_VECTOR) {
+      textRender = renderTextPagesToPdf(pdf, pages, paper);
+      pageCount = textRender.pageCount;
+    }
+
+    // THE BYTES ARE THE DOCUMENT, and they are verified here — before anything is
+    // uploaded or recorded. The check is only what makes a file a document: the
+    // value exists, its byte length is greater than zero, and it is a PDF. A
+    // preview, a thumbnail, a canvas dimension, a page screenshot and a page
+    // count are NOT part of this check and never block storage.
+    const blob = pdf.output('blob');
+    const artifact = await assertPdfArtifact(blob);
+
     return {
-      blob: pdf.output('blob'),
+      blob,
       pageCount,
+      // How this copy's pages were rendered, what its page preview is, and the
+      // verified size of the stored document.
+      rendering,
+      previewStatus: resilience?.previewStatus || null,
+      artifactBytes: artifact.byteLength,
       // What the capture had to sanitise, so a storage failure can name it.
       captureDiagnostics: {
         degenerateGradients,
+        rendering,
+        previewStatus: resilience?.previewStatus || null,
+        artifactBytes: artifact.byteLength,
+        // What the text render produced, where it was the only path available.
+        textRender,
         // How the pages were rasterised: what was recovered from the whole-
         // composition fallback, what measured nothing, the scale each page used.
         resilience,

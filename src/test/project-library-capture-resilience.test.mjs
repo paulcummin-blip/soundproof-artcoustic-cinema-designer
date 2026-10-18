@@ -112,17 +112,33 @@ describe('Project Library capture resilience', () => {
     expect(diagnostics.failed).toEqual([]);
   });
 
-  it('5. a document whose every page measures nothing is refused, named as no raster', async () => {
-    await expect(collectPageRasters({
+  it('5. a document whose every page measures nothing is NOT refused: the preview is unavailable', async () => {
+    const { rasters, diagnostics } = await collectPageRasters({
       pages,
       rasterPage: async () => { throw pageFailure('page_dimensions', { zeroSize: true }); },
       rasterAll: async () => pages.map(() => null),
-    })).rejects.toMatchObject({
-      captureDiagnostics: {
-        operation: 'library_page_capture',
-        failed: [{ operation: 'no_page_rasterised' }],
-      },
     });
+
+    // A page image is a preview of the document, never the document: the attempt
+    // returns so the caller can store the PDF it already holds.
+    expect(rasters.filter(Boolean)).toEqual([]);
+    expect(diagnostics.skipped).toEqual([
+      { page: 1, reason: 'page_measures_nothing' },
+      { page: 2, reason: 'page_measures_nothing' },
+      { page: 3, reason: 'page_measures_nothing' },
+    ]);
+    expect(diagnostics.previewStatus).toBe('unavailable');
+    expect(diagnostics.previewUnavailable).toBe(true);
+    // No sheet FAILED — they measured nothing — so the copy is not incomplete; it
+    // simply carries no page images.
+    expect(diagnostics.pageFailures).toEqual([]);
+    expect(diagnostics.incomplete).toBe(false);
+    expect(diagnostics.failed).toEqual([{
+      page: null,
+      operation: 'page_images_unavailable',
+      heading: null,
+      message: 'No sheet of this composition could be rendered as a page image, so this stored copy carries no page preview. The document itself is unaffected.',
+    }]);
   });
 
   it('6. a page neither pass can rasterise does NOT cost the designer the document', async () => {
@@ -147,24 +163,26 @@ describe('Project Library capture resilience', () => {
     ]);
   });
 
-  it('6b. a document with NO usable page is still refused — a copy is never invented', async () => {
-    const failure = await collectPageRasters({
+  it('6b. a composition with NO usable page still returns, with the preview stated unavailable', async () => {
+    const { rasters, diagnostics } = await collectPageRasters({
       pages,
       rasterPage: async (_page, index) => {
         throw pageFailure('png_validation', { message: `page ${index + 1} produced nothing` });
       },
       rasterAll: async () => [null, null, null],
-    }).catch((error) => error);
+    });
 
-    // Nothing was usable, so there is genuinely no document to store: the capture
-    // stops, naming the first sheet that failed as well as the fact that no page
-    // of the composition could be rasterised.
-    expect(failure).toBeTruthy();
-    expect(failure.captureDiagnostics.failed[0]).toMatchObject({ page: 1 });
-    expect(failure.captureDiagnostics.failed).toEqual(expect.arrayContaining([
-      expect.objectContaining({ page: null, operation: 'no_page_rasterised' }),
+    // The PDF the caller holds IS the document. Nothing is invented in place of the
+    // sheets that failed, and storage is not refused for want of a preview.
+    expect(rasters.every((entry) => entry === null)).toBe(true);
+    expect(diagnostics.previewStatus).toBe('unavailable');
+    expect(diagnostics.previewUnavailable).toBe(true);
+    expect(diagnostics.pageFailures.map((entry) => entry.page)).toEqual([1, 2, 3]);
+    expect(diagnostics.incomplete).toBe(true);
+    expect(diagnostics.failed).toEqual(expect.arrayContaining([
+      expect.objectContaining({ page: 1 }),
+      expect.objectContaining({ page: null, operation: 'page_images_unavailable' }),
     ]));
-    expect(failure.captureDiagnostics.incomplete).toBeUndefined();
   });
 
   it('7. a zero-size failure is told apart from a real raster failure', () => {

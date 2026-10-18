@@ -28,6 +28,7 @@ import { base44 } from '@/api/base44Client';
 import { toast } from '@/components/ui/use-toast';
 import { captureCompositionToPdf, captureStylesMarkup } from '@/components/library/compositionCapture';
 import { notifyIssuedExportStored } from '@/components/library/issuedExportSignal';
+import { PREVIEW_STATUS, assertPdfArtifact } from '@/components/library/pdfArtifactAuthority';
 import ExportStorageFailureActions from './ExportStorageFailureActions';
 import { ISSUED_DOCUMENT_COMPOSITION, issuedDocumentLabel } from './issuedDocumentTypes';
 import {
@@ -206,6 +207,10 @@ async function captureIssuedDocument({ identity, snapshot }) {
     filename,
     blob: captured.blob,
     pageCount: captured.pageCount,
+    // How the stored copy's pages were rendered, and what its page preview is.
+    // Recorded with the document; neither one decides whether it exists.
+    rendering: captured.rendering || null,
+    previewStatus: captured.previewStatus || null,
     // Whatever the capture had to sanitise travels with the attempt, so a
     // failure can name the exact element that produced a degenerate gradient.
     captureDiagnostics: captured.captureDiagnostics || null,
@@ -254,7 +259,7 @@ async function uploadIssuedPdf({ blob, filename }) {
  * @throws {ExportStorageError} stage asset_record — the file is already stored
  * at this point, so the failure records that a stored file has no Library row.
  */
-async function insertIssuedRow({ issued, filename, pageCount, fileUri, attemptKind = 'initial' }) {
+async function insertIssuedRow({ issued, filename, pageCount, fileUri, previewStatus = null, rendering = null, attemptKind = 'initial' }) {
   try {
     // The record is built by the one payload authority: the project's own
     // ownership account when it has one, and the field omitted — never sent as
@@ -264,6 +269,8 @@ async function insertIssuedRow({ issued, filename, pageCount, fileUri, attemptKi
       filename,
       pageCount,
       fileUri,
+      previewStatus,
+      rendering,
     }));
   } catch (error) {
     // The rejection is kept exactly as it came back — its code, its message and
@@ -289,15 +296,38 @@ export async function storeIssuedDocument({ identity, snapshot, attemptKind = 'i
     retryExport: identity?.retryExport || null,
   });
 
-  const { issued, filename, blob, pageCount, captureDiagnostics } = await captureIssuedDocument({ identity, snapshot });
-  updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics });
+  const { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus } = await captureIssuedDocument({ identity, snapshot });
+  updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus });
+
+  // THE PDF IS VERIFIED BEFORE IT IS STORED — and only the PDF. A document exists
+  // once valid bytes exist: a page preview, a thumbnail, a canvas or a raster is
+  // not part of that question, and its absence never blocks the upload.
+  try {
+    await assertPdfArtifact(blob);
+  } catch (error) {
+    throw new ExportStorageError({
+      stage: EXPORT_STORAGE_STAGE.CAPTURE,
+      reasonCode: 'invalid_pdf_artifact',
+      reason: EXPORT_STORAGE_REASON.CAPTURE_FAILED,
+      detail: error?.message ? String(error.message) : null,
+      cause: error,
+    });
+  }
 
   const stored = await uploadIssuedPdf({ blob, filename });
   // The uploaded file's own path is held with the attempt, so a failure at the
   // record step is retried against THIS file instead of uploading a second copy
   // of the same PDF.
   updatePendingExport(pendingKey, { fileUri: stored.file_uri });
-  const record = await insertIssuedRow({ issued, filename, pageCount, fileUri: stored.file_uri, attemptKind });
+  const record = await insertIssuedRow({
+    issued,
+    filename,
+    pageCount,
+    fileUri: stored.file_uri,
+    previewStatus,
+    rendering,
+    attemptKind,
+  });
 
   return { record, pendingKey };
 }
@@ -334,9 +364,18 @@ export function recordIssuedExportInBackground({ identity, snapshot }) {
 /** Tell an open Project Library the row has landed, and say so. */
 function announceStored(issued, record) {
   notifyIssuedExportStored(record?.project_id || issued?.projectId);
+  const label = `${issuedDocumentLabel(record?.document_type || issued?.documentType)} · ${record?.filename || ''}`;
+  // A document stored without page images is stated as exactly that: the
+  // document is stored, and the page preview is what is missing. The stored file
+  // is openable and downloadable from the Library either way.
+  const noPreview = record?.preview_status === PREVIEW_STATUS.UNAVAILABLE;
+  const somePreviewMissing = record?.preview_status === PREVIEW_STATUS.PARTIAL;
+  const note = noPreview
+    ? ' · stored without page preview'
+    : (somePreviewMissing ? ' · some pages have no preview' : '');
   toast({
     title: 'Stored in Project Library',
-    description: `${issuedDocumentLabel(record?.document_type || issued?.documentType)} · ${record?.filename || ''}`,
+    description: `${label}${note}`,
   });
 }
 

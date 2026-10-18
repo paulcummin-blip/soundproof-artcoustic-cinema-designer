@@ -44,6 +44,11 @@ export function buildIssuedDocumentRow({
   filename,
   pageCount = null,
   fileUri = null,
+  // What the stored copy's page preview is, and how its pages were rendered.
+  // Recorded so a copy stored without page images is never mistaken for a full
+  // one — and never read as a missing document: `file_uri` holds the PDF.
+  previewStatus = null,
+  rendering = null,
   exportedAt = null,
 } = {}) {
   const accountId = normaliseAccountId(issued.accountId);
@@ -67,6 +72,11 @@ export function buildIssuedDocumentRow({
     page_count: pageCount,
     superseded_by_id: null,
   };
+
+  // Stated only when the capture stated them, so a document stored before these
+  // were recorded is unchanged rather than given an invented preview state.
+  if (previewStatus) row.preview_status = previewStatus;
+  if (rendering) row.rendering = rendering;
 
   // Stated only when the project has an owning account. Absent is the honest
   // record for an admin-owned project; null is not an accepted value.

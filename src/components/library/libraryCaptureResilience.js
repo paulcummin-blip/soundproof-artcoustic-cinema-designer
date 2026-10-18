@@ -15,22 +15,30 @@
  *      page is the page itself: nothing is reflowed or re-paginated.
  *   3. A page that measures nothing paints nothing, so it is skipped with a
  *      warning rather than guessed at.
- *   4. Only a document whose pages can genuinely not be rasterised by either pass
- *      stops storage — and it stops with the page, the operation and the reason
- *      named, never as a generic export failure. A Library copy is never invented.
+ *   4. A composition whose pages can genuinely not be rasterised by either pass is
+ *      NOT a missing document. The PDF is the document; the page rasters are only
+ *      how its sheets are painted for a preview. So the attempt RETURNS, states
+ *      the preview as unavailable, and the caller stores the document without page
+ *      images rather than refusing to store anything. No sheet is invented and no
+ *      blank page is substituted for one that failed.
  *
  * Pure orchestration: the caller hands in the two raster functions, so every
  * outcome above is exercised by a test without a browser.
  */
 
 import { pageCaptureFailure } from '@/components/library/capturePagePng';
+import { PREVIEW_STATUS } from '@/components/library/pdfArtifactAuthority';
 
 /** The operation codes a failure record can carry. */
 export const RESILIENCE_OPERATION = Object.freeze({
   PAGE: 'page_raster',
   FALLBACK: 'composition_raster_fallback',
+  /** No sheet of the composition could be painted: the copy carries no page preview. */
+  PAGE_IMAGES_UNAVAILABLE: 'page_images_unavailable',
   NONE: 'none',
 });
+
+export { PREVIEW_STATUS };
 
 /** A page that measured nothing: it paints nothing, so it is not a sheet. */
 export function isZeroSizePageFailure(error) {
@@ -46,9 +54,11 @@ export function isZeroSizePageFailure(error) {
  * @param {(page: any, index: number) => Promise<{dataUrl: string, width: number, height: number}>} input.rasterPage
  * @param {() => Promise<Array<{dataUrl: string, width: number, height: number}|null>>} [input.rasterAll]
  *   — one pass over the whole composition, one entry per page, in the same order
- * @returns {Promise<{rasters: Array, diagnostics: Object}>}
- * @throws {Error} a failure carrying `captureDiagnostics` when no pass could
- *   rasterise a page
+ * @returns {Promise<{rasters: Array, diagnostics: Object}>} one entry per page —
+ *   the raster, or null where that page has none. `diagnostics.previewStatus`
+ *   states what the preview is ('available', 'partial', 'unavailable'). It never
+ *   decides whether a document exists: the caller holds the PDF, and a
+ *   composition with no painted sheet still returns.
  */
 export async function collectPageRasters({ pages, rasterPage, rasterAll = null }) {
   const list = Array.isArray(pages) ? pages : [];
@@ -120,44 +130,29 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null }
   }
 
   const stored = rasters.filter(Boolean).length;
+
+  // A PAGE IMAGE IS A PREVIEW OF THE DOCUMENT, NEVER THE DOCUMENT. A page that
+  // could not be painted is recorded and left out — the reader is told which
+  // sheet has no preview — and a composition with NO painted sheet is still the
+  // document the designer exported. Both outcomes RETURN: there is no raster
+  // condition under which storage is refused.
+  diagnostics.pageFailures = diagnostics.failed.filter((entry) => entry.page !== null);
+  diagnostics.incomplete = diagnostics.pageFailures.length > 0;
+  diagnostics.previewStatus = stored === 0
+    ? PREVIEW_STATUS.UNAVAILABLE
+    : (stored < list.length ? PREVIEW_STATUS.PARTIAL : PREVIEW_STATUS.AVAILABLE);
+  diagnostics.previewUnavailable = stored === 0;
+
   if (stored === 0) {
     diagnostics.failed.push({
       page: null,
-      operation: 'no_page_rasterised',
+      operation: RESILIENCE_OPERATION.PAGE_IMAGES_UNAVAILABLE,
       heading: null,
-      message: 'No page of this composition could be rasterised, so there is no document to store.',
+      message: 'No sheet of this composition could be rendered as a page image, so this stored copy carries no page preview. The document itself is unaffected.',
     });
-    throw buildResilienceFailure(diagnostics);
   }
 
-  // THE PDF IS THE DELIVERABLE, the page rasters are how it is made. A page that
-  // could not be rasterised is recorded and left out of the stored copy — the
-  // reader is told which sheet is missing and the designer keeps the document
-  // they exported, with the Library showing the document's own PDF. Only a
-  // composition with NO usable page is refused, because then there is genuinely
-  // no document to store.
-  diagnostics.incomplete = diagnostics.failed.length > 0;
-
   return { rasters, diagnostics };
-}
-
-/** The failure a capture stops on: the pages, the operations and the reasons. */
-export function buildResilienceFailure(diagnostics) {
-  const first = diagnostics.failed[0] || null;
-  const error = new Error(first?.page
-    ? `Library capture page ${first.page} (${first.heading || 'untitled'}), ${first.operation}: ${first.message}`
-    : first?.message || 'The document could not be captured.');
-  error.captureDiagnostics = {
-    operation: 'library_page_capture',
-    pages: diagnostics.pages,
-    failed: diagnostics.failed,
-    recovered: diagnostics.recovered,
-    skipped: diagnostics.skipped,
-    fallback: diagnostics.fallback,
-    fallbackFailed: diagnostics.fallbackFailed,
-    scales: diagnostics.scales,
-  };
-  return error;
 }
 
 export default collectPageRasters;
