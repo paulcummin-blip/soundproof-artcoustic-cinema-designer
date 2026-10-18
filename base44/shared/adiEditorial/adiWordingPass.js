@@ -10,6 +10,14 @@
  * narrative grounding rules for a proposal section. A proposed rewrite is accepted
  * only when it passes every one of them.
  *
+ * ONE CORRECTION ATTEMPT, AND NO MORE. When the first candidate is refused, ADI is
+ * not simply stopped: the exact violations it was refused for go straight back to
+ * the pass, with the copy they were read against and the brief it was given, and it
+ * is asked to repair its own wording once. The corrected candidate is read by
+ * exactly the same gates, in the same order, with no rule relaxed — so a correction
+ * can only ever be accepted on merit. Two candidates in total: there is no further
+ * loop, and the validator stays the final authority.
+ *
  * A refusal is a RESULT, never an exception: a rewrite that changed the supported
  * meaning comes back refused with the copy untouched, so the designer keeps the
  * wording that was already there. Nothing is written by this module — it reads, it
@@ -25,6 +33,7 @@ import { writerModelFor } from '../proposalWriter/writerProvider.js';
 import { checkWordingConservation } from './adiWordingConservation.js';
 import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from './adiRejectionDiagnostics.js';
 import { looksLikeHtml } from './adiEditorialStandard.js';
+import { buildAdiCorrectionPrompt } from './adiEditorialPrompt.js';
 
 /** What became of one editorial pass. */
 export const ADI_WORDING_OUTCOME = Object.freeze({
@@ -78,7 +87,50 @@ export function cleanAdiCopy(raw, { html = false } = {}) {
 }
 
 /**
+ * THE MOST CANDIDATES ONE PASS MAY ASK FOR. Two, and no more: the first, and the
+ * single correction it is allowed after a refusal.
+ */
+export const ADI_MAX_CANDIDATES = 2;
+
+/**
+ * Read one candidate against the two gates, in the order that decides it: the
+ * meaning-conservation gate, and then the surface's OWN validator. A corrected
+ * candidate goes through this same function, so nothing is relaxed for it.
+ *
+ * @returns {Promise<null|{stage: string, violations: Array}>} null when it passes
+ */
+async function refusalFor({ original, proposed, validate, validateStage }) {
+  // ── THE MEANING GATE: the same facts, and no more than the same facts ──
+  const conservation = checkWordingConservation({ original, improved: proposed });
+  if (!conservation.ok) {
+    return { stage: ADI_REJECTION_STAGE.MEANING_CONSERVATION, violations: conservation.violations };
+  }
+
+  // ── THE SURFACE'S OWN VALIDATOR, run again on the improved wording ──
+  if (typeof validate !== 'function') return null;
+
+  let checked = null;
+  try {
+    checked = await validate(proposed);
+  } catch (error) {
+    checked = { ok: false, violations: [{ code: 'validator_failed', detail: String(error?.message || '') }] };
+  }
+  if (checked?.ok === true) return null;
+
+  return {
+    stage: validateStage,
+    violations: Array.isArray(checked?.violations) ? checked.violations : [],
+  };
+}
+
+/**
  * Run one editorial pass.
+ *
+ * ONE CANDIDATE, THEN ONE CORRECTION. The first candidate is read against both
+ * gates. If it is refused, the exact violations are handed back to the provider
+ * with the copy they were read from, and ONE corrected candidate is asked for and
+ * read against those same gates. Two candidates in total; when the corrected one is
+ * refused as well, the original copy stands and the refusal is reported.
  *
  * @param {Object} input
  * @param {Object|null} input.flag — resolveGptWriterFlag output: the writer's switch
@@ -94,7 +146,7 @@ export function cleanAdiCopy(raw, { html = false } = {}) {
  *   read under, for the diagnostic alone. It names the validator; it never decides
  *   anything.
  * @returns {Promise<Object>} the outcome, the proposed copy where one is accepted,
- *   and the reasons where one is refused
+ *   how many candidates it took, and the reasons where one is refused
  */
 export async function runAdiWordingPass({
   flag = null,
@@ -136,79 +188,95 @@ export async function runAdiWordingPass({
 
   const model = writerModelFor(flag?.model ?? null);
   const startedAt = Date.now();
-  let raw = null;
-  try {
-    raw = await invokeLLM({ prompt, model });
-  } catch (error) {
-    const detail = String(error?.message || 'The editorial provider call failed.').slice(0, MAX_ERROR_LENGTH);
-    return asResult(ADI_WORDING_OUTCOME.PROVIDER_FAILED, {
-      detail,
-      provider: { model, duration_ms: Date.now() - startedAt },
-    });
-  }
+  const html = looksLikeHtml(original);
+  const flat = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+  const providerOf = () => ({ model, duration_ms: Date.now() - startedAt });
 
-  const provider = { model, duration_ms: Date.now() - startedAt };
-  const proposed = cleanAdiCopy(providerText(raw), { html: looksLikeHtml(original) });
-  if (!proposed) {
-    return asResult(ADI_WORDING_OUTCOME.PROVIDER_FAILED, {
-      detail: 'The provider returned no copy.',
-      provider,
-    });
-  }
+  let callPrompt = prompt;
+  let refusal = null;
+  let attempts = 0;
 
-  // NOTHING TO CHANGE is a result the designer is told plainly, and nothing
-  // is written: re-saving identical wording would churn an approval for nothing.
-  if (checkWordingConservation({ original, improved: proposed }).ok
-    && String(proposed).replace(/\s+/g, ' ').trim()
-      === String(original).replace(/\s+/g, ' ').trim()) {
-    return asResult(ADI_WORDING_OUTCOME.UNCHANGED, { provider });
-  }
+  while (attempts < ADI_MAX_CANDIDATES) {
+    attempts += 1;
 
-  // ── THE MEANING GATE: the same facts, and no more than the same facts ──
-  const conservation = checkWordingConservation({ original, improved: proposed });
-  if (!conservation.ok) {
-    return asResult(ADI_WORDING_OUTCOME.REJECTED, {
-      text: null,
-      violations: conservation.violations,
-      // THE REFUSAL, READABLE: the copy that was refused, the stage that refused
-      // it, and every fact each violation was read from. Returned in the response
-      // and stored nowhere — a refusal writes nothing.
-      diagnostics: buildAdiRejectionDiagnostics({
-        originalText: original,
-        proposedText: proposed,
-        stage: ADI_REJECTION_STAGE.MEANING_CONSERVATION,
-        violations: conservation.violations,
-      }),
-      provider,
-    });
-  }
-
-  // ── THE SURFACE'S OWN VALIDATOR, run again on the improved wording ──
-  if (typeof validate === 'function') {
-    let checked = null;
+    let raw = null;
     try {
-      checked = await validate(proposed);
+      raw = await invokeLLM({ prompt: callPrompt, model });
     } catch (error) {
-      checked = { ok: false, violations: [{ code: 'validator_failed', detail: String(error?.message || '') }] };
+      return asResult(ADI_WORDING_OUTCOME.PROVIDER_FAILED, {
+        detail: String(error?.message || 'The editorial provider call failed.').slice(0, MAX_ERROR_LENGTH),
+        provider: providerOf(),
+        attempts,
+      });
     }
-    if (checked?.ok !== true) {
-      return asResult(ADI_WORDING_OUTCOME.REJECTED, {
-        text: null,
-        violations: Array.isArray(checked?.violations) ? checked.violations : [],
-        // The surface's own validator refused the copy: the stage, and the
-        // validator's own violations, exactly as it reported them.
-        diagnostics: buildAdiRejectionDiagnostics({
-          originalText: original,
-          proposedText: proposed,
-          stage: validateStage,
-          violations: Array.isArray(checked?.violations) ? checked.violations : [],
-        }),
-        provider,
+
+    const proposed = cleanAdiCopy(providerText(raw), { html });
+    if (!proposed) {
+      return asResult(ADI_WORDING_OUTCOME.PROVIDER_FAILED, {
+        detail: 'The provider returned no copy.',
+        provider: providerOf(),
+        attempts,
+      });
+    }
+
+    // NOTHING TO CHANGE is a result the designer is told plainly, and nothing is
+    // written: re-saving identical wording would churn an approval for nothing. On
+    // a correction attempt the same thing means the correction has given up, so the
+    // refusal that asked for it stands.
+    const unchanged = checkWordingConservation({ original, improved: proposed }).ok
+      && flat(proposed) === flat(original);
+    if (unchanged) {
+      if (attempts === 1) {
+        return asResult(ADI_WORDING_OUTCOME.UNCHANGED, { provider: providerOf(), attempts });
+      }
+      break;
+    }
+
+    const refused = await refusalFor({ original, proposed, validate, validateStage });
+    if (!refused) {
+      return asResult(ADI_WORDING_OUTCOME.IMPROVED, {
+        text: proposed,
+        provider: providerOf(),
+        attempts,
+        corrected: attempts > 1,
+      });
+    }
+
+    refusal = { proposed, stage: refused.stage, violations: refused.violations };
+
+    // ── THE ONE CORRECTION ──
+    // The exact violations, the copy they were read from and the brief that
+    // produced the refused copy go straight back to the same pass, which is asked
+    // to repair its own wording once. Nothing about the gates changes: the
+    // corrected candidate is read by refusalFor above, exactly as the first was.
+    if (attempts < ADI_MAX_CANDIDATES) {
+      callPrompt = buildAdiCorrectionPrompt({
+        basePrompt: prompt,
+        original,
+        refused: proposed,
+        stage: refused.stage,
+        violations: refused.violations,
       });
     }
   }
 
-  return asResult(ADI_WORDING_OUTCOME.IMPROVED, { text: proposed, provider });
+  // ── BOTH CANDIDATES REFUSED: the original copy stands, and nothing is written ──
+  return asResult(ADI_WORDING_OUTCOME.REJECTED, {
+    text: null,
+    violations: refusal ? refusal.violations : [],
+    // THE REFUSAL, READABLE: the copy that was refused, the stage that refused it,
+    // and every fact each violation was read from. Returned in the response and
+    // stored nowhere — a refusal writes nothing.
+    diagnostics: buildAdiRejectionDiagnostics({
+      originalText: original,
+      proposedText: refusal ? refusal.proposed : null,
+      stage: refusal ? refusal.stage : null,
+      violations: refusal ? refusal.violations : [],
+    }),
+    provider: providerOf(),
+    attempts,
+    corrected: false,
+  });
 }
 
 export default runAdiWordingPass;

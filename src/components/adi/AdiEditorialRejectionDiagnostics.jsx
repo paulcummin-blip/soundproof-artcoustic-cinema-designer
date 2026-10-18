@@ -13,11 +13,13 @@
  * with the values and the excerpts it was read from.
  *
  * It is the ADI refusal's counterpart to the Design Intent diagnostics block, and
- * it is deliberately out of the workflow: a compact panel, shown only to a master
- * admin or with Engineering Mode on, and only while a refusal is held. Nothing here
- * is ever shown to a dealer, nothing is printed in a document, nothing is retried
- * and nothing is written. A refused candidate is evidence to read, never copy to
- * publish.
+ * it is deliberately out of the workflow: a compact panel, shown ONLY while
+ * ENGINEERING MODE is on and only while a refusal is held. Normal use is left
+ * clean — a designer at work, or a master admin at work, never sees it: outside
+ * engineering mode the panel does not render at all, and the workflow states the
+ * refusal in one plain line instead. Nothing here is ever shown to a dealer,
+ * nothing is printed in a document, nothing is retried and nothing is written. A
+ * refused candidate is evidence to read, never copy to publish.
  *
  * It is presentation only: it holds no rule, decides nothing, and reads exactly
  * what the backend returned.
@@ -25,8 +27,6 @@
 
 import React, { useState } from 'react';
 import { Check, ChevronDown, Copy, X } from 'lucide-react';
-import { useAuth } from '@/lib/AuthContext';
-import { isMasterAdmin } from '@/lib/accountAccess';
 import { useEngineeringMode } from '@/components/state/useEngineeringMode';
 import {
   clearAdiEditorialRejection,
@@ -89,15 +89,15 @@ function asText(held) {
 }
 
 export default function AdiEditorialRejectionDiagnostics() {
-  const { user } = useAuth();
   const { engineeringMode } = useEngineeringMode();
   const held = useAdiEditorialRejection();
   const [expanded, setExpanded] = useState(false);
   const [copyState, setCopyState] = useState('idle');
 
-  // Master admins and Engineering Mode only — and a session that was never handed a
-  // refusal has nothing to read.
-  const mayView = isMasterAdmin(user) || engineeringMode === true;
+  // ENGINEERING MODE ONLY — and a session that was never handed a refusal has
+  // nothing to read. Being a master admin is deliberately NOT what shows this panel:
+  // normal use stays clean, and the diagnostic appears only in engineering mode.
+  const mayView = engineeringMode === true;
   if (!mayView || !held) return null;
 
   const violations = Array.isArray(held.violations) ? held.violations : [];

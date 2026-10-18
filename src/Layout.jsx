@@ -548,9 +548,9 @@ export default function Layout({ children, currentPageName }) {
           </main>
         </div>
         <BuildDiagnosticPanel />
-        {/* The refused ADI editorial rewrite, for a master admin or in Engineering
-            Mode: a refusal writes nothing, so this is the only place its proposed
-            copy, its stage and its violations can be read. */}
+        {/* The refused ADI editorial rewrite, in ENGINEERING MODE alone: a refusal
+            writes nothing, so this is the only place its proposed copy, its stage
+            and its violations can be read. Normal use never shows it. */}
         <AdiEditorialRejectionDiagnostics />
         <DealerIdentityDiagnostic />
         </PartnerPortalIdentityProvider>

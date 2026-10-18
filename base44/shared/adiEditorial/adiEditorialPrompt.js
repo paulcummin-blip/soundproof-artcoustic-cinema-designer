@@ -24,6 +24,7 @@ import {
   ADI_EDITORIAL_STANDARD,
   looksLikeHtml,
 } from './adiEditorialStandard.js';
+import { normaliseDiagnosticViolation } from './adiRejectionDiagnostics.js';
 
 const RULE = 'Never say or imply that this copy was written by AI. ADI is Sound Proof\'s own editorial intelligence.';
 
@@ -129,6 +130,89 @@ export function buildAdiEditorialPrompt({
     scoped
       ? 'Return the improved highlighted text alone, and nothing else.'
       : 'Return the improved copy alone, and nothing else.',
+  ].join('\n');
+}
+
+/**
+ * THE CORRECTION PROMPT — the second, and final, candidate.
+ *
+ * A rewrite that was refused is not simply lost: it goes straight back with the
+ * exact violations it was refused for, the copy it was read against and the brief
+ * it was first given, and ADI is asked to repair its own wording once.
+ *
+ * Nothing is relaxed to make a correction easier. The same authority boundary is
+ * stated again, and each violation is stated exactly as the deciding module
+ * reported it — so the pass repairs its wording against the rule it actually
+ * broke, not against a paraphrase of it.
+ *
+ * @param {Object} input
+ * @param {string} [input.basePrompt] — the brief that produced the refused copy
+ * @param {string} [input.original] — the copy whose meaning must not change
+ * @param {string} [input.refused] — the rewrite that was refused
+ * @param {string|null} [input.stage] — the stage that refused it, for the record
+ * @param {Array} [input.violations] — the deciding module's own violations, verbatim
+ * @returns {string} the prompt
+ */
+export function buildAdiCorrectionPrompt({
+  basePrompt = '',
+  original = '',
+  refused = '',
+  stage = null,
+  violations = [],
+} = {}) {
+  const html = looksLikeHtml(refused) || looksLikeHtml(original);
+  const entries = (Array.isArray(violations) ? violations : []).map(normaliseDiagnosticViolation);
+
+  const stated = entries.length === 0
+    ? ['(no single violation was named — the copy was refused as a whole)']
+    : entries.reduce((lines, entry, index) => {
+      lines.push(`${index + 1}. RULE: ${entry.rule || 'unnamed'}`);
+      if (entry.category) lines.push(`   CATEGORY: ${entry.category}`);
+      if (entry.originalValue) lines.push(`   ORIGINAL VALUE: ${entry.originalValue}`);
+      if (entry.proposedValue) lines.push(`   PROPOSED VALUE: ${entry.proposedValue}`);
+      if (entry.originalExcerpt) lines.push(`   ORIGINAL EXCERPT: ${entry.originalExcerpt}`);
+      if (entry.proposedExcerpt) lines.push(`   PROPOSED EXCERPT: ${entry.proposedExcerpt}`);
+      if (entry.explanation) lines.push(`   WHY IT WAS REFUSED: ${entry.explanation}`);
+      return lines;
+    }, []);
+
+  const brief = String(basePrompt || '').trim();
+
+  return [
+    ...(brief.length > 0
+      ? ['=== THE BRIEF YOU WERE GIVEN (unchanged) ===', brief, '']
+      : []),
+    '=== CORRECTION REQUIRED — YOU HAVE ONE MORE ATTEMPT ===',
+    'The rewrite you returned was read against the authority boundary below and REFUSED. It was not accepted, nothing was saved, and the original copy is still in place.',
+    ...(stage ? [`The stage that refused it: ${stage}.`] : []),
+    '',
+    '=== THE COPY TO IMPROVE (the authority — its meaning does not change) ===',
+    original || '(the copy is empty)',
+    '',
+    '=== THE REWRITE THAT WAS REFUSED (do not return it again as it stands) ===',
+    refused || '(nothing was returned)',
+    '',
+    '=== THE EXACT VIOLATIONS (final authority — the corrected copy must carry none of them) ===',
+    ...stated,
+    '',
+    '=== INSTRUCTION ===',
+    'Correct only the listed validation violations. Preserve the intended editorial improvements. Do not restore weak wording unnecessarily.',
+    'Repair the wording itself: remove or rephrase only the change each violation names, and keep every fact, figure, level, product, scope and limitation the copy already supports.',
+    'Deleting supported engineering content is not a correction, and adding a new fact, benefit, reason or claim is not a correction.',
+    '',
+    '=== THE AUTHORITY BOUNDARY (absolute — unchanged) ===',
+    'The corrected wording may NOT:',
+    ...ADI_AUTHORITY_BOUNDARY.map((entry) => `  - ${entry}`),
+    'Every violation above is one of these rules having been broken. The corrected copy breaks none of them.',
+    '',
+    RULE,
+    '',
+    '=== OUTPUT ===',
+    html
+      ? 'Keep the same HTML structure and the same tags. Return the corrected copy as HTML, with no wrapper element, no <html>, <head> or <body>, and no code fence.'
+      : 'Return the corrected copy as clean plain prose, with no wrapper, no heading, no label and no code fence.',
+    'Write in British English. Do not add a heading, a sign-off, a note, an explanation or a list of what you changed.',
+    'Return the corrected copy alone, and nothing else.',
   ].join('\n');
 }
 
