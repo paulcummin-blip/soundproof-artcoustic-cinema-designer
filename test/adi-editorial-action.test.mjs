@@ -447,6 +447,20 @@ describe('a whole-section editorial pass', () => {
     expect(after.approval.all_approved).toBe(false);
   });
 
+  it('never reports an accepted edit when the store returns the body without the Undo marker', async () => {
+    const world = proposalWorld();
+    world.entities.ProposalSection.update = async (_id, patch) => ({
+      ...world.stored(),
+      ...patch,
+      metadata: null,
+    });
+
+    await expect(sectionAction(world, {
+      mode: ADI_SECTION_MODE.SECTION,
+      answer: BODY_REWORDED,
+    })).rejects.toThrow('The improved wording and its Undo record were not saved together.');
+  });
+
   it('writes nothing at all when ADI leaves the copy as it is', async () => {
     const world = proposalWorld();
     const result = await sectionAction(world, { mode: ADI_SECTION_MODE.SECTION, answer: BODY });
