@@ -299,6 +299,102 @@ describe('one shared editorial action, on both surfaces', () => {
     expect(ADI_UNDO_LABEL).toBe('Undo');
     expect(ADI_IMPROVED_MESSAGE).toMatch(/^ADI has improved the wording\./);
   });
+
+  it('declares the complete proposal-section Undo marker in the stored entity schema', () => {
+    const schema = JSON.parse(readFileSync('base44/entities/ProposalSection.jsonc', 'utf8'));
+    const marker = schema.properties.metadata.properties.adi_editorial.properties;
+    for (const field of [
+      'previous_body',
+      'source_fingerprint',
+      'improved_fingerprint',
+      'improved_by',
+      'improved_at',
+    ]) expect(marker).toHaveProperty(field);
+  });
+
+  it('gives the provider the narrow no-new-meaning principle verbatim', () => {
+    const prompt = readFileSync('base44/shared/adiEditorial/adiEditorialPrompt.js', 'utf8');
+    expect(prompt).toContain('Do not make the text more impressive by adding plausible benefits or explanations. If an idea is not already expressed in the source copy, do not introduce it. Better wording may be simpler than the original.');
+  });
+});
+
+describe('semantic meaning conservation', () => {
+  const seatingSource = 'Eight seats are arranged in two rows.';
+
+  it('accepts safe paraphrases without becoming word-for-word strict', () => {
+    expect(checkWordingConservation({
+      original: seatingSource,
+      improved: 'Two rows provide seating for eight.',
+    }).ok).toBe(true);
+    expect(checkWordingConservation({
+      original: seatingSource,
+      improved: 'Eight seats are arranged across two rows.',
+    }).ok).toBe(true);
+  });
+
+  it('accepts deletion and shortening when no protected meaning is removed', () => {
+    expect(checkWordingConservation({
+      original: 'Eight seats are arranged across two rows in a clear and straightforward layout.',
+      improved: 'Eight seats are arranged across two rows.',
+    }).ok).toBe(true);
+  });
+
+  it('rejects new experiential claims about the view or sightlines', () => {
+    for (const improved of [
+      'Two rows provide seating for eight, giving every listener an involving view.',
+      'Eight seats are arranged across two rows. The arrangement improves sightlines from the rear row.',
+    ]) {
+      const checked = checkWordingConservation({ original: seatingSource, improved });
+      expect(checked.ok).toBe(false);
+      expect(checked.violations.map((entry) => entry.code))
+        .toContain(ADI_CONSERVATION_REJECTION.NEW_EXPERIENTIAL_CLAIM);
+    }
+  });
+
+  it('rejects a new room-use claim', () => {
+    const checked = checkWordingConservation({
+      original: seatingSource,
+      improved: 'Eight seats are arranged in two rows. The layout supports shared use of the room.',
+    });
+    expect(checked.ok).toBe(false);
+    expect(checked.violations.map((entry) => entry.code))
+      .toContain(ADI_CONSERVATION_REJECTION.NEW_ROOM_USE_CLAIM);
+  });
+
+  it('rejects a new bass or design rationale unless the source already expresses it', () => {
+    const source = 'One front and two rear subwoofers provide the bass foundation.';
+    const added = checkWordingConservation({
+      original: source,
+      improved: 'One front and two rear subwoofers provide the bass foundation, an established approach to managing room modes.',
+    });
+    expect(added.ok).toBe(false);
+    expect(added.violations.map((entry) => entry.code))
+      .toContain(ADI_CONSERVATION_REJECTION.NEW_DESIGN_RATIONALE);
+
+    const supported = checkWordingConservation({
+      original: 'One front and two rear subwoofers are arranged to manage room modes and provide the bass foundation.',
+      improved: 'The bass foundation comes from one front and two rear subwoofers, an established approach to managing room modes.',
+    });
+    expect(supported.ok).toBe(true);
+  });
+
+  it('keeps the numeric, RP22/RP23 and product protections unchanged', () => {
+    const numeric = checkWordingConservation({ original: seatingSource, improved: 'Ten seats are arranged in two rows.' });
+    expect(numeric.violations.map((entry) => entry.code)).toContain(ADI_CONSERVATION_REJECTION.ADDED_NUMBER);
+
+    const performance = checkWordingConservation({
+      original: 'RP22 P19 reaches Performance Level 4.',
+      improved: 'RP23 P20 reaches Performance Level 3.',
+    });
+    expect(performance.violations.map((entry) => entry.code)).toContain(ADI_CONSERVATION_REJECTION.ADDED_LEVEL);
+    expect(performance.violations.map((entry) => entry.code)).toContain(ADI_CONSERVATION_REJECTION.ADDED_PARAMETER);
+
+    const product = checkWordingConservation({
+      original: 'Q6-3 screen speakers carry the front stage.',
+      improved: 'Q8-5 screen speakers carry the front stage.',
+    });
+    expect(product.violations.map((entry) => entry.code)).toContain(ADI_CONSERVATION_REJECTION.ADDED_PRODUCT);
+  });
 });
 
 describe('a whole-section editorial pass', () => {
@@ -334,6 +430,14 @@ describe('a whole-section editorial pass', () => {
     });
     expect(patch.metadata.adi_editorial.source_revision).toBe(publishedSectionFingerprint(BODY));
     expect(patch.metadata.adi_editorial.improved_revision).toBe(publishedSectionFingerprint(BODY_REWORDED));
+    expect(patch.metadata.adi_editorial.source_fingerprint).toBe(publishedSectionFingerprint(BODY));
+    expect(patch.metadata.adi_editorial.improved_fingerprint).toBe(publishedSectionFingerprint(BODY_REWORDED));
+    expect(patch.metadata.adi_editorial.improved_by).toBe('Paul Cummin');
+
+    // A normal hydration reads the durable marker, which is exactly the toolbar's
+    // Undo condition after an accepted edit.
+    const [hydrated] = await world.entities.ProposalSection.filter({ id: 'sec_1' });
+    expect(Boolean(hydrated.metadata?.adi_editorial?.previous_body)).toBe(true);
 
     // The consequence on the surface: the wording no longer matches the approval.
     const after = approvalOf(world.stored());
