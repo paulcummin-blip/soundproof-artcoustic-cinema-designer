@@ -27,6 +27,7 @@ import {
   presentationComposition,
 } from '../components/proposal/images/proposalImagePlacementAuthority.js';
 import { imagePageKind, imagePagesFor } from '../components/proposal/print/imagePageLayout.js';
+import { planProposalImages } from '../components/proposal/images/proposalImagePlanner.js';
 
 const asset = (id, extra = {}) => ({ id, file_url: `https://example.test/${id}.jpg`, ...extra });
 const fullWidth = (id) => asset(id, { image_presentation: IMAGE_PRESENTATION.FULL_WIDTH });
@@ -79,6 +80,33 @@ describe('the recorded presentation is read as one composition weight', () => {
     expect(composition.weight).toBe(COMPOSITION_WEIGHT.UNSTATED);
     expect(composition.widthPercent).toBeNull();
     expect(composition.cropAllowed).toBe(true);
+  });
+});
+
+describe('cover and body placement stay independent', () => {
+  it('does not reuse a cover-only asset in the body merely because it has an image purpose', () => {
+    const cover = asset('cover', {
+      slot: 'cover',
+      usage: 'gallery',
+      image_purpose: 'whole_room',
+      image_presentation: null,
+    });
+    const body = fullWidth('body');
+    const plan = planProposalImages({
+      assets: [cover, body],
+      coverAssetId: cover.id,
+      sectionSlots: [
+        { section_type: 'system_design_summary', section_id: 'summary' },
+        { section_type: 'spatial_resolution', section_id: 'spatial' },
+        { section_type: 'dynamic_range', section_id: 'dynamic' },
+        { section_type: 'timbre_matching', section_id: 'timbre' },
+      ],
+    });
+
+    expect(plan.coverPlacement.source_asset_id).toBe(cover.id);
+    expect(plan.placements.filter((placement) => placement.source_asset_id === cover.id)).toHaveLength(1);
+    expect(plan.flowImages.some((placement) => placement.source_asset_id === cover.id)).toBe(false);
+    expect(plan.placements.some((placement) => placement.source_asset_id === body.id)).toBe(true);
   });
 });
 
