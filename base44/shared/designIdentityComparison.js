@@ -51,9 +51,13 @@ export const DERIVED_DISPLAY_IDENTITY_KEYS = Object.freeze([
  */
 export function withoutDerivedDisplayIdentity(screen) {
   if (!screen || typeof screen !== 'object') return screen ?? null;
-  const facts = { ...screen };
-  for (const key of DERIVED_DISPLAY_IDENTITY_KEYS) {
-    if (key in facts) delete facts[key];
+  // The derived keys are omitted as the facts are rebuilt, so the result is the
+  // same object the in-place removal produced: every other own key, in its own
+  // order, and no key removal of any kind.
+  const derived = new Set(DERIVED_DISPLAY_IDENTITY_KEYS);
+  const facts = {};
+  for (const [key, value] of Object.entries(screen)) {
+    if (!derived.has(key)) facts[key] = value;
   }
   return facts;
 }

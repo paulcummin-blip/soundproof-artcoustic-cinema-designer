@@ -273,9 +273,12 @@ export async function improveReportDesignIntentWording({
         'There is no earlier wording to restore for this report.',
       );
     }
-    const next = { ...payload, design_intent: replaced };
-    delete next.design_intent_previous;
-    await entities.ReportSnapshot.update(snapshot.id, { payload: next });
+    // The replaced copy is removed by rebuilding the payload without that key, so
+    // the stored payload is exactly what the in-place removal produced.
+    const { design_intent_previous: _removed, ...next } = payload;
+    await entities.ReportSnapshot.update(snapshot.id, {
+      payload: { ...next, design_intent: replaced },
+    });
     return result({
       applied: true,
       action,
