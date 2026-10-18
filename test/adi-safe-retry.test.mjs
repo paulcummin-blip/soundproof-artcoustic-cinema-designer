@@ -106,6 +106,8 @@ describe('the one correction attempt', () => {
     expect(provider.prompts).toHaveLength(2);
     expect(provider.prompts[1]).toContain('editorial_quality');
     expect(provider.prompts[1]).toContain('reference-style cinema intent');
+    expect(provider.prompts[1]).toContain('change only the exact phrase spans named above');
+    expect(provider.prompts[1]).toContain('Keep every other word, sentence, HTML tag and paragraph');
     expect(pass.outcome).toBe(ADI_WORDING_OUTCOME.IMPROVED);
     expect(pass.text).toBe(WEAK_CORRECTED);
     expect(pass.attempts).toBe(2);
