@@ -203,12 +203,15 @@ export async function improveProposalSectionWording({
       return blocked(ADI_SECTION_BLOCK.NOTHING_TO_UNDO, 409, 'There is no earlier wording to restore for this section.');
     }
     const replacedText = readable(section.body);
-    await entities.ProposalSection.update(sectionId, {
+    const restored = await entities.ProposalSection.update(sectionId, {
       body: marker.previous_body,
       last_user_edited_at: marker.previous_last_user_edited_at ?? null,
       last_gpt_generated_at: marker.previous_last_gpt_generated_at ?? null,
       metadata: withoutMarker(section.metadata),
     });
+    if (restored?.body !== marker.previous_body || restored?.metadata?.adi_editorial) {
+      throw new Error('The earlier wording and its Undo record were not restored together.');
+    }
     return result({
       applied: true,
       action: 'undo',
@@ -361,7 +364,22 @@ export async function improveProposalSectionWording({
  * that was replaced held in the section's own metadata.
  */
 async function save({ entities, sectionId, section, body, now, user, mode, previousBody, previousText, improvedText }) {
-  await entities.ProposalSection.update(sectionId, {
+  const sourceFingerprint = publishedSectionFingerprint(previousText);
+  const improvedFingerprint = publishedSectionFingerprint(improvedText);
+  const marker = {
+    previous_body: previousBody,
+    previous_last_user_edited_at: section.last_user_edited_at ?? null,
+    previous_last_gpt_generated_at: section.last_gpt_generated_at ?? null,
+    improved_at: now,
+    improved_by: byWhom(user),
+    mode,
+    source_fingerprint: sourceFingerprint,
+    improved_fingerprint: improvedFingerprint,
+    // Kept for the existing revision-identity readers.
+    source_revision: sourceFingerprint,
+    improved_revision: improvedFingerprint,
+  };
+  const updated = await entities.ProposalSection.update(sectionId, {
     body,
     // A GENERATION, NOT A HAND EDIT: the wording was written for the designer by
     // ADI, which is what returns the section to Needs review — the same stamp a
@@ -369,19 +387,21 @@ async function save({ entities, sectionId, section, body, now, user, mode, previ
     last_gpt_generated_at: now,
     metadata: {
       ...(section.metadata && typeof section.metadata === 'object' ? section.metadata : {}),
-      adi_editorial: {
-        previous_body: previousBody,
-        previous_last_user_edited_at: section.last_user_edited_at ?? null,
-        previous_last_gpt_generated_at: section.last_gpt_generated_at ?? null,
-        improved_at: now,
-        improved_by: byWhom(user),
-        mode,
-        // The wording revision that was replaced, and the one saved in its place.
-        source_revision: publishedSectionFingerprint(previousText),
-        improved_revision: publishedSectionFingerprint(improvedText),
-      },
+      adi_editorial: marker,
     },
   });
+
+  // One entity update is the atomic boundary. Never report an accepted edit when
+  // the returned stored record contains the body but not the complete Undo marker.
+  const persisted = updated?.metadata?.adi_editorial || null;
+  if (updated?.body !== body
+    || persisted?.previous_body !== previousBody
+    || persisted?.source_fingerprint !== sourceFingerprint
+    || persisted?.improved_fingerprint !== improvedFingerprint
+    || persisted?.improved_by !== marker.improved_by
+    || persisted?.improved_at !== now) {
+    throw new Error('The improved wording and its Undo record were not saved together.');
+  }
 
   return {
     applied: true,
