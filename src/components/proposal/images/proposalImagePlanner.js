@@ -10,8 +10,8 @@
  *   - the first structure section takes a portrait accent from a third source,
  *     and a drawing the document must show whole may take that accent on the
  *     design-overview page itself, beside the account it explains;
- *   - the last structure section is the visual break, where the COVER source
- *     returns in the landscape crop;
+ *   - the last structure section may be the visual break, but a cover source
+ *     returns only when its own Image Library card explicitly places it in the body;
  *   - a seating-style page carries the large lifestyle alternatives;
  *   - each comparison group the designer marked carries one page of its own,
  *     both options full width with the designer's own message;
@@ -30,10 +30,9 @@
  * page apart. Where no source satisfies the spacing rule for a page, that page
  * simply carries no image: the planner never fills a page to make a gallery.
  *
- * A photograph chosen for the cover is not consumed by it: the cover page takes
- * the portrait crop, and the same source still takes its own place in the body —
- * returning as the visual break where the rhythm allows it, and otherwise kept on
- * the image page rather than dropped from the document.
+ * A photograph chosen for the cover is independent from body placement: the cover
+ * page takes the cover crop, and the same source may return only when its own Image
+ * Library card carries an explicit body presentation.
  *
  * A source the designer marked FULL WIDTH is never composed as a smaller crop:
  * the prominent presentation that was chosen always leads, and a supporting
@@ -189,13 +188,12 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   // page and is never scattered through the narrative as a design feature.
   const seatingSources = usable.filter((asset) => asset !== coverAsset && !isCompared(asset) && seatingStyleOf(asset));
   // THE DESIGNER PLACES A PHOTOGRAPH IN THE BODY, NOT THE CHOICE OF A COVER. An
-  // asset has a body placement only where its own card says so: how it is
-  // presented (Full Width / Detail / Cropped Detail) or what it is for. A cover
-  // selection is not one of those — a photograph chosen for the cover is composed
-  // on the cover, and the same source joins the narrative only when the designer
-  // placed it there as well. Nothing is dropped by this: a photograph with nothing
-  // recorded is still composed inside the narrative at its own proportions by the
-  // flow below.
+  // asset has a body placement only where its own card says how it is presented
+  // (Full Width / Detail / Cropped Detail). Purpose describes content; it does not
+  // create a placement. A photograph chosen for the cover is composed on the cover,
+  // and the same source joins the narrative only when the designer placed it there
+  // as well. Other non-cover images with nothing recorded keep the established
+  // narrative flow at their own proportions.
   const narrativeSources = usable.filter((asset) => !isCompared(asset) && !seatingStyleOf(asset)
     && (hasBodyPlacement(asset) || asset !== coverAsset));
 
