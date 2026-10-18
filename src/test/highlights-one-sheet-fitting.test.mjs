@@ -19,7 +19,7 @@
  *      with no row withdrawn and the closing note kept
  *   B  when tightening is not enough the least valuable rows are withdrawn, one at
  *      a time, the COMPLETE composition — note included — being measured again
- *   C  a composition that carries a table but not its closing note is refused
+ *   C  a client summary without an internal reassurance note still fits normally
  *      rather than accepted
  *   D  a section that cannot be fitted legibly is reported, never clipped: the note
  *      stays, no row below the legible floor is withdrawn, no text is rewritten
@@ -326,12 +326,12 @@ describe('Key Performance Highlights — one A4 sheet, closing note included', (
     expect(pageMeasurement(page).availableMm - pageMeasurement(page).usedMm).toBeGreaterThanOrEqual(1.5);
   });
 
-  it('C. refuses a composition that carries a table but not its closing note', () => {
+  it('C. accepts a client summary without an internal reassurance note', () => {
     const { page, body } = highlightsPage({ note: false });
     const before = rowText(body);
 
-    expect(fitHighlightsSection(page, pageMeasurement)).toBe(false);
-    // Nothing was accepted, and nothing was cut to try to make it fit.
+    expect(fitHighlightsSection(page, pageMeasurement)).toBe(true);
+    // The table is complete in client form: every row remains and no note is invented.
     expect(rowText(body)).toEqual(before);
     expect(page.querySelector('.kph-table__note')).toBeNull();
   });
