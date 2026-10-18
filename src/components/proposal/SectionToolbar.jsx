@@ -151,7 +151,6 @@ export default function SectionToolbar({
             )}
             {isApproving ? 'Approving…' : 'Approve section'}
           </button>
-          <div className="w-px h-5 bg-[#DCDBD6]" />
         </>
       )}
 
@@ -166,9 +165,9 @@ export default function SectionToolbar({
             type="button"
             onClick={() => onImproveWording()}
             disabled={isImprovingWording}
-            title="Improve this section's wording with ADI — the same facts, better said"
+            title="Polish the client wording without changing the engineering."
             data-adi-improve="section"
-            className="flex items-center gap-1 px-2 py-1 text-xs text-[#3E4349] hover:bg-[#F5F4F0] rounded transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold whitespace-nowrap text-[#213428] bg-[#EAF0EC] border border-[#BFCFC4] hover:bg-[#DDE8E0] rounded transition-colors disabled:opacity-50"
           >
             {isImprovingWording ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
