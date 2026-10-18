@@ -32,7 +32,10 @@ import {
   improveProposalSectionWording,
 } from '../base44/shared/adiEditorial/proposalSectionWordingEditorial.js';
 import { ADI_REJECTION_STAGE } from '../base44/shared/adiEditorial/adiRejectionDiagnostics.js';
-import { ADI_KEPT_ORIGINAL_MESSAGE } from '../base44/shared/adiEditorial/adiEditorialStandard.js';
+import {
+  ADI_KEPT_ORIGINAL_MESSAGE,
+  checkAdiEditorialQuality,
+} from '../base44/shared/adiEditorial/adiEditorialStandard.js';
 
 const NOW = '2026-10-18T16:08:00.000Z';
 
@@ -40,8 +43,8 @@ const NOW = '2026-10-18T16:08:00.000Z';
 const LIVE_ORIGINAL = 'The contrast between a quiet exchange and a sudden musical or effects peak is central to this cinema\u2019s intent.';
 const LIVE_INVENTED_REASON = 'This cinema is designed to convey the contrast between quiet dialogue and sudden musical or effects peaks.';
 const LIVE_CORRECTED = 'The contrast between quiet dialogue and sudden musical or effects peaks is central to this cinema.';
-const WEAK_ORIGINAL = '<p>The projection screen and seating distances have been considered together as part of the room’s reference-style cinema intent.</p><p>The design supports consistent tone across the assessed seating and allows music and effects to build in scale.</p>';
-const WEAK_CORRECTED = '<p>The projection screen and seating distances have been considered together.</p><p>The design supports consistent tone across the assessed seating.</p>';
+const WEAK_ORIGINAL = '<p>The projection screen and seating distances have been considered together as part of the room’s reference-style cinema intent.</p>';
+const WEAK_CORRECTED = '<p>The projection screen and seating distances have been considered together for the room.</p>';
 
 /** A provider that answers from a script, one answer per call, recording the prompts. */
 function scriptedProvider(...answers) {
@@ -103,11 +106,22 @@ describe('the one correction attempt', () => {
     expect(provider.prompts).toHaveLength(2);
     expect(provider.prompts[1]).toContain('editorial_quality');
     expect(provider.prompts[1]).toContain('reference-style cinema intent');
-    expect(provider.prompts[1]).toContain('allows music and effects to build in scale');
     expect(pass.outcome).toBe(ADI_WORDING_OUTCOME.IMPROVED);
     expect(pass.text).toBe(WEAK_CORRECTED);
     expect(pass.attempts).toBe(2);
     expect(pass.corrected).toBe(true);
+  });
+
+  it('names every surviving audited phrase without changing the copy', () => {
+    const checked = checkAdiEditorialQuality(
+      '<p>The room has a reference-style cinema intent and allows music and effects to build in scale.</p>',
+    );
+
+    expect(checked.ok).toBe(false);
+    expect(checked.violations.map((entry) => entry.matched_substring)).toEqual([
+      'reference-style cinema intent',
+      'allows music and effects to build in scale',
+    ]);
   });
 
   it('keeps the original copy, and reports the refusal, when the correction fails too', async () => {
