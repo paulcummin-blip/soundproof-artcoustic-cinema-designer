@@ -37,6 +37,7 @@ export async function applyProposalRevision({
   editId = null,
   appliedAt = new Date().toISOString(),
   source = editId ? 'edit' : 'generated',
+  sectionPatchByType = null,
 } = {}) {
   if (!entities || !proposalId || !generationId || !Array.isArray(sections)) {
     throw new Error('A proposal, generation and validated section list are required for publication handoff.');
@@ -53,10 +54,17 @@ export async function applyProposalRevision({
   for (const body of mapped.bodies) {
     const record = stored.find((row) => row.section_type === body.section_type) || null;
     if (!record) throw new Error(`Proposal section is missing: ${body.section_type}`);
+    const targetedPatch = sectionPatchByType?.[record.section_type] || null;
+    const baseMetadata = targetedPatch?.metadata ?? record.metadata;
     await entities.ProposalSection.update(record.id, {
       body: body.html,
-      ...(editId ? { last_user_edited_at: appliedAt } : { last_gpt_generated_at: appliedAt }),
-      metadata: publicationRevisionMetadata(record.metadata, {
+      // Normal editor saves retain their existing behaviour. A caller that is
+      // publishing one generated editorial change supplies the exact section
+      // patch instead, so unchanged sections keep their approval timestamps.
+      ...(targetedPatch || (editId
+        ? { last_user_edited_at: appliedAt }
+        : { last_gpt_generated_at: appliedAt })),
+      metadata: publicationRevisionMetadata(baseMetadata, {
         generationId,
         editId,
         appliedAt,
