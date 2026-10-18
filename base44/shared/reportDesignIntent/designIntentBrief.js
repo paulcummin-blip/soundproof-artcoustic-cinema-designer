@@ -50,8 +50,9 @@ export const DESIGN_INTENT_WORD_LIMIT = 200;
  * THE DESIGN INTENT'S APPROVED SENTENCE FRAMES.
  *
  * Three approved frames, one per paragraph, in the register Sound Proof publishes
- * this block in: the design reasoning, spatial resolution with timbre matching, and
- * dynamic capability with the bass. They show the writer exactly what to write
+ * this block in and in the order it publishes it in: the cinema experience, spatial
+ * resolution with timbre matching, and dynamic capability with the bass and the
+ * design decisions. They show the writer exactly what to write
  * rather than describing a register to write towards, because this block is a
  * controlled engineering summary: the approved wording is the deliverable, and free
  * paraphrasing of it is a defect rather than a variation.
@@ -64,24 +65,44 @@ export const DESIGN_INTENT_WORD_LIMIT = 200;
  */
 export const DESIGN_INTENT_SENTENCE_FRAMES = Object.freeze([
   {
-    id: 'design_reasoning',
-    label: 'PARAGRAPH ONE: THE DESIGN REASONING',
-    frame: 'The seating is set forward of the rear wall to leave useful space behind the audience for the surround system. Keeping listeners away from that boundary also avoids a position where bass can be more difficult to control, making the clearance a deliberate part of the room layout.',
-    populate: 'the boundary this design actually clears, the surround layers this design actually has, and the room type this design is',
+    id: 'cinema_experience',
+    label: 'PARAGRAPH ONE: THE CINEMA EXPERIENCE',
+    frame: 'This [the room type this design is] is designed around [this project\'s own display and its format], with [this project\'s own seat count and row arrangement] arranged to make the most of it. The screen and the seating have been considered together, so the seating sits within the picture at a scale that gives the room its cinematic character.',
+    populate: 'the room type this design is, this project\'s own display and its format, and this project\'s own seat count and row arrangement',
   },
   {
     id: 'spatial_and_timbre',
     label: 'PARAGRAPH TWO: SPATIAL RESOLUTION AND TIMBRE MATCHING',
-    frame: 'The [loudspeaker layers this design actually has] provide strong spatial resolution around and above the seating. The screen channels maintain close level consistency across the [seat scope the evidence states that result for], while the [authoritative tonal groups the evidence supports] each maintain close tonal consistency within their respective layers.',
+    frame: 'The loudspeaker layout extends that experience around and above the audience. The [loudspeaker layers this design actually has] provide strong spatial resolution around and above the seating. The screen channels maintain close level consistency across the [seat scope the evidence states that result for], while the [authoritative tonal groups the evidence supports] each maintain close tonal consistency within their respective layers.',
     populate: 'the layers this design actually has, the seat scope the evidence states the level-consistency result for, and the tonal groups the evidence actually supports',
   },
   {
     id: 'dynamic_and_bass',
-    label: 'PARAGRAPH THREE: DYNAMIC RANGE AND BASS',
+    label: 'PARAGRAPH THREE: DYNAMIC RANGE, BASS AND THE DESIGN DECISIONS',
     frame: 'Dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. The [this design\'s own subwoofer arrangement] extends the predicted low-frequency response to [this project\'s own authoritative extension figure], giving film soundtracks the depth and impact expected from a dedicated cinema.',
-    populate: 'this design\'s own subwoofer arrangement, this project\'s own extension figure, and the room-type vocabulary that fits this room',
+    populate: 'this design\'s own subwoofer arrangement, this project\'s own extension figure, the room-type vocabulary that fits this room, and any design decision this project\'s own evidence records for it',
   },
 ]);
+
+/**
+ * THE ONE OPTIONAL SENTENCE OF PARAGRAPH THREE.
+ *
+ * A detailed design decision is stated only where this project's own evidence
+ * records it AND it is genuinely part of why this room is laid out as it is. The
+ * seating kept clear of the rear wall is the common case, not a required sentence:
+ * a project that records no such clearance writes no such sentence and forces
+ * nothing in its place, and the block stays three paragraphs either way.
+ *
+ * It is deliberately NOT a fourth frame: the paragraph count and the three-paragraph
+ * shape are unchanged, and this sentence is appended inside paragraph three.
+ */
+export const DESIGN_INTENT_DECISION_SENTENCE = Object.freeze({
+  id: 'design_decision',
+  label: 'PARAGRAPH THREE, ONLY WHERE THIS PROJECT RECORDS IT: THE DETAILED DESIGN DECISION',
+  frame: 'The seating is set forward of the rear wall to leave useful space behind the audience for the surround system. Keeping listeners away from that boundary also avoids a position where bass can be more difficult to control, making the clearance a deliberate part of the room layout.',
+  include_when: 'this project\'s own geometry records the clearance behind the seating and that decision is genuinely part of why the room is laid out as it is — never add it because the frame exists, and never write it where the evidence records no clearance',
+  populate: 'the boundary this design actually clears, the surround layers this design actually has, and the room type this design is',
+});
 
 /**
  * The approved frames as the writer reads them, as ONE block: the three frames it
