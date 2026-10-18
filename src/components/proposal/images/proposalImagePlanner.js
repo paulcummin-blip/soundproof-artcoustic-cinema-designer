@@ -166,8 +166,12 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   const comparisonIds = new Set(comparisonGroupList.flatMap((group) => group.images.map((image) => image.id)));
   const isCompared = (asset) => Boolean(asset?.id) && comparisonIds.has(asset.id);
 
-  /** Whether the designer placed this source in the body, on its own card. */
-  const hasBodyPlacement = (asset) => Boolean(imagePresentationOf(asset) || imagePurposeOf(asset));
+  /**
+   * Whether the designer explicitly placed this source in the body, on its own
+   * card. Purpose says what an image communicates; it does not create a second
+   * placement for a cover image. A body presentation is the placement instruction.
+   */
+  const hasBodyPlacement = (asset) => Boolean(imagePresentationOf(asset));
 
   /**
    * Whether the designer composed this source as a SUPPORTING image. Only a
