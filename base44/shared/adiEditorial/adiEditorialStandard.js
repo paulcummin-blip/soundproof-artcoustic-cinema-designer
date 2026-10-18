@@ -133,6 +133,47 @@ export const ADI_EDITORIAL_STANDARD = [
   'State the relationship or the result instead.',
 ].join('\n');
 
+/**
+ * Known weak phrases that the final editorial pass must remove. These are not
+ * engineering claims and are never evidence authority: they are the exact filler,
+ * unsupported inference and repetitive intent wording already identified by the
+ * client-copy audit. Keeping this list narrow makes the check deterministic without
+ * turning a style preference into a second writer.
+ */
+export const ADI_WEAK_EDITORIAL_PHRASES = Object.freeze([
+  'shared film-watching space',
+  'reference-style dedicated cinema',
+  'rather than loud playback alone',
+  'manage the room’s bass resonances',
+  "manage the room's bass resonances",
+  'reference-style cinema intent',
+  'allows music and effects to build in scale',
+]);
+
+/**
+ * Final editorial smell test. A safe rewrite can still be weak copy; when one of
+ * the audited phrases survives, return an exact violation so the existing single
+ * correction attempt can remove it. This check changes no engineering meaning and
+ * never edits copy itself.
+ */
+export function checkAdiEditorialQuality(value) {
+  const copy = String(value || '');
+  const lower = copy.toLocaleLowerCase('en-GB');
+  const violations = ADI_WEAK_EDITORIAL_PHRASES.reduce((found, phrase) => {
+    const index = lower.indexOf(phrase.toLocaleLowerCase('en-GB'));
+    if (index < 0) return found;
+    const matched = copy.slice(index, index + phrase.length);
+    found.push({
+      code: 'weak_editorial_phrase',
+      category: 'editorial quality',
+      matched_substring: matched,
+      detail: `Remove or rewrite the weak phrase “${matched}” without changing the supported engineering meaning.`,
+    });
+    return found;
+  }, []);
+  return { ok: violations.length === 0, violations };
+}
+
 /** Whether a piece of copy is HTML rather than plain prose. */
 export function looksLikeHtml(value) {
   return /<\/?[a-z][\s\S]*>/i.test(String(value || ''));
