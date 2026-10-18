@@ -159,6 +159,7 @@ function result({ applied, action, outcome = null, mode, improvedText = null, pr
  *   version specifies.
  * @param {Object} [input.user]
  * @param {string} [input.now]
+ * @param {Function|null} [input.persistRevision] — production proposal revision handoff
  * @returns {Promise<Object>} the outcome, or `{ ok: false, block }`
  */
 export async function improveProposalSectionWording({
@@ -174,6 +175,7 @@ export async function improveProposalSectionWording({
   grounding = null,
   user = null,
   now = null,
+  persistRevision = null,
 } = {}) {
   if (!proposalId || !sectionId) {
     return blocked(ADI_SECTION_BLOCK.INVALID_REQUEST, 400, 'proposal_id and section_id are required.');
@@ -203,12 +205,35 @@ export async function improveProposalSectionWording({
       return blocked(ADI_SECTION_BLOCK.NOTHING_TO_UNDO, 409, 'There is no earlier wording to restore for this section.');
     }
     const replacedText = readable(section.body);
-    const restored = await entities.ProposalSection.update(sectionId, {
+    const restorePatch = {
       body: marker.previous_body,
       last_user_edited_at: marker.previous_last_user_edited_at ?? null,
       last_gpt_generated_at: marker.previous_last_gpt_generated_at ?? null,
       metadata: withoutMarker(section.metadata),
+    };
+    const persistedRestore = await persistSectionChange({
+      entities,
+      persistRevision,
+      proposalId,
+      sectionId,
+      section,
+      body: marker.previous_body,
+      patch: restorePatch,
+      now,
+      user,
+      source: 'adi_undo',
     });
+    if (persistedRestore.accepted !== true) {
+      return rejectedByRevision({
+        action: 'undo',
+        mode: marker.mode || ADI_SECTION_MODE.SECTION,
+        originalText: replacedText,
+        proposedText: readable(marker.previous_body),
+        persisted: persistedRestore,
+        canUndo: true,
+      });
+    }
+    const restored = persistedRestore.section;
     if (restored?.body !== marker.previous_body || restored?.metadata?.adi_editorial) {
       throw new Error('The earlier wording and its Undo record were not restored together.');
     }
@@ -279,7 +304,7 @@ export async function improveProposalSectionWording({
       });
     }
     const write = await save({
-      entities, sectionId, section, body: bodyHtml, now, user, mode,
+      entities, persistRevision, proposalId, sectionId, section, body: bodyHtml, now, user, mode,
       previousBody: originalBody, previousText: original, improvedText: readable(bodyHtml),
     });
     return result({ ...write, action, mode });
@@ -353,7 +378,7 @@ export async function improveProposalSectionWording({
 
   // ── THE ONE WRITE ──
   const write = await save({
-    entities, sectionId, section, body: pass.text, now, user, mode,
+    entities, persistRevision, proposalId, sectionId, section, body: pass.text, now, user, mode,
     previousBody: originalBody, previousText: original, improvedText: readable(pass.text),
   });
   return result({ ...write, action, mode });
@@ -363,7 +388,20 @@ export async function improveProposalSectionWording({
  * The single write: the improved body, the moved generated stamp, and the copy
  * that was replaced held in the section's own metadata.
  */
-async function save({ entities, sectionId, section, body, now, user, mode, previousBody, previousText, improvedText }) {
+async function save({
+  entities,
+  persistRevision,
+  proposalId,
+  sectionId,
+  section,
+  body,
+  now,
+  user,
+  mode,
+  previousBody,
+  previousText,
+  improvedText,
+}) {
   const sourceFingerprint = publishedSectionFingerprint(previousText);
   const improvedFingerprint = publishedSectionFingerprint(improvedText);
   const marker = {
@@ -379,7 +417,7 @@ async function save({ entities, sectionId, section, body, now, user, mode, previ
     source_revision: sourceFingerprint,
     improved_revision: improvedFingerprint,
   };
-  const updated = await entities.ProposalSection.update(sectionId, {
+  const patch = {
     body,
     // A GENERATION, NOT A HAND EDIT: the wording was written for the designer by
     // ADI, which is what returns the section to Needs review — the same stamp a
@@ -389,9 +427,32 @@ async function save({ entities, sectionId, section, body, now, user, mode, previ
       ...(section.metadata && typeof section.metadata === 'object' ? section.metadata : {}),
       adi_editorial: marker,
     },
+  };
+  const persistedRevision = await persistSectionChange({
+    entities,
+    persistRevision,
+    proposalId,
+    sectionId,
+    section,
+    body,
+    patch,
+    now,
+    user,
+    source: 'adi',
   });
+  if (persistedRevision.accepted !== true) {
+    return rejectedByRevision({
+      action: ADI_SECTION_ACTION.IMPROVE,
+      mode,
+      originalText: previousText,
+      proposedText: improvedText,
+      persisted: persistedRevision,
+      canUndo: Boolean(section.metadata?.adi_editorial),
+    });
+  }
+  const updated = persistedRevision.section;
 
-  // One entity update is the atomic boundary. Never report an accepted edit when
+  // One authoritative revision handoff is the persistence boundary. Never report an accepted edit when
   // the returned stored record contains the body but not the complete Undo marker.
   const persisted = updated?.metadata?.adi_editorial || null;
   if (updated?.body !== body
