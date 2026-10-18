@@ -10,7 +10,7 @@ import { resolveProposalComparison, isCompleteComparisonTable } from '@/componen
 import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceState';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
-import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
+import useSectionAdiEditorial from '@/components/proposal/editor/useSectionAdiEditorial';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
 import {
@@ -138,13 +138,9 @@ export default function ProposalEditor() {
   const [saveStatuses, setSaveStatuses] = useState({});
   const [dirtySections, setDirtySections] = useState(new Set());
   const [regenerating, setRegenerating] = useState(null);
-  // ── The ADI editorial pass ──
-  // The wording of a section, improved where it stands. Which section is being
-  // worked on, and the one plain line ADI stated about it. Nothing here decides
-  // anything: the pass, the meaning gate and the revalidation are resolved on the
-  // server, and an approval stops counting because the wording changed.
-  const [adiBusySectionId, setAdiBusySectionId] = useState(null);
-  const [adiNotice, setAdiNotice] = useState(null);
+  // Bumped when an editorial pass has written new wording, so the copy layer is
+  // re-read and the approval each section needs follows the wording on screen.
+  const [adiLayerRefresh, setAdiLayerRefresh] = useState(0);
   const [clientBrief, setClientBrief] = useState('');
   const [showClientBrief, setShowClientBrief] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
@@ -602,159 +598,6 @@ export default function ProposalEditor() {
     }
   };
 
-  // ── The ADI editorial pass on a section's wording ──
-  // Every action re-reads the sections from the server, so the body, the stamps and
-  // the editorial marker the Undo action reads are always the stored ones — and so
-  // the approval state is resolved again from the wording that is actually there.
-  const reloadSections = useCallback(async () => {
-    if (!proposal?.id) return;
-    const rows = await base44.entities.ProposalSection.filter({ proposal_id: proposal.id });
-    setSections(orderPublicationSections({
-      sections: (rows || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
-      proposalType: proposal.proposal_type,
-    }));
-  }, [proposal?.id, proposal?.proposal_type]);
-
-  const invokeAdiEditorial = useCallback((payload) => (
-    base44.functions.invoke('improveAdiWording', {
-      surface: 'proposal_section',
-      proposal_id: proposal?.id || null,
-      ...payload,
-    })
-  ), [proposal?.id]);
-
-  // The whole section: the copy is improved and saved, and the copy it replaced is
-  // kept behind it.
-  const handleImproveWording = async (section) => {
-    if (!section || archived) return;
-    setAdiBusySectionId(section.id);
-    setAdiNotice(null);
-    try {
-      const response = await invokeAdiEditorial({
-        action: 'improve',
-        mode: 'section',
-        section_id: section.id,
-      });
-      const data = response?.data || {};
-      setAdiNotice({
-        sectionId: section.id,
-        message: data.ok === true
-          ? (data.message || null)
-          : (data.error || 'ADI could not change the wording, so it is unchanged.'),
-        busy: false,
-      });
-      if (data.ok === true && data.applied === true) await reloadSections();
-    } catch (error) {
-      setAdiNotice({
-        sectionId: section.id,
-        message: error?.response?.data?.error
-          || error?.response?.data?.message
-          || 'ADI could not be reached, so the wording is unchanged.',
-        busy: false,
-      });
-    } finally {
-      setAdiBusySectionId(null);
-    }
-  };
-
-  // Undo: the exact wording ADI replaced, put back as it was.
-  const handleUndoWording = async (section) => {
-    if (!section || archived) return;
-    setAdiBusySectionId(section.id);
-    setAdiNotice(null);
-    try {
-      const response = await invokeAdiEditorial({ action: 'undo', section_id: section.id });
-      const data = response?.data || {};
-      setAdiNotice({
-        sectionId: section.id,
-        message: data.ok === true
-          ? (data.message || 'The wording ADI replaced has been put back.')
-          : (data.error || 'The earlier wording could not be put back.'),
-        busy: false,
-      });
-      if (data.ok === true && data.applied === true) await reloadSections();
-    } catch (error) {
-      setAdiNotice({
-        sectionId: section.id,
-        message: error?.response?.data?.error || 'The earlier wording could not be put back.',
-        busy: false,
-      });
-    } finally {
-      setAdiBusySectionId(null);
-    }
-  };
-
-  // The highlighted text alone: improved on its own, and NOT saved yet. The editor
-  // puts it back in its place and calls the second half of the same action with the
-  // copy it produced.
-  const handleImproveSelection = useCallback(async (selectionText) => {
-    if (archived || !activeSection) return null;
-    setAdiNotice({ sectionId: activeSection.id, message: null, busy: true });
-    try {
-      const response = await invokeAdiEditorial({
-        action: 'improve',
-        mode: 'selection',
-        section_id: activeSection.id,
-        selection_text: selectionText,
-      });
-      const data = response?.data || {};
-      setAdiNotice({
-        sectionId: activeSection.id,
-        message: data.ok === true ? (data.message || null) : (data.error || null),
-        busy: false,
-      });
-      return data;
-    } catch (error) {
-      setAdiNotice({
-        sectionId: activeSection.id,
-        message: error?.response?.data?.error || 'ADI could not be reached, so the wording is unchanged.',
-        busy: false,
-      });
-      return null;
-    }
-  }, [archived, activeSection, invokeAdiEditorial]);
-
-  // The second half: the editor's own copy, with the improved highlighted text in
-  // it, is handed over to be saved. The server proves that nothing outside the
-  // highlighted text changed before anything is written.
-  const handleApplyAdiSelection = useCallback(async ({ selectionText, improvedSelection, body }) => {
-    if (archived || !activeSection) return null;
-    try {
-      const response = await invokeAdiEditorial({
-        action: 'improve',
-        mode: 'selection',
-        section_id: activeSection.id,
-        selection_text: selectionText,
-        improved_selection: improvedSelection,
-        body_text: body,
-      });
-      const data = response?.data || {};
-      setAdiNotice({
-        sectionId: activeSection.id,
-        message: data.ok === true
-          ? (data.message || null)
-          : (data.error || 'The highlighted wording was not saved, so the copy is unchanged.'),
-        busy: false,
-      });
-      if (data.ok === true && data.applied === true) {
-        // The ADI edit is written by the server, so the hand-edit draft of this
-        // section is finished: what is on screen is now the stored copy.
-        editDraftsRef.current[activeSection.id] = null;
-        delete editBaselinesRef.current[activeSection.id];
-        setEditingSectionId(null);
-        await reloadSections();
-      }
-      return data;
-    } catch (error) {
-      setAdiNotice({
-        sectionId: activeSection.id,
-        message: error?.response?.data?.error || 'The highlighted wording was not saved, so the copy is unchanged.',
-        busy: false,
-      });
-      return null;
-    }
-  }, [archived, activeSection, invokeAdiEditorial, reloadSections]);
-
   const handleToggleVisibility = async (sectionId) => {
     if (archived) return;
     const section = sections.find((s) => s.id === sectionId);
@@ -799,6 +642,42 @@ export default function ProposalEditor() {
 
   // ── Archived read-only + restore ──
   const archived = isArchived(proposal?.status);
+
+  // The sections as the server holds them, re-read after every editorial action, so
+  // the body, the stamps and the editorial marker the Undo action reads are the
+  // stored ones — and so the approval state is resolved again from the wording that
+  // is actually there.
+  const reloadSections = useCallback(async () => {
+    if (!proposal?.id) return;
+    const rows = await base44.entities.ProposalSection.filter({ proposal_id: proposal.id });
+    setSections(orderPublicationSections({
+      sections: (rows || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
+      proposalType: proposal.proposal_type,
+    }));
+  }, [proposal?.id, proposal?.proposal_type]);
+
+  // An accepted edit was written by the server, so the hand-edit draft of the active
+  // section is finished — what is on screen is now the stored copy — and the copy
+  // layer is re-read so the approval this section needs follows the new wording.
+  const finishAdiEdit = useCallback(async () => {
+    setEditingSectionId(null);
+    setAdiLayerRefresh((count) => count + 1);
+    await reloadSections();
+  }, [reloadSections]);
+
+  // The one editorial action, in its two ways of working: the whole section, or the
+  // text the designer highlighted. The pass, the meaning gate, the revalidation and
+  // the approval consequence are all resolved on the server; this holds the state and
+  // shows the one plain line it reported.
+  const {
+    notice: adiNotice,
+    busySectionId: adiBusySectionId,
+    improveSection: handleImproveWording,
+    undoSection: handleUndoWording,
+    improveSelection: handleImproveSelection,
+    applySelection: handleApplyAdiSelection,
+    dismissNotice: dismissAdiNotice,
+  } = useSectionAdiEditorial({ proposal, archived, activeSection, onApplied: finishAdiEdit });
 
   const handleRestore = async () => {
     if (!proposal) return;
@@ -1113,7 +992,7 @@ export default function ProposalEditor() {
           onBlockedReasonChange={setEditLayerBlockReason}
           onLayerChange={setDocumentLayer}
           documentRevision={JSON.stringify(sections.map(section => [section.id, section.body, section.is_enabled, section.order_index, section.dealer_notes]))}
-          refreshSignal={layerRefreshSignal}
+          refreshSignal={layerRefreshSignal + adiLayerRefresh}
         />
         {/* Proposal typography scope — cover, section headings and body copy
             follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
@@ -1159,6 +1038,12 @@ export default function ProposalEditor() {
                     : (html, editedAt) => handleDirty(section.id, html, editedAt)
                 }
                 onUnloadSave={editingThisSection ? undefined : (html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
+                // The highlighted-text editorial action, offered where a highlight can
+                // actually be made: inside manual edit mode, from this editor's own
+                // toolbar. The editor puts the improved wording back itself and hands
+                // its own copy over to be saved.
+                onImproveSelection={isActive && editingThisSection && !archived ? handleImproveSelection : null}
+                onApplyAdiSelection={isActive && editingThisSection && !archived ? handleApplyAdiSelection : null}
                 editable={isActive && editingThisSection && !archived}
                 saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
               />
@@ -1239,6 +1124,16 @@ export default function ProposalEditor() {
                       approvalStatus={approvalByType?.[section.section_type] || null}
                       isApproving={approvingSectionId === section.id}
                       onApprove={() => handleApproveSection(section)}
+                      // ── The editorial pass on this section's wording ──
+                      // Offered on the copy that is already here, and only for a
+                      // section that carries copy. The one line ADI states about it
+                      // is shown directly beneath these controls.
+                      onImproveWording={() => handleImproveWording(section)}
+                      onUndoWording={() => handleUndoWording(section)}
+                      isImprovingWording={adiBusySectionId === section.id}
+                      canUndoAdi={Boolean(section.metadata?.adi_editorial?.previous_body)}
+                      notice={adiNotice?.sectionId === section.id ? adiNotice.message : null}
+                      onDismissNotice={dismissAdiNotice}
                     />
                   </div>
                 )}

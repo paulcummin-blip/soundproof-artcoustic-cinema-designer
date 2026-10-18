@@ -1,5 +1,6 @@
 import React from 'react';
 import { PenLine, Plus, Minus, Wrench, Home, RefreshCw, Lock, Unlock, StickyNote, Pencil, Check, X, Loader2, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
+import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
 import { REGENERATION_ACTIONS } from '@/components/proposal/proposalSections';
 import { MANUAL_EDIT_LABEL } from '@/components/proposal/proposalManualEdit';
 import {
@@ -69,10 +70,15 @@ export default function SectionToolbar({
   onUndoWording = null,
   isImprovingWording = false,
   canUndoAdi = false,
+  // The one line ADI stated about the last editorial action on THIS section, shown
+  // directly beneath these controls, and how it is cleared.
+  notice = null,
+  onDismissNotice = null,
 }) {
   const approved = approvalStatus === APPROVAL_STATUS.APPROVED;
   const approvalChip = approvalChipStyle(approvalStatus);
   return (
+    <>
     <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg shadow-md border border-[#DCDBD6] bg-white">
       {/* Manual edit — wording changes by hand, no AI */}
       {isEditing ? (
@@ -270,5 +276,13 @@ export default function SectionToolbar({
         </>
       )}
     </div>
+    {/* What ADI said about the editorial action on this section, in one plain line
+        directly beneath the controls it was taken from. */}
+    <AdiEditorialNotice
+      message={notice}
+      busy={isImprovingWording}
+      onDismiss={onDismissNotice}
+    />
+    </>
   );
 }
