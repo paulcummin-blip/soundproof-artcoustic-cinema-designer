@@ -245,7 +245,8 @@ describe('structure evidence cards', () => {
 
   it('names the parameter source and keeps the gain populated', () => {
     const cards = buildEvidenceCards(ROWS, 'spatial_resolution');
-    assert.equal(cards[0].parameter, 'P2 discrete channels');
+    assert.equal(cards[0].parameter, 'Discrete channels');
+    assert.doesNotMatch(cards.map((card) => card.parameter).join(' '), /\bP\d+\b/);
     cards.forEach((card) => assert.ok(card.gain.length > 15, card.key));
   });
 
