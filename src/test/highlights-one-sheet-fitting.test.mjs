@@ -20,7 +20,6 @@
  *   B  when tightening is not enough the least valuable rows are withdrawn, one at
  *      a time, the COMPLETE composition — note included — being measured again
  *   C  a client summary without an internal reassurance note still fits normally
- *      rather than accepted
  *   D  a section that cannot be fitted legibly is reported, never clipped: the note
  *      stays, no row below the legible floor is withdrawn, no text is rewritten
  *   E  the same authority composes a many-option comparison table, measured as ONE
