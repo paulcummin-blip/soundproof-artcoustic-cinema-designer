@@ -15,17 +15,17 @@ import { curateSummaryHighlights } from '@/components/proposal/highlightsSelecti
  * -----------------------------
  * The measured summary table of a System Design report.
  *
- * Single Summary:      Performance area | Parameter | Result | What the room gains
+ * Single Summary:      Area | Result | What it means
  * Comparison:          Performance area | Option A | Option B | What changes
  *                      (one column per selected version)
  *
  * Every cell is read from calculated Sound Proof data stored on the section:
  * for a summary the calculated rows, for a comparison the calculated comparison
  * rows (one value per version, plus the derived change). This component never
- * derives, regrades or recalculates a value. The summary's Performance area,
- * Parameter source and display rounding come from
- * keyPerformanceHighlightsAuthority, which also guarantees the "What the room
- * gains" column is populated on every row.
+ * derives, regrades or recalculates a value. The summary's area, result and
+ * client meaning come from keyPerformanceHighlightsAuthority. The parameter
+ * source stays in the row data for traceability but is deliberately not printed
+ * as an internal P-code column.
  *
  * The Design Index is an internal designer diagnostic, so it is never a row
  * here. A proposal generated before that rule existed still carries the row in
