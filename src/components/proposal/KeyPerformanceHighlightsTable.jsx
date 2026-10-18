@@ -50,10 +50,9 @@ import { curateSummaryHighlights } from '@/components/proposal/highlightsSelecti
  */
 
 const SUMMARY_COLUMNS = [
-  { key: 'area', label: 'Performance area', width: '17%' },
-  { key: 'parameter', label: 'Parameter', width: '21%' },
-  { key: 'result', label: 'Result', width: '18%' },
-  { key: 'gain', label: 'What the room gains', width: '44%' },
+  { key: 'area', label: 'Area', width: '23%' },
+  { key: 'result', label: 'Result', width: '31%' },
+  { key: 'gain', label: 'What it means', width: '46%' },
 ];
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';
@@ -153,9 +152,7 @@ export default function KeyPerformanceHighlightsTable({
             ))}
           </tbody>
         </table>
-        <p className="kph-table__note mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
-          Values are read from each version’s frozen Sound Proof evidence.
-        </p>
+
       </div>
     );
   }
@@ -193,16 +190,13 @@ export default function KeyPerformanceHighlightsTable({
             // component knowing anything about the sheet it is printed on.
             <tr key={row.key} data-row-key={row.key} data-row-area={row.area}>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
-              <td className={`${CELL} text-[#3E4349]`} style={proposalRoleStyle('body')}>{row.parameter}</td>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.result}</td>
               <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.gain}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="kph-table__note mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
-        Every result calculated by Sound Proof. Levels and calculated results are shown as assessed, rounded to whole degrees, dB and Hz.
-      </p>
+
     </div>
   );
 }
