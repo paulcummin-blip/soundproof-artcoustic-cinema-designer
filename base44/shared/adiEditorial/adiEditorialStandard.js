@@ -9,8 +9,9 @@
  *   1. THE ENGINEERING WRITER decides what is TRUE. It writes the client-facing
  *      copy from the frozen evidence, and every figure, level, product, scope and
  *      result in that copy is the engineering authority's.
- *   2. ADI IMPROVES HOW THAT TRUTH IS EXPRESSED. It reads copy that is already
- *      grounded and accepted, and it rewrites the wording only.
+ *   2. ADI IMPROVES HOW THAT TRUTH IS EXPRESSED. It reads a generated draft
+ *      whose engineering facts are grounded. Its qualitative wording remains
+ *      editing input: unsupported inference, repetition and rhetoric may be cut.
  *
  * The standard below is the second job's whole contract: what an editorial pass
  * improves, what it may never do, and the one question it asks of every sentence.
@@ -116,6 +117,15 @@ export const ADI_EDITORIAL_STANDARD = [
   '  - defensive caveats, or implementation explanation',
   '  - "not just X, but Y"',
   '  - repeated superlatives, or vague claims',
+  '',
+  'FINAL CUT — perform this deletion pass before returning the copy:',
+  '  - remove lifestyle or audience labels such as shared, family, social or entertaining unless the copy contains a specific recorded client priority for them',
+  '  - remove repeated intent labels such as reference-style; state the project relationship once instead',
+  '  - remove contrastive tails such as "rather than loud playback alone" when the preceding sentence already makes the point',
+  '  - replace mechanisms such as "manage room resonances" with the simpler client outcome already supported by the copy',
+  '  - delete a closing sentence that merely restates tonal consistency, placement, capability or cinema intent',
+  '  - do not replace anything removed with a new adjective, benefit, rationale or conclusion',
+  'The returned version must be noticeably clearer and tighter, not merely different.',
   '',
   'Phrases to remove wherever they appear: make the most of it, works well together,',
   'remarkably stable, exceptionally precise, great speaker spacing, powerful capability,',
