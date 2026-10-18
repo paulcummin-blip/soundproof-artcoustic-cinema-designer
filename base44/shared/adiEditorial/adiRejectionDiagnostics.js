@@ -27,6 +27,8 @@ export const ADI_REJECTION_STAGE = Object.freeze({
   PRODUCT_GROUNDING: 'product_grounding',
   /** The surface's own validator, run again on the improved copy. */
   ORIGINAL_SURFACE_VALIDATOR: 'original_surface_validator',
+  /** The final client-copy smell test: known weak wording survived the rewrite. */
+  EDITORIAL_QUALITY: 'editorial_quality',
   /** The highlighted text was put back wrongly: the copy outside it changed. */
   SELECTION_CONSERVATION: 'selection_conservation',
 });
