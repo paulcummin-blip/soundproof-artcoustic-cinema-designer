@@ -74,6 +74,10 @@ const BODY_NUMBER_WORDS = '<p>The screen channels maintain close level consisten
 const SELECTION = 'The screen channels maintain close level consistency across the primary seats.';
 const SELECTION_IMPROVED = 'Across the primary seats, the screen channels maintain close level consistency.';
 
+/** The exact current Barton System Design Summary and the live ADI proposal refused before this fix. */
+const BARTON_SYSTEM_SUMMARY = `<h2>Design Summary</h2><p>This dedicated cinema centres on a large projection image and two rows of four seats, bringing a shared film-watching space into a room measuring 5.0m × 4.2m × 2.4m. The 120" 2.35:1 projection screen and seating distances have been considered together, with an involving view of the picture from the rear row.</p><p>Sound extends beyond the image through front-wide, side and rear loudspeakers, with overhead speakers carrying the action above the audience. The screen channels sit behind the acoustically transparent screen, keeping the front-stage arrangement closely connected to the picture. Subwoofers at the front and rear support the soundtrack’s low-frequency weight.</p><p>The space behind the seating is a deliberate part of the layout. Keeping listeners clear of the rear wall gives the surrounding loudspeakers room to work around them and avoids placing the audience directly against a difficult boundary for bass.</p><p>The intended experience is that of a reference-style dedicated cinema: a substantial picture, sound that reaches into the listening space, and the capability for demanding film soundtracks. Picture, seating and sound are treated as parts of the same room, rather than separate purchases.</p><h2>Design Overview</h2><p>Dialogue and the main on-screen action come from the left, centre and right loudspeakers behind the projection screen. Front wides sit between that front stage and the side surrounds, while rear surrounds carry sound behind the seating and overhead loudspeakers place height effects above it.</p><p>The seating faces the screen in two rows. A front subwoofer and two rear subwoofers complete the arrangement, giving the film’s low-frequency effects their own substantial output capability.</p><h2>Why This Specification</h2><p>For a dedicated cinema with two seating rows, tonal character matters alongside the scale of the soundtrack. The specified loudspeaker package supports strong seat-to-seat tonal consistency within the screen channels and, separately, within the surround and overhead group. Voices, instruments and atmospheric effects can retain a familiar tonal balance across the assessed seating.</p><p>The front stage provides exceptional output reserve for major musical peaks and on-screen effects, complemented by substantial headroom around and above the audience. This is capability for the demanding passages that give a film its scale, not simply a specification for loud playback.</p><p>The front-and-rear subwoofer arrangement is intended to manage the room’s bass resonances, while its output capability supplies the weight behind large effects. That combination of tonal consistency, directional placement and soundtrack capability suits the room’s reference-style cinema intent.</p>`;
+const BARTON_ADI_PROPOSAL = `<h2>Design Summary</h2><p>This dedicated cinema combines a large projection image with two rows of four seats in a shared film-watching space measuring 5.0m × 4.2m × 2.4m. The 120" 2.35:1 projection screen and seating distances have been considered together to give the rear row an involving view of the picture.</p><p>Front-wide, side and rear loudspeakers extend sound beyond the image, while overhead speakers carry the action above the audience. The screen channels sit behind the acoustically transparent screen, keeping the front-stage arrangement closely connected to the picture. Subwoofers at the front and rear provide the soundtrack’s low-frequency weight.</p><p>The space behind the seating is a deliberate part of the layout. Keeping listeners clear of the rear wall gives the surrounding loudspeakers room to work around them and keeps the audience away from a difficult boundary for bass.</p><p>The aim is a reference-style dedicated cinema experience, with a substantial picture, sound that reaches into the listening space and the capability to handle demanding film soundtracks. Picture, seating and sound are designed as parts of the same room rather than treated as separate purchases.</p><h2>Design Overview</h2><p>The left, centre and right loudspeakers behind the projection screen deliver dialogue and the main on-screen action. Front wides sit between the front stage and side surrounds, while rear surrounds carry sound behind the seating and overhead loudspeakers place height effects above it.</p><p>The seating faces the screen in two rows. A front subwoofer and two rear subwoofers complete the arrangement, providing substantial output capability for the film’s low-frequency effects.</p><h2>Why This Specification</h2><p>In a dedicated cinema with two seating rows, tonal character matters alongside soundtrack scale. The specified loudspeaker package supports strong seat-to-seat tonal consistency within the screen channels and, separately, within the surround and overhead group. Voices, instruments and atmospheric effects can retain a consistent tonal balance across the assessed seating.</p><p>The front stage provides exceptional output reserve for major musical peaks and on-screen effects, with substantial headroom around and above the audience. This capability serves the demanding passages that give a film its scale, rather than loud playback alone.</p><p>The front-and-rear subwoofer arrangement is intended to manage the room’s bass resonances, while its output capability provides the weight behind large effects. Together, tonal consistency, directional placement and soundtrack capability suit the room’s reference-style cinema intent.</p>`;
+
 /** An approved section, on the real fingerprint of the real authority. */
 function approvedSection({ body = BODY } = {}) {
   return {
@@ -300,6 +304,22 @@ describe('one shared editorial action, on both surfaces', () => {
     expect(ADI_IMPROVED_MESSAGE).toMatch(/^ADI has improved the wording\./);
   });
 
+  it('places the visually emphasised ADI finishing action directly beside Approve', () => {
+    const toolbar = readFileSync('src/components/proposal/SectionToolbar.jsx', 'utf8');
+    const approveAt = toolbar.indexOf('data-approve-section="true"');
+    const adiAt = toolbar.indexOf('data-adi-improve="section"');
+    const regenerationAt = toolbar.indexOf('{REGENERATION_ACTIONS.map');
+
+    expect(approveAt).toBeGreaterThan(-1);
+    expect(adiAt).toBeGreaterThan(approveAt);
+    expect(regenerationAt).toBeGreaterThan(adiAt);
+    expect(toolbar.slice(approveAt, adiAt)).not.toContain('w-px h-5 bg-[#DCDBD6]');
+    expect(toolbar.slice(adiAt - 500, regenerationAt)).toContain('Polish the client wording without changing the engineering.');
+    expect(toolbar.slice(adiAt - 500, regenerationAt)).toContain('whitespace-nowrap');
+    expect(toolbar.slice(adiAt - 500, regenerationAt)).toContain('bg-[#EAF0EC]');
+    expect(toolbar.slice(adiAt - 500, regenerationAt)).toContain('<Sparkles');
+  });
+
   it('declares the complete proposal-section Undo marker in the stored entity schema', () => {
     const schema = JSON.parse(readFileSync('base44/entities/ProposalSection.jsonc', 'utf8'));
     const marker = schema.properties.metadata.properties.adi_editorial.properties;
@@ -315,6 +335,9 @@ describe('one shared editorial action, on both surfaces', () => {
   it('gives the provider the narrow no-new-meaning principle verbatim', () => {
     const prompt = readFileSync('base44/shared/adiEditorial/adiEditorialPrompt.js', 'utf8');
     expect(prompt).toContain('Do not make the text more impressive by adding plausible benefits or explanations. If an idea is not already expressed in the source copy, do not introduce it. Better wording may be simpler than the original.');
+    expect(prompt).toContain('Qualitative filler, repetition and rhetorical commentary may be simplified or removed.');
+    expect(prompt).toContain('Preserve every supported engineering fact, figure, product, scope, result and genuine limitation.');
+    expect(prompt).not.toContain('Never add a sentence, and never drop a sentence');
   });
 });
 
@@ -337,6 +360,34 @@ describe('semantic meaning conservation', () => {
       original: 'Eight seats are arranged across two rows in a clear and straightforward layout.',
       improved: 'Eight seats are arranged across two rows.',
     }).ok).toBe(true);
+  });
+
+  it('does not mistake contrastive rhetoric for an engineering limitation', () => {
+    const checked = checkWordingConservation({
+      original: 'This is capability for the demanding passages that give a film its scale, not simply a specification for loud playback.',
+      improved: 'This capability serves the demanding passages that give a film its scale, rather than loud playback alone.',
+    });
+    expect(checked.ok).toBe(true);
+    expect(checked.violations.map((entry) => entry.code))
+      .not.toContain(ADI_CONSERVATION_REJECTION.REMOVED_LIMITATION);
+  });
+
+  it('accepts the exact current Barton System Design Summary improvement', () => {
+    const checked = checkWordingConservation({
+      original: BARTON_SYSTEM_SUMMARY,
+      improved: BARTON_ADI_PROPOSAL,
+    });
+    expect(checked).toEqual({ ok: true, violations: [] });
+  });
+
+  it('still refuses removal of a genuine limitation', () => {
+    const checked = checkWordingConservation({
+      original: 'The rear row does not meet the target and remains limited by boundary clearance.',
+      improved: 'The rear row meets the target.',
+    });
+    expect(checked.ok).toBe(false);
+    expect(checked.violations.map((entry) => entry.code))
+      .toContain(ADI_CONSERVATION_REJECTION.REMOVED_LIMITATION);
   });
 
   it('rejects new experiential claims about the view or sightlines', () => {
