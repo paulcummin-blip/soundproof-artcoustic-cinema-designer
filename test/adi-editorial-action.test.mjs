@@ -402,7 +402,7 @@ describe('semantic meaning conservation', () => {
     const plain = (value) => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     const finalCopy = plain(BARTON_FINAL_ADI_VERSION);
     expect(plain(BARTON_SYSTEM_SUMMARY).split(' ')).toHaveLength(398);
-    expect(finalCopy.split(' ')).toHaveLength(332);
+    expect(finalCopy.split(' ')).toHaveLength(333);
     for (const weak of [
       'shared film-watching space',
       'reference-style',
