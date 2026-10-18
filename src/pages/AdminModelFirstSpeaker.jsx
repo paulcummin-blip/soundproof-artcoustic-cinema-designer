@@ -35,7 +35,7 @@ export default function AdminModelFirstSpeaker() {
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
       <div style={{ marginBottom: 16 }}>
-        <a href="/admin/speaker-database" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>
+        <a href="/admin/speaker-database/advanced" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>
           ← Back to Speaker Database
         </a>
       </div>

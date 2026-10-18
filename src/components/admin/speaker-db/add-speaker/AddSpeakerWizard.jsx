@@ -127,11 +127,11 @@ export default function AddSpeakerWizard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <a href="/admin/speaker-database" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>← Back to Speaker Database</a>
+          <a href="/admin/speaker-database/advanced" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>← Back to Speaker Database</a>
           <h1 style={{ margin: "8px 0 0", fontSize: 24, color: BRAND.text }}>Add Speaker</h1>
         </div>
         <button
-          onClick={() => navigate("/admin/speaker-database")}
+          onClick={() => navigate("/admin/speaker-database/advanced")}
           className="p-2 rounded-md hover:bg-gray-100"
           title="Cancel and close"
         >

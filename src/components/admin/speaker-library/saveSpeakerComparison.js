@@ -299,10 +299,14 @@ export async function saveSpeakerComparison({ values, row = null, actorName }) {
     published = true;
   }
 
-  // The retail price lives on the comparison record. A blank entry is an explicit
-  // "no price set" and is stored as nothing at all, never as zero.
+  // The retail price lives on the comparison record. A price the administrator
+  // supplied is written as it stands; a blank entry only clears a price they were
+  // shown and deliberately removed. Adding a model therefore can never wipe the
+  // price already held for it, and a price is never stored as zero.
   const price = parsePriceEntry(values.price);
-  if (comparisonRecordId && price.valid) {
+  const priorPrice = row?.price ?? null;
+  const clearsShownPrice = price.valid && price.value === null && row !== null && priorPrice !== null;
+  if (comparisonRecordId && price.valid && (price.value !== null || clearsShownPrice)) {
     await base44.entities.CompetitorSpeaker.update(comparisonRecordId, {
       retail_price_inc_vat: price.value,
       currency: "GBP",

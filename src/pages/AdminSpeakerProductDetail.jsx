@@ -377,7 +377,7 @@ export default function AdminSpeakerProductDetail() {
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
       <div style={{ marginBottom: 20 }}>
-        <a href="/admin/speaker-database" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>← Back to Speaker Database</a>
+        <a href="/admin/speaker-database/advanced" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>← Back to Speaker Database</a>
       </div>
 
       {/* Header */}
