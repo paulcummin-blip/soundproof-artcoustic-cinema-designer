@@ -28,7 +28,7 @@
  * Pure: no React, no network, no recalculation, no engineering value.
  */
 
-import { findPublication } from './publishedEngineeringAuthority.js';
+import { findPublication } from './publishedEngineeringRead.js';
 
 /**
  * THE derived display identity of a screen: which display it is PRESENTED as.

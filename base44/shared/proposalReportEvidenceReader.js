@@ -29,7 +29,7 @@ import { validateReportEvidence } from './reportEvidenceCompleteness.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
 import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
 import { proposalEvidenceMoveIsSafe } from './designIdentityComparison.js';
-import { loadCacheRecord } from './publishedEngineeringAuthority.js';
+import { loadCacheRecord } from './publishedEngineeringRead.js';
 
 /** The parameters a proposal must be able to state from a Technical Report. */
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];

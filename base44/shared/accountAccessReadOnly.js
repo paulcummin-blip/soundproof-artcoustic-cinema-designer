@@ -138,8 +138,12 @@ export async function resolveAccountAccessReadOnly({
     return { allowed: false, reason: 'USER_DISABLED' };
   }
 
-  const email = normaliseEmail(authoritativeUser.email);
-  let accountId = String(authoritativeUser.account_id || '').trim();
+  // The login is MIRRORED, never modified: this path must leave every record it read
+  // exactly as it found it, so everything below works on the path's own copy.
+  const login = { ...authoritativeUser };
+
+  const email = normaliseEmail(login.email);
+  let accountId = String(login.account_id || '').trim();
   let invitationMembership = null;
 
   // The administrator-assigned Base44 user-id seat, read first: the production SSO
@@ -147,7 +151,7 @@ export async function resolveAccountAccessReadOnly({
   // its email, dealer name, URL or account parameter.
   if (!accountId) {
     const assignedRows = await entities.AccountMembership.filter({
-      user_id: authoritativeUser.id,
+      user_id: login.id,
     });
     const eligibleAssignments = (assignedRows || []).filter((item) =>
       item.status === 'pending' || item.status === 'active'
@@ -186,7 +190,7 @@ export async function resolveAccountAccessReadOnly({
   }
 
   // The same pilot gate, read and decided by portalSessionGateRead.js.
-  const portalAccess = await readPilotPortalAccess(base44, authoritativeUser, account, {
+  const portalAccess = await readPilotPortalAccess(base44, login, account, {
     entities,
     bridgeUrl,
   });
@@ -200,14 +204,14 @@ export async function resolveAccountAccessReadOnly({
 
   // The shared resolver stamps the login's account here when an invitation bound it.
   // The account is the one just resolved, so this path carries it in memory only.
-  if (!authoritativeUser.account_id && invitationMembership) {
-    authoritativeUser.account_id = accountId;
+  if (!login.account_id && invitationMembership) {
+    login.account_id = accountId;
   }
 
   const accountMemberships = await entities.AccountMembership.filter({ account_id: accountId });
   const allMemberships = Array.isArray(accountMemberships) ? accountMemberships : [];
   let membership = allMemberships.find((item) =>
-    item?.user_id === authoritativeUser.id
+    item?.user_id === login.id
     || (normaliseEmail(item?.email) && normaliseEmail(item.email) === email)
   ) || invitationMembership || null;
 
@@ -218,7 +222,7 @@ export async function resolveAccountAccessReadOnly({
 
   if (!membership && bootstrapLegacyMembership) {
     const shouldBootstrapAdmin =
-      authoritativeUser.account_role === 'admin'
+      login.account_role === 'admin'
       || !existingAdmin && occupiedMemberships.length === 0;
     // ── THE ONE CASE WHERE THE SHARED RESOLVER WOULD WRITE A RECORD FIRST ──
     // The seat it would create is mirrored here — the same fields, from the same
@@ -229,7 +233,7 @@ export async function resolveAccountAccessReadOnly({
       id: null,
       user_id: authoritativeUser.id,
       email,
-      full_name: authoritativeUser.full_name || null,
+      full_name: login.full_name || null,
       account_id: accountId,
       membership_role: shouldBootstrapAdmin ? 'dealer_admin' : 'full_access',
       access_level: ACCESS_LEVELS.FULL_ACCESS,
@@ -254,7 +258,7 @@ export async function resolveAccountAccessReadOnly({
       || membership.membership_role === 'designer'
       || membership.membership_role === 'viewer'
     )
-    && (membership.user_id === authoritativeUser.id || normaliseEmail(membership.email) === email);
+    && (membership.user_id === login.id || normaliseEmail(membership.email) === email);
 
   const isAccountAdmin =
     membership.is_account_admin === true
@@ -265,7 +269,7 @@ export async function resolveAccountAccessReadOnly({
   const accessLevel = isAccountAdmin
     ? ACCESS_LEVELS.FULL_ACCESS
     : normaliseAccessLevel(
-        membership.access_level || authoritativeUser.access_level,
+        membership.access_level || login.access_level,
         ACCESS_LEVELS.FULL_ACCESS,
       );
 
@@ -279,8 +283,8 @@ export async function resolveAccountAccessReadOnly({
   const membershipPatch = {};
   if (membership.user_id !== authoritativeUser.id) membershipPatch.user_id = authoritativeUser.id;
   if (normaliseEmail(membership.email) !== email) membershipPatch.email = email;
-  if ((membership.full_name || null) !== (authoritativeUser.full_name || null)) {
-    membershipPatch.full_name = authoritativeUser.full_name || null;
+  if ((membership.full_name || null) !== (login.full_name || null)) {
+    membershipPatch.full_name = login.full_name || null;
   }
   if (membership.status !== 'active') membershipPatch.status = 'active';
   if (membershipWasPending && !membership.accepted_at) membershipPatch.accepted_at = now;
@@ -302,14 +306,14 @@ export async function resolveAccountAccessReadOnly({
   }
 
   const userPatch = {};
-  if (authoritativeUser.account_role !== (isAccountAdmin ? 'admin' : 'account_user')) {
+  if (login.account_role !== (isAccountAdmin ? 'admin' : 'account_user')) {
     userPatch.account_role = isAccountAdmin ? 'admin' : 'account_user';
   }
-  if (authoritativeUser.access_level !== accessLevel) userPatch.access_level = accessLevel;
+  if (login.access_level !== accessLevel) userPatch.access_level = accessLevel;
   const appRole = legacyAppRoleForAccess(accessLevel, isAccountAdmin);
-  if (authoritativeUser.app_role !== appRole) userPatch.app_role = appRole;
+  if (login.app_role !== appRole) userPatch.app_role = appRole;
   if (Object.keys(userPatch).length > 0) {
-    Object.assign(authoritativeUser, userPatch);
+    Object.assign(login, userPatch);
   }
 
   return {
@@ -324,7 +328,7 @@ export async function resolveAccountAccessReadOnly({
       accessLevel,
     }),
     user: {
-      ...publicUser(authoritativeUser),
+      ...publicUser(login),
       account_id: accountId,
       account_role: isAccountAdmin ? 'admin' : 'account_user',
       access_level: accessLevel,
@@ -335,7 +339,7 @@ export async function resolveAccountAccessReadOnly({
       name: account.name,
       account_type: account.account_type,
       status: account.status,
-      territory: account.territory || authoritativeUser.territory || 'UK',
+      territory: account.territory || login.territory || 'UK',
     },
     membership: {
       id: membership.id,

@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
-import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
+import { readOnlyAccountEntities, resolveAccountAccessReadOnly } from '../../shared/accountAccessReadOnly.js';
 import { improveReportDesignIntentWording } from '../../shared/reportDesignIntent/improveReportDesignIntentWording.js';
 import { improveProposalSectionWording } from '../../shared/adiEditorial/proposalSectionWordingEditorial.js';
 import { readOnlyEntities } from '../../shared/reportDesignIntent/readOnlyEntities.js';
@@ -78,7 +78,15 @@ export default async function (req) {
       return Response.json({ error: 'That wording cannot be improved here.' }, { status: 400 });
     }
 
-    const accessContext = await resolveAccountAccess(base44, user);
+    // ── AUTHORISATION, BY READS ALONE ──
+    // The identical account-access decision the shared resolver reaches, resolved
+    // through a door that carries reads and no write at all: authorising this action
+    // performs no account maintenance, keeps no books and cannot change a record.
+    const accessContext = await resolveAccountAccessReadOnly({
+      base44,
+      entities: readOnlyAccountEntities(base44.asServiceRole.entities),
+      sessionUser: user,
+    });
     if (accessContext?.allowed !== true || accessContext.capabilities?.soundProof !== true) {
       return Response.json({ error: 'Sound Proof access is required to improve this wording.' }, { status: 403 });
     }

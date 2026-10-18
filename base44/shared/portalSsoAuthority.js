@@ -13,6 +13,7 @@ import {
 import { claimPilotPortalAdministratorSeat } from './pilotSeatClaimAuthority.js';
 import { hasText, normaliseEmail, uniqueRows } from './portalPrimitives.js';
 import { callBridge, providerAccessToken, providerIdToken } from './portalBridgeTransport.js';
+import { readPilotPortalAccess, resolvePilotPortalMapping } from './portalSessionGateRead.js';
 import { bindingGateFailure as classifyBindingGateFailure } from './portalBindingGate.js';
 import {
   resolveOrClaimPortalAdministratorMembership as resolveAccountAdministratorMembership,
@@ -24,54 +25,10 @@ import {
 // importer keeps one stable entry point and no import path changes.
 export { providerAccessToken, providerIdToken };
 
-export async function resolvePilotPortalMapping(service, accountId) {
-  if (accountId !== PILOT_SOUND_PROOF_ACCOUNT_ID) {
-    return { required: false, allowed: true, link: null };
-  }
-
-  const accountLinks = await uniqueRows(service.entities.ExternalAccountLink, {
-    account_id: accountId,
-    source_system: PORTAL_SOURCE,
-    active: true,
-  });
-
-  const pilotLinks = accountLinks.filter(
-    (link) => link?.partner_user_id === PILOT_EXTERNAL_SUBJECT,
-  );
-  if (pilotLinks.length !== 1) {
-    return { required: true, allowed: false, reason: 'PORTAL_MAPPING_AMBIGUOUS' };
-  }
-
-  const identityLinks = await uniqueRows(service.entities.ExternalAccountLink, {
-    source_system: PORTAL_SOURCE,
-    partner_user_id: PILOT_EXTERNAL_SUBJECT,
-    active: true,
-  });
-  if (
-    identityLinks.length !== 1
-    || identityLinks[0]?.id !== pilotLinks[0]?.id
-    || identityLinks[0]?.account_id !== accountId
-  ) {
-    return { required: true, allowed: false, reason: 'PORTAL_MAPPING_AMBIGUOUS' };
-  }
-
-  return { required: true, allowed: true, link: pilotLinks[0] };
-}
-
-function bindingMatches(binding, identity, mapping) {
-  return (
-    binding?.target === PORTAL_TARGET
-    && binding?.user_id === PILOT_EXTERNAL_SUBJECT
-    && binding?.session_id === identity.portal_session_id
-    && binding?.profile_id === PILOT_PARTNER_PROFILE_ID
-    && identity.partner_profile_id === PILOT_PARTNER_PROFILE_ID
-    && identity.external_subject === PILOT_EXTERNAL_SUBJECT
-    && identity.account_id === mapping.link.account_id
-    && hasText(binding?.account_name)
-    && hasText(binding?.expires_at)
-    && Date.parse(binding.expires_at) > Date.now()
-  );
-}
+// The pilot gate's reads, its binding check and its verdict live in
+// portalSessionGateRead.js, so a caller that may only read resolves the gate without
+// this module's bookkeeping. The mapping reader is re-exported here unchanged, so
+// every existing entry point stays exactly where it was.
 
 export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   bridgeUrl,
@@ -529,32 +486,25 @@ export async function validatePilotPortalAccessIfRequired(base44, base44User, ac
   bridgeUrl,
 } = {}) {
   const service = base44.asServiceRole;
-  const mapping = await resolvePilotPortalMapping(service, account.id);
-  if (!mapping.required) return { required: false, allowed: true };
-  if (!mapping.allowed) return mapping;
-  if (account.status !== 'active') {
-    return { required: true, allowed: false, reason: 'PORTAL_ACCOUNT_INACTIVE' };
+
+  // The verdict itself is reached by reading: the gate's reads, its binding check and
+  // its reasons are shared with the read-only callers of this app, so there is one
+  // implementation of the rule and no caller can reach a different one.
+  const gate = await readPilotPortalAccess(base44, base44User, account, {
+    entities: service.entities,
+    bridgeUrl,
+  });
+  if (!gate.required) return { required: false, allowed: true };
+  if (!gate.allowed) {
+    return { required: true, allowed: false, reason: gate.reason };
   }
 
+  // ── THE GATE'S OWN BOOKKEEPING, and the only writes on this path ──
+  // The session verified, so the identity, the account name and the external link name
+  // are refreshed exactly as they always were, with a write failure still failing the
+  // gate closed. A read-only caller stops at the verdict and reaches it without these.
   try {
-    const identities = await uniqueRows(service.entities.PortalIdentity, {
-      base44_user_id: base44User.id,
-      target: PORTAL_TARGET,
-    });
-    if (identities.length !== 1) {
-      return { required: true, allowed: false, reason: 'PORTAL_IDENTITY_NOT_BOUND' };
-    }
-    const identity = identities[0];
-
-    const binding = await callBridge(base44, base44User.id, {
-      action: 'validate_session',
-      portal_session_id: identity.portal_session_id,
-      target: PORTAL_TARGET,
-    }, bridgeUrl);
-    if (!bindingMatches(binding, identity, mapping)) {
-      return { required: true, allowed: false, reason: 'PORTAL_SESSION_REJECTED' };
-    }
-
+    const { identity, binding, mapping } = gate;
     const verifiedAt = new Date().toISOString();
     await service.entities.PortalIdentity.update(identity.id, {
       account_name: binding.account_name,

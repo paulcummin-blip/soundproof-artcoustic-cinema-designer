@@ -1,55 +1,35 @@
 import { validatePilotPortalAccessIfRequired } from './portalSsoAuthority.js';
+import {
+  ACCESS_LEVELS,
+  ACTIVE_SEAT_STATUSES,
+  ADMIN_MEMBERSHIP_ROLES,
+  MAX_ACCOUNT_SEATS,
+  buildCapabilities,
+  getSingle,
+  legacyAppRoleForAccess,
+  normaliseAccessLevel,
+  normaliseEmail,
+  publicUser,
+} from './accountAccessRules.js';
 
-export const ACCESS_LEVELS = Object.freeze({
-  FULL_ACCESS: 'FULL_ACCESS',
-  SOUND_PROOF_ONLY: 'SOUND_PROOF_ONLY',
-  PRICE_LIST_ONLY: 'PRICE_LIST_ONLY',
-});
+// THE PURE DECISION RULES AND THE READ HELPERS live in accountAccessRules.js, so a
+// caller that must resolve access with READS ALONE can share the identical rules
+// without importing this module's persistence. They are re-exported here unchanged,
+// so every existing importer keeps the names it already used and there is still one
+// implementation of each rule.
+export {
+  ACCESS_LEVELS,
+  MAX_ACCOUNT_SEATS,
+  buildCapabilities,
+  legacyAppRoleForAccess,
+  normaliseAccessLevel,
+  normaliseEmail,
+};
 
-export const MAX_ACCOUNT_SEATS = 5;
+// normaliseEmail, normaliseAccessLevel and legacyAppRoleForAccess live in
+// accountAccessRules.js, and are re-exported at the top of this module.
 
-const ADMIN_MEMBERSHIP_ROLES = new Set(['dealer_admin', 'distributor_admin', 'internal_admin']);
-const ACTIVE_SEAT_STATUSES = new Set(['active', 'pending']);
-
-export function normaliseEmail(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-export function normaliseAccessLevel(value, fallback = ACCESS_LEVELS.FULL_ACCESS) {
-  const candidate = String(value || '').trim().toUpperCase();
-  return Object.values(ACCESS_LEVELS).includes(candidate) ? candidate : fallback;
-}
-
-export function legacyAppRoleForAccess(accessLevel, isAccountAdmin = false) {
-  if (isAccountAdmin) return 'Administrator';
-  if (accessLevel === ACCESS_LEVELS.FULL_ACCESS) return 'Designer Pro';
-  if (accessLevel === ACCESS_LEVELS.SOUND_PROOF_ONLY) return 'Designer Lite';
-  return 'Viewer';
-}
-
-export function buildCapabilities({ isMasterAdmin, isAccountAdmin, accessLevel }) {
-  if (isMasterAdmin) {
-    return {
-      soundProof: true,
-      priceList: true,
-      commercial: true,
-      manageUsers: true,
-      masterAdmin: true,
-    };
-  }
-
-  return {
-    soundProof:
-      accessLevel === ACCESS_LEVELS.FULL_ACCESS
-      || accessLevel === ACCESS_LEVELS.SOUND_PROOF_ONLY,
-    priceList:
-      accessLevel === ACCESS_LEVELS.FULL_ACCESS
-      || accessLevel === ACCESS_LEVELS.PRICE_LIST_ONLY,
-    commercial: accessLevel === ACCESS_LEVELS.FULL_ACCESS,
-    manageUsers: isAccountAdmin === true,
-    masterAdmin: false,
-  };
-}
+// buildCapabilities lives in accountAccessRules.js, and is re-exported above.
 
 export async function appendAccountUserAudit(service, {
   accountId,
@@ -74,26 +54,8 @@ export async function appendAccountUserAudit(service, {
   });
 }
 
-async function getSingle(service, entityName, query) {
-  const rows = await service.entities[entityName].filter(query);
-  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-}
-
-function publicUser(authoritativeUser) {
-  return {
-    id: authoritativeUser.id,
-    email: authoritativeUser.email,
-    full_name: authoritativeUser.full_name || null,
-    role: authoritativeUser.role,
-    territory: authoritativeUser.territory || 'UK',
-    account_id: authoritativeUser.account_id || null,
-    account_role: authoritativeUser.account_role || 'account_user',
-    access_level: authoritativeUser.access_level || ACCESS_LEVELS.FULL_ACCESS,
-    app_role: authoritativeUser.app_role || null,
-    dealer_account_id: authoritativeUser.dealer_account_id || null,
-    dealer_name: authoritativeUser.dealer_name || null,
-  };
-}
+// getSingle and publicUser live in accountAccessRules.js, so a read-only resolver
+// reads the same records and describes a login the same way.
 
 /**
  * Resolves account identity only from the authenticated session and the
