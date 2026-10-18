@@ -87,6 +87,12 @@ export function numericTokens(value) {
 /** The words that state a limitation, a caveat or an assumption. */
 const LIMITATION = /\b(?:not|never|cannot|can't|isn't|aren't|doesn't|don't|won't|without|lacks?|lacking|limits?|limiting|limited|only|up to|at most|remains?|requires? (?:attention|work)|to be (?:addressed|confirmed)|assum\w*|estimat\w*|approximately|about)\b/gi;
 
+/** Every limitation word a text states, lowercased, so a refusal can name the ones that went. */
+function limitationWords(value) {
+  const found = String(value || '').match(new RegExp(LIMITATION.source, LIMITATION.flags)) || [];
+  return found.map((word) => word.toLowerCase());
+}
+
 /** The connectors a reason is written with. */
 const RATIONALE = /\b(?:because|so that|in order to|to ensure|which means|that is why|therefore|designed to)\b/gi;
 
@@ -129,19 +135,28 @@ function difference(original, proposed) {
   return { added, dropped };
 }
 
-/** The claim types one text makes, read sentence by sentence. */
-function claimTypes(text) {
-  const types = new Set();
+/**
+ * The claim types one text makes, read sentence by sentence — the sentence each
+ * one was read from is kept, so a refusal can quote the copy that carried it.
+ */
+function claimTypeSentences(text) {
+  const types = new Map();
   for (const sentence of sentenceParts(text)) {
+    const note = (label) => { if (!types.has(label)) types.set(label, sentence); };
     const kind = assertionKind(sentence);
-    if (kind === 'gain') types.add(CLAIM_TYPE.GAIN);
-    if (kind === 'change') types.add(CLAIM_TYPE.CHANGE);
-    if (kind === 'same') types.add(CLAIM_TYPE.SAME);
-    if (kind === 'result') types.add(CLAIM_TYPE.RESULT);
-    if (isRecommendation(sentence)) types.add(CLAIM_TYPE.RECOMMENDATION);
-    if (seatConsistencyClaim(sentence)) types.add(CLAIM_TYPE.CONSISTENCY);
+    if (kind === 'gain') note(CLAIM_TYPE.GAIN);
+    if (kind === 'change') note(CLAIM_TYPE.CHANGE);
+    if (kind === 'same') note(CLAIM_TYPE.SAME);
+    if (kind === 'result') note(CLAIM_TYPE.RESULT);
+    if (isRecommendation(sentence)) note(CLAIM_TYPE.RECOMMENDATION);
+    if (seatConsistencyClaim(sentence)) note(CLAIM_TYPE.CONSISTENCY);
   }
   return types;
+}
+
+/** The claim types one text makes. */
+function claimTypes(text) {
+  return new Set(claimTypeSentences(text).keys());
 }
 
 /** The seating scopes a text names, as a multiset. */
@@ -155,9 +170,44 @@ function rationaleWords(text) {
   return new Set(found.map((word) => word.toLowerCase()));
 }
 
-/** One refusal. */
-function violation(code, detail) {
-  return { code, detail };
+/**
+ * The sentence of a text that carries a token, so a refusal can quote the copy it
+ * was read from. Presentation of the same refusal, never part of the decision.
+ */
+function excerptFor(text, token) {
+  const needle = String(token || '').toLowerCase();
+  if (needle.length === 0) return null;
+  const wholeWord = /^[a-z]+$/.test(needle) ? new RegExp(`\\b${needle}\\b`, 'i') : null;
+  const sentences = sentenceParts(text);
+  const carrying = sentences.find((sentence) => (wholeWord
+    ? wholeWord.test(sentence)
+    : sentence.toLowerCase().includes(needle)));
+  if (carrying) return carrying;
+  const flat = String(text || '').replace(/\s+/g, ' ').trim();
+  return flat.length > 0 ? flat.slice(0, 240) : null;
+}
+
+/**
+ * One refusal: the code the workflow acts on, and — for diagnosis alone — the
+ * exact category, values and excerpts it was read from.
+ *
+ * The extra fields never take part in the decision: a rewrite is refused because
+ * a violation exists at all, and the code and the detail are exactly what they
+ * have always been. They exist so a refusal can be read afterwards without
+ * re-running the provider, and they are never stored on a record.
+ */
+function violation(code, detail, facts = {}) {
+  return {
+    code,
+    detail,
+    category: facts.category || null,
+    rule: code,
+    originalValue: facts.originalValue ?? null,
+    proposedValue: facts.proposedValue ?? null,
+    originalExcerpt: facts.originalExcerpt ?? null,
+    proposedExcerpt: facts.proposedExcerpt ?? null,
+    explanation: facts.explanation || null,
+  };
 }
 
 /**
@@ -178,26 +228,56 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
   // ── Figures, levels, parameters and quantities ──────────────────────────
   const numbers = difference(numericTokens(before), numericTokens(after));
   for (const token of numbers.added) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_NUMBER, `added:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_NUMBER, `added:${token}`, {
+      category: 'figure',
+      proposedValue: token,
+      proposedExcerpt: excerptFor(after, token),
+      explanation: `The rewritten copy states the figure ${token}, which the copy it came from does not.`,
+    }));
   }
   for (const token of numbers.dropped) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_NUMBER, `dropped:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_NUMBER, `dropped:${token}`, {
+      category: 'figure',
+      originalValue: token,
+      originalExcerpt: excerptFor(before, token),
+      explanation: `The figure ${token} stated by the original copy is not in the rewritten copy.`,
+    }));
   }
 
   const levels = difference(levelTokens(before), levelTokens(after));
   for (const token of levels.added) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_LEVEL, `added:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_LEVEL, `added:${token}`, {
+      category: 'performance level',
+      proposedValue: token,
+      proposedExcerpt: excerptFor(after, token),
+      explanation: `The rewritten copy states Performance Level ${token}, which the original copy does not.`,
+    }));
   }
   for (const token of levels.dropped) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_LEVEL, `dropped:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_LEVEL, `dropped:${token}`, {
+      category: 'performance level',
+      originalValue: token,
+      originalExcerpt: excerptFor(before, token),
+      explanation: `Performance Level ${token} stated by the original copy is not in the rewritten copy.`,
+    }));
   }
 
   const parameters = difference(parameterIds(before), parameterIds(after));
   for (const token of parameters.added) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_PARAMETER, `added:P${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_PARAMETER, `added:P${token}`, {
+      category: 'parameter',
+      proposedValue: `P${token}`,
+      proposedExcerpt: excerptFor(after, `P${token}`),
+      explanation: `The rewritten copy names parameter P${token}, which the original copy does not.`,
+    }));
   }
   for (const token of parameters.dropped) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_PARAMETER, `dropped:P${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_PARAMETER, `dropped:P${token}`, {
+      category: 'parameter',
+      originalValue: `P${token}`,
+      originalExcerpt: excerptFor(before, `P${token}`),
+      explanation: `The parameter P${token} named by the original copy is not named by the rewritten copy.`,
+    }));
   }
 
   // ── Equipment: the products and the quantities named ────────────────────
@@ -206,28 +286,56 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
     modelTokens(after).filter(isProductToken),
   );
   for (const token of products.added) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_PRODUCT, `added:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.ADDED_PRODUCT, `added:${token}`, {
+      category: 'equipment',
+      proposedValue: token,
+      proposedExcerpt: excerptFor(after, token),
+      explanation: `The rewritten copy names equipment the original copy never named.`,
+    }));
   }
   for (const token of products.dropped) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_PRODUCT, `dropped:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.DROPPED_PRODUCT, `dropped:${token}`, {
+      category: 'equipment',
+      originalValue: token,
+      originalExcerpt: excerptFor(before, token),
+      explanation: 'Equipment named by the original copy is not named by the rewritten copy.',
+    }));
   }
 
   // ── Scope: never widened, and never one the original did not name ───────
   const scopes = difference(scopeTokens(before), scopeTokens(after));
   for (const token of scopes.added) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.WIDENED_SCOPE, `added:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.WIDENED_SCOPE, `added:${token}`, {
+      category: 'seat scope',
+      proposedValue: token,
+      proposedExcerpt: excerptFor(after, token),
+      explanation: 'The rewritten copy states a seat scope the original copy never named.',
+    }));
   }
   for (const token of scopes.dropped) {
-    violations.push(violation(ADI_CONSERVATION_REJECTION.WIDENED_SCOPE, `dropped:${token}`));
+    violations.push(violation(ADI_CONSERVATION_REJECTION.WIDENED_SCOPE, `dropped:${token}`, {
+      category: 'seat scope',
+      originalValue: token,
+      originalExcerpt: excerptFor(before, token),
+      explanation: 'A seat scope the original copy named is no longer stated in the rewritten copy.',
+    }));
   }
 
   // ── A material limitation is never removed ──────────────────────────────
   const limitationsBefore = matchCount(before, LIMITATION);
   const limitationsAfter = matchCount(after, LIMITATION);
   if (limitationsAfter < limitationsBefore) {
+    const gone = difference(limitationWords(before), limitationWords(after)).dropped;
     violations.push(violation(
       ADI_CONSERVATION_REJECTION.REMOVED_LIMITATION,
       `${limitationsBefore}->${limitationsAfter}`,
+      {
+        category: 'limitation',
+        originalValue: gone.length > 0 ? gone.join(', ') : limitationsBefore,
+        proposedValue: limitationsAfter,
+        originalExcerpt: gone.map((word) => excerptFor(before, word)).filter(Boolean)[0] || null,
+        explanation: 'A limitation, caveat or assumption the original copy stated is not in the rewritten copy.',
+      },
     ));
   }
 
@@ -235,15 +343,26 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
   const reasonsBefore = rationaleWords(before);
   for (const word of rationaleWords(after)) {
     if (!reasonsBefore.has(word)) {
-      violations.push(violation(ADI_CONSERVATION_REJECTION.INVENTED_REASON, `added:${word}`));
+      violations.push(violation(ADI_CONSERVATION_REJECTION.INVENTED_REASON, `added:${word}`, {
+        category: 'reason',
+        proposedValue: word,
+        proposedExcerpt: excerptFor(after, word),
+        explanation: 'The rewritten copy gives a reason, with a connector the original copy never used.',
+      }));
     }
   }
 
   // ── A claim the original never made is never added ──────────────────────
   const claimsBefore = claimTypes(before);
-  for (const claim of claimTypes(after)) {
+  const claimsAfter = claimTypeSentences(after);
+  for (const claim of claimsAfter.keys()) {
     if (!claimsBefore.has(claim)) {
-      violations.push(violation(ADI_CONSERVATION_REJECTION.NEW_CLAIM, `added:${claim}`));
+      violations.push(violation(ADI_CONSERVATION_REJECTION.NEW_CLAIM, `added:${claim}`, {
+        category: 'claim',
+        proposedValue: claim,
+        proposedExcerpt: claimsAfter.get(claim) || null,
+        explanation: `The rewritten copy makes ${claim}, which the original copy never made.`,
+      }));
     }
   }
 

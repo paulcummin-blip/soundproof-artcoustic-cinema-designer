@@ -137,7 +137,16 @@ export default async function (req) {
     // plainly, and nothing is written.
     if (!outcome.ok) {
       return Response.json(
-        { error: outcome.block.error, reason: outcome.block.reason, details: outcome.block.detail || null },
+        {
+          error: outcome.block.error,
+          reason: outcome.block.reason,
+          details: outcome.block.detail || null,
+          // A block writes nothing either, so its diagnostic is returned the same
+          // way — and to a master admin alone.
+          diagnostics: accessContext.isMasterAdmin === true
+            ? (outcome.block.diagnostics || null)
+            : null,
+        },
         { status: outcome.block.status },
       );
     }
@@ -152,11 +161,18 @@ export default async function (req) {
       + `applied=${applied} outcome=${outcome.outcome || 'none'} by=${user.email || user.id}`,
     );
 
+    const message = applied
+      ? ADI_IMPROVED_MESSAGE
+      : (keptOriginal
+        ? refusalMessage(outcome)
+        : improvedSelectionOnly ? null : messageFor(outcome.outcome));
+
     return Response.json({
       ok: true,
       applied,
-      // The designer's own wording was refused: the copy stands, and this is the
-      // one line they are shown about it.
+      // The outcome stated in the response's own words, so a caller reads it rather
+      // than inferring it from ok and applied.
+      accepted: applied,
       surface,
       action: outcome.action,
       mode: outcome.mode,
@@ -168,15 +184,25 @@ export default async function (req) {
       improved_text: outcome.improved_text || null,
       previous_text: outcome.previous_text || null,
       can_undo: outcome.can_undo === true,
-      message: applied
-        ? ADI_IMPROVED_MESSAGE
-        : (keptOriginal
-          ? refusalMessage(outcome)
-          : improvedSelectionOnly ? null : messageFor(outcome.outcome)),
-      // The reason the wording was kept, for a MASTER ADMIN alone: an ordinary
-      // designer is given the plain line above and no rule, code or claim ID.
+      message,
+      // The same line, under the name a caller reads the refusal with.
+      userMessage: message,
+      // ── DIAGNOSIS, FOR A MASTER ADMIN ALONE ──
+      // A refused rewrite is a ZERO-WRITE outcome: the copy stands, and nothing
+      // about the refusal is stored on the section, the snapshot or anywhere else in
+      // the project. Its evidence therefore exists only here, in the response to the
+      // button that asked for it — the copy as it stood, the copy that was refused,
+      // the stage that refused it and every violation it was refused for.
+      //
+      // An ordinary designer is given the plain line above and nothing else: no
+      // rule, no code, no extracted value and no candidate copy ever reaches a
+      // dealer's browser.
       diagnostics: accessContext.isMasterAdmin === true
-        ? { outcome: outcome.outcome || null, reason: outcome.reason || null }
+        ? {
+          outcome: outcome.outcome || null,
+          reason: outcome.reason || null,
+          ...(outcome.diagnostics || {}),
+        }
         : null,
     });
   } catch (error) {

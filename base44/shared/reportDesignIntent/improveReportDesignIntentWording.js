@@ -44,6 +44,7 @@ import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js
 import { buildAdiEditorialPrompt } from '../adiEditorial/adiEditorialPrompt.js';
 import { ADI_WORDING_OUTCOME, runAdiWordingPass } from '../adiEditorial/adiWordingPass.js';
 import { checkSelectionSpliceConservation, checkWordingConservation } from '../adiEditorial/adiWordingConservation.js';
+import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from '../adiEditorial/adiRejectionDiagnostics.js';
 
 /** The action the caller asks for. */
 export const ADI_INTENT_ACTION = Object.freeze({
@@ -67,8 +68,8 @@ export const ADI_INTENT_BLOCK = Object.freeze({
   SPLICE_NOT_CONSERVED: 'selection_not_conserved',
 });
 
-function blocked(code, status, error, reason = null) {
-  return { ok: false, block: { code, status, error, reason } };
+function blocked(code, status, error, reason = null, diagnostics = null) {
+  return { ok: false, block: { code, status, error, reason, diagnostics } };
 }
 
 /** A name for the record of who improved the wording. */
@@ -132,7 +133,7 @@ function carriedIdentity(saved) {
 }
 
 /** One uniform result, whatever the pass ended in. */
-function result({ applied, action, outcome = null, mode, saved = null, improvedText = null, previousText = null, reason = null }) {
+function result({ applied, action, outcome = null, mode, saved = null, improvedText = null, previousText = null, reason = null, diagnostics = null }) {
   return {
     ok: true,
     applied: Boolean(applied),
@@ -147,6 +148,9 @@ function result({ applied, action, outcome = null, mode, saved = null, improvedT
     // replaced wording is still held behind it.
     can_undo: action === ADI_INTENT_ACTION.UNDO ? false : Boolean(enabledUndo(saved)),
     reason,
+    // The refusal read back in full, for the response alone. It is never written to
+    // the snapshot — a refusal is a zero-write outcome.
+    diagnostics,
   };
 }
 
@@ -322,20 +326,50 @@ export async function improveReportDesignIntentWording({
         409,
         'The copy outside the highlighted text changed, so nothing was saved.',
         conserved.violations?.[0]?.detail || null,
+        buildAdiRejectionDiagnostics({
+          originalText: original,
+          proposedText: bodyText,
+          stage: ADI_REJECTION_STAGE.SELECTION_CONSERVATION,
+          violations: conserved.violations,
+        }),
       );
     }
     // The replacement itself is held to the same two gates as a whole-section
     // rewrite: the meaning it may carry, and the writer's own rules.
     const whole = checkWordingConservation({ original, improved: bodyText });
     const checked = revalidate(improvedSelection);
-    if (!whole.ok || checked.ok !== true) {
+    // The same two gates, each stating its own refusal, in the same order as
+    // before: the meaning gate first, then the writer's own rules.
+    if (!whole.ok) {
       return result({
         applied: false,
         action,
         mode,
         outcome: ADI_WORDING_OUTCOME.REJECTED,
         saved,
-        reason: whole.violations?.[0]?.code || checked.violations?.[0]?.code || null,
+        reason: whole.violations?.[0]?.code || null,
+        diagnostics: buildAdiRejectionDiagnostics({
+          originalText: original,
+          proposedText: bodyText,
+          stage: ADI_REJECTION_STAGE.MEANING_CONSERVATION,
+          violations: whole.violations,
+        }),
+      });
+    }
+    if (checked.ok !== true) {
+      return result({
+        applied: false,
+        action,
+        mode,
+        outcome: ADI_WORDING_OUTCOME.REJECTED,
+        saved,
+        reason: checked.violations?.[0]?.code || null,
+        diagnostics: buildAdiRejectionDiagnostics({
+          originalText: selection,
+          proposedText: improvedSelection,
+          stage: ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
+          violations: checked.violations,
+        }),
       });
     }
     const written = await saveImproved({ text: bodyText, previousText: original });
@@ -380,6 +414,9 @@ export async function improveReportDesignIntentWording({
     original: mode === ADI_INTENT_MODE.SELECTION ? selection : original,
     mode,
     validate: revalidate,
+    // The writer's own validator is what refuses the copy here, and the refusal is
+    // read as that stage. Naming the stage decides nothing.
+    validateStage: ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
   });
 
   if (pass.outcome !== ADI_WORDING_OUTCOME.IMPROVED) {
@@ -391,6 +428,9 @@ export async function improveReportDesignIntentWording({
       saved,
       previousText: mode === ADI_INTENT_MODE.SECTION ? original : null,
       reason: pass.violations?.[0]?.code || null,
+      // Which stage refused it, the copy that was refused and every violation: the
+      // refusal's own record, carried in the response and written nowhere.
+      diagnostics: pass.diagnostics || null,
     });
   }
 

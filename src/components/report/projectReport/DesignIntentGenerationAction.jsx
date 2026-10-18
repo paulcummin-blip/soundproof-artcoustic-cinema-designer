@@ -26,6 +26,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import DesignIntentDiagnosticsPanel from '@/components/report/projectReport/DesignIntentDiagnosticsPanel';
 import { saveDesignIntentDiagnostics } from '@/components/report/projectReport/designIntentDiagnosticStore';
+import { saveAdiEditorialRejection } from '@/components/adi/adiEditorialRejectionStore';
 import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
 
 const LABEL_COLOR = '#625143';
@@ -78,6 +79,10 @@ export default function DesignIntentGenerationAction({
         version_id: versionId,
       });
       const data = response?.data || {};
+      // A refused rewrite is written nowhere, so this response is the only copy of
+      // what ADI proposed and why it was kept back. Held for the session for a
+      // master admin to read; a dealer's response carries no diagnostic at all.
+      saveAdiEditorialRejection(data.diagnostics || null);
       if (data.ok !== true) {
         setAdi((previous) => ({
           ...previous,

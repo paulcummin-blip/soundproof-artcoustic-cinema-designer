@@ -28,6 +28,7 @@ import ApiBadge from "@/components/ui/ApiBadge";
 import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BuildDiagnosticPanel from "@/components/dev/BuildDiagnosticPanel";
+import AdiEditorialRejectionDiagnostics from "@/components/adi/AdiEditorialRejectionDiagnostics";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
@@ -547,6 +548,10 @@ export default function Layout({ children, currentPageName }) {
           </main>
         </div>
         <BuildDiagnosticPanel />
+        {/* The refused ADI editorial rewrite, for a master admin or in Engineering
+            Mode: a refusal writes nothing, so this is the only place its proposed
+            copy, its stage and its violations can be read. */}
+        <AdiEditorialRejectionDiagnostics />
         <DealerIdentityDiagnostic />
         </PartnerPortalIdentityProvider>
         </AppStateProvider>

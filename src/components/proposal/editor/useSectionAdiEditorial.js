@@ -25,6 +25,7 @@
 
 import { useCallback, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { saveAdiEditorialRejection } from '@/components/adi/adiEditorialRejectionStore';
 
 export default function useSectionAdiEditorial({
   proposal = null,
@@ -47,6 +48,18 @@ export default function useSectionAdiEditorial({
     setNotice({ sectionId, message: message || null, busy });
   }, []);
 
+  /**
+   * Hold whatever refusal this response carried. A refusal writes nothing, so the
+   * response is the only copy of what was proposed and why it was refused; it is
+   * held for the session for a master admin to read. A dealer's response carries no
+   * diagnostic, so nothing is held for them and nothing is shown.
+   */
+  const holdDiagnostics = useCallback((data, error) => {
+    saveAdiEditorialRejection(
+      data?.diagnostics || error?.response?.data?.diagnostics || null,
+    );
+  }, []);
+
   /** The shared half: one action, one section, one line about how it ended. */
   const run = useCallback(async ({ sectionId, payload, fallback }) => {
     setAdiBusySectionIdSafe(setBusySectionId, sectionId);
@@ -54,9 +67,11 @@ export default function useSectionAdiEditorial({
     try {
       const response = await invokeAdiEditorial(payload);
       const data = response?.data || {};
+      holdDiagnostics(data);
       report(sectionId, data.ok === true ? data.message : (data.error || fallback));
       return data;
     } catch (error) {
+      holdDiagnostics(null, error);
       report(
         sectionId,
         error?.response?.data?.error || error?.response?.data?.message || fallback,
@@ -65,7 +80,7 @@ export default function useSectionAdiEditorial({
     } finally {
       setBusySectionId(null);
     }
-  }, [invokeAdiEditorial, report]);
+  }, [holdDiagnostics, invokeAdiEditorial, report]);
 
   /**
    * The whole section: the copy is improved and saved, and the copy it replaced is
@@ -109,16 +124,18 @@ export default function useSectionAdiEditorial({
         selection_text: selectionText,
       });
       const data = response?.data || {};
+      holdDiagnostics(data);
       report(activeSection.id, data.ok === true ? data.message : data.error);
       return data;
     } catch (error) {
+      holdDiagnostics(null, error);
       report(
         activeSection.id,
         error?.response?.data?.error || 'ADI could not be reached, so the wording is unchanged.',
       );
       return null;
     }
-  }, [activeSection, archived, invokeAdiEditorial, report]);
+  }, [activeSection, archived, holdDiagnostics, invokeAdiEditorial, report]);
 
   /**
    * The second half: the editor's own copy, with the improved highlighted text in
@@ -137,6 +154,7 @@ export default function useSectionAdiEditorial({
         body_text: body,
       });
       const data = response?.data || {};
+      holdDiagnostics(data);
       report(
         activeSection.id,
         data.ok === true
@@ -146,13 +164,14 @@ export default function useSectionAdiEditorial({
       if (data.ok === true && data.applied === true && onApplied) await onApplied();
       return data;
     } catch (error) {
+      holdDiagnostics(null, error);
       report(
         activeSection.id,
         error?.response?.data?.error || 'The highlighted wording was not saved, so the copy is unchanged.',
       );
       return null;
     }
-  }, [activeSection, archived, invokeAdiEditorial, onApplied, report]);
+  }, [activeSection, archived, holdDiagnostics, invokeAdiEditorial, onApplied, report]);
 
   return {
     notice,

@@ -23,6 +23,7 @@
 
 import { writerModelFor } from '../proposalWriter/writerProvider.js';
 import { checkWordingConservation } from './adiWordingConservation.js';
+import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from './adiRejectionDiagnostics.js';
 import { looksLikeHtml } from './adiEditorialStandard.js';
 
 /** What became of one editorial pass. */
@@ -89,6 +90,9 @@ export function cleanAdiCopy(raw, { html = false } = {}) {
  *   proposed copy and returning `{ ok, violations }`. The report narrative passes
  *   the writer's output validator here; a proposal section passes its narrative
  *   grounding. A validator that reports anything refuses the rewrite.
+ * @param {string} [input.validateStage] — the stage a refusal by that validator is
+ *   read under, for the diagnostic alone. It names the validator; it never decides
+ *   anything.
  * @returns {Promise<Object>} the outcome, the proposed copy where one is accepted,
  *   and the reasons where one is refused
  */
@@ -99,6 +103,7 @@ export async function runAdiWordingPass({
   original = '',
   mode = 'section',
   validate = null,
+  validateStage = ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
 } = {}) {
   const asResult = (outcome, extra = {}) => ({
     outcome,
@@ -165,6 +170,15 @@ export async function runAdiWordingPass({
     return asResult(ADI_WORDING_OUTCOME.REJECTED, {
       text: null,
       violations: conservation.violations,
+      // THE REFUSAL, READABLE: the copy that was refused, the stage that refused
+      // it, and every fact each violation was read from. Returned in the response
+      // and stored nowhere — a refusal writes nothing.
+      diagnostics: buildAdiRejectionDiagnostics({
+        originalText: original,
+        proposedText: proposed,
+        stage: ADI_REJECTION_STAGE.MEANING_CONSERVATION,
+        violations: conservation.violations,
+      }),
       provider,
     });
   }
@@ -181,6 +195,14 @@ export async function runAdiWordingPass({
       return asResult(ADI_WORDING_OUTCOME.REJECTED, {
         text: null,
         violations: Array.isArray(checked?.violations) ? checked.violations : [],
+        // The surface's own validator refused the copy: the stage, and the
+        // validator's own violations, exactly as it reported them.
+        diagnostics: buildAdiRejectionDiagnostics({
+          originalText: original,
+          proposedText: proposed,
+          stage: validateStage,
+          violations: Array.isArray(checked?.violations) ? checked.violations : [],
+        }),
         provider,
       });
     }

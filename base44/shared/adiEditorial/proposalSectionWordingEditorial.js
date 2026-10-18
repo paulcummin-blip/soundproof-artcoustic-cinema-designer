@@ -41,6 +41,7 @@ import { groundProductMentions } from '../proposalProductGrounding.js';
 import { buildAdiEditorialPrompt } from '../adiEditorial/adiEditorialPrompt.js';
 import { ADI_WORDING_OUTCOME, runAdiWordingPass } from '../adiEditorial/adiWordingPass.js';
 import { checkSelectionSpliceConservation } from '../adiEditorial/adiWordingConservation.js';
+import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from '../adiEditorial/adiRejectionDiagnostics.js';
 
 /** The action the caller asks for. */
 export const ADI_SECTION_ACTION = Object.freeze({
@@ -66,8 +67,8 @@ export const ADI_SECTION_BLOCK = Object.freeze({
   SPLICE_NOT_CONSERVED: 'selection_not_conserved',
 });
 
-function blocked(code, status, error, reason = null) {
-  return { ok: false, block: { code, status, error, reason } };
+function blocked(code, status, error, reason = null, diagnostics = null) {
+  return { ok: false, block: { code, status, error, reason, diagnostics } };
 }
 
 /** The words a reader sees, whichever form the body is stored in. */
@@ -92,16 +93,30 @@ function withoutMarker(metadata) {
   return rest;
 }
 
-/** Is this copy fit to be saved: every product it names is one this version specifies. */
-function groundingViolation(text, grounding) {
+/**
+ * Is this copy fit to be saved: every product it names is one this version
+ * specifies. The refusal carries the product it names and the copy it was read
+ * from, so it can be read afterwards. The code is the refusal; the rest is detail.
+ */
+function groundingViolationEntry(text, grounding) {
   if (!grounding) return null;
   const checked = groundProductMentions(text, grounding);
   if (checked?.grounded === true) return null;
-  return (checked?.unresolved || [])[0]?.name ? 'ungrounded_product' : 'ungrounded_product';
+  const first = (checked?.unresolved || [])[0] || null;
+  return {
+    code: 'ungrounded_product',
+    rule: 'ungrounded_product',
+    category: 'product grounding',
+    originalValue: null,
+    proposedValue: first?.name || null,
+    originalExcerpt: null,
+    proposedExcerpt: first?.segment || null,
+    explanation: 'The rewritten copy names equipment this design version does not specify.',
+  };
 }
 
 /** One uniform result, whatever the pass ended in. */
-function result({ applied, action, outcome = null, mode, improvedText = null, previousText = null, text = null, canUndo = false, reason = null }) {
+function result({ applied, action, outcome = null, mode, improvedText = null, previousText = null, text = null, canUndo = false, reason = null, diagnostics = null }) {
   return {
     ok: true,
     applied: Boolean(applied),
@@ -117,6 +132,10 @@ function result({ applied, action, outcome = null, mode, improvedText = null, pr
     text,
     can_undo: Boolean(canUndo),
     reason,
+    // The refusal read back in full, for the response alone: the copy as it stood,
+    // the copy that was refused, the stage that refused it and every violation. It
+    // is never written to the record — a refusal is a zero-write outcome.
+    diagnostics,
   };
 }
 
@@ -232,11 +251,29 @@ export async function improveProposalSectionWording({
         409,
         'The copy outside the highlighted text changed, so nothing was saved.',
         conserved.violations?.[0]?.detail || null,
+        buildAdiRejectionDiagnostics({
+          originalText: original,
+          proposedText: bodyHtml,
+          stage: ADI_REJECTION_STAGE.SELECTION_CONSERVATION,
+          violations: conserved.violations,
+        }),
       );
     }
-    const ungrounded = groundingViolation(bodyHtml, grounding);
+    const ungrounded = groundingViolationEntry(bodyHtml, grounding);
     if (ungrounded) {
-      return result({ applied: false, action, mode, outcome: ADI_WORDING_OUTCOME.REJECTED, reason: ungrounded });
+      return result({
+        applied: false,
+        action,
+        mode,
+        outcome: ADI_WORDING_OUTCOME.REJECTED,
+        reason: ungrounded.code,
+        diagnostics: buildAdiRejectionDiagnostics({
+          originalText: original,
+          proposedText: bodyHtml,
+          stage: ADI_REJECTION_STAGE.PRODUCT_GROUNDING,
+          violations: [ungrounded],
+        }),
+      });
     }
     const write = await save({
       entities, sectionId, section, body: bodyHtml, now, user, mode,
@@ -273,10 +310,15 @@ export async function improveProposalSectionWording({
     mode,
     validate: grounding
       ? (proposed) => {
-        const violation = groundingViolation(proposed, grounding);
-        return { ok: violation === null, violations: violation ? [{ code: violation }] : [] };
+        const entry = groundingViolationEntry(proposed, grounding);
+        return { ok: entry === null, violations: entry ? [entry] : [] };
       }
       : null,
+    // Which stage a refusal by that validator is read under, for the diagnostic
+    // alone. It names the validator; it never decides anything.
+    validateStage: grounding
+      ? ADI_REJECTION_STAGE.PRODUCT_GROUNDING
+      : ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
   });
 
   if (pass.outcome !== ADI_WORDING_OUTCOME.IMPROVED) {
@@ -288,6 +330,9 @@ export async function improveProposalSectionWording({
       previousText: mode === ADI_SECTION_MODE.SECTION ? original : null,
       canUndo: Boolean(marker),
       reason: pass.violations?.[0]?.code || null,
+      // Which stage refused it, the copy that was refused and every violation: the
+      // refusal's own record, carried in the response and written nowhere.
+      diagnostics: pass.diagnostics || null,
     });
   }
 
