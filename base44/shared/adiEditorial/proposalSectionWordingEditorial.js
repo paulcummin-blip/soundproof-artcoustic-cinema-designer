@@ -1,0 +1,343 @@
+/**
+ * proposalSectionWordingEditorial.js (shared)
+ * ------------------------------------------
+ * "IMPROVE WORDING WITH ADI" for one generated narrative section of a report.
+ *
+ * The section's copy was written by the engineering writer from the version's own
+ * frozen system authority. This is the separate editorial job: ADI reads that copy
+ * and improves how it reads. The writer is not asked again, no evidence is
+ * re-derived, and no engineering value is touched.
+ *
+ * TWO MODES, one authority:
+ *
+ *   WHOLE SECTION  the whole body is improved and written back, with the copy it
+ *                  replaced kept behind it.
+ *   SELECTION      the designer highlights a sentence or a paragraph. The
+ *                  highlighted text is improved on its own, WITHOUT a write, and
+ *                  the editor splices it back in; the same action is then called
+ *                  again with the spliced body, which is checked mechanically to
+ *                  prove that nothing outside the selection changed, and only then
+ *                  is it saved. Everything outside the selection is byte-for-byte
+ *                  unchanged.
+ *
+ * WHAT IS WRITTEN, and what it means:
+ *
+ *   - the body is replaced, and the section's GENERATED stamp moves with it: the
+ *     wording was written for the designer by ADI, not typed by them, so the
+ *     manual-edit flag is not raised;
+ *   - the approval of this section's wording stops counting the moment the body or
+ *     either stamp changes, so an improved section is awaiting approval again by
+ *     construction rather than through a second reset path;
+ *   - the copy that was replaced — its body and BOTH its timestamps — is kept in
+ *     the section's own metadata, so UNDO puts back exactly what was there and,
+ *     with it, the approval identity that belonged to that exact wording.
+ *
+ * Pure apart from the injected calls: no React, no SDK, no runtime-specific APIs.
+ */
+
+import { approvalPlainText } from '../proposalApproval/sectionApprovalAuthority.js';
+import { publishedSectionFingerprint } from '../proposalApproval/sectionApprovalAuthority.js';
+import { groundProductMentions } from '../proposalProductGrounding.js';
+import { buildAdiEditorialPrompt } from '../adiEditorial/adiEditorialPrompt.js';
+import { ADI_WORDING_OUTCOME, runAdiWordingPass } from '../adiEditorial/adiWordingPass.js';
+import { checkSelectionSpliceConservation } from '../adiEditorial/adiWordingConservation.js';
+
+/** The action the caller asks for. */
+export const ADI_SECTION_ACTION = Object.freeze({
+  IMPROVE: 'improve',
+  UNDO: 'undo',
+});
+
+/** What the caller is improving. */
+export const ADI_SECTION_MODE = Object.freeze({
+  SECTION: 'section',
+  SELECTION: 'selection',
+});
+
+/** Why the editorial pass could not even be set up. */
+export const ADI_SECTION_BLOCK = Object.freeze({
+  INVALID_REQUEST: 'invalid_request',
+  ACTION_UNKNOWN: 'unknown_action',
+  PROPOSAL_NOT_FOUND: 'proposal_not_found',
+  SECTION_NOT_FOUND: 'section_not_found',
+  NO_COPY: 'section_has_no_copy',
+  NOTHING_TO_UNDO: 'nothing_to_undo',
+  NOTHING_SELECTED: 'nothing_selected',
+  SPLICE_NOT_CONSERVED: 'selection_not_conserved',
+});
+
+function blocked(code, status, error, reason = null) {
+  return { ok: false, block: { code, status, error, reason } };
+}
+
+/** The words a reader sees, whichever form the body is stored in. */
+function readable(value) {
+  return approvalPlainText(value);
+}
+
+/** A name for the record of who improved the wording. */
+function byWhom(user) {
+  return user?.full_name || user?.email || null;
+}
+
+/** The section's metadata without its editorial marker, so an undo leaves no trace. */
+function withoutMarker(metadata) {
+  const next = { ...(metadata && typeof metadata === 'object' ? metadata : {}) };
+  delete next.adi_editorial;
+  return next;
+}
+
+/** Is this copy fit to be saved: every product it names is one this version specifies. */
+function groundingViolation(text, grounding) {
+  if (!grounding) return null;
+  const checked = groundProductMentions(text, grounding);
+  if (checked?.grounded === true) return null;
+  return (checked?.unresolved || [])[0]?.name ? 'ungrounded_product' : 'ungrounded_product';
+}
+
+/** One uniform result, whatever the pass ended in. */
+function result({ applied, action, outcome = null, mode, improvedText = null, previousText = null, text = null, canUndo = false, reason = null }) {
+  return {
+    ok: true,
+    applied: Boolean(applied),
+    action,
+    mode,
+    outcome,
+    kept_original: outcome !== null && outcome !== ADI_WORDING_OUTCOME.IMPROVED,
+    improved_text: improvedText,
+    previous_text: previousText,
+    text,
+    can_undo: Boolean(canUndo),
+    reason,
+  };
+}
+
+/**
+ * One editorial action on one section.
+ *
+ * @param {Object} input
+ * @param {Object} input.entities — the user-scoped entity client
+ * @param {Function} input.invokeLLM — the server-side provider call
+ * @param {string} input.proposalId
+ * @param {string} input.sectionId
+ * @param {string} [input.action] — improve (default) or undo
+ * @param {string} [input.mode] — section (default) or selection
+ * @param {string} [input.selectionText] — exactly what the designer highlighted
+ * @param {string} [input.improvedSelection] — what ADI returned for it, on the half
+ *   of a selection edit that saves
+ * @param {string} [input.bodyHtml] — the body after the editor spliced the improved
+ *   selection in. Present only on the saving half of a selection edit.
+ * @param {Object} [input.grounding] — the version's product grounding, from
+ *   buildProductGrounding: the improved copy may name only the products this design
+ *   version specifies.
+ * @param {Object} [input.user]
+ * @param {string} [input.now]
+ * @returns {Promise<Object>} the outcome, or `{ ok: false, block }`
+ */
+export async function improveProposalSectionWording({
+  entities,
+  invokeLLM,
+  proposalId = null,
+  sectionId = null,
+  action = ADI_SECTION_ACTION.IMPROVE,
+  mode = ADI_SECTION_MODE.SECTION,
+  selectionText = '',
+  improvedSelection = null,
+  bodyHtml = null,
+  grounding = null,
+  user = null,
+  now = null,
+} = {}) {
+  if (!proposalId || !sectionId) {
+    return blocked(ADI_SECTION_BLOCK.INVALID_REQUEST, 400, 'proposal_id and section_id are required.');
+  }
+  if (action !== ADI_SECTION_ACTION.IMPROVE && action !== ADI_SECTION_ACTION.UNDO) {
+    return blocked(ADI_SECTION_BLOCK.ACTION_UNKNOWN, 400, 'That editorial action is not available.');
+  }
+
+  const proposals = await entities.Proposal.filter({ id: proposalId }).catch(() => []);
+  const proposal = proposals?.[0] || null;
+  if (!proposal?.id) return blocked(ADI_SECTION_BLOCK.PROPOSAL_NOT_FOUND, 404, 'That report was not found.');
+
+  const sections = await entities.ProposalSection.filter({ id: sectionId }).catch(() => []);
+  const section = sections?.[0] || null;
+  if (!section?.id || String(section.proposal_id || '') !== String(proposalId)) {
+    return blocked(ADI_SECTION_BLOCK.SECTION_NOT_FOUND, 404, 'That section is not part of this report.');
+  }
+
+  const marker = section.metadata?.adi_editorial || null;
+
+  // ── UNDO: the exact copy that was replaced, put back exactly as it was ──
+  // The body and BOTH timestamps are restored, so the section's approval
+  // fingerprint describes the wording that was approved again and the approval
+  // that belonged to it counts once more.
+  if (action === ADI_SECTION_ACTION.UNDO) {
+    if (!marker || typeof marker.previous_body !== 'string') {
+      return blocked(ADI_SECTION_BLOCK.NOTHING_TO_UNDO, 409, 'There is no earlier wording to restore for this section.');
+    }
+    const replacedText = readable(section.body);
+    await entities.ProposalSection.update(sectionId, {
+      body: marker.previous_body,
+      last_user_edited_at: marker.previous_last_user_edited_at ?? null,
+      last_gpt_generated_at: marker.previous_last_gpt_generated_at ?? null,
+      metadata: withoutMarker(section.metadata),
+    });
+    return result({
+      applied: true,
+      action: 'undo',
+      mode: marker.mode || ADI_SECTION_MODE.SECTION,
+      outcome: ADI_WORDING_OUTCOME.UNCHANGED,
+      previousText: replacedText,
+      text: readable(marker.previous_body),
+      canUndo: false,
+    });
+  }
+
+  // ── IMPROVE ──
+  const originalBody = typeof section.body === 'string' ? section.body : '';
+  const original = readable(originalBody);
+  if (original.length === 0) {
+    return blocked(ADI_SECTION_BLOCK.NO_COPY, 409, 'This section has no copy to improve yet.');
+  }
+
+  const selection = String(selectionText || '');
+  const saving = mode === ADI_SECTION_MODE.SELECTION && typeof bodyHtml === 'string';
+
+  // ── A SELECTION EDIT SAVES ONLY WHAT IT CAN PROVE ──
+  // The improved highlighted text is put back by the editor, and the copy it was
+  // spliced into is read back here: the stored body with exactly that one
+  // replacement has to read as the body on screen. Anything else is refused before
+  // it comes near the record, and the stored body is left untouched.
+  if (saving) {
+    if (readable(selection).length === 0 || readable(improvedSelection).length === 0) {
+      return blocked(ADI_SECTION_BLOCK.NOTHING_SELECTED, 400, 'The highlighted text was not supplied.');
+    }
+    const conserved = checkSelectionSpliceConservation({
+      originalBody,
+      improvedBody: bodyHtml,
+      selectionText: selection,
+      improvedSelection,
+    });
+    if (!conserved.ok) {
+      return blocked(
+        ADI_SECTION_BLOCK.SPLICE_NOT_CONSERVED,
+        409,
+        'The copy outside the highlighted text changed, so nothing was saved.',
+        conserved.violations?.[0]?.detail || null,
+      );
+    }
+    const ungrounded = groundingViolation(bodyHtml, grounding);
+    if (ungrounded) {
+      return result({ applied: false, action, mode, outcome: ADI_WORDING_OUTCOME.REJECTED, reason: ungrounded });
+    }
+    const write = await save({
+      entities, sectionId, section, body: bodyHtml, now, user, mode,
+      previousBody: originalBody, previousText: original, improvedText: readable(bodyHtml),
+    });
+    return result({ ...write, action, mode });
+  }
+
+  if (mode === ADI_SECTION_MODE.SELECTION && readable(selection).length === 0) {
+    return blocked(ADI_SECTION_BLOCK.NOTHING_SELECTED, 400, 'Highlight the text to improve first.');
+  }
+
+  const prompt = buildAdiEditorialPrompt({
+    sectionLabel: section.title || 'this section',
+    mode,
+    currentText: mode === ADI_SECTION_MODE.SELECTION ? original : originalBody,
+    selectionText: selection,
+    evidenceIdentity: {
+      source: 'the version\u2019s frozen system authority',
+      report_or_report_type: proposal.proposal_type || null,
+    },
+    documentIdentity: {
+      document: proposal.title || null,
+    },
+  });
+
+  const pass = await runAdiWordingPass({
+    // NOT flag-gated: this is an editorial action on copy the designer already has,
+    // exactly as the section regeneration actions beside it are.
+    flag: null,
+    invokeLLM,
+    prompt,
+    original: mode === ADI_SECTION_MODE.SELECTION ? selection : originalBody,
+    mode,
+    validate: grounding
+      ? (proposed) => {
+        const violation = groundingViolation(proposed, grounding);
+        return { ok: violation === null, violations: violation ? [{ code: violation }] : [] };
+      }
+      : null,
+  });
+
+  if (pass.outcome !== ADI_WORDING_OUTCOME.IMPROVED) {
+    return result({
+      applied: false,
+      action,
+      mode,
+      outcome: pass.outcome,
+      previousText: mode === ADI_SECTION_MODE.SECTION ? original : null,
+      canUndo: Boolean(marker),
+      reason: pass.violations?.[0]?.code || null,
+    });
+  }
+
+  // ── A HIGHLIGHTED REWRITE IS NOT SAVED UNTIL THE EDITOR HAS PUT IT BACK ──
+  if (mode === ADI_SECTION_MODE.SELECTION) {
+    return result({
+      applied: false,
+      action: 'propose',
+      mode,
+      outcome: pass.outcome,
+      improvedText: pass.text,
+      canUndo: Boolean(marker),
+    });
+  }
+
+  // ── THE ONE WRITE ──
+  const write = await save({
+    entities, sectionId, section, body: pass.text, now, user, mode,
+    previousBody: originalBody, previousText: original, improvedText: readable(pass.text),
+  });
+  return result({ ...write, action, mode });
+}
+
+/**
+ * The single write: the improved body, the moved generated stamp, and the copy
+ * that was replaced held in the section's own metadata.
+ */
+async function save({ entities, sectionId, section, body, now, user, mode, previousBody, previousText, improvedText }) {
+  await entities.ProposalSection.update(sectionId, {
+    body,
+    // A GENERATION, NOT A HAND EDIT: the wording was written for the designer by
+    // ADI, which is what returns the section to Needs review — the same stamp a
+    // regeneration moves.
+    last_gpt_generated_at: now,
+    metadata: {
+      ...(section.metadata && typeof section.metadata === 'object' ? section.metadata : {}),
+      adi_editorial: {
+        previous_body: previousBody,
+        previous_last_user_edited_at: section.last_user_edited_at ?? null,
+        previous_last_gpt_generated_at: section.last_gpt_generated_at ?? null,
+        improved_at: now,
+        improved_by: byWhom(user),
+        mode,
+        // The wording revision that was replaced, and the one saved in its place.
+        source_revision: publishedSectionFingerprint(previousText),
+        improved_revision: publishedSectionFingerprint(improvedText),
+      },
+    },
+  });
+
+  return {
+    applied: true,
+    outcome: ADI_WORDING_OUTCOME.IMPROVED,
+    text: improvedText,
+    previous_text: previousText,
+    improved_text: improvedText,
+    canUndo: true,
+  };
+}
+
+export default improveProposalSectionWording;

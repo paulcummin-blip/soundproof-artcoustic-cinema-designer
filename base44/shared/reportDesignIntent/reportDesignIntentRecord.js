@@ -199,6 +199,23 @@ export function buildDesignIntentRecord({
     duration_ms: Number.isFinite(providerIdentity.durationMs) ? providerIdentity.durationMs : null,
     generated_at: asText(generatedAt),
     generated_by: asText(generatedBy),
+    // ── THE EDITORIAL ACT, where ADI improved this wording ──
+    // The words were written when they were written and improved when they were
+    // improved: the generation identity above is left exactly as it was, and this
+    // states the editorial pass beside it — when, by whom, in which mode, and the
+    // wording revision it replaced and the one it saved. Absent, not null, unless
+    // there was one, so a record written before this existed is unchanged.
+    ...(editorial
+      ? {
+        editorial: {
+          improved_at: asText(editorial.improvedAt),
+          improved_by: asText(editorial.improvedBy),
+          mode: asText(editorial.mode),
+          source_revision: asText(editorial.sourceRevision),
+          improved_revision: asText(editorial.improvedRevision),
+        },
+      }
+      : {}),
     rejection: rejection
       ? { code: rejection.code ?? null, detail: rejection.detail ?? null }
       : null,

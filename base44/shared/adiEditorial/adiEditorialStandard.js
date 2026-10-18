@@ -56,6 +56,10 @@ export const ADI_NOTHING_TO_IMPROVE_MESSAGE =
 /** What the workflow says when the writer is not switched on for this login. */
 export const ADI_UNAVAILABLE_MESSAGE = 'ADI is not available for this login.';
 
+/** What the workflow says when ADI could not be reached at all. */
+export const ADI_PROVIDER_UNAVAILABLE_MESSAGE =
+  'ADI could not be reached, so the wording is unchanged.';
+
 /**
  * THE AUTHORITY BOUNDARY, verbatim, for the prompt and for the audit trail. It is
  * the list of things an editorial pass may never do, and it is the same list the
