@@ -62,9 +62,11 @@ export async function applyProposalRevision({
       // Normal editor saves retain their existing behaviour. A caller that is
       // publishing one generated editorial change supplies the exact section
       // patch instead, so unchanged sections keep their approval timestamps.
-      ...(targetedPatch ? targetedFields : (editId
-        ? { last_user_edited_at: appliedAt }
-        : { last_gpt_generated_at: appliedAt })),
+      ...(sectionPatchByType
+        ? (targetedPatch ? targetedFields : {})
+        : (editId
+          ? { last_user_edited_at: appliedAt }
+          : { last_gpt_generated_at: appliedAt })),
       metadata: publicationRevisionMetadata(baseMetadata, {
         generationId,
         editId,
