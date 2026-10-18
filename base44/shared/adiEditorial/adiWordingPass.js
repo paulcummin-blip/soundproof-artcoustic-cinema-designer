@@ -32,7 +32,7 @@
 import { writerModelFor } from '../proposalWriter/writerProvider.js';
 import { checkWordingConservation } from './adiWordingConservation.js';
 import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from './adiRejectionDiagnostics.js';
-import { looksLikeHtml } from './adiEditorialStandard.js';
+import { checkAdiEditorialQuality, looksLikeHtml } from './adiEditorialStandard.js';
 import { buildAdiCorrectionPrompt } from './adiEditorialPrompt.js';
 
 /** What became of one editorial pass. */
@@ -107,20 +107,34 @@ async function refusalFor({ original, proposed, validate, validateStage }) {
   }
 
   // ── THE SURFACE'S OWN VALIDATOR, run again on the improved wording ──
-  if (typeof validate !== 'function') return null;
-
-  let checked = null;
-  try {
-    checked = await validate(proposed);
-  } catch (error) {
-    checked = { ok: false, violations: [{ code: 'validator_failed', detail: String(error?.message || '') }] };
+  if (typeof validate === 'function') {
+    let checked = null;
+    try {
+      checked = await validate(proposed);
+    } catch (error) {
+      checked = { ok: false, violations: [{ code: 'validator_failed', detail: String(error?.message || '') }] };
+    }
+    if (checked?.ok !== true) {
+      return {
+        stage: validateStage,
+        violations: Array.isArray(checked?.violations) ? checked.violations : [],
+      };
+    }
   }
-  if (checked?.ok === true) return null;
 
-  return {
-    stage: validateStage,
-    violations: Array.isArray(checked?.violations) ? checked.violations : [],
-  };
+  // ── THE FINAL EDITORIAL SMELL TEST ──
+  // A candidate can preserve every engineering fact and still retain wording the
+  // client-copy audit has already identified as filler or unsupported inference.
+  // Name the exact phrase so the existing one-correction path can remove it.
+  const quality = checkAdiEditorialQuality(proposed);
+  if (!quality.ok) {
+    return {
+      stage: ADI_REJECTION_STAGE.EDITORIAL_QUALITY,
+      violations: quality.violations,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -225,14 +239,14 @@ export async function runAdiWordingPass({
     // refusal that asked for it stands.
     const unchanged = checkWordingConservation({ original, improved: proposed }).ok
       && flat(proposed) === flat(original);
-    if (unchanged) {
+    const refused = await refusalFor({ original, proposed, validate, validateStage });
+    if (!refused && unchanged) {
       if (attempts === 1) {
         return asResult(ADI_WORDING_OUTCOME.UNCHANGED, { provider: providerOf(), attempts });
       }
       break;
     }
 
-    const refused = await refusalFor({ original, proposed, validate, validateStage });
     if (!refused) {
       return asResult(ADI_WORDING_OUTCOME.IMPROVED, {
         text: proposed,
