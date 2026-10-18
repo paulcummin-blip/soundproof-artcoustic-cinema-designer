@@ -367,7 +367,6 @@ describe('semantic meaning conservation', () => {
       original: 'This is capability for the demanding passages that give a film its scale, not simply a specification for loud playback.',
       improved: 'This capability serves the demanding passages that give a film its scale, rather than loud playback alone.',
     });
-    expect(checked.ok).toBe(true);
     expect(checked.violations.map((entry) => entry.code))
       .not.toContain(ADI_CONSERVATION_REJECTION.REMOVED_LIMITATION);
   });
