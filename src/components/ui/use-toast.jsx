@@ -2,7 +2,11 @@
 import { useState, useEffect, createContext, useContext } from "react";
 
 const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+// How long AFTER a notification is dismissed it is actually removed from the
+// rendered list. This has to be short: a dismissed notification that is still
+// mounted is still on screen, and still intercepts clicks over whatever it
+// covers. It only needs to outlast the closing animation.
+const TOAST_REMOVE_DELAY = 1000;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -161,4 +165,4 @@ function useToast() {
   };
 }
 
-export { useToast, toast }; 
+export { useToast, toast };

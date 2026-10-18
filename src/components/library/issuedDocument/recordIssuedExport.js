@@ -25,12 +25,18 @@
 
 import React from 'react';
 import { base44 } from '@/api/base44Client';
-import { toast } from '@/components/ui/use-toast';
 import { captureCompositionToPdf, captureStylesMarkup } from '@/components/library/compositionCapture';
 import { notifyIssuedExportStored } from '@/components/library/issuedExportSignal';
-import { PREVIEW_STATUS, assertPdfArtifact } from '@/components/library/pdfArtifactAuthority';
+import { assertPdfArtifact } from '@/components/library/pdfArtifactAuthority';
 import ExportStorageFailureActions from './ExportStorageFailureActions';
+import PreviewIncompleteNotice from './PreviewIncompleteNotice';
 import { ISSUED_DOCUMENT_COMPOSITION, issuedDocumentLabel } from './issuedDocumentTypes';
+import { showLibraryNotice } from './libraryNoticeStore';
+import {
+  STORED_NOTICE_STATE,
+  STORED_NOTICE_STAYS_MS,
+  resolveStoredNotice,
+} from './libraryStoredNoticeAuthority';
 import {
   clearPendingExport,
   holdPendingExport,
@@ -365,17 +371,20 @@ export function recordIssuedExportInBackground({ identity, snapshot }) {
 function announceStored(issued, record) {
   notifyIssuedExportStored(record?.project_id || issued?.projectId);
   const label = `${issuedDocumentLabel(record?.document_type || issued?.documentType)} · ${record?.filename || ''}`;
-  // A document stored without page images is stated as exactly that: the
-  // document is stored, and the page preview is what is missing. The stored file
-  // is openable and downloadable from the Library either way.
-  const noPreview = record?.preview_status === PREVIEW_STATUS.UNAVAILABLE;
-  const somePreviewMissing = record?.preview_status === PREVIEW_STATUS.PARTIAL;
-  const note = noPreview
-    ? ' · stored without page preview'
-    : (somePreviewMissing ? ' · some pages have no preview' : '');
-  toast({
-    title: 'Stored in Project Library',
-    description: `${label}${note}`,
+  // THE DOCUMENT IS STORED EITHER WAY — that is what this notice reports. What
+  // can be missing is its page preview, and a missing preview is stated as
+  // exactly that. It is never presented as a failed document: the PDF opens and
+  // downloads from the Library as it is, so it is toned as informative and left
+  // on screen until the designer dismisses it. A full success, which asks nothing
+  // of anyone, takes itself away.
+  const notice = resolveStoredNotice(record);
+  showLibraryNotice({
+    title: notice.title,
+    description: notice.state === STORED_NOTICE_STATE.PREVIEW_INCOMPLETE
+      ? React.createElement(PreviewIncompleteNotice, { label, summary: notice.previewSentence })
+      : label,
+    className: notice.tone,
+    duration: notice.duration,
   });
 }
 
@@ -437,12 +446,16 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
     // created." — so the designer knows exactly what did and did not land.
     title: issued.storageFailureTitle || STORAGE_FAILURE_MESSAGE,
     reason: exportStorageReason(identified),
-    duration: RETRY_TOAST_MS,
+    // A failure the designer can act on stays until they act on it or dismiss it.
+    duration: STORED_NOTICE_STAYS_MS,
   });
 
   let handle = null;
-  handle = toast({
+  handle = showLibraryNotice({
     ...notice,
+    // Dismissing the notice clears the record of it, so a retry that fails again
+    // is still reported — the dedupe only covers notices still on screen.
+    onDismiss: () => failureNoticesShown.delete(noticeKey),
     ...(offerActions
       ? {
           action: React.createElement(ExportStorageFailureActions, {
@@ -458,16 +471,6 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
         }
       : {}),
   });
-
-  // Dismissing the notice clears the record of it, so a retry that fails again
-  // is still reported — the dedupe only covers notices still on screen.
-  const dismiss = handle?.dismiss;
-  if (typeof dismiss === 'function') {
-    handle.dismiss = () => {
-      failureNoticesShown.delete(noticeKey);
-      return dismiss();
-    };
-  }
 }
 
 /**

@@ -54,8 +54,8 @@ export const EXPORT_STORAGE_REASON = Object.freeze({
  * The notice is deliberately small: one short line, the reason in plain words,
  * and the actions. The technical diagnostic is NEVER part of the notice body —
  * it lives behind the "TECHNICAL DETAIL" disclosure inside the actions, closed
- * until the reader opens it, so a failure that has to be seen for a full minute
- * does not take over the screen while it is read.
+ * until the reader opens it, so a failure that stays on screen until it is
+ * dismissed does not take over the screen while it is read.
  */
 export const STORAGE_NOTICE_CLASS = 'items-start gap-1 p-3 pr-8 text-sm bg-destructive/10 border-destructive/40 text-foreground';
 
