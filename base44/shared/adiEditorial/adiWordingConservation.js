@@ -85,7 +85,7 @@ export function numericTokens(value) {
 }
 
 /** The words that state a limitation, a caveat or an assumption. */
-const LIMITATION = /\b(?:not|never|cannot|can't|isn't|aren't|doesn't|don't|won't|without|lacks?|lacking|limited|only|up to|at most|remains?|requires? (?:attention|work)|to be (?:addressed|confirmed)|assum\w*|estimat\w*|approximately|about)\b/gi;
+const LIMITATION = /\b(?:not|never|cannot|can't|isn't|aren't|doesn't|don't|won't|without|lacks?|lacking|limits?|limiting|limited|only|up to|at most|remains?|requires? (?:attention|work)|to be (?:addressed|confirmed)|assum\w*|estimat\w*|approximately|about)\b/gi;
 
 /** The connectors a reason is written with. */
 const RATIONALE = /\b(?:because|so that|in order to|to ensure|which means|that is why|therefore|designed to)\b/gi;
