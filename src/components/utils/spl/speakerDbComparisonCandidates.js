@@ -34,7 +34,6 @@ import { ASSUMED_SENSITIVITY_BASIS, applySensitivityBasisAssumption } from "@/co
 import { installedSpaceAssumptionForRow } from "@/components/utils/spl/installedSpaceAssumption";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { selectComparisonLibraryRows, comparisonDataQuality } from "./competitorSpreadsheetImport.js";
-import { RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import {
   documentTypeLabel,
   evidenceBadgeLabel,
@@ -87,7 +86,7 @@ export const ADI_ESTIMATE_STATEMENT =
   "This is an ADI estimate based on available manufacturer data. It is useful for early comparison but not equivalent to verified published capability data.";
 
 export const COMPARISON_PARITY_STATEMENT =
-  `Same RP22 P12/P13 engine, distance, amplifier power, 1 W / 1 m normalisation and Sound Proof ${RP22_EQ_HEADROOM_LABEL} headroom as the Artcoustic row.`;
+  "Same RP22 P12/P13 engine, distance, amplifier power and 1 W / 1 m normalisation as the Artcoustic row.";
 
 // Controlled assumptions — each one is stated wherever the comparison is shown.
 // The installed-speaker normalisation assumption lives in

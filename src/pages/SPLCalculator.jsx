@@ -9,7 +9,6 @@ import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/mode
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import { normalizeCompetitor, competitorMetaForComparison, parseRecommendedAmpRange } from "@/components/utils/spl/competitorNormalization";
-import { RP22_EQ_HEADROOM_RESERVE_DB, RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
@@ -182,9 +181,8 @@ function artcousticInfoRows(speaker, price, result = null) {
     ["Usable LF response (-6 dB)", infoValue(meta?.usable_lf_hz_minus6db, " Hz")],
     ["Measurement basis", "Artcoustic published Half Space authority"],
     ["Evidence standing", "Published measured capability (Artcoustic registry)"],
-    ["Raw SPL at RSP (pre-headroom)", infoValue(result?.rawSpl, " dB")],
-    [`Design SPL at RSP (after ${RP22_EQ_HEADROOM_LABEL} headroom)`, infoValue(result?.designSpl, " dB")],
-    ["Graded from", "Design SPL (post-headroom), whole dB"],
+    ["Calculated SPL at RSP", infoValue(result?.designSpl ?? result?.rawSpl, " dB")],
+    ["Graded from", "Calculated SPL at RSP, whole dB"],
     ["Source", "Canonical Sound Proof speaker registry"],
   ];
 }
@@ -253,9 +251,8 @@ function competitorInfoRows(record, result = null, candidate = null) {
         ? "Published sensitivity and stated power authority only — partial manufacturer data"
         : "Published sensitivity, impedance and power authority"],
     ["Fields missing", missingFields.join(" · ") || "None recorded"],
-    ["Raw SPL at RSP (pre-headroom)", infoValue(result?.rawSpl, " dB")],
-    [`Design SPL at RSP (after ${RP22_EQ_HEADROOM_LABEL} headroom)`, infoValue(result?.designSpl, " dB")],
-    ["Graded from", "Design SPL (post-headroom), whole dB"],
+    ["Calculated SPL at RSP", infoValue(result?.designSpl ?? result?.rawSpl, " dB")],
+    ["Graded from", "Calculated SPL at RSP, whole dB"],
     ["User amplifier", debug ? `${Math.round(debug.ampPowerW)} W` : "—"],
     ["Effective amplifier used", debug ? `${Math.round(debug.availablePowerW)} W` : "—"],
     ["Final limiting factor", limitingFactor],
@@ -544,15 +541,15 @@ export default function SPLCalculatorPage() {
 
     const runForKey = (modelKey) => {
       if (!modelKey) return null;
-      // The Artcoustic row takes the same design headroom reserve as every
-      // competitor row, so the two columns are graded in the same units.
+      // RP22 Comparison applies no automatic EQ headroom deduction, so the
+      // Artcoustic row and every competitor row are graded from the calculated
+      // capability at the RSP in the same units.
       return computeSpeakerCapabilityAtDistance({
         speakerModelId: modelKey,
         speakerMeta: resolveSpeakerSplMeta(modelKey),
         distance_m: d,
         powerW: p,
         roomVolumeM3,
-        eqHeadroom_dB: RP22_EQ_HEADROOM_RESERVE_DB,
       });
     };
 
@@ -570,7 +567,7 @@ export default function SPLCalculatorPage() {
     return {
       spl: designSpl,
       designSpl,
-      rawSpl: Number.isFinite(designSpl) ? designSpl + RP22_EQ_HEADROOM_RESERVE_DB : null,
+      rawSpl: designSpl,
       p12Capability,
       p13Capability,
       grades: { p12: p12Grade, p13: p13Grade },
@@ -590,24 +587,19 @@ export default function SPLCalculatorPage() {
     }
     const speakerMeta = competitorMetaForComparison(record);
     if (!speakerMeta) return { spl: null, rawSpl: null, designSpl: null, grades: { p12: "—", p13: "—" } };
-    // Competitors are graded from the DESIGN SPL: raw capability less the Sound
-    // Proof design headroom, exactly as the Artcoustic rows are graded from their
-    // published, headroom-inclusive authority. The engine takes the reserve as a
-    // positive loss term.
+    // Competitors are graded from the calculated capability at the RSP, exactly
+    // as the Artcoustic rows are. RP22 Comparison applies no automatic EQ
+    // headroom deduction to either side.
     const capability = computeSpeakerCapabilityAtDistance({
       speakerModelId: `competitor:${record.id}`,
       distance_m: d,
       powerW: p,
       roomVolumeM3,
       speakerMeta,
-      eqHeadroom_dB: RP22_EQ_HEADROOM_RESERVE_DB,
     });
-    const rawSpl = Number.isFinite(capability.spl)
-      ? capability.spl + RP22_EQ_HEADROOM_RESERVE_DB
-      : null;
     return {
       ...capability,
-      rawSpl,
+      rawSpl: capability.spl,
       designSpl: capability.spl,
       grades: gradeFromSpl(capability.spl, basis),
     };
