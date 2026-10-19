@@ -55,9 +55,17 @@ export default function useSectionAdiEditorial({
    * diagnostic, so nothing is held for them and nothing is shown.
    */
   const holdDiagnostics = useCallback((data, error) => {
-    saveAdiEditorialRejection(
-      data?.diagnostics || error?.response?.data?.diagnostics || null,
-    );
+    const diagnostic = data?.diagnostics || error?.response?.data?.diagnostics || null;
+    saveAdiEditorialRejection(diagnostic);
+    // The server returns this only to a master admin. Never log proposal copy.
+    if (Array.isArray(diagnostic?.attempt_audit) && diagnostic.attempt_audit.length > 0) {
+      console.debug('[ADI editorial audit]', JSON.stringify({
+        attempts: diagnostic.attempts,
+        corrected: diagnostic.corrected,
+        final: diagnostic.final,
+        attempt_audit: diagnostic.attempt_audit.map(({ proposedText, ...attempt }) => attempt),
+      }));
+    }
   }, []);
 
   /** The shared half: one action, one section, one line about how it ended. */
