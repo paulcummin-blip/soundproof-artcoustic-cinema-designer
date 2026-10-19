@@ -48,7 +48,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerPromptBuilder.js': '034c66ba91a3a474a695138d23acffde40e84fe63441ad084f256963d59df39c',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
-  'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
+  'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
   'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',
   'base44/shared/proposalEvidence/evidencePackSchema.js': '2b25a3401a24a65944a441741b47e8ca5fff25271bb7d364c8b834ed04303631',
