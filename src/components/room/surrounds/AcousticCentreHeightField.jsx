@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import {
   HIGHLIGHT_GREEN,
   useSpeakerHighlighted,
+  useLiveSpeakerPositionForRoles,
   beginSpeakerHighlight,
   settleSpeakerHighlight,
 } from "@/components/state/speakerSelectionStore";
@@ -18,9 +19,15 @@ import {
  * `mixed` reports a group whose speakers stand at different heights.
  *
  * While the speakers it governs are moving — dragged in the elevation, or typed
- * here — the label and the value turn Artcoustic dark green and hold for a
- * moment after the edit finishes, then return to normal. The field is never
- * outlined and is never permanently marked.
+ * here — the value turns bold Artcoustic dark green behind the field's own thin
+ * green border, and holds for five seconds after the movement stops. Nothing is
+ * boxed, outlined or permanently marked: the existing field simply reads as
+ * active, and then quietly returns to normal.
+ *
+ * A drag in the elevation publishes its live position, so the field shows the
+ * height the designer can see, continuously, while they move the speaker — to
+ * two decimals. Display only: the stored value stays the project's own and is
+ * written once, on release.
  */
 export default function AcousticCentreHeightField({
   group = null,
@@ -48,6 +55,11 @@ export default function AcousticCentreHeightField({
   // The light is shared with the elevation: these speakers are green whenever
   // they are moving, whichever end started the movement.
   const lit = useSpeakerHighlighted(lightRoles);
+
+  // The height the designer is watching: while one of these speakers is being
+  // dragged, this is where it is being dragged to, right now.
+  const live = useLiveSpeakerPositionForRoles(lightRoles);
+  const liveZ = live && Number.isFinite(Number(live.z)) ? Number(live.z) : null;
 
   const numericMin = Number.isFinite(Number(minM)) ? Number(minM) : null;
 
@@ -91,7 +103,7 @@ export default function AcousticCentreHeightField({
           inputMode="decimal"
           min={numericMin === null ? undefined : numericMin.toFixed(2)}
           max={Number.isFinite(Number(maxM)) ? Number(maxM).toFixed(2) : undefined}
-          value={text}
+          value={editing ? text : asText(liveZ ?? valueM)}
           placeholder={mixed ? "Mixed" : asText(defaultM)}
           disabled={disabled}
           onFocus={() => {
@@ -110,7 +122,11 @@ export default function AcousticCentreHeightField({
             endEdit();
           }}
           className="pr-8 bg-white transition-colors duration-500 ease-out"
-          style={{ color: lit ? HIGHLIGHT_GREEN : "#1B1A1A" }}
+          style={{
+            color: lit ? HIGHLIGHT_GREEN : "#1B1A1A",
+            fontWeight: lit ? 700 : 400,
+            borderColor: lit ? HIGHLIGHT_GREEN : undefined,
+          }}
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
           m

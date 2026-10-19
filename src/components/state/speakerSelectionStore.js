@@ -15,6 +15,9 @@
  * never recalculates, saves or changes project data, and it survives a change
  * of view because it is not owned by any one view.
  *
+ * It also carries the movement itself: the transient highlight, and the live
+ * position a drag publishes while it is moving.
+ *
  * `token` changes on every distinct selection, which is how a surface knows a
  * fresh choice was made (and can bring the matching controls into view).
  */
@@ -153,6 +156,75 @@ export function useSpeakerHighlighted(roles) {
   const light = useSpeakerHighlight();
   if (!light.lit) return false;
   return normaliseRoles(roles).some((role) => light.roles.includes(role));
+}
+
+// ---------------------------------------------------------------------------
+// The LIVE POSITION — the movement itself, published as numbers
+//
+// While a speaker is being dragged in the Side Elevation its position lives in
+// the gesture, not in the project: nothing is saved, nothing is recalculated and
+// no second store of the design is created. The gesture publishes it here so
+// every surface that displays that speaker's own numbers reads the position the
+// designer can see, at the moment they see it — the acoustic centre height
+// control above all, which then shows the moving height at two decimals.
+//
+// One number, one authority: the position becomes the project's own on release,
+// through the one save path, and the live number is withdrawn with it.
+// ---------------------------------------------------------------------------
+const NO_LIVE_POSITION = { role: null, z: null, y: null, token: 0 };
+
+let livePosition = NO_LIVE_POSITION;
+const positionListeners = new Set();
+
+export function subscribeLiveSpeakerPosition(listener) {
+  positionListeners.add(listener);
+  return () => {
+    positionListeners.delete(listener);
+  };
+}
+
+export function getLiveSpeakerPosition() {
+  return livePosition;
+}
+
+/** The speaker being moved right now, at the position it is being moved to. */
+export function publishLiveSpeakerPosition({ role = null, z = null, y = null } = {}) {
+  const nextRole = role ? String(role).toUpperCase() : null;
+  const nextZ = Number.isFinite(Number(z)) ? Number(z) : null;
+  const nextY = Number.isFinite(Number(y)) ? Number(y) : null;
+
+  if (
+    nextRole === livePosition.role &&
+    nextZ === livePosition.z &&
+    nextY === livePosition.y
+  ) {
+    return;
+  }
+
+  livePosition = { role: nextRole, z: nextZ, y: nextY, token: livePosition.token + 1 };
+  positionListeners.forEach((listener) => listener());
+}
+
+/** The movement has stopped: the live number is withdrawn. */
+export function clearLiveSpeakerPosition() {
+  if (!livePosition.role) return;
+  livePosition = { ...NO_LIVE_POSITION, token: livePosition.token + 1 };
+  positionListeners.forEach((listener) => listener());
+}
+
+export function useLiveSpeakerPosition() {
+  return useSyncExternalStore(
+    subscribeLiveSpeakerPosition,
+    getLiveSpeakerPosition,
+    getLiveSpeakerPosition,
+  );
+}
+
+/** The live position of these speakers, while one of them is being moved. */
+export function useLiveSpeakerPositionForRoles(roles) {
+  const live = useLiveSpeakerPosition();
+  if (!live.role) return null;
+  return normaliseRoles(roles).includes(live.role) ? live : null;
 }
 
 export default useSpeakerSelection;

@@ -3,6 +3,10 @@ import {
   clampAcousticCentreHeight,
   resolveAcousticCentreBounds,
 } from "@/components/room/surrounds/surroundAcousticCentreAuthority";
+import {
+  clearLiveSpeakerPosition,
+  publishLiveSpeakerPosition,
+} from "@/components/state/speakerSelectionStore";
 
 /**
  * Direct dragging of a surround or front-wide speaker in the Side Elevation.
@@ -14,7 +18,10 @@ import {
  * ambiguous. Both axes write the speaker's own stored coordinates through the
  * same commit the panel uses, so the drawing and the controls cannot diverge.
  * The draft lives in local state for the duration of the drag and one commit is
- * written on release: dragging therefore triggers no calculation work.
+ * written on release: dragging therefore triggers no calculation work. The draft
+ * is also published as the LIVE POSITION, so the control that owns this speaker
+ * shows the moving number while the designer moves it — display only: the single
+ * commit on release stays the only write.
  *
  * Extracted from SideElevation so the drawing file stays inside its size limit;
  * behaviour, snapping and clamping are exactly as before, with the horizontal
@@ -62,8 +69,10 @@ export function useSideSpeakerDrag({
     window.removeEventListener("mousemove", listeners.move);
     window.removeEventListener("mouseup", listeners.up);
     listenersRef.current = null;
-    // A drag that outlives the drawing must not leave a speaker lit forever.
+    // A drag that outlives the drawing must not leave a speaker lit forever,
+    // nor a live number standing.
     if (releaseRef.current) releaseRef.current();
+    clearLiveSpeakerPosition();
   }, []);
 
   const handleSpeakerMouseDown = useCallback((event, role, start = {}) => {
@@ -96,6 +105,7 @@ export function useSideSpeakerDrag({
       live: { role, axis: null, z: startZ, y: startY },
     };
     setLiveDrag({ role, axis: null, z: startZ, y: startY });
+    publishLiveSpeakerPosition({ role, z: startZ, y: startY });
 
     const move = (moveEvent) => {
       const drag = dragRef.current;
@@ -122,6 +132,7 @@ export function useSideSpeakerDrag({
         );
         drag.live = { role, axis, z: drag.startZ, y };
         setLiveDrag(drag.live);
+        publishLiveSpeakerPosition({ role, z: drag.startZ, y });
         return;
       }
 
@@ -144,6 +155,7 @@ export function useSideSpeakerDrag({
       setActiveSnapZ(snapHit);
       drag.live = { role, axis, z: snapHit !== null ? snapHit : rawZ, y: drag.startY };
       setLiveDrag(drag.live);
+      publishLiveSpeakerPosition({ role, z: drag.live.z, y: drag.startY });
     };
 
     const up = () => {
@@ -162,14 +174,24 @@ export function useSideSpeakerDrag({
       setLiveDrag(null);
 
       // A click that never resolved an axis is not a move.
-      if (!drag || !drag.axis || !drag.live) return;
+      if (!drag || !drag.axis || !drag.live) {
+        clearLiveSpeakerPosition();
+        return;
+      }
 
       const { axis, z, y } = drag.live;
       const commit = { role };
       if (axis === "z" && Number.isFinite(z)) commit.newZ = Math.round(z * 1000) / 1000;
       if (axis === "y" && Number.isFinite(y)) commit.newY = Math.round(y * 1000) / 1000;
-      if (commit.newZ === undefined && commit.newY === undefined) return;
+      if (commit.newZ === undefined && commit.newY === undefined) {
+        clearLiveSpeakerPosition();
+        return;
+      }
+      // The number the control has been showing becomes the project's own, and
+      // only then is the live number withdrawn — in that order, so the control
+      // never flashes back to the old height for a frame. One write per drag.
       commitRef.current(commit);
+      clearLiveSpeakerPosition();
     };
 
     listenersRef.current = { move, up };

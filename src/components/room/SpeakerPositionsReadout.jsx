@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
+import { useLiveSpeakerPosition } from '@/components/state/speakerSelectionStore';
 
 export default function SpeakerPositionsReadout({ 
   placedSpeakers = [], 
@@ -11,6 +12,10 @@ export default function SpeakerPositionsReadout({
   screenFrontPlaneM = null,
   view = 'off' // 'off' | 'plan' | 'table' | 'both'
 }) {
+  // While a speaker is being dragged in the elevation the table reads the
+  // position the designer can see, live.
+  const livePosition = useLiveSpeakerPosition();
+
   const modelLabel = (modelId) => {
     if (!modelId) return '(none)';
     
@@ -83,7 +88,22 @@ export default function SpeakerPositionsReadout({
     const W = Number(roomWidth) || 0;
     const L = Number(roomLength) || 0;
 
-    const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    // The moving speaker's row shows where it is being moved to, at this moment.
+    // Nothing is stored: the row reads the gesture, and the project's own saved
+    // position returns the instant the speaker is released.
+    const draggingRole = livePosition?.role ? String(livePosition.role).toUpperCase() : null;
+    const list = (Array.isArray(placedSpeakers) ? placedSpeakers : []).map((speaker) => {
+      if (!draggingRole) return speaker;
+      if (String(speaker?.role || '').toUpperCase() !== draggingRole) return speaker;
+      return {
+        ...speaker,
+        position: {
+          ...speaker.position,
+          y: livePosition.y ?? speaker?.position?.y,
+          z: livePosition.z ?? speaker?.position?.z,
+        },
+      };
+    });
     const out = [];
 
     const safeNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -183,7 +203,7 @@ export default function SpeakerPositionsReadout({
     }
 
     return out;
-  }, [placedSpeakers, roomWidth, roomLength, seatingPositions, recommendedBedHeightM]);
+  }, [placedSpeakers, roomWidth, roomLength, seatingPositions, recommendedBedHeightM, livePosition]);
   
   const copyTable = () => {
     if (installerRows.length === 0) return;
