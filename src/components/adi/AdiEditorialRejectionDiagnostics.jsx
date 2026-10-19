@@ -66,6 +66,8 @@ function asText(held) {
   const lines = [
     ADI_REJECTION_DIAGNOSTICS_TITLE,
     `Rejection stage: ${held.rejectionStage || SHOWN}`,
+    `Attempts: ${held.attempts ?? SHOWN} · Corrected: ${held.corrected === true} · Final: ${held.final || SHOWN}`,
+    JSON.stringify(held.attempt_audit || [], null, 2),
     '',
     'ORIGINAL COPY',
     held.originalText || SHOWN,
@@ -186,6 +188,20 @@ export default function AdiEditorialRejectionDiagnostics() {
       <div style={{ marginTop: 4, fontFamily: MONO }}>
         Stage: {held.rejectionStage || SHOWN} · Violations: {violations.length}
       </div>
+
+      {Array.isArray(held.attempt_audit) && held.attempt_audit.length > 0 && (
+        <div data-adi-attempt-audit="true" style={{ marginTop: 6, fontFamily: MONO }}>
+          {[1, 2].map((number) => {
+            const attempt = held.attempt_audit.find((entry) => entry.attempt === number);
+            return <div key={number}>
+              ATTEMPT {number}: {attempt?.outcome || 'not needed'}
+              {attempt?.rejectionStage ? ` · ${attempt.rejectionStage}` : ''}
+              {attempt?.violations?.length ? ` · ${attempt.violations.map((entry) => entry.rule || entry.code).join(', ')}` : ''}
+            </div>;
+          })}
+          <div>FINAL: {held.final || SHOWN} · Attempts: {held.attempts ?? SHOWN} · Corrected: {held.corrected ? 'yes' : 'no'}</div>
+        </div>
+      )}
 
       {expanded && (
         <div style={{ marginTop: 6 }}>
