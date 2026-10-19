@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle2, CircleHelp, MinusCircle, RefreshCw } from 'lucide-react';
+import AdiKnowledgeConfirmation from '@/components/proposal/wizard/AdiKnowledgeConfirmation';
 
 /**
  * Step — Clarifications.
@@ -20,9 +21,12 @@ import { CheckCircle2, CircleHelp, MinusCircle, RefreshCw } from 'lucide-react';
  */
 export default function ClarificationStep({
   questions = [],
+  confirmations = [],
   answers = {},
   loading = false,
   onAnswer,
+  onUseConfirmation,
+  onExplainDifferently,
   onRefresh,
 }) {
   const [draft, setDraft] = useState({});
@@ -64,13 +68,29 @@ export default function ClarificationStep({
         <p className="text-[11px] text-[#8A8477] mb-3">Reading this design for anything left unexplained…</p>
       )}
 
-      {!loading && questions.length === 0 && (
+      {!loading && questions.length === 0 && confirmations.length === 0 && (
         <div className="flex items-start gap-2 rounded-lg border border-[#E5E1D8] bg-[#F9F8F5] p-4">
           <CheckCircle2 className="w-4 h-4 mt-0.5 text-[#213428]" />
           <p className="text-xs text-[#625143] leading-relaxed">
             No clarifications needed for this design: every decision ADI would ask about is already
             explained by the design interpretation or your brief.
           </p>
+        </div>
+      )}
+
+      {/* Understood well enough to state, not well enough to rely on without asking:
+          the designer confirms it or explains it in their own words. The full
+          clarification form is never forced on them for a matter ADI half knows. */}
+      {confirmations.length > 0 && (
+        <div className={`space-y-3 ${questions.length > 0 ? 'mb-4' : ''}`}>
+          {confirmations.map((confirmation) => (
+            <AdiKnowledgeConfirmation
+              key={confirmation.question_id}
+              confirmation={confirmation}
+              onUse={onUseConfirmation}
+              onExplain={onExplainDifferently}
+            />
+          ))}
         </div>
       )}
 

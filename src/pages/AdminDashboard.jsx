@@ -62,6 +62,13 @@ const CORE_CARDS = [
     href: "/admin/content",
   },
   {
+    title: "ADI Design Knowledge",
+    description: "Why decisions are made, learned from the reasons designers give to ADI's clarification questions across separate projects. Review, approve, edit, merge or disable what ADI understands.",
+    status: "Curated",
+    count: "Design intent only",
+    href: "/admin/adi-design-knowledge",
+  },
+  {
     title: "System Health",
     description: "Live status of core systems and infrastructure.",
     status: "Operational",

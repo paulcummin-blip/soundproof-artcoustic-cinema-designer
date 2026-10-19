@@ -19,6 +19,8 @@ import { isReadinessRefusalMessage, resolveProposalReadinessGate } from '@/compo
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
 import ProposalPreparationPanel from '@/components/proposal/preparation/ProposalPreparationPanel';
 import useProposalPreparation from '@/components/proposal/wizard/useProposalPreparation';
+import useAdiKnowledgeGate from '@/components/proposal/wizard/useAdiKnowledgeGate';
+import { captureAdiClarificationLearning } from '@/components/proposal/wizard/adiKnowledgeCapture';
 import { clearWizardDraft, readWizardDraft } from '@/components/proposal/wizard/proposalWizardDraft';
 import { steerFromPayload, steerPreferences } from '@/components/proposal/wizard/narrativeSteer';
 import NarrativeSteerReview from '@/components/proposal/wizard/NarrativeSteerReview';
@@ -103,6 +105,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // A regeneration carries the answers the original proposal already holds, so a
   // question already answered or passed is not asked again.
   const [clarifications, setClarifications] = useState([]);
+  // Questions the designer asked to answer in their own words after ADI offered what it
+  // already understands, so "Explain differently" opens the normal answer box.
+  const [explainedQuestions, setExplainedQuestions] = useState([]);
   // The answers the original proposal already holds — or, for a fresh creation the
   // designer stepped away from, the answers they had already given.
   const [clarificationAnswers, setClarificationAnswers] = useState(() => {
@@ -339,11 +344,45 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           area: question.area || current[questionId]?.area || null,
           belongs_to: question.belongs_to || current[questionId]?.belongs_to || null,
           version_ids: question.version_ids || current[questionId]?.version_ids || [],
-          source: current[questionId]?.source || 'proposal_wizard',
+          source: patch.source || current[questionId]?.source || 'proposal_wizard',
         },
       };
     });
+    // A real answer teaches ADI a reason; a passed question teaches nothing at all. Only
+    // the designer's own words are ever sent — an understanding ADI already holds is
+    // never sent back to it as though a designer had just confirmed it.
+    if (patch?.status === 'answered' && patch.answer && patch.source !== 'learned_design_knowledge') {
+      captureAdiClarificationLearning({
+        question: {
+          question_id: questionId,
+          area: question.area || null,
+          question: question.question || null,
+        },
+        answer: String(patch.answer),
+        projectId: selectedProjectId,
+      });
+    }
     creationRequestIdRef.current = null;
+  }, [selectedProjectId]);
+
+  // "Use this": the designer accepts ADI's understanding of this decision for THIS
+  // project, and it is carried as the project's own intent — the document is written
+  // from it exactly as it is written from an answer the designer typed.
+  const handleUseLearned = useCallback((confirmation) => {
+    const intent = confirmation?.intent || confirmation?.rationale || '';
+    if (!intent) return;
+    handleClarificationAnswer(
+      confirmation?.question || { question_id: confirmation?.question_id },
+      { status: 'answered', answer: intent, source: 'learned_design_knowledge' },
+    );
+  }, [handleClarificationAnswer]);
+
+  // "Explain differently": the designer explains it in their own words after all, so the
+  // normal question is shown and no confirmation is offered for it again in this design.
+  const handleExplainDifferently = useCallback((confirmation) => {
+    const questionId = confirmation?.question_id;
+    if (!questionId) return;
+    setExplainedQuestions((current) => (current.includes(questionId) ? current : [...current, questionId]));
   }, []);
 
   // What the wizard sends so ADI never asks the same question twice: the questions
@@ -368,6 +407,58 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       source: entry.source || 'proposal_wizard',
     })),
   [clarificationAnswers]);
+
+  // ── What ADI already understands about this design ──
+  // A matter ADI understands is not asked again; a matter it half knows is offered as a
+  // lightweight confirmation. The designer's own answers for THIS project are sent as
+  // project context, so a reason given for this design is never replaced by a familiar
+  // one from elsewhere, and a project result is never read as a general rule.
+  const projectAnswers = useMemo(() => Object.fromEntries(Object.entries(clarificationAnswers)
+    .filter(([, entry]) => entry?.status === 'answered'
+      && entry.source !== 'learned_design_knowledge'
+      && Boolean(entry.answer))
+    .map(([questionId, entry]) => [questionId, entry.answer])), [clarificationAnswers]);
+  const knowledgeGate = useAdiKnowledgeGate({ questions: clarifications, projectAnswers });
+  const openQuestions = useMemo(() => [
+    ...knowledgeGate.questions,
+    ...knowledgeGate.confirmations
+      .filter((confirmation) => explainedQuestions.includes(confirmation.question_id))
+      .map((confirmation) => confirmation.question)
+      .filter(Boolean),
+  ], [knowledgeGate.questions, knowledgeGate.confirmations, explainedQuestions]);
+  const confirmations = useMemo(() => knowledgeGate.confirmations
+    .filter((confirmation) => !explainedQuestions.includes(confirmation.question_id)),
+  [knowledgeGate.confirmations, explainedQuestions]);
+
+  // An understanding ADI already holds is carried as THIS design's own intent, so the
+  // proposal explains the decision rather than passing over it. It is recorded as
+  // understood intent — never as an answer a designer gave — and it is never fed back to
+  // the learning authority, so ADI can only ever learn from a designer's own words.
+  useEffect(() => {
+    const understood = knowledgeGate.learned || [];
+    if (understood.length === 0) return;
+    setClarificationAnswers((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const matter of understood) {
+        const existing = next[matter.question_id];
+        if (existing?.status === 'answered' && existing.source !== 'learned_design_knowledge') continue;
+        const intent = matter.intent || matter.rationale;
+        if (!intent) continue;
+        next[matter.question_id] = {
+          status: 'answered',
+          answer: intent,
+          question: matter.question?.question || existing?.question || null,
+          area: matter.question?.area || existing?.area || null,
+          belongs_to: matter.question?.belongs_to || existing?.belongs_to || null,
+          version_ids: matter.question?.version_ids || existing?.version_ids || [],
+          source: 'learned_design_knowledge',
+        };
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [knowledgeGate.learned]);
 
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
@@ -649,10 +740,13 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       {/* Step 4 — Clarifications */}
       {step === 4 && (
         <ClarificationStep
-          questions={clarifications}
+          questions={openQuestions}
+          confirmations={confirmations}
           answers={clarificationAnswers}
-          loading={readinessLoading || snapshotLoading}
+          loading={readinessLoading || snapshotLoading || knowledgeGate.loading}
           onAnswer={handleClarificationAnswer}
+          onUseConfirmation={handleUseLearned}
+          onExplainDifferently={handleExplainDifferently}
         />
       )}
 

@@ -1,0 +1,183 @@
+{
+  "name": "AdiDesignKnowledge",
+  "type": "object",
+  "description": "Structured Sound Proof design knowledge ADI has learned from repeated designer clarifications. One record per MATTER: a topic read under one design condition (e.g. the overhead-count rationale for a two-row cinema using a .6 overhead layout). A matter begins as a candidate from one designer's answer, is strengthened by a second project's matching answer, and becomes learned knowledge on the third \u2014 separate projects only, never a repeated answer from one project. A later contradicting answer does not overwrite the record: the matter is marked contested, its confidence falls to the lowest band and ADI asks the designer again. Learned records keep the canonical, context-first meaning and internal source references only: the designers' raw wording is dropped the moment a matter becomes learned, and a project result ('this room achieved 22 Hz'), a project-specific constraint, a budget, a price, an address or any personal detail is never stored here at all. This is a DESIGN ASSISTANT and never an authority: current project evidence, current project clarifications, RP22/RP23 results, the client brief and the room's actual geometry always override it. Read by ADI when deciding whether a clarification still needs asking; written only by the manageAdiDesignKnowledge backend function under the service role, and curated (approved, edited, disabled, merged, confidence reset) by a master admin.",
+  "properties": {
+    "knowledge_key": {
+      "type": "string",
+      "description": "The identity of one matter: the topic read under one design condition (topic::rows/overheads/subwoofers/panels). One record per key, so a reason learned for a two-row .6 layout is never merged into a reason for a four-row .4 layout."
+    },
+    "topic": {
+      "type": "string",
+      "enum": [
+        "overhead_count_rationale",
+        "subwoofer_arrangement_rationale",
+        "seating_priority_rationale",
+        "acoustic_treatment_rationale"
+      ],
+      "description": "The design decision this knowledge explains. Every topic is a WHY question about an intentional design choice, never a project outcome."
+    },
+    "condition": {
+      "type": "object",
+      "description": "THE DESIGN CONDITION the reason was given under: the structured state of the design the rationale belongs to (rows, overheads, overhead layout and positions, subwoofers, treatment panels and product). Only the fields the design actually states are present. A record is only ever applied to a design whose own condition it covers exactly."
+    },
+    "condition_text": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "The design condition as a designer reads it: 'two seating rows', 'six overhead speakers', 'front, middle and rear overhead layout'."
+    },
+    "canonical_meaning": {
+      "type": "string",
+      "description": "The canonical, context-first rationale: the condition leads and the shared meaning follows ('For a two-row cinema using a .6 overhead layout, a common rationale is to ...'). Composed from the design condition and the meaning the designers expressed, never from one answer's phrasing, so no designer is ever required to word a reason identically."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "strengthened",
+        "learned",
+        "disabled"
+      ],
+      "default": "candidate",
+      "description": "How far the matter has been learned. candidate = one project's answer; strengthened = a second matching project; learned = three matching projects, or an admin approval; disabled = an admin has turned it off, and it is never used or learned again while disabled."
+    },
+    "confidence": {
+      "type": "number",
+      "default": 0.25,
+      "description": "The confidence the record has earned from the separate projects that agree with it, held at the lowest band while the matter is contested and raised by an admin approval."
+    },
+    "confidence_band": {
+      "type": "string",
+      "enum": [
+        "low",
+        "moderate",
+        "high"
+      ],
+      "default": "low",
+      "description": "What the confidence permits. high = ADI understands the design and does not ask; moderate = ADI offers a lightweight confirmation instead of the full clarification; low = ADI asks the designer."
+    },
+    "seen_projects": {
+      "type": "number",
+      "default": 0,
+      "description": "How many SEPARATE projects have given this reason. The promotion rule counts projects, not answers, so one designer answering twice on one project never promotes anything."
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Internal reference only: which project and which designer each answer came from, and when. Never a client name, never a project title, never shown to a dealer or a client."
+    },
+    "raw_answers": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "The designers' exact answers, kept ONLY while the matter is still being learned so a candidate can be read back in the designers' own words. Emptied the moment the matter becomes learned knowledge: a learned record carries the canonical meaning and internal references only."
+    },
+    "contested": {
+      "type": "boolean",
+      "default": false,
+      "description": "Set when a later answer means something different. A contested matter is never applied, its confidence is held at the lowest band and ADI returns to asking; the designers' disagreement is never resolved on its own."
+    },
+    "contested_answer": {
+      "type": "string",
+      "nullable": true,
+      "description": "The answer that contradicted the record, kept while the matter is contested so the disagreement can be reviewed. Null on a settled record."
+    },
+    "last_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When this reason was last given by a designer for a project."
+    },
+    "approved_by": {
+      "type": "string",
+      "nullable": true,
+      "description": "Name or email of the master admin who approved this record as learned knowledge."
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the record was approved. An approval sets the confidence floor at high and clears any contest."
+    },
+    "disabled_by": {
+      "type": "string",
+      "nullable": true,
+      "description": "Name or email of the master admin who disabled this record."
+    },
+    "disabled_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the record was disabled. Null unless the record is disabled."
+    },
+    "admin_edited": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether a master admin has edited the canonical meaning by hand."
+    },
+    "admin_edited_by": {
+      "type": "string",
+      "nullable": true,
+      "description": "Name or email of the master admin who last edited the canonical meaning."
+    },
+    "admin_edited_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the canonical meaning was last edited by hand."
+    },
+    "merged_from": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "The knowledge keys merged into this record, so a merge of duplicate matters is auditable."
+    }
+  },
+  "required": [
+    "knowledge_key",
+    "topic",
+    "canonical_meaning",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -18,6 +18,7 @@ import AdminSystemHealth from './pages/AdminSystemHealth';
 import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminPublicationContent from './pages/AdminPublicationContent';
 import AdminProposalDiagnostics from './pages/AdminProposalDiagnostics';
+import AdminAdiDesignKnowledge from './pages/AdminAdiDesignKnowledge';
 import AdminDesignIntentPreview from './pages/AdminDesignIntentPreview';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
@@ -154,6 +155,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />
         <Route path="/admin/content" element={<AccessGate masterAdmin><AdminPublicationContent /></AccessGate>} />
         <Route path="/admin/proposal-diagnostics" element={<AccessGate masterAdmin><AdminProposalDiagnostics /></AccessGate>} />
+        <Route path="/admin/adi-design-knowledge" element={<AccessGate masterAdmin><AdminAdiDesignKnowledge /></AccessGate>} />
         <Route path="/admin/design-intent-preview" element={<AccessGate masterAdmin><AdminDesignIntentPreview /></AccessGate>} />
         <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><SpeakerComparisonLibrary /></AccessGate>} />
         <Route path="/admin/speaker-database/advanced" element={<AccessGate masterAdmin><AdminSpeakerDatabase /></AccessGate>} />
