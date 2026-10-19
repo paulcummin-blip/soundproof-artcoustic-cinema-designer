@@ -143,6 +143,14 @@ describe('atomic Undo under nested metadata merge semantics', () => {
     assert.equal(world.counts().writes, 1);
     assert.ok(world.counts().reads >= 2);
   });
+  it('restores an explicitly absent previous approval instead of retaining an approval of the ADI copy', async () => {
+    const world = undoWorld();
+    world.state().metadata.adi_editorial.previous_approval = null;
+    const result = await improveProposalSectionWording({ entities: world.entities, proposalId: 'p', sectionId: 's', action: 'undo' });
+    assert.equal(result.applied, true);
+    assert.equal(world.state().metadata.approval, null);
+    assert.equal(world.counts().writes, 1);
+  });
   for (const field of ['timestamp', 'marker']) {
     it('refuses successful Undo when storage fails to restore ' + field, async () => {
       const world = undoWorld(field);
