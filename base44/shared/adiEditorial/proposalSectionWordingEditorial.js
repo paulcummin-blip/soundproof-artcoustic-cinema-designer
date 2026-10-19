@@ -36,9 +36,11 @@
  */
 
 import { approvalPlainText } from '../proposalApproval/sectionApprovalAuthority.js';
-import { publishedSectionFingerprint } from '../proposalApproval/sectionApprovalAuthority.js';
+import { latestValidGeneration } from '../proposalGeneration/proposalGenerationHistory.js';
+import { frozenProposalMode } from '../proposalEdit/proposalEditEditorModel.js';
+import { sectionApprovalFingerprint, publishedSectionFingerprint } from '../proposalApproval/sectionApprovalAuthority.js';
 import { groundProductMentions } from '../proposalProductGrounding.js';
-import { buildAdiEditorialPrompt } from '../adiEditorial/adiEditorialPrompt.js';
+import { adiSectionContract, buildAdiEditorialPrompt } from '../adiEditorial/adiEditorialPrompt.js';
 import { ADI_WORDING_OUTCOME, runAdiWordingPass } from '../adiEditorial/adiWordingPass.js';
 import { checkSelectionSpliceConservation } from '../adiEditorial/adiWordingConservation.js';
 import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from '../adiEditorial/adiRejectionDiagnostics.js';
@@ -90,7 +92,7 @@ function withoutMarker(metadata) {
   const { adi_editorial: _marker, ...rest } = (metadata && typeof metadata === 'object')
     ? metadata
     : {};
-  return rest;
+  return { ...rest, adi_editorial: null };
 }
 
 /**
@@ -116,7 +118,7 @@ function groundingViolationEntry(text, grounding) {
 }
 
 /** One uniform result, whatever the pass ended in. */
-function result({ applied, action, outcome = null, mode, improvedText = null, previousText = null, text = null, canUndo = false, reason = null, diagnostics = null }) {
+function result({ applied, action, outcome = null, mode, improvedText = null, previousText = null, text = null, canUndo = false, reason = null, diagnostics = null, attempts = 0, corrected = false, attempt_audit = [] }) {
   return {
     ok: true,
     applied: Boolean(applied),
@@ -136,6 +138,9 @@ function result({ applied, action, outcome = null, mode, improvedText = null, pr
     // the copy that was refused, the stage that refused it and every violation. It
     // is never written to the record — a refusal is a zero-write outcome.
     diagnostics,
+    attempts,
+    corrected,
+    attempt_audit,
   };
 }
 
@@ -209,7 +214,11 @@ export async function improveProposalSectionWording({
       body: marker.previous_body,
       last_user_edited_at: marker.previous_last_user_edited_at ?? null,
       last_gpt_generated_at: marker.previous_last_gpt_generated_at ?? null,
-      metadata: withoutMarker(section.metadata),
+      metadata: {
+        ...withoutMarker(section.metadata),
+        // Approval is restored only for the exact content previously approved.
+        approval: marker.previous_approval || section.metadata?.approval || null,
+      },
     };
     const persistedRestore = await persistSectionChange({
       entities,
@@ -233,10 +242,31 @@ export async function improveProposalSectionWording({
         canUndo: true,
       });
     }
-    const restored = persistedRestore.section;
-    if (restored?.body !== marker.previous_body || restored?.metadata?.adi_editorial) {
-      throw new Error('The earlier wording and its Undo record were not restored together.');
+    // Read the stored record, not an optimistic update response.
+    const restored = (await entities.ProposalSection.filter({ id: sectionId }))[0] || null;
+    const approval = restorePatch.metadata.approval;
+    const expectedApprovalFingerprint = sectionApprovalFingerprint({
+      publishedBody: marker.previous_body, storedBody: marker.previous_body,
+      lastUserEditedAt: restorePatch.last_user_edited_at,
+      lastGptGeneratedAt: restorePatch.last_gpt_generated_at,
+    });
+    const mismatches = [];
+    if (restored?.body !== marker.previous_body) mismatches.push('body');
+    for (const key of ['last_user_edited_at', 'last_gpt_generated_at']) {
+      if ((restored?.[key] ?? null) !== restorePatch[key]) mismatches.push(key);
     }
+    if (restored?.metadata?.adi_editorial) mismatches.push('adi_editorial');
+    if (publishedSectionFingerprint(restored?.body) !== marker.source_fingerprint) mismatches.push('source_fingerprint');
+    if (approval?.fingerprint === expectedApprovalFingerprint
+      && JSON.stringify(restored?.metadata?.approval) !== JSON.stringify(approval)) mismatches.push('approval');
+    if (mismatches.length) return blocked(
+      'undo_verification_failed', 409,
+      'The earlier wording could not be fully restored. Please reload and try again.',
+      null,
+      { rejectionStage: 'undo_persistence', violations: mismatches.map((field) => ({
+        rule: 'undo_field_not_restored', category: 'persistence', explanation: field,
+      })) },
+    );
     return result({
       applied: true,
       action: 'undo',
@@ -314,7 +344,18 @@ export async function improveProposalSectionWording({
     return blocked(ADI_SECTION_BLOCK.NOTHING_SELECTED, 400, 'Highlight the text to improve first.');
   }
 
+  const generations = entities.ProposalGeneration?.filter
+    ? await entities.ProposalGeneration.filter({ proposal_id: proposalId })
+    : [];
+  const generation = latestValidGeneration(generations, { proposalId });
+  const sectionContract = adiSectionContract({
+    sectionType: section.section_type,
+    sectionLabel: section.title || section.section_type,
+    mode: generation ? frozenProposalMode(generation) : 'single',
+    original: mode === ADI_SECTION_MODE.SELECTION ? selection : originalBody,
+  });
   const prompt = buildAdiEditorialPrompt({
+    sectionContract,
     sectionLabel: section.title || 'this section',
     mode,
     currentText: mode === ADI_SECTION_MODE.SELECTION ? original : originalBody,
@@ -334,14 +375,20 @@ export async function improveProposalSectionWording({
     flag: null,
     invokeLLM,
     prompt,
+    sectionContract,
     original: mode === ADI_SECTION_MODE.SELECTION ? selection : originalBody,
     mode,
-    validate: grounding
-      ? (proposed) => {
-        const entry = groundingViolationEntry(proposed, grounding);
-        return { ok: entry === null, violations: entry ? [entry] : [] };
+    validate: async (proposed) => {
+      const entry = groundingViolationEntry(proposed, grounding);
+      if (entry) return { ok: false, violations: [entry] };
+      if (mode === ADI_SECTION_MODE.SECTION && typeof persistRevision === 'function') {
+        const checked = await persistRevision({
+          entities, proposalId, section, body: proposed, user, now, validateOnly: true,
+        });
+        return { ok: checked.accepted === true, violations: checked.violations || [] };
       }
-      : null,
+      return { ok: true, violations: [] };
+    },
     // Which stage a refusal by that validator is read under, for the diagnostic
     // alone. It names the validator; it never decides anything.
     validateStage: grounding
@@ -349,11 +396,17 @@ export async function improveProposalSectionWording({
       : ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
   });
 
+  const telemetry = {
+    attempts: pass.attempts || 0,
+    corrected: pass.corrected === true,
+    attempt_audit: pass.attempt_audit || [],
+  };
   if (pass.outcome !== ADI_WORDING_OUTCOME.IMPROVED) {
     return result({
       applied: false,
       action,
       mode,
+      ...telemetry,
       outcome: pass.outcome,
       previousText: mode === ADI_SECTION_MODE.SECTION ? original : null,
       canUndo: Boolean(marker),
@@ -381,7 +434,7 @@ export async function improveProposalSectionWording({
     entities, persistRevision, proposalId, sectionId, section, body: pass.text, now, user, mode,
     previousBody: originalBody, previousText: original, improvedText: readable(pass.text),
   });
-  return result({ ...write, action, mode });
+  return result({ ...write, action, mode, ...telemetry });
 }
 
 function rejectedByRevision({
@@ -465,6 +518,7 @@ async function save({
   const improvedFingerprint = publishedSectionFingerprint(improvedText);
   const marker = {
     previous_body: previousBody,
+    previous_approval: section.metadata?.approval || null,
     previous_last_user_edited_at: section.last_user_edited_at ?? null,
     previous_last_gpt_generated_at: section.last_gpt_generated_at ?? null,
     improved_at: now,
