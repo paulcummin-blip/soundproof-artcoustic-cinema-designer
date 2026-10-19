@@ -25,13 +25,18 @@ function addRow(rowEarHeights, rowCount) {
 }
 
 /** Platform height is stored absolute: a row's platform is its rise over row 1. */
-const platformOfRow = (heights, rowIndex) => heights[rowIndex] - heights[0];
+const platformOfRow = (heights, rowIndex) =>
+  Math.round((heights[rowIndex] - heights[0]) * 100) / 100;
+
+/** The rise from the row in front, at the centimetre the designer reads. */
+const stepOfRow = (heights, rowIndex) =>
+  Math.round((heights[rowIndex] - heights[rowIndex - 1]) * 100) / 100;
 
 test("row 2 defaults to row 1 + 0.4 m", () => {
   // The Room Designer's own starting state for a one-row design.
   const heights = addRow([1.2, 1.5, 1.8], 1);
   assert.deepEqual(heights, [1.2, 1.6]);
-  assert.equal(heights[1] - heights[0], ROW_EAR_HEIGHT_INCREMENT_M);
+  assert.equal(stepOfRow(heights, 1), ROW_EAR_HEIGHT_INCREMENT_M);
   assert.equal(platformOfRow(heights, 1), 0.4);
 });
 
@@ -39,7 +44,7 @@ test("row 3 defaults to row 2 + 0.4 m", () => {
   const first = addRow([1.2, 1.5, 1.8], 1);
   const second = addRow(first, 2);
   assert.deepEqual(second, [1.2, 1.6, 2.0]);
-  assert.equal(second[2] - second[1], ROW_EAR_HEIGHT_INCREMENT_M);
+  assert.equal(stepOfRow(second, 2), ROW_EAR_HEIGHT_INCREMENT_M);
   assert.equal(platformOfRow(second, 2), 0.8);
 });
 
@@ -70,7 +75,9 @@ test("a row defaults without a stated previous height fall back to the row-1 bas
   assert.equal(getEarHeightForRow(1), 1.2);
   // Bounds of the Ear Height field are respected.
   assert.equal(defaultEarHeightForNewRow({ previousEarHeightM: 3.0 }), 3.0);
-  assert.equal(defaultEarHeightForNewRow({ previousEarHeightM: 0.05 }), 0.45);
+  assert.equal(defaultEarHeightForNewRow({ previousEarHeightM: 0.1 }), 0.5);
+  // An unusable previous height is never stepped from: the row-1 base is used.
+  assert.equal(defaultEarHeightForNewRow({ previousEarHeightM: -1 }), 1.6);
 });
 
 test("the default is a creation default: no stored value is rewritten by resolving rows", () => {
@@ -83,9 +90,12 @@ test("the Ear Height field stays the only manual writer, and platform keeps one 
   const rebuild = read("src/components/hooks/useSeatingRebuild.jsx");
 
   // The added row is the only row defaulted on Add Row.
-  assert.match(layout, /defaultEarHeightForNewRow\(\{ previousEarHeightM/);
+  assert.match(layout, /defaultEarHeightForNewRow\(\{\s*previousEarHeightM/);
   // No second, competing platform rule was introduced: platform stays absolute,
-  // derived from the row ear heights by the seat-rebuild authority.
+  // derived from the row ear heights by the seat-rebuild authority, which states
+  // no increment of its own.
   assert.match(rebuild, /getRowZ\(rowIndex\) - getRowZ\(0\)/);
   assert.doesNotMatch(rebuild, /0\.4/);
+  // The Ear Height field remains a manual writer of its own row only.
+  assert.match(layout, /next\[idx\] = clamped;/);
 });
