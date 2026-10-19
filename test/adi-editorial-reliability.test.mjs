@@ -76,6 +76,15 @@ describe('section-aware ADI correction', () => {
     assert.equal(pass.attempt_audit[1].outcome, 'rejected');
     assert.ok(pass.attempt_audit.every((entry) => entry.violations.length > 0));
   });
+  it('records the actual writer-validator stage rather than the grounding fallback', async () => {
+    const { pass } = await passFor(source, [improved, improved], {
+      validateStage: 'product_grounding',
+      validate: async () => ({ ok: false, stage: 'original_surface_validator', violations: [{ code: 'unsupported_recommendation' }] }),
+    });
+    assert.equal(pass.outcome, 'rejected');
+    assert.ok(pass.attempt_audit.every((entry) => entry.rejectionStage === 'original_surface_validator'));
+    assert.equal(pass.attempts, 2);
+  });
   it('validation-only mode writes no section and creates no history record', async () => {
     const { generation, input } = editWorld();
     const section = { id: 'section', section_type: 'dynamic_range' };
