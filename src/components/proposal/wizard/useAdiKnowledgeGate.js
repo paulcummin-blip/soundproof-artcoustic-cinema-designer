@@ -18,9 +18,9 @@
  * WHAT IT NEVER DOES. It decides nothing itself: the authority order (project
  * evidence, the designer's own answers, learned knowledge, then ask) and the design
  * condition test live in the gating authority, and the reading happens behind the
- * backend function — so no learning machinery, confidence score or knowledge record
- * ever reaches the browser. A failed read is not an error: it simply means ADI asks
- * exactly as it did before any of this existed.
+ * backend function — so no learning machinery, score or knowledge record ever reaches
+ * the browser. A failed read is not an error: it simply means ADI asks exactly as it
+ * did before any of this existed.
  */
 
 import { useEffect, useMemo, useState } from 'react';

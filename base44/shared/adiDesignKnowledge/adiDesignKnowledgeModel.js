@@ -132,6 +132,8 @@ const PERSONAL_OR_COMMERCIAL = [
   /\b\d+\s?(?:k|thousand)\b\s*(?:budget|pounds|dollars|euros)?/i,
   /[\w.+-]+@[\w-]+\.[\w.]+/,
   /\b(?:tel|phone|mobile|call)\b[^.]{0,12}\d{4,}/i,
+  // A telephone number written on its own, with no key word in front of it.
+  /\b\d[\d\s()+/-]{6,}\d\b/,
   /\b(?:mr|mrs|ms|miss|dr|sir|lady|prof)\b\.?\s+[A-Z][a-z]+/,
   /\b(?:client|customer|owner|homeowner)\b[^.]{0,20}\b[A-Z][a-z]{2,}\b/,
   /\b(?:postcode|zip|address|street|road|avenue|lane|drive|house number)\b/i,
@@ -152,11 +154,17 @@ export function countWord(value) {
   return whole >= 0 && whole < NUMBER_WORDS.length ? NUMBER_WORDS[whole] : String(whole);
 }
 
-/** `2` reads as 'two'; a count read back from text ('two') reads as 2. */
+/**
+ * `2` reads as 'two'; a count read back from text ('two') reads as 2. A count the design
+ * does NOT state is null — never zero: a condition built from an unstated value would
+ * describe a design that does not exist, and a rationale learned for a two-row cinema
+ * would then read as though it belonged to a one-row room.
+ */
 export function countValue(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
   const direct = Number(value);
   if (Number.isFinite(direct)) return Math.round(direct);
-  const text = String(value ?? '').trim().toLowerCase();
+  const text = String(value).trim().toLowerCase();
   const index = NUMBER_WORDS.indexOf(text);
   return index >= 0 ? index : null;
 }

@@ -100,6 +100,22 @@ function normalise(value) {
     .trim();
 }
 
+/**
+ * Does an answer express one family's key word or phrase? A single word is matched whole
+ * — 'even' in 'prevents' is not the continuity family — and a phrase is matched as it is
+ * written. Reading meaning must never be looser than the meaning itself.
+ */
+function escapeKeyword(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function expresses(text, keyword) {
+  const normalised = normalise(keyword);
+  if (!normalised) return false;
+  if (/^[a-z0-9]+$/.test(normalised)) return new RegExp(`\\b${escapeKeyword(normalised)}\\b`).test(text);
+  return text.includes(normalised);
+}
+
 /** The meaning families one answer expresses, as sorted concept keys. */
 export function conceptsOf(answer, topic = null) {
   const text = normalise(answer);
@@ -107,7 +123,7 @@ export function conceptsOf(answer, topic = null) {
   const families = CONCEPT_KEYWORDS[topic] || {};
   const found = [];
   for (const [concept, keywords] of Object.entries(families)) {
-    if (keywords.some((keyword) => text.includes(normalise(keyword)))) found.push(concept);
+    if (keywords.some((keyword) => expresses(text, keyword))) found.push(concept);
   }
   return found.sort();
 }

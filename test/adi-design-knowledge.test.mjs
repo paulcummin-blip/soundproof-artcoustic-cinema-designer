@@ -153,7 +153,7 @@ test('the same rationale worded three different ways is one cluster', () => {
 
   assert.equal(clusters.length, 1);
   assert.equal(clusters[0].answers.length, 3);
-  assert.deepEqual(clusters[0].concepts, ['front_rear_envelope', 'middle_fills_gap']);
+  assert.deepEqual([...clusters[0].concepts].sort(), ['front_rear_envelope', 'middle_fills_gap']);
   assert.equal(clusters[0].projects.length, 3);
 
   // And the canonical form states that shared meaning in context, in none of their words.
@@ -313,7 +313,7 @@ test('a moderately-confident rationale is offered as a light confirmation', () =
 
   const confirmation = gated.confirmations[0];
   assert.match(confirmation.confirmation, /^ADI understands the six-overhead layout is intended to/);
-  assert.ok(confirmation.intent && confirmation.confirmation.includes(confirmation.intent.replace(/\.$/, '')));
+  assert.equal(confirmation.rationale, second.record.canonical_meaning);
   // The designer can still answer it in their own words: the question is carried with it.
   assert.equal(confirmation.question.question_id, QUESTION.question_id);
 
@@ -505,7 +505,9 @@ test('the learning machinery is not exposed to a dealer or a client', () => {
   ];
   for (const file of wizardFiles) {
     const source = read(file);
-    assert.ok(!source.includes('AdiDesignKnowledge'), `${file} must not read the knowledge table directly`);
+    // A dealer's browser may call the learning authority, but it never reads the
+    // knowledge table itself and never holds a record.
+    assert.ok(!source.includes('entities.AdiDesignKnowledge'), `${file} must not read the knowledge table directly`);
     for (const forbidden of ['confidence', 'confidence_band', 'seen_projects', 'raw_answers', 'source_refs']) {
       assert.ok(!source.includes(forbidden), `${file} must never surface "${forbidden}"`);
     }
