@@ -8,10 +8,14 @@ import OverheadChannelsPanel from './OverheadChannelsPanel';
 import { useFinalSafetyPass } from './hooks/useFinalSafetyPass';
 import {
   resolveInitialWallPosition,
-  resolveAutoSurroundHeight,
   resolveCanonicalRsp,
   hasInvalidAutomaticRearPair,
 } from '@/components/room/placement/initialSpeakerPlacement';
+import {
+  readAcousticCentreGroups,
+  applyAcousticCentreForGroup,
+  resolveSurroundAcousticCentreDefaults,
+} from '@/components/room/surrounds/surroundAcousticCentreAuthority';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -506,14 +510,6 @@ function SpeakerPlacementImpl(props) {
     )?.mlp || null;
   }, [seatingPositions, effectiveDims?.width, effectiveDims?.widthM, effectiveDims?.length, effectiveDims?.lengthM]);
 
-  // ONE authority for the automatic surround height — the shared resolver is
-  // also used by initial placement, so a newly installed surround is already at
-  // its final height and the height effect finds nothing to change.
-  const computeAutoSurroundHeight = useCallback(
-    (seatingPos, roomH) => resolveAutoSurroundHeight(seatingPos, roomH),
-    []
-  );
-
   const setSpeakers = useCallback((updater) => {
     setSpeakerSystem(prev => {
       const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
@@ -527,6 +523,25 @@ function SpeakerPlacementImpl(props) {
       return { ...prev, placedSpeakers: nextArr };
     });
   }, [setSpeakerSystem]);
+
+  // Surround and front-wide heights live on the speakers themselves: the panel
+  // reads the acoustic centre each group actually holds and writes a typed value
+  // straight back to that group, so the controls and the drawing share one value.
+  const roomHeightM = Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8;
+
+  const acousticCentreDefaults = useMemo(
+    () => resolveSurroundAcousticCentreDefaults(seatingPositions, roomHeightM),
+    [seatingPositions, roomHeightM]
+  );
+
+  const acousticCentreGroups = useMemo(
+    () => readAcousticCentreGroups(placedSpeakers, roomHeightM),
+    [placedSpeakers, roomHeightM]
+  );
+
+  const handleAcousticCentreChange = useCallback((group, valueM) => {
+    setSpeakers((prev) => applyAcousticCentreForGroup(prev, group, valueM, roomHeightM));
+  }, [setSpeakers, roomHeightM]);
 
   const canSides = allowedRoles.has('SL') && allowedRoles.has('SR');
   const canRears = allowedRoles.has('SBL') && allowedRoles.has('SBR');
@@ -555,12 +570,6 @@ function SpeakerPlacementImpl(props) {
       value: { master, side: master, rear: master, wide: master },
       override: { side: false, rear: false, wide: false },
     };
-  });
-
-  const [surroundHeightConfig, setSurroundHeightConfig] = useState({
-    side: { mode: 'auto', value: null },
-    rear: { mode: 'auto', value: null },
-    wide: { mode: 'auto', value: null },
   });
 
   // Rehydrate local surroundConfig when appState.globalSurroundModel is restored
@@ -1386,54 +1395,6 @@ function SpeakerPlacementImpl(props) {
 
   useFinalSafetyPass({ placedSpeakers, effectivePreset, useWides, effectiveDims, allowedRoles, setSpeakers, surroundConfig });
 
-  // Apply surround heights (z only) based on surroundHeightConfig — preserves x/y
-  useEffect(() => {
-    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
-    const roomH = Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8;
-    const autoH = computeAutoSurroundHeight(seatingPositions, roomH);
-    const maxH = roomH - 0.30;
-
-    const sideH = surroundHeightConfig.side.mode === 'auto'
-      ? autoH
-      : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.side.value) || autoH));
-    const rearH = surroundHeightConfig.rear.mode === 'auto'
-      ? autoH
-      : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.rear.value) || autoH));
-    const wideH = (surroundHeightConfig.wide?.mode ?? 'auto') === 'auto'
-      ? autoH
-      : Math.max(0.80, Math.min(maxH, Number(surroundHeightConfig.wide?.value) || autoH));
-
-    const SIDE_ROLES = new Set(['SL', 'SR', 'SL1', 'SR1', 'SL2', 'SR2']);
-    const REAR_ROLES = new Set(['SBL', 'SBR', 'SBL1', 'SBR1', 'SBL2', 'SBR2']);
-    // WIDE_ROLES (LW, RW) intentionally excluded — Front Wide heights must not be auto-adjusted
-
-    setSpeakers(prev => {
-      if (!Array.isArray(prev) || prev.length === 0) return prev;
-      let changed = false;
-      const next = prev.map(s => {
-        const canon = getCanonicalRole(s.role);
-        const r = String(s.role || '').toUpperCase();
-        let targetH = null;
-        if (SIDE_ROLES.has(canon) || SIDE_ROLES.has(r)) targetH = sideH;
-        else if (REAR_ROLES.has(canon) || REAR_ROLES.has(r)) targetH = rearH;
-        // Front Wides (LW/RW): targetH remains null — height preserved as-is
-        if (targetH === null || !s.position) return s;
-        if (Math.abs((s.position.z || 0) - targetH) < 0.001) return s;
-        changed = true;
-        return { ...s, position: { ...s.position, z: targetH } };
-      });
-      return changed ? next : prev;
-    });
-  }, [
-    surroundHeightConfig,
-    seatingPositions,
-    effectiveDims?.height,
-    effectiveDims?.heightM,
-    computeAutoSurroundHeight,
-    setSpeakers,
-    placedSpeakers?.length,
-  ]);
-
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
       <div className="space-y-3 mt-4">
@@ -1545,10 +1506,11 @@ function SpeakerPlacementImpl(props) {
           extraSurroundCount={extraSurroundCount}
           onExtraSurroundCountChange={onExtraSurroundCountChange}
           allowExtraSurrounds={allowExtraSurrounds}
-          surroundHeightConfig={surroundHeightConfig}
-          setSurroundHeightConfig={setSurroundHeightConfig}
-          autoSurroundHeight={computeAutoSurroundHeight(seatingPositions, Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8)}
-          roomHeight={Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.8}
+          acousticCentre={{
+            groups: acousticCentreGroups,
+            defaults: acousticCentreDefaults,
+            onChange: handleAcousticCentreChange,
+          }}
         />
         </div>
 

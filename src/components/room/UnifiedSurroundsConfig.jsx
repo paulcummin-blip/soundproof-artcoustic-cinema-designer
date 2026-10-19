@@ -9,6 +9,15 @@ import { PRODUCT_ROLES } from "@/components/products/productMaster";
 import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { timeNowMs } from "@/components/utils/timeNow";
 import SurroundsSelector from '../speakers/SurroundsSelector';
+import AcousticCentreHeightField from './surrounds/AcousticCentreHeightField';
+
+/** "Default 1.60 m (follows the risers)" — the group's own stated default. */
+const defaultHint = (defaultM) => {
+  const value = Number(defaultM);
+  return Number.isFinite(value)
+    ? `Default ${value.toFixed(2)} m (follows the risers)`
+    : 'Default follows the risers';
+};
 
 export default function UnifiedSurroundsConfig({
   placedSpeakers,
@@ -37,10 +46,7 @@ export default function UnifiedSurroundsConfig({
   extraSurroundCount,
   onExtraSurroundCountChange,
   allowExtraSurrounds,
-  surroundHeightConfig,
-  setSurroundHeightConfig,
-  autoSurroundHeight,
-  roomHeight,
+  acousticCentre,
 }) {
   const dimsSafe = React.useMemo(() => {
     const src = dimensions || {};
@@ -328,88 +334,61 @@ export default function UnifiedSurroundsConfig({
         allowExtraSurrounds={safeAllowExtraSurrounds}
       />
 
-      {/* Surround Heights */}
+      {/* Acoustic centre heights — read from, and written to, the speakers
+          themselves, so the panel and the drawing can never disagree. */}
       {(canSides || canRears || canWides) && (
         <div className="mt-3 border-t border-[#E6E4DD] pt-3 space-y-3">
           <p className="text-xs text-[#625143]">
-            RP22 Auto: acoustic centre at or slightly above listener ear plane, raised only where needed for acoustic clearance.
+            Acoustic Centre Height is the vertical centre of the speaker cabinet, measured from the
+            finished floor. The default follows the seating risers: front wides 1.20 m above the first
+            row, side surrounds above the second row, rear surrounds above the last row. Typing a value
+            sets that group's height and is kept, whatever the seating does afterwards.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-            {/* Side Surround Height */}
             {canSides && (
-              <div className="space-y-2">
-                <Label className="text-xs font-medium text-[#3E4349]">Side Surround Height</Label>
-
-                <div className="relative">
-                  <Input
-                    type="number" step="0.01"
-                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                    value={surroundHeightConfig?.side?.mode === 'manual'
-                      ? (surroundHeightConfig.side.value ?? autoSurroundHeight ?? 1.2)
-                      : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, side: { mode: 'manual', value: v } }));
-                    }}
-                    disabled={disabled}
-                    className="pr-8 bg-white text-[#1B1A1A]"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-                </div>
-              </div>
+              <AcousticCentreHeightField
+                label="Side Surround — Acoustic Centre Height"
+                valueM={acousticCentre?.groups?.side?.valueM}
+                mixed={acousticCentre?.groups?.side?.mixed}
+                defaultM={acousticCentre?.defaults?.sideM}
+                minM={acousticCentre?.groups?.side?.minM}
+                maxM={acousticCentre?.groups?.side?.maxM}
+                hint={defaultHint(acousticCentre?.defaults?.sideM)}
+                disabled={disabled}
+                onChange={(valueM) => acousticCentre?.onChange?.('side', valueM)}
+              />
             )}
 
-            {/* Rear Surround Height */}
             {canRears && (
-              <div className="space-y-2">
-                <Label className="text-xs font-medium text-[#3E4349]">Rear Surround Height</Label>
+              <AcousticCentreHeightField
+                label="Rear Surround — Acoustic Centre Height"
+                valueM={acousticCentre?.groups?.rear?.valueM}
+                mixed={acousticCentre?.groups?.rear?.mixed}
+                defaultM={acousticCentre?.defaults?.rearM}
+                minM={acousticCentre?.groups?.rear?.minM}
+                maxM={acousticCentre?.groups?.rear?.maxM}
+                hint={defaultHint(acousticCentre?.defaults?.rearM)}
+                disabled={disabled}
+                onChange={(valueM) => acousticCentre?.onChange?.('rear', valueM)}
+              />
+            )}
 
-                <div className="relative">
-                  <Input
-                    type="number" step="0.01"
-                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                    value={surroundHeightConfig?.rear?.mode === 'manual'
-                      ? (surroundHeightConfig.rear.value ?? autoSurroundHeight ?? 1.2)
-                      : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.2}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, rear: { mode: 'manual', value: v } }));
-                    }}
-                    disabled={disabled}
-                    className="pr-8 bg-white text-[#1B1A1A]"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-                  </div>
-                  </div>
-                  )}
-
-                  {/* Front Wide Height */}
-                  {canWides && (
-                  <div className="space-y-2">
-                  <Label className="text-xs font-medium text-[#3E4349]">Front Wide Height</Label>
-                  <div className="relative">
-                  <Input
-                    type="number" step="0.01"
-                    min="0.80" max={roomHeight ? (roomHeight - 0.30).toFixed(2) : 2.5}
-                    value={surroundHeightConfig?.wide?.mode === 'manual'
-                      ? (surroundHeightConfig.wide.value ?? autoSurroundHeight ?? 1.25)
-                      : Number.isFinite(autoSurroundHeight) ? Number(autoSurroundHeight.toFixed(2)) : 1.25}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) setSurroundHeightConfig?.(prev => ({ ...prev, wide: { mode: 'manual', value: v } }));
-                    }}
-                    disabled={disabled}
-                    className="pr-8 bg-white text-[#1B1A1A]"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">m</span>
-                  </div>
-                  </div>
-                  )}
-
-                  </div>
-                  </div>
-                  )}
+            {canWides && (
+              <AcousticCentreHeightField
+                label="Front Wide — Acoustic Centre Height"
+                valueM={acousticCentre?.groups?.wide?.valueM}
+                mixed={acousticCentre?.groups?.wide?.mixed}
+                defaultM={acousticCentre?.defaults?.wideM}
+                minM={acousticCentre?.groups?.wide?.minM}
+                maxM={acousticCentre?.groups?.wide?.maxM}
+                hint={defaultHint(acousticCentre?.defaults?.wideM)}
+                disabled={disabled}
+                onChange={(valueM) => acousticCentre?.onChange?.('wide', valueM)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

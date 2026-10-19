@@ -14,9 +14,9 @@ import {
   resolveInitialWallPosition,
   resolveInitialLcrPosition,
   resolveFrontWideY,
-  resolveAutoSurroundHeight,
   resolveCanonicalRsp,
 } from '@/components/room/placement/initialSpeakerPlacement';
+import { resolveSurroundAcousticCentreDefaults } from '@/components/room/surrounds/surroundAcousticCentreAuthority';
 import { resolveSideSurroundVisualSpan } from '@/components/room/rv/hooks/useSideSurroundVisualSpanM';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { buildFrontStageSeed } from '@/components/room/lcrFrontStageSeed';
@@ -154,10 +154,11 @@ export function run() {
   ok('deeper model keeps x', flDeep.position.x === 1.1, 'x=' + flDeep.position.x);
   ok('deeper model pushes y clear', flDeep.position.y >= 0.01 + 0.40 / 2 - 1e-9, 'y=' + flDeep.position.y);
 
-  // 8) Surround height + canonical RSP.
-  // Parity with the previous inline expression (ear height + 5 cm), bit for bit.
-  ok('auto surround height = plan-view rule', resolveAutoSurroundHeight(SEATS, ROOM.heightM) === (1.1 + 0.05),
-    'h=' + resolveAutoSurroundHeight(SEATS, ROOM.heightM));
+  // 8) Surround acoustic-centre default + canonical RSP.
+  const centreDefaults = resolveSurroundAcousticCentreDefaults(SEATS, ROOM.heightM);
+  ok('surround default = 1.20 m for a single row',
+    centreDefaults.sideM === 1.20 && centreDefaults.rearM === 1.20 && centreDefaults.wideM === 1.20,
+    JSON.stringify(centreDefaults));
   ok('canonical RSP prefers published green dot',
     JSON.stringify(resolveCanonicalRsp({ roomDims: ROOM, mlpX_m: 2.1, mlpY_m: 3.9 })) === JSON.stringify({ x: 2.1, y: 3.9 }));
 

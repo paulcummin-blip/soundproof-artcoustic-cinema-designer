@@ -2286,17 +2286,25 @@ function RoomDesignerWithState() {
                       rearSubsCfg={rearSubsCfg}
                       wall={sideElevationWall}
                       onScreenHeightFromFloorChange={(h) => setScreenGuarded(prev => ({ ...prev, heightFromFloorM: h }))}
-                      onSideSpeakerMoved={({ role, newZ }) => {
-                        // Standard paired roles — both sides share the same height
+                      onSideSpeakerMoved={({ role, newZ, newY }) => {
+                        const movesZ = Number.isFinite(newZ);
+                        const movesY = Number.isFinite(newY);
+                        if (!movesZ && !movesY) return;
+                        // Standard paired roles — both sides share the height and the
+                        // along-wall position, so a pair stays symmetrical.
                         const PAIRS = { LW: 'RW', RW: 'LW', SL: 'SR', SR: 'SL', SBL: 'SBR', SBR: 'SBL' };
                         const paired = PAIRS[role] || null;
                         // Extra surrounds (SL2/SR2, SL3/SR3…): match exact role only
                         const isExtraSurround = /^(SL|SR)\d+$/.test(role);
                         setSpeakers(prev => prev.map(s => {
                           const r = String(s.role).toUpperCase();
-                          if (r === role) return { ...s, position: { ...s.position, z: newZ } };
-                          if (!isExtraSurround && paired && r === paired) return { ...s, position: { ...s.position, z: newZ } };
-                          return s;
+                          if (r !== role && !(!isExtraSurround && paired && r === paired)) return s;
+                          // One write of the speaker's own coordinates, recorded as the
+                          // designer's own position so no automatic pass moves it back.
+                          const position = { ...s.position };
+                          if (movesZ) position.z = newZ;
+                          if (movesY) position.y = newY;
+                          return { ...s, position, positionSource: 'user' };
                         }));
                       }}
                       onFrontSubHeightChange={(bottomHeightM) => compat.setFrontBottomHeight(bottomHeightM)}

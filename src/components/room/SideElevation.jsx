@@ -24,6 +24,8 @@ import {
 } from "@/components/utils/dualCentreSideProjection";
 import SideViewCentreCabinets from "@/components/room/dualCentre/SideViewCentreCabinets";
 import SideViewSubwoofers from "@/components/room/sideview/SideViewSubwoofers";
+import AcousticCentreDim from "@/components/room/sideview/AcousticCentreDim";
+import { SURROUND_DRAG_AXES, useSideSpeakerDrag } from "@/components/room/sideview/useSideSpeakerDrag";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -324,11 +326,6 @@ export default function SideElevation({
         window.removeEventListener('mouseup', listenersRef.current.up);
         listenersRef.current = null;
       }
-      if (speakerListenersRef.current) {
-        window.removeEventListener('mousemove', speakerListenersRef.current.move);
-        window.removeEventListener('mouseup', speakerListenersRef.current.up);
-        speakerListenersRef.current = null;
-      }
       if (seatRowListenersRef.current) {
         window.removeEventListener('mousemove', seatRowListenersRef.current.move);
         window.removeEventListener('mouseup', seatRowListenersRef.current.up);
@@ -337,13 +334,45 @@ export default function SideElevation({
     };
   }, []);
 
-  // Speaker vertical drag state
-  const speakerDragRef = useRef(null);
-  const speakerListenersRef = useRef(null);
-  const [liveSpeakerDrag, setLiveSpeakerDrag] = useState(null); // { role, z } | null
-  const [activeSnapZ, setActiveSnapZ] = useState(null); // snapped Z in room-metres while dragging, null when not snapping
-  const activeSnapZRef = useRef(null);
-  const speakersForSnapRef = useRef([]); // draggable side speaker z values — updated each render
+  // Direct dragging of a surround or front-wide speaker: horizontal moves it
+  // along its wall, vertical sets its acoustic centre height. Both axes write
+  // the speaker's own stored position through one commit on release, so the
+  // drawing and the controls can never diverge and no calculation runs mid-drag.
+  const isDraggableSideRole = (role) => {
+    const upper = String(role || "").toUpperCase();
+    return ['LW', 'RW', 'SL', 'SR', 'SBL', 'SBR'].includes(upper) || /^(SL|SR)\d+$/.test(upper);
+  };
+
+  const dragSnapTargets = useMemo(
+    () => (Array.isArray(resolvedSpeakers)
+      ? resolvedSpeakers
+          .filter((s) => isDraggableSideRole(s?.role) && Number.isFinite(s?.position?.z))
+          .map((s) => ({ role: String(s.role).toUpperCase(), z: s.position.z }))
+      : []),
+    [resolvedSpeakers],
+  );
+
+  const { liveDrag, activeSnapZ, handleSpeakerMouseDown } = useSideSpeakerDrag({
+    svgRef,
+    SVG_W,
+    SVG_H,
+    drawW,
+    drawH,
+    roomL,
+    roomH,
+    snapTargets: dragSnapTargets,
+    onCommit: onSideSpeakerMoved,
+  });
+
+  // What a marker hands to the drag authority: the speaker's own coordinates,
+  // its cabinet extent, and the axes it may move along.
+  const dragStartFor = (role, { z, y, cabinetHeightM, widthM, axes = SURROUND_DRAG_AXES.BOTH }) => ({
+    z,
+    y,
+    cabinetHeightM,
+    halfWidthM: (Number(widthM) > 0 ? Number(widthM) : 0.18) / 2,
+    axes,
+  });
 
   // Sub vertical-only drag state — local only, committed once on mouseup
   const [liveSubDrag, setLiveSubDrag] = useState(null); // { group, liveBottomHeightM } | null
@@ -356,55 +385,6 @@ export default function SideElevation({
 
   // Sightline overlay toggle
   const [showSightlines, setShowSightlines] = useState(false);
-
-  const handleSpeakerMouseDown = useCallback((e, role, startZ) => {
-    if (!onSideSpeakerMoved) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    speakerDragRef.current = { role, startClientY: e.clientY, startZ };
-    setLiveSpeakerDrag({ role, z: startZ });
-    const handleMove = (me) => {
-      const svgRect = svgEl.getBoundingClientRect();
-      const svgScale = svgRect.height / SVG_H;
-      const deltaZ = -((me.clientY - speakerDragRef.current.startClientY) / svgScale / drawH) * roomH;
-      const rawZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
-      // Magnetic snap — same 50 mm threshold as Front Elevation
-      const SNAP_M = 0.05;
-      const others = speakersForSnapRef.current.filter(s => s.role !== role);
-      let snapHit = null;
-      for (const other of others) {
-        if (Math.abs(rawZ - other.z) < SNAP_M) {
-          if (snapHit === null || Math.abs(rawZ - other.z) < Math.abs(rawZ - snapHit)) {
-            snapHit = other.z;
-          }
-        }
-      }
-      activeSnapZRef.current = snapHit;
-      setActiveSnapZ(snapHit);
-      setLiveSpeakerDrag({ role, z: snapHit !== null ? snapHit : rawZ });
-    };
-    const handleUp = (me) => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      speakerListenersRef.current = null;
-      const svgRect = svgEl.getBoundingClientRect();
-      const svgScale = svgRect.height / SVG_H;
-      const deltaZ = -((me.clientY - speakerDragRef.current.startClientY) / svgScale / drawH) * roomH;
-      const rawZ = Math.max(0.05, Math.min(roomH - 0.05, speakerDragRef.current.startZ + deltaZ));
-      // Use snapped value if a snap was active at release
-      const finalZ = activeSnapZRef.current !== null ? activeSnapZRef.current : rawZ;
-      speakerDragRef.current = null;
-      activeSnapZRef.current = null;
-      setActiveSnapZ(null);
-      setLiveSpeakerDrag(null);
-      onSideSpeakerMoved({ role, newZ: Math.round(finalZ * 1000) / 1000 });
-    };
-    speakerListenersRef.current = { move: handleMove, up: handleUp };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }, [onSideSpeakerMoved, roomH, drawH, SVG_H]);
 
   const handleSubMouseDown = useCallback((e, group, startBottomHeightM, subHeightM) => {
     const handler = group === 'front' ? onFrontSubHeightChange : onRearSubHeightChange;
@@ -523,17 +503,6 @@ export default function SideElevation({
     if (liveSeatRowDrag && liveSeatRowDrag.rowNumber === row.rowIdx) return liveSeatRowDrag.liveY;
     return row.y;
   };
-
-  // Populate snap targets — draggable side/rear surround speakers, updated every render
-  const isDraggableSideRole = (r) => {
-    const u = String(r || '').toUpperCase();
-    return ['LW','RW','SL','SR','SBL','SBR'].includes(u) || /^(SL|SR)\d+$/.test(u);
-  };
-  speakersForSnapRef.current = Array.isArray(resolvedSpeakers)
-    ? resolvedSpeakers
-        .filter(s => isDraggableSideRole(s?.role) && Number.isFinite(s?.position?.z))
-        .map(s => ({ role: String(s.role).toUpperCase(), z: s.position.z }))
-    : [];
 
   // Hoisted so the topmost screen drag hit rect (rendered after all speakers) can reference these
   const sxPx       = rx(screenFrontY);
@@ -910,7 +879,8 @@ export default function SideElevation({
             const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
             const grpRole = grp.roles[0] || '';
             const isDraggableGrp = !!onSideSpeakerMoved && grp.roles.some(r => ['SBL','SBR'].includes(r));
-            const effectiveGrpZ = (liveSpeakerDrag && grp.roles.includes(liveSpeakerDrag.role)) ? liveSpeakerDrag.z : grp.z;
+            const grpDraft = liveDrag && grp.roles.includes(String(liveDrag.role || '').toUpperCase()) ? liveDrag : null;
+            const effectiveGrpZ = Number.isFinite(grpDraft?.z) ? grpDraft.z : grp.z;
             const frontX = rx(roomL - spkDepthM); // front face of speaker
             const backX  = rx(roomL);             // rear wall
             const svgW   = Math.max(3, backX - frontX);
@@ -920,9 +890,11 @@ export default function SideElevation({
             const label  = grp.roles.length > 1
               ? grp.roles.join('/')
               : grp.roles[0];
+            // A rear surround's along-wall axis is X, which a side elevation does
+            // not show, so these stay height-only draggable here.
             return (
               <g key={`rear-${i}`} opacity={0.92}
-                onMouseDown={isDraggableGrp ? (e) => handleSpeakerMouseDown(e, grpRole, effectiveGrpZ) : undefined}
+                onMouseDown={isDraggableGrp ? (e) => handleSpeakerMouseDown(e, grpRole, dragStartFor(grpRole, { z: effectiveGrpZ, y: grp.y, cabinetHeightM: spkHeightM, widthM: spkDepthM, axes: SURROUND_DRAG_AXES.HEIGHT_ONLY })) : undefined}
                 style={{ cursor: isDraggableGrp ? 'ns-resize' : 'default' }}
                 {...speakerInfo.bind(() => ({
                   ...buildSpeakerInfo({
@@ -949,17 +921,26 @@ export default function SideElevation({
                   fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
-                {/* Height and cabinet dimensions are read on hover or tap in the
-                    speaker information card rather than drawn permanently. */}
+                {/* The cabinet's acoustic centre is dimensioned from the finished
+                    floor; the full height and cabinet size stay on the card. */}
                 {isDraggableGrp && (
-                  <rect
-                    x={frontX - 7} y={svgTop - 7}
-                    width={svgW + 14} height={svgH + 14}
-                    fill="transparent"
-                    pointerEvents="all"
-                    style={{ cursor: 'ns-resize' }}
-                    onMouseDown={(e) => handleSpeakerMouseDown(e, grpRole, effectiveGrpZ)}
-                  />
+                  <>
+                    <rect
+                      x={frontX - 7} y={svgTop - 7}
+                      width={svgW + 14} height={svgH + 14}
+                      fill="transparent"
+                      pointerEvents="all"
+                      style={{ cursor: 'ns-resize' }}
+                      onMouseDown={(e) => handleSpeakerMouseDown(e, grpRole, dragStartFor(grpRole, { z: effectiveGrpZ, y: grp.y, cabinetHeightM: spkHeightM, widthM: spkDepthM, axes: SURROUND_DRAG_AXES.HEIGHT_ONLY }))}
+                    />
+                    <AcousticCentreDim
+                      xPx={frontX - 8}
+                      floorPx={rz(0)}
+                      centrePx={rz(effectiveGrpZ)}
+                      heightM={effectiveGrpZ}
+                      side="left"
+                    />
+                  </>
                 )}
               </g>
             );
@@ -968,8 +949,8 @@ export default function SideElevation({
           {/* Magnetic snap guide — same style as Front Elevation */}
           {activeSnapZ !== null && (() => {
             // AFF: bottom of dragged cabinet at snapped height
-            const draggedSp = liveSpeakerDrag && Array.isArray(resolvedSpeakers)
-              ? resolvedSpeakers.find(s => String(s?.role || '').toUpperCase() === liveSpeakerDrag.role)
+            const draggedSp = liveDrag && Array.isArray(resolvedSpeakers)
+              ? resolvedSpeakers.find(s => String(s?.role || '').toUpperCase() === liveDrag.role)
               : null;
             const snapMeta = draggedSp ? (getSpeakerModelMeta(draggedSp.model) || {}) : {};
             const snapItemHM = Number(snapMeta.heightM) > 0 ? Number(snapMeta.heightM) : 0.27;
@@ -988,8 +969,8 @@ export default function SideElevation({
           })()}
 
           {/* Centre height AFF badge — visible during any vertical speaker drag */}
-          {liveSpeakerDrag && (() => {
-            const affZ = liveSpeakerDrag.z;
+          {liveDrag?.axis !== 'y' && Number.isFinite(liveDrag?.z) && (() => {
+            const affZ = liveDrag.z;
             const py = rz(affZ);
             return (
               <g key="spk-aff-badge" opacity={0.92}>
@@ -1166,9 +1147,12 @@ export default function SideElevation({
             const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
 
             const roleUp = String(spk.role || '').toUpperCase();
-            const isDraggable = !!onSideSpeakerMoved && (['LW','RW','SL','SR'].includes(roleUp) || /^(SL|SR)\d+$/.test(roleUp));
-            const effectiveZ = (liveSpeakerDrag && liveSpeakerDrag.role === roleUp) ? liveSpeakerDrag.z : spk.z;
-            const spkX   = rx(spk.y);
+            const isDraggable = !!onSideSpeakerMoved && isDraggableSideRole(roleUp);
+            // The speaker's stored position, with the live drag draft on top of it.
+            const draft = liveDrag && liveDrag.role === roleUp ? liveDrag : null;
+            const effectiveZ = Number.isFinite(draft?.z) ? draft.z : spk.z;
+            const effectiveY = Number.isFinite(draft?.y) ? draft.y : spk.y;
+            const spkX   = rx(effectiveY);
             const svgTop = rz(effectiveZ + spkHeightM / 2);
             const svgBot = rz(effectiveZ - spkHeightM / 2);
             const svgH   = Math.max(3, svgBot - svgTop);
@@ -1199,8 +1183,8 @@ export default function SideElevation({
             const sideDimX = spkX + svgW / 2 + 4;
             return (
               <g key={`spk-${i}`}
-                onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
-                style={{ cursor: isDraggable ? 'ns-resize' : 'default' }}
+                onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, dragStartFor(roleUp, { z: effectiveZ, y: effectiveY, cabinetHeightM: spkHeightM, widthM: spkWidthM })) : undefined}
+                style={{ cursor: isDraggable ? 'move' : 'default' }}
                 {...speakerInfo.bind(() => ({
                   ...buildSpeakerInfo({
                     role: spk.role,
@@ -1245,17 +1229,25 @@ export default function SideElevation({
                   fontWeight={600}>
                   {spk.role}
                 </text>
-                {/* Height and cabinet dimensions are read on hover or tap in the
-                    speaker information card rather than drawn permanently. */}
+                {/* The cabinet's acoustic centre is dimensioned from the finished
+                    floor; the full height and cabinet size stay on the card. */}
                 {isDraggable && (
-                  <rect
-                    x={cabinetX - 7} y={cabinetY - 7}
-                    width={svgW + 14} height={svgH + 14}
-                    fill="transparent"
-                    pointerEvents="all"
-                    style={{ cursor: 'ns-resize' }}
-                    onMouseDown={(e) => handleSpeakerMouseDown(e, roleUp, effectiveZ)}
-                  />
+                  <>
+                    <rect
+                      x={cabinetX - 7} y={cabinetY - 7}
+                      width={svgW + 14} height={svgH + 14}
+                      fill="transparent"
+                      pointerEvents="all"
+                      style={{ cursor: 'move' }}
+                      onMouseDown={(e) => handleSpeakerMouseDown(e, roleUp, dragStartFor(roleUp, { z: effectiveZ, y: effectiveY, cabinetHeightM: spkHeightM, widthM: spkWidthM }))}
+                    />
+                    <AcousticCentreDim
+                      xPx={spkX + svgW / 2 + 7}
+                      floorPx={rz(0)}
+                      centrePx={rz(effectiveZ)}
+                      heightM={effectiveZ}
+                    />
+                  </>
                 )}
               </g>
             );

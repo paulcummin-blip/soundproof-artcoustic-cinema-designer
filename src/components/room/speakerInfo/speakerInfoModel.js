@@ -14,6 +14,11 @@ const toCm = (metres) => {
   return Number.isFinite(v) && v > 0 ? Math.round(v * 100) : null;
 };
 
+const toMetres = (metres) => {
+  const v = Number(metres);
+  return Number.isFinite(v) && v > 0 ? v.toFixed(2) : null;
+};
+
 const isUnset = (model) => !model || model === "off" || model === "none";
 
 /** Friendly product name for a model key (falls back to the key itself). */
@@ -67,8 +72,10 @@ export function buildSpeakerInfoLines({
   extras = [],
 }) {
   const lines = [];
-  const centreCm = toCm(acousticCentreZ_m);
-  if (centreCm !== null) lines.push(`Acoustic centre height: ${centreCm} cm`);
+  // The acoustic centre is stated in metres — the same unit the control panel
+  // and the elevation dimension use, so one value never reads as two.
+  const centreM = toMetres(acousticCentreZ_m);
+  if (centreM !== null) lines.push(`Acoustic centre height: ${centreM} m`);
   const wCm = toCm(cabinetWidth_m);
   const hCm = toCm(cabinetHeight_m);
   if (wCm !== null && hCm !== null) lines.push(`Cabinet: ${wCm} × ${hCm} cm`);

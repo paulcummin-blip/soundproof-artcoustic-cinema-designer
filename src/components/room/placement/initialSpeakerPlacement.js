@@ -31,9 +31,9 @@ import { resolveRspScreenFrontPlaneM } from "@/components/room/rsp/screenGeometr
 import { SIDE_ALLOW_OVERHANG } from "@/components/room/rvPlanHelpers";
 import { resolveSideSurroundVisualSpan } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
 import { resolveWallHugTarget, resolveSpeakerDims, wallHugKind } from "./wallHugAuthority";
+import { resolveSurroundAcousticCentreDefaults } from "@/components/room/surrounds/surroundAcousticCentreAuthority";
 
 export const FRONT_WALL_GAP_M = 0.01;
-export const DEFAULT_EAR_Z_M = 1.1;
 
 const num = (v) => {
   const n = Number(v);
@@ -58,21 +58,6 @@ export function resolveCanonicalRsp({ roomDims, mlpX_m, mlpY_m, fallbackMlp }) {
   const resolvedY = y ?? fy ?? null;
   if (resolvedX === null || resolvedY === null) return null;
   return { x: resolvedX, y: resolvedY };
-}
-
-/**
- * Automatic surround height — the same rule the surround height effect applies,
- * so a newly installed surround is already at its final height.
- */
-export function resolveAutoSurroundHeight(seatingPositions, roomHeightM) {
-  const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
-  const earHeights = seats.map((s) =>
-    Number.isFinite(s?.rowEarHeight) ? s.rowEarHeight : Number.isFinite(s?.z) ? s.z : DEFAULT_EAR_Z_M
-  );
-  const maxEarH = earHeights.length > 0 ? Math.max(...earHeights) : DEFAULT_EAR_Z_M;
-  const raw = maxEarH + 0.05;
-  const maxH = (num(roomHeightM) ?? 2.8) - 0.30;
-  return Math.max(1.10, Math.min(maxH, raw));
 }
 
 /**
@@ -340,11 +325,13 @@ export function resolveInitialWallPosition({
     y = target.y;
   }
 
-  // Wides are excluded from the surround height effect, so they keep their own
-  // height; sides and rears take the automatic surround height.
-  const z = kind === "wide"
-    ? (num(existingPosition?.z) ?? DEFAULT_EAR_Z_M)
-    : resolveAutoSurroundHeight(seatingPositions, roomH(roomDims));
+  // The height is the group's DEFAULT acoustic centre, resolved from the
+  // project's own seating risers: front wides 1.20 m above the first row's
+  // floor, side surrounds one riser up, rear surrounds at the last row. This
+  // function only runs for a speaker that has no installation yet, so a speaker
+  // the designer has already placed keeps the height it holds.
+  const defaults = resolveSurroundAcousticCentreDefaults(seatingPositions, roomH(roomDims));
+  const z = kind === "rear" ? defaults.rearM : kind === "wide" ? defaults.wideM : defaults.sideM;
 
   return { x, y, z };
 }

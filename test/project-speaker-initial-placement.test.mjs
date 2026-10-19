@@ -21,9 +21,9 @@ import {
   resolveInitialWallPosition,
   resolveInitialLcrPosition,
   resolveFrontWideY,
-  resolveAutoSurroundHeight,
   resolveCanonicalRsp,
 } from '@/components/room/placement/initialSpeakerPlacement';
+import { resolveSurroundAcousticCentreDefaults } from '@/components/room/surrounds/surroundAcousticCentreAuthority';
 import { resolveSideSurroundVisualSpan } from '@/components/room/rv/hooks/useSideSurroundVisualSpanM';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { buildFrontStageSeed } from '@/components/room/lcrFrontStageSeed';
@@ -359,14 +359,19 @@ test('a deeper model pushes a preserved LCR clear of the front wall', () => {
 
 // ── 5. Surround height authority ──────────────────────────────────────────
 
-test('automatic surround height matches the plan-view rule', () => {
-  // Parity with the previous inline expression (ear height + 5 cm), bit for bit.
-  assert.equal(resolveAutoSurroundHeight(SEATS, ROOM.heightM), 1.1 + 0.05);
-  assert.equal(resolveAutoSurroundHeight([{ z: 1.4 }], ROOM.heightM), 1.4 + 0.05);
-  assert.equal(resolveAutoSurroundHeight([], ROOM.heightM), 1.15);
+test('the surround default acoustic centre follows the seating risers', () => {
+  // One row: every wall group sits 1.20 m above that row's own floor.
+  assert.deepEqual(resolveSurroundAcousticCentreDefaults(SEATS, ROOM.heightM), {
+    rows: 1,
+    wideM: 1.20,
+    sideM: 1.20,
+    rearM: 1.20,
+  });
+  // No seating data at all still resolves to the base acoustic centre.
+  assert.equal(resolveSurroundAcousticCentreDefaults([], ROOM.heightM).sideM, 1.20);
 });
 
-test('a surround keeps its manual installation height', () => {
+test('a newly placed surround takes its group default acoustic centre', () => {
   const pos = resolveInitialWallPosition({
     role: 'SL',
     model: MODEL,
@@ -380,7 +385,10 @@ test('a surround keeps its manual installation height', () => {
     getModelDimsM,
   });
   assert.equal(pos.y, sideSurroundDefaultY(ANCHORS), 'Y takes the centre line');
-  assert.equal(pos.z, 1.15, 'Z takes the automatic surround height');
+  // The caller only re-derives a position for a speaker that has none, so a
+  // speaker already at 1.35 m keeps it; the authority itself states the group
+  // default, which for a single 1.1 m row is 1.20 m.
+  assert.equal(pos.z, 1.20, 'Z takes the group default acoustic centre');
 });
 
 // ── 6. Canonical RSP resolution ───────────────────────────────────────────
