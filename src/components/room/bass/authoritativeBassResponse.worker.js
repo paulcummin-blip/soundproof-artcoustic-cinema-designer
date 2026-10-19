@@ -1,4 +1,26 @@
 import { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEngine";
+import { captureCombinedIntegrationTransfers } from "./combinedIntegrationEngine";
+
+// The combined LCR + subwoofer model is ADDITIVE. A failure inside it must never
+// take the authoritative subwoofer-only simulation down with it, so its result
+// is isolated and reported as unavailable instead of thrown.
+function captureIntegrationTransfers(payload) {
+  const integration = payload?.integration;
+  if (!integration || integration.enabled === false) return null;
+  try {
+    return captureCombinedIntegrationTransfers({
+      roomDims: payload.roomDims,
+      seatingPositions: payload.seatingPositions,
+      rspPosition: payload.rspPosition,
+      sources: payload.sources,
+      speakerSources: integration.speakerSources,
+      physics: payload.physics,
+      qStrategyOverride: payload.qStrategyOverride,
+    });
+  } catch (error) {
+    return { available: false, reason: error?.message || "combined-integration-failed" };
+  }
+}
 
 self.onmessage = (event) => {
   const { generation, payload } = event.data || {};
@@ -9,7 +31,12 @@ self.onmessage = (event) => {
 
   try {
     const result = simulateAuthoritativeBassResponse(payload || {});
-    self.postMessage({ type: "complete", generation, result });
+    const integrationTransfers = captureIntegrationTransfers(payload);
+    self.postMessage({
+      type: "complete",
+      generation,
+      result: integrationTransfers ? { ...result, integrationTransfers } : result,
+    });
   } catch (error) {
     self.postMessage({
       type: "error",

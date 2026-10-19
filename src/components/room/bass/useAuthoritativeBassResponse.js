@@ -5,6 +5,14 @@ import { BASS_NORMALIZED_PHYSICS_DEFAULTS as DEFAULTS } from "./bassPhysicsDefau
 import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
 import { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEngine";
 export { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEngine";
+import { captureCombinedIntegrationTransfers } from "./combinedIntegrationEngine";
+import { buildCombinedSystemResponse } from "./combinedSystemResponse";
+import { buildLcrIntegrationSources } from "./lcrIntegrationSources";
+import {
+  resolveSharedCrossoverLimits,
+  normaliseCrossoverConfig,
+  DEFAULT_MODEL_CROSSOVER_LIMITS,
+} from "./crossoverAuthority";
 import { ARTCOUSTIC_HOUSE_CURVE } from "@/components/utils/artcousticHouseCurve";
 import { computeCalibrationFingerprint, computeGeometryFingerprint, computeHouseCurveFingerprint, computeProductFingerprint } from "./bassAnalysisFingerprints";
 import { computeBaseDesignFingerprint } from "./p14TargetDefinitions";
@@ -188,6 +196,55 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   }, [designatedRspSeatId, seatingPositions]);
   const rspPosition = useMemo(() => buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, designatedRspSeat), [roomDims?.widthM, appState?.mlpY_m, appState?.mlpX_m, designatedRspSeat]);
 
+  // ── Crossover & Integration ────────────────────────────────────────────
+  // The three screen channels take part in the combined bass-managed response.
+  // The permitted crossover range comes from the selected speaker models: a
+  // frequency below a speaker's minimum cannot be produced, whether the
+  // designer types it or the optimiser proposes it.
+  const lcrSources = useMemo(
+    () => buildLcrIntegrationSources(appState?.placedSpeakers),
+    [appState?.placedSpeakers],
+  );
+  const crossoverLimits = useMemo(
+    () => (lcrSources.length
+      ? resolveSharedCrossoverLimits(lcrSources.map((source) => source.modelKey))
+      : { ...DEFAULT_MODEL_CROSSOVER_LIMITS }),
+    [lcrSources],
+  );
+  const storedCrossover = appState?.splConfig?.crossover;
+  // Normalising against the CURRENT limits is what enforces a model's minimum:
+  // select an Evolve 1 and an illegal 80 Hz is raised to 150 Hz immediately,
+  // while an existing manually chosen frequency that is still valid is kept.
+  const crossover = useMemo(
+    () => normaliseCrossoverConfig(storedCrossover, crossoverLimits),
+    [storedCrossover, crossoverLimits],
+  );
+  const setSplConfigRef = appState?.setSplConfig;
+  const setCrossover = useCallback((patch) => {
+    if (typeof setSplConfigRef !== "function") return;
+    setSplConfigRef((previous) => {
+      const current = previous && typeof previous === "object" ? previous : {};
+      const merged = { ...normaliseCrossoverConfig(current.crossover, crossoverLimits), ...(patch || {}) };
+      return { ...current, crossover: normaliseCrossoverConfig(merged, crossoverLimits) };
+    });
+  }, [setSplConfigRef, crossoverLimits]);
+  const integration = useMemo(
+    () => (lcrSources.length
+      ? { enabled: true, speakerSources: lcrSources }
+      : { enabled: false, speakerSources: [] }),
+    [lcrSources],
+  );
+  // The LCR signature identifies the combined model's own geometry. It is
+  // deliberately NOT part of the published engineering fingerprint: the
+  // crossover and the LCR paths are additive inputs to the combined response
+  // and must never invalidate an existing published result.
+  const integrationSignature = useMemo(
+    () => lcrSources
+      .map((source) => `${source.id}:${source.modelKey}:${source.x.toFixed(3)}:${source.y.toFixed(3)}:${source.z.toFixed(3)}`)
+      .join("|"),
+    [lcrSources],
+  );
+
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [roomDamping, setRoomDamping] = useState(DEFAULTS.roomDamping);
   const [surfaceAbsorptionInputs, setSurfaceAbsorptionInputs] = useState(DEFAULTS.surfaceAbsorption);
@@ -261,15 +318,31 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention, debugModalHSign,
     reflectionGainScale, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
     rewModalBandwidthScale, bassSmoothingMode]);
+  // The combined LCR + subwoofer transfers are captured alongside the
+  // authoritative subwoofer-only simulation, on the same worker pass. The
+  // CROSSOVER IS NOT PART OF THIS REQUEST: room transfer does not depend on it,
+  // so changing crossover frequency or slopes never re-runs a room simulation.
   const runSimulation = useCallback((strategy = qStrategy) => {
     if (analysisBlocked) return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] } };
-    return simulateAuthoritativeBassResponse({
+    const result = simulateAuthoritativeBassResponse({
       roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: strategy,
     });
-  }, [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, analysisBlocked]);
+    if (!integration.enabled) return result;
+    // Additive model: a failure here must never take the authoritative
+    // subwoofer-only result down with it.
+    try {
+      const integrationTransfers = captureCombinedIntegrationTransfers({
+        roomDims, seatingPositions, rspPosition, sources,
+        speakerSources: integration.speakerSources, physics, qStrategyOverride: strategy,
+      });
+      return integrationTransfers ? { ...result, integrationTransfers } : result;
+    } catch {
+      return result;
+    }
+  }, [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, analysisBlocked, integration]);
   const simulationRequest = useMemo(() => ({
-    roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: qStrategy,
-  }), [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy]);
+    roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride: qStrategy, integration,
+  }), [roomDims, seatingPositions, rspPosition, sources, physics, qStrategy, integration]);
   const simulationGenerationRef = useRef(0);
   const [simulationState, setSimulationState] = useState({
     request: null,

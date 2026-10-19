@@ -31,7 +31,10 @@ function isBatchModalEligible({ qStrategyOverride, physics, sources }) {
  * so the batch evaluator receives the exact same product-curve representation.
  */
 function buildDeratedProductCurve(sub, sourceIndex, amplifierAuthority) {
-  const subCurve = getSubwooferCurve(sub.modelKey);
+  // A source may carry its own spectrum (the combined LCR + subwoofer model
+  // drives the speakers from a unit flat source). Ordinary subwoofer sources
+  // have no productCurve and keep resolving their curve from the registry.
+  const subCurve = sub?.productCurve || getSubwooferCurve(sub.modelKey);
   if (!subCurve?.length) return null;
   const deratingDb = amplifierAuthority.sourceAuthorities[sourceIndex]?.deratingDb ?? 0;
   if (!Number.isFinite(deratingDb) || deratingDb === 0) return subCurve;
@@ -240,7 +243,8 @@ export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, 
     let sumRe = null;
     let sumIm = null;
     sources.forEach((sub, sourceIndex) => {
-      const subCurve = getSubwooferCurve(sub.modelKey);
+      // See buildDeratedProductCurve — a source may carry its own spectrum.
+      const subCurve = sub?.productCurve || getSubwooferCurve(sub.modelKey);
       if (!subCurve?.length) return;
       const sourceAmplifierDeratingDb = amplifierAuthority.sourceAuthorities[sourceIndex]?.deratingDb ?? 0;
       const rawSourceCurve = REW_SOURCE_CURVES[physics.rewSourceCurveMode] || subCurve;
