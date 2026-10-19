@@ -668,8 +668,8 @@ describe('undo restores the exact prior state', () => {
     expect(patch.last_gpt_generated_at).toBe(GPT_STAMP);
     expect(patch.last_user_edited_at).toBe(EDITED_STAMP);
     // No trace of the editorial act is left in the record.
-    expect('adi_editorial' in patch.metadata).toBe(false);
-    expect(patch.metadata).toEqual(originalMetadata);
+    expect(patch.metadata.adi_editorial).toBeNull();
+    expect(patch.metadata).toEqual({ ...originalMetadata, adi_editorial: null });
 
     // The stored section is the approved one again, so its approval counts again.
     const restored = approvalOf(world.stored());
