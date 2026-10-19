@@ -183,7 +183,9 @@ export async function runAdiWordingPass({
   mode = 'section',
   validate = null,
   validateStage = ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR,
+  sectionContract = null,
 } = {}) {
+  const attemptAudit = [];
   const asResult = (outcome, extra = {}) => ({
     outcome,
     mode,
@@ -192,6 +194,9 @@ export async function runAdiWordingPass({
     kept_original: outcome !== ADI_WORDING_OUTCOME.IMPROVED,
     violations: [],
     provider: { model: null, duration_ms: null },
+    attempt_audit: attemptAudit,
+    attempts: attemptAudit.length,
+    corrected: false,
     ...extra,
   });
 
@@ -253,6 +258,13 @@ export async function runAdiWordingPass({
     const unchanged = checkWordingConservation({ original, improved: proposed }).ok
       && flat(proposed) === flat(original);
     const refused = await refusalFor({ original, proposed, validate, validateStage });
+    attemptAudit.push({
+      attempt: attempts,
+      outcome: refused ? 'rejected' : (unchanged ? 'unchanged' : 'accepted'),
+      rejectionStage: refused?.stage || null,
+      violations: refused?.violations || [],
+      proposedText: proposed,
+    });
     if (!refused && unchanged) {
       if (attempts === 1) {
         return asResult(ADI_WORDING_OUTCOME.UNCHANGED, { provider: providerOf(), attempts });
@@ -279,6 +291,7 @@ export async function runAdiWordingPass({
     if (attempts < ADI_MAX_CANDIDATES) {
       callPrompt = buildAdiCorrectionPrompt({
         basePrompt: prompt,
+        sectionContract,
         original,
         refused: proposed,
         stage: refused.stage,
