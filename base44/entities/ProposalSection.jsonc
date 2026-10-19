@@ -190,6 +190,51 @@
             },
             "improved_revision": {
               "type": "string"
+            },
+            "previous_approval": {
+              "type": "object",
+              "description": "The designer's approval of this section's wording. Written only by approveProposalSection, never by a save, a generation, a preview or a read. Absent = the section has never been approved. It stops counting automatically when the section's content no longer matches fingerprint.",
+              "nullable": true,
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "approved"
+                  ],
+                  "description": "Always 'approved'. A section that is not approved carries no approval at all, so there is no second state to keep in step."
+                },
+                "approved_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the designer approved this wording."
+                },
+                "approved_by": {
+                  "type": "string",
+                  "description": "Name or email of the person who approved it."
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "The fingerprint of the content that was on screen when the approval was given. Compared against the section's current content on every read; a mismatch means the wording changed, so the approval no longer counts."
+                },
+                "revision_id": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "The exact generated or edited revision whose displayed wording was approved."
+                },
+                "generation_id": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "edit_id": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "published_page_fingerprint": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Fingerprint of the exact body used by the published page and PDF when approved."
+                }
+              }
             }
           }
         },
