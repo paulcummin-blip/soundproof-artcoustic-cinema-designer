@@ -10,6 +10,14 @@ import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRol
 import { timeNowMs } from "@/components/utils/timeNow";
 import SurroundsSelector from '../speakers/SurroundsSelector';
 import AcousticCentreHeightField from './surrounds/AcousticCentreHeightField';
+import SelectedSpeakerCard from './surrounds/SelectedSpeakerCard';
+import { groupForSurroundRole } from './surrounds/surroundAcousticCentreAuthority';
+import { useSpeakerSelection, setSpeakerSelection } from '@/components/state/speakerSelectionStore';
+
+/** What each group is called on screen, and the roles it governs when no
+    speaker of that group is installed yet. */
+const GROUP_LABEL = { side: 'Side Surround', rear: 'Rear Surround', wide: 'Front Wide' };
+const GROUP_ROLE_FALLBACK = { side: ['SL', 'SR'], rear: ['SBL', 'SBR'], wide: ['LW', 'RW'] };
 
 /** "Default 1.60 m (follows the risers)" — the group's own stated default. */
 const defaultHint = (defaultM) => {
@@ -68,6 +76,74 @@ export default function UnifiedSurroundsConfig({
     if (allowedRoles.has('LW')) roles.push('LW', 'RW');
     return roles;
   }, [allowedRoles]);
+
+  // --- Selection: the same act as choosing a speaker in the elevation --------
+  // A selection made in the drawing names ONE speaker, so SL, SL1, SR and SR1
+  // stay individually identifiable; a selection made at a control names the
+  // whole group that control governs, so the group's speakers light up together.
+  const selection = useSpeakerSelection();
+
+  // Which speakers each group actually has installed, read from the design.
+  const installedByGroup = useMemo(() => {
+    const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    return list.reduce((groups, speaker) => {
+      const group = groupForSurroundRole(speaker?.role);
+      if (!group) return groups;
+      const role = String(speaker?.role || '').toUpperCase();
+      if (!role) return groups;
+      groups[group] = groups[group] || [];
+      if (!groups[group].includes(role)) groups[group].push(role);
+      return groups;
+    }, {});
+  }, [placedSpeakers]);
+
+  const rolesForGroup = useCallback(
+    (group) =>
+      installedByGroup[group]?.length ? installedByGroup[group] : GROUP_ROLE_FALLBACK[group] || [],
+    [installedByGroup],
+  );
+
+  // The group the current selection points at, whichever end it came from.
+  const selectedGroup =
+    selection.group || (selection.primary ? groupForSurroundRole(selection.primary) : null);
+
+  const selectedSpeaker = useMemo(() => {
+    if (!selection.primary) return null;
+    const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    return (
+      list.find(
+        (speaker) => String(speaker?.role || '').toUpperCase() === selection.primary,
+      ) || null
+    );
+  }, [placedSpeakers, selection.primary]);
+
+  const selectedWall = useMemo(() => {
+    const x = Number(selectedSpeaker?.position?.x);
+    if (!Number.isFinite(x)) return null;
+    return x < dimsSafe.width / 2 ? 'left wall' : 'right wall';
+  }, [selectedSpeaker, dimsSafe.width]);
+
+  // A speaker picked in the drawing brings its own control into view.
+  React.useEffect(() => {
+    if (selection.source !== 'drawing' || !selectedGroup) return undefined;
+    const element = document.getElementById(`acoustic-centre-${selectedGroup}`);
+    if (!element || typeof element.scrollIntoView !== 'function') return undefined;
+    const frame = requestAnimationFrame(() => {
+      try {
+        element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        // A view with nothing to scroll simply stays where it is.
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selection.token, selection.source, selectedGroup]);
+
+  const engageGroup = useCallback(
+    (group) => {
+      setSpeakerSelection({ group, roles: rolesForGroup(group), source: 'panel' });
+    },
+    [rolesForGroup],
+  );
 
   const safeExtraSurroundCount = Number.isFinite(extraSurroundCount) ? extraSurroundCount : 0;
   const safeOnExtraSurroundCountChange =
@@ -338,6 +414,27 @@ export default function UnifiedSurroundsConfig({
           themselves, so the panel and the drawing can never disagree. */}
       {(canSides || canRears || canWides) && (
         <div className="mt-3 border-t border-[#E6E4DD] pt-3 space-y-3">
+          <SelectedSpeakerCard
+            role={selection.primary}
+            model={selectedSpeaker?.model || null}
+            acousticCentreM={
+              Number.isFinite(Number(selectedSpeaker?.position?.z))
+                ? Number(selectedSpeaker.position.z)
+                : null
+            }
+            positionY={
+              Number.isFinite(Number(selectedSpeaker?.position?.y))
+                ? Number(selectedSpeaker.position.y)
+                : null
+            }
+            wall={selectedWall}
+            groupLabel={selection.group ? GROUP_LABEL[selection.group] : null}
+            groupRoles={selection.group ? rolesForGroup(selection.group) : []}
+            groupValueM={
+              selection.group ? acousticCentre?.groups?.[selection.group]?.valueM : null
+            }
+            groupMixed={selection.group ? !!acousticCentre?.groups?.[selection.group]?.mixed : false}
+          />
           <p className="text-xs text-[#625143]">
             Acoustic Centre Height is the vertical centre of the speaker cabinet, measured from the
             finished floor. The default follows the seating risers: front wides 1.20 m above the first
@@ -347,6 +444,9 @@ export default function UnifiedSurroundsConfig({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {canSides && (
               <AcousticCentreHeightField
+                group="side"
+                highlight={selectedGroup === 'side'}
+                onEngage={() => engageGroup('side')}
                 label="Side Surround — Acoustic Centre Height"
                 valueM={acousticCentre?.groups?.side?.valueM}
                 mixed={acousticCentre?.groups?.side?.mixed}
@@ -361,6 +461,9 @@ export default function UnifiedSurroundsConfig({
 
             {canRears && (
               <AcousticCentreHeightField
+                group="rear"
+                highlight={selectedGroup === 'rear'}
+                onEngage={() => engageGroup('rear')}
                 label="Rear Surround — Acoustic Centre Height"
                 valueM={acousticCentre?.groups?.rear?.valueM}
                 mixed={acousticCentre?.groups?.rear?.mixed}
@@ -375,6 +478,9 @@ export default function UnifiedSurroundsConfig({
 
             {canWides && (
               <AcousticCentreHeightField
+                group="wide"
+                highlight={selectedGroup === 'wide'}
+                onEngage={() => engageGroup('wide')}
                 label="Front Wide — Acoustic Centre Height"
                 valueM={acousticCentre?.groups?.wide?.valueM}
                 mixed={acousticCentre?.groups?.wide?.mixed}

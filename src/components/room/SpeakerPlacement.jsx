@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { __b44SigFor, __b44SameSpeakers } from '@/components/utils/speakerEqualityUtils';
 import UnifiedSurroundsConfigExtracted from './UnifiedSurroundsConfig';
+import { useSpeakerSelection } from '@/components/state/speakerSelectionStore';
 import SubwooferPanel from './SubwooferPanel';
 import OverheadChannelsPanel from './OverheadChannelsPanel';
 import { useFinalSafetyPass } from './hooks/useFinalSafetyPass';
@@ -542,6 +543,15 @@ function SpeakerPlacementImpl(props) {
   const handleAcousticCentreChange = useCallback((group, valueM) => {
     setSpeakers((prev) => applyAcousticCentreForGroup(prev, group, valueM, roomHeightM));
   }, [setSpeakers, roomHeightM]);
+
+  // A speaker picked in the elevation brings its controls into view: the
+  // Surround Channels panel opens itself, so the highlighted control is on
+  // screen and ready to edit.
+  const selection = useSpeakerSelection();
+  const [surroundsPanelOpen, setSurroundsPanelOpen] = useState(false);
+  useEffect(() => {
+    if (selection.source === 'drawing' && selection.primary) setSurroundsPanelOpen(true);
+  }, [selection.token, selection.source, selection.primary]);
 
   const canSides = allowedRoles.has('SL') && allowedRoles.has('SR');
   const canRears = allowedRoles.has('SBL') && allowedRoles.has('SBR');
@@ -1455,7 +1465,12 @@ function SpeakerPlacementImpl(props) {
         />
       </CollapsiblePanel>
 
-      <CollapsiblePanel title="Surround Channels" defaultOpen={false}>
+      <CollapsiblePanel
+        title="Surround Channels"
+        defaultOpen={false}
+        isOpen={surroundsPanelOpen}
+        onToggle={() => setSurroundsPanelOpen((open) => !open)}
+      >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left column: configuration and mounting */}
         <div className="space-y-3">

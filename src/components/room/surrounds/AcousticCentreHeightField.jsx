@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 /**
  * One group's Acoustic Centre Height (m) — the vertical centre of the speaker
@@ -12,6 +13,7 @@ import { Label } from "@/components/ui/label";
  * `mixed` reports a group whose speakers stand at different heights.
  */
 export default function AcousticCentreHeightField({
+  group = null,
   label,
   valueM = null,
   mixed = false,
@@ -20,6 +22,8 @@ export default function AcousticCentreHeightField({
   maxM = null,
   hint = null,
   disabled = false,
+  highlight = false,
+  onEngage = null,
   onChange,
 }) {
   const asText = (value) => (Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "");
@@ -42,8 +46,22 @@ export default function AcousticCentreHeightField({
     onChange(parsed);
   };
 
+  // Pointing at this control selects its speakers in the drawing, so the panel
+  // and the elevation are one interface rather than two.
+  const engage = () => {
+    if (typeof onEngage === "function") onEngage();
+  };
+
   return (
-    <div className="space-y-1.5">
+    <div
+      id={group ? `acoustic-centre-${group}` : undefined}
+      onPointerDown={engage}
+      onFocus={engage}
+      className={cn(
+        "space-y-1.5 rounded-md transition-all duration-150",
+        highlight && "ring-2 ring-[#213428] ring-offset-2 ring-offset-white",
+      )}
+    >
       <Label className="text-xs font-medium text-[#3E4349]">{label}</Label>
       <div className="relative">
         <Input

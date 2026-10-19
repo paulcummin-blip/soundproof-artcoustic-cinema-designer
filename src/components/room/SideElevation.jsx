@@ -26,6 +26,7 @@ import SideViewCentreCabinets from "@/components/room/dualCentre/SideViewCentreC
 import SideViewSubwoofers from "@/components/room/sideview/SideViewSubwoofers";
 import AcousticCentreDim from "@/components/room/sideview/AcousticCentreDim";
 import { SURROUND_DRAG_AXES, useSideSpeakerDrag } from "@/components/room/sideview/useSideSpeakerDrag";
+import { useSpeakerSelection, setSpeakerSelection } from "@/components/state/speakerSelectionStore";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -318,6 +319,18 @@ export default function SideElevation({
   const dragStartRef = useRef(null);
   const listenersRef = useRef(null); // tracks active window listeners for unmount cleanup
 
+  // Sub vertical-only drag state — local only, committed once on mouseup
+  const [liveSubDrag, setLiveSubDrag] = useState(null); // { group, liveBottomHeightM } | null
+  const liveSubDragRef = useRef(null);
+
+  // Seat row horizontal drag state — local only, committed once on mouseup
+  const [liveSeatRowDrag, setLiveSeatRowDrag] = useState(null); // { rowNumber, liveY } | null
+  const seatRowDragRef = useRef(null);
+  const seatRowListenersRef = useRef(null);
+
+  // Sightline overlay toggle
+  const [showSightlines, setShowSightlines] = useState(false);
+
   // Cleanup: remove any active drag listeners if component unmounts mid-drag
   useEffect(() => {
     return () => {
@@ -374,17 +387,25 @@ export default function SideElevation({
     axes,
   });
 
-  // Sub vertical-only drag state — local only, committed once on mouseup
-  const [liveSubDrag, setLiveSubDrag] = useState(null); // { group, liveBottomHeightM } | null
-  const liveSubDragRef = useRef(null);
+  // --- Selection: one act, shared with the control panel ---------------------
+  // The drawing IS the design, so pointing at a loudspeaker and pointing at its
+  // control are the same act. 'selected' is the one speaker the designer picked;
+  // 'group' marks the speakers a group control governs. Selection reads the
+  // canonical roles and positions and changes nothing: no recalculation runs.
+  const selection = useSpeakerSelection();
+  const selectionStateFor = (role) => {
+    const upper = String(role || '').toUpperCase();
+    if (!upper) return null;
+    if (selection.primary && upper === selection.primary) return 'selected';
+    return (selection.roles || []).includes(upper) ? 'group' : null;
+  };
 
-  // Seat row horizontal drag state — local only, committed once on mouseup
-  const [liveSeatRowDrag, setLiveSeatRowDrag] = useState(null); // { rowNumber, liveY } | null
-  const seatRowDragRef = useRef(null);
-  const seatRowListenersRef = useRef(null);
-
-  // Sightline overlay toggle
-  const [showSightlines, setShowSightlines] = useState(false);
+  // Selecting begins the same gesture as dragging, so the highlight is already
+  // in place when a drag starts and the designer always sees what they hold.
+  const beginWallInteraction = (event, primary, roles, dragStart) => {
+    setSpeakerSelection({ roles, primary, source: 'drawing' });
+    if (dragStart) handleSpeakerMouseDown(event, primary, dragStart);
+  };
 
   const handleSubMouseDown = useCallback((e, group, startBottomHeightM, subHeightM) => {
     const handler = group === 'front' ? onFrontSubHeightChange : onRearSubHeightChange;
@@ -892,9 +913,13 @@ export default function SideElevation({
               : grp.roles[0];
             // A rear surround's along-wall axis is X, which a side elevation does
             // not show, so these stay height-only draggable here.
+            const grpSelectionState = grp.roles.reduce(
+              (state, role) => state || selectionStateFor(role),
+              null,
+            );
             return (
               <g key={`rear-${i}`} opacity={0.92}
-                onMouseDown={isDraggableGrp ? (e) => handleSpeakerMouseDown(e, grpRole, dragStartFor(grpRole, { z: effectiveGrpZ, y: grp.y, cabinetHeightM: spkHeightM, widthM: spkDepthM, axes: SURROUND_DRAG_AXES.HEIGHT_ONLY })) : undefined}
+                onMouseDown={isDraggableGrp ? (e) => beginWallInteraction(e, grpRole, grp.roles, dragStartFor(grpRole, { z: effectiveGrpZ, y: grp.y, cabinetHeightM: spkHeightM, widthM: spkDepthM, axes: SURROUND_DRAG_AXES.HEIGHT_ONLY })) : undefined}
                 style={{ cursor: isDraggableGrp ? 'ns-resize' : 'default' }}
                 {...speakerInfo.bind(() => ({
                   ...buildSpeakerInfo({
@@ -910,6 +935,17 @@ export default function SideElevation({
                   x={frontX} y={svgTop}
                   width={svgW} height={svgH}
                   fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
+                {/* Selection outline — shared with the control panel */}
+                {grpSelectionState && (
+                  <rect
+                    x={frontX - 4} y={svgTop - 4}
+                    width={svgW + 8} height={svgH + 8}
+                    rx={3} fill="none"
+                    stroke={grpSelectionState === 'selected' ? '#213428' : '#625143'}
+                    strokeWidth={grpSelectionState === 'selected' ? 1.3 : 1}
+                    opacity={grpSelectionState === 'selected' ? 1 : 0.5}
+                    style={{ transition: 'opacity 120ms ease-out' }} />
+                )}
                 {/* Front face line (the visible baffle edge) */}
                 <line
                   x1={frontX} y1={svgTop}
@@ -918,7 +954,8 @@ export default function SideElevation({
                 <text
                   x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
                   textAnchor="end" fontSize={6}
-                  fill={LABEL_COLOR} fontWeight={600}>
+                  fill={grpSelectionState === 'selected' ? '#1B1A1A' : LABEL_COLOR}
+                  fontWeight={grpSelectionState ? 800 : 600}>
                   {label}
                 </text>
                 {/* The cabinet's acoustic centre is dimensioned from the finished
@@ -1148,6 +1185,9 @@ export default function SideElevation({
 
             const roleUp = String(spk.role || '').toUpperCase();
             const isDraggable = !!onSideSpeakerMoved && isDraggableSideRole(roleUp);
+            // The same wall roles the control panel governs, so SL, SL1, SR and
+            // SR1 are each picked and highlighted on their own.
+            const selState = selectionStateFor(roleUp);
             // The speaker's stored position, with the live drag draft on top of it.
             const draft = liveDrag && liveDrag.role === roleUp ? liveDrag : null;
             const effectiveZ = Number.isFinite(draft?.z) ? draft.z : spk.z;
@@ -1183,7 +1223,7 @@ export default function SideElevation({
             const sideDimX = spkX + svgW / 2 + 4;
             return (
               <g key={`spk-${i}`}
-                onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, dragStartFor(roleUp, { z: effectiveZ, y: effectiveY, cabinetHeightM: spkHeightM, widthM: spkWidthM })) : undefined}
+                onMouseDown={isDraggable ? (e) => beginWallInteraction(e, roleUp, [roleUp], dragStartFor(roleUp, { z: effectiveZ, y: effectiveY, cabinetHeightM: spkHeightM, widthM: spkWidthM })) : undefined}
                 style={{ cursor: isDraggable ? 'move' : 'default' }}
                 {...speakerInfo.bind(() => ({
                   ...buildSpeakerInfo({
@@ -1220,13 +1260,25 @@ export default function SideElevation({
                     fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2}
                     opacity={0.85} />
                 )}
+                {/* Selection outline — one speaker, or the speakers a group
+                    control governs. Subtle, so the drawing stays a drawing. */}
+                {selState && (
+                  <rect
+                    x={cabinetX - 4} y={cabinetY - 4}
+                    width={svgW + 8} height={svgH + 8}
+                    rx={3} fill="none"
+                    stroke={selState === 'selected' ? '#213428' : '#625143'}
+                    strokeWidth={selState === 'selected' ? 1.3 : 1}
+                    opacity={selState === 'selected' ? 1 : 0.5}
+                    style={{ transition: 'opacity 120ms ease-out' }} />
+                )}
                 <text
                   x={spkX}
                   y={svgTop - 3}
                   textAnchor="middle"
                   fontSize={6}
-                  fill={SPK_COLOR}
-                  fontWeight={600}>
+                  fill={selState === 'selected' ? '#1B1A1A' : SPK_COLOR}
+                  fontWeight={selState ? 800 : 600}>
                   {spk.role}
                 </text>
                 {/* The cabinet's acoustic centre is dimensioned from the finished
@@ -1239,7 +1291,7 @@ export default function SideElevation({
                       fill="transparent"
                       pointerEvents="all"
                       style={{ cursor: 'move' }}
-                      onMouseDown={(e) => handleSpeakerMouseDown(e, roleUp, dragStartFor(roleUp, { z: effectiveZ, y: effectiveY, cabinetHeightM: spkHeightM, widthM: spkWidthM }))}
+                      onMouseDown={(e) => beginWallInteraction(e, roleUp, [roleUp], dragStartFor(roleUp, { z: effectiveZ, y: effectiveY, cabinetHeightM: spkHeightM, widthM: spkWidthM }))}
                     />
                     <AcousticCentreDim
                       xPx={spkX + svgW / 2 + 7}
