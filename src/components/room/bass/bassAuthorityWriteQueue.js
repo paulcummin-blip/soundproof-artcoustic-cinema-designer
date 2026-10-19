@@ -33,6 +33,49 @@ function rowAuthoritySignature(row) {
   return `${row.current_fingerprint || ""}|${row.status || ""}|${keys}`;
 }
 
+/** The exact entity operation the write performs, named so a failure is actionable. */
+function describeWriteOperation(record) {
+  return record?.id
+    ? `update ProjectAnalysisCache ${record.id}`
+    : "create ProjectAnalysisCache";
+}
+
+/** The server's own response, when the SDK surfaced one. Never invented. */
+function describeWriteResponse(error) {
+  const response = error?.response;
+  if (response == null) return null;
+  if (typeof response === "string") return response.slice(0, 1000);
+  try {
+    return JSON.stringify({ status: response.status ?? null, data: response.data ?? null }).slice(0, 1000);
+  } catch {
+    return String(response);
+  }
+}
+
+/** The serialised size of the write, so a size-related refusal is visible. */
+function payloadBytes(payload) {
+  try {
+    return JSON.stringify(payload)?.length ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One line naming what actually failed: the operation, the error, the server's
+ * response and the payload size. Reported instead of speculating about a cause.
+ */
+function describeWriteFailure(error, operation, payload) {
+  const parts = [`${operation} failed: ${error?.message || String(error)}`];
+  const status = error?.response?.status ?? error?.status;
+  if (Number.isFinite(Number(status))) parts.push(`HTTP ${status}`);
+  const response = describeWriteResponse(error);
+  if (response) parts.push(`response: ${response}`);
+  const bytes = payloadBytes(payload);
+  if (Number.isFinite(bytes)) parts.push(`payload ${bytes} bytes`);
+  return parts.join(" | ");
+}
+
 export function queueBassAuthorityWrite(key, signature, record, payload) {
   if (!key || key === "free::free" || !payload) return Promise.resolve(null);
   // The row already holds this authority: writing it again would spend write
@@ -94,12 +137,16 @@ async function flushQueuedBassAuthorityWrite(key) {
       return true;
     } catch (e) {
       // The promotion did not persist: the in-memory authority stays current for
-      // this session, and the next open must reconcile again. Never silent.
-      // The result the write failed to store is named, so a failure for an older
-      // result can never be read as a failure of the result now in hand.
+      // this session, and the next open must reconcile again. Never silent and
+      // never speculative — the failed operation, the server's own response and
+      // the payload size are reported so the failure can be acted on.
+      const operation = describeWriteOperation(record);
       publishBassReconciliationStatus(projectId, versionId, {
         writeSucceeded: false,
-        writeError: e?.message || String(e),
+        writeOperation: operation,
+        writeError: describeWriteFailure(e, operation, payload),
+        writeResponse: describeWriteResponse(e),
+        writePayloadBytes: payloadBytes(payload),
         writeFailedFingerprint: payload?.current_fingerprint || null,
       });
       return false;

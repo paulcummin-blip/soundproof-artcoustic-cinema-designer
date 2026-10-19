@@ -11,14 +11,15 @@
 //   1. a saved-but-unpublished result requests the ONE publication path, once;
 //   2. a further render does not ask again, but a new result does;
 //   3. a current result asks for nothing;
-//   4. a failed save is never retried silently — only the designer's explicit
-//      retry reaches the publisher;
+//   4. a failed save is never retried silently — and Retry save publishes only
+//      after the durable save has itself succeeded;
 //   5. the publisher is reached even when it registers after the band mounted;
 //   6. another version's publisher is never used.
 import { register } from 'node:module';
 register('../../test/_alias-loader.mjs', import.meta.url);
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
@@ -96,12 +97,33 @@ test('TEST 3 — a current result asks for nothing', () => {
   assert.equal(count(), 0);
 });
 
-test('TEST 4 — a failed save is never retried silently', () => {
+test('TEST 4 — a failed save is never retried silently, and publication waits for the save', async () => {
   const count = publisher();
   const handle = mount({ ...saved, stateCode: BASS_AUTHORITY_STATE.SAVE_FAILED });
   assert.equal(count(), 0, 'the failure is reported, not spun in a silent loop');
-  act(() => handle.api.current.retrySave());
-  assert.equal(count(), 1, "the designer's Retry save reaches the same one publication path");
+  // No completed result is held in memory here, so the durable save cannot
+  // succeed. Publication must NOT be requested: asking for it before the result
+  // is stored is the sequencing defect this ordering exists to prevent.
+  const outcome = await handle.api.current.retrySave();
+  assert.equal(outcome.persisted, false, 'the retry reports the save it could not complete');
+  assert.equal(count(), 0, 'an unsaved result is never published');
+});
+
+test('TEST 7 — Retry save awaits the durable save before it requests publication', () => {
+  const source = readFileSync(
+    new URL('../components/room/bass/bda/useBassAuthorityAutoPublication.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(
+    source,
+    /const outcome = await retryBassAuthorityPersistence\(projectId, versionId\)/,
+    'the retry must wait for its own persistence outcome',
+  );
+  assert.match(
+    source,
+    /if \(!outcome\?\.persisted\) return outcome;/,
+    'publication must be skipped entirely when persistence did not succeed',
+  );
 });
 
 test('TEST 5 — a publisher that registers later is still reached', () => {

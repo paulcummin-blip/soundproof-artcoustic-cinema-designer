@@ -19,10 +19,10 @@ import { diagnoseAuthoritative } from "./publicationTraceStore";
 import { bassCacheKey, bassDbFilter, parseBassCacheKey } from "./bassCacheKey";
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 import { hydrateRecommendation } from "@/components/recommendationEngine/recommendationPersistence";
-import { queueBassAuthorityWrite, resetBassAuthorityWriteQueue } from "./bassAuthorityWriteQueue";
+import { queueBassAuthorityWrite, resetBassAuthorityWriteQueue, flushBassAuthorityWrite } from "./bassAuthorityWriteQueue";
 import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
 import { findSavedContractForFingerprint, parseTargetCacheBank } from "./bassIdentityReconciliation";
-import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
+import { publishBassReconciliationStatus, readBassReconciliationStatus } from "./bassReconciliationStatus";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -581,7 +581,10 @@ export function syncPersistentBassAuthority(projectId, versionId, currentFingerp
     }
     return setMemory(projectId, versionId, resolved);
   });
-  writeQueues.set(key, queued);
+  // A failed read-back must not poison this version's write chain: the chain is
+  // what every later save — including a Retry save — is appended to, and a
+  // rejected chain would silently skip every subsequent write.
+  writeQueues.set(key, queued.catch(() => null));
   return queued;
 }
 
@@ -629,23 +632,67 @@ export function retryCompletedBassAuthority(projectId, versionId) {
 
 /**
  * Offer the current authoritative result to durable storage again after a failed
- * write.
+ * write, and WAIT for that write's durable outcome.
  *
  * The write signature guard exists to stop the same authority being written
  * twice in a burst; a genuine FAILURE must still be retryable, so the guard for
  * this version is cleared first. Nothing is recalculated, regraded or
  * recompacted — the identical authoritative contract is handed to the identical
- * write path, and its outcome is reported through the same reconciliation status
- * the failure came from.
+ * write path.
+ *
+ * ORDER IS THE CONTRACT. The write is queued and then flushed, and this promise
+ * resolves only once that write has actually completed or failed, so a caller
+ * can begin engineering publication only after the result is provably stored.
+ * The completed result, its fingerprint, its raw response curves and its
+ * P14/P18/P19/P20 assessments stay in memory untouched whatever the outcome, so
+ * a further retry re-offers exactly the same result.
+ *
+ * @returns {Promise<{ persisted: boolean, fingerprint: string|null, error: string|null }>}
  */
-export function retryBassAuthorityPersistence(projectId, versionId) {
+export async function retryBassAuthorityPersistence(projectId, versionId) {
   const key = projectKey(projectId, versionId);
   const authority = memoryByProject.get(key);
   const contract = authority?.contract || null;
   const fingerprint = contract?.job?.resultFingerprint || authority?.currentFingerprint || null;
-  if (!contract || !fingerprint || authority?.authoritative !== true) return Promise.resolve(false);
-  syncSignatures.delete(key);
-  return syncPersistentBassAuthority(projectId, versionId, fingerprint, contract);
+  if (!contract || !fingerprint || authority?.authoritative !== true) {
+    return {
+      persisted: false,
+      fingerprint,
+      error: "No completed bass result is held for this version, so there is nothing to save.",
+    };
+  }
+  // The retry is in flight: clear the previous refusal so the report shows the
+  // save being attempted again rather than a stale failure.
+  publishBassReconciliationStatus(projectId, versionId, {
+    writeAttempted: true,
+    writeSucceeded: null,
+    writeError: null,
+    writeFailedFingerprint: null,
+  });
+  try {
+    syncSignatures.delete(key);
+    await syncPersistentBassAuthority(projectId, versionId, fingerprint, contract);
+    // Settle the coalesced row write and await its outcome — never publication.
+    const persisted = (await flushBassAuthorityWrite(projectId, versionId)) === true;
+    return {
+      persisted,
+      fingerprint,
+      error: persisted
+        ? null
+        : (readBassReconciliationStatus(projectId, versionId)?.writeError
+          || "The bass result could not be saved."),
+    };
+  } catch (e) {
+    // The write could not even be attempted: report the real error, keep the
+    // result in memory, and let the designer try again.
+    const error = `Save of ${fingerprint} failed: ${e?.message || String(e)}`;
+    publishBassReconciliationStatus(projectId, versionId, {
+      writeSucceeded: false,
+      writeError: error,
+      writeFailedFingerprint: fingerprint,
+    });
+    return { persisted: false, fingerprint, error };
+  }
 }
 
 export function getCompletedBassAuthority(projectId, versionId) {

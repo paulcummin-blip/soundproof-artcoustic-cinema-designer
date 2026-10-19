@@ -18,10 +18,11 @@
 // silent retry loop.
 //
 // Retry save re-offers the SAME authoritative contract to the SAME persistence
-// path — a failed row write is never swallowed — and then asks for publication
-// again. The publication path re-reads the stored row before it publishes, so a
-// result that still has not persisted is refused there rather than announced as
-// saved.
+// path — a failed row write is never swallowed — and SEQUENCES it: the durable
+// save is awaited to its outcome, and publication is asked for only once that
+// save has succeeded. The publication path additionally re-reads the stored row
+// before it publishes, so a result that still has not persisted is refused there
+// rather than announced as saved.
 import { useCallback, useEffect, useRef } from "react";
 import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
 import {
@@ -60,12 +61,20 @@ export default function useBassAuthorityAutoPublication({
     });
   }, [projectId, versionId, stateCode, resultFingerprint]);
 
-  const retrySave = useCallback(() => {
-    if (!projectId || !versionId) return;
-    // The durable write first, then the publication that depends on it.
-    retryBassAuthorityPersistence(projectId, versionId);
+  const retrySave = useCallback(async () => {
+    if (!projectId || !versionId) {
+      return { persisted: false, fingerprint: null, error: "No project version is open." };
+    }
+    // ORDER IS THE FIX: the existing completed calculation is saved and the
+    // write's outcome awaited BEFORE anything is published. Publication must
+    // never begin on a result that has not reached durable storage, and a
+    // failed save is reported and left alone — the completed result, its
+    // fingerprint and its curves stay in memory for another retry.
+    const outcome = await retryBassAuthorityPersistence(projectId, versionId);
+    if (!outcome?.persisted) return outcome;
     const publish = readEngineeringPublishTrigger(projectId, versionId);
     if (typeof publish === "function") publish();
+    return outcome;
   }, [projectId, versionId]);
 
   return { retrySave };
