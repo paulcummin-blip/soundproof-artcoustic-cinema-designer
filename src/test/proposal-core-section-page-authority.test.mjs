@@ -168,40 +168,44 @@ describe('a FULL WIDTH photograph is composed at the full content width', () => 
 /* ── 3. A Detail image belongs only to its recorded target ─────────────────── */
 
 describe('a Detail image sits only with the section it was recorded for', () => {
-  it('keeps the Product detail photograph out of the core sound sections', () => {
+  it('composes the Product detail photograph with the section its PLACE WITH target names', () => {
     const plan = bartonPlan();
     const detail = plan.placements.filter(
       (placement) => placement.source_asset_id === 'barton-image-q6-3',
     );
     expect(detail.length).toBe(1);
-    // Never a core structure: the page it lands on is the section its own
-    // recorded purpose names (Product detail → the products / summary account).
-    const coreSectionIds = bartonSections()
-      .filter((section) => CORE_SECTION_TYPES.includes(section.section_type))
-      .map((section) => section.id);
-    expect(coreSectionIds.includes(detail[0].section_id)).toBe(false);
+    // THE REPORTED DEFECT: this image was composed under Spatial Resolution. Its
+    // section is now the one the designer chose on its own card — never inferred
+    // from the purpose, the product, the file name or the room left on a page.
+    const dynamic = bartonSections().find((section) => section.section_type === 'dynamic_range');
+    expect(detail[0].section_id).toBe(dynamic.id);
+    expect(detail[0].section_target).toBe('dynamic_range');
     expect(detail[0].image_presentation).toBe('detail');
     expect(detail[0].image_purpose).toBe('product_detail');
-
-    const summary = bartonSections().find((section) => section.section_type === 'system_design_summary');
-    expect(detail[0].section_id).toBe(summary.id);
-    // And the plan is still a valid document: nothing is dropped.
+    // Composed smaller, beside that section's copy, and never cropped.
+    expect(detail[0].editorial_role).toBe(EDITORIAL_ROLE.PORTRAIT_EDITORIAL);
+    expect(detail[0].crop_allowed).toBe(false);
+    // No section it was not given claims it.
+    const sectionsUsed = plan.placements
+      .filter((placement) => placement.source_asset_id === 'barton-image-q6-3')
+      .map((placement) => placement.section_id);
+    expect(sectionsUsed).toEqual([dynamic.id]);
+    const spatial = bartonSections().find((section) => section.section_type === 'spatial_resolution');
+    expect(sectionsUsed.includes(spatial.id)).toBe(false);
+    // The plan is still a valid document: nothing is dropped.
     const sources = new Set(plan.placements.map((placement) => placement.source_asset_id));
     expect(sources.size).toBe(BARTON_IMAGES.length);
     expect(plan.galleryImages.length).toBe(0);
+    expect(plan.detailImagesAwaitingTarget).toEqual([]);
   });
 
-  it('sends a Detail image to a core structure when that is what it records', () => {
+  it('sends an Inline Detail image to a core sound structure when its PLACE WITH target names one', () => {
     const timbre = bartonSections().find((section) => section.section_type === 'timbre_matching');
-    const assets = [
-      ...BARTON_IMAGES.filter((asset) => asset.slot !== 'image_5'),
-      {
-        ...BARTON_IMAGES.find((asset) => asset.slot === 'image_5'),
-        // The same photograph, recorded as an interior detail: its purpose names
-        // Timbre Matching, so that is where it belongs.
-        image_purpose: 'interior_detail',
-      },
-    ];
+    const assets = BARTON_IMAGES.map((asset) => (asset.slot === 'image_5'
+      // The same photograph, placed with Timbre Matching: the designer's target is
+      // the only authority, whatever purpose the image still records.
+      ? { ...asset, section_target: 'timbre_matching' }
+      : asset));
     const sections = bartonSections();
     const plan = planProposalImages({
       assets,
@@ -211,6 +215,25 @@ describe('a Detail image sits only with the section it was recorded for', () => 
     const detail = plan.placements.find((placement) => placement.source_asset_id === 'barton-image-q6-3');
     expect(detail.section_id).toBe(timbre.id);
     expect(detail.editorial_role).toBe(EDITORIAL_ROLE.PORTRAIT_EDITORIAL);
+  });
+
+  it('places an Inline Detail image nowhere until its section is chosen, and reports it', () => {
+    const assets = BARTON_IMAGES.map((asset) => (asset.slot === 'image_5'
+      ? { ...asset, section_target: null }
+      : asset));
+    const sections = bartonSections();
+    const plan = planProposalImages({
+      assets,
+      sectionSlots: composeSectionSlots({ sections, sectionTypes: DOCUMENT_TYPES }),
+      coverAssetId: resolveCoverAssetId({ assets, coverImageUrl: assets[0].file_url }),
+    });
+    // No guessing: it is not composed anywhere at all, and the Library is told to
+    // ask for a section.
+    expect(plan.placements.some((placement) => placement.source_asset_id === 'barton-image-q6-3')).toBe(false);
+    expect(plan.detailImagesAwaitingTarget).toEqual(['barton-image-q6-3']);
+    const spatial = bartonSections().find((section) => section.section_type === 'spatial_resolution');
+    expect((plan.bySection[spatial.id] || [])
+      .some((placement) => placement.source_asset_id === 'barton-image-q6-3')).toBe(false);
   });
 });
 

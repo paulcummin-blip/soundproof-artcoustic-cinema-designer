@@ -2,10 +2,15 @@
  * proposal-image-placement.test.mjs
  * ---------------------------------
  * The rule under test: two or three strong sources give the proposal its visual
- * rhythm through a dominant full-width landscape, a smaller portrait accent and
- * the deliberate RETURN of one source in a different crop — and the plan never
- * puts a source too close to itself, never repeats a crop, and never keeps a
- * gallery spread that would read as gallery-first.
+ * rhythm through a dominant full-width landscape on the design overview, ONE on
+ * EACH of the three core sound sections (so each of those pages carries its own
+ * copy and the image that follows it), the deliberate RETURN of one source in a
+ * different crop and the closing photograph — and the plan never puts a source too
+ * close to itself, never repeats a crop, and never keeps a gallery spread that
+ * would read as gallery-first.
+ *
+ * An INLINE DETAIL image is placed by its own PLACE WITH target instead: see
+ * proposal-inline-detail-section-target.test.mjs.
  *
  * Run: node test/proposal-image-placement.test.mjs
  * (Plain node assertions, no test runner: the modules under test import nothing
@@ -27,7 +32,11 @@ import {
   resolveCoverAssetId,
 } from '../src/components/proposal/images/proposalImagePlanner.js';
 import { validateProposalImagePlan } from '../src/components/proposal/images/proposalImagePlanValidator.js';
-import { FLOW_IMAGE_LAYOUT } from '../src/components/proposal/images/proposalImageFlow.js';
+import {
+  FLOW_IMAGE_LAYOUT,
+  flowImageLayoutFor,
+  planImageFlow,
+} from '../src/components/proposal/images/proposalImageFlow.js';
 
 const SECTION_TYPES = [
   'cover',
@@ -117,13 +126,14 @@ test('one source: composed on the cover only, never converted into a body image'
   return 'a cover-only selection is never placed in the body';
 });
 
-// ── 3b. The designer's own placement leads: a Full Width photograph is composed
-//       full width, a Detail photograph takes the smaller supporting treatment,
-//       and every placement points at the uploaded source, never a derived crop. ──
-test('the designer\'s own placements lead: Full Width leads the page, Detail supports it', () => {
+// ── 3b. The designer's own placements lead: a Full Width photograph is composed
+//       full width, an Inline Detail photograph takes the smaller supporting place
+//       BESIDE THE COPY of the section its PLACE WITH target names, and every
+//       placement points at the uploaded source, never a derived crop. ──
+test('the designer\'s own placements lead: Full Width leads the page, Inline Detail supports its chosen section', () => {
   const { planned } = plan(4, {
     2: { image_presentation: IMAGE_PRESENTATION.FULL_WIDTH },
-    3: { image_presentation: IMAGE_PRESENTATION.DETAIL },
+    3: { image_presentation: IMAGE_PRESENTATION.DETAIL, section_target: 'dynamic_range' },
   });
   const fullWidth = planned.placements.find((placement) => placement.source_asset_id === 'asset-2');
   assert.ok(fullWidth, 'the Full Width photograph is placed in the body');
@@ -133,9 +143,12 @@ test('the designer\'s own placements lead: Full Width leads the page, Detail sup
   const detail = planned.placements.find(
     (placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL,
   );
-  assert.equal(detail?.source_asset_id, 'asset-3', 'the Detail photograph takes the supporting accent');
+  assert.equal(detail?.source_asset_id, 'asset-3', 'the Inline Detail photograph takes the supporting place');
   assert.equal(detail?.image_presentation, IMAGE_PRESENTATION.DETAIL);
+  assert.equal(detail?.section_id, 'section-dynamic_range', 'only the section its target names');
+  assert.equal(detail?.crop_allowed, false, 'an Inline Detail image is never cropped');
   assert.notEqual(detail?.crop_orientation, CROP_ORIENTATION.COVER_PORTRAIT, 'never the cover crop');
+  assert.deepEqual(planned.detailImagesAwaitingTarget, [], 'its section is chosen, so nothing waits');
 
   planned.placements.forEach((placement) => {
     assert.ok(
@@ -143,7 +156,7 @@ test('the designer\'s own placements lead: Full Width leads the page, Detail sup
       'every placement points at the uploaded source, never at a derived cover crop',
     );
   });
-  return `full width ${fullWidth.editorial_role}, supporting ${detail?.editorial_role}`;
+  return `full width ${fullWidth.editorial_role}, supporting ${detail?.editorial_role} in ${detail?.section_id}`;
 });
 
 // ── 4. The spacing and crop rules hold for every source, at every count. ──
@@ -197,10 +210,16 @@ test('the photographs the narrative did not place are integrated into it, not se
   const { planned } = plan(8);
   assert.equal(planned.retainedGallery, false, 'the narrative carries them all');
   assert.equal(planned.galleryImages.length, 0, 'no gallery spread is composed');
-  // The rhythm places three landscapes (the design overview, the visual break and
-  // the closing feature); the cover source is not placed in the body unless the
-  // designer placed it there, so four photographs are integrated.
-  assert.equal(planned.flowImages.length, 4, 'the four photographs the rhythm did not place are integrated');
+  assert.ok(planned.flowImages.length >= 1, 'the photographs the rhythm did not place are integrated');
+  // Each of the three core sound structures carries its own photograph on its own
+  // page, so none of them is left without the image that supports it.
+  ['spatial_resolution', 'dynamic_range', 'timbre_matching'].forEach((type) => {
+    const onSection = planned.placements.find((placement) => (
+      placement.section_id === `section-${type}`
+      && placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE
+    ));
+    assert.ok(onSection, `${type} carries a landscape of its own`);
+  });
   const placed = new Set(planned.placements.map((p) => p.source_asset_id));
   assert.equal(placed.size, 8, 'every selected photograph still prints');
   assert.equal(
@@ -210,21 +229,38 @@ test('the photographs the narrative did not place are integrated into it, not se
   return `${planned.placements.length} placements, ${planned.flowImages.length} integrated, no gallery spread`;
 });
 
-// ── 7b. Two photographs that would each have taken a page of their own share
-//       ONE page instead, and neither takes a page of its own.
-test('two photographs the document has not placed share one page instead of taking two', () => {
-  const { planned } = plan(6);
-  assert.equal(planned.flowGroups.length, 1, 'they travel on one page together');
-  const [group] = planned.flowGroups;
-  assert.equal(group.sources.length, 2, 'the page carries both photographs');
-  assert.equal(group.placements.length, 2);
-  assert.equal(group.layout, FLOW_IMAGE_LAYOUT.STACKED, 'two photographs with nothing recorded are stacked');
-  group.placements.forEach((placement) => {
-    assert.equal(placement.editorial_role, EDITORIAL_ROLE.FLOW_IMAGE);
-    assert.equal(placement.section_id, group.section_id, 'both sit on the same section page');
-    assert.equal(placement.page_position, group.page);
+// ── 7b. Two photographs share one page only when they are composed together at
+//       their intended presentation size. A Full Width photograph is never
+//       reduced to sit beside anything, and two of them are never squeezed side by
+//       side to keep them on one sheet. ──
+test('two photographs share one page only at their intended size, never by shrinking them to fit', () => {
+  const twoUnplaced = [
+    { id: 'asset-6', file_url: 'https://example.test/image-6.jpg', slot: 'image_5', order_index: 5 },
+    { id: 'asset-7', file_url: 'https://example.test/image-7.jpg', slot: 'image_6', order_index: 6 },
+  ];
+  const { groups, remainder } = planImageFlow({
+    sources: twoUnplaced,
+    targets: [{
+      section_id: 'section-overall_design',
+      section_type: 'overall_design',
+      page: 7,
+      placed_count: 0,
+    }],
   });
-  assert.equal(planned.retainedGallery, false);
+  assert.equal(groups.length, 1, 'they travel on one page together');
+  const [group] = groups;
+  assert.equal(group.sources.length, 2, 'the page carries both photographs');
+  assert.equal(group.layout, FLOW_IMAGE_LAYOUT.STACKED, 'two photographs with nothing recorded are stacked');
+  assert.equal(remainder.length, 0);
+
+  // Two FULL WIDTH photographs are composed one under the other at the full
+  // content width — never side by side at a reduced share — and a supporting
+  // photograph is never promoted to the full content width to make a pair fit.
+  const fullWidth = { image_presentation: IMAGE_PRESENTATION.FULL_WIDTH };
+  const supporting = { image_presentation: IMAGE_PRESENTATION.DETAIL };
+  assert.equal(flowImageLayoutFor(fullWidth, fullWidth), FLOW_IMAGE_LAYOUT.STACKED);
+  assert.equal(flowImageLayoutFor(fullWidth, supporting), FLOW_IMAGE_LAYOUT.FEATURE_AND_SUPPORT);
+  assert.equal(flowImageLayoutFor(supporting, supporting), FLOW_IMAGE_LAYOUT.SIDE_BY_SIDE);
   return `${group.section_type} carries both photographs on one page (${group.layout})`;
 });
 

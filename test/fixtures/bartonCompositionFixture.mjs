@@ -122,7 +122,8 @@ export const BARTON_HIGHLIGHT_ROWS = [
 /**
  * The six Library images as the designer's own cards state them: five Full Width
  * whole-room photographs, and one Detail photograph of the screen speakers,
- * recorded as a Product detail — Spitfire Q6-3.
+ * recorded as a Product detail — Spitfire Q6-3 — and PLACED WITH Dynamic Range,
+ * which is the section the designer chose for it on its own card.
  */
 export const BARTON_IMAGES = [
   {
@@ -172,6 +173,8 @@ export const BARTON_IMAGES = [
     caption: 'Spitfire Q6-3',
     image_presentation: 'detail',
     image_purpose: 'product_detail',
+    // PLACE WITH — the only authority for an Inline Detail image's section.
+    section_target: 'dynamic_range',
   },
 ];
 

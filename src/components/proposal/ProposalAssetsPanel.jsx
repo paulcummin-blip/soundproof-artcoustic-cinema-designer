@@ -276,6 +276,25 @@ export default function ProposalAssetsPanel({
     }
   };
 
+  /**
+   * PLACE WITH — the Proposal section an Inline Detail image is composed with. It
+   * is the ONLY authority for that image's section: the composer reads this value
+   * and infers nothing from the purpose, the product, the file name or the space
+   * left on a page. An Inline Detail image with no section stored here is placed
+   * nowhere until the designer chooses one.
+   */
+  const handleSectionTargetChange = async (asset, value) => {
+    if (!asset?.id) return;
+    const patch = { section_target: value || null };
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, patch);
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+    } catch (err) {
+      console.error('Failed to change the image section:', err);
+      alert('Failed to change this image’s section. Please try again.');
+    }
+  };
+
   /** Which part of the frame this image's crops keep. */
   const handleFocalChange = async (asset, patch) => {
     if (!asset?.id) return;
@@ -440,6 +459,7 @@ export default function ProposalAssetsPanel({
                         onSeatingChange={(value) => handleSeatingChange(existing, value)}
                         onPresentationChange={(value) => handlePresentationChange(existing, value)}
                         onPurposeChange={(value) => handlePurposeChange(existing, value)}
+                        onSectionTargetChange={(value) => handleSectionTargetChange(existing, value)}
                         onFocalChange={(patch) => handleFocalChange(existing, patch)}
                         onComparisonChange={(patch) => handleComparisonChange(existing, patch)}
                         onUseAsCover={() => handleUseAsCover(group, slot, existing)}

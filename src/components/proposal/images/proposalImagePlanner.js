@@ -11,6 +11,10 @@
  *     composed below its copy on its own page, so no structure is left without
  *     the image that supports it and none is composed under the section before
  *     it;
+ *   - an INLINE DETAIL image is composed with the section its PLACE WITH target
+ *     names, and with no other section: the target is the ONLY authority for it,
+ *     and an Inline Detail image that names no section is placed NOWHERE rather
+ *     than guessed at, so a page with room for it never claims it;
  *   - an image the designer recorded a purpose for takes ONLY the section that
  *     purpose names: a detail image is never dropped into a structure because
  *     there is room for it, and where the document composes none of the sections
@@ -70,6 +74,7 @@ import {
   isUsableInProposal,
   makePlacement,
   purposeSectionTypes,
+  sectionTargetOf,
   seatingStyleOf,
 } from './proposalImagePlacementAuthority.js';
 
@@ -275,7 +280,15 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
       (asset) => asset.id && eligible(asset, pagePosition, CROP_ORIENTATION.LANDSCAPE_FULL)
         && !isSupportingPresentation(asset),
     );
-    const coverReturn = candidates.find((asset) => asset.id === coverAsset?.id);
+    // THE DELIBERATE RETURN. The cover source takes a body landscape only when its
+    // own Library card says FULL WIDTH: that is the designer stating the image is a
+    // body image as well as the cover, so it may come back in the landscape crop.
+    // A cover image with nothing recorded keeps its dedicated page and is never
+    // brought back into the body by the planner's own choice.
+    const coverReturn = coverAsset?.id && isFullWidthPreference(coverAsset)
+      && eligible(coverAsset, pagePosition, CROP_ORIENTATION.LANDSCAPE_FULL)
+      ? coverAsset
+      : null;
     // The break normally returns the cover source. Where the designer marked a
     // photograph FULL WIDTH and it has not been placed yet, that chosen photograph
     // takes the prominent placement instead: the designer's own presentation
@@ -284,12 +297,18 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     const chosenFullWidth = candidates.find(
       (asset) => usesOf(asset) === 0 && asset.id !== coverAsset?.id && isFullWidthPreference(asset),
     );
-    if (preferCoverReturn && chosenFullWidth) return chosenFullWidth;
-    if (preferCoverReturn && coverReturn) return coverReturn;
+    // A source the document has not used YET always takes the prominent place
+    // before any source returns: the cover's own return is the deliberate fallback
+    // for a break with no fresh photograph left, never the first thing taken.
     const fresh = candidates.filter((asset) => usesOf(asset) === 0 && asset.id !== coverAsset?.id);
-    if (fresh.length > 0) return fresh[0];
+    if (fresh.length > 0) {
+      if (preferCoverReturn && chosenFullWidth) return chosenFullWidth;
+      return fresh[0];
+    }
     if (coverReturn) return coverReturn;
-    return candidates.slice().sort((a, b) => lastUsed(a) - lastUsed(b))[0] || null;
+    // Nothing is left for the prominent place: the page carries its copy alone
+    // rather than returning a photograph the designer never placed in the body.
+    return null;
   };
 
   /**
@@ -299,6 +318,15 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
    * from another source rather than replacing it.
    */
   const isFullWidthPreference = (asset) => imagePresentationOf(asset) === IMAGE_PRESENTATION.FULL_WIDTH;
+
+  /**
+   * Whether the designer's own card asks for this source to be composed in the
+   * BODY as well as where it already sits: 'Use in proposal' (usage 'gallery') or
+   * the FULL WIDTH presentation. A photograph the document shows only on the cover
+   * is never brought back into the narrative on the planner's own initiative.
+   */
+  const asksForBodyUse = (asset) => String(asset?.usage || '').trim() === 'gallery'
+    || isFullWidthPreference(asset);
 
   // 1. The cover.
   add(coverAsset, EDITORIAL_ROLE.COVER, 'cover', 1);
@@ -329,16 +357,46 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     );
   });
 
-  // 4. The image that supports the copy: it sits smaller, beside the paragraphs
-  // it explains, in the copy-and-image row the portrait accent already uses.
+  // 4. THE IMAGE THAT SUPPORTS THE COPY — placed by the designer's own section.
   //
-  // A RECORDED PURPOSE IS AUTHORITY. The image takes only the section its own
-  // purpose names, so a drawing or a detail is never separated from the account it
-  // supports — and an image whose purpose is recorded but names no section this
-  // document composes is never dropped into whichever structure happens to have
-  // room: it joins the narrative flow below, where its purpose is read again. An
-  // image with NOTHING recorded keeps the treatment the document has always given
-  // it.
+  // An INLINE DETAIL image's PLACE WITH target is the ONLY placement authority for
+  // it: the image is composed with the section the designer named, beside that
+  // section's copy in the copy-and-image row the portrait accent already uses, and
+  // it is never moved anywhere else because another page happens to have room.
+  // Nothing else is consulted for it — not the purpose, not the product, not the
+  // space left on a page, not a previous placement, nor the file or model name.
+  //
+  // An Inline Detail image with NO target is placed NOWHERE: the composer does not
+  // guess at a section, and the image is reported below as awaiting one so the
+  // Image Library can ask for it.
+  const detailEntryFor = (asset) => {
+    const target = sectionTargetOf(asset);
+    return target ? (entries.find((entry) => entry.section_type === target) || null) : null;
+  };
+  const detailImagesAwaitingTarget = [];
+  // One supporting image to a section: the copy stays in charge of its own page.
+  const detailSectionsTaken = new Set();
+  narrativeSources
+    .filter((asset) => asset.id && asset.id !== coverAsset?.id
+      && imagePresentationOf(asset) === IMAGE_PRESENTATION.DETAIL && usesOf(asset) === 0)
+    .forEach((source) => {
+      const entry = detailEntryFor(source);
+      // The section is the ONLY thing that decides. A detail whose section is not
+      // chosen, is not composed by this document, is already carrying a supporting
+      // image, or cannot take it at this page is NOT moved to another section: it
+      // waits for the designer instead.
+      if (!entry || detailSectionsTaken.has(entry.section_id)
+        || !eligible(source, entry.page, CROP_ORIENTATION.PORTRAIT)) {
+        detailImagesAwaitingTarget.push(source.id);
+        return;
+      }
+      detailSectionsTaken.add(entry.section_id);
+      add(source, EDITORIAL_ROLE.PORTRAIT_EDITORIAL, entry.section_id, entry.page);
+    });
+
+  // 4b. A CROPPED DETAIL image keeps the established behaviour — a crop-permitting
+  // supporting mode still follows the purpose the designer recorded for it, and an
+  // image with nothing recorded is never invented as a supporting accent.
   const fallbackEntry = structures[0] || null;
   // The design-overview page already carries the document's leading photograph, so
   // a supporting image normally takes another section. It may take the overview
@@ -351,7 +409,8 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     .find(Boolean) || null;
   const supportingPick = narrativeSources
     .filter((asset) => asset.id && asset.id !== coverAsset?.id
-      && isSupportingPresentation(asset) && usesOf(asset) === 0)
+      && imagePresentationOf(asset) === IMAGE_PRESENTATION.CROPPED_DETAIL
+      && usesOf(asset) === 0)
     .map((source) => {
       const fromPurpose = imagePurposeOf(source) !== null;
       return {
@@ -361,9 +420,11 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
       };
     })
     .find(({ source, entry, fromPurpose }) => entry
+      && !detailSectionsTaken.has(entry.section_id)
       && (fromPurpose || entry !== overviewEntry)
       && eligible(source, entry.page, CROP_ORIENTATION.PORTRAIT));
   if (supportingPick) {
+    detailSectionsTaken.add(supportingPick.entry.section_id);
     add(
       supportingPick.source,
       EDITORIAL_ROLE.PORTRAIT_EDITORIAL,
@@ -413,9 +474,14 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
       .map((placement) => placement.source_asset_id)
       .filter(Boolean),
   );
+  const withheldDetailIds = new Set(detailImagesAwaitingTarget);
   const unplaced = usable.filter(
     (asset) => asset.id && !bodyPlacedIds.has(asset.id)
-      && !seatingStyleOf(asset) && !isCompared(asset),
+      && !seatingStyleOf(asset) && !isCompared(asset)
+      // An Inline Detail image with no section named is NOT guessed at: it waits
+      // for the designer to choose its section rather than joining whichever
+      // narrative page happens to have room for it.
+      && !withheldDetailIds.has(asset.id),
   );
 
   // 7. THE PHOTOGRAPHS THAT WOULD HAVE HAD A PAGE OF THEIR OWN JOIN THE
@@ -464,6 +530,14 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   const flow = planImageFlow({
     sources: unplaced
       .filter((asset) => !placedIds.has(asset.id))
+      // THE COVER SOURCE IS NOT BROUGHT BACK INTO THE BODY BY THE PLANNER. A
+      // photograph the designer chose for the cover is already printed — on the
+      // cover — so the narrative does not show it again merely because the rhythm
+      // had no other slot for it. That second, body use exists only where the
+      // designer's own card asks for it: 'Use in proposal' (usage 'gallery') or the
+      // FULL WIDTH presentation. An image with nothing recorded keeps the single
+      // cover use it has always had.
+      .filter((asset) => !shownOnCover.has(asset.id) || asksForBodyUse(asset))
       .sort((a, b) => Number(shownOnCover.has(a.id)) - Number(shownOnCover.has(b.id))),
     targets: entries.map((entry) => ({
       ...entry,
@@ -533,6 +607,12 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
         && placement.comparison_group === group.name),
     })),
     galleryImages,
+    // The Inline Detail images the document did not place because their PLACE WITH
+    // section is not chosen, is already taken by another supporting image, or names
+    // a section this document does not compose. They are withheld rather than
+    // guessed at: the Image Library asks for a section, and no page claims them
+    // because it has room.
+    detailImagesAwaitingTarget,
     // The photographs integrated into the narrative, one entry per page that
     // received them: the section they joined, the layout the pair is composed
     // in, and the placements themselves, in reading order.

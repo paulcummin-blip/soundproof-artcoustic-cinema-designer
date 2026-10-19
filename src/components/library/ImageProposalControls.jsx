@@ -6,11 +6,19 @@
  *   Use in proposal / Hidden from proposal — whether the plan may place it
  *   Use as cover                          — swaps this image into the cover slot
  *   Seating option                        — groups it as a lifestyle alternative
+ *   Image purpose                         — what this image is meant to communicate
+ *   Presentation                          — Full Width, Inline Detail, Cropped Detail
+ *   Place with                            — the section an Inline Detail image sits with
  *   Focal point                           — which part of the frame the crop keeps
  *
  * These are presentation choices. Nothing here changes the stored file, the
  * caption, the scope, or any engineering value, and the only slot that moves is
  * the deliberate cover swap (both images are kept).
+ *
+ * PLACE WITH is the ONLY authority for where an Inline Detail image is composed:
+ * nothing else decides its section — not the purpose, the product, the file name
+ * or the room left on a page. Until a section is chosen the image is not placed
+ * at all, so the control asks for one rather than leaving the document to guess.
  */
 
 import React from 'react';
@@ -25,6 +33,9 @@ import {
   IMAGE_PURPOSE,
   IMAGE_PURPOSE_HELP,
   IMAGE_PURPOSE_LABELS,
+  PROPOSAL_SECTION_TARGET_LABELS,
+  PROPOSAL_SECTION_TARGET_ORDER,
+  SECTION_TARGET_CHOOSE,
   SEATING_STYLE,
   SEATING_STYLE_LABELS,
   assetFocalPoint,
@@ -33,6 +44,7 @@ import {
   isDrawingPurpose,
   placementCropAllowed,
   seatingStyleOf,
+  sectionTargetOf,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
 
 /** The six purposes, in the order the card offers them. */
@@ -78,6 +90,9 @@ export default function ImageProposalControls({
   onSeatingChange,
   onPurposeChange,
   onPresentationChange,
+  // PLACE WITH — the Proposal section an Inline Detail image is composed with.
+  // Required for that presentation, and the only authority that decides it.
+  onSectionTargetChange,
   onFocalChange,
   onComparisonChange,
   onUseAsCover,
@@ -96,6 +111,12 @@ export default function ImageProposalControls({
   // recorded. Editorial context only: it tells the composer which copy the image
   // belongs with, and it decides whether the image is a drawing shown whole.
   const purpose = imagePurposeOf(asset) || '';
+  // WHICH PROPOSAL SECTION AN INLINE DETAIL IMAGE SITS WITH — the designer's own
+  // choice, and the ONLY authority for that image's section. Empty means no
+  // section has been chosen yet: the control asks for one, and the composer places
+  // the image nowhere rather than guessing.
+  const sectionTarget = sectionTargetOf(asset) || '';
+  const targetRequired = presentation === IMAGE_PRESENTATION.DETAIL && !sectionTarget;
   // A drawing is never cropped, whatever presentation is selected. The permission
   // is decided in one place, so no page-fit decision can override it here.
   const drawingProtected = isDrawingPurpose(purpose);
@@ -209,6 +230,45 @@ export default function ImageProposalControls({
                   : 'This image is composed exactly as the proposal has always composed it.'}
             </p>
           </div>
+
+          {/* PLACE WITH — the Proposal section an INLINE DETAIL image is composed
+              with. It is the ONLY authority for that image's section: the composer
+              reads this choice and infers nothing from the purpose, the product,
+              the file name or the room left on a page. Key Performance Highlights
+              is deliberately not offered — that page is an evidence-led statement,
+              not an image-placement target. Until a section is chosen the image is
+              not placed at all, so the control asks for one. */}
+          {presentation === IMAGE_PRESENTATION.DETAIL && (
+            <div>
+              <label
+                className="block text-[10px] uppercase tracking-[0.12em] mb-1"
+                style={{ ...FONT, color: targetRequired ? '#B45309' : '#A79E8C' }}
+              >
+                Place with
+              </label>
+              <select
+                value={sectionTarget}
+                onChange={(event) => onSectionTargetChange(event.target.value)}
+                className={targetRequired
+                  ? `${SELECT_CLASS} !border-[#B45309] !text-[#B45309]`
+                  : SELECT_CLASS}
+                style={FONT}
+              >
+                <option value="">{SECTION_TARGET_CHOOSE}</option>
+                {PROPOSAL_SECTION_TARGET_ORDER.map((value) => (
+                  <option key={value} value={value}>{PROPOSAL_SECTION_TARGET_LABELS[value]}</option>
+                ))}
+              </select>
+              <p
+                className="mt-1 text-[10px] leading-snug"
+                style={{ ...FONT, color: targetRequired ? '#B45309' : '#8A8477' }}
+              >
+                {targetRequired
+                  ? 'Inline Detail needs a section: choose where this image belongs. Until you do, it is not placed.'
+                  : `Composed with ${PROPOSAL_SECTION_TARGET_LABELS[sectionTarget]}, beside its copy, and cropped by nothing.`}
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>

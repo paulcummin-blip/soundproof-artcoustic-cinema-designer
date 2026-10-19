@@ -360,6 +360,76 @@ export function isSupportingComposition(asset) {
   return presentationComposition(asset).weight === COMPOSITION_WEIGHT.SUPPORTING;
 }
 
+/**
+ * ── PLACE WITH: the section an Inline Detail image belongs with ─────────────
+ * An INLINE DETAIL image is supporting evidence, so it is read with the copy it
+ * explains. The designer states that in ONE place — the image's own PLACE WITH
+ * choice — and that choice is the ONLY authority for where the image is composed.
+ *
+ * Nothing is inferred for it: not from the image purpose, not from the product or
+ * the model, not from the space left on a page, not from a previous placement, and
+ * not from the file name. Where no section is chosen the image is placed NOWHERE
+ * and the Image Library asks for one ('Choose Proposal section') rather than
+ * silently guessing a section, and a page with room for it never claims it.
+ *
+ * Key Performance Highlights is deliberately absent: that page is an evidence and
+ * table-led statement, so it is never offered as a general image-placement target.
+ */
+export const PROPOSAL_SECTION_TARGET = Object.freeze({
+  SYSTEM_DESIGN_SUMMARY: 'system_design_summary',
+  SPATIAL_RESOLUTION: 'spatial_resolution',
+  DYNAMIC_RANGE: 'dynamic_range',
+  TIMBRE_MATCHING: 'timbre_matching',
+  OVERALL_DESIGN: 'overall_design',
+});
+
+/** The targets in the order the Image Library offers them. */
+export const PROPOSAL_SECTION_TARGET_ORDER = Object.freeze([
+  PROPOSAL_SECTION_TARGET.SYSTEM_DESIGN_SUMMARY,
+  PROPOSAL_SECTION_TARGET.SPATIAL_RESOLUTION,
+  PROPOSAL_SECTION_TARGET.DYNAMIC_RANGE,
+  PROPOSAL_SECTION_TARGET.TIMBRE_MATCHING,
+  PROPOSAL_SECTION_TARGET.OVERALL_DESIGN,
+]);
+
+export const PROPOSAL_SECTION_TARGET_LABELS = Object.freeze({
+  [PROPOSAL_SECTION_TARGET.SYSTEM_DESIGN_SUMMARY]: 'System Design Summary',
+  [PROPOSAL_SECTION_TARGET.SPATIAL_RESOLUTION]: 'Spatial Resolution',
+  [PROPOSAL_SECTION_TARGET.DYNAMIC_RANGE]: 'Dynamic Range',
+  [PROPOSAL_SECTION_TARGET.TIMBRE_MATCHING]: 'Timbre Matching',
+  [PROPOSAL_SECTION_TARGET.OVERALL_DESIGN]: 'Overall Design',
+});
+
+/** The control's own label, and what it reads before a section is chosen. */
+export const SECTION_TARGET_LABEL = 'Place with';
+export const SECTION_TARGET_CHOOSE = 'Choose Proposal section';
+
+const SECTION_TARGET_VALUES = Object.values(PROPOSAL_SECTION_TARGET);
+
+/** Whether this image is presented as an INLINE DETAIL: shown whole, supporting. */
+export function isInlineDetail(asset) {
+  return imagePresentationOf(asset) === IMAGE_PRESENTATION.DETAIL;
+}
+
+/**
+ * The Proposal section this image is composed with, or null where none is
+ * recorded. Only the five declared sections are read: anything else is null, so a
+ * bad value can never place an image in a section that does not exist.
+ */
+export function sectionTargetOf(asset) {
+  const value = recorded(asset?.section_target);
+  return SECTION_TARGET_VALUES.includes(value) ? value : null;
+}
+
+/**
+ * Whether this image still needs its section chosen: an Inline Detail image with
+ * no target recorded. The Library asks for one, and the composer places the image
+ * nowhere until it is given.
+ */
+export function inlineDetailAwaitingSection(asset) {
+  return isInlineDetail(asset) && sectionTargetOf(asset) === null;
+}
+
 /** The two seating styles a Library image may be grouped as. */
 export const SEATING_STYLE = Object.freeze({
   LOUNGE: 'lounge',
@@ -594,6 +664,12 @@ export function makePlacement({ source, role, sectionId, pagePosition, order, co
     // WHAT THE IMAGE IS FOR — editorial context for the composer, carried on the
     // placement so a page does not have to look the source up again.
     image_purpose: purpose,
+    // PLACE WITH — the Proposal section the designer chose for this image, where
+    // one is recorded. Carried so the composer and the pack state which section an
+    // Inline Detail image belongs with without looking the source up again. It is
+    // read ONLY for an Inline Detail presentation, and there it is the authority:
+    // nothing else decides the section that image is composed in.
+    section_target: sectionTargetOf(source),
     crop_allowed: cropAllowed,
     // Stated so the renderer and the composer can say WHY an image is shown
     // whole rather than appearing to ignore the presentation that was selected.
