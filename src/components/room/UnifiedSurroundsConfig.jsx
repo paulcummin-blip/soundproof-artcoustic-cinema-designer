@@ -10,7 +10,6 @@ import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRol
 import { timeNowMs } from "@/components/utils/timeNow";
 import SurroundsSelector from '../speakers/SurroundsSelector';
 import AcousticCentreHeightField from './surrounds/AcousticCentreHeightField';
-import SelectedSpeakerCard from './surrounds/SelectedSpeakerCard';
 import { groupForSurroundRole } from './surrounds/surroundAcousticCentreAuthority';
 import { useSpeakerSelection, setSpeakerSelection } from '@/components/state/speakerSelectionStore';
 
@@ -18,14 +17,6 @@ import { useSpeakerSelection, setSpeakerSelection } from '@/components/state/spe
     speaker of that group is installed yet. */
 const GROUP_LABEL = { side: 'Side Surround', rear: 'Rear Surround', wide: 'Front Wide' };
 const GROUP_ROLE_FALLBACK = { side: ['SL', 'SR'], rear: ['SBL', 'SBR'], wide: ['LW', 'RW'] };
-
-/** "Default 1.60 m (follows the risers)" — the group's own stated default. */
-const defaultHint = (defaultM) => {
-  const value = Number(defaultM);
-  return Number.isFinite(value)
-    ? `Default ${value.toFixed(2)} m (follows the risers)`
-    : 'Default follows the risers';
-};
 
 export default function UnifiedSurroundsConfig({
   placedSpeakers,
@@ -106,22 +97,6 @@ export default function UnifiedSurroundsConfig({
   // The group the current selection points at, whichever end it came from.
   const selectedGroup =
     selection.group || (selection.primary ? groupForSurroundRole(selection.primary) : null);
-
-  const selectedSpeaker = useMemo(() => {
-    if (!selection.primary) return null;
-    const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-    return (
-      list.find(
-        (speaker) => String(speaker?.role || '').toUpperCase() === selection.primary,
-      ) || null
-    );
-  }, [placedSpeakers, selection.primary]);
-
-  const selectedWall = useMemo(() => {
-    const x = Number(selectedSpeaker?.position?.x);
-    if (!Number.isFinite(x)) return null;
-    return x < dimsSafe.width / 2 ? 'left wall' : 'right wall';
-  }, [selectedSpeaker, dimsSafe.width]);
 
   // A speaker picked in the drawing brings its own control into view.
   React.useEffect(() => {
@@ -414,46 +389,26 @@ export default function UnifiedSurroundsConfig({
           themselves, so the panel and the drawing can never disagree. */}
       {(canSides || canRears || canWides) && (
         <div className="mt-3 border-t border-[#E6E4DD] pt-3 space-y-3">
-          <SelectedSpeakerCard
-            role={selection.primary}
-            model={selectedSpeaker?.model || null}
-            acousticCentreM={
-              Number.isFinite(Number(selectedSpeaker?.position?.z))
-                ? Number(selectedSpeaker.position.z)
-                : null
-            }
-            positionY={
-              Number.isFinite(Number(selectedSpeaker?.position?.y))
-                ? Number(selectedSpeaker.position.y)
-                : null
-            }
-            wall={selectedWall}
-            groupLabel={selection.group ? GROUP_LABEL[selection.group] : null}
-            groupRoles={selection.group ? rolesForGroup(selection.group) : []}
-            groupValueM={
-              selection.group ? acousticCentre?.groups?.[selection.group]?.valueM : null
-            }
-            groupMixed={selection.group ? !!acousticCentre?.groups?.[selection.group]?.mixed : false}
-          />
-          <p className="text-xs text-[#625143]">
-            Acoustic Centre Height is the vertical centre of the speaker cabinet, measured from the
-            finished floor. The default follows the seating risers: front wides 1.20 m above the first
-            row, side surrounds above the second row, rear surrounds above the last row. Typing a value
-            sets that group's height and is kept, whatever the seating does afterwards.
-          </p>
+          {/* One quiet heading, and the one fact that is not self-evident in a
+              tooltip. Nothing else is explained. */}
+          <div
+            className="text-xs font-medium text-[#3E4349]"
+            title="Measured from the finished floor to the acoustic centre of the cabinet."
+          >
+            Acoustic Centre Height
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {canSides && (
               <AcousticCentreHeightField
                 group="side"
                 lightRoles={rolesForGroup('side')}
                 onEngage={() => engageGroup('side')}
-                label="Side Surround — Acoustic Centre Height"
+                label="Side Surround Height"
                 valueM={acousticCentre?.groups?.side?.valueM}
                 mixed={acousticCentre?.groups?.side?.mixed}
                 defaultM={acousticCentre?.defaults?.sideM}
                 minM={acousticCentre?.groups?.side?.minM}
                 maxM={acousticCentre?.groups?.side?.maxM}
-                hint={defaultHint(acousticCentre?.defaults?.sideM)}
                 disabled={disabled}
                 onChange={(valueM) => acousticCentre?.onChange?.('side', valueM)}
               />
@@ -464,13 +419,12 @@ export default function UnifiedSurroundsConfig({
                 group="rear"
                 lightRoles={rolesForGroup('rear')}
                 onEngage={() => engageGroup('rear')}
-                label="Rear Surround — Acoustic Centre Height"
+                label="Rear Surround Height"
                 valueM={acousticCentre?.groups?.rear?.valueM}
                 mixed={acousticCentre?.groups?.rear?.mixed}
                 defaultM={acousticCentre?.defaults?.rearM}
                 minM={acousticCentre?.groups?.rear?.minM}
                 maxM={acousticCentre?.groups?.rear?.maxM}
-                hint={defaultHint(acousticCentre?.defaults?.rearM)}
                 disabled={disabled}
                 onChange={(valueM) => acousticCentre?.onChange?.('rear', valueM)}
               />
@@ -481,13 +435,12 @@ export default function UnifiedSurroundsConfig({
                 group="wide"
                 lightRoles={rolesForGroup('wide')}
                 onEngage={() => engageGroup('wide')}
-                label="Front Wide — Acoustic Centre Height"
+                label="Front Wide Height"
                 valueM={acousticCentre?.groups?.wide?.valueM}
                 mixed={acousticCentre?.groups?.wide?.mixed}
                 defaultM={acousticCentre?.defaults?.wideM}
                 minM={acousticCentre?.groups?.wide?.minM}
                 maxM={acousticCentre?.groups?.wide?.maxM}
-                hint={defaultHint(acousticCentre?.defaults?.wideM)}
                 disabled={disabled}
                 onChange={(valueM) => acousticCentre?.onChange?.('wide', valueM)}
               />

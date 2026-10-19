@@ -30,7 +30,6 @@ export default function AcousticCentreHeightField({
   defaultM = null,
   minM = null,
   maxM = null,
-  hint = null,
   disabled = false,
   lightRoles = [],
   onEngage = null,
@@ -117,12 +116,6 @@ export default function AcousticCentreHeightField({
           m
         </span>
       </div>
-      {(hint || mixed) && (
-        <p className="text-[11px] leading-tight text-[#625143]">
-          {hint}
-          {mixed ? `${hint ? " · " : ""}speakers in this group differ` : ""}
-        </p>
-      )}
     </div>
   );
 }

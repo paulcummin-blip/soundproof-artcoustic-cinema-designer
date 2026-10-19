@@ -39,7 +39,6 @@ const store = read('src/components/state/speakerSelectionStore.js');
 const drawing = read('src/components/room/SideElevation.jsx');
 const panel = read('src/components/room/UnifiedSurroundsConfig.jsx');
 const field = read('src/components/room/surrounds/AcousticCentreHeightField.jsx');
-const card = read('src/components/room/surrounds/SelectedSpeakerCard.jsx');
 const placement = read('src/components/room/SpeakerPlacement.jsx');
 
 const reset = () => clearSpeakerSelection();
@@ -190,23 +189,27 @@ test('TEST 8  The panel names the selection and brings its control into view', (
     panel.includes("setSpeakerSelection({ group, roles: rolesForGroup(group), source: 'panel' })"),
     'a group control selects exactly the speakers installed in that group',
   );
-  assert.ok(panel.includes('SelectedSpeakerCard'), 'what is selected is always named');
+  assert.ok(!panel.includes('SelectedSpeakerCard'), 'and it shows no selection box');
 });
 
-test('TEST 9  The selected speaker reads back its identity, height and position', () => {
-  assert.ok(card.includes('Acoustic centre'), 'the acoustic centre is shown');
-  assert.ok(card.includes('from front wall'), 'the along-wall position is shown');
-  assert.ok(card.includes('acousticCentreM'), 'the height is the stored value');
-  assert.ok(card.includes('groupRoles'), 'a group selection names its speakers');
+test('TEST 9  The panel keeps its controls and drops every explanation', () => {
+  ['Side Surround Height', 'Rear Surround Height', 'Front Wide Height'].forEach((label) => {
+    assert.ok(panel.includes(`label="${label}"`), `${label} is a concise label`);
+  });
 
+  assert.ok(!panel.includes('SelectedSpeakerCard'), 'the selection box is gone');
+  assert.ok(!panel.includes('Acoustic Centre Height is the vertical centre'), 'the paragraph is gone');
+  assert.ok(!panel.includes('highlighted control below'), 'no sentence explains the highlight');
+  assert.ok(!panel.includes('defaultHint'), 'no helper line sits under the fields');
+  assert.ok(!field.includes('hint'), 'and the field carries no helper text of its own');
   assert.ok(
-    panel.includes('Number(selectedSpeaker.position.z)'),
-    'the height is read from the speaker itself',
+    panel.includes('title="Measured from the finished floor'),
+    'the one definition that is not self-evident lives in a discreet tooltip',
   );
-  assert.ok(
-    panel.includes("list.find(") && panel.includes('=== selection.primary'),
-    'the speaker is matched by its exact role',
-  );
+
+  // The controls themselves are untouched.
+  assert.ok(panel.includes('SurroundsSelector'), 'surround model selection is untouched');
+  assert.ok(panel.includes('engageGroup'), 'and the controls still drive the drawing');
 });
 
 test('TEST 10  A speaker picked in the drawing opens the panel that adjusts it', () => {
