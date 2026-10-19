@@ -1,3 +1,4 @@
+import { approvalPlainText } from '../proposalApproval/sectionApprovalAuthority.js';
 import { composeWriterSectionBodies } from '../proposalWriter/writerSectionMapping.js';
 
 function asRows(result) {
@@ -57,8 +58,12 @@ export async function applyProposalRevision({
     const targetedPatch = sectionPatchByType?.[record.section_type] || null;
     const { body: _untrustedBody, metadata: targetedMetadata, ...targetedFields } = targetedPatch || {};
     const baseMetadata = targetedMetadata ?? record.metadata;
+    const exactUndoBody = source === 'adi_undo' && targetedPatch ? targetedPatch.body : null;
+    if (exactUndoBody !== null && approvalPlainText(exactUndoBody) !== approvalPlainText(body.html)) {
+      throw new Error('The Undo body does not match the validated restored revision.');
+    }
     await entities.ProposalSection.update(record.id, {
-      body: body.html,
+      body: exactUndoBody ?? body.html,
       // Normal editor saves retain their existing behaviour. A caller that is
       // publishing one generated editorial change supplies the exact section
       // patch instead, so unchanged sections keep their approval timestamps.
