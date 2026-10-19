@@ -11,6 +11,7 @@ import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenc
 import { resolveReportLayout } from '../highChannelDensityRule.js';
 import { orderPublicationSections } from './publicationOrder.js';
 import { preparePublishedSectionBody, missingPublishedContent } from './publishedSectionPreparation.js';
+import { resolvePublicationBodies } from './publicationCopyAuthority.js';
 
 import { containsPrivateNote, publicationText as plain } from './privateNoteAuthority.js';
 import { isRetiredSectionType } from '../systemDesignSummarySections.js';
