@@ -203,6 +203,10 @@ export default async function (req) {
         ? {
           outcome: outcome.outcome || null,
           reason: outcome.reason || null,
+          attempts: outcome.attempts || 0,
+          corrected: outcome.corrected === true,
+          attempt_audit: outcome.attempt_audit || [],
+          final: applied || improvedSelectionOnly ? 'accepted' : 'rejected',
           ...(outcome.diagnostics || {}),
         }
         : null,
