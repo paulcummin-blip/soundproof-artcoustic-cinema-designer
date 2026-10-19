@@ -55,7 +55,12 @@ const read = (rel) => fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
 
 const faceIcons = read('src/components/report/SpeakerFaceIcons.jsx');
 const c41Artwork = read('src/components/report/C41ArtworkFaceIcons.jsx');
-const frontElevation = read('src/components/room/FrontElevation.jsx');
+// The front elevation's whole drawing path: the view itself, and the speaker
+// renderer it draws through (its own module, so the view stays manageable).
+// Both are read together — the assertions are about how the elevation draws the
+// cabinet, wherever in that path the line sits.
+const frontElevation = read('src/components/room/FrontElevation.jsx')
+  + read('src/components/room/front/FrontSpeakerArt.jsx');
 const planLayer = read('src/components/room/rv/render/RvSpeakerLayer.jsx');
 const planIcons = read('src/components/room/rv/RenderPrimitives.jsx');
 

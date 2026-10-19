@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import StepperInput from '@/components/ui/StepperInput';
+import LcrAcousticCentreField from '@/components/room/LcrAcousticCentreField';
 import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
 import { useProductRoleOptions } from '@/components/products/useProductMaster';
 import { PRODUCT_ROLES } from '@/components/products/productMaster';
@@ -277,6 +277,17 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const [lcrHeightInputValue, setLcrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM).toFixed(2)));
   // Separate L/R height for center_only mode (FC uses lcrHeightInputValue)
   const [lrHeightInputValue, setLrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrLRHeightM)) ? Number(splConfig.lcrLRHeightM) : defaultLcrHeightM).toFixed(2)));
+
+  // The speakers each height control governs — exactly the roles the Front
+  // Elevation drag moves, so the field's live height and its movement light
+  // always match the drawing. In center_only mode the centre authority is the
+  // FC alone and FL/FR have their own; everywhere else the LCR height is one
+  // shared authority across FL, FC and FR.
+  const lcrCentreFieldRoles = useMemo(
+    () => (frontStageMode === 'center_only' ? ['FC'] : ['FL', 'FC', 'FR']),
+    [frontStageMode],
+  );
+  const lcrLrFieldRoles = useMemo(() => ['FL', 'FR'], []);
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
@@ -960,11 +971,11 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <StepperInput
-                        value={Number(lrHeightInputValue) || 0}
-                        step={0.01}
-                        min={0.2}
-                        max={roomH - 0.2}
+                      <LcrAcousticCentreField
+                        roles={lcrLrFieldRoles}
+                        valueM={Number(lrHeightInputValue) || 0}
+                        minM={0.2}
+                        maxM={roomH - 0.2}
                         disabled={disabled}
                         onChange={(val) => {
                           const clamped = clampLcrHeight(val);
@@ -992,11 +1003,11 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[11px] text-[#625143]">Centre soundbar height from floor (to middle of speaker)</Label>
-                    <StepperInput
-                      value={Number(lcrHeightInputValue) || 0}
-                      step={0.01}
-                      min={0.2}
-                      max={roomH - 0.2}
+                    <LcrAcousticCentreField
+                      roles={lcrCentreFieldRoles}
+                      valueM={Number(lcrHeightInputValue) || 0}
+                      minM={0.2}
+                      maxM={roomH - 0.2}
                       disabled={disabled || !lcrHeightManual}
                       onChange={(val) => {
                         if (!lcrHeightManual) return;
@@ -1013,11 +1024,11 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                 </div>
               ) : (
                 <>
-                  <StepperInput
-                    value={Number(lcrHeightInputValue) || 0}
-                    step={0.01}
-                    min={0.2}
-                    max={roomH - 0.2}
+                  <LcrAcousticCentreField
+                    roles={lcrCentreFieldRoles}
+                    valueM={Number(lcrHeightInputValue) || 0}
+                    minM={0.2}
+                    maxM={roomH - 0.2}
                     disabled={disabled || !lcrHeightManual}
                     onChange={(val) => {
                       if (!lcrHeightManual) return;

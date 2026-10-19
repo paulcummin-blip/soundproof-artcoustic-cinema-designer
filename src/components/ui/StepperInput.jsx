@@ -16,6 +16,11 @@ import React from 'react';
  *   decimals    — display decimal places (default 2)
  *   className   — extra classes for the input
  *   disabled    — disables both steppers and input
+ *   highlighted — the field is showing a MOVEMENT: the value turns bold
+ *                 Artcoustic dark green behind the field's own thin green
+ *                 border, and the field is never dimmed while it is shown
+ *   onFocus     — forwarded to the input: movement begins or continues
+ *   onBlur      — forwarded to the input: movement has stopped
  */
 export default function StepperInput({
   value,
@@ -28,6 +33,9 @@ export default function StepperInput({
   className = '',
   disabled = false,
   placeholder = '',
+  highlighted = false,
+  onFocus = null,
+  onBlur = null,
 }) {
   const [draft, setDraft] = React.useState(null); // null = use value prop
 
@@ -71,13 +79,14 @@ export default function StepperInput({
   };
 
   return (
-    <div className={`relative flex items-stretch ${disabled ? 'opacity-50' : ''}`}>
+    <div className={`relative flex items-stretch ${disabled && !highlighted ? 'opacity-50' : ''}`}>
       <input
         type="text"
         inputMode="decimal"
         value={displayValue}
         onChange={handleChange}
-        onBlur={commitDraft}
+        onFocus={onFocus || undefined}
+        onBlur={(e) => { commitDraft(); if (onBlur) onBlur(e); }}
         onKeyDown={handleKeyDown}
         readOnly={readOnly}
         disabled={disabled}
@@ -87,10 +96,18 @@ export default function StepperInput({
           'border-[#DCDBD6] text-[#1B1A1A]',
           readOnly ? 'bg-[#F8F8F7]' : 'bg-white',
           'focus:outline-none focus:ring-1 focus:ring-[#213428]',
+          'transition-colors duration-500 ease-out',
           'pr-7', // leave room for stepper buttons
           className,
         ].filter(Boolean).join(' ')}
-        style={{ cursor: readOnly ? 'default' : undefined }}
+        style={{
+          cursor: readOnly ? 'default' : undefined,
+          // The movement cue, on the field's own border: bold Artcoustic dark
+          // green. Nothing is boxed and no outline is added.
+          color: highlighted ? '#213428' : undefined,
+          fontWeight: highlighted ? 700 : 400,
+          borderColor: highlighted ? '#213428' : undefined,
+        }}
       />
       {/* Stepper buttons — stacked vertically on right edge */}
       <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#DCDBD6]" style={{ width: 22 }}>

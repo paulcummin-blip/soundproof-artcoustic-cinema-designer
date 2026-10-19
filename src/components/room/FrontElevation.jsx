@@ -1,12 +1,10 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
-import { C41_1222FaceIcon, C41_1441FaceIcon, C41_1711FaceIcon } from "@/components/report/C41ArtworkFaceIcons";
-import ProductArtwork from "@/components/report/ProductArtwork";
-import { elevationArtFitRatio } from "@/components/report/elevation/elevationArtAuthority";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
-import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
+import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
+import { drawFrontSpeakerArt } from "@/components/room/front/FrontSpeakerArt";
+import FrontScreenLayer from "@/components/room/front/FrontScreenLayer";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
 import { subwooferCentreZM } from "@/components/utils/subwooferDrawingHeight";
 import {
@@ -22,6 +20,14 @@ import SpeakerInfoTooltip from "@/components/room/speakerInfo/SpeakerInfoTooltip
 import { useSpeakerInfoTooltip } from "@/components/room/speakerInfo/useSpeakerInfoTooltip";
 import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
 import { scaleSvgBoxToContainer } from "@/components/room/speakerInfo/speakerTooltipPlacement";
+import {
+  HIGHLIGHT_GREEN,
+  beginSpeakerHighlight,
+  settleSpeakerHighlight,
+  clearLiveSpeakerPosition,
+  publishLiveSpeakerPosition,
+  useSpeakerHighlight,
+} from "@/components/state/speakerSelectionStore";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -98,6 +104,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const subItemsRef = useRef([]);
   const frontStageModeRef = useRef('standard');
 
+  // The movement cue, shared with the LCR height control and with the surround
+  // views: a speaker that is moving right now wears its green label. The drawing
+  // reads this one authority, so it can never disagree with the panel.
+  const speakerHighlight = useSpeakerHighlight();
+  const litRoles = useMemo(
+    () => new Set(speakerHighlight.lit ? speakerHighlight.roles : []),
+    [speakerHighlight.lit, speakerHighlight.roles],
+  );
+
   const clientToRoom = useCallback((clientX, clientY) => {
     const svg = svgRef.current;
     if (!svg) return null;
@@ -115,6 +130,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     dragRef.current = { role, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
     if (isDraggingRef) isDraggingRef.current = true;
     document.body.style.cursor = 'grabbing';
+    // Movement begins: the speaker is identified in the drawing and the height
+    // control that governs it lights — the same gesture as the surround view.
+    beginSpeakerHighlight([role]);
     // Show TV centre guide immediately when dragging FL/FR in TV mode
     if ((role === 'FL' || role === 'FR') && tvCentreRef.current !== null) {
       setTvGuideRef.current?.({ snapped: false });
@@ -249,6 +267,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         }
         liveDragLcrRef.current = liveMap;
         setLiveDragLcr({ ...liveMap });
+        // The movement itself, published live: the height control shows the
+        // number being dragged to, and every speaker that is actually moving is
+        // identified — the shared height relationship included.
+        publishLiveSpeakerPosition({ role: drag.role, z: snappedZ });
+        beginSpeakerHighlight(Object.keys(liveMap));
         if (drag.axisLocked === 'z') {
           setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
           // Update TV centre snap state for FL/FR
@@ -289,6 +312,12 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             onMovedRef.current?.({ role: drag.role, newX: live.x, newZ: live.z, axis: drag.axisLocked });
           }
         }
+        // The number the control has been showing becomes the project's own, and
+        // only then is the live number withdrawn — in that order, so the control
+        // never flashes back to the old height for a frame. The light then holds
+        // for its five seconds and returns on its own.
+        clearLiveSpeakerPosition();
+        settleSpeakerHighlight();
         liveDragLcrRef.current = null;
         setLiveDragLcr(null);
       }
@@ -301,7 +330,14 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     };
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-    return () => { window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      // A front-stage drag that outlives the drawing must not leave a live number
+      // standing, nor a speaker lit indefinitely.
+      clearLiveSpeakerPosition();
+      settleSpeakerHighlight();
+    };
   }, [clientToRoom, isDraggingRef]);
   // ────────────────────────────────────────────────────────────────────────
 
@@ -587,10 +623,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const ROOM_STROKE = "#B0AEA8";  // lighter grey, less dominant
   const SCREEN_FILL = "#2C2C2C";
   const SCREEN_STROKE = "#1a1a1a";
-  // The acoustically transparent screen surface: a light translucent tint, so
-  // the LCR loudspeakers and subwoofers behind the screen stay visible through
-  // it. A TV keeps its opaque picture surface and never uses this fill.
-  const AT_SCREEN_SURFACE_FILL = "rgba(214,217,214,0.45)";
+  // The acoustically transparent screen surface: a barely-there translucent wash
+  // (5–8 %), so every loudspeaker and subwoofer behind the screen reads clearly
+  // through it. The dark frame identifies the screen; the surface only hints at
+  // it, and never conceals the equipment. A TV keeps its opaque picture surface
+  // and never uses this fill. Drawing only — no screen setting, transmission loss
+  // or calculation is affected.
+  const AT_SCREEN_SURFACE_FILL = "rgba(214,217,214,0.06)";
   const SPEAKER_FILL = "#213428";
   const SPEAKER_STROKE = "#152420";
   const SUB_FILL = "#4A3B30";      // darker than before for contrast
@@ -603,179 +642,22 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const RISER_STROKE = "#9B9890";
 
   /**
-   * drawSpeakerFront — reusable helper for rendering a single speaker
-   * in the XZ front-elevation plane.
-   *
-   * @param {string}  key    - React key
-   * @param {number}  cx     - SVG centre X (pixels)
-   * @param {number}  cy     - SVG centre Y (pixels, position.z mapped via ry)
-   * @param {number}  sw     - rendered width in SVG pixels
-   * @param {number}  sh     - rendered height in SVG pixels
-   * @param {boolean} isRound - true → circle, false → rectangle
-   * @param {string}  fill   - body fill colour
-   * @param {string}  stroke - body stroke colour
-   * @param {string}  label  - text label above speaker
-   * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
-   * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
+   * drawSpeakerFront — one loudspeaker in the XZ front-elevation plane. It is
+   * the single rendering path for the LCR speakers and the front subwoofers; the
+   * renderer itself lives in its own module (front/FrontSpeakerArt) so this
+   * drawing file stays a manageable size, and every value it needs is handed to
+   * it here.
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown, vertical = false, cabinetLengthMm = null }) => {
-    const sx = cx - sw / 2;
-    const sy = cy - sh / 2;
-
-    // Detect Artcoustic models for face icon rendering
-    const mk = modelKey || "";
-    const isQ43 = mk.includes("q4-3");
-    const isQ45 = mk.includes("q4-5");
-    const isQ85 = mk.includes("q8-5");
-    const isQ63 = mk.includes("q6-3");
-    const isEv11 = mk.includes("evolve-1-1");
-    const isEv21 = !isEv11 && mk.includes("evolve-2-1");
-    const isEv31 = !isEv11 && mk.includes("evolve-3-1");
-    const isEv42 = mk.includes("evolve-4-2");
-    const isEv63 = !isEv31 && mk.includes("evolve-6-3");
-    const isEv84 = mk.includes("evolve-8-4");
-    const isC41 = mk.includes("c4-1");
-    // The 1222 mm, 1441 mm and 1711 mm C4-1 cabinets each have their own
-    // approved artwork; every other C4-1 length keeps the existing drawing.
-    const isC41_1222 = isC41 && Number(cabinetLengthMm) === 1222;
-    const isC41_1441 = isC41 && Number(cabinetLengthMm) === 1441;
-    const isC41_1711 = isC41 && Number(cabinetLengthMm) === 1711;
-    // The C-1 is its own product ("c-1"); "c4-1" never contains that key.
-    const isC1 = mk.includes("c-1");
-    const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
-    const isTv65 = speakerTvPreset === "tv65";
-    const isTv77 = speakerTvPreset === "tv77";
-    const isTv83 = speakerTvPreset === "tv83";
-    const isTv100 = speakerTvPreset === "tv100";
-    const isManualScreen = isManualOverrideActive(screen);
-    const useMulti65Artwork = isMultiSoundbar && isTv65;
-    const useMulti83Artwork = isMultiSoundbar && (isTv83 || isManualScreen);
-    const useMulti77Artwork = isMultiSoundbar && isTv77;
-    const useMulti100Artwork = isMultiSoundbar && isTv100;
-    const useMultiArtwork = useMulti65Artwork || useMulti83Artwork || useMulti77Artwork || useMulti100Artwork;
-
-    // Full-width Multi Soundbar artwork — renders the dedicated technical line
-    // drawing at exactly the screen's rendered width. ViewBox and aspect
-    // ratios match each source image's NATIVE pixel dimensions to prevent
-    // preserveAspectRatio="meet" from letterboxing the artwork inside the
-    // screen-width container. SVG threshold filters (not CSS filters) produce
-    // pure black-and-white from the grey source screenshots.
-    if (useMultiArtwork) {
-      const screenOW = (overallW / roomW) * drawW;
-      const aspectRatio = useMulti65Artwork ? (1544 / 118) : useMulti77Artwork ? (1588 / 106) : useMulti100Artwork ? (1722 / 90) : (1558 / 90);
-      const artworkW = screenOW;
-      const artworkH = screenOW / aspectRatio;
-      const artworkX = rx(screenCenterX) - artworkW / 2;
-      const artworkY = cy - artworkH / 2;
-      const ArtworkComponent = useMulti65Artwork ? MultiSoundbar65ArtworkFaceIcon : useMulti77Artwork ? MultiSoundbar77ArtworkFaceIcon : useMulti100Artwork ? MultiSoundbar100ArtworkFaceIcon : MultiSoundbarArtworkFaceIcon;
-      return (
-        <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
-          <ArtworkComponent x={artworkX} y={artworkY} width={artworkW} height={artworkH} />
-          <text x={rx(screenCenterX)} y={labelY ?? (artworkY - 10)} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
-            {label}
-          </text>
-        </g>
-      );
-    }
-
-    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41 || isC1;
-
-    // C4-1, C-1 and Multi Soundbar icons are cropped to their own cabinet edges,
-    // so their drawing fills the boundary box exactly (ratio 1.0). The Q 6-3
-    // artwork is cropped to its cabinet outline in the same way, so it also
-    // fills the box exactly: its cabinet face is square (280 × 280 mm) and so is
-    // the crop, so the box is the cabinet's own footprint. Every other
-    // Artcoustic PNG still carries internal page padding and is enlarged to
-    // compensate.
-    // The figure comes from the ONE elevation crop authority, read for the
-    // artwork this model actually draws: a normalised artwork is drawn AT the
-    // cabinet's footprint (its page is cropped away), while an artwork with no
-    // trustworthy crop keeps the long-standing enlargement (its page is still
-    // inside the box). It is not repeated at the draw site.
-    const faceIconArtworkKey = isC41 ? (isC41_1222 ? "c41_1222" : isC41_1441 ? "c41_1441" : isC41_1711 ? "c41_1711" : "c41")
-      : isC1 ? "c1"
-        : isQ63 ? "q63"
-          : isQ45 ? "q45"
-            : isQ85 ? "q85"
-              : isQ43 ? "q43"
-                : isEv21 ? "evolve_2_1"
-                  : isEv31 ? "evolve_3_1"
-                    : isEv42 ? "evolve_4_2"
-                      : isEv63 ? "evolve_6_3"
-                        : isEv84 ? "evolve_8_4"
-                          : null;
-    const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio(faceIconArtworkKey);
-    // A vertically mounted cabinet draws the SAME face rotated a quarter turn:
-    // the face icon's own long axis is the box's height, and the whole icon is
-    // turned 90° about the cabinet centre, so the drawn footprint is the cabinet's
-    // rotated width × height (the dimension labels read from the same box).
-    const iconBoxW = vertical ? sh : sw;
-    const iconBoxH = vertical ? sw : sh;
-    const adjustedW = hasFaceIcon ? iconBoxW / FACE_ICON_VISIBLE_RATIO : iconBoxW;
-    const adjustedH = hasFaceIcon ? iconBoxH / FACE_ICON_VISIBLE_RATIO : iconBoxH;
-    const adjustedX = hasFaceIcon ? cx - adjustedW / 2 : sx;
-    const adjustedY = hasFaceIcon ? cy - adjustedH / 2 : sy;
-
-    const renderFaceIcon = () => {
-      if (isC1) return <C1FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      // Every C4-1 artwork is drawn at the cabinet's installed footprint (and
-      // rotated with the cabinet when it is mounted vertically) — never
-      // stretched onto another cabinet's shape.
-      if (isC41 && isC41_1222) return <C41_1222FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isC41 && isC41_1441) return <C41_1441FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isC41 && isC41_1711) return <C41_1711FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isQ85) return <Q85FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      // The Q 6-3 artwork is cropped to its cabinet outline, so it is drawn at
-      // the cabinet's own footprint — the face fills the box edge to edge.
-      if (isQ63) return <Q63FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isEv11) return <Evolve11FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isEv21) return <Evolve21FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isEv31) return <Evolve31FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isEv42) return <Evolve42FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isEv63) return <Evolve63FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isEv84) return <Evolve84FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      return null;
-    };
-
-    return (
-      <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
-        {/* Body */}
-        {hasFaceIcon ? (
-          <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>
-            {/* Product artwork is line art on an opaque white page — the page is
-                knocked out so the graphic shows only the cabinet's own drawing.
-                The tight opaque white backing is the cabinet's OWN scaled
-                footprint (iconBoxW × iconBoxH): a vertical cabinet brings its
-                backing round with the rotated face, and nothing larger appears. */}
-            <ProductArtwork
-              backing={{ x: cx - iconBoxW / 2, y: cy - iconBoxH / 2, width: iconBoxW, height: iconBoxH }}
-            >
-              {renderFaceIcon()}
-            </ProductArtwork>
-          </g>
-        ) : isRound ? (
-          <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
-        ) : (
-          <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
-        )}
-        {/* Acoustic centre dot — fallback only (face icons include their own markers) */}
-        {!hasFaceIcon && <circle cx={cx} cy={cy} r={1.8} fill="rgba(255,255,255,0.55)" />}
-        {/* Label: above for speakers, inside for subs */}
-        {labelInsideBox ? (
-          <text x={cx} y={cy + 3} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em" dominantBaseline="middle">
-            {label}
-          </text>
-        ) : (
-          <text x={cx} y={labelY ?? (sy - 10)} textAnchor="middle" fontSize={9} fill={LABEL_COLOR} fontWeight={700} letterSpacing="0.04em">
-            {label}
-          </text>
-        )}
-      </g>
-    );
-  };
+  const drawSpeakerFront = (opts) => drawFrontSpeakerArt(opts, {
+    rx,
+    ry,
+    roomW,
+    drawW,
+    screenCenterX,
+    overallW,
+    screen,
+    labelColor: LABEL_COLOR,
+  });
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
@@ -969,6 +851,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 vertical: spk.vertical === true,
                 // The installed cabinet variant decides which artwork is drawn.
                 cabinetLengthMm: spk.cabinetLengthMm ?? null,
+                // Moving right now: the label is the identification, green.
+                labelHighlighted: litRoles.has(spk.role),
                 labelY: annotation.label.y,
                 // FL/FC/FR keep their existing drag behaviour; a dual-centre
                 // cabinet is draggable by its own role (FCL / FCR), so its
@@ -1046,77 +930,28 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             FRONT LAYER: the frame / border, drawn last as an opaque band, so the
             frame sits in front of every cabinet and no speaker or subwoofer
             graphic can break through the screen perimeter. */}
-        {(() => {
-          // Overall frame rect (viewable + border on all sides)
-          const oW = (overallW / roomW) * drawW;
-          const oH = (overallH / roomH) * drawH;
-          const ox = rx(screenCenterX) - oW / 2;
-          const oy = ry(screenFloorM + screenData.h + borderM);
-
-          // Viewable rect
-          const sw = (screenData.w / roomW) * drawW;
-          const sh = (screenData.h / roomH) * drawH;
-          const sx = rx(screenCenterX) - sw / 2;
-          const syTop = ry(screenFloorM + screenData.h);
-
-          return (
-            <g
-              onMouseDown={onScreenHeightFromFloorChange ? handleScreenMouseDown : undefined}
-              style={onScreenHeightFromFloorChange
-                ? { cursor: screenDragging ? 'grabbing' : 'ns-resize', userSelect: 'none' }
-                : undefined}
-            >
-              {/* Drag affordance: the frame is outlined while the screen is being
-                  dragged, so the control is visible while it is used. */}
-              {screenDragging && (
-                <rect x={ox - 3} y={oy - 3} width={oW + 6} height={oH + 6}
-                  fill="none" stroke="#213428" strokeWidth={1.6} strokeDasharray="5 3" rx={3} />
-              )}
-              {/* Viewable surface — middle layer. Translucent for an acoustically
-                  transparent screen, so the LCR and subwoofers behind it read
-                  through; pointer events pass through to the cabinets, so a
-                  speaker behind the screen can still be hovered or dragged. */}
-              <rect
-                x={sx}
-                y={syTop}
-                width={sw}
-                height={sh}
-                fill={isTV ? "#fff" : AT_SCREEN_SURFACE_FILL}
-                stroke="#555"
-                strokeWidth={0.5}
-                style={isTV ? undefined : { pointerEvents: 'none' }}
-              />
-              {/* Frame / border — front layer. An opaque band (the overall rect
-                  with the viewable area knocked out, even-odd fill) drawn last,
-                  so it is the last thing on the front wall and covers any
-                  cabinet graphic beneath it. It is also the screen drag surface. */}
-              <path
-                d={`M ${ox} ${oy} H ${ox + oW} V ${oy + oH} H ${ox} Z M ${sx} ${syTop} H ${sx + sw} V ${syTop + sh} H ${sx} Z`}
-                fill={SCREEN_STROKE}
-                fillRule="evenodd"
-                stroke={SCREEN_STROKE}
-                strokeWidth={screenDragging ? 1.6 : 1}
-              />
-              {/* The screen's own size is stated in the Screen Size panel's live
-                  metrics, so the drawing carries no overall or viewable
-                  dimension text. The outline, frame and drag surface above are
-                  unchanged. */}
-              {/* Live height during the drag — the same value the numeric input
-                  shows, in centimetres, kept inside the room rectangle. */}
-              {screenDragging && (() => {
-                const badgeY = Math.min(Math.max(oy - 20, offsetY + 3), offsetY + drawH - 20);
-                return (
-                  <g key="screen-drag-value" style={{ pointerEvents: 'none' }}>
-                    <rect x={rx(screenCenterX) - 49} y={badgeY} width={98} height={15} fill="#213428" rx={2} />
-                    <text x={rx(screenCenterX)} y={badgeY + 11} textAnchor="middle" fontSize={8} fill="white" fontWeight={700} letterSpacing="0.04em">
-                      {`Screen height ${Math.round(screenFloorM * 100)} cm`}
-                    </text>
-                  </g>
-                );
-              })()}
-            </g>
-          );
-        })()}
+        <FrontScreenLayer
+          overallW={overallW}
+          overallH={overallH}
+          screenData={screenData}
+          borderM={borderM}
+          screenCenterX={screenCenterX}
+          screenFloorM={screenFloorM}
+          roomW={roomW}
+          roomH={roomH}
+          drawW={drawW}
+          drawH={drawH}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          rx={rx}
+          ry={ry}
+          isTV={isTV}
+          surfaceFill={AT_SCREEN_SURFACE_FILL}
+          frameColor={SCREEN_STROKE}
+          dragging={screenDragging}
+          dragEnabled={!!onScreenHeightFromFloorChange}
+          onMouseDown={handleScreenMouseDown}
+        />
 
         {/* Projector element if present */}
         {projectorEl && (() => {

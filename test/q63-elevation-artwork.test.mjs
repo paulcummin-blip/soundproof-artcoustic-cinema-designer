@@ -20,6 +20,9 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const ICONS = read('src/components/report/SpeakerFaceIcons.jsx');
 const FRONT = read('src/components/room/FrontElevation.jsx');
+// The front elevation's speaker renderer lives in its own module; the assertions
+// about HOW a cabinet is drawn read it there.
+const SPEAKER_ART = read('src/components/room/front/FrontSpeakerArt.jsx');
 const SIDE = read('src/components/room/SideElevation.jsx');
 const REGISTRY = read('src/components/models/speakers/registry.jsx');
 const REPORT_GRAPHIC = read('src/components/report/ScreenWallConstructionGraphic.jsx');
@@ -81,14 +84,14 @@ test('C. the crop is square, matching the cabinet face, so nothing is distorted'
 });
 
 test('D. the elevation draws it at the cabinet footprint, with no inset square', () => {
-  assert.match(FRONT, /const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio\(faceIconArtworkKey\);/,
+  assert.match(SPEAKER_ART, /const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio\(faceIconArtworkKey\);/,
     'Q6-3 draws at its own footprint: the fit figure comes from the crop authority');
-  assert.match(FRONT, /if \(isQ63\) return <Q63FaceIcon x=\{adjustedX\} y=\{adjustedY\} width=\{adjustedW\} height=\{adjustedH\} \/>;/,
+  assert.match(SPEAKER_ART, /if \(isQ63\) return <Q63FaceIcon x=\{adjustedX\} y=\{adjustedY\} width=\{adjustedW\} height=\{adjustedH\} \/>;/,
     'the icon is given the cabinet box in both dimensions');
-  assert.equal(/isQ63\) return <Q63FaceIcon[^\n]*size=\{Math\.min\(/.test(FRONT), false,
+  assert.equal(/isQ63\) return <Q63FaceIcon[^\n]*size=\{Math\.min\(/.test(SPEAKER_ART), false,
     'no min-square sizing remains, which was what inset the drawing inside its box');
   // The footprint the icon is given is still the cabinet's own width and height.
-  assert.match(FRONT, /const iconBoxW = vertical \? sh : sw;/, 'the icon box is still the cabinet footprint');
+  assert.match(SPEAKER_ART, /const iconBoxW = vertical \? sh : sw;/, 'the icon box is still the cabinet footprint');
 });
 
 test('E. the Q6-3 model and the elevation geometry are unchanged', () => {
