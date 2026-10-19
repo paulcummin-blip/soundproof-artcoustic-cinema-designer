@@ -36,6 +36,7 @@ export async function persistAdiProposalSectionRevision({
   user = null,
   now = new Date().toISOString(),
   source = 'adi',
+  validateOnly = false,
 } = {}) {
   if (!entities?.ProposalGeneration?.filter
     || !entities?.ProposalEdit?.filter
@@ -69,11 +70,18 @@ export async function persistAdiProposalSectionRevision({
   }
 
   const mode = frozenProposalMode(generation);
-  const drafts = writerDraftsFromProposalSectionBody({
-    sectionType: section.section_type,
-    body,
-    mode,
-  });
+  let drafts;
+  try {
+    drafts = writerDraftsFromProposalSectionBody({
+      sectionType: section.section_type, body, mode,
+    });
+  } catch (error) {
+    return {
+      accepted: false,
+      violations: [{ code: 'required_section_structure', detail: error.message }],
+      section: null,
+    };
+  }
   const editedSections = composeEditedSections({
     generatedSections: generatedSectionsOf(generation),
     currentSections: current.export_sections,
@@ -97,6 +105,10 @@ export async function persistAdiProposalSectionRevision({
       section: null,
     };
   }
+
+  if (validateOnly) return {
+    accepted: true, violations: [], record, section: null,
+  };
 
   await entities.ProposalEdit.create(
     editEntityPayload({ record, accountId: generation.account_id ?? null }),
