@@ -77,24 +77,41 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
   if (narrative.some(text => containsPrivateNote(text, notes))) reject('raw_dealer_notes', 'Private design instructions cannot be published verbatim.');
   const safeOptionsText = containsPrivateNote(optionsText, notes) ? '' : optionsText;
   const mapped = composeWriterSectionBodies({ output: { sections: copy }, mode: input?.proposal_mode || generation?.evidence_pack?.mode });
-  const bodyByType = new Map(mapped.bodies.map(body => [body.section_type, body.html]));
+  const copyBodies = new Map(mapped.bodies.map(body => [body.section_type, body.html]));
   const originalBodies = new Map(composeWriterSectionBodies({ output: generation?.gpt_output, mode: input?.evidence?.proposal_mode || generation?.evidence_pack?.mode }).bodies.map(body => [body.section_type, body.html]));
+  const highChannelDensity = resolveReportLayout(proposal?.engineering_snapshot).highDensity;
+  // ── THE PUBLICATION COPY AUTHORITY ────────────────────────────────────────
+  // The copy this document PUBLISHES is the current saved ProposalSection body
+  // wherever the designer has approved that exact wording, and the validated copy
+  // of the generation (or the latest valid edit) everywhere else. Generation and
+  // edit history stay provenance: they are still read, still validated and still
+  // audited, but a draft the designer's own approved wording has replaced never
+  // holds the publication back. Approval of the wording as it stands is the whole
+  // condition — a section changed since it was approved falls back to the
+  // validated copy and is reported, so no unapproved body can be published.
+  const publication = resolvePublicationBodies({
+    sections: storedDocumentSections,
+    copyBodies,
+    highChannel: highChannelDensity,
+    proposalType: proposal?.proposal_type,
+  });
+  const publicationBodies = publication.bodies;
   const documentSections = storedDocumentSections.map(section => {
-    if (!bodyByType.has(section.section_type)) return section;
-    const approved = bodyByType.get(section.section_type);
+    if (!copyBodies.has(section.section_type)) return section;
+    const published = publicationBodies.get(section.section_type);
     const original = originalBodies.get(section.section_type);
-    if (plain(section.body) !== plain(original) && plain(section.body) !== plain(approved)) {
+    if (plain(section.body) !== plain(original) && plain(section.body) !== plain(published)) {
       reject('unvalidated_document_text', `This section contains wording not approved by the copy validator: ${section.section_type}`);
       return section; // Remain readable for review; never silently replace a manual edit.
     }
-    return { ...section, body: approved };
+    return { ...section, body: published };
   });
   // Old documents stay readable, but no unvalidated options body is exposed.
   const safeSections = documentSections.map(section => section.section_type === 'presented_options'
     ? { ...section, body: safeOptionsText ? section.body : '', is_enabled: section.is_enabled !== false && Boolean(optionsRequired && safeOptionsText) }
     : { ...section, body: containsPrivateNote(section.body, notes) ? '' : section.body });
   for (const section of safeSections) {
-    if (section.is_enabled !== false && section.body?.trim() && !bodyByType.has(section.section_type)) {
+    if (section.is_enabled !== false && section.body?.trim() && !publicationBodies.has(section.section_type)) {
       reject('unvalidated_document_text', `This section has no approved writer copy: ${section.section_type}`);
     }
   }
@@ -105,14 +122,13 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
   // place and the Appendix stays last. The bodies are then prepared by the same
   // deterministic rules the browser renders, so the Editor and the PDF publish
   // one prepared content rather than two assemblies of the same records.
-  const highChannel = resolveReportLayout(proposal?.engineering_snapshot).highDensity;
   const published = orderPublicationSections({ sections: safeSections, proposalType: proposal?.proposal_type })
     .map((section) => (section.is_enabled === false ? section : {
       ...section,
       body: preparePublishedSectionBody(section.body, {
         title: section.title,
         sectionType: section.section_type,
-        highChannel,
+        highChannel: highChannelDensity,
         proposalType: proposal?.proposal_type,
       }),
     }));
@@ -122,7 +138,7 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
   // Required validated copy must SURVIVE that preparation. A successful writer
   // response is not enough: the published page is what the client reads, and a
   // validated section whose copy the page has lost is not a publishable document.
-  for (const [sectionType, approvedHtml] of bodyByType.entries()) {
+  for (const [sectionType, approvedHtml] of publicationBodies.entries()) {
     const section = published.find(row => row.section_type === sectionType && row.is_enabled !== false);
     if (!section) continue; // already reported as missing or hidden above
     const missing = missingPublishedContent({

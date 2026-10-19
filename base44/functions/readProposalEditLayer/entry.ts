@@ -31,6 +31,11 @@ import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } fro
  * this login only, and returned as a resolved state: whether the action may be
  * shown, and its label. The browser is never given the scope lists, and it cannot
  * switch the writer on for itself.
+ *
+ * Which copy the document publishes is resolved by the publication copy authority:
+ * the designer's own wording, where they have approved it as it stands, and the
+ * validated generation or edit copy everywhere else. The history is read exactly
+ * as it always was — it simply no longer overrides copy the designer has approved.
  */
 export default async function(req) {
   try {

@@ -19,6 +19,10 @@ import { readCompleteDocument } from '../../shared/proposalEdit/readCompleteDocu
  *
  * This is the ONLY path that should change proposal.status. Client-side
  * direct status updates are rejected by the lifecycle rules.
+ *
+ * The document that gates an issue is the one the publication copy authority
+ * resolves: the designer's own approved wording where it stands, and the validated
+ * copy of the generation or edit everywhere else.
  */
 export default async function(req) {
   try {

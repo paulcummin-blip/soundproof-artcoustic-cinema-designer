@@ -23,6 +23,11 @@ import { publishedSectionFingerprint, resolveSectionApproval } from '../../share
  * every other section are left exactly as they were, which is why approving one
  * section can never affect another — and why a later change to that section's
  * wording stops counting automatically, without anyone having to reset it.
+ *
+ * The document this approval is resolved against is resolved by the publication
+ * copy authority, so the fingerprint a designer approves is the fingerprint of the
+ * wording their document will actually publish: their own saved wording where they
+ * have approved it, and the validated generation or edit copy everywhere else.
  */
 export default async function(req) {
   try {
