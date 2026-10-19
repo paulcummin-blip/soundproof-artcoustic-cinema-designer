@@ -13,6 +13,7 @@ import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActi
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
 import { getCanonicalRole as getCanonicalRoleShared } from "@/components/utils/surroundRoleMap";
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
+import { resolveScreenFrameGeometry } from "@/components/models/screen/screenFrameGeometry";
 import SpeakerInfoTooltip from "@/components/room/speakerInfo/SpeakerInfoTooltip";
 import { useSpeakerInfoTooltip } from "@/components/room/speakerInfo/useSpeakerInfoTooltip";
 import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
@@ -146,8 +147,19 @@ export default function SideElevation({
       setLiveFloorM(Number(screen?.heightFromFloorM) || 0.5);
     }
   }, [screen?.heightFromFloorM]);
-  const screenFloorM = liveFloorM;
-  const screenTopM   = screenFloorM + screenData.h;
+  // ── Screen geometry: ONE authority, shared with the Screen Setup metrics and
+  // the room-fit warning. The stored height from floor is the bottom of the
+  // COMPLETE frame, so the viewable image sits one border thickness above it and
+  // the frame top is viewable top + one border. The resolved bounds are handed
+  // to the drawing as they are and are NEVER clamped to the room: a screen that
+  // does not fit its ceiling is drawn exactly as it is built, crossing the
+  // ceiling line, so the drawing can never disagree with the calculation.
+  const screenGeometry = useMemo(
+    () => resolveScreenFrameGeometry({ ...screen, heightFromFloorM: liveFloorM }),
+    [screen, liveFloorM],
+  );
+  const screenFloorM = screenGeometry.viewableBottomM; // bottom of viewable image
+  const screenTopM   = screenGeometry.viewableTopM;    // top of viewable image
   // Screen front plane Y — same source of truth as Plan View
   const screenFrontY = Number(screen?.screenPlaneY_m) > 0
     ? Number(screen.screenPlaneY_m)
@@ -156,10 +168,13 @@ export default function SideElevation({
       : Number(screen?.screen_front_plane_m) > 0
         ? Number(screen.screen_front_plane_m)
         : Number(screen?.floatDepthM) || 0.20;
-  // Border thickness
-  const borderM      = Number(screen?.borderThicknessM) > 0 ? Number(screen.borderThicknessM) : 0.05;
-  const frameTopM    = screenTopM + borderM;      // top of frame (above viewable)
-  const frameBottomM = Math.max(0, screenFloorM - borderM); // bottom of frame (below viewable)
+  // Border thickness and complete-frame bounds, from the same geometry. The
+  // border is PER SIDE: the frame is the viewable image inset by one border on
+  // every side, so the frame bottom is the stored height from floor and the
+  // frame top is the viewable top plus one border.
+  const borderM      = screenGeometry.borderM;
+  const frameBottomM = screenGeometry.frameBottomM; // bottom of complete frame
+  const frameTopM    = screenGeometry.frameTopM;    // top of complete frame
 
   // --- Projector: resolved via shared resolver (projectorPos) ---
 
@@ -437,7 +452,7 @@ export default function SideElevation({
       const deltaClientY = me.clientY - dragStartRef.current.clientY;
       const deltaM = -(deltaClientY / svgScale / drawH) * roomH;
       const minFloor = 0.05;
-      const maxFloor = roomH - screenData.h - 0.05;
+      const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM * 2);
       const newFloor = Math.max(minFloor, Math.min(maxFloor, dragStartRef.current.floorM + deltaM));
       setLiveFloorM(newFloor);
     };
@@ -452,7 +467,7 @@ export default function SideElevation({
       const deltaClientY = me.clientY - dragStartRef.current.clientY;
       const deltaM = -(deltaClientY / svgScale / drawH) * roomH;
       const minFloor = 0.05;
-      const maxFloor = roomH - screenData.h - 0.05;
+      const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM * 2);
       const newFloor = Math.max(minFloor, Math.min(maxFloor, dragStartRef.current.floorM + deltaM));
       const rounded = Math.round(newFloor * 100) / 100;
       setLiveFloorM(rounded);
@@ -462,7 +477,7 @@ export default function SideElevation({
     listenersRef.current = { move: handleMove, up: handleUp };
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
-  }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, drawH, SVG_H]);
+  }, [onScreenHeightFromFloorChange, liveFloorM, roomH, screenData.h, borderM, drawH, SVG_H]);
 
   // --- Seat row horizontal drag handler ---
   // Moves an entire row along Y (room depth). Draft-only during pointer move;
@@ -736,21 +751,23 @@ export default function SideElevation({
                   letterSpacing="0.04em">
                   SCREEN
                 </text>
-                {/* Screen bottom height dim */}
-                <line x1={sxPx + 8} y1={rz(0)} x2={sxPx + 8} y2={rz(screenFloorM)}
+                {/* Screen bottom dim — the complete frame's own bottom, the height
+                    from floor the designer set. */}
+                <line x1={sxPx + 8} y1={rz(0)} x2={sxPx + 8} y2={rz(frameBottomM)}
                   stroke={DIM_COLOR} strokeWidth={0.6} strokeDasharray="3 2" />
-                <line x1={sxPx + 5} y1={rz(screenFloorM)} x2={sxPx + 11} y2={rz(screenFloorM)}
+                <line x1={sxPx + 5} y1={rz(frameBottomM)} x2={sxPx + 11} y2={rz(frameBottomM)}
                   stroke={DIM_COLOR} strokeWidth={0.7} />
-                <text x={sxPx + 13} y={rz(screenFloorM) + 3}
+                <text x={sxPx + 13} y={rz(frameBottomM) + 3}
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
-                  {screenFloorM.toFixed(2)}m
+                  {frameBottomM.toFixed(2)}m
                 </text>
-                {/* Screen top height dim */}
-                <line x1={sxPx + 8} y1={rz(screenTopM)} x2={sxPx + 11} y2={rz(screenTopM)}
+                {/* Screen top dim — the top of the COMPLETE frame, the same position
+                    the warning measures against the ceiling. */}
+                <line x1={sxPx + 8} y1={rz(frameTopM)} x2={sxPx + 11} y2={rz(frameTopM)}
                   stroke={DIM_COLOR} strokeWidth={0.7} />
-                <text x={sxPx + 13} y={rz(screenTopM) + 3}
+                <text x={sxPx + 13} y={rz(frameTopM) + 3}
                   fontSize={7} fill={DIM_COLOR} textAnchor="start">
-                  {screenTopM.toFixed(2)}m
+                  {frameTopM.toFixed(2)}m
                 </text>
                 {/* Screen drag hit rect moved to end of SVG so it sits above all speaker layers */}
               </g>

@@ -16,6 +16,7 @@ import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import ManualSizeInput from "./ManualSizeInput";
 import DisplayTypeSelector from "./DisplayTypeSelector";
 import { DISPLAY_TYPE_PROJECTOR, isTvDisplay } from "@/components/models/screen/displayTypeAuthority";
+import { resolveScreenFrameGeometry } from "@/components/models/screen/screenFrameGeometry";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 export default function ScreenConfiguration(props) {
@@ -227,13 +228,17 @@ export default function ScreenConfiguration(props) {
     };
   }, [seatingRowsLive, screenFrontPlaneM, viewableDimensions]);
 
-  // Overall dimensions including border
-  const overallDimensions = useMemo(() => {
-    return {
-      widthM: viewableDimensions.widthM + 2 * borderThicknessM,
-      heightM: viewableDimensions.heightM + 2 * borderThicknessM
-    };
-  }, [viewableDimensions, borderThicknessM]);
+  // ONE canonical screen frame, shared with the elevation drawings: the stored
+  // height from floor is the bottom of the COMPLETE frame (viewable image plus a
+  // border on every side), so the reported overall size and the frame's top
+  // position can never disagree with the drawing.
+  const screenFrame = useMemo(() => resolveScreenFrameGeometry(screenData), [screenData]);
+
+  // Overall dimensions including border — read from the shared frame geometry.
+  const overallDimensions = useMemo(() => ({
+    widthM: screenFrame.overallWidthM,
+    heightM: screenFrame.overallHeightM
+  }), [screenFrame]);
 
   // Fire custom event when metrics change
   useEffect(() => {
@@ -745,9 +750,11 @@ export default function ScreenConfiguration(props) {
                 const roomWidth = dimensions?.width_m || dimensions?.width || 0;
                 const roomHeight = dimensions?.height_m || dimensions?.height || 0;
 
-                const screenWidth = overallDimensions.widthM;
-                const screenHeight = overallDimensions.heightM;
-                const totalHeight = screenHeight + heightFromFloorM;
+                const screenWidth = screenFrame.overallWidthM;
+                const screenHeight = screenFrame.overallHeightM;
+                // The complete frame's own top, from the shared geometry: the same
+                // position the elevation drawing places the top of the frame at.
+                const totalHeight = screenFrame.frameTopM;
 
                 const widthClearance = roomWidth - screenWidth;
                 const heightClearance = roomHeight - totalHeight;
