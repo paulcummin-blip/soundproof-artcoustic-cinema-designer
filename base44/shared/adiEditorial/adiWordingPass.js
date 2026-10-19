@@ -127,7 +127,7 @@ async function refusalFor({ original, proposed, validate, validateStage }) {
     }
     if (checked?.ok !== true) {
       return {
-        stage: validateStage,
+        stage: checked?.stage || validateStage,
         violations: [
           ...(Array.isArray(checked?.violations) ? checked.violations : []),
           ...(quality.ok ? [] : quality.violations),
