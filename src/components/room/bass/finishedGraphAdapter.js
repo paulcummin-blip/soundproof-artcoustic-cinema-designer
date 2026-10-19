@@ -90,7 +90,14 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     canonicalVerticalOffsetDb: null,
     canonicalHouseCurveShape: null,
     canonicalTargetCurve: productionHouseCurveTarget,
-    physicalRawResponseCurve: null, // live rspRawCurve is the same curve
+    // Product-aware physical RSP response BEFORE EQ, restored from the persisted
+    // graph payload — the same curve the live calculation renders, including
+    // modal peaks and nulls. Empty when the persisted contract predates this
+    // field: the Raw / before EQ layer then stays unavailable (the graph never
+    // substitutes the normalized Room / layout response for it).
+    physicalRawResponseCurve: Array.isArray(gp.physicalRawResponseCurve)
+      ? gp.physicalRawResponseCurve.map((point) => ({ ...point }))
+      : [],
     selectedSubwooferLayout: [],
     finalSeatVariationData,
     assessmentStartHz: envelope?.assessmentStartHz ?? null,

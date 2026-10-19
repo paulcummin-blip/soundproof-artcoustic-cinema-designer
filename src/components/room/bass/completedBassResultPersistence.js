@@ -382,6 +382,14 @@ function buildGraphPayload(contract) {
     // Canonical unsmoothed flat-reference Room Response — carried through
     // compaction so the finished graph restores on cold reopen.
     roomResponseCurve: cloneCurve(finalResponse.roomResponseCurve),
+    // Product-aware physical RSP response BEFORE EQ — the genuine modelled room
+    // response (modal peaks and nulls), carried through compaction so the Expert
+    // Curve View's Raw / before EQ layer survives a cached reopen. This is the
+    // SAME field and the SAME curve the live graph already renders; it is never
+    // derived from another curve. Absent on snapshots written before it was
+    // carried through — the adapter then leaves the layer unavailable rather than
+    // substituting the normalized Room / layout response.
+    physicalRawResponseCurve: cloneCurve(finalResponse.physicalRawResponseCurve),
     // Raw per-seat room response curves (before EQ). Persisted so the graph
     // can show raw → EQ → target for any selected seat after cached reopen.
     perSeatRoomResponseCurves: (Array.isArray(finalResponse.perSeatRawCurves) ? finalResponse.perSeatRawCurves : [])
