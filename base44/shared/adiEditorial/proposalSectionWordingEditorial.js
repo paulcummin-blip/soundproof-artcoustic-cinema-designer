@@ -380,12 +380,12 @@ export async function improveProposalSectionWording({
     mode,
     validate: async (proposed) => {
       const entry = groundingViolationEntry(proposed, grounding);
-      if (entry) return { ok: false, violations: [entry] };
+      if (entry) return { ok: false, stage: ADI_REJECTION_STAGE.PRODUCT_GROUNDING, violations: [entry] };
       if (mode === ADI_SECTION_MODE.SECTION && typeof persistRevision === 'function') {
         const checked = await persistRevision({
           entities, proposalId, section, body: proposed, user, now, validateOnly: true,
         });
-        return { ok: checked.accepted === true, violations: checked.violations || [] };
+        return { ok: checked.accepted === true, stage: ADI_REJECTION_STAGE.ORIGINAL_SURFACE_VALIDATOR, violations: checked.violations || [] };
       }
       return { ok: true, violations: [] };
     },
@@ -426,6 +426,7 @@ export async function improveProposalSectionWording({
       outcome: pass.outcome,
       improvedText: pass.text,
       canUndo: Boolean(marker),
+      ...telemetry,
     });
   }
 
