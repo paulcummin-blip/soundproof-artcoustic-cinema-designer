@@ -14,6 +14,11 @@ import ViewingAnglePanel from './ViewingAnglePanel';
 import { useAppState } from '@/components/AppStateProvider';
 import { cancelMlpGrab } from '@/components/state/mlpGrabStore';
 import { normaliseSeatCount, stepSeatCount } from './seatCount';
+import {
+  defaultEarHeightForNewRow,
+  getEarHeightForRow,
+  resolveRowEarHeights,
+} from './seatingRowHeightDefaults';
 import SeatPrioritySelector from './SeatPrioritySelector';
 import { Switch } from '@/components/ui/switch';
 import { resolveSeatPriority } from '@/components/utils/seatPriorityAuthority';
@@ -42,16 +47,6 @@ function targetMlpY57_5(screen, roomFrontY = 0) {
 }
 
 
-
-// Function to get ear height for each row
-const getEarHeightForRow = (rowNumber) => {
-  switch (rowNumber) {
-    case 1:return 1.2;
-    case 2:return 1.5;
-    case 3:return 1.8;
-    default:return 1.2 + (rowNumber - 1) * 0.3;
-  }
-};
 
 // Normalise row spacing to a sane, monotonic numeric value in metres.
 const normaliseRowSpacing = (raw) => {
@@ -560,9 +555,16 @@ export default function SeatingLayout({
                 seatSpacing,
                 rowSpacingM
               });
-              const currentHeights = rowEarHeights.length ? [...rowEarHeights] : rowsArray.map((_, j) => getEarHeightForRow(j + 1));
-              currentHeights.push(getEarHeightForRow(next.length));
-              onRowEarHeightsChange?.(currentHeights);
+              // The added row starts 0.4 m above the row in front of it. Rows that
+              // are already on screen keep the height they carry, and the row only
+              // takes this default because no value has been stated for it yet.
+              const currentHeights = resolveRowEarHeights({ rowEarHeights, rowCount });
+              onRowEarHeightsChange?.([
+                ...currentHeights,
+                defaultEarHeightForNewRow({
+                  previousEarHeightM: currentHeights[currentHeights.length - 1],
+                }),
+              ]);
             }}>
             + Add Row
           </Button>
