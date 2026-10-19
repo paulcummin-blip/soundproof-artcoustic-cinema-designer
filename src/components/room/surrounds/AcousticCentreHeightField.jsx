@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import {
+  HIGHLIGHT_GREEN,
+  useSpeakerHighlighted,
+  beginSpeakerHighlight,
+  settleSpeakerHighlight,
+} from "@/components/state/speakerSelectionStore";
 
 /**
  * One group's Acoustic Centre Height (m) — the vertical centre of the speaker
@@ -11,6 +16,11 @@ import { cn } from "@/lib/utils";
  * installed speakers of that group actually hold and writes a typed value
  * straight back to them, so the panel and the drawing can never disagree.
  * `mixed` reports a group whose speakers stand at different heights.
+ *
+ * While the speakers it governs are moving — dragged in the elevation, or typed
+ * here — the label and the value turn Artcoustic dark green and hold for a
+ * moment after the edit finishes, then return to normal. The field is never
+ * outlined and is never permanently marked.
  */
 export default function AcousticCentreHeightField({
   group = null,
@@ -22,7 +32,7 @@ export default function AcousticCentreHeightField({
   maxM = null,
   hint = null,
   disabled = false,
-  highlight = false,
+  lightRoles = [],
   onEngage = null,
   onChange,
 }) {
@@ -35,6 +45,10 @@ export default function AcousticCentreHeightField({
   useEffect(() => {
     if (!editing) setText(asText(valueM));
   }, [valueM, editing]);
+
+  // The light is shared with the elevation: these speakers are green whenever
+  // they are moving, whichever end started the movement.
+  const lit = useSpeakerHighlighted(lightRoles);
 
   const numericMin = Number.isFinite(Number(minM)) ? Number(minM) : null;
 
@@ -52,17 +66,25 @@ export default function AcousticCentreHeightField({
     if (typeof onEngage === "function") onEngage();
   };
 
+  // Editing is movement: the light comes on with the edit and the hold starts
+  // when editing finishes. Further typing restarts nothing — it simply stays on
+  // while the speakers are being moved.
+  const beginEdit = () => beginSpeakerHighlight(lightRoles);
+  const endEdit = () => settleSpeakerHighlight();
+
   return (
     <div
       id={group ? `acoustic-centre-${group}` : undefined}
       onPointerDown={engage}
       onFocus={engage}
-      className={cn(
-        "space-y-1.5 rounded-md transition-all duration-150",
-        highlight && "ring-2 ring-[#213428] ring-offset-2 ring-offset-white",
-      )}
+      className="space-y-1.5 rounded-md"
     >
-      <Label className="text-xs font-medium text-[#3E4349]">{label}</Label>
+      <Label
+        className="text-xs font-medium transition-colors duration-500 ease-out"
+        style={{ color: lit ? HIGHLIGHT_GREEN : "#3E4349" }}
+      >
+        {label}
+      </Label>
       <div className="relative">
         <Input
           type="number"
@@ -73,17 +95,23 @@ export default function AcousticCentreHeightField({
           value={text}
           placeholder={mixed ? "Mixed" : asText(defaultM)}
           disabled={disabled}
-          onFocus={() => setEditing(true)}
+          onFocus={() => {
+            setEditing(true);
+            beginEdit();
+          }}
           onChange={(event) => {
             setText(event.target.value);
             commit(event.target.value);
+            beginEdit();
           }}
           onBlur={(event) => {
             setEditing(false);
             commit(event.target.value);
             setText(asText(valueM));
+            endEdit();
           }}
-          className="pr-8 bg-white text-[#1B1A1A]"
+          className="pr-8 bg-white transition-colors duration-500 ease-out"
+          style={{ color: lit ? HIGHLIGHT_GREEN : "#1B1A1A" }}
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
           m

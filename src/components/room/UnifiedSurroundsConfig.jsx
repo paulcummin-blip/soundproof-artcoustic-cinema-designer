@@ -445,7 +445,7 @@ export default function UnifiedSurroundsConfig({
             {canSides && (
               <AcousticCentreHeightField
                 group="side"
-                highlight={selectedGroup === 'side'}
+                lightRoles={rolesForGroup('side')}
                 onEngage={() => engageGroup('side')}
                 label="Side Surround — Acoustic Centre Height"
                 valueM={acousticCentre?.groups?.side?.valueM}
@@ -462,7 +462,7 @@ export default function UnifiedSurroundsConfig({
             {canRears && (
               <AcousticCentreHeightField
                 group="rear"
-                highlight={selectedGroup === 'rear'}
+                lightRoles={rolesForGroup('rear')}
                 onEngage={() => engageGroup('rear')}
                 label="Rear Surround — Acoustic Centre Height"
                 valueM={acousticCentre?.groups?.rear?.valueM}
@@ -479,7 +479,7 @@ export default function UnifiedSurroundsConfig({
             {canWides && (
               <AcousticCentreHeightField
                 group="wide"
-                highlight={selectedGroup === 'wide'}
+                lightRoles={rolesForGroup('wide')}
                 onEngage={() => engageGroup('wide')}
                 label="Front Wide — Acoustic Centre Height"
                 valueM={acousticCentre?.groups?.wide?.valueM}

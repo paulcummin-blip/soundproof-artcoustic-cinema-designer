@@ -40,6 +40,7 @@ export function useSideSpeakerDrag({
   roomH,
   snapTargets = [],
   onCommit = null,
+  onRelease = null,
 }) {
   const [liveDrag, setLiveDrag] = useState(null); // { role, axis, z, y } | null
   const [activeSnapZ, setActiveSnapZ] = useState(null);
@@ -48,9 +49,11 @@ export function useSideSpeakerDrag({
   const listenersRef = useRef(null);
   const snapTargetsRef = useRef(snapTargets);
   const commitRef = useRef(onCommit);
+  const releaseRef = useRef(onRelease);
 
   snapTargetsRef.current = Array.isArray(snapTargets) ? snapTargets : [];
   commitRef.current = typeof onCommit === "function" ? onCommit : null;
+  releaseRef.current = typeof onRelease === "function" ? onRelease : null;
 
   // A drag that outlives the component must not leave listeners behind.
   useEffect(() => () => {
@@ -59,6 +62,8 @@ export function useSideSpeakerDrag({
     window.removeEventListener("mousemove", listeners.move);
     window.removeEventListener("mouseup", listeners.up);
     listenersRef.current = null;
+    // A drag that outlives the drawing must not leave a speaker lit forever.
+    if (releaseRef.current) releaseRef.current();
   }, []);
 
   const handleSpeakerMouseDown = useCallback((event, role, start = {}) => {
@@ -145,6 +150,11 @@ export function useSideSpeakerDrag({
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
       listenersRef.current = null;
+
+      // The hands are off the speaker: the drawing lets its highlight settle.
+      // Called before the "was this actually a move?" check, so a plain click
+      // also settles rather than leaving a speaker lit indefinitely.
+      if (releaseRef.current) releaseRef.current();
 
       const drag = dragRef.current;
       dragRef.current = null;

@@ -68,8 +68,8 @@ export default function SelectedSpeakerCard({
 
       <p className="text-[11px] leading-tight text-[#625143]">
         {role
-          ? "The highlighted control below adjusts this speaker. Individual heights set here are kept."
-          : "The highlighted speakers move together. A height set on one speaker in the drawing stays with it."}
+          ? "The control below adjusts this speaker. Its text turns dark green while the speaker is moved, then returns to normal. Individual heights set here are kept."
+          : "These speakers move together, and their text turns dark green while they move. A height set on one speaker in the drawing stays with it."}
       </p>
     </div>
   );

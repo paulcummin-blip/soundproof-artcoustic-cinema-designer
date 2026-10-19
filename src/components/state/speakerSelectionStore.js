@@ -79,4 +79,80 @@ export function useSpeakerSelection() {
   return useSyncExternalStore(subscribeSpeakerSelection, getSpeakerSelection, getSpeakerSelection);
 }
 
+// ---------------------------------------------------------------------------
+// The transient highlight — a MOVEMENT cue, never a permanent mark
+//
+// Green means "this speaker is moving now": it lights the moment movement
+// begins (a speaker dragged in the elevation, or a value typed in the panel),
+// stays lit for as long as the movement lasts, holds briefly after the speaker
+// is released, then returns to normal on its own. Nothing is ever left
+// permanently marked, and no outline is ever drawn around a control or a
+// speaker. Both ends read this one authority, so the drawing and the panel can
+// never disagree about what is moving.
+// ---------------------------------------------------------------------------
+export const HIGHLIGHT_GREEN = '#213428'; // Artcoustic dark green
+export const HIGHLIGHT_HOLD_MS = 5000;
+
+const NO_HIGHLIGHT = { roles: [], lit: false, token: 0 };
+
+let highlight = NO_HIGHLIGHT;
+let holdTimer = null;
+
+const cancelHold = () => {
+  if (holdTimer === null) return;
+  clearTimeout(holdTimer);
+  holdTimer = null;
+};
+
+const publishHighlight = (next) => {
+  highlight = next;
+  listeners.forEach((listener) => listener());
+};
+
+/** Movement begins, or continues: light these speakers, right now. */
+export function beginSpeakerHighlight(roles = []) {
+  cancelHold();
+  const nextRoles = normaliseRoles(roles);
+  if (!nextRoles.length) return;
+  // Already lit for exactly these speakers: nothing to republish.
+  if (highlight.lit && nextRoles.join('|') === highlight.roles.join('|')) return;
+  publishHighlight({ roles: nextRoles, lit: true, token: highlight.token + 1 });
+}
+
+/** Movement has stopped: hold the light, then let it return on its own. */
+export function settleSpeakerHighlight({ hold = HIGHLIGHT_HOLD_MS } = {}) {
+  if (!highlight.lit) return;
+  cancelHold();
+  if (Number(hold) > 0) {
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      releaseSpeakerHighlight();
+    }, Number(hold));
+    return;
+  }
+  releaseSpeakerHighlight();
+}
+
+/** Let it return to normal now. */
+export function releaseSpeakerHighlight() {
+  cancelHold();
+  if (!highlight.lit) return;
+  publishHighlight({ roles: [], lit: false, token: highlight.token + 1 });
+}
+
+export function getSpeakerHighlight() {
+  return highlight;
+}
+
+export function useSpeakerHighlight() {
+  return useSyncExternalStore(subscribeSpeakerSelection, getSpeakerHighlight, getSpeakerHighlight);
+}
+
+/** Are these speakers lit right now? (a control asks about the speakers it governs) */
+export function useSpeakerHighlighted(roles) {
+  const light = useSpeakerHighlight();
+  if (!light.lit) return false;
+  return normaliseRoles(roles).some((role) => light.roles.includes(role));
+}
+
 export default useSpeakerSelection;
