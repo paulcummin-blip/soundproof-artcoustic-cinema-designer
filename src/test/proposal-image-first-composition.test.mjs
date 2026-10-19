@@ -9,17 +9,26 @@
  * bottom". The image was the thing that gave way, every time, because the fitting
  * walk reduced it until the sheet accepted it.
  *
+ * The rule now: a photograph the designer composed as FULL WIDTH is a page element
+ * at the full printable content width, in its own proportions, and is never
+ * reduced to fit the room left beside the copy. The fit refuses, and the copy (or
+ * the photograph) moves to the next sheet instead.
+ *
  * What is asserted here, using the real authorities and the real allocator:
  *
  *   A  the Library role sets the area the layout reserves (FULL WIDTH 40% of the
  *      printable height, DETAIL 22%), and an image with NO role keeps the floor
  *      the compositor has always used, so nothing is re-composed by a new field
- *   B  a full-width photograph is never reduced below its reserved area: the fit
- *      REFUSES, which is what makes the copy move instead
+ *   B  a full-width photograph is never reduced AT ALL: the fit refuses, so the
+ *      photograph keeps the full content width and its own height — composed on
+ *      this sheet, or moved whole to the next one
+ *   B2 a photograph that cannot share the copy's sheet moves to the next sheet
+ *      whole, at its own size
  *   C  the copy does move: the measured partition realises an approved
  *      three-pillar composition (the blocks measured, the image reserved)
- *   D  the three pillars are classified as ONE composition group, whichever of
- *      the approved compositions the measurement produced
+ *   D  the three pillars are classified as the composition they print: EACH
+ *      STRUCTURE ON ITS OWN SHEET; the shared-sheet readings stay for a document
+ *      that still groups them
  *   E  a DETAIL photograph keeps a readable reserved area rather than becoming a
  *      thumbnail
  *   F  an image that fits needs no reduction at all: nothing changed for it
@@ -122,17 +131,18 @@ describe('the Library role is layout authority', () => {
     assert.equal(imageRoleOf(placedNode(null)), null);
   });
 
-  test('B — a FULL WIDTH photograph is never reduced below its reserved area; the copy moves', () => {
+  test('B — a FULL WIDTH photograph is never reduced at all; the copy moves instead', () => {
     const image = fakeUnit({ role: 'full_width', naturalMm: 118 });
     const copy = textUnit(200);
     assert.equal(isMediaUnit(image), true);
     const fitted = reserveMediaUnit(image, [copy], measureUnits);
     // The fit refuses rather than shrinking the hero image onto the copy's sheet.
     assert.equal(fitted, false);
-    // It stopped at the reserved area (40% of 261 = 104.4 mm), never below it.
-    assert.ok(image.heightMm() >= 104.4 - 0.01, `reserved ${image.heightMm()}mm`);
-    // And the role that decided it is recorded on the image itself.
-    assert.equal(image.image.dataset.imageRole, 'full_width');
+    // The photograph is left EXACTLY as the page composed it: the full content
+    // width and its own proportions, not one millimetre shorter. No height is
+    // written to it, so nothing can pull its width back from 100%.
+    assert.equal(image.heightMm(), 118, `composed at ${image.heightMm()}mm`);
+    assert.equal(image.image.dataset.imageReservedMm, undefined);
   });
 
   test('C — an image that already fits is not touched at all', () => {
@@ -174,6 +184,22 @@ describe('the measured partition moves the copy, not the image', () => {
     textUnit(60, 'timbre_matching'),
     fakeUnit({ role: 'full_width', naturalMm: 104.4 }),
   ];
+
+  test('B2 — a FULL WIDTH photograph that cannot share the sheet moves to the next one whole', () => {
+    const units = [
+      textUnit(200, 'spatial_resolution'),
+      fakeUnit({ role: 'full_width', naturalMm: 118 }),
+    ];
+    const ranges = partition(units);
+    // The photograph does not share the copy's sheet: the copy keeps its own page
+    // and the photograph is composed on the next one.
+    assert.equal(ranges.length, 2);
+    assert.deepEqual(ranges[0], [0, 1]);
+    assert.deepEqual(ranges[1], [1, 2]);
+    // At its own size — never reduced to the room the copy left behind, and never
+    // fragmented across the two sheets.
+    assert.equal(units[1].heightMm(), 118);
+  });
 
   test('C — the blocks are measured and an approved composition is realised', () => {
     const units = pillars();
@@ -219,6 +245,16 @@ describe('the measured partition moves the copy, not the image', () => {
       { page: 2, sections: ['dynamic_range', 'timbre_matching'], roles: ['cropped_detail'] },
     ]);
     assert.equal(paired.composition, PILLAR_COMPOSITION.ONE_WITH_IMAGE_THEN_TWO);
+    // The composition the document composes: one structure per sheet, in the
+    // document's own order — no structure continued under the one before it.
+    assert.equal(
+      classifyPillarComposition([
+        { page: 1, sections: ['spatial_resolution'], roles: ['full_width'] },
+        { page: 2, sections: ['dynamic_range'], roles: ['full_width'] },
+        { page: 3, sections: ['timbre_matching'], roles: ['full_width'] },
+      ]).composition,
+      PILLAR_COMPOSITION.EACH_ON_ITS_OWN_SHEET,
+    );
     // A document with no pillar group is not labelled as one.
     assert.equal(classifyPillarComposition([{ page: 1, sections: ['executive_summary'], roles: [] }]).composition, null);
     // A sheet that carries only images never opens the group.

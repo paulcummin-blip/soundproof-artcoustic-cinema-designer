@@ -320,27 +320,12 @@ export default function ProposalPackDocument({
     return frame;
   };
 
-  // The three RP22 structures are ONE connected editorial section: their groups
-  // are composed together, under one shared heading, rather than printed as three
-  // unrelated pages. They travel as one composition, so the sheets they need are
-  // decided by their complete copy — and if their copy truly needs a second
-  // sheet, that continuation still carries the group's own identity and
-  // hierarchy.
-  let pillarSection = null;
-  const flushPillarSection = () => {
-    if (!pillarSection) return;
-    // ONE connected editorial section. Its shared heading lives inside the first
-    // structure's own opening composition — the one place it cannot be parted
-    // from the structure it introduces, because the measured compositor reads a
-    // composition as one unit and never breaks inside one. The wrapper carries
-    // the continuity the two sheets share.
-    pillarSection.sheet.children.push(
-      <div data-editorial-composition="sound_experience" className="pp-pillars" key="sound_experience">
-        {pillarSection.groups}
-      </div>,
-    );
-    pillarSection = null;
-  };
+  // The three RP22 structures are ONE connected editorial account, read across
+  // three consecutive pages under one shared heading. Each structure OPENS its own
+  // section frame — and therefore its own page — so a structure is never composed
+  // under the copy of the section before it, and never flows into the one after
+  // it. The shared heading belongs to the structure that opens the account.
+  let pillarGroupOpened = false;
 
   // The seating-style page: the large lifestyle alternatives, placed immediately
   // before the closing section (the planner names that anchor) or at the end of
@@ -676,9 +661,9 @@ export default function ProposalPackDocument({
         ) : null;
 
       // The first structure of the group carries THE SOUND EXPERIENCE heading: it
-      // opens the section, so it is the one the heading must never be parted from.
-      const opensPillarGroup = isPillarSection(section.section_type)
-        && (!pillarSection || pillarSection.groups.length === 0);
+      // opens the account, so it is the one the heading must never be parted from.
+      const opensPillarGroup = isPillarSection(section.section_type) && !pillarGroupOpened;
+      if (opensPillarGroup) pillarGroupOpened = true;
 
       const groupNode = (
         <div
@@ -750,15 +735,10 @@ export default function ProposalPackDocument({
         </div>
       );
 
-      // The three design structures travel as one composition; every other section
-      // takes its own place in the flow.
-      if (isPillarSection(section.section_type)) {
-        pillarSection = pillarSection || { sheet, groups: [] };
-        pillarSection.groups.push(groupNode);
-      } else {
-        flushPillarSection();
-        sheet.children.push(groupNode);
-      }
+      // Every section takes its own place in the frame it opened: a core sound
+      // section's page carries that structure alone — its heading, its complete
+      // copy and the image that follows them.
+      sheet.children.push(groupNode);
 
       // The concluding hero has been used once. Remaining images still flow to
       // their own metadata-led pages after the narrative.
@@ -779,8 +759,6 @@ export default function ProposalPackDocument({
         });
       }
     });
-
-  flushPillarSection();
 
   // A seating-style page whose closing anchor was not composed still belongs in
   // the document, after the narrative it supports.

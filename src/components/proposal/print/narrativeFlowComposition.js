@@ -11,10 +11,15 @@
  * new section begins a new sheet.
  *
  * What may share a sheet, and what may not:
- *   - the narrative sections of the design story flow together (the three pillar
- *     structures, the system summary, the closing statement). They are read as
- *     one continuous account, so they continue on one sheet and onto the next
- *     when their copy needs it;
+ *   - the narrative sections of the design story flow together (the system
+ *     summary, the closing statement). They are read as one continuous account,
+ *     so they continue on one sheet and onto the next when their copy needs it;
+ *   - THE THREE CORE SOUND SECTIONS NEVER SHARE A SHEET. Spatial Resolution,
+ *     Dynamic Range and Timbre Matching are the document's most important
+ *     client-facing structures, so each one OPENS a sheet of its own — its
+ *     heading, its complete copy and the image that follows them. None of the
+ *     three is continued under the section before it, and none of them flows
+ *     into the section after it.
  *   - a designed page does not join the flow. At a Glance, the Method page, the
  *     Key Performance Highlights evidence page, an imagery page, the Presented
  *     Options page and a comparison page each state one thing on their own sheet,
@@ -28,13 +33,28 @@
  * Pure: no React, no DOM, no runtime reads.
  */
 
+/**
+ * The three core sound sections. Each one OPENS a sheet of its own: these are the
+ * document's three most important client-facing structures, and each is read as
+ * its own page — its heading, its copy, then the image that follows them.
+ */
+export const CORE_SECTION_TYPES = Object.freeze([
+  'spatial_resolution',
+  'dynamic_range',
+  'timbre_matching',
+]);
+
+/** Whether this section is one of the three core sound structures. */
+export function isCoreSection(sectionType) {
+  return CORE_SECTION_TYPES.includes(String(sectionType || ''));
+}
+
 /** The narrative sections that may share a sheet with the section before them. */
 export const FLOW_SECTION_TYPES = Object.freeze([
   // The System Design structure — one continuous design account.
   'system_design_summary',
-  'spatial_resolution',
-  'dynamic_range',
-  'timbre_matching',
+  // The three core sound sections are absent on purpose: because each of them
+  // opens a band of its own, none is ever composed under another section's copy.
   'overall_design',
   // The legacy ten-section report's narrative, kept so saved documents compose
   // under the same editorial rule.

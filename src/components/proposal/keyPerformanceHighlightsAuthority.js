@@ -499,12 +499,20 @@ export function highlightParameterFor(key, fallbackArea = null) {
  * Four client-facing headlines from the exact frozen snapshot used by this proposal.
  * No value is calculated or regraded here: related current parameters are grouped
  * so the table tells the design story once instead of becoming a miniature report.
+ *
+ * Each result states the parameter it came from, beside the result: "P12 L4 ·
+ * 110 dBC" says which level and which figure belong to which parameter. This table
+ * is the ONLY place a P-code is printed — it is what tells the reader what each
+ * result represents — and no P-code ever enters the document's prose.
  */
 export function buildClientSummaryRows(snapshot) {
   const headlines = Array.isArray(snapshot?.rp22?.parameter_headlines)
     ? snapshot.rp22.parameter_headlines
     : [];
   const byId = new Map(headlines.map((row) => [Number(row?.parameter_id), row]));
+  // The result AS IT PRINTS: the parameter's identity, then the level it reached,
+  // then the calculated figure. The identity leads, because the level and the
+  // figure are meaningless without knowing which parameter they belong to.
   const stated = (id) => {
     const row = byId.get(id);
     if (!row) return null;
@@ -512,7 +520,7 @@ export function buildClientSummaryRows(snapshot) {
     // A P19/P20 deviation is stated at the canonical floored display value;
     // every other parameter's calculated text is carried exactly as it stands.
     const value = clientDeviationText(id, String(row.formatted_value ?? row.value ?? '').trim());
-    return [level, value].filter(Boolean).join(' · ');
+    return [`P${id}${level ? ` ${level}` : ''}`, value].filter(Boolean).join(' · ');
   };
   const layout = snapshot?.system?.configuration?.dolby_config || null;
   const subwooferCount = snapshot?.system?.channel_layout?.subwoofer_count;
@@ -528,28 +536,32 @@ export function buildClientSummaryRows(snapshot) {
       key: 'client_system_spatial',
       area: 'System / Spatial Resolution',
       parameter: 'System format and discrete channels',
-      result: `${format} · ${p2}`,
+      // The system format, then the parameter that states how many discrete
+      // positions it is built from. One entry per line, so neither result hides
+      // inside the other.
+      result: [`${format}`, `${p2}`].join('\n'),
       gain: 'Fifteen discrete speaker positions place sound around and above both seating rows.',
     },
     {
       key: 'client_dynamic',
       area: 'Dynamic Range',
       parameter: 'Screen · surround/overhead · bass',
-      result: dynamic.join(' · '),
+      // One parameter per line: P12 screen, P13 surround/overhead, P14 bass.
+      result: dynamic.join('\n'),
       gain: 'The screen, surround and bass systems retain headroom as soundtracks become demanding.',
     },
     {
       key: 'client_timbre',
       area: 'Timbre Matching',
       parameter: 'Screen · surround/overhead',
-      result: timbre.join(' · '),
+      result: timbre.join('\n'),
       gain: 'Voices and effects retain a consistent tonal character within each assessed speaker group.',
     },
     {
       key: 'client_bass',
       area: 'Bass Performance',
       parameter: 'Extension · reference-seat response · seat-to-seat variation',
-      result: bass.join(' · '),
+      result: bass.join('\n'),
       gain: 'Deep extension and accurate bass at the reference seat, with greater variation across the other seats.',
       limitation: true,
     },

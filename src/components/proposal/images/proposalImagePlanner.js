@@ -7,10 +7,16 @@
  * The rule it enforces, in one place:
  *   - the cover takes the strongest source, framed as a portrait cover crop;
  *   - the design overview takes a full-width landscape from another source;
- *   - the first structure section takes a portrait accent from a third source,
- *     and a drawing the document must show whole may take that accent on the
- *     design-overview page itself, beside the account it explains;
- *   - the last structure section may be the visual break, and a cover source may
+ *   - EACH of the three core sound structures takes its own full-width landscape,
+ *     composed below its copy on its own page, so no structure is left without
+ *     the image that supports it and none is composed under the section before
+ *     it;
+ *   - an image the designer recorded a purpose for takes ONLY the section that
+ *     purpose names: a detail image is never dropped into a structure because
+ *     there is room for it, and where the document composes none of the sections
+ *     its purpose names it joins the narrative flow, where its purpose is read
+ *     again;
+ *   - the last structure may be the visual break, and a cover source may
  *     return there because its cover placement never consumes its body inclusion;
  *   - a seating-style page carries the large lifestyle alternatives;
  *   - each comparison group the designer marked carries one page of its own,
@@ -261,8 +267,13 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
    * a return is never bunched up behind another.
    */
   const pickLandscape = (pagePosition, { preferCoverReturn = false } = {}) => {
+    // A source the designer composed as a SUPPORTING image is never taken for a
+    // full-width page: DETAIL is a deliberate secondary presentation, so those
+    // photographs stay with the section their own purpose names (step 4 below) and
+    // are never promoted to a page's hero.
     const candidates = narrativeSources.filter(
-      (asset) => asset.id && eligible(asset, pagePosition, CROP_ORIENTATION.LANDSCAPE_FULL),
+      (asset) => asset.id && eligible(asset, pagePosition, CROP_ORIENTATION.LANDSCAPE_FULL)
+        && !isSupportingPresentation(asset),
     );
     const coverReturn = candidates.find((asset) => asset.id === coverAsset?.id);
     // The break normally returns the cover source. Where the designer marked a
@@ -289,24 +300,6 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
    */
   const isFullWidthPreference = (asset) => imagePresentationOf(asset) === IMAGE_PRESENTATION.FULL_WIDTH;
 
-  /**
-   * The source for a portrait accent — and ONLY a source the designer composed as
-   * a supporting image. The accent is a smaller crop of a photograph, so it is
-   * placed only where the designer's own card asks for that treatment (Detail or
-   * Cropped Detail). A photograph with nothing recorded is never turned into a
-   * narrow portrait, and a photograph marked Full Width is never reduced to one:
-   * where no such source exists, the page carries its copy and no accent at all.
-   * Returning the cover source here would repeat the cover treatment rather than
-   * add an accent to it, so it is passed over for the same reason.
-   */
-  const pickPortrait = (pagePosition) => narrativeSources.find(
-    (asset) => asset.id
-      && asset.id !== coverAsset?.id
-      && isSupportingPresentation(asset)
-      && usesOf(asset) === 0
-      && eligible(asset, pagePosition, CROP_ORIENTATION.PORTRAIT),
-  ) || null;
-
   // 1. The cover.
   add(coverAsset, EDITORIAL_ROLE.COVER, 'cover', 1);
 
@@ -316,14 +309,36 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     add(pickLandscape(overviewEntry.page), EDITORIAL_ROLE.LANDSCAPE_FEATURE, overviewEntry.section_id, overviewEntry.page);
   }
 
-  // 3. The image that supports the copy: it sits smaller, beside the paragraphs
-  // it explains, in the copy-and-image row the portrait accent already uses.
-  // Where the designer recorded what the image is for, it takes the section that
-  // purpose belongs with, so a drawing or a detail is not separated from the
-  // account it supports. Where nothing is recorded, or the document has none of
-  // the sections that purpose prefers, it keeps the treatment it has always had:
-  // the first design structure.
   const structures = entries.filter((entry) => STRUCTURE_TYPES.includes(entry.section_type));
+
+  // 3. EVERY CORE SOUND SECTION TAKES THE PHOTOGRAPH THAT FOLLOWS ITS COPY. The
+  // three structures each stand on their own page — heading, then the complete
+  // text, then the image below — so each one takes a full-width photograph of its
+  // own. A structure never carries the section before it's imagery, and no
+  // photograph is shared between two of these pages: where the document has fewer
+  // photographs than structures, the structures with none carry their copy alone.
+  //
+  // The last structure keeps the document's deliberate return — the cover source
+  // may come back there, which is the visual break the rhythm is built on.
+  structures.forEach((entry, index) => {
+    add(
+      pickLandscape(entry.page, { preferCoverReturn: index === structures.length - 1 }),
+      EDITORIAL_ROLE.LANDSCAPE_FEATURE,
+      entry.section_id,
+      entry.page,
+    );
+  });
+
+  // 4. The image that supports the copy: it sits smaller, beside the paragraphs
+  // it explains, in the copy-and-image row the portrait accent already uses.
+  //
+  // A RECORDED PURPOSE IS AUTHORITY. The image takes only the section its own
+  // purpose names, so a drawing or a detail is never separated from the account it
+  // supports — and an image whose purpose is recorded but names no section this
+  // document composes is never dropped into whichever structure happens to have
+  // room: it joins the narrative flow below, where its purpose is read again. An
+  // image with NOTHING recorded keeps the treatment the document has always given
+  // it.
   const fallbackEntry = structures[0] || null;
   // The design-overview page already carries the document's leading photograph, so
   // a supporting image normally takes another section. It may take the overview
@@ -334,21 +349,26 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     .map((type) => entries.find((entry) => entry.section_type === type
       && (entry !== overviewEntry || isProtectedDrawing(asset))))
     .find(Boolean) || null;
-  const supportingSource = pickPortrait(fallbackEntry ? fallbackEntry.page : 999);
-  const purposeEntry = supportingSource ? purposeEntryFor(supportingSource) : null;
-  const portraitEntry = purposeEntry || fallbackEntry;
-  if (portraitEntry && (portraitEntry !== overviewEntry || Boolean(purposeEntry))) {
-    add(supportingSource, EDITORIAL_ROLE.PORTRAIT_EDITORIAL, portraitEntry.section_id, portraitEntry.page);
-  }
-
-  // 4. The visual break: the cover source returns as a full-width landscape.
-  const featureEntry = structures.length > 1 ? structures[structures.length - 1] : null;
-  if (featureEntry) {
+  const supportingPick = narrativeSources
+    .filter((asset) => asset.id && asset.id !== coverAsset?.id
+      && isSupportingPresentation(asset) && usesOf(asset) === 0)
+    .map((source) => {
+      const fromPurpose = imagePurposeOf(source) !== null;
+      return {
+        source,
+        fromPurpose,
+        entry: fromPurpose ? purposeEntryFor(source) : fallbackEntry,
+      };
+    })
+    .find(({ source, entry, fromPurpose }) => entry
+      && (fromPurpose || entry !== overviewEntry)
+      && eligible(source, entry.page, CROP_ORIENTATION.PORTRAIT));
+  if (supportingPick) {
     add(
-      pickLandscape(featureEntry.page, { preferCoverReturn: true }),
-      EDITORIAL_ROLE.LANDSCAPE_FEATURE,
-      featureEntry.section_id,
-      featureEntry.page,
+      supportingPick.source,
+      EDITORIAL_ROLE.PORTRAIT_EDITORIAL,
+      supportingPick.entry.section_id,
+      supportingPick.entry.page,
     );
   }
 

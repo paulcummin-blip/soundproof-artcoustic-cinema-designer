@@ -38,12 +38,19 @@ export const PILLAR_COMPOSITION = Object.freeze({
   ALL_THREE: 'A',
   TWO_THEN_ONE_WITH_IMAGE: 'B',
   ONE_WITH_IMAGE_THEN_TWO: 'C',
+  /**
+   * D — EACH STRUCTURE ON ITS OWN SHEET. The composition the document composes:
+   * Spatial Resolution, Dynamic Range and Timbre Matching each open their own
+   * page, and each carries its own copy with the photograph that follows it.
+   */
+  EACH_ON_ITS_OWN_SHEET: 'D',
 });
 
 export const PILLAR_COMPOSITION_NOTE = Object.freeze({
   A: 'All three structures on one sheet; the image takes the following sheet at its reserved size.',
   B: 'Two structures on the first sheet; the third shares the next sheet with the image.',
   C: 'One structure with an image, then the remaining two with the other image.',
+  D: 'Each structure opens its own sheet: its own copy, and its own photograph below it.',
 });
 
 /** Whether a section type is one of the three presented structures. */
@@ -97,7 +104,18 @@ export function classifyPillarComposition(pages = []) {
   const pillarOnly = shape.filter((sheet) => sheet.pillars.length > 0);
   const opening = pillarOnly[0];
   let composition = null;
-  if (opening && opening.pillars.length >= PILLAR_SECTION_TYPES.length && !opening.fullWidth) {
+  // D first: the composition the document composes. One structure per sheet, in
+  // the document's own order, each opening its own page — no structure is
+  // continued under the one before it. Read before the shared-sheet
+  // compositions below, which are what a document that still groups them prints.
+  const eachOnItsOwnSheet = pillarOnly.length >= PILLAR_SECTION_TYPES.length
+    && PILLAR_SECTION_TYPES.every((type, index) => {
+      const sheet = pillarOnly[index];
+      return sheet && sheet.pillars.length === 1 && sheet.pillars[0] === type;
+    });
+  if (eachOnItsOwnSheet) {
+    composition = PILLAR_COMPOSITION.EACH_ON_ITS_OWN_SHEET;
+  } else if (opening && opening.pillars.length >= PILLAR_SECTION_TYPES.length && !opening.fullWidth) {
     composition = PILLAR_COMPOSITION.ALL_THREE;
   } else if (opening && opening.pillars.length === 2) {
     const withImage = pillarOnly.find((sheet) => sheet !== opening

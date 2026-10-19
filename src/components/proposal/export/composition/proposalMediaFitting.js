@@ -6,9 +6,18 @@
  *
  * A photograph and its caption can be split by no rule, so a photograph that does
  * not fit the sheet it is measured against is reduced in height only, until the
- * pair fits the printable area it has. Nothing is cropped, stretched, reordered or
- * removed: the width follows the photograph's own proportions, and the caption is
- * never separated from it.
+ * pair fits the printable area it has. Reduction stops at the area the image's own
+ * Library role reserves: where it cannot reach that area, the fit refuses and the
+ * COPY moves to the next sheet instead.
+ *
+ * A FULL WIDTH photograph is never reduced at all. Its presentation states that
+ * the uploaded composition IS the composition — the full content width, its own
+ * proportions, no crop — so a full-width image that does not fit the room left
+ * beside the copy it was measured with is MOVED, whole, to the next sheet, where
+ * it is composed again at the same full width. Only a photograph taller than a
+ * whole printable sheet is reduced, and only as far as it takes to print at all.
+ * Nothing is cropped, stretched, reordered or removed: the width follows the
+ * photograph's own proportions, and the caption is never separated from it.
  *
  * THE IMAGE KEEPS ITS RESERVED AREA. Reduction stops at the floor the image's own
  * Library role reserves (proposalImageRoleAuthority): a full-width image holds a
@@ -23,6 +32,7 @@
  */
 
 import { PX_PER_MM, setPrintStyle } from '@/components/proposal/export/composition/proposalPageGeometry';
+import { IMAGE_PRESENTATION } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import { LEGACY_MIN_MEDIA_HEIGHT_MM, mediaFloorMm, imageRoleOf } from '@/components/proposal/export/composition/proposalImageRoleAuthority';
 
 /**
@@ -117,6 +127,16 @@ export function fitMediaUnit(unit, prefix, measureUnits, options = {}) {
  */
 export function reserveMediaUnit(unit, prefix, measureUnits) {
   const budgetMm = measureUnits(prefix).availableMm;
+  // A FULL WIDTH photograph is a page element, not a space-filler: it is composed
+  // at the full content width in its own proportions and is NEVER reduced to fit
+  // the room that is left beside the copy it was measured with. The fit REFUSES,
+  // and the measured partition moves the whole block to the next sheet, where it
+  // is composed again at the same full width. Only a photograph taller than a
+  // whole printable sheet is reduced, and only as far as it takes to print.
+  if (imageRoleOf(unit?.node) === IMAGE_PRESENTATION.FULL_WIDTH) {
+    if (measureUnits([...prefix, unit]).fits) return true;
+    if (measureUnits([unit]).fits) return false;
+  }
   return fitMediaUnit(unit, prefix, measureUnits, {
     floorMm: mediaFloorMm(unit?.node, budgetMm),
   });

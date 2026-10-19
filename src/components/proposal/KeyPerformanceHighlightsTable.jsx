@@ -190,7 +190,11 @@ export default function KeyPerformanceHighlightsTable({
             // component knowing anything about the sheet it is printed on.
             <tr key={row.key} data-row-key={row.key} data-row-area={row.area}>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
-              <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.result}</td>
+              {/* The result states the parameter it came from, beside the level and
+                  the figure: one entry per line, so a row that carries three
+                  results reads as three stated results rather than one anonymous
+                  run of levels. */}
+              <td className={`${CELL} text-[#1B1A1A] whitespace-pre-line`} style={proposalRoleStyle('body')}>{row.result}</td>
               <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.gain}</td>
             </tr>
           ))}
