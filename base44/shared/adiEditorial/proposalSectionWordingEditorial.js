@@ -217,7 +217,9 @@ export async function improveProposalSectionWording({
       metadata: {
         ...withoutMarker(section.metadata),
         // Approval is restored only for the exact content previously approved.
-        approval: marker.previous_approval || section.metadata?.approval || null,
+        approval: Object.prototype.hasOwnProperty.call(marker, 'previous_approval')
+          ? marker.previous_approval
+          : (section.metadata?.approval || null),
       },
     };
     const persistedRestore = await persistSectionChange({
@@ -257,8 +259,8 @@ export async function improveProposalSectionWording({
     }
     if (restored?.metadata?.adi_editorial) mismatches.push('adi_editorial');
     if (publishedSectionFingerprint(restored?.body) !== marker.source_fingerprint) mismatches.push('source_fingerprint');
-    if (approval?.fingerprint === expectedApprovalFingerprint
-      && JSON.stringify(restored?.metadata?.approval) !== JSON.stringify(approval)) mismatches.push('approval');
+    if ((approval === null || approval?.fingerprint === expectedApprovalFingerprint)
+      && JSON.stringify(restored?.metadata?.approval ?? null) !== JSON.stringify(approval)) mismatches.push('approval');
     if (mismatches.length) return blocked(
       'undo_verification_failed', 409,
       'The earlier wording could not be fully restored. Please reload and try again.',
