@@ -27,6 +27,33 @@ import {
 } from './adiEditorialStandard.js';
 import { normaliseDiagnosticViolation } from './adiRejectionDiagnostics.js';
 
+import { PROPOSAL_SECTION_FOR_WRITER_SECTION } from '../proposalWriter/writerSectionMapping.js';
+import { writerSectionsForMode } from '../proposalWriter/writerContractSchema.js';
+
+/** The structural agreement is read from the existing frozen writer mapping. */
+export function adiSectionContract({ sectionType = null, sectionLabel = 'section', mode = 'single', original = '' } = {}) {
+  const parts = writerSectionsForMode(mode).filter((entry) =>
+    PROPOSAL_SECTION_FOR_WRITER_SECTION[entry.section] === sectionType);
+  return {
+    section_type: sectionType,
+    section_label: sectionLabel,
+    required_headings: parts.length > 1 ? parts.map((entry) => entry.title) : [],
+    source_blocks: (String(original).match(/<(h[1-6]|p|ul|ol|li)\b[^>]*>/gi) || []),
+    instruction: 'Preserve the heading order and the paragraph/block structure within each part. Shorten wording within blocks; never move supported meaning between parts.',
+  };
+}
+
+function contractBlock(contract) {
+  return [
+    '=== SECTION TYPE ===',
+    contract?.section_label || contract?.section_type || 'section',
+    '=== REQUIRED STRUCTURE ===',
+    JSON.stringify(contract || {}, null, 2),
+    'Required headings are immutable labels: retain their exact wording and order.',
+    'Frozen supporting context is exactly the unchanged evidence-identity block in the original brief below. No additional project evidence is sent for correction.'
+  ];
+}
+
 const RULE = 'Never say or imply that this copy was written by AI. ADI is Sound Proof\'s own editorial intelligence.';
 
 /** The copy to improve, stated as the pass is asked to see it. */
@@ -93,6 +120,7 @@ export function buildAdiEditorialPrompt({
   selectionText = '',
   evidenceIdentity = null,
   documentIdentity = null,
+  sectionContract = null,
 } = {}) {
   const sourceCopy = mode === 'selection' ? selectionText : currentText;
   const html = looksLikeHtml(sourceCopy);
@@ -126,6 +154,8 @@ export function buildAdiEditorialPrompt({
     RULE,
     '',
     ...identityBlock({ evidenceIdentity, documentIdentity }),
+    '',
+    ...contractBlock(sectionContract),
     '',
     ...requiredFinalCut,
     ...copyBlock({ mode, selectionText, currentText }),
@@ -172,6 +202,7 @@ export function buildAdiCorrectionPrompt({
   refused = '',
   stage = null,
   violations = [],
+  sectionContract = null,
 } = {}) {
   const html = looksLikeHtml(refused) || looksLikeHtml(original);
   const entries = (Array.isArray(violations) ? violations : []).map(normaliseDiagnosticViolation);
@@ -195,6 +226,8 @@ export function buildAdiCorrectionPrompt({
     ...(brief.length > 0
       ? ['=== THE BRIEF YOU WERE GIVEN (unchanged) ===', brief, '']
       : []),
+    ...contractBlock(sectionContract),
+    '',
     '=== CORRECTION REQUIRED — YOU HAVE ONE MORE ATTEMPT ===',
     'The rewrite you returned was read against the authority boundary below and REFUSED. It was not accepted, nothing was saved, and the original copy is still in place.',
     ...(stage ? [`The stage that refused it: ${stage}.`] : []),
@@ -207,6 +240,7 @@ export function buildAdiCorrectionPrompt({
     '',
     '=== THE EXACT VIOLATIONS (final authority — the corrected copy must carry none of them) ===',
     ...stated,
+    JSON.stringify(violations, null, 2),
     '',
     '=== INSTRUCTION ===',
     'Correct only the listed validation violations. Preserve the intended editorial improvements. Do not restore weak wording unnecessarily.',
@@ -216,6 +250,9 @@ export function buildAdiCorrectionPrompt({
         'Keep every other word, sentence, HTML tag and paragraph in the refused rewrite unchanged.',
       ]
       : []),
+    'Start from the first candidate. Do not start again from scratch. Preserve every useful editorial improvement outside the phrases responsible for the listed failures.',
+    'Preserve every figure, qualifier, limitation, seat scope, product, RP22/RP23 result, required heading and required section structure.',
+    'Return the complete corrected section.',
     'Repair the wording itself: remove or rephrase only the change each violation names, and keep every fact, figure, level, product, scope and limitation the copy already supports.',
     'Deleting supported engineering content is not a correction, and adding a new fact, benefit, reason or claim is not a correction.',
     '',
