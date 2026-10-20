@@ -27,7 +27,7 @@ import { useIsDragActive } from "@/components/state/userInteractionStore";
  * @param {Array} params.seatingPositions — [{ id, x, y, z?, priority? }]
  * @param {object} params.physicsOptions — modal physics options (optional)
  */
-export function useStage1PlacementOptimiser({ projectId, versionId = "free", roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null }) {
+export function useStage1PlacementOptimiser({ projectId, versionId = "free", roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null, scopeQuantity = null }) {
   const state = useSyncExternalStore(
     subscribeStage1,
     () => getStage1State(projectId, versionId),
@@ -44,12 +44,16 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
   const [hydratedCache, setHydratedCache] = useState(null);
 
   // Compute fingerprint (product-independent, P14-independent)
-  const fingerprint = computeStage1Fingerprint({
+  const baseFingerprint = computeStage1Fingerprint({
     roomDims,
     rspPosition,
     seatingPositions,
     physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
   });
+  const scope = [1, 2, 3, 4].includes(scopeQuantity) ? scopeQuantity : null;
+  // A scoped run carries its own identity so its partial result is never
+  // mistaken for the all-quantity study of the same design.
+  const fingerprint = baseFingerprint && scope ? `${baseFingerprint}|sel:${scope}` : baseFingerprint;
 
   // ── Hydration on mount / project change ──────────────────────────────
   useEffect(() => {
@@ -74,14 +78,14 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
   // Project geometry can hydrate after the cache query completes. Retain the
   // persisted snapshot and restore as soon as the final fingerprint is known.
   useEffect(() => {
-    if (!hydrationDone || !isStage1CacheValid(hydratedCache, fingerprint)) return;
-    publishHydratedStage1(projectId, versionId, fingerprint, {
+    if (!hydrationDone || !isStage1CacheValid(hydratedCache, baseFingerprint)) return;
+    publishHydratedStage1(projectId, versionId, baseFingerprint, {
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
       three_sub_result: hydratedCache.three_sub_result,
       four_sub_result: hydratedCache.four_sub_result,
     });
-  }, [hydrationDone, hydratedCache, fingerprint, projectId]);
+  }, [hydrationDone, hydratedCache, baseFingerprint, projectId]);
 
   // ── Schedule / cancel search on fingerprint change ───────────────────
   useEffect(() => {
@@ -137,10 +141,11 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     // A valid persisted snapshot is authoritative for this fingerprint.
     // Restore synchronously here as well so scheduling cannot race the restore
     // effect during the same commit.
-    if (isStage1CacheValid(hydratedCache, fingerprint)) {
-      publishHydratedStage1(projectId, versionId, fingerprint, {
+    if (isStage1CacheValid(hydratedCache, baseFingerprint)) {
+      publishHydratedStage1(projectId, versionId, baseFingerprint, {
         one_sub_result: hydratedCache.one_sub_result,
         two_sub_result: hydratedCache.two_sub_result,
+        three_sub_result: hydratedCache.three_sub_result,
         four_sub_result: hydratedCache.four_sub_result,
       });
       return;
@@ -148,7 +153,8 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
 
     // If the current state already has this fingerprint and is complete, skip
     const current = getStage1State(projectId, versionId);
-    if (current.status === "complete" && current.fingerprint === fingerprint) return;
+    // A complete all-quantity result for the same design also satisfies a scoped run.
+    if (current.status === "complete" && (current.fingerprint === fingerprint || current.fingerprint === baseFingerprint)) return;
 
     // Schedule the search (cancels any existing pending/active search)
     stage1PlacementController.schedule({
@@ -157,12 +163,13 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
       fingerprint,
       payload: { roomDims, rspPosition, seatingPositions, physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS },
       delay: STAGE1_START_DELAY_MS,
+      scopeQuantity: scope,
     });
 
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, baseFingerprint, scope, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {

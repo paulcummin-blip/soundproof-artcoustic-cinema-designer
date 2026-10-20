@@ -244,12 +244,14 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
  * Run full Stage 1 search for all quantities (1, 2, 3, 4).
  * Suggested order: 2-sub, 4-sub, 1-sub.
  */
-export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, physicsOptions, generationId }) {
+export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, physicsOptions, generationId, scopeQuantity = null }) {
   const overallStart = performance.now();
   const physics = physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS;
   // The three-source quantity is appended, never inserted: the order the existing
   // quantities are searched in is unchanged.
-  const quantities = [2, 4, 1, 3];
+  // A selected-quantity run searches only the installed quantity (all its families
+  // and candidates still run). Compare passes no scope and searches every quantity.
+  const quantities = [1, 2, 3, 4].includes(scopeQuantity) ? [scopeQuantity] : [2, 4, 1, 3];
   const quantityResultKeys = {
     1: "one_sub_result",
     2: "two_sub_result",

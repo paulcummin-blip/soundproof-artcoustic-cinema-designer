@@ -660,6 +660,12 @@ function RoomDesignerWithState() {
   const recommendationsActive = !!bassHeavyAction?.requestId
     && ["optimise", "compare"].includes(bassHeavyAction.action)
     && ["requested", "running", "complete"].includes(bassHeavyAction.status);
+  // Installed subwoofer count (same rule Stage 2 uses) scopes a selected-quantity Stage 1 run.
+  const _stage1ScopeQty = React.useMemo(() => {
+    const instances = (appState?.subwooferInstances || []).filter(i => i?.enabled !== false);
+    const count = instances.length || (appState?.subwoofers || []).length;
+    return (count === 1 || count === 2 || count === 3 || count === 4) ? count : null;
+  }, [appState?.subwoofers, appState?.subwooferInstances]);
   const stage1Optimisation = useStage1PlacementOptimiser({
     projectId: activeProjectId,
     versionId: appState?.activeVersionId || "free",
@@ -668,6 +674,7 @@ function RoomDesignerWithState() {
     seatingPositions: _seatingPositions,
     enabled: recommendationsActive,
     requestId: recommendationsActive ? bassHeavyAction.requestId : null,
+    scopeQuantity: bassHeavyAction?.selectedQuantityOnly === true ? _stage1ScopeQty : null,
   });
 
   // ── Stage 2 Subwoofer Placement Optimiser ──────────────────────────

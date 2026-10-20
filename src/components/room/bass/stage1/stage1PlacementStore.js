@@ -143,7 +143,7 @@ class Stage1PlacementController {
    * Schedule a Stage 1 search. Cancels any existing pending/active search.
    * Debounces rapid geometry changes.
    */
-  schedule({ projectId, versionId, fingerprint, payload, delay }) {
+  schedule({ projectId, versionId, fingerprint, payload, delay, scopeQuantity = null }) {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     this.cancelActive("superseded");
 
@@ -159,13 +159,14 @@ class Stage1PlacementController {
     this.timer = setTimeout(() => {
       this.timer = null;
       this.pendingRequest = null;
-      this.start({ projectId, versionId, fingerprint, payload });
+      const scoped = Number.isFinite(scopeQuantity) ? scopeQuantity : null;
+      this.start({ projectId, versionId, fingerprint, payload: { ...payload, scopeQuantity: scoped }, scopeQuantity: scoped });
     }, waitMs);
   }
 
-  start({ projectId, versionId, fingerprint, payload }) {
+  start({ projectId, versionId, fingerprint, payload, scopeQuantity = null }) {
     const requestId = `stage1-${++this.requestSequence}`;
-    this.activeRequest = { requestId, fingerprint, projectId, versionId, startedAtMs: performance.now() };
+    this.activeRequest = { requestId, fingerprint, projectId, versionId, scopeQuantity, startedAtMs: performance.now() };
 
     try {
       if (!this.worker) {
@@ -207,7 +208,8 @@ class Stage1PlacementController {
     if (message.type === "complete") {
       this.activeRequest = null;
       publishStage1Complete(active.projectId, active.versionId, active.fingerprint, message.result?.results || null);
-      this.persist(active.projectId, active.versionId, active.fingerprint, message.result?.results);
+      // A selected-quantity result is partial: never persisted as the all-quantity study.
+      if (!active.scopeQuantity) this.persist(active.projectId, active.versionId, active.fingerprint, message.result?.results);
     }
   }
 

@@ -29,6 +29,7 @@ self.onmessage = (event) => {
       seatingPositions: payload.seatingPositions,
       physicsOptions: payload.physicsOptions,
       generationId: cancellationChecker,
+      scopeQuantity: payload.scopeQuantity ?? null,
     });
 
     if (cancellationChecker.cancelled) {
