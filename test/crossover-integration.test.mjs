@@ -15,10 +15,10 @@ const db = (c) => 20 * Math.log10(Math.max(Math.hypot(c.re, c.im), 1e-12));
 
 describe("speaker-specific crossover defaults and minimums", () => {
   it("uses the mandated default and minimum for each raised model", () => {
-    expect(crossoverLimitsForModel("evolve-1")).toMatchObject({ defaultHz: 150, minHz: 150, maxHz: 200 });
-    expect(crossoverLimitsForModel("evolve-1-1")).toMatchObject({ defaultHz: 120, minHz: 120, maxHz: 200 });
-    expect(crossoverLimitsForModel("evolve-2-1")).toMatchObject({ defaultHz: 100, minHz: 100, maxHz: 200 });
-    expect(crossoverLimitsForModel("q6-3")).toMatchObject({ defaultHz: 100, minHz: 80, maxHz: 200 });
+    expect(crossoverLimitsForModel("evolve-1")).toEqual({ defaultHz: 150, minHz: 150, maxHz: 200 });
+    expect(crossoverLimitsForModel("evolve-1-1")).toEqual({ defaultHz: 120, minHz: 120, maxHz: 200 });
+    expect(crossoverLimitsForModel("evolve-2-1")).toEqual({ defaultHz: 100, minHz: 100, maxHz: 200 });
+    expect(crossoverLimitsForModel("q6-3")).toEqual({ defaultHz: 100, minHz: 80, maxHz: 200 });
   });
 
   it("never lets a frequency under a speaker minimum be produced", () => {
@@ -153,6 +153,6 @@ describe("combined response preserves genuine low-frequency limits", () => {
       crossover: { frequencyHz: 60, subwooferFrequencyHz: 60, linkFrequencies: true, speakerHpSlopeDbPerOct: 24, subwooferLpSlopeDbPerOct: 24 },
       primarySeatId: "rsp",
     });
-    expect(valueAt(raised.combinedBySeat.rsp, 80)).not.toBeCloseTo(valueAt(combined.combinedBySeat.rsp, 80), 1);
+    expect(Math.abs(valueAt(raised.combinedBySeat.rsp, 80) - valueAt(combined.combinedBySeat.rsp, 80))).toBeGreaterThan(0.1);
   });
 });
