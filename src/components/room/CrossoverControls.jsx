@@ -59,6 +59,7 @@ export default function CrossoverControls({
   onChange,
   disabled = false,
   hint = null,
+  stack = false,
 }) {
   if (!crossover || !limits) return null;
 
@@ -119,7 +120,7 @@ export default function CrossoverControls({
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: stack ? "1fr" : "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
         {showHighPass && renderBlock(
           "highpass",
           showLowPass ? "Speaker High-Pass" : null,

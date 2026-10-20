@@ -1386,12 +1386,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       )}
 
       {/* Crossover & Integration — the screen channels take part in the bass-managed response */}
-      <CrossoverIntegrationPanel
-        crossover={crossover}
-        limits={crossoverLimits}
-        disabled={!Array.isArray(lcrSources) || lcrSources.length === 0}
-        onChange={setCrossover}
-      />
+      <CrossoverIntegrationPanel />
       <CombinedResponsePanel
         provisional={provisionalCombined}
         combined={combinedSystem}
