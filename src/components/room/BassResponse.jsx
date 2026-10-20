@@ -42,6 +42,9 @@ import Test11GentlePeakCutValidation from "@/components/room/bass/Test11GentlePe
 import { normaliseHouseCurveToP14Total, diagnoseHouseCurveP14Integration } from "@/components/utils/p14HouseCurveNormalisation";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import CrossoverIntegrationPanel from "@/components/room/bass/CrossoverIntegrationPanel";
+import CombinedResponsePanel from "@/components/room/bass/CombinedResponsePanel";
+import { buildProvisionalCombinedAssessment } from "@/components/room/bass/provisionalCombinedAssessment";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { resolvePreviewSeatId, resolvePreviewCurve } from "@/components/room/bass/previewSeatCurveAuthority";
@@ -86,6 +89,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     qStrategy, setQStrategy, rewModalBandwidthScale, setRewModalBandwidthScale,
     bassSmoothingMode, setBassSmoothingMode, includeDiagnostics, setIncludeDiagnostics,
     normalizedLive, normalizedPhysicsOptions,
+    crossover, setCrossover, crossoverLimits, lcrSources, combinedSystem,
   } = authoritative;
   const activeProjectId = useActiveProjectId();
   const layoutContextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims });
@@ -93,6 +97,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
+
+  // Provisional combined LCR + subwoofer assessment. The band and the target
+  // come from the same published contract the canonical assessment uses, and
+  // grading reuses the canonical functions — nothing is re-derived here.
+  const canonicalContract = sharedBassResults?.completedBassAuthority || null;
+  const provisionalCombined = useMemo(() => buildProvisionalCombinedAssessment({
+    combined: combinedSystem,
+    achievedP18Hz: canonicalContract?.achievedP18FrequencyHz
+      ?? canonicalContract?.contract?.achievedP18FrequencyHz
+      ?? null,
+    transitionHz: optimisationTransitionHz ?? null,
+    targetCurve: canonicalContract?.idealHouseTarget
+      ?? canonicalContract?.contract?.idealHouseTarget
+      ?? null,
+  }), [combinedSystem, canonicalContract, optimisationTransitionHz]);
   const resolveAutoDelayForSub = (subId, group, index) => {
     if (autoAlignDelays[subId] != null) return autoAlignDelays[subId];
     const labels = ["left", "right"];
@@ -1365,6 +1384,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           />}
         </div>
       )}
+
+      {/* Crossover & Integration — the screen channels take part in the bass-managed response */}
+      <CrossoverIntegrationPanel
+        crossover={crossover}
+        limits={crossoverLimits}
+        disabled={!Array.isArray(lcrSources) || lcrSources.length === 0}
+        onApply={setCrossover}
+      />
+      <CombinedResponsePanel
+        provisional={provisionalCombined}
+        combined={combinedSystem}
+        hasResult={hasCurrentBassResult}
+      />
 
       {/* Absorption Coefficients — room acoustics, useful but not the first thing a dealer needs */}
                 <CollapsiblePanel title="Absorption Coefficients" defaultOpen={false}>

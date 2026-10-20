@@ -332,7 +332,8 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     // subwoofer-only result down with it.
     try {
       const integrationTransfers = captureCombinedIntegrationTransfers({
-        roomDims, seatingPositions, rspPosition, sources,
+        roomDims, seatingPositions, rspPosition,
+        subTransfers: result?.perSourcePerSeatComplexTransfers,
         speakerSources: integration.speakerSources, physics, qStrategyOverride: strategy,
       });
       return integrationTransfers ? { ...result, integrationTransfers } : result;
@@ -403,7 +404,13 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       }
     };
     const cachedRoomPhysics = geometryFingerprint ? getCachedRoomPhysics(geometryFingerprint) : null;
-    if (cachedRoomPhysics) {
+    // A cached entry is reused only when it was captured for the SAME LCR
+    // geometry. Moving a screen channel changes the combined model without
+    // changing the published geometry fingerprint, so the signature is checked
+    // here instead of widening the published fingerprint.
+    const cachedCoversIntegration = !integration.enabled
+      || cachedRoomPhysics?.integrationSignature === integrationSignature;
+    if (cachedRoomPhysics && cachedCoversIntegration) {
       finish({ status: "complete", result: cachedRoomPhysics, error: null });
       return () => { cancelled = true; };
     }
@@ -414,7 +421,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       const timer = setTimeout(() => {
         try {
           const result = runSimulation(qStrategy);
-          if (geometryFingerprint && result) setCachedRoomPhysics(geometryFingerprint, result);
+          if (geometryFingerprint && result) setCachedRoomPhysics(geometryFingerprint, integration.enabled ? { ...result, integrationSignature } : result);
           finish({ status: "complete", result, error: null });
         } catch (error) {
           finish({ status: "error", result: null, error: error?.message || String(error) });
@@ -464,7 +471,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
         // a subsequent P14-only change reuses it without re-running the
         // modal engine. Room physics is geometry-dependent only.
         if (geometryFingerprint && message.result) {
-          setCachedRoomPhysics(geometryFingerprint, message.result);
+          setCachedRoomPhysics(geometryFingerprint, integration.enabled ? { ...message.result, integrationSignature } : message.result);
         }
         finish({ status: "complete", result: message.result, error: null });
       } else {
@@ -526,7 +533,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       }
       // ── END INSTRUMENTATION ──────────────────────────────────────────────
     };
-  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy, analysisRequestId, analysisRequestFingerprint, backgroundPrepFingerprint]);
+  }, [analysisBlocked, simulationRequest, runSimulation, qStrategy, analysisRequestId, analysisRequestFingerprint, backgroundPrepFingerprint, integration, integrationSignature]);
   const simulationReady = simulationState.request === simulationRequest
     && simulationState.status === "complete"
     && !!simulationState.result;
@@ -553,6 +560,28 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     () => extractRoomResponseCurve(canonicalRoomResponseResult),
     [canonicalRoomResponseResult],
   );
+  // ── Combined LCR + subwoofer response ──────────────────────────────────
+  // Built here on the main thread from the cached complex transfers, so a
+  // crossover frequency or slope change re-combines the two paths instantly
+  // and never re-runs a room simulation. Provisional by design: it is not
+  // published and does not replace the subwoofer-only authority.
+  const integrationTransfers = simulationResults?.integrationTransfers || null;
+  const combinedSystem = useMemo(() => {
+    if (!integrationTransfers) return null;
+    if (!integrationTransfers.available) {
+      return { available: false, reason: integrationTransfers.reason || "unavailable" };
+    }
+    const primarySeatId = rspPosition?.id || "rsp";
+    return buildCombinedSystemResponse({
+      frequenciesHz: integrationTransfers.frequenciesHz,
+      seats: Object.keys(integrationTransfers.subTransfersBySeat || {})
+        .map((seatId) => ({ seatId, isRsp: seatId === primarySeatId })),
+      subTransfersBySeat: integrationTransfers.subTransfersBySeat,
+      speakerTransfersBySeat: integrationTransfers.speakerTransfersBySeat,
+      crossover,
+      primarySeatId,
+    });
+  }, [integrationTransfers, crossover, rspPosition?.id]);
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
     if (!simulationResults) return { rspRawCurve: [], perSeatRawCurves: [] };
     return buildAuthoritativeResponseCurves(simulationResults.seatResponses);
@@ -642,6 +671,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     frontSubsLive, rearSubsLive,
     rspRawCurve, perSeatRawCurves, perSourceRspComplexTransfers,
     canonicalRoomResponseCurve,
+    crossover, setCrossover, crossoverLimits, lcrSources, combinedSystem, integrationTransfers,
     designEqSystemLimits, optimisationTransitionHz, requested,
     fingerprintInputs, fingerprints, payload, inputsValid, physics, runSimulation,
     autoAlignEnabled, setAutoAlignEnabled, autoAlignDelays, roomDamping, setRoomDamping,

@@ -4,7 +4,10 @@ import { captureCombinedIntegrationTransfers } from "./combinedIntegrationEngine
 // The combined LCR + subwoofer model is ADDITIVE. A failure inside it must never
 // take the authoritative subwoofer-only simulation down with it, so its result
 // is isolated and reported as unavailable instead of thrown.
-function captureIntegrationTransfers(payload) {
+//
+// The subwoofer transfers are passed straight through from the authoritative
+// run — the combined model never recomputes them.
+function captureIntegrationTransfers(payload, result) {
   const integration = payload?.integration;
   if (!integration || integration.enabled === false) return null;
   try {
@@ -12,7 +15,7 @@ function captureIntegrationTransfers(payload) {
       roomDims: payload.roomDims,
       seatingPositions: payload.seatingPositions,
       rspPosition: payload.rspPosition,
-      sources: payload.sources,
+      subTransfers: result?.perSourcePerSeatComplexTransfers,
       speakerSources: integration.speakerSources,
       physics: payload.physics,
       qStrategyOverride: payload.qStrategyOverride,
@@ -31,7 +34,7 @@ self.onmessage = (event) => {
 
   try {
     const result = simulateAuthoritativeBassResponse(payload || {});
-    const integrationTransfers = captureIntegrationTransfers(payload);
+    const integrationTransfers = captureIntegrationTransfers(payload, result);
     self.postMessage({
       type: "complete",
       generation,
