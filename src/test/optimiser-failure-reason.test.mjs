@@ -47,7 +47,7 @@ const incompletePlan = (run = null) => ({
 const BASS_FIX_LABELS = [
   "Recalculate Bass Performance",
   "Calculate Bass Performance",
-  "Update Bass Performance",
+  "Recalculate Bass Results",
 ];
 
 describe("the reason a run could not complete is mapped, never dumped", () => {

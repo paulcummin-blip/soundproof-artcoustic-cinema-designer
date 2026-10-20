@@ -201,15 +201,15 @@ export const OPTIMISER_PLAN_RUN_BLOCK_MESSAGE = Object.freeze({
   [OPTIMISER_PLAN_RUN_BLOCK.TARGET_NOT_SELECTED]:
     "No bass target has been selected for this design. Select the bass target, then run the Optimisation Plan.",
   [OPTIMISER_PLAN_RUN_BLOCK.DESIGN_STALE]:
-    "This design has changed since the bass result was published. Update Bass Performance, then run the Optimisation Plan.",
+    "This design has changed since the bass result was published. Recalculate Bass Results, then run the Optimisation Plan.",
   [OPTIMISER_PLAN_RUN_BLOCK.CALCULATION_IN_PROGRESS]:
     "A bass calculation is already running. The Optimisation Plan can run as soon as it finishes.",
   [OPTIMISER_PLAN_RUN_BLOCK.WORKER_FAILED]:
-    "The last bass calculation did not complete. Retry Calculate Performance, then run the Optimisation Plan.",
+    "The last bass calculation did not complete. Retry Calculate Bass Results, then run the Optimisation Plan.",
   [OPTIMISER_PLAN_RUN_BLOCK.CALCULATION_REQUIRED]:
-    "Calculation required before optimisation. Calculate Performance, then run the Optimisation Plan.",
+    "Calculation required before optimisation. Calculate Bass Results, then run the Optimisation Plan.",
   [OPTIMISER_PLAN_RUN_BLOCK.NO_VALID_BASS_RESULT]:
-    "No valid bass result is available for this design. Calculate Performance, then run the Optimisation Plan.",
+    "No valid bass result is available for this design. Calculate Bass Results, then run the Optimisation Plan.",
 });
 
 /** First sentence of a diagnosis line — e.g. "Seat-to-seat consistency is the limiting factor." */

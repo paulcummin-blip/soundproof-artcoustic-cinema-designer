@@ -294,7 +294,7 @@ describe("ADI optimiser journey — why the optimiser cannot run yet", () => {
       expect(
         OPTIMISER_PLAN_RUN_BLOCK_MESSAGE[code],
         `${code} does not tell the designer what to do next`,
-      ).toMatch(/Calculate Performance|Select the bass target|Choose the subwoofer system|Update Bass Performance|as soon as it finishes|Retry Calculate Performance/);
+      ).toMatch(/Calculate Bass Results|Select the bass target|Choose the subwoofer system|Recalculate Bass Results|as soon as it finishes|Retry Calculate Bass Results/);
     });
   });
 
@@ -351,7 +351,7 @@ describe("ADI optimiser journey — why the optimiser cannot run yet", () => {
     expect(journey.message).toContain(LIMITING);
     expect(journey.canRun).toBe(false);
     expect(journey.action).not.toBeNull();
-    expect(journey.blockReason.message).toMatch(/Calculate Performance/);
+    expect(journey.blockReason.message).toMatch(/Calculate Bass Results/);
   });
 });
 

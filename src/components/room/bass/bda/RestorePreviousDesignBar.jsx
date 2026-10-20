@@ -215,7 +215,7 @@ export default function RestorePreviousDesignBar({
             className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Update Bass Performance
+            Recalculate Bass Results
           </button>
         )}
       </div>
@@ -286,7 +286,7 @@ export default function RestorePreviousDesignBar({
               className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Update Bass Performance
+              Recalculate Bass Results
             </button>
           )}
           <button

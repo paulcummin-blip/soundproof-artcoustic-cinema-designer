@@ -323,6 +323,6 @@ export function buildIncomplete(problem, hasP20Evidence) {
     action: 'Bass evidence is available, but ADI could not confirm an improvement from the optimisation run.',
     why: problem?.description || '',
     rp22Evidence: [],
-    remainingLimitation: seatConsistencyNote || 'Run Update Bass Performance to complete the evaluation.',
+    remainingLimitation: seatConsistencyNote || 'Recalculate Bass Results to complete the evaluation.',
   };
 }

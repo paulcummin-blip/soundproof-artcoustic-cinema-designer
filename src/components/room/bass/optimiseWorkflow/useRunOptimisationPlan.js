@@ -193,7 +193,7 @@ export default function useRunOptimisationPlan({
       const live = sharedRef.current;
       if (live?.hasCurrentResult !== true) {
         if (typeof live?.onCalculate !== "function" || live?.canCalculate !== true) {
-          const reason = "The design has no current bass result. Calculate Performance, then run the Optimisation Plan.";
+          const reason = "The design has no current bass result. Calculate Bass Results, then run the Optimisation Plan.";
           saveRunFailure(reason);
           logRunHistory({
             terminalStatus: "failed",
@@ -207,7 +207,7 @@ export default function useRunOptimisationPlan({
         phaseRef.current = "calculating";
         live.onCalculate();
         if (!(await waitForCurrentPublication(sharedRef, phaseRef))) {
-          const reason = "The bass calculation did not publish a current result. Retry Calculate Performance, then run the Optimisation Plan.";
+          const reason = "The bass calculation did not publish a current result. Retry Calculate Bass Results, then run the Optimisation Plan.";
           saveRunFailure(reason);
           logRunHistory({
             terminalStatus: "failed",

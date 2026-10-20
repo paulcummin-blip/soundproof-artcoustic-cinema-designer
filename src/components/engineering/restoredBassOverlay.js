@@ -52,7 +52,7 @@ const normaliseLevel = (level) => {
 };
 
 export const SAVED_BASS_OUT_OF_DATE_MESSAGE =
-  "Saved bass analysis is out of date. Update Bass Performance before generating reports.";
+  "Saved bass analysis is out of date. Recalculate Bass Results before generating reports.";
 
 /**
  * Fail-closed currentness check for report/proposal use.

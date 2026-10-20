@@ -83,7 +83,7 @@ export default function BassDesignAssistant({
     && previewWorkerStatus !== "calculating"
     ? (previewErrorMessage
       ? `Preview could not be generated — ${previewErrorMessage}`
-      : "Preview could not be generated. Update Bass Performance to calculate this layout.")
+      : "Preview could not be generated. Recalculate Bass Results to calculate this layout.")
     : null;
   // Lifecycle state consumed from the sole authority — no independent derivation.
   const bassLifecycleState = shared?.bassLifecycleState || null;
