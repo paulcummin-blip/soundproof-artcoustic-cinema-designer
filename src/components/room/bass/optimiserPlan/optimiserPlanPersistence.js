@@ -113,3 +113,32 @@ export function readPublishedOptimiserPlan(completedBassAuthority) {
   if (!plan || typeof plan !== "object") return null;
   return plan;
 }
+// Acknowledged by the existing version writer, only AFTER its durable update.
+// Bounded to the latest saved run per version; never writes design state itself.
+const savedRuns = new Map();
+const saveWaiters = new Set();
+export function acknowledgeOptimiserPlanSave(projectId, versionId, plan) {
+  if (!plan?.run?.runId) return;
+  const key = projectId + "::" + versionId;
+  const value = { runId: plan.run.runId, at: Date.now() };
+  savedRuns.set(key, value);
+  for (const notify of saveWaiters) notify(key, value);
+}
+export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs = 60000) {
+  const key = projectId + "::" + versionId;
+  const previous = savedRuns.get(key);
+  if (previous?.runId === runId) return Promise.resolve(previous.at);
+  return new Promise((resolve, reject) => {
+    const notify = (savedKey, value) => {
+      if (savedKey !== key || value.runId !== runId) return;
+      clearTimeout(timer);
+      saveWaiters.delete(notify);
+      resolve(value.at);
+    };
+    const timer = setTimeout(() => {
+      saveWaiters.delete(notify);
+      reject(new Error("The optimiser plan is ready, but its version save was not acknowledged. Retry saving the project."));
+    }, timeoutMs);
+    saveWaiters.add(notify);
+  });
+}
