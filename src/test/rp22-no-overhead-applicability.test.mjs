@@ -188,7 +188,7 @@ describe("report readiness is complete for N/A parameters", () => {
       terminalSummary({ p9: "provisional", p10: "provisional", p11: "provisional" }),
     );
     expect(unassessed.complete).toBe(false);
-    expect(unassessed.missingParameterKeys).toEqual(expect.arrayContaining(["p9", "p10", "p11"]));
+    for (const key of ["p9", "p10", "p11"]) expect(unassessed.missingParameterKeys).toContain(key);
   });
 });
 
@@ -240,7 +240,7 @@ describe("the surfaces carry the reason through", () => {
   it("states the reason in the compliance panel for an overhead-only N/A parameter", () => {
     const panel = read("components/rp22/RP22CompliancePanel.jsx");
     expect(panel).toContain("isOverheadOnlyParameter(p.id)");
-    expect(panel).toContain("{NO_OVERHEAD_LAYER_REASON}");
+    expect(panel).toContain("{debugMetric?.note || NO_OVERHEAD_LAYER_REASON}");
     expect(NO_OVERHEAD_LAYER_REASON).toBe("Not applicable — this design has no overhead / height speakers.");
   });
 });
