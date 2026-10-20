@@ -39,3 +39,12 @@ test('large completed cache preserves current and previous contracts without rew
  assert.equal(saved.completedByFingerprint.fp7,snapshots.fp7);
  assert.ok(JSON.stringify(saved).length<1250000);
 });
+
+test("saved primary scope survives compacted candidate rows and remains enforced",()=>{
+ const compact=structuredClone(authority);
+ compact.contract.selectedCandidate.perSeatP20Results[0].isPrimary=false;
+ compact.contract.provenance={primarySeatIds:["a"]};
+ assert.equal(recommendationResultMatches(compact,expected),true);
+ compact.contract.provenance.primarySeatIds=[];
+ assert.equal(recommendationResultMatches(compact,expected),false);
+});

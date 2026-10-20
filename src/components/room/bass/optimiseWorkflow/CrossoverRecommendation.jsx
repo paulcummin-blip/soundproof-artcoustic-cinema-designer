@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration";
 import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification";
 import useSharedBassAuthorityState from "../useSharedBassAuthorityState";
-import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison";
 
 const number = value => Number.isFinite(value) ? value.toFixed(2) : "—";
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -23,7 +22,6 @@ export default function CrossoverRecommendation({
   live.current = {shared,instances,appState,authorityState};
   const [applying,setApplying] = useState(false);
   const [error,setError] = useState(null);
-  const verificationLogKey = useRef(null);
   const record = saved;
   useEffect(() => {
     if (!candidate?.integrationVerified || !candidate?.baselineCacheKey || typeof write !== "function") return;
@@ -40,10 +38,6 @@ export default function CrossoverRecommendation({
   useEffect(() => {
     if (applying || !record?.expectedConfiguration || !["applying","restoring","verification-required"].includes(record.status)) return;
     if (shared?.calculationInProgress || shared?.cacheKey === record.beforeCacheKey) return;
-    if (verificationLogKey.current !== shared.cacheKey) {
-      verificationLogKey.current = shared.cacheKey;
-      console.info("Crossover Apply verification", JSON.stringify({settingsMatch:recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration),actual:extractAuthorityForComparison(shared?.completedBassAuthority),expected:record.operation==="restore"?record.baseline&&{p19:record.baseline.achievedP19VariationDb,p20:record.baseline.achievedP20VariationDb,p14:record.baseline.p14AchievedDb,p18:record.baseline.achievedP18Hz}:record.candidate&&{p19:record.candidate.achievedP19VariationDb,p20:record.candidate.achievedP20VariationDb,p14:record.candidate.p14AchievedDb,p18:record.candidate.achievedP18Hz},sources:shared?.authoritative?.sources,expectedSettings:record.expectedConfiguration}));
-    }
     if (authorityState.code !== "current") return;
     if (!recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration)) return;
     const restore=record.operation==="restore";
@@ -54,7 +48,7 @@ export default function CrossoverRecommendation({
   if (!record?.candidate) return null;
   const recommended=record.candidate;
   const baseline=record.baseline;
-  const stale=record.status==="recommended" && record.baselineCacheKey!==shared?.cacheKey;
+  const stale=["recommended","restored"].includes(record.status) && record.baselineCacheKey!==shared?.cacheKey;
   const pending=applying||busy;
   const limiter=worst(recommended);
 
@@ -132,9 +126,10 @@ export default function CrossoverRecommendation({
     <p className="text-xs">Primary-seat change: {number(Math.max(0,...(recommended.perSeatP20||[]).filter(s=>s.isPrimary).map(s=>s.variationDbRaw-(baseline?.perSeatP20?.find(b=>b.seatId===s.seatId)?.variationDbRaw??s.variationDbRaw))))} dB maximum regression.</p>
     {stale && <p className="text-xs text-amber-800">Design changed — re-run ADI before applying.</p>}
     {record.status==="applied" && record.appliedCacheKey===shared?.cacheKey && <p className="text-xs text-green-800">Applied — calculated result verified and saved.</p>}
-    {(error||record.error) && <><p role="alert" className="text-xs text-red-700">{error||record.error}</p><details><summary>Verification details</summary><pre className="text-xs whitespace-pre-wrap">{JSON.stringify({settingsMatch:recommendationSettingsMatch(shared?.authoritative,record.expectedConfiguration),actual:extractAuthorityForComparison(shared?.completedBassAuthority),expectedSettings:record.expectedConfiguration,actualSettings:{crossover:shared?.authoritative?.crossover,sources:shared?.authoritative?.sources?.map(s=>({id:s.id,tuning:s.tuning}))}},null,2)}</pre></details></>}
+    {record.status==="restored" && record.appliedCacheKey===shared?.cacheKey && <p className="text-xs text-green-800">Previous settings restored — calculated result verified and saved.</p>}
+    {(error||record.error) && <p role="alert" className="text-xs text-red-700">{error||record.error}</p>}
     <div className="flex gap-2">
-      <button className="rounded bg-[#213428] px-3 py-2 text-xs text-white disabled:opacity-40" disabled={pending||stale||record.status!=="recommended"} onClick={()=>commitAndVerify(false)}>
+      <button className="rounded bg-[#213428] px-3 py-2 text-xs text-white disabled:opacity-40" disabled={pending||stale||!["recommended","restored"].includes(record.status)} onClick={()=>commitAndVerify(false)}>
         {applying?"Calculating and saving…":"Apply Recommended Settings"}
       </button>
       {record.previousConfiguration && <button className="rounded border px-3 py-2 text-xs disabled:opacity-40" disabled={pending||record.status==="restored"} onClick={()=>commitAndVerify(true)}>Restore Previous Settings</button>}
