@@ -117,8 +117,8 @@ test('single overhead pair P9 N/A survives saved publication restore and passes 
   assert.equal(restored.parameter_index.P9.level, 'N/A');
   assert.equal(restored.parameter_index.P9.raw_value, null);
   assert.equal(assessEngineeringReportCompleteness(restored.engineering_summary).complete, true);
-  assert.equal(auditPublicationContract(restored).allowed, true);
-  assert.equal(validateReportEvidence(evidence(restored)).complete, true);
+  assert.equal(auditPublicationContract(restored).allowed, true, JSON.stringify(auditPublicationContract(restored).missing));
+  assert.equal(validateReportEvidence(evidence(restored)).complete, true, JSON.stringify(validateReportEvidence(evidence(restored))));
   restored.engineering_summary.parameterAuthority.p12.state = 'provisional';
   assert.equal(auditPublicationContract(restored).allowed, false);
 });
