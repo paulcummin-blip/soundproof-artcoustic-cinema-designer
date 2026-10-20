@@ -718,6 +718,7 @@ function RoomDesignerWithState() {
     subwooferBottomHeightM: _stage2SubBottomHeightM,
     enabled: recommendationsActive,
     requestId: recommendationsActive ? bassHeavyAction.requestId : null,
+    selectedQuantityOnly: bassHeavyAction?.selectedQuantityOnly === true,
   });
 
   useEffect(() => {

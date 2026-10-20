@@ -36,10 +36,11 @@ function publish(projectId, versionId, patch) {
   return states.get(key);
 }
 
-export function requestBassHeavyAction(projectId, versionId, action, sourceFingerprint) {
+export function requestBassHeavyAction(projectId, versionId, action, sourceFingerprint, options = {}) {
   if (!["optimise", "compare"].includes(action) || !sourceFingerprint) return null;
   sequence += 1;
   return publish(projectId, versionId, {
+    selectedQuantityOnly: options?.selectedQuantityOnly === true,
     requestId: `${action}:${Date.now()}:${sequence}`,
     action,
     sourceFingerprint,

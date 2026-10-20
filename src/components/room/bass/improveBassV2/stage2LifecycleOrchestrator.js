@@ -38,8 +38,10 @@ const STAGE2_WAIT_TIMEOUT_MS = 300000;
  * @param {object} stage2State — from getStage2State(projectId)
  * @returns {boolean}
  */
-export function isStage2ReadyForConsumption(stage2State) {
+export function isStage2ReadyForConsumption(stage2State, quantity = null) {
   if (!stage2State) return false;
+  // A selected-quantity result only serves the quantity it was computed for.
+  if (stage2State.scopeQuantity && stage2State.scopeQuantity !== quantity) return false;
   return stage2State.status === "complete"
     && !!stage2State.placementFingerprint
     && !!stage2State.fingerprint;

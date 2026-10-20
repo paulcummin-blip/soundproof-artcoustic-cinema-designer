@@ -87,7 +87,9 @@ export function useStage2PlacementOptimiser({
   subwooferBottomHeightM,
   enabled = true,
   requestId = null,
+  selectedQuantityOnly = false,
 }) {
+  const scopeQuantity = selectedQuantityOnly && [1, 2, 3, 4].includes(currentQuantity) ? currentQuantity : null;
   const state = useSyncExternalStore(
     subscribeStage2,
     () => getStage2State(projectId, versionId),
@@ -179,9 +181,11 @@ export function useStage2PlacementOptimiser({
 
   // Legacy fingerprint for cache compatibility (includes P14).
   // p18TargetBasis is NOT included — it is a presentation-only grading view.
+  // A selected-quantity run carries a scoped identity so its partial result can
+  // never be mistaken for the all-quantity study of the same design.
   const fingerprint = useMemo(() => {
     if (!stage1Fingerprint || !stage1Finalists || !selectedSubModel || !p14Target) return null;
-    return computeStage2Fingerprint({
+    const base = computeStage2Fingerprint({
       stage1Fingerprint,
       stage1Finalists,
       selectedSubModel,
@@ -191,7 +195,8 @@ export function useStage2PlacementOptimiser({
       subwooferBottomHeightM,
       amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
     });
-  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW]);
+    return scopeQuantity ? `${base}|sel:${scopeQuantity}` : base;
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW, scopeQuantity]);
 
   // Hydration on mount / project change
   useEffect(() => {
@@ -340,6 +345,7 @@ export function useStage2PlacementOptimiser({
         subwooferBottomHeightM,
       },
       quantityOrder,
+      scopeQuantity,
       delay: STAGE2_START_DELAY_MS,
     });
   }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW]); // eslint-disable-line react-hooks/exhaustive-deps

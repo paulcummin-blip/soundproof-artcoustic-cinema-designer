@@ -51,6 +51,7 @@ function emptyState(projectId, versionId) {
     totalRuntimeMs: 0,
     errorMessage: null,
     hydratedFromCache: false,
+    scopeQuantity: null,
     bEligible: false,
     bEvaluated: false,
     bEligibilityReason: null,
@@ -113,6 +114,7 @@ export function publishHydratedStage2(projectId, versionId, fingerprint, results
     bResult: results?.b_result || null,
     errorMessage: null,
     hydratedFromCache: true,
+    scopeQuantity: null,
   });
 }
 
@@ -174,6 +176,7 @@ function publishStage2Progress(projectId, versionId, fingerprint, results, place
     completedJobs: results?.completed_jobs || 0,
     totalJobsPlanned: results?.total_jobs_planned || 0,
     phase: results?.phase || "preparing",
+    scopeQuantity: results?.scope_quantity ?? null,
     bEligible: results?.b_eligible || false,
     bEvaluated: results?.b_evaluated || false,
     bEligibilityReason: results?.b_eligibility_reason || null,
@@ -205,6 +208,7 @@ function publishStage2Complete(projectId, versionId, fingerprint, results, place
     bResult: results?.b_result || null,
     errorMessage: null,
     hydratedFromCache: false,
+    scopeQuantity: results?.scope_quantity ?? null,
   });
 }
 
@@ -261,8 +265,15 @@ export class Stage2PlacementController {
     this.watchdogs = new Map();
   }
 
-  schedule({ projectId, versionId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay }) {
+  schedule({ projectId, versionId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay, scopeQuantity = null }) {
     this.cancelAll("superseded");
+    // SELECTED-QUANTITY SCOPE: when the caller consumes ONE quantity (ADI
+    // optimisation of the installed sub count), only that quantity is placed and
+    // confirmed. Every candidate family, confirmation and tuning variant for it
+    // still runs; other quantities are never queued, so they cannot compete for
+    // workers, delay completion or overwrite the result.
+    this.scopeQuantity = Number.isFinite(scopeQuantity) ? scopeQuantity : null;
+    if (this.scopeQuantity) quantityOrder = [this.scopeQuantity];
     if (!fingerprint) {
       markStage2Idle(projectId, versionId);
       return;
@@ -814,6 +825,7 @@ export class Stage2PlacementController {
     results.runtime_diagnostics = { ...this.runtimeDiagnostics };
     results.completed_jobs = this.completedJobs;
     results.total_jobs_planned = this.totalJobsPlanned;
+    results.scope_quantity = this.scopeQuantity;
     // Phase label reflects the interleaved two-phase architecture. Placement
     // and confirmation can overlap: the selected quantity's confirmation may
     // run while non-selected quantities' placement is still in progress.
@@ -853,7 +865,9 @@ export class Stage2PlacementController {
 
     // B only applies to 4-sub. Check eligibility (initial or re-check after
     // representative evaluations complete).
-    if (this.bState === "not_checked" || this.bState === "evaluating_representatives") {
+    if (!this.quantityOrder.includes(4)) {
+      this.bState = "not_eligible";
+    } else if (this.bState === "not_checked" || this.bState === "evaluating_representatives") {
       const fourSubResults = this.completedResults[4] || [];
 
       const eligibility = evaluateBEligibility({
@@ -948,6 +962,7 @@ export class Stage2PlacementController {
     results.completed_jobs = this.completedJobs;
     results.total_jobs_planned = this.totalJobsPlanned;
     results.phase = "ready";
+    results.scope_quantity = this.scopeQuantity;
     results.total_runtime_ms = Math.max(0, now() - this.startTime);
     results.b_eligible = this.bState === "queued" || this.bState === "evaluated";
     results.b_evaluated = this.bState === "evaluated" && this.bResult != null;
@@ -956,7 +971,9 @@ export class Stage2PlacementController {
     results.b_result = this.bResult;
 
     publishStage2Complete(this.projectId, this.versionId, this.currentFingerprint, results, this.placementFingerprint);
-    this.persist(this.projectId, this.versionId, this.currentFingerprint, results);
+    // A selected-quantity result is partial by design: never written to the
+    // shared all-quantity cache, so it cannot be mistaken for a full study.
+    if (!this.scopeQuantity) this.persist(this.projectId, this.versionId, this.currentFingerprint, results);
     this.cancelAll("complete");
   }
 

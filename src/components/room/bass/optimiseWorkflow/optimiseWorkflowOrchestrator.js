@@ -139,14 +139,20 @@ export async function runOptimisation(opts) {
   let stage2Result = getStage2State(projectId, versionId);
   let placementFingerprint = stage2Result?.placementFingerprint;
 
-  const reusedStage2 = isStage2ReadyForConsumption(stage2Result);
+  const selectedQuantity = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
+    .filter((instance) => instance?.enabled !== false).length;
+  const reusedStage2 = isStage2ReadyForConsumption(stage2Result, selectedQuantity);
   if (!reusedStage2) {
     if (!shared.cacheKey) {
       return { status: "error", error: "Bass result is not ready — calculate parameter results first." };
     }
 
     setAwaitingStage2(projectId, versionId, snapshot);
-    requestBassHeavyAction(projectId, versionId, "optimise", shared.cacheKey);
+    // The ADI optimisation consumes only the installed quantity's placement
+    // result, so only that quantity is studied (all its families/confirmations run).
+    requestBassHeavyAction(projectId, versionId, "optimise", shared.cacheKey, {
+      selectedQuantityOnly: [1, 2, 3, 4].includes(selectedQuantity),
+    });
 
     const getCurrentFingerprint = () => {
       try {
