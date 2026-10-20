@@ -50,7 +50,11 @@ test('a blocked save is named as a save failure, and stays retryable', () => {
     const state=resolve({ ...current, publicationAttempt:{ status, fingerprint:'eng:a', message:'P9 is incomplete' } });
     assert.equal(state.code,'save_failed');
     assert.equal(state.label,'Bass result could not be saved');
-    assert.match(state.message,/P9 assessment needs updating/);
+    // The bass panel speaks only in the bass domain: a P9 blocker is never
+    // named as a bass problem, and a refusal that recorded no verified gate is
+    // never read as Current. It stays the save failure it is, retryable.
+    assert.equal(state.message,'The bass result could not be saved, so reports and proposals cannot use it yet.');
+    assert.doesNotMatch(state.message,/\bp\d{1,2}\b/i);
     assert.doesNotMatch(state.message,/engineering_summary|parameter_index/);
     assert.equal(state.actionLabel,'Retry save');
     assert.equal(state.secondaryActionLabel,'Recalculate');

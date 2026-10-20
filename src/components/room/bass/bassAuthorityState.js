@@ -302,6 +302,19 @@ export function resolveBassAuthorityState({
       // when nothing real is outstanding the band says so.
       const waiting = resolveOverallProjectWaiting({ attempt: matchingAttempt });
       if (waiting.complete) {
+        // Nothing was named as outstanding. That is only evidence of completion
+        // when the attempt actually recorded a gate it verified — a refusal that
+        // carried no gate at all (a bare message, e.g. from the publication
+        // service) leaves the bass result's own validity unconfirmed, so it is
+        // never read as CURRENT or as an overall completion. It is reported as
+        // the refusal it is, with the same retry/recalculate ways forward.
+        if (failedGates(matchingAttempt).length === 0) {
+          return {
+            code: BASS_AUTHORITY_STATE.SAVE_FAILED,
+            ...BASS_AUTHORITY_SAVE_FAILED_COPY,
+            attention: true,
+          };
+        }
         return {
           ...withCopy(BASS_AUTHORITY_STATE.CURRENT),
           note: BASS_OVERALL_ASSESSMENT_COMPLETE_NOTE,
