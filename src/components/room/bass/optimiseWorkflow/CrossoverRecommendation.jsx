@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration";
 import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification";
+import { buildCrossoverComparison, buildRecommendationSentence, buildTuningComparison, hasSettingChanges } from "./crossoverRecommendationComparison";
 import useSharedBassAuthorityState from "../useSharedBassAuthorityState";
 
 const number = value => Number.isFinite(value) ? value.toFixed(2) : "—";
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const worst = result => (result?.perSeatP20 || []).slice().sort((a,b)=>b.variationDbRaw-a.variationDbRaw)[0];
-const crossoverText = (c, hp) => c ? String(hp ? c.frequencyHz : c.subwooferFrequencyHz ?? c.frequencyHz) +
-  " Hz · " + (hp ? c.speakerHpSlopeDbPerOct : c.subwooferLpSlopeDbPerOct) + " dB/oct" : "—";
+const dbText = value => value === null || value === undefined ? null
+  : Number.isFinite(Number(value)) ? Number(value).toFixed(2) + " dB" : null;
 
 // A view / apply boundary inside the existing ADI workflow, not another optimiser.
 // Persisted project metadata carries the confirmed option and restore snapshot.
@@ -54,6 +55,23 @@ export default function CrossoverRecommendation({
   const limiter=worst(recommended);
   const baselineLimiter=worst(baseline);
   const seatLabel=id=>id ? String(id).replace(/^seat-r(\d+)-c(\d+)$/, "Row $1 seat $2") : "—";
+
+  // Only a value that will actually change is highlighted, so the panel states
+  // exactly what Apply Recommended Settings writes and nothing more.
+  const crossoverRows=buildCrossoverComparison({baselineCrossover:baseline?.crossover,recommendedCrossover:recommended.crossover});
+  const tuningRows=buildTuningComparison({baselineTuning:baseline?.appliedTuning,recommendedTuning:recommended.appliedTuning});
+  const willChange=hasSettingChanges({crossoverRows,tuningRows});
+  const p20BeforeText=dbText(baseline?.achievedP20VariationDb);
+  const p20AfterText=dbText(recommended.achievedP20VariationDb);
+  const p20Gain=baseline?.achievedP20VariationDb!=null&&recommended.achievedP20VariationDb!=null
+    ? Number(baseline.achievedP20VariationDb)-Number(recommended.achievedP20VariationDb) : null;
+  const p20GainText=p20Gain!=null&&p20Gain>0.05 ? number(p20Gain)+" dB improvement" : null;
+  // One sentence: what ADI recommends and why, from the compared values and the
+  // run's own limiting frequency and modelled result.
+  const recommendationSentence=buildRecommendationSentence({
+    crossoverRows,tuningRows,limitingFrequencyHz:limiter?.worstFrequencyHz ?? null,
+    p20BeforeDb:baseline?.achievedP20VariationDb ?? null,p20AfterDb:recommended.achievedP20VariationDb ?? null,
+  });
 
   async function commitAndVerify(restore) {
     if (pending || typeof write !== "function" || typeof commitInstances !== "function") return;
@@ -107,11 +125,27 @@ export default function CrossoverRecommendation({
 
   return <section className="rounded-lg border border-stone-300 bg-white p-3 space-y-3" aria-label="ADI crossover recommendation">
     <div className="font-semibold text-sm">Current Design versus ADI Recommended</div>
+
+    {/* WHAT ADI RECOMMENDS AND WHY — one sentence, from the compared values and
+        the run's own limiting frequency and modelled result. */}
+    <p className="text-xs" data-adi-recommendation-sentence="true">{recommendationSentence}</p>
+
+    {/* THE PERFORMANCE the decision rests on, kept prominent. */}
+    {p20AfterText && <div className="flex flex-wrap items-baseline gap-x-2" data-adi-recommendation-p20="true">
+      <span className="text-[11px] font-semibold text-[#1B1A1A]">P20:</span>
+      {p20BeforeText && p20BeforeText!==p20AfterText && <span className="text-[11px] text-[#8A7B6A]">{p20BeforeText} →</span>}
+      <span className="text-[15px] font-bold leading-none text-[#1B1A1A]">{p20AfterText}</span>
+      {p20GainText && <span className="text-[11px] font-medium text-[#213428]">({p20GainText})</span>}
+    </div>}
+
     <table className="w-full text-xs">
       <thead><tr><th className="text-left">Setting</th><th>Current Design</th><th>ADI Recommended</th></tr></thead>
       <tbody>
-        <tr><td>Speaker high-pass</td><td>{crossoverText(baseline?.crossover,true)}</td><td>{crossoverText(recommended.crossover,true)}</td></tr>
-        <tr><td>Subwoofer low-pass</td><td>{crossoverText(baseline?.crossover,false)}</td><td>{crossoverText(recommended.crossover,false)}</td></tr>
+        {crossoverRows.map(row=><tr key={row.key} data-adi-crossover-row={row.key} data-changed={row.changed?"true":undefined}>
+          <td className="text-left">{row.label}</td>
+          <td className="text-[#8A7B6A]">{row.beforeText}</td>
+          <td className={row.changed?"bg-[#F1F4F2] font-semibold text-[#1B1A1A]":"text-[#3E4349]"}>{row.afterText}</td>
+        </tr>)}
         <tr><td>P19 deviation</td><td>{number(baseline?.achievedP19VariationDb)} dB</td><td>{number(recommended.achievedP19VariationDb)} dB</td></tr>
         <tr><td>P20 deviation</td><td>{number(baseline?.achievedP20VariationDb)} dB</td><td>{number(recommended.achievedP20VariationDb)} dB</td></tr>
         <tr><td>Limiting seat / frequency</td><td>{seatLabel(baselineLimiter?.seatId)} · {number(baselineLimiter?.worstFrequencyHz)} Hz</td><td>{seatLabel(limiter?.seatId)} · {number(limiter?.worstFrequencyHz)} Hz</td></tr>
@@ -120,23 +154,25 @@ export default function CrossoverRecommendation({
     </table>
     <table className="w-full text-xs">
       <thead><tr><th className="text-left">Subwoofer</th><th>Gain</th><th>Delay</th><th>Phase</th><th>Polarity</th></tr></thead>
-      <tbody>{recommended.appliedTuning?.map((t,i)=><tr key={t.sourceId||i}>
-        <td>{t.sourceId?.replace(/^sub-/, "").replace(/-/g," ") || "Sub "+(i+1)}</td><td>{number(t.gainDb)} dB</td><td>{number(t.delayMs)} ms</td>
-        <td>{number(t.phaseControlDeg||0)}°</td><td>{t.polarity===180||t.polarity===-1?"Inverted":"Normal"}</td>
+      <tbody>{tuningRows.map(row=><tr key={row.key} data-adi-tuning-row={row.key}>
+        <td>{row.label}</td>
+        {row.cells.map(cell=><td key={cell.key} data-changed={cell.changed?"true":undefined}
+          className={cell.changed?"bg-[#F1F4F2] font-semibold text-[#1B1A1A]":"text-[#3E4349]"}>
+          {cell.changed?`${cell.beforeText} → ${cell.afterText}`:cell.afterText}
+        </td>)}
       </tr>)}</tbody>
     </table>
-    <p className="text-xs">{recommended.integrationExplanation}</p>
+    {recommended.integrationExplanation && <p className="text-xs">{recommended.integrationExplanation}</p>}
     <p className="text-xs">Primary-seat change: {number(Math.max(0,...(recommended.perSeatP20||[]).filter(s=>s.isPrimary).map(s=>s.variationDbRaw-(baseline?.perSeatP20?.find(b=>b.seatId===s.seatId)?.variationDbRaw??s.variationDbRaw))))} dB maximum regression.</p>
     {stale && <p className="text-xs text-amber-800">Design changed — re-run ADI before applying.</p>}
     {record.status==="applied" && record.appliedCacheKey===shared?.cacheKey && authorityState.code==="current" && <p className="text-xs text-green-800">Applied — calculated result verified and saved.</p>}
     {record.status==="restored" && record.appliedCacheKey===shared?.cacheKey && authorityState.code==="current" && <p className="text-xs text-green-800">Previous settings restored — calculated result verified and saved.</p>}
     {(error||record.error) && <p role="alert" className="text-xs text-red-700">{error||record.error}</p>}
     <div className="flex gap-2">
-      <button className="rounded bg-[#213428] px-3 py-2 text-xs text-white disabled:opacity-40" disabled={pending||stale||!["recommended","restored"].includes(record.status)} onClick={()=>commitAndVerify(false)}>
+      <button className="rounded bg-[#213428] px-3 py-2 text-xs text-white disabled:opacity-40" disabled={pending||stale||!willChange||!["recommended","restored"].includes(record.status)} onClick={()=>commitAndVerify(false)}>
         {applying?"Calculating and saving…":"Apply Recommended Settings"}
       </button>
       {record.previousConfiguration && <button className="rounded border px-3 py-2 text-xs disabled:opacity-40" disabled={pending||record.status==="restored"} onClick={()=>commitAndVerify(true)}>Restore Previous Settings</button>}
     </div>
   </section>;
 }
-
