@@ -436,7 +436,7 @@ export default function RP22CompliancePanel({
           </div>
           {showNotApplicableReason && (
             <div style={{ fontSize: 11, color: "#8B7F76", marginTop: 4, fontStyle: "italic" }}>
-              {NO_OVERHEAD_LAYER_REASON}
+              {debugMetric?.note || NO_OVERHEAD_LAYER_REASON}
             </div>
           )}
           {targetBasisNote && (
