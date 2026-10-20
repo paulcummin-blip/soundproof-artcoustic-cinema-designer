@@ -1390,7 +1390,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         crossover={crossover}
         limits={crossoverLimits}
         disabled={!Array.isArray(lcrSources) || lcrSources.length === 0}
-        onApply={setCrossover}
+        onChange={setCrossover}
       />
       <CombinedResponsePanel
         provisional={provisionalCombined}

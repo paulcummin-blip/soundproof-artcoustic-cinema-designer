@@ -21,6 +21,8 @@ import {
 import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
+import CrossoverControls from '@/components/room/CrossoverControls';
+import { useProjectCrossover } from '@/components/room/useProjectCrossover';
 import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
 import { calculateTvFrontStageHeightGuidance } from '@/components/utils/acoustics/tvFrontStageHeightGuidance';
 import { P12_MODE_RECOMMENDED } from '@/components/utils/p12ModeAuthority';
@@ -70,6 +72,14 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const { speakerSystem, splConfig = {}, updateGlobalSpl, seatingPositions, screen, frontSubsCfg, subwoofers } = appState || {};
   const { options: standardLcrOptions } = useProductRoleOptions(PRODUCT_ROLES.LCR);
   const { options: soundbarOptions } = useProductRoleOptions(PRODUCT_ROLES.CENTRE_SOUNDBAR);
+  // The one project crossover authority, shared with the Subwoofers panel and
+  // Bass Response — a change here is visible there immediately.
+  const {
+    crossover: projectCrossover,
+    limits: projectCrossoverLimits,
+    setCrossover: setProjectCrossover,
+    hasSpeakerModels,
+  } = useProjectCrossover();
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(['FL', 'FC', 'FR']), []);
   const lcrRoles = useMemo(() => ['FL', 'FC', 'FR'], []);
@@ -746,6 +756,21 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Speaker high-pass — the same project crossover shown in the Subwoofers panel and Bass Response */}
+          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+            <CrossoverControls
+              title="Speaker High-Pass"
+              variant="highpass"
+              crossover={projectCrossover}
+              limits={projectCrossoverLimits}
+              onChange={setProjectCrossover}
+              disabled={disabled || !hasSpeakerModels}
+              hint={hasSpeakerModels
+                ? `Permitted ${Math.round(projectCrossoverLimits.minHz)}–${Math.round(projectCrossoverLimits.maxHz)} Hz`
+                : 'Select the LCR model to set the crossover.'}
+            />
           </div>
 
           {frontStageMode !== 'standard' && frontStageMode !== FRONT_STAGE_DUAL_CENTRE && (

@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import HeightInput from '@/components/ui/HeightInput';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import CrossoverControls from '@/components/room/CrossoverControls';
+import { useProjectCrossover } from '@/components/room/useProjectCrossover';
 import { subwooferModelKey, subwooferDisplayLabel } from '@/components/utils/subwooferDisplayLabel';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { useSubwooferCompatibilityActions } from '@/components/hooks/useSubwooferCompatibilityActions';
@@ -61,6 +63,12 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
+  // The one project crossover authority, shared with the LCR panel and Bass Response.
+  const {
+    crossover: projectCrossover,
+    limits: projectCrossoverLimits,
+    setCrossover: setProjectCrossover,
+  } = useProjectCrossover();
   const hasLcrSubClash = useMemo(() => hasFrontLcrSubClash({
     speakers: appState?.speakerSystem?.placedSpeakers,
     frontSubs: appState?.subwoofers,
@@ -69,6 +77,17 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
   const innerContent = (
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
+        {/* Subwoofer low-pass — the same project crossover shown in the LCR panel and Bass Response */}
+        <div className="mb-4 rounded-lg border border-[#DCDBD6] bg-white p-3">
+          <CrossoverControls
+            title="Subwoofer Low-Pass"
+            variant="lowpass"
+            crossover={projectCrossover}
+            limits={projectCrossoverLimits}
+            onChange={setProjectCrossover}
+            disabled={disabled}
+          />
+        </div>
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
