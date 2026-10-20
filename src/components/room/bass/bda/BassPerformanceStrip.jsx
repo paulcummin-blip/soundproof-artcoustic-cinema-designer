@@ -31,6 +31,9 @@ import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEf
 import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
 import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
 import useBassAuthorityAutoPublication from "@/components/room/bass/bda/useBassAuthorityAutoPublication";
+import BassRecalculationBar from "@/components/room/bass/bda/BassRecalculationBar";
+import useCombinedResultRecalculation from "@/components/room/bass/useCombinedResultRecalculation";
+import { useProjectCrossover } from "@/components/room/useProjectCrossover";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -63,10 +66,35 @@ export default function BassPerformanceStrip() {
   });
   const saveFailed = authorityState.code === BASS_AUTHORITY_STATE.SAVE_FAILED;
   const canRecalculate = typeof shared?.onCalculate === "function";
-  const stateAction = saveFailed
-    ? autoPublication.retrySave
-    : (canRecalculate ? shared.onCalculate : null);
-  const secondaryAction = saveFailed && canRecalculate ? shared.onCalculate : null;
+
+  // ── Manual recalculation ────────────────────────────────────────────────
+  // ONE request path. The band's own action and the recalculate button below
+  // both go through requestCalculate, so a completed recalculation is
+  // recognised whichever control started it. The combined LCR + subwoofer
+  // preview keeps a validity of its own, keyed on the crossover settings it was
+  // last recalculated at: a crossover change never invalidates the
+  // subwoofer-only result, which does not use crossover settings at all.
+  const { crossover } = useProjectCrossover();
+  const calculating = shared?.calculationInProgress === true;
+  const previousResultExists = !!shared?.completedBassAuthority?.contract?.job?.resultFingerprint;
+  const subOnlyCurrent = previousResultExists && (
+    authorityState.code === BASS_AUTHORITY_STATE.CURRENT
+    || authorityState.code === BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED
+    || authorityState.code === BASS_AUTHORITY_STATE.PUBLISHING
+  );
+  const hasCombinedResult = shared?.authoritative?.combinedSystem?.available === true;
+  const recalculation = useCombinedResultRecalculation({
+    projectId: shared?.scopeId,
+    versionId: shared?.versionId,
+    crossover,
+    subOnlyCurrent,
+    hasCombinedResult,
+    calculating,
+    onCalculate: shared?.onCalculate,
+  });
+  const calculate = canRecalculate ? recalculation.requestCalculate : null;
+  const stateAction = saveFailed ? autoPublication.retrySave : calculate;
+  const secondaryAction = saveFailed ? calculate : null;
 
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
@@ -167,9 +195,23 @@ export default function BassPerformanceStrip() {
       <BassAuthorityStateBar
         state={authorityState}
         onPrimaryAction={stateAction}
-        primaryDisabled={shared?.calculationInProgress === true}
+        primaryDisabled={calculating}
         onSecondaryAction={secondaryAction}
-        secondaryDisabled={shared?.calculationInProgress === true}
+        secondaryDisabled={calculating}
+      />
+
+      {/* The manual recalculation control, beside the results. When the band
+          above already carries the action, that button IS the recalculation, so
+          only one is ever shown. */}
+      <BassRecalculationBar
+        combinedState={recalculation.combinedState}
+        hasCombinedResult={hasCombinedResult}
+        hasPreviousResult={previousResultExists}
+        subOnlyCurrent={subOnlyCurrent}
+        showRecalculate={!!calculate && !(authorityState.actionLabel && !!stateAction)}
+        calculating={calculating}
+        canCalculate={shared?.canCalculate === true}
+        onRecalculate={calculate}
       />
     </div>
   );
