@@ -202,8 +202,8 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   // frequency below a speaker's minimum cannot be produced, whether the
   // designer types it or the optimiser proposes it.
   const lcrSources = useMemo(
-    () => buildLcrIntegrationSources(appState?.placedSpeakers),
-    [appState?.placedSpeakers],
+    () => buildLcrIntegrationSources(appState?.speakerSystem?.placedSpeakers),
+    [appState?.speakerSystem?.placedSpeakers],
   );
   const crossoverLimits = useMemo(
     () => (lcrSources.length
@@ -219,15 +219,11 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     () => normaliseCrossoverConfig(storedCrossover, crossoverLimits),
     [storedCrossover, crossoverLimits],
   );
-  const setSplConfigRef = appState?.setSplConfig;
+  const updateGlobalSpl = appState?.updateGlobalSpl;
   const setCrossover = useCallback((patch) => {
-    if (typeof setSplConfigRef !== "function") return;
-    setSplConfigRef((previous) => {
-      const current = previous && typeof previous === "object" ? previous : {};
-      const merged = { ...normaliseCrossoverConfig(current.crossover, crossoverLimits), ...(patch || {}) };
-      return { ...current, crossover: normaliseCrossoverConfig(merged, crossoverLimits) };
-    });
-  }, [setSplConfigRef, crossoverLimits]);
+    if (typeof updateGlobalSpl !== "function") return;
+    updateGlobalSpl({crossover: normaliseCrossoverConfig({...crossover,...(patch || {})}, crossoverLimits)});
+  }, [updateGlobalSpl, crossover, crossoverLimits]);
   const integration = useMemo(
     () => (lcrSources.length
       ? { enabled: true, speakerSources: lcrSources }
