@@ -45,6 +45,9 @@ function smoothFractionalOctave(data, width) {
   if (!Array.isArray(data) || data.length < 3) return data;
   const mode = width === 6 ? "sixth" : width === 3 ? "third" : "octave";
   const { sorted, bounds } = prepareBassSmoothingGrid(data, mode);
+  // Convert each sample once. The window sum retains exactly the original
+  // order and arithmetic; joint integration search reuses this authority.
+  const powers = sorted.map(point => Number.isFinite(point.spl) ? Math.pow(10, point.spl / 10) : null);
   return sorted.map(({ frequency }, pointIndex) => {
     const [start, end] = bounds[pointIndex];
     // Power-domain (energy) averaging: convert dB to linear power, average, convert back.
@@ -53,9 +56,9 @@ function smoothFractionalOctave(data, width) {
     let powerSum = 0;
     let count = 0;
     for (let index = start; index < end; index++) {
-      const spl = sorted[index].spl;
-      if (!Number.isFinite(spl)) continue;
-      powerSum += Math.pow(10, spl / 10);
+      const power = powers[index];
+      if (power === null) continue;
+      powerSum += power;
       count++;
     }
     return { frequency, spl: count === 0 ? null : 10 * Math.log10(powerSum / count) };

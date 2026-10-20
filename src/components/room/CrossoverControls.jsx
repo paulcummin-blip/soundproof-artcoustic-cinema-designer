@@ -68,7 +68,7 @@ export default function CrossoverControls({
   const subwooferHz = Math.round(
     linked ? Number(crossover.frequencyHz) : Number(crossover.subwooferFrequencyHz),
   );
-  const options = crossoverFrequencyOptions(limits, Math.max(speakerHz, subwooferHz));
+  const options = [...new Set([...crossoverFrequencyOptions(limits, speakerHz), ...crossoverFrequencyOptions(limits, subwooferHz)])].sort((a, b) => a - b);
 
   const showHighPass = variant !== "lowpass";
   const showLowPass = variant !== "highpass";
@@ -123,7 +123,7 @@ export default function CrossoverControls({
       <div style={{ display: "grid", gridTemplateColumns: stack ? "1fr" : "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
         {showHighPass && renderBlock(
           "highpass",
-          showLowPass ? "Speaker High-Pass" : null,
+          "Speaker High-Pass",
           speakerHz,
           setSpeakerFrequency,
           crossover.speakerHpSlopeDbPerOct,
@@ -131,7 +131,7 @@ export default function CrossoverControls({
         )}
         {showLowPass && renderBlock(
           "lowpass",
-          showHighPass ? "Subwoofer Low-Pass" : null,
+          "Subwoofer Low-Pass",
           subwooferHz,
           setSubwooferFrequency,
           crossover.subwooferLpSlopeDbPerOct,

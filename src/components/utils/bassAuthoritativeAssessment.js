@@ -22,16 +22,17 @@ function curveValueAt(curve, frequency) {
   if (frequency < curve[0].frequency || frequency > curve[curve.length - 1].frequency) return null;
   if (frequency === curve[0].frequency) return curve[0].spl;
   if (frequency === curve[curve.length - 1].frequency) return curve[curve.length - 1].spl;
-  for (let index = 0; index < curve.length - 1; index += 1) {
-    const low = curve[index];
-    const high = curve[index + 1];
-    if (frequency < low.frequency || frequency > high.frequency) continue;
-    const span = high.frequency - low.frequency;
-    if (span === 0) return low.spl;
-    const ratio = (frequency - low.frequency) / span;
-    return low.spl + (high.spl - low.spl) * ratio;
+  let lo = 0, hi = curve.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >>> 1;
+    if (curve[mid].frequency < frequency) lo = mid;
+    else hi = mid;
   }
-  return null;
+  const low = curve[lo], high = curve[hi];
+  const span = high.frequency - low.frequency;
+  if (span === 0) return low.spl;
+  const ratio = (frequency - low.frequency) / span;
+  return low.spl + (high.spl - low.spl) * ratio;
 }
 
 // ── Canonical P19 authority ──
