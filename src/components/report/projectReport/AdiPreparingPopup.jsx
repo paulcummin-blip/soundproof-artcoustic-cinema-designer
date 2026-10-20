@@ -40,7 +40,7 @@ export default function AdiPreparingPopup({ status, onRetry }) {
       }}
     >
       <div style={{ fontSize: 14, fontWeight: 700, color: '#213428' }}>
-        {failed ? 'ADI could not finish your report' : showReady && !running ? 'Your report is ready' : 'ADI is preparing your report'}
+        {failed ? 'ADI could not finish: Design Intent' : showReady && !running ? 'Your report is ready' : 'ADI is preparing your report'}
       </div>
       {!showReady && !failed && (
         <>

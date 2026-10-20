@@ -47,6 +47,10 @@ export function useReportDesignIntent({ projectId, versionId }) {
   }, [projectId, versionId]);
 
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    window.addEventListener('adi-design-intent-updated', reload);
+    return () => window.removeEventListener('adi-design-intent-updated', reload);
+  }, [reload]);
 
   return { ...state, reload };
 }

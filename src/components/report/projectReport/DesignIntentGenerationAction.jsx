@@ -26,8 +26,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import DesignIntentDiagnosticsPanel from '@/components/report/projectReport/DesignIntentDiagnosticsPanel';
 import { saveDesignIntentDiagnostics } from '@/components/report/projectReport/designIntentDiagnosticStore';
-import AdiPreparingPopup from '@/components/report/projectReport/AdiPreparingPopup';
-import useAutoDesignIntent, { AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
+import { useAutoDesignIntentStatus, AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
 
 const LABEL_COLOR = '#625143';
 const BODY_FONT = 'Didact Gothic, sans-serif';
@@ -65,7 +64,7 @@ export default function DesignIntentGenerationAction({
   // level, product, scope or limitation changes. The wording it replaces is kept, so
   // Undo can put it back exactly.
   // Automatic first pass for a newly generated report (write + ADI rewrite, once).
-  const auto = useAutoDesignIntent({ projectId, versionId, onDone: onGenerated });
+  const autoStatus = useAutoDesignIntentStatus(projectId, versionId);
 
   if (!projectId || !versionId) return null;
 
@@ -110,11 +109,10 @@ export default function DesignIntentGenerationAction({
 
   return (
     <div style={{ marginTop: 10 }}>
-      <AdiPreparingPopup status={auto.status} onRetry={auto.retry} />
       <button
         type="button"
         onClick={generate}
-        disabled={state.busy || auto.status === AUTO_INTENT.RUNNING}
+        disabled={state.busy || autoStatus === AUTO_INTENT.RUNNING}
         style={{
           fontFamily: BODY_FONT,
           fontSize: 11,

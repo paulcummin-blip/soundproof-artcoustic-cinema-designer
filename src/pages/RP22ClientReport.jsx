@@ -25,7 +25,8 @@ import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
-import { useAutoDesignIntentStatus, AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
+import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
+import AdiPreparingPopup from "@/components/report/projectReport/AdiPreparingPopup";
 import {
   readReportActionIntent,
   useReportActionIntent,
@@ -577,7 +578,7 @@ export default function RP22ClientReport() {
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
   // Export waits for the automatic ADI pass on a newly generated report.
-  const autoIntentStatus = useAutoDesignIntentStatus(projectId, authority.versionId);
+  const { status: autoIntentStatus, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId });
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
@@ -799,6 +800,7 @@ export default function RP22ClientReport() {
       background: "#F1F0EE",
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
+      <AdiPreparingPopup status={autoIntentStatus} onRetry={retryAutoIntent} />
       {/* Shared report typography system — the Visual Report preview and its
           PDF export both read their type from this one source. The preview
           keeps its own screen-adapted body sizes, so only the families,
