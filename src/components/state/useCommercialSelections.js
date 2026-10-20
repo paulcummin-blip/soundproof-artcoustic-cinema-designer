@@ -22,11 +22,18 @@ const ABFUSER_QTY_SOURCE_DEFAULT = "none";
  */
 export function useCommercialSelections(autosavePayload) {
   // ── Acoustic treatment (Abfuser product selection) ──────────────────────
-  const [acousticTreatmentEnabled, setAcousticTreatmentEnabled] = useState(() => (
+  const [acousticTreatmentEnabled, _setAcousticTreatmentEnabled] = useState(() => (
     (autosavePayload && typeof autosavePayload.acousticTreatmentEnabled === "boolean")
       ? autosavePayload.acousticTreatmentEnabled
       : false
   ));
+  // Acoustic treatment is OFF by default; switching it on or off is a genuine
+  // commercial decision, so it is recorded like every other priced selection and
+  // survives the save gate, refresh and reopen.
+  const setAcousticTreatmentEnabled = useCallback((value) => {
+    recordCommercialEdit(COMMERCIAL_COLLECTION.ACOUSTIC_TREATMENT);
+    _setAcousticTreatmentEnabled(value === true);
+  }, []);
   const [selectedAbfuserQty, _setSelectedAbfuserQty] = useState(() => (
     (autosavePayload && Number.isFinite(Number(autosavePayload.selectedAbfuserQty)))
       ? Number(autosavePayload.selectedAbfuserQty)

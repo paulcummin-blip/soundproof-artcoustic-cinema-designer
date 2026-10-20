@@ -1929,10 +1929,10 @@ function useDesignerState() {
     // Design EQ defaults to On for a new/reset project
     setDesignEqEnabled(true);
 
-    // Acoustic treatment defaults to ON for every new project. The ADI
-    // recommendation is guidance only: nothing is selected or priced until the
-    // designer accepts it.
-    setAcousticTreatmentEnabled(true);
+    // Acoustic treatment defaults to OFF for every new design. ADI still
+    // calculates its recommendation, but nothing is included in the system, the
+    // price or the proposal until the designer switches treatment on.
+    setAcousticTreatmentEnabled(false);
     setSelectedAbfuserQty(0);
     setAbfuserQtySource("none");
     setLegacyAbfuserAutoQty(0);

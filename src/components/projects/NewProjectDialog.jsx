@@ -130,7 +130,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
             target_spl: payload.target_spl,
             amplifier_power: payload.amplifier_power,
             notes: payload.notes,
-            acoustic_treatment_enabled: true,
+            acoustic_treatment_enabled: false,
           });
           const result = res.data;
           if (result.status === 'SUCCESS') {
