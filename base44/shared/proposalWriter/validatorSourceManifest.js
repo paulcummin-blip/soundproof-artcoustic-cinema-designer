@@ -45,7 +45,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '91a405ff8bceb9192584a32deef339de6ae72435762dc3bcf0dce0b41e69f709',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '44f5a2a1959b7a484eb446e1639afdf823dab01a1712b1103be306effd6beeb1',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
@@ -78,7 +78,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // proposal is written to, and the approved reference passages it shows instead
   // of any example of wording to avoid. Hashed so a draft can always be traced to
   // the standard it was written under.
-  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': '6e426c0b818a5d6749e6cc4d2ca9e5fd3df694b8778d14dfb1240aa9d9fa8097',
+  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': 'be91ab7e72bade08b678f78a768df9ea2e22f458abd8372268b6b718db05c1e5',
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',

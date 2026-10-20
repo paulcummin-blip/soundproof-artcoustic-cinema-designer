@@ -111,6 +111,7 @@ export const ADI_EDITORIAL_STANDARD = [
   '  - project-specific wording over general wording',
   '  - the evidence and the actual relationship, over adjectives',
   '  - natural British English',
+  '  - where the copy already cites an RP22 parameter, write it in full as Parameter 12, Parameter 13 and so on, never P12 or P13, and keep the level and the minimum or recommended target exactly as the copy states them; do not add a parameter reference, a level or any headroom claim the copy does not already carry',
   '  - "you" and "your" only where the document already speaks that way',
   '',
   'Never write:',
