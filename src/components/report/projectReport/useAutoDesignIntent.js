@@ -1,13 +1,21 @@
 /**
  * useAutoDesignIntent
  * -------------------
- * Runs the Astra Design Intent writer once for a newly generated Project Report,
- * with no user interaction. It is mounted by the report PAGE, so it always runs.
+ * Runs ADI's initial rewrite of a newly generated Project Report's Design Intent,
+ * once, with no user interaction. Mounted by the report PAGE, so it always runs.
  *
- * A brand-new report's snapshot is saved a moment after the page opens, so it is
- * polled for (up to ~60 s). Only a snapshot generated in the last 30 min with NO
- * Design Intent yet is written; any other report is marked done and never touched,
- * now or on reopening. The outcome is remembered per project version.
+ * A new report already carries its first-draft Design Intent. The rewrite is the
+ * same editorial pass the "Improve with ADI" button runs, applied to that draft.
+ *
+ * Identity and completion:
+ *   - the report's generation identity is its snapshot `generated_at`; the handled
+ *     outcome is remembered against it, so a regenerated report is a new identity;
+ *   - the durable completion mark is the saved narrative's own `editorial` record,
+ *     written atomically with the improved text. A narrative that carries it, or
+ *     that has a replaced draft kept beside it, has already been rewritten and is
+ *     never touched again.
+ * Only a snapshot generated in the last 30 min is eligible; any other report is
+ * left exactly as it is.
  */
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { base44 } from '@/api/base44Client';
@@ -19,7 +27,8 @@ export const AUTO_INTENT = { IDLE: 'idle', RUNNING: 'running', FAILED: 'failed',
 
 const inFlight = new Set();
 const listeners = new Set();
-const keyOf = (projectId, versionId) => `adi_auto_intent_v1:${projectId}:${versionId}`;
+const keyOf = (projectId, versionId) => `adi_auto_intent_v2:${projectId}:${versionId}`;
+const genKeyOf = (key) => `${key}:generation`;
 
 function readStored(key) {
   try {
@@ -30,10 +39,17 @@ function readStored(key) {
   } catch { return AUTO_INTENT.IDLE; }
 }
 
-function setStatus(key, status) {
-  try { window.localStorage.setItem(key, status); } catch { /* memory only */ }
+function setStatus(key, status, generation) {
+  try {
+    window.localStorage.setItem(key, status);
+    if (generation) window.localStorage.setItem(genKeyOf(key), generation);
+  } catch { /* memory only */ }
   listeners.forEach((listener) => listener());
 }
+
+const readGeneration = (key) => {
+  try { return window.localStorage.getItem(genKeyOf(key)); } catch { return null; }
+};
 
 const subscribe = (listener) => { listeners.add(listener); return () => listeners.delete(listener); };
 
@@ -53,31 +69,41 @@ async function readSnapshot(projectId, versionId) {
   return (page?.items || [])[0] || null;
 }
 
+/** Already rewritten: the narrative carries its editorial record or a kept prior draft. */
+const alreadyRewritten = (payload) => !!(payload?.design_intent?.editorial || payload?.design_intent_previous);
+
 export default function useAutoDesignIntent({ projectId, versionId }) {
   const status = useAutoDesignIntentStatus(projectId, versionId);
   const key = keyOf(projectId, versionId);
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (generation) => {
     if (!projectId || !versionId || inFlight.has(key)) return;
     inFlight.add(key);
-    setStatus(key, AUTO_INTENT.RUNNING);
+    setStatus(key, AUTO_INTENT.RUNNING, generation);
     let outcome = AUTO_INTENT.FAILED;
     try {
-      // One writing process only: the Astra Design Intent writer.
-      const written = (await base44.functions.invoke('generateReportDesignIntent', {
+      let snapshot = await readSnapshot(projectId, versionId);
+      // The first draft is normally saved with the report; write it only if absent.
+      if (snapshot?.payload?.design_intent?.status !== 'accepted') {
+        await base44.functions.invoke('generateReportDesignIntent', { project_id: projectId, version_id: versionId });
+      }
+      const rewritten = (await base44.functions.invoke('improveAdiWording', {
+        surface: 'report_design_intent', action: 'improve', mode: 'section',
         project_id: projectId, version_id: versionId,
       }))?.data || {};
-      // A writer switched off for this login leaves the report's own text.
-      if (written.ok === true || written.reason === 'writer_flag_off') outcome = AUTO_INTENT.COMPLETE;
+      if (rewritten.applied === true) {
+        // Complete only once the improved text is read back from the saved report.
+        snapshot = await readSnapshot(projectId, versionId);
+        if (snapshot?.payload?.design_intent?.editorial) outcome = AUTO_INTENT.COMPLETE;
+      }
     } catch { outcome = AUTO_INTENT.FAILED; }
     inFlight.delete(key);
-    setStatus(key, outcome);
-    // The text is saved before the report re-reads it.
+    setStatus(key, outcome, generation);
     window.dispatchEvent(new Event(INTENT_UPDATED_EVENT));
   }, [key, projectId, versionId]);
 
   useEffect(() => {
-    if (!projectId || !versionId || status !== AUTO_INTENT.IDLE) return undefined;
+    if (!projectId || !versionId || status === AUTO_INTENT.RUNNING) return undefined;
     let cancelled = false;
     let tries = 0;
     let timer;
@@ -90,14 +116,17 @@ export default function useAutoDesignIntent({ projectId, versionId }) {
         if (tries < 20) timer = setTimeout(check, 3000);
         return;
       }
+      const generation = snapshot.generated_at || snapshot.id;
+      // This generation was already handled (completed or failed): leave it.
+      if (readGeneration(key) === generation && status !== AUTO_INTENT.IDLE) return;
       const generatedAt = snapshot.generated_at ? new Date(snapshot.generated_at).getTime() : 0;
-      const isNew = !snapshot.payload?.design_intent
-        && generatedAt > 0 && Date.now() - generatedAt < NEW_REPORT_WINDOW_MS;
-      if (isNew) run(); else setStatus(key, AUTO_INTENT.COMPLETE);
+      const isNew = generatedAt > 0 && Date.now() - generatedAt < NEW_REPORT_WINDOW_MS;
+      if (isNew && !alreadyRewritten(snapshot.payload)) run(generation);
+      else setStatus(key, AUTO_INTENT.COMPLETE, generation);
     };
     timer = setTimeout(check, 500);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [projectId, versionId, status, run, key]);
 
-  return { status, retry: run };
+  return { status, retry: () => readSnapshot(projectId, versionId).then((s) => run(s?.generated_at || s?.id || 'retry')) };
 }
