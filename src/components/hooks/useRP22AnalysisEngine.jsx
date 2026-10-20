@@ -43,6 +43,7 @@ import {
   hasZonalSpeakerLayer,
 } from "@/components/utils/rp22/overheadLayerAuthority";
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
+import { isIntegratedLcrSpeaker } from "../../../shared/channelArchitecture";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { logRp22EngineDiagnostic } from "@/components/utils/rp22RuntimeDiagnostic";
 import { resolveAssumedParameterResult } from "@/components/utils/assumedParameterAuthority";
