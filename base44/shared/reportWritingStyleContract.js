@@ -513,6 +513,10 @@ export function buildWritingStyleContract(options = {}) {
     '',
     DESIGN_INTENT_WRITING,
     '',
+    // EXPERIENCE, THEN DESIGN, THEN EVIDENCE: where a client paragraph starts,
+    // and the seat, trade-off, evidence and equipment rules that govern it.
+    reportNarrativePriority(),
+    '',
     TONE_REFERENCE,
     '',
     WHAT_THE_REPORT_MUST_ANSWER,

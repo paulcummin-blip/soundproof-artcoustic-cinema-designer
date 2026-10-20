@@ -24,6 +24,8 @@
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
+import { ADI_NARRATIVE_EMPHASIS } from '../clientNarrativePriority.js';
+
 /** The whole-section action, exactly as it is shown. */
 export const ADI_IMPROVE_LABEL = 'Improve wording with ADI';
 
