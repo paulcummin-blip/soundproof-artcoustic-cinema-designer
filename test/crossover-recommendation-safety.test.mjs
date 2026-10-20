@@ -52,13 +52,13 @@ test("saved primary scope survives compacted candidate rows and remains enforced
 import { computeEngineeringFingerprint } from '../src/components/proposal/engineeringAuthority/engineeringFingerprint.js';
 import { buildFrozenReportProject } from '../shared/engineeringPublicationContract.js';
 test('recommendation receipts cannot republish unchanged engineering while real crossover changes do',()=>{
- const design={splConfig:{crossover:{frequencyHz:100,speakerHpSlopeDbPerOct:24,subwooferLpSlopeDbPerOct:24},crossoverRecommendation:{status:'applying'}}};
+ const design={name:'Control',versionName:'Original',roomDims:{widthM:3.6,lengthM:4.8,heightM:2.4},screen:{visibleWidthInches:100,aspectRatio:'16:9',manualMode:false,heightFromFloorM:0.5,mountMode:'wall'},screenFrontPlaneM:0,dolbyLayout:'5.1',seatingPositions:[{id:'a',row:1}],placedSpeakers:[{model:'q6-3',role:'FL',position:{x:0.5,y:0.2,z:1.2}}],subwooferInstances:[],acousticTreatmentEnabled:false,selectedAbfuserQty:0,splConfig:{crossover:{frequencyHz:100,speakerHpSlopeDbPerOct:24,subwooferLpSlopeDbPerOct:24},crossoverRecommendation:{status:'applying'}}};
  const versions={publicationContractVersion:2,bassFingerprint:'bass-a'};
  const before=computeEngineeringFingerprint(design,versions);
  const receipt=structuredClone(design);receipt.splConfig.crossoverRecommendation={status:'applied',verifiedAt:'later'};
  assert.equal(computeEngineeringFingerprint(receipt,versions),before);
- assert.deepEqual(buildFrozenReportProject(receipt).reportProject.spl_config,buildFrozenReportProject(design).reportProject.spl_config);
- assert.equal('crossoverRecommendation' in buildFrozenReportProject(receipt).reportProject.spl_config,false);
+ assert.deepEqual(buildFrozenReportProject(receipt,{projectId:"p",versionId:"v"}).reportProject.spl_config,buildFrozenReportProject(design,{projectId:"p",versionId:"v"}).reportProject.spl_config);
+ assert.equal('crossoverRecommendation' in buildFrozenReportProject(receipt,{projectId:"p",versionId:"v"}).reportProject.spl_config,false);
  receipt.splConfig.crossover.frequencyHz=150;
  assert.notEqual(computeEngineeringFingerprint(receipt,versions),before);
 });
