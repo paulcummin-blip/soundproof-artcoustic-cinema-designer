@@ -10,7 +10,7 @@ import {
   applyAuthorityToCanonicalResult,
   finalOptimisedBassAuthorityMatches,
 } from "../src/components/room/bass/finalOptimisedBassResponse.js";
-import { buildFilterBankSignature } from "../src/components/room/bass/bassResultAuthority.js";
+import { buildFilterBankSignature, buildCorrectionCurveSignature } from "../src/components/room/bass/bassResultAuthority.js";
 
 const rsp = [
   { frequency: 30, spl: 100 },
@@ -73,6 +73,7 @@ test("published and graphed final curves use the shared aligned calibration", ()
     eqFilterBank: filterBank,
     filterBankSignature: buildFilterBankSignature({ generatedFilterBank: filterBank }),
     postEqCurveSignature: "pre-alignment",
+    correctionCurveSignature: buildCorrectionCurveSignature({}),
     finalSeatVariationData: {
       p18: { candidateId: "candidate-1" },
       p19: { candidateId: "candidate-1" },
