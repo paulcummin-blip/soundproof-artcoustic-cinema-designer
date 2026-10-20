@@ -32,6 +32,7 @@ import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState"
 import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
 import useBassAuthorityAutoPublication from "@/components/room/bass/bda/useBassAuthorityAutoPublication";
 import BassRecalculationBar from "@/components/room/bass/bda/BassRecalculationBar";
+import { bassRecalculationRequired } from "@/components/room/bass/bda/bassRecalculationWarning";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -77,6 +78,14 @@ export default function BassPerformanceStrip() {
   // that did not land. Calculate / Recalculate lives in the permanent button
   // below, so the two are never shown as duplicate controls.
   const stateAction = saveFailed ? autoPublication.retrySave : null;
+  // The design moved on (or a recalculation failed and the previous published
+  // result is retained): say so, beside the button that fixes it. The condition
+  // is read from the same authority state that decides currency — there is no
+  // second change detection here.
+  const recalculationRequired = bassRecalculationRequired({
+    hasResult,
+    stateCode: authorityState.code,
+  });
 
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
@@ -186,6 +195,7 @@ export default function BassPerformanceStrip() {
         hasResult={hasResult}
         calculating={calculating}
         canCalculate={canCalculate}
+        warning={recalculationRequired}
         onCalculate={calculate}
       />
     </div>
