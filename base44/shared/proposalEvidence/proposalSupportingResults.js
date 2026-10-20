@@ -260,10 +260,12 @@ export function buildSupportingResultClaims({ options = [], requestContext = nul
   const seen = new Set();
 
   for (const request of requests) {
-    for (const option of list) {
+    for (const [optionIndex, option] of list.entries()) {
       if (request.key === 'viewing_rows') {
         const built = viewingGeometryClaim(option);
         if (built.claim) {
+          // One claim per option, so the ID carries the option's place.
+          built.claim.claim_id = buildClaimId('rp23_viewing', CLAIM_KIND.SUPPORTING_RESULT, optionIndex + 1);
           claims.push(built.claim);
           minted.push({ key: request.key, version_id: option.version_id ?? null, claim_id: built.claim.claim_id });
         } else {
@@ -275,6 +277,7 @@ export function buildSupportingResultClaims({ options = [], requestContext = nul
       for (const parameterId of request.parameter_ids) {
         const built = parameterClaim(option, request, parameterId);
         if (built.claim) {
+          built.claim.claim_id = buildClaimId(`p${parameterId}`, CLAIM_KIND.SUPPORTING_RESULT, optionIndex + 1);
           const identity = `${option.version_id ?? ''}|${built.claim.claim_id}`;
           if (seen.has(identity)) continue;
           seen.add(identity);

@@ -276,6 +276,17 @@ test('the pack modules can reach no live project, entity client or session store
     '../comparisonEvidence.js',
     '../adiReportEvidenceRules.js',
     '../clientFacingParameterAuthority.js',
+    // The ranked narrative-priority authority: a pure read of the classified rows.
+    '../narrativePriorityAuthority.js',
+    '../seatScopeNarrativeAuthority.js',
+    '../parameterCapabilityFields.js',
+    '../strengthImportance.js',
+    '../narrativePillarGrouping.js',
+    '../proposalNarrativeContext.js',
+    './proposalSupportingResults.js',
+    './proposalBriefRequests.js',
+    './proposalEvidenceBuilder.js',
+    './proposalEvidenceClassification.js',
   ]);
 
   for (const name of files) {
@@ -294,7 +305,8 @@ test('a single version is not a comparison: no classification and no claims are 
   const built = pack([option('a')]);
   assert.equal(built.mode, 'single');
   assert.deepEqual(built.classification, []);
-  assert.deepEqual(built.allowed_claims, []);
+  // Only the Dynamic Range supporting results (Parameters 12 to 14) are offered.
+  assert.ok(built.allowed_claims.every((claim) => claim.kind === 'supporting_result'));
   assert.equal(built.decision_framing.allowed, false);
   assert.equal(built.decision_framing.reason, 'single_option');
   assert.ok(built.blocked_claims.length > 0, 'the global rules still apply');
