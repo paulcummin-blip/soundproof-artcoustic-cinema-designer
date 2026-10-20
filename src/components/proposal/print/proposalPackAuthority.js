@@ -367,6 +367,10 @@ const PACKAGE_GROUP_ORDER = Object.freeze([
  */
 const ROLE_LAYER_KEY = Object.freeze({
   lcr: 'lcr',
+  // An integrated LCR (e.g. Multi (LCR)) is stored as one centre role whose
+  // physical quantity lives in the saved LCR equipment row (quantity 1), never
+  // in its three rendered channels.
+  centre: 'lcr',
   centre_soundbar: 'lcr',
   surround: 'surrounds',
   rear_surround: 'surrounds',

@@ -53,7 +53,7 @@ export function quantityPositionLabel(row) {
 export function equipmentQuantityMessage(rows) {
   const positions = unresolvedQuantities(rows).map(quantityPositionLabel);
   if (positions.length === 0) return null;
-  return `Loudspeaker quantities could not be resolved for ${positions.join(', ')}. ${EQUIPMENT_QUANTITY_RULE} Nothing was issued — resolve the count for each position, then export again.`;
+  return `Loudspeaker quantities could not be resolved for ${positions.join(', ')}. ${EQUIPMENT_QUANTITY_RULE} Missing stored field: the saved quantity of the equipment row for each position (Speaker Design, Qty column). Set it there, then export again. No proposal copy needs to change.`;
 }
 
 export default unresolvedQuantities;
