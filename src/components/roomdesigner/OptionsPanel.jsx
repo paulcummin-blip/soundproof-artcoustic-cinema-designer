@@ -146,33 +146,37 @@ export default function OptionsPanel({
             onChange={handleAcousticTreatmentToggle}
           />
         </div>
-        {acousticTreatmentEnabled ? (
+        {/* The ADI recommendation is calculated and shown whether treatment is
+            included or not, so the designer can always review the recommended
+            quantity, the treatment area and the suggested locations before
+            deciding whether to include it. */}
+        {isNotCalculated ? (
+          <div className="mt-3 text-xs text-[#8B7F76]">
+            Enter room dimensions to calculate the ADI acoustic treatment recommendation.
+          </div>
+        ) : (
           <div className="mt-3 space-y-3">
-            {isNotCalculated ? (
-              <div className="text-xs text-[#8B7F76]">
-                Enter room dimensions to calculate the ADI acoustic treatment recommendation.
+            <div className="rounded-md bg-[#F8F8F7] border border-[#EEEDEA] p-3 space-y-1">
+              <div className="text-xs font-semibold text-[#213428]">
+                ADI recommends {recommendedQuantity} × Artcoustic Abfuser
               </div>
-            ) : (
-              <>
-                <div className="rounded-md bg-[#F8F8F7] border border-[#EEEDEA] p-3 space-y-1">
-                  <div className="text-xs font-semibold text-[#213428]">
-                    ADI recommends {recommendedQuantity} × Artcoustic Abfuser
-                  </div>
-                  <div className="text-xs text-[#625143]">
-                    Total treatment area: {(recommendation?.totalRecommendedAreaM2 ?? 0).toFixed(2)} m²
-                  </div>
-                  <div className="text-[11px] text-[#625143]">
-                    {byZone.left || 0} left first reflection · {byZone.right || 0} right first reflection · {byZone.rear || 0} rear wall
-                    {(byZone.ceilingAdvisory || 0) > 0 ? ` · ${byZone.ceilingAdvisory} optional ceiling` : ""}
-                  </div>
-                  {fullDesignRequired && (
-                    <div className="text-[11px] font-semibold text-amber-800 pt-1">
-                      Full acoustic treatment design required — the quantity above the automatic limit is not added to the product selection or pricing.
-                    </div>
-                  )}
-                  <div className="text-[10px] text-[#8B7F76]">{recommendation?.estimatedEffect?.bassNote}</div>
+              <div className="text-xs text-[#625143]">
+                Total treatment area: {(recommendation?.totalRecommendedAreaM2 ?? 0).toFixed(2)} m²
+              </div>
+              <div className="text-[11px] text-[#625143]">
+                {byZone.left || 0} left first reflection · {byZone.right || 0} right first reflection · {byZone.rear || 0} rear wall
+                {(byZone.ceilingAdvisory || 0) > 0 ? ` · ${byZone.ceilingAdvisory} optional ceiling` : ""}
+              </div>
+              {fullDesignRequired && (
+                <div className="text-[11px] font-semibold text-amber-800 pt-1">
+                  Full acoustic treatment design required — the quantity above the automatic limit is not added to the product selection or pricing.
                 </div>
+              )}
+              <div className="text-[10px] text-[#8B7F76]">{recommendation?.estimatedEffect?.bassNote}</div>
+            </div>
 
+            {acousticTreatmentEnabled ? (
+              <>
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="abfuser-qty" className="text-xs font-medium text-[#3E4349] whitespace-nowrap">Included quantity</Label>
                   <div className="flex items-center gap-2">
@@ -220,10 +224,10 @@ export default function OptionsPanel({
                   </div>
                 )}
               </>
+            ) : (
+              <div className="text-[11px] text-[#625143]">{inclusion.message}</div>
             )}
           </div>
-        ) : (
-          <div className="mt-3 text-xs text-[#8B7F76]">{inclusion.message}</div>
         )}
       </SectionCard>
 

@@ -110,7 +110,7 @@ check('migration: a stored value inside the current automatic range is preserved
 check('report wording follows the three states', () => {
   assert.equal(
     describeAbfuserInclusion({ recommendedQuantity: 6, selectedQuantity: 6 }).message,
-    'ADI recommendation included in proposal.'
+    'Acoustic treatment included in proposal.'
   );
   assert.equal(
     describeAbfuserInclusion({ recommendedQuantity: 6, selectedQuantity: 4 }).message,
@@ -118,7 +118,12 @@ check('report wording follows the three states', () => {
   );
   assert.equal(
     describeAbfuserInclusion({ recommendedQuantity: 6, selectedQuantity: 4, enabled: false }).message,
-    'ADI acoustic treatment recommendation not included in proposal.'
+    'Optional — not included in proposal.'
+  );
+  // OFF is the default state, so the optional wording is what a new design shows.
+  assert.equal(
+    describeAbfuserInclusion({ recommendedQuantity: 6, selectedQuantity: 6, enabled: false }).message,
+    'Optional — not included in proposal.'
   );
 });
 

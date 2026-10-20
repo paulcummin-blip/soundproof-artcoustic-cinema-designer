@@ -2450,7 +2450,11 @@ function RoomDesignerWithState() {
             onLinkEarPlatformHeightsChange={appState?.setLinkEarPlatformHeights}
             acousticTreatmentEnabled={appState?.acousticTreatmentEnabled ?? false}
             setAcousticTreatmentEnabled={appState?.setAcousticTreatmentEnabled}
-            selectedAbfuserQty={includedAbfuserQty}
+            // The panel shows the STORED quantity, not the included quantity:
+            // switching treatment off includes nothing while the dealer's own
+            // quantity stays intact, ready to be restored when it is switched
+            // back on. Pricing still follows includedAbfuserQty.
+            selectedAbfuserQty={Number(appState?.selectedAbfuserQty) || 0}
             setSelectedAbfuserQty={appState?.setSelectedAbfuserQty}
             abfuserRecommendation={abfuserRecommendation}
           />
