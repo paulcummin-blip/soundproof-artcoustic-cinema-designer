@@ -70,7 +70,8 @@ async function retuneFullCalibration(ctx, rawTransfer, baseline) {
     const phaseSearch = await runInWorker(worker, "grouped-phase", {
       rawTransfer, instances: subwooferInstances, roomDims, effectiveBaseline: tuning,
     }, controller.signal);
-    metrics.recordWorkerCall("grouped-phase", "combined-retune-phase", performance.now() - t0, false);
+    metrics.recordWorkerCall("grouped-phase", "combined-retune-phase", performance.now() - t0, false,
+      { startedAt: t0, endedAt: performance.now() });
     if (isStale()) return null;
     const phaseTuning = phaseSearch?.candidates?.[0]?.tuning;
     if (phaseTuning) tuning = phaseTuning;
@@ -85,7 +86,8 @@ async function retuneFullCalibration(ctx, rawTransfer, baseline) {
     const delaySearch = await runInWorker(worker, "grouped-delay", {
       rawTransfer, instances: subwooferInstances, roomDims, effectiveBaseline: tuning,
     }, controller.signal);
-    metrics.recordWorkerCall("grouped-delay", "combined-retune-delay", performance.now() - t0, false);
+    metrics.recordWorkerCall("grouped-delay", "combined-retune-delay", performance.now() - t0, false,
+      { startedAt: t0, endedAt: performance.now() });
     if (isStale()) return null;
     const delayTuning = delaySearch?.candidates?.[0]?.tuning;
     if (delayTuning) tuning = delayTuning;
@@ -99,7 +101,8 @@ async function retuneFullCalibration(ctx, rawTransfer, baseline) {
     const gainSearch = await runInWorker(worker, "grouped-gain", {
       rawTransfer, instances: subwooferInstances, roomDims, effectiveBaseline: tuning,
     }, controller.signal);
-    metrics.recordWorkerCall("grouped-gain", "combined-retune-gain", performance.now() - t0, false);
+    metrics.recordWorkerCall("grouped-gain", "combined-retune-gain", performance.now() - t0, false,
+      { startedAt: t0, endedAt: performance.now() });
     if (isStale()) return null;
     const gainTuning = gainSearch?.candidates?.[0]?.tuning;
     if (gainTuning) tuning = gainTuning;
@@ -117,10 +120,14 @@ async function confirmCombinedCandidate(ctx, rawTransfer, tuning, candidateInfo,
   const { worker, controller, isStale, bindConfirmation, validationContext,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis } = ctx;
 
+  const confirmStarted = performance.now();
   const response = await runInWorker(worker, "confirmation", {
     rawTransfer, tuning, tuningVariant: "delay-polarity-trim",
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
   }, controller.signal);
+  ctx.metrics?.recordWorkerCall("confirmation", "combined:" + (candidateInfo?.candidateOrigin || "candidate"),
+    performance.now() - confirmStarted, false,
+    { startedAt: confirmStarted, endedAt: performance.now(), tuning, transferKey: "combined" });
   if (isStale()) return null;
   if (!response) return null;
 
@@ -165,7 +172,8 @@ export async function runCombinedOptimisation(ctx) {
       rawTransfer: currentRawTransfer, effectiveBaseline,
       p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     }, controller.signal, { timeoutMs: 120000 });
-    metrics.recordWorkerCall("crossover-integration", "joint-integration", performance.now() - started, false);
+    metrics.recordWorkerCall("crossover-integration", "joint-integration", performance.now() - started, false,
+      { startedAt: started, endedAt: performance.now() });
     if (isStale() || isCancelled()) return { combinedCandidates: [], diagnostics: { status: "stale" } };
     const combinedCandidates = [];
     for (const [index, candidate] of (search?.candidates || []).entries()) {
@@ -195,7 +203,7 @@ export async function runCombinedOptimisation(ctx) {
   const elapsed = () => Date.now() - combinedStartTime;
 
   const retuneCtx = { worker, controller, isStale, metrics, subwooferInstances, roomDims };
-  const confirmCtx = { worker, controller, isStale, bindConfirmation, validationContext,
+  const confirmCtx = { worker, controller, isStale, bindConfirmation, validationContext, metrics,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis };
 
   // ═══════════════════════════════════════════════════════════════════════

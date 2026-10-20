@@ -55,6 +55,10 @@ export const ELECTRONIC_TIMING_STAGE = Object.freeze({
   // belongs inside Calculate Bass can be read on its own.
   PHYSICAL_PLACEMENT: "physical-placement",
   SEATING_ADVISORY: "seating-advisory",
+  // The wait BEFORE the optimiser: acquiring or waiting for the Stage 2
+  // placement result the run consumes. Measured so the interval between the
+  // run's own verdict and its evaluation figure is never left unaccounted.
+  STAGE2_WAIT: "stage2-wait",
 });
 
 /** The stage labels, in the order the work happens. */
@@ -74,6 +78,7 @@ export const ELECTRONIC_TIMING_STAGE_LABEL = Object.freeze({
   [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: "Final candidate selection",
   [ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT]: "Physical placement work",
   [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: "Seating advisory work",
+  [ELECTRONIC_TIMING_STAGE.STAGE2_WAIT]: "Stage 2 placement wait",
 });
 
 /** The counters kept alongside the stages. */
@@ -212,10 +217,17 @@ function finiteOrNull(value) {
  *   the persistence stage; without it that stage is NOT MEASURED.
  * @returns {object|null} the breakdown, or null when there is no telemetry
  */
-export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTimings = null } = {}) {
+export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTimings = null, stageTimings = null } = {}) {
   if (!runtimeMetrics || typeof runtimeMetrics !== "object") return null;
 
   const calls = Array.isArray(runtimeMetrics.workerCalls) ? runtimeMetrics.workerCalls : [];
+  // Stage spans the engine measured for THIS run (transfer acquisition, baseline
+  // evaluation, seating advisory, final selection). Absent for a run recorded
+  // before they existed — then the stage stays NOT MEASURED, never zero.
+  const stageSpans = runtimeMetrics.stageSpans && typeof runtimeMetrics.stageSpans === "object"
+    ? runtimeMetrics.stageSpans
+    : {};
+  const measuredSpan = (key) => finiteOrNull(stageSpans[key]);
   const operations = Array.isArray(runtimeMetrics.transferOperations) ? runtimeMetrics.transferOperations : [];
   const sum = (predicate) => calls
     .filter(predicate)
@@ -250,10 +262,10 @@ export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTi
     ?? (saveMs !== null || publishMs !== null ? (saveMs || 0) + (publishMs || 0) : null);
 
   const stages = {
-    // Not published by the engine's telemetry today — stated as unmeasured rather
-    // than reported as zero.
-    [ELECTRONIC_TIMING_STAGE.TRANSFER_ACQUISITION]: null,
-    [ELECTRONIC_TIMING_STAGE.BASELINE_EVALUATION]: null,
+    // Measured by the engine's own stage ledger. Absent (older run) = NOT MEASURED.
+    [ELECTRONIC_TIMING_STAGE.TRANSFER_ACQUISITION]: measuredSpan("transfer-acquisition"),
+    [ELECTRONIC_TIMING_STAGE.BASELINE_EVALUATION]: measuredSpan("current-baseline"),
+    [ELECTRONIC_TIMING_STAGE.STAGE2_WAIT]: measuredSpan("stage2-wait") ?? finiteOrNull(stageTimings?.stage2WaitMs),
     [ELECTRONIC_TIMING_STAGE.PERSISTENCE_PUBLICATION]: persistenceMs,
     [ELECTRONIC_TIMING_STAGE.PHASE_POLARITY_SCREENING]: byPhase("grouped-phase"),
     [ELECTRONIC_TIMING_STAGE.DELAY_SCREENING]: byPhase("grouped-delay"),
@@ -261,12 +273,26 @@ export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTi
     [ELECTRONIC_TIMING_STAGE.COMBINED_SCREENING]: combinedScreeningMs,
     [ELECTRONIC_TIMING_STAGE.CANONICAL_CONFIRMATIONS]: confirmationMs,
     [ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT]: physicalPlacementMs,
-    [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: null,
-    [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: null,
+    [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: measuredSpan("seating-search"),
+    [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: measuredSpan("final-selection"),
   };
 
   return {
+    runId: runtimeMetrics.runId || null,
     totalWallClockMs: Number(runtimeMetrics.totalWallClockMs) || 0,
+    // THE RECONCILIATION of the run's own elapsed time: worker time, the
+    // sequential wait between worker calls, and what falls outside that sequence.
+    wait: {
+      workerBusyMs: finiteOrNull(runtimeMetrics.workerBusyMs),
+      sequentialWaitMs: finiteOrNull(runtimeMetrics.sequentialWaitMs),
+      residualMs: finiteOrNull(runtimeMetrics.residualMs),
+      longestWaits: Array.isArray(runtimeMetrics.longestWaits) ? runtimeMetrics.longestWaits.slice(0, 5) : [],
+    },
+    // The same transfer + tuning confirmed more than once in this run.
+    repeatedConfirmations: {
+      repeatedGroups: Number(runtimeMetrics.repeatedConfirmations?.repeatedGroups) || 0,
+      repeatedCalls: Number(runtimeMetrics.repeatedConfirmations?.repeatedCalls) || 0,
+    },
     stages,
     unmeasuredStages: Object.entries(stages).filter(([, value]) => value === null).map(([key]) => key),
     workerCallCount: calls.length,
@@ -320,10 +346,26 @@ export function buildElectronicTimingRows(breakdown) {
     })
     .filter(Boolean);
 
+  // The run's own reconciliation: worker time, sequential wait, and what sits
+  // outside the worker sequence. A figure that was not measured is not a row.
+  const wait = breakdown.wait || {};
+  const waitRows = [
+    ["worker-busy", "Worker calls (busy)", wait.workerBusyMs],
+    ["sequential-wait", "Sequential wait between worker calls", wait.sequentialWaitMs],
+    ["residual", "Outside worker sequence", wait.residualMs],
+  ]
+    .map(([key, label, value]) => {
+      if (value === null || value === undefined) return null;
+      const formatted = formatTimingDuration(value);
+      return formatted ? { key: `wait:${key}`, label, value: formatted } : null;
+    })
+    .filter(Boolean);
+
   const cache = breakdown.transferCache || {};
   const counts = [
     ["Worker calls", breakdown.workerCallCount],
     ["Canonical confirmations", breakdown.canonicalConfirmationCount],
+    ["Repeated confirmations", breakdown.repeatedConfirmations?.repeatedCalls],
     ["Seating advisory probes", cost.seatingAdvisoryProbes],
     ["Transfer-cache hits", cache.hits],
     ["Transfer-cache misses", cache.misses],
@@ -335,6 +377,7 @@ export function buildElectronicTimingRows(breakdown) {
   return [
     ...rows,
     ...costRows,
+    ...waitRows,
     ...counts,
     ...(total ? [{ key: "total", label: "Total wall time", value: total }] : []),
   ];

@@ -208,6 +208,9 @@ export default function useRunOptimisationPlan({
       const result = await runOptimisation({
         projectId,
         versionId,
+        // ONE RUN IDENTITY for every timing this run records — engine stages,
+        // worker calls, sequential wait, the plan save and the publication.
+        runId: activeRun.runId,
         shared: sharedRef.current,
         subwooferInstances: subInstancesRef.current,
         roomDims,

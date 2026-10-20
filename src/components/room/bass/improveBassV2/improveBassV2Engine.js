@@ -454,7 +454,16 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   // termination when the user cancels or the whole-run deadline expires.
   // Stale detection remains completely separate (isStale does NOT check signal).
   const controller = new AbortController();
-  const metrics = new V2RuntimeMetrics(projectId);
+  // ONE RUN IDENTITY: the id minted when the designer started this run, so every
+  // timing recorded here reconciles with the Stage 2 wait, the plan save and the
+  // publication as one run.
+  const metrics = new V2RuntimeMetrics(projectId, { runId: params.runId || null, versionId });
+  // The wait BEFORE this engine began (acquiring or waiting for Stage 2). It is
+  // measured by the orchestrator on the same run identity, so the interval
+  // between the run's verdict and its evaluation figure is never unaccounted.
+  if (Number.isFinite(Number(params.stage2WaitMs)) && Number(params.stage2WaitMs) >= 0) {
+    metrics.addStage("stage2-wait", Number(params.stage2WaitMs));
+  }
 
   // Subscribe to the V2 store for this project. When cancelRequested becomes
   // true, abort the controller immediately (synchronous — same call stack as
@@ -515,22 +524,33 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         };
       }),
     };
-    return fullTransferReuseCache.getOrCompute({
-      projectId, runId: transferRunId, signal: controller.signal, isStale,
-      params: { finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
-        selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM },
-      compute: () => runInWorker(worker, "placement", {
-        finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
-        selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
-      }, controller.signal),
-      onOperation: operation => {
-        metrics.recordTransferOperation({ ...operation, logicalCandidateId: candidateId,
-          consumer, decisionIdentity: { p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-            priorities: seatingPositions.map(s => [s.id, s.priority]) } });
-        if (operation.computationEnd != null) metrics.recordWorkerCall("placement", candidateId,
-          operation.computationEnd - operation.computationStart, false);
-      },
-    });
+    // TRANSFER ACQUISITION: the cache lookup and, on a miss, the modal simulation.
+    // Measured around the single authority every caller goes through, so the
+    // figure covers exactly the work this run did to obtain its transfers.
+    const acquisitionStarted = performance.now();
+    metrics.count("transfersRequested", 1);
+    try {
+      return await fullTransferReuseCache.getOrCompute({
+        projectId, runId: transferRunId, signal: controller.signal, isStale,
+        params: { finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
+          selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM },
+        compute: () => runInWorker(worker, "placement", {
+          finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
+          selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+        }, controller.signal),
+        onOperation: operation => {
+          metrics.recordTransferOperation({ ...operation, logicalCandidateId: candidateId,
+            consumer, decisionIdentity: { p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+              priorities: seatingPositions.map(s => [s.id, s.priority]) } });
+          if (operation.computationEnd != null) metrics.recordWorkerCall("placement", candidateId,
+            operation.computationEnd - operation.computationStart, false, {
+              startedAt: operation.computationStart, endedAt: operation.computationEnd,
+            });
+        },
+      });
+    } finally {
+      metrics.addStage("transfer-acquisition", performance.now() - acquisitionStarted);
+    }
   }
 
   let runResult = null;
@@ -565,6 +585,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // the optimiser never presents a re-derived Current as the designer-facing
     // baseline. The parity outcome is recorded either way, so a future mismatch
     // is diagnosable from saved evidence.
+    // BASELINE EVALUATION: resolving, validating and (only when it is missing)
+    // re-confirming the published Current. Measured, never recomputed.
+    metrics.beginStage("current-baseline");
     const liveSeatIds = (seatingPositions || []).map((seat) => seat?.id).filter(Boolean);
     const baselineTargetIdentity = { p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis };
     let baselineParity = resolveBaselineParity({
@@ -617,6 +640,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     }
     metrics.recordCurrentReuse(!!existingAuthority);
     metrics.recordPlacementFingerprint(placementFingerprint);
+    metrics.endStage("current-baseline");
 
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot };
@@ -720,7 +744,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             roomDims,
             effectiveBaseline,
           }, controller.signal);
-          metrics.recordWorkerCall("grouped-phase", "phase-current", performance.now() - phaseStarted, false);
+          metrics.recordWorkerCall("grouped-phase", "phase-current", performance.now() - phaseStarted, false,
+            { startedAt: phaseStarted, endedAt: performance.now() });
           if (isStale()) return {status:"stale",snapshot};
           const retainedPhase = phaseSearch?.candidates || [];
           Object.assign(phaseDiagnostics, {
@@ -755,7 +780,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               tuningVariant: "phase-all-pass",
               p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis, correctabilityAssessment,
             }, controller.signal);
-            metrics.recordWorkerCall("confirmation", "phase:" + index, performance.now() - confirmStarted, false);
+            metrics.recordWorkerCall("confirmation", "phase:" + index, performance.now() - confirmStarted, false,
+              { startedAt: confirmStarted, endedAt: performance.now(), tuning: retainedPhase[index].tuning, transferKey: "current" });
             if (isStale()) return {status:"stale",snapshot};
             const result = response
               ? bindConfirmation(
@@ -806,7 +832,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         const calibrationSearch=await runInWorker(worker,"grouped-delay",{
           rawTransfer:currentRawTransfer,instances:subwooferInstances,roomDims,effectiveBaseline,
         },controller.signal);
-        metrics.recordWorkerCall("grouped-delay","calibration-current",performance.now()-groupedStarted,false);
+        metrics.recordWorkerCall("grouped-delay","calibration-current",performance.now()-groupedStarted,false,
+          { startedAt: groupedStarted, endedAt: performance.now() });
         if(isStale()) return {status:"stale",snapshot};
         const retained=calibrationSearch?.candidates || [];
         Object.assign(calibrationDiagnostics,{grouping:calibrationSearch?.grouping,
@@ -824,7 +851,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             rawTransfer:currentRawTransfer,tuning:retained[index].tuning,tuningVariant:"delay-only",
             p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis, correctabilityAssessment,
           },controller.signal);
-          metrics.recordWorkerCall("confirmation","calibration:"+index,performance.now()-_confirmT0,false);
+          metrics.recordWorkerCall("confirmation","calibration:"+index,performance.now()-_confirmT0,false,
+            { startedAt: _confirmT0, endedAt: performance.now(), tuning: retained[index].tuning, transferKey: "current" });
           if(isStale()) return {status:"stale",snapshot};
           const result=response?bindConfirmation(response,retained[index].tuning,{...currentFinalist,groupedDelay:retained[index]},"calibration"):null;
           const check=validateConfirmedCandidate(result,validationContext);
@@ -876,7 +904,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           rawTransfer: savedCurrentRawTransfer, instances: subwooferInstances,
           roomDims, effectiveBaseline: savedEffectiveBaseline,
         }, controller.signal);
-        metrics.recordWorkerCall("grouped-gain", "gain-current", performance.now() - gainStarted, false);
+        metrics.recordWorkerCall("grouped-gain", "gain-current", performance.now() - gainStarted, false,
+          { startedAt: gainStarted, endedAt: performance.now() });
         if (isStale()) return {status: "stale", snapshot};
         const gainRetained = gainSearch?.candidates || [];
         Object.assign(gainDiagnostics, {
@@ -907,7 +936,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             tuningVariant: "delay-polarity-trim",
             p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
           }, controller.signal);
-          metrics.recordWorkerCall("confirmation", "gain:"+gi, performance.now() - gConfirmT0, false);
+          metrics.recordWorkerCall("confirmation", "gain:"+gi, performance.now() - gConfirmT0, false,
+            { startedAt: gConfirmT0, endedAt: performance.now(), tuning: gainRetained[gi].tuning, transferKey: "current" });
           if (isStale()) return {status: "stale", snapshot};
           if (gResponse) {
             const gBound = bindConfirmation(gResponse, gainRetained[gi].tuning,
@@ -1085,7 +1115,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
           }, controller.signal);
           metrics.recordWorkerCall("confirmation", "current",
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false);
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _confirmT0, false,
+            { startedAt: _confirmT0, endedAt: (typeof performance !== "undefined" ? performance.now() : Date.now()),
+              tuning: installedTuning, transferKey: "current" });
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
           if (currentConfirmation) {
@@ -1201,6 +1233,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       onProgress(`screening_${escPhase.name}`, escPhase.label, 0, 1);
 
       let phaseResult;
+      const screeningStartedAt = performance.now();
       try {
         phaseResult = runPositionScreenPhase(
           escPhase.name, currentPositions, roomDims, cabinetDims,
@@ -1211,6 +1244,14 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         evaluationIssues.push({stage:escPhase.name,error:err.message});
         phaseResult = { promoted: [], funnel: { generated: 0, screened: 0, promotedToV2: 0 }, timingMs: 0 };
       }
+      // CANDIDATE GENERATION AND SCREENING for this phase, and the counts the
+      // funnel actually reported — never a planned number.
+      metrics.addStage("position-screening", performance.now() - screeningStartedAt);
+      metrics.recordCounts({
+        candidatesGenerated: phaseResult.funnel?.generated || 0,
+        candidatesScreened: phaseResult.funnel?.screened || 0,
+        candidatesPromoted: phaseResult.funnel?.promotedToV2 || 0,
+      });
 
       funnel[funnelKey] = { ...phaseResult.funnel, confirmed: 0, confirmationAttempts:0, completed:!evaluationIssues.some(e=>e.stage===escPhase.name) };
       phasesRun.push(escPhase.name);
@@ -1273,7 +1314,6 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
         try {
-          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
           attemptedConfirmationIds.add(newPromoted[i].id);
           const options=[newPromoted[i].proxyResult,...(newPromoted[i].proxyResult?.alternatives || [])];
           // EVERY retained tuning alternative is canonically confirmed. Stopping
@@ -1282,6 +1322,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
           const option = options[optionIndex];
           funnel[funnelKey].confirmationAttempts++;
+          // Each OPTION's own confirmation is timed separately: a shared timer
+          // outside this loop recorded the second alternative as the sum of both
+          // and hid the true cost of each canonical confirmation.
+          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
           const result = await runInWorker(worker, "confirmation", {
             rawTransfer: newPromoted[i].rawTransfer,
             tuning: option?.tuning,
@@ -1289,7 +1333,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
           }, controller.signal);
           metrics.recordWorkerCall("confirmation", newPromoted[i].id,
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false);
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false,
+            { startedAt: _t0, endedAt: (typeof performance !== "undefined" ? performance.now() : Date.now()),
+              tuning: option?.tuning, transferKey: newPromoted[i].id });
           if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
           if (result) {
             const candidate=newPromoted[i];
@@ -1352,6 +1398,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let positionRawTransfer = null;
     let seatingProfiler = createSeatingProfiler();
     setStageVerdict(projectId, versionId, "seating_positions", "skipped");
+    const seatingSearchStarted = performance.now();
     try {
       const screenWall = "front"; // default; could be derived from project
       const seatingCandidates = generateSeatingCandidates(seatingPositions, roomDims, screenWall);
@@ -1462,7 +1509,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
             }, controller.signal);
             const confirmMs = performance.now() - seatingConfirmT0;
-            metrics.recordWorkerCall("confirmation", `seating-${i}`, confirmMs, false);
+            metrics.recordWorkerCall("confirmation", `seating-${i}`, confirmMs, false,
+              { startedAt: seatingConfirmT0, endedAt: performance.now(),
+                tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
+                transferKey: "seating:" + sc.offsetMm });
             seatingProfiler.recordConfirmation(sc.offsetMm, { confirmMs });
 
             if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
@@ -1549,6 +1599,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       evaluationIssues.push({ stage: "seating", error: err.message });
       setStageVerdict(projectId, versionId, "seating_positions", "incomplete");
     }
+    // SEATING ADVISORY: the batch simulation, the proxy pruning and the
+    // canonical confirmations of the shortlist, as one measured stage.
+    metrics.addStage("seating-search", performance.now() - seatingSearchStarted);
+    metrics.recordCounts({ seatingProbes: seatingDiagnostics.confirmed || 0 });
 
     // ── Phase 10: Combined optimisation ────────────────────────────────
     // Build combined candidates by retuning FULL calibration (phase → delay →
@@ -1609,6 +1663,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         });
 
         combinedDiagnostics = combinedDiag;
+        metrics.addStage("combined-search", Date.now() - combinedStartTime);
 
         // Add confirmed combined candidates to the pool
         for (const cc of combinedCandidates) {
@@ -1644,6 +1699,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     onProgress("finalising", "Finalising recommendation", 0, 1);
     setStageVerdict(projectId, versionId, "comparing", "done");
     snapshot.evaluationIncomplete=evaluationIssues.length>0;
+    // FINAL SELECTION AND RECOMMENDATION: the winner rule, the objective winners
+    // and the diagnostic ledger. Measured so a slow selection can be told apart
+    // from a slow search.
+    const selectionStarted = performance.now();
     const selection = selectWinnerWithProtection([...confirmedResults,...calibrationCandidates], snapshot, existingAuthority);
     selection.phaseResult=phaseResult;
     selection.phaseMaterial=phaseMaterial;
@@ -1689,6 +1748,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       objectives: selection.objectives,
       finalCandidate: selection.winner,
     });
+    metrics.addStage("final-selection", performance.now() - selectionStarted);
     setStageVerdict(projectId, versionId, "preparing", "done");
     await yieldToUI();
 

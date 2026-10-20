@@ -65,6 +65,10 @@ export async function runOptimisation(opts) {
   const {
     projectId,
     versionId,
+    // The run's own identity, minted when the designer started it. Every timing
+    // the engine records carries it, so the Stage 2 wait, the search and the
+    // saved plan reconcile as one run.
+    runId = null,
     deferRecommendationPublication = false,
     shared,
     subwooferInstances,
@@ -131,6 +135,7 @@ export async function runOptimisation(opts) {
   })();
 
   // ── Stage 2 lifecycle: reuse or request ──
+  const stage2StartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   let stage2Result = getStage2State(projectId, versionId);
   let placementFingerprint = stage2Result?.placementFingerprint;
 
@@ -176,6 +181,10 @@ export async function runOptimisation(opts) {
     placementFingerprint = waitResult.stage2?.placementFingerprint;
   }
 
+  // THE STAGE 2 WAIT — acquisition or waiting for the placement result this run
+  // consumes. Measured on its own so it can never be mistaken for search time.
+  const stage2WaitMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - stage2StartedAt;
+
   // ── Compute correctability BEFORE the optimisation ──
   // The Physical Recoverability Assessment is the authoritative input to the
   // EQ optimisation. It determines whether EQ is physically appropriate before
@@ -203,6 +212,8 @@ export async function runOptimisation(opts) {
   startImproveBassV2(projectId, versionId, snapshot);
 
   const params = {
+    runId,
+    stage2WaitMs,
     subwooferInstances,
     roomDims,
     seatingPositions,
