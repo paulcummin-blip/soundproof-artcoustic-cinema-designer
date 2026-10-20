@@ -6,8 +6,8 @@
 //
 //   A / F  P4 (or any other non-bass parameter) blocking the overall
 //          engineering publication → the bass band does NOT name it. The
-//          completed bass result stays current and the panel states the overall
-//          position: "Overall design assessment is not yet complete."
+//          completed bass result stays current; overall readiness belongs in
+//          Project Report.
 //   B      P14 incomplete → the bass band may name P14.
 //   C      P18 incomplete → the bass band may name P18.
 //   D      P19 incomplete → the bass band may name P19.
@@ -68,14 +68,10 @@ test('A / F — a non-bass blocker never names a parameter inside the bass band'
   expect(p4.message).toBe('Calculated and saved.');
   expect(p4.attention).not.toBe(true);
   expect(p4.actionLabel).toBeNull();
-  // The real items are named from the attempt's own gate verdicts and recorded
-  // items — never a generic "not complete"…
-  expect(p4.waitingHeading).toBe('Overall project waiting for:');
-  expect(p4.waitingItems).toEqual([
-    'P4 Maximum SPL difference between screen wall speakers',
-    'P16 Seat-to-seat frequency response variance across all screen wall speakers',
-  ]);
-  // …and a non-bass item is never presented as a bass problem the band can fix.
+  expect(p4.waitingHeading).toBeUndefined();
+  expect(p4.waitingItems).toBeUndefined();
+  expect(p4.note).toBeUndefined();
+  expect(JSON.stringify(p4)).not.toMatch(/overall|P4|P16/i);
   expect(JSON.stringify(p4)).not.toMatch(/assessment needs updating/i);
 });
 
@@ -163,7 +159,7 @@ test('a not-ready attempt is filtered by the same domain rule', () => {
     },
   });
   expect(state.label).toBe('Performance Current');
-  expect(state.note).toBe('Waiting for P4 Maximum SPL difference between screen wall speakers.');
+  expect(state.note).toBeUndefined();
 });
 
 test('P15 and P21 are assumed design values: never named, never outstanding', () => {
@@ -174,7 +170,7 @@ test('P15 and P21 are assumed design values: never named, never outstanding', ()
     gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p15, p21')],
   });
   expect(state.label).toBe('Performance Current');
-  expect(state.note).toBe('Overall project assessment complete.');
+  expect(state.note).toBeUndefined();
   expect(state.waitingItems).toBeUndefined();
   expect(state.message).toBe('Calculated and saved.');
   expect(state.actionLabel).toBeNull();

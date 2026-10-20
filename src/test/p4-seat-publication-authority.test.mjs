@@ -12,8 +12,7 @@
 //           developer wording.
 //   TEST 4  Publication blocked by P4 only → the bass band stays in the bass
 //           domain: the completed bass result is current, no bass action is
-//           offered, and the real item the overall assessment is waiting for is
-//           named instead of a generic "not complete".
+//           offered, and overall readiness remains in Project Report.
 //   TEST 5  Saved and acknowledged → "Performance Current" (the state a refresh
 //           restores from the durable publication).
 //
@@ -145,7 +144,7 @@ test('TEST 4 — a P4-only blocker is never named inside the bass band', () => {
   expect(state.message).toBeNull();
   expect(state.actionLabel).toBeNull();
   expect(state.note).toBe('Waiting for P4 Maximum SPL difference between screen wall speakers.');
-  expect(state.waitingItems).toEqual(['P4 Maximum SPL difference between screen wall speakers']);
+  expect(state.waitingItems).toBeUndefined();
   expect(JSON.stringify(state)).not.toMatch(/assessment needs updating/i);
 });
 

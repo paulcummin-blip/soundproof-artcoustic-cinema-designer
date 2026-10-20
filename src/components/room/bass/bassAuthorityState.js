@@ -32,7 +32,7 @@
  * P20). When a save is refused, only a bass-domain parameter may be named. A
  * gate outside that domain (P1–P13, P15–P17, P21) is a whole-design position,
  * never a bass problem: the completed bass assessment then stays current and
- * the overall position is stated without naming a non-bass parameter.
+ * overall project readiness is shown only in Project Report.
  *
  * ASSUMED PARAMETERS — P15 (background noise floor) and P21 (early reflections)
  * are assumptions the designer states, not calculations the app owes. They are
@@ -41,7 +41,6 @@
  */
 
 import { BASS_AUTHORITY_STATUS } from "./completedBassResultStore";
-import { resolveOverallProjectWaiting } from "./overallProjectWaiting";
 
 export const BASS_AUTHORITY_STATE = Object.freeze({
   CALCULATING: "calculating",
@@ -117,12 +116,6 @@ function bassPersistenceFailed(durableWrite, resultFingerprint) {
  * P1–P13, P15–P17 and P21 sit outside it and are never named here.
  */
 export const BASS_DOMAIN_PARAMETERS = Object.freeze([14, 18, 19, 20]);
-
-/**
- * The one line the bass panel shows when the completed bass result is current
- * and nothing real is outstanding anywhere else either.
- */
-export const BASS_OVERALL_ASSESSMENT_COMPLETE_NOTE = "Overall project assessment complete.";
 
 /**
  * The assumed design parameters, by number. They are never waiting items.
@@ -203,7 +196,7 @@ const ATTEMPT = Object.freeze({
  * @param {boolean} input.calculationInProgress
  * @param {boolean} input.placementPreviewActive
  * @returns {{ code: string, label: string, message: string|null, actionLabel: string|null,
- *   note?: string|null, waitingHeading?: string|null, waitingItems?: string[] }}
+ *   attention?: boolean }}
  */
 export function resolveBassAuthorityState({
   projectId = null,
@@ -293,39 +286,16 @@ export function resolveBassAuthorityState({
           attention: true,
         };
       }
-      // The completed bass assessment is saved and current; a NON-BASS gate is
-      // holding up the overall engineering publication. The band reports the
-      // bass assessment as current, then names the real items the overall
-      // assessment is waiting for — read from the attempt's own failed gates,
-      // never invented and never a generic "not complete". P15 and P21 are
-      // assumed design values, so they are never among the items named, and
-      // when nothing real is outstanding the band says so.
-      const waiting = resolveOverallProjectWaiting({ attempt: matchingAttempt });
-      if (waiting.complete) {
-        // Nothing was named as outstanding. That is only evidence of completion
-        // when the attempt actually recorded a gate it verified — a refusal that
-        // carried no gate at all (a bare message, e.g. from the publication
-        // service) leaves the bass result's own validity unconfirmed, so it is
-        // never read as CURRENT or as an overall completion. It is reported as
-        // the refusal it is, with the same retry/recalculate ways forward.
-        if (failedGates(matchingAttempt).length === 0) {
-          return {
-            code: BASS_AUTHORITY_STATE.SAVE_FAILED,
-            ...BASS_AUTHORITY_SAVE_FAILED_COPY,
-            attention: true,
-          };
-        }
+      // Non-bass gates belong to Project Report. A refusal without any
+      // recorded gate still leaves the save unconfirmed and remains retryable.
+      if (failedGates(matchingAttempt).length === 0) {
         return {
-          ...withCopy(BASS_AUTHORITY_STATE.CURRENT),
-          note: BASS_OVERALL_ASSESSMENT_COMPLETE_NOTE,
+          code: BASS_AUTHORITY_STATE.SAVE_FAILED,
+          ...BASS_AUTHORITY_SAVE_FAILED_COPY,
+          attention: true,
         };
       }
-      return {
-        ...withCopy(BASS_AUTHORITY_STATE.CURRENT),
-        note: waiting.message,
-        waitingHeading: waiting.heading,
-        waitingItems: waiting.items,
-      };
+      return withCopy(BASS_AUTHORITY_STATE.CURRENT);
     }
     // Saved and current, but the publication has not acknowledged it yet: the
     // values are correct and saving is what is outstanding. That save is
