@@ -26,8 +26,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import DesignIntentDiagnosticsPanel from '@/components/report/projectReport/DesignIntentDiagnosticsPanel';
 import { saveDesignIntentDiagnostics } from '@/components/report/projectReport/designIntentDiagnosticStore';
-import { saveAdiEditorialRejection } from '@/components/adi/adiEditorialRejectionStore';
-import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
+import AdiPreparingPopup from '@/components/report/projectReport/AdiPreparingPopup';
 import useAutoDesignIntent, { AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
 
 const LABEL_COLOR = '#625143';
@@ -65,50 +64,10 @@ export default function DesignIntentGenerationAction({
   // saved is improved where it stands, the writer is not asked again, and no figure,
   // level, product, scope or limitation changes. The wording it replaces is kept, so
   // Undo can put it back exactly.
-  const [adi, setAdi] = useState({ busy: false, message: null, canUndo: false });
   // Automatic first pass for a newly generated report (write + ADI rewrite, once).
   const auto = useAutoDesignIntent({ projectId, versionId, onDone: onGenerated });
 
   if (!projectId || !versionId) return null;
-
-  const runAdiAction = async (action) => {
-    setAdi((previous) => ({ ...previous, busy: true, message: null }));
-    try {
-      const response = await base44.functions.invoke('improveAdiWording', {
-        surface: 'report_design_intent',
-        action,
-        mode: 'section',
-        project_id: projectId,
-        version_id: versionId,
-      });
-      const data = response?.data || {};
-      // A refused rewrite is written nowhere, so this response is the only copy of
-      // what ADI proposed and why it was kept back. Held for the session for a
-      // master admin to read; a dealer's response carries no diagnostic at all.
-      saveAdiEditorialRejection(data.diagnostics || null);
-      if (data.ok !== true) {
-        setAdi((previous) => ({
-          ...previous,
-          busy: false,
-          message: data.error || 'ADI could not change the wording, so it is unchanged.',
-        }));
-        return;
-      }
-      // The server's own line: on a refusal it is the one plain sentence that says
-      // the original wording was kept because the revised version changed the
-      // supported meaning.
-      setAdi({ busy: false, message: data.message || null, canUndo: data.can_undo === true });
-      if (data.applied === true && typeof onGenerated === 'function') await onGenerated();
-    } catch (error) {
-      setAdi((previous) => ({
-        ...previous,
-        busy: false,
-        message: error?.response?.data?.error
-          || error?.response?.data?.message
-          || 'ADI could not be reached, so the wording is unchanged.',
-      }));
-    }
-  };
 
   const generate = async () => {
     setState({ busy: true, message: 'Writing the Design Intent…', tone: 'muted' });
@@ -151,23 +110,11 @@ export default function DesignIntentGenerationAction({
 
   return (
     <div style={{ marginTop: 10 }}>
-      {auto.status === AUTO_INTENT.RUNNING && (
-        <div style={{ fontFamily: BODY_FONT, fontSize: 11, color: LABEL_COLOR, marginBottom: 6 }}>
-          ADI is preparing your report…
-        </div>
-      )}
-      {auto.status === AUTO_INTENT.FAILED && (
-        <div style={{ fontFamily: BODY_FONT, fontSize: 11, color: '#4A230F', marginBottom: 6 }}>
-          ADI could not finish preparing your report.{' '}
-          <button type="button" onClick={auto.retry} style={{ textDecoration: 'underline', fontWeight: 600 }}>
-            Retry
-          </button>
-        </div>
-      )}
+      <AdiPreparingPopup status={auto.status} onRetry={auto.retry} />
       <button
         type="button"
         onClick={generate}
-        disabled={state.busy}
+        disabled={state.busy || auto.status === AUTO_INTENT.RUNNING}
         style={{
           fontFamily: BODY_FONT,
           fontSize: 11,
@@ -181,42 +128,8 @@ export default function DesignIntentGenerationAction({
           opacity: state.busy ? 0.6 : 1,
         }}
       >
-        {state.busy
-          ? 'Writing Design Intent…'
-          : hasNarrative ? 'Rewrite Design Intent' : 'Write Design Intent'}
+        {state.busy ? 'Improving with ADI…' : 'Improve with ADI'}
       </button>
-      <div className="flex items-center gap-2" style={{ marginTop: 6, flexWrap: 'wrap' }}>
-        {hasNarrative && (
-          <button
-            type="button"
-            onClick={() => runAdiAction('improve')}
-            disabled={adi.busy}
-            title="Improve the wording of this Design Intent with ADI — the same facts, better said"
-            data-adi-improve="section"
-            style={{ ...ACTION_BUTTON, cursor: adi.busy ? 'default' : 'pointer', opacity: adi.busy ? 0.6 : 1 }}
-          >
-            Improve wording with ADI
-          </button>
-        )}
-        {adi.canUndo && (
-          <button
-            type="button"
-            onClick={() => runAdiAction('undo')}
-            disabled={adi.busy}
-            title="Put back the wording ADI replaced"
-            data-adi-undo="section"
-            style={{ ...ACTION_BUTTON, cursor: adi.busy ? 'default' : 'pointer', opacity: adi.busy ? 0.6 : 1 }}
-          >
-            Undo
-          </button>
-        )}
-      </div>
-
-      <AdiEditorialNotice
-        message={adi.message}
-        busy={adi.busy}
-        onDismiss={() => setAdi((previous) => ({ ...previous, message: null }))}
-      />
 
       {state.message && (
         <div

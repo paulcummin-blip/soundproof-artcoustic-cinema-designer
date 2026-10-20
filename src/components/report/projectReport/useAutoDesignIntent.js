@@ -67,25 +67,12 @@ export default function useAutoDesignIntent({ projectId, versionId, onDone }) {
     setStatus(key, AUTO_INTENT.RUNNING);
     let outcome = AUTO_INTENT.FAILED;
     try {
-      const snapshot = await readSnapshot(projectId, versionId);
-      let proceed = true;
-      if (!snapshot?.payload?.design_intent) {
-        const written = (await base44.functions.invoke('generateReportDesignIntent', {
-          project_id: projectId, version_id: versionId,
-        }))?.data || {};
-        if (written.ok !== true) {
-          // A writer that is switched off for this login leaves the report's own text.
-          proceed = false;
-          if (written.reason === 'writer_flag_off') outcome = AUTO_INTENT.COMPLETE;
-        }
-      }
-      if (proceed) {
-        const improved = (await base44.functions.invoke('improveAdiWording', {
-          surface: 'report_design_intent', action: 'improve', mode: 'section',
-          project_id: projectId, version_id: versionId,
-        }))?.data || {};
-        if (improved.ok === true) outcome = AUTO_INTENT.COMPLETE;
-      }
+      // One writing process only: the Astra Design Intent writer.
+      const written = (await base44.functions.invoke('generateReportDesignIntent', {
+        project_id: projectId, version_id: versionId,
+      }))?.data || {};
+      // A writer switched off for this login leaves the report's own text.
+      if (written.ok === true || written.reason === 'writer_flag_off') outcome = AUTO_INTENT.COMPLETE;
     } catch { outcome = AUTO_INTENT.FAILED; }
     inFlight.delete(key);
     setStatus(key, outcome);
