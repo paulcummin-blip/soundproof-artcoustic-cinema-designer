@@ -53,6 +53,8 @@ export default function ProposalWorkspaceToolbar({
   // failed. Rendered inside PaginationFailureDetails, which shows it to a
   // master-admin login only.
   errorDetail = null,
+  // True while the automatic ADI pass is unfinished: the export button is disabled.
+  exportDisabled = false,
 }) {
   const message = blockedReason || error;
 
@@ -91,7 +93,7 @@ export default function ProposalWorkspaceToolbar({
           <button
             type="button"
             onClick={onExport}
-            disabled={exporting}
+            disabled={exporting || exportDisabled}
             className="flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.12em] rounded-md text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#213428', fontFamily: FONT }}
           >

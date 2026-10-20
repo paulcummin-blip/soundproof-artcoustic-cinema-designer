@@ -11,6 +11,8 @@ import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceSta
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import useSectionAdiEditorial from '@/components/proposal/editor/useSectionAdiEditorial';
+import useAutoAdiRewrite from '@/components/proposal/editor/useAutoAdiRewrite';
+import AutoAdiStatusBar from '@/components/proposal/editor/AutoAdiStatusBar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
 import {
@@ -679,6 +681,11 @@ export default function ProposalEditor() {
     dismissNotice: dismissAdiNotice,
   } = useSectionAdiEditorial({ proposal, archived, activeSection, onApplied: finishAdiEdit });
 
+  // Automatic ADI pass, once per newly generated report (reuses the action above).
+  const autoAdi = useAutoAdiRewrite({
+    proposal, setProposal, sections, loading, archived, improveSection: handleImproveWording,
+  });
+
   const handleRestore = async () => {
     if (!proposal) return;
     setRestoring(true);
@@ -939,14 +946,16 @@ export default function ProposalEditor() {
         showClientBrief={showClientBrief}
         onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
         exporting={exporting}
-        onExport={handleExportClick}
-        blockedReason={comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
+        onExport={autoAdi.blockedReason ? () => {} : handleExportClick}
+        exportDisabled={Boolean(autoAdi.blockedReason)}
+        blockedReason={autoAdi.blockedReason || comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
         review={copyReview}
         approval={approval}
         error={exportError}
         retryable={exportRetryable}
         errorDetail={exportErrorDetail}
       />
+      <AutoAdiStatusBar status={autoAdi.status} running={autoAdi.running} onRetry={autoAdi.retry} />
 
       <ProposalReviewRequiredDialog
         open={showReviewDialog}
