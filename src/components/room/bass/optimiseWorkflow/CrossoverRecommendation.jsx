@@ -23,13 +23,14 @@ export default function CrossoverRecommendation({
   live.current = {shared,instances,appState,authorityState};
   const [applying,setApplying] = useState(false);
   const [error,setError] = useState(null);
+  const versionId = appState?.activeVersionId || null;
   const record = saved;
   useEffect(() => {
     if (!candidate?.integrationVerified || !candidate?.baselineCacheKey || typeof write !== "function") return;
     if (candidate.baselineCacheKey !== shared?.cacheKey) return;
     if (saved?.candidateId === candidate.candidateId && saved?.baselineCacheKey === candidate.baselineCacheKey) return;
     write({ crossoverRecommendation: {
-      version:1,candidateId:candidate.candidateId,baselineCacheKey:candidate.baselineCacheKey,
+      version:1,versionId,candidateId:candidate.candidateId,baselineCacheKey:candidate.baselineCacheKey,
       candidate,baseline:diagnostics?.baseline || null,status:"recommended",
     } });
   }, [candidate,diagnostics,write,shared?.cacheKey,saved?.candidateId,saved?.baselineCacheKey]);
@@ -48,6 +49,10 @@ export default function CrossoverRecommendation({
   }, [record,applying,authorityState.code,shared?.cacheKey,shared?.calculationInProgress,shared?.completedBassAuthority,shared?.authoritative,write]);
 
   if (!record?.candidate) return null;
+  // Only this version's own recommendation for the CURRENT design is shown.
+  // An inherited, other-version or outdated recommendation hides the whole table.
+  if (record.versionId && record.versionId !== versionId) return null;
+  if (["recommended","restored"].includes(record.status) && record.baselineCacheKey!==shared?.cacheKey) return null;
   const recommended=record.candidate;
   const baseline=record.baseline;
   const stale=["recommended","restored"].includes(record.status) && record.baselineCacheKey!==shared?.cacheKey;

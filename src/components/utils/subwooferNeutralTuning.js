@@ -37,5 +37,12 @@ export function neutraliseDesignStateForNewVersion(designState) {
   // shows "Calculate Bass Results" until it is calculated and optimised itself.
   if ("optimiser_plan" in next) next.optimiser_plan = null;
   if ("applied_seating_provenance" in next) next.applied_seating_provenance = null;
+  // No inherited crossover/ADI recommendation: the new version must run ADI itself.
+  for (const key of ["splConfig", "spl_config"]) {
+    if (next[key] && typeof next[key] === "object" && "crossoverRecommendation" in next[key]) {
+      const { crossoverRecommendation, ...rest } = next[key];
+      next[key] = rest;
+    }
+  }
   return next;
 }
