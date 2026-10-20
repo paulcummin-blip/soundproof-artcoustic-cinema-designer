@@ -38,6 +38,7 @@ import {
   PUBLICATION_FAILURE_CATEGORY,
   getPublicationAttempts,
   getPublicationFailure,
+  getPublicationDiagnostics,
 } from "@/components/recommendationEngine/recommendationPersistence";
 import {
   RUN_TIMING,
@@ -90,7 +91,8 @@ export function buildRecommendationPublicationRecord({
     error: ok ? null : (publication?.failure?.publicationError || publication?.failure?.message || null),
     attempts: Number.isFinite(attempts) ? attempts : null,
     mode: publication?.mode || null,
-    fingerprints: results.map((entry) => entry.fingerprint).filter(Boolean),
+    fingerprints: results.filter(entry => entry.persisted === true).map(entry => entry.fingerprint).filter(Boolean),
+    diagnostics: results.map(entry => ({ fingerprint: entry.fingerprint, persisted: entry.persisted, failure: entry.failure || null, ...entry.diagnostics })),
     at,
     runId: runId || null,
   };
@@ -176,14 +178,18 @@ export async function publishOptimiserRecommendation({
   }
 
   const results = [];
+  let attempts = 0;
+  recordRunTiming(projectId, versionId, RUN_TIMING.PUBLICATION_STARTED);
   for (const write of decision.writes) {
-    recordRunTiming(projectId, versionId, RUN_TIMING.PUBLICATION_STARTED);
     const payload = write.withPlan && plan ? { ...recommendation, optimiserPlan: plan } : { ...recommendation };
     const persisted = await publishRecommendation(projectId, versionId, payload, write.fingerprint);
-    recordRunTiming(projectId, versionId, RUN_TIMING.PUBLICATION_COMPLETED);
-    recordPublicationRetries(projectId, versionId, getPublicationAttempts(projectId, versionId));
-    results.push({ fingerprint: write.fingerprint, withPlan: write.withPlan === true, persisted: persisted === true });
+    attempts += getPublicationAttempts(projectId, versionId);
+    results.push({ fingerprint: write.fingerprint, withPlan: write.withPlan === true, persisted: persisted === true,
+      failure: persisted === true ? null : getPublicationFailure(projectId, versionId),
+      diagnostics: getPublicationDiagnostics(projectId, versionId) });
   }
+  recordRunTiming(projectId, versionId, RUN_TIMING.PUBLICATION_COMPLETED);
+  recordPublicationRetries(projectId, versionId, attempts);
 
   // ── DID THE PUBLICATION ACTUALLY HAPPEN? ──
   // The record is the authority: a write that did not persist is a FAILURE the
@@ -193,7 +199,7 @@ export async function publishOptimiserRecommendation({
   //
   // Nothing to publish (no fingerprint) is complete by definition, not failed.
   const refused = results.find((entry) => entry.persisted !== true) || null;
-  const recorded = refused ? getPublicationFailure(projectId, versionId) : null;
+  const recorded = refused?.failure || null;
 
   return {
     ...decision,

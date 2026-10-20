@@ -94,7 +94,7 @@ function notify() {
 export function beginRunTimings(projectId, versionId, runId) {
   const key = keyOf(projectId, versionId);
   store.set(key, { runId: runId || null, milestones: {}, publicationRetries: 0 });
-  notify();
+  recordRunTiming(projectId, versionId, RUN_TIMING.RUN_START);
   return getRunTimings(projectId, versionId);
 }
 

@@ -24,6 +24,10 @@ const persistenceWrites = new Map();
 // How many attempts the last WRITE for a project+version needed. Read by the
 // optimiser run diagnostic instrumentation — never a claim about the record.
 const attemptsByProject = new Map();
+const diagnosticsByProject = new Map();
+export function getPublicationDiagnostics(projectId, versionId) {
+  return diagnosticsByProject.get(`${projectId}::${versionId}`) || null;
+}
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -109,13 +113,9 @@ export async function publishRecommendation(
 ) {
   const key = `${projectId}::${versionId}`;
 
-  // Update in-memory store
-  memoryByProject.set(key, {
-    recommendation,
-    resultFingerprint,
-    publishedAt: new Date().toISOString(),
-  });
-  notify();
+  // Preserve the previous authoritative recommendation until the write succeeds.
+  const started = performance.now();
+  const diagnostics = { queueMs: 0, readMs: 0, writeMs: 0, backoffMs: 0, reads: 0, writes: 0, totalMs: 0 };
 
   // The final bass contract may be authoritative in memory before its cache
   // snapshot has finished writing. Wait for that exact fingerprint instead of
@@ -124,6 +124,7 @@ export async function publishRecommendation(
 
   const previousWrite = persistenceWrites.get(key) || Promise.resolve();
   const write = previousWrite.catch(() => {}).then(async () => {
+    diagnostics.queueMs = performance.now() - started;
     attemptsByProject.set(key, 0);
     const boundedWrites = Number.isFinite(Number(writeAttempts)) && Number(writeAttempts) > 0
       ? Math.floor(Number(writeAttempts))
@@ -134,11 +135,15 @@ export async function publishRecommendation(
       let record = null;
       let snapshot = null;
       let readError = null;
+      const readStarted = performance.now();
+      diagnostics.reads++;
       try {
         record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
         snapshot = (record?.completed_by_fingerprint || {})[resultFingerprint] || null;
       } catch (e) {
         readError = e;
+      } finally {
+        diagnostics.readMs += performance.now() - readStarted;
       }
 
       if (record && snapshot) {
@@ -146,6 +151,8 @@ export async function publishRecommendation(
         const completedByFingerprint = record.completed_by_fingerprint || {};
         for (let attempt = 0; attempt < boundedWrites; attempt += 1) {
           attemptsByProject.set(key, attempt + 1);
+          const writeStarted = performance.now();
+          diagnostics.writes++;
           try {
             await base44.entities.ProjectAnalysisCache.update(record.id, {
               completed_by_fingerprint: {
@@ -155,6 +162,8 @@ export async function publishRecommendation(
             });
             invalidateProjectAnalysisCacheRead(projectId, versionId);
             failureByProject.delete(key);
+            memoryByProject.set(key, { recommendation, resultFingerprint, publishedAt: new Date().toISOString() });
+            notify();
             return true;
           } catch (e) {
             recordFailure(key, {
@@ -162,7 +171,13 @@ export async function publishRecommendation(
               error: e,
               attempts: attempt + 1,
             });
-            if (attempt < boundedWrites - 1) await sleep(WRITE_RETRY_BACKOFF_MS);
+          } finally {
+            diagnostics.writeMs += performance.now() - writeStarted;
+          }
+          if (attempt < boundedWrites - 1) {
+            const backoffStarted = performance.now();
+            await sleep(WRITE_RETRY_BACKOFF_MS);
+            diagnostics.backoffMs += performance.now() - backoffStarted;
           }
         }
         // Every attempt was refused. The caller states the failure and the run
@@ -173,10 +188,14 @@ export async function publishRecommendation(
 
       recordFailure(key, {
         category: PUBLICATION_FAILURE_CATEGORY.SNAPSHOT_MISSING,
-        error: readError,
+        error: readError || "The exact completed bass snapshot for this result fingerprint is missing.",
         attempts: 0,
       });
-      await sleep(SNAPSHOT_WAIT_MS);
+      if (wait < SNAPSHOT_WAIT_ITERATIONS - 1) {
+        const backoffStarted = performance.now();
+        await sleep(SNAPSHOT_WAIT_MS);
+        diagnostics.backoffMs += performance.now() - backoffStarted;
+      }
     }
     // The snapshot the recommendation belongs to never appeared.
     return false;
@@ -185,6 +204,8 @@ export async function publishRecommendation(
   try {
     return await write;
   } finally {
+    diagnostics.totalMs = performance.now() - started;
+    diagnosticsByProject.set(key, diagnostics);
     if (persistenceWrites.get(key) === write) persistenceWrites.delete(key);
   }
 }

@@ -333,9 +333,9 @@ export async function runOptimisation(opts) {
             roomDims,
           },
         });
-        const resultFingerprint = selection?.currentResult?.inputIdentity
+        const resultFingerprint = shared?.completedBassAuthority?.contract?.job?.resultFingerprint
           || shared?.completedBassAuthority?.currentFingerprint
-          || startFingerprint;
+          || null;
         if (resultFingerprint && generatedRecommendation) {
           result.recommendationPublication = {
             fingerprint: resultFingerprint,
