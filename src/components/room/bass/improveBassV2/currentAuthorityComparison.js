@@ -29,10 +29,12 @@ function finiteOrNull(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
-function seatRows(rows) {
+function seatRows(rows, primarySeatIds) {
+  const primary = Array.isArray(primarySeatIds) ? new Set(primarySeatIds.map(String)) : null;
   return (Array.isArray(rows) ? rows : []).map((seat) => ({
     seatId: seat.seatId,
-    isPrimary: seat.isPrimary || false,
+    // Compacted candidate rows omit this flag; provenance retains the canonical scope.
+    isPrimary: primary ? primary.has(String(seat.seatId)) : seat.isPrimary || false,
     level: seat.level,
     variationDbRaw: seat.variationDbRaw,
     worstFrequencyHz: seat.worstFrequencyHz,
@@ -93,8 +95,8 @@ export function extractAuthorityForComparison(currentAuthority) {
   );
 
   return {
-    perSeatP19: seatRows(perSeatP19Results),
-    perSeatP20: seatRows(perSeatP20Results),
+    perSeatP19: seatRows(perSeatP19Results, contract.provenance?.primarySeatIds),
+    perSeatP20: seatRows(perSeatP20Results, contract.provenance?.primarySeatIds),
     // P19: the aggregate RSP headline, preserved exactly as published.
     achievedP19VariationDb,
     achievedP19Level,
