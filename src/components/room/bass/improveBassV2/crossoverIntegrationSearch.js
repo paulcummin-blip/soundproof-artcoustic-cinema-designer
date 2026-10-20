@@ -53,6 +53,7 @@ export function runCrossoverIntegrationSearch({
     ...canonicalParams, crossover: currentCrossover, tuning: currentTuning,
   });
   if (!baseline) return { candidates: [], diagnostics: { status: "error", reason: "Baseline confirmation failed" } };
+  const baselineDone = performance.now();
   const diagnostics = {
     status: "completed", screened: 0, confirmed: 1, slopePairs: [], linkedFrequencies: [],
     independentTested: 0, jointTrials: 0, rejected: [], searchVersion: "joint-crossover-v1",
@@ -146,7 +147,10 @@ export function runCrossoverIntegrationSearch({
   const ranked=all.slice().sort((a,b)=>a.score-b.score);
   const diverse=diagnostics.slopePairs.flatMap(([hp,lp])=>ranked.filter(c=>c.crossover.speakerHpSlopeDbPerOct===hp&&c.crossover.subwooferLpSlopeDbPerOct===lp).slice(0,1));
   const finalists=[...new Map([...ranked.slice(0,8),...diverse].map(c=>[c.key,c])).values()];
+  diagnostics.baselineMs=baselineDone-started;
+  diagnostics.screeningMs=performance.now()-baselineDone;
   const candidates=[];
+  const confirmationStarted=performance.now();
   for(const candidate of finalists){
     const result=evaluateStage2ConfirmationWithTuning(rawTransfer,{...canonicalParams,crossover:candidate.crossover,tuning:candidate.tuning});
     diagnostics.confirmed++;
@@ -160,6 +164,7 @@ export function runCrossoverIntegrationSearch({
     });
   }
   candidates.sort((a,b)=>p20(a)-p20(b)||p19(a)-p19(b));
+  diagnostics.confirmationMs=performance.now()-confirmationStarted;
   diagnostics.runtimeMs=performance.now()-started;
   diagnostics.status=candidates.length?"completed":"no_safe_improvement";
   return {baseline,candidates:candidates.slice(0,3),diagnostics};
