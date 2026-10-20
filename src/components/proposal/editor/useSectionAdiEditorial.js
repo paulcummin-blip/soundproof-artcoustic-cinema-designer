@@ -92,7 +92,9 @@ export default function useSectionAdiEditorial({
       payload: { action: 'improve', mode: 'section', section_id: section.id },
       fallback: 'ADI could not change the wording, so it is unchanged.',
     });
-    if (data?.ok === true && data.applied === true && onApplied) await onApplied();
+    // Re-read the stored section whatever happened, so the editor's revision is
+    // always the stored one and approval is judged against what is really saved.
+    if (onApplied) await onApplied();
     return data;
   }, [archived, onApplied, run]);
 

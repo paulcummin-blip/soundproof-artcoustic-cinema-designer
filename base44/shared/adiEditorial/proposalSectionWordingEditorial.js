@@ -609,7 +609,9 @@ async function save({
   // One authoritative revision handoff is the persistence boundary. Never report an accepted edit when
   // the returned stored record contains the body but not the complete Undo marker.
   const persisted = updated?.metadata?.adi_editorial || null;
-  if (updated?.body !== body
+  // The revision handoff stores the validated revision's own rendering of the
+  // wording, so markup may differ from the submitted string; the WORDS must not.
+  if (approvalPlainText(updated?.body) !== approvalPlainText(body)
     || persisted?.previous_body !== previousBody
     || persisted?.source_fingerprint !== sourceFingerprint
     || persisted?.improved_fingerprint !== improvedFingerprint
