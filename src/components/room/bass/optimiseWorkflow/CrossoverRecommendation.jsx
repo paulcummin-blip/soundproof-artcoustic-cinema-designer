@@ -132,7 +132,7 @@ export default function CrossoverRecommendation({
     <p className="text-xs">Primary-seat change: {number(Math.max(0,...(recommended.perSeatP20||[]).filter(s=>s.isPrimary).map(s=>s.variationDbRaw-(baseline?.perSeatP20?.find(b=>b.seatId===s.seatId)?.variationDbRaw??s.variationDbRaw))))} dB maximum regression.</p>
     {stale && <p className="text-xs text-amber-800">Design changed — re-run ADI before applying.</p>}
     {record.status==="applied" && record.appliedCacheKey===shared?.cacheKey && <p className="text-xs text-green-800">Applied — calculated result verified and saved.</p>}
-    {(error||record.error) && <p role="alert" className="text-xs text-red-700">{error||record.error}</p>}
+    {(error||record.error) && <><p role="alert" className="text-xs text-red-700">{error||record.error}</p><details><summary>Verification details</summary><pre className="text-xs whitespace-pre-wrap">{JSON.stringify({settingsMatch:recommendationSettingsMatch(shared?.authoritative,record.expectedConfiguration),actual:extractAuthorityForComparison(shared?.completedBassAuthority),expectedSettings:record.expectedConfiguration,actualSettings:{crossover:shared?.authoritative?.crossover,sources:shared?.authoritative?.sources?.map(s=>({id:s.id,tuning:s.tuning}))}},null,2)}</pre></details></>}
     <div className="flex gap-2">
       <button className="rounded bg-[#213428] px-3 py-2 text-xs text-white disabled:opacity-40" disabled={pending||stale||record.status!=="recommended"} onClick={()=>commitAndVerify(false)}>
         {applying?"Calculating and saving…":"Apply Recommended Settings"}
