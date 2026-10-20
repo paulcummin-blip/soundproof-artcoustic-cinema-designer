@@ -505,6 +505,23 @@ export function highlightParameterFor(key, fallbackArea = null) {
  * is the ONLY place a P-code is printed — it is what tells the reader what each
  * result represents — and no P-code ever enters the document's prose.
  */
+/**
+ * The Spatial Resolution sentence, written ONLY from the saved design: the P2
+ * result's own speaker count (an integrated soundbar's three LCR channels count
+ * as three discrete channels), falling back to the saved channel layout, and the
+ * saved seating row count. Nothing is assumed: an unknown quantity is left out.
+ */
+export function spatialGainSentence(snapshot, p2Row) {
+  const fromP2 = /(\d+)\s*speakers?/i.exec(String(p2Row?.formatted_value ?? p2Row?.value ?? ''));
+  const stored = Number(snapshot?.system?.channel_layout?.total_discrete);
+  const count = fromP2 ? Number(fromP2[1]) : (Number.isFinite(stored) && stored > 0 ? stored : null);
+  const rows = Number(snapshot?.room?.seating?.row_count);
+  const hasRows = Number.isFinite(rows) && rows > 0;
+  const seating = !hasRows ? 'the seating area' : rows === 1 ? 'the seating row' : `all ${rows} seating rows`;
+  if (!count) return `Discrete speaker positions place sound around and above ${seating}.`;
+  return `${count} discrete speaker positions place sound around and above ${seating}.`;
+}
+
 export function buildClientSummaryRows(snapshot) {
   const headlines = Array.isArray(snapshot?.rp22?.parameter_headlines)
     ? snapshot.rp22.parameter_headlines
@@ -540,7 +557,7 @@ export function buildClientSummaryRows(snapshot) {
       // positions it is built from. One entry per line, so neither result hides
       // inside the other.
       result: [`${format}`, `${p2}`].join('\n'),
-      gain: 'Fifteen discrete speaker positions place sound around and above both seating rows.',
+      gain: spatialGainSentence(snapshot, byId.get(2)),
     },
     {
       key: 'client_dynamic',
