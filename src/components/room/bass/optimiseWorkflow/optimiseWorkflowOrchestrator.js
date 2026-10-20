@@ -164,6 +164,13 @@ export async function runOptimisation(opts) {
       startFingerprint,
     });
 
+    const waitedMetrics = {
+      runId, totalWallClockMs: 0,
+      stageSpans: { "stage2-wait": performance.now() - stage2StartedAt },
+      counts: {}, workerCalls: [],
+      stage2: getStage2State(projectId, versionId)?.runtimeDiagnostics || null,
+    };
+    opts.onRuntimeMetrics?.(waitedMetrics);
     if (waitResult.status === "cancelled") {
       setCancelled(projectId, versionId);
       return { status: "cancelled" };

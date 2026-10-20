@@ -110,6 +110,7 @@ export default function useRunOptimisationPlan({
     let measuredRuntime = null;
     let publicationDiagnostics = null;
     const logRunHistory = (facts = {}) => {
+      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
       const timings = getRunTimings(projectId, versionId);
       const live = sharedRef.current;
       Promise.resolve(persistOptimiserRunHistory({
@@ -444,7 +445,7 @@ export default function useRunOptimisationPlan({
       setOptimiserPlanAuthority(projectId, versionId, {
         ...runRecord,
         timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
-        runtimeBreakdown,
+        runtimeBreakdown: { ...runtimeBreakdown, timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)), publication: publicationDiagnostics },
         recommendationPublication,
       });
 
