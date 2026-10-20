@@ -111,7 +111,7 @@ test('single overhead pair P9 N/A survives saved publication restore and passes 
   p.report_snapshot.placedSpeakers = d.placedSpeakers;
   p.engineering_summary.parameterAuthority.p9 = { state: 'na', scope: 'seat', level: null };
   delete p.engineering_summary.roomResultsByParameter[9];
-  p.engineering_summary.project.reportCounts.seatResultsByParameter.p9 = d.seatingPositions.map(s => ({ seatId: s.id, priority: 'primary', state: 'na', status: 'not_applicable', applicable: false, level: 'N/A', value: null, valueFormatted: 'N/A' }));
+  p.engineering_summary.project.reportCounts.seatResultsByParameter.p9 = d.seatingPositions.map((s, i) => ({ seatId: s.id, row: 1, column: i + 1, priority: 'primary', state: 'na', status: 'not_applicable', applicable: false, level: 'N/A', value: null, valueFormatted: 'N/A' }));
   p.parameter_index = buildAtomicParameterIndex(p);
   const restored = copy(p);
   assert.equal(restored.parameter_index.P9.level, 'N/A');
