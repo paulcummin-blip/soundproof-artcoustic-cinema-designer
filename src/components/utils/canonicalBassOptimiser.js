@@ -549,6 +549,12 @@ function buildCanonicalCandidate({
     ? Number(p18RequiredExtensionHz)
     : p18ThresholdHzForLevel(selectedP18Basis, 1);
 
+  // Position-aware P14/P18 capability is independent of candidate EQ: its
+  // authority applies the fixed 3 dB reserve, with zero positive EQ cost.
+  // Resolve it once per candidate pool evaluation; each refinement only
+  // changes the correction receipt. This preserves the exact authority while
+  // avoiding repeated product/transfer interpolation for every trim trial.
+  const pairedCapability = calculatePairedP14P18ProductionAuthority(pairedAuthorityInputs || {});
   const evaluateCandidate = (globalTrimDbOverride) => {
     const realisticResult = predictRealisticPostCalibrationCorrection({
       maximumCapabilityCurve: maximumSplCurveBeforeEq,
@@ -625,11 +631,13 @@ function buildCanonicalCandidate({
     });
 
     // P14 via the SAME paired authority used by production
-    const pairedP14P18Authority = calculatePairedP14P18ProductionAuthority({
-      ...(pairedAuthorityInputs || {}),
-      combinedEqCurve: correctionCurve,
-      selectedCorrectionIdentity: buildCurveSignature(correctionCurve),
-    });
+    const pairedP14P18Authority = {
+      ...pairedCapability,
+      eqHeadroom: {
+        ...pairedCapability.eqHeadroom,
+        selectedCorrectionIdentity: buildCurveSignature(correctionCurve),
+      },
+    };
     const p14Pass = pairedP14P18Authority?.status === "PASS";
     const p14MarginDb = pairedP14P18Authority?.limitingResult?.marginDb ?? null;
     const p14AchievedDb = pairedP14P18Authority?.limitingResult?.worstCapabilityDb ?? null;
