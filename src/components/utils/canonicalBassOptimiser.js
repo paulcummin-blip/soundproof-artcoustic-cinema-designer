@@ -1356,7 +1356,6 @@ export function generateCanonicalCandidatePool({
   // When a generated bank fails validation, create sanitised and cut-only
   // candidates from the same filters. Safe cuts are retained; unsafe boosts
   // are removed. One impossible boost does not discard unrelated valid cuts.
-  for (const candidate of eqCandidates) { candidate.responseBasis = responseBasis; candidate.crossover = crossover; }
   const salvagedCandidates = [];
   const salvageDiagnosticsByProfile = {};
   const salvageTriggerDiagnosticsByProfile = {};
@@ -1507,6 +1506,7 @@ export function generateCanonicalCandidatePool({
     p18TargetBasis,
   });
   const candidates = annotateCandidatePoolForHouseCurveRanking([...eqCandidates, ...salvagedCandidates, identityCandidate]);
+  for (const candidate of candidates) { candidate.responseBasis = responseBasis; candidate.crossover = crossover; }
   const __canonicalTrace__ = {
     receivedCollectDiagnostics: collectDiagnostics,
     profiles: eqResults.map((eq, i) => {

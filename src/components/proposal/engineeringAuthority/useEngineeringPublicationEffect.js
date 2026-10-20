@@ -243,7 +243,7 @@ export function useEngineeringPublicationEffect({
           if (cancelled) return;
           if (record?.current_fingerprint !== bassFingerprint
             || !isAuthoritativeBassContract(record?.completed_by_fingerprint?.[bassFingerprint])) {
-            throw new Error('The current bass assessment has not reached durable storage. Retry publication after calculation completes.');
+            throw new Error('Saved bass verification failed: fingerprint match=' + (record?.current_fingerprint === bassFingerprint) + ', contract present=' + !!record?.completed_by_fingerprint?.[bassFingerprint] + ', authority valid=' + isAuthoritativeBassContract(record?.completed_by_fingerprint?.[bassFingerprint]) + '. Retry publication after calculation completes.');
           }
         }
         // Read the presentation payload at fire time so it reflects the most

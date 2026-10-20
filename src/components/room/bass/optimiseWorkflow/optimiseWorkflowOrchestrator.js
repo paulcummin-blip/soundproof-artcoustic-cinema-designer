@@ -77,11 +77,11 @@ export async function runOptimisation(opts) {
     appState,
   } = opts;
 
-  const rspPosition = buildAuthoritativeRspPosition(
+  const rspPosition = shared?.authoritative?.rspPosition || buildAuthoritativeRspPosition(
     roomDims,
     appState?.mlpY_m,
     appState?.mlpX_m,
-    appState?.designatedRspSeatId,
+    seatingPositions?.find(seat => seat.id === appState?.designatedRspSeatId),
   );
 
   const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
