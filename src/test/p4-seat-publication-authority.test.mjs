@@ -131,7 +131,6 @@ test('TEST 4 — a P4-only blocker is never named inside the bass band', () => {
       fingerprint: 'eng:a',
       message: 'The saved assessment is incomplete (engineering_summary.p4 is not terminal, parameter_index.P4.level is not a terminal published result).',
       missing: [{ key: 'engineering_summary.p4' }, { key: 'parameter_index.P4.level' }],
-      gates: [{ key: 'rp22_terminal', ok: false, detail: 'p4' }],
     },
   });
 
