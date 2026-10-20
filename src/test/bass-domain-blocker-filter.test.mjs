@@ -195,3 +195,14 @@ test('the canonical completeness authority never counts an assumed P15/P21 as mi
     expect(verdict.reason || '').not.toMatch(/\bP15\b|\bP21\b/);
   }
 });
+test('rendered bass status cannot display an old overall waiting list or non-bass note', async () => {
+  const { default: React } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { default: BassAuthorityStateBar } = await import('../components/room/bass/bda/BassAuthorityStateBar.jsx');
+  const html = renderToStaticMarkup(React.createElement(BassAuthorityStateBar, {
+    state: { ...blockedBy({ gates: [gate('rp22_terminal', 'RP22 terminal', 'p4, p9')] }),
+      note: 'Waiting for P9', waitingHeading: 'Overall project waiting for:', waitingItems: ['P4', 'P9'] },
+  }));
+  expect(html).toMatch(/Calculated and saved/);
+  expect(html).not.toMatch(/Overall|Waiting|P4|P9|<ul/);
+});
