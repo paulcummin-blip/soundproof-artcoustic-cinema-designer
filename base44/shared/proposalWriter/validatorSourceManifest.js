@@ -32,21 +32,21 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the shared strength statements are composed from and the rules the writer is
   // held to, so a draft can always be traced to the exact language authority it was
   // written under.
-  'base44/shared/performanceLanguageAuthority.js': '032cc7da62935ec9eb6ea1d8ceb9d4899fa8eda4a1011bb55b6cece10c05b340',
+  'base44/shared/performanceLanguageAuthority.js': '0e815b1800fb1e7dc4eb1f56b7b7024ab6ed410ee84b4b61ebe2f7ac8cae56d2',
   // The narrative steer: the designer's three-state preference over the topics ADI
   // offers. It carries the rule the writer reads — a preference is an ingredient,
   // never a section plan — so a draft can always be traced to the exact steer it was
   // written under. Beside it is the exclusion backstop: the module that removes a
   // sentence about an excluded topic from the client-facing narrative, and touches
   // no evidence, no result and no table while doing it.
-  'base44/shared/proposalWriter/writerNarrativeSteerRules.js': '8cc5516dd1bb99b8a3511cd449eae27e3d43f1e104d18e1a5eb0b819498202f8',
+  'base44/shared/proposalWriter/writerNarrativeSteerRules.js': '1fa28842cc3550cdd01e9c0130b584d1615c981c67a889ee38690d7eb7e14cf0',
   'base44/shared/proposalNarrativeExclusions.js': '5a16e430aa88673e48e72c8fb4ff1b68c0283e7da10eb0199f9ffe37fd035f76',
   // The Design Summary brief for a TV media room: it states the requirement and
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
   'base44/shared/proposalWriter/writerPromptBuilder.js': '91a405ff8bceb9192584a32deef339de6ae72435762dc3bcf0dce0b41e69f709',
-  'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
+  'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
   'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
@@ -78,7 +78,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // proposal is written to, and the approved reference passages it shows instead
   // of any example of wording to avoid. Hashed so a draft can always be traced to
   // the standard it was written under.
-  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': 'c52687eb092f357ffbd8698109b6dc1c64ac0a5161325e258a661cf9eeb446cd',
+  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': 'ea821215f6072b3a6edc23cff344a1a57f1b1303a295970b926ed3b468866c91',
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',

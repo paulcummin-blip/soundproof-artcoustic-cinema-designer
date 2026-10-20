@@ -152,7 +152,7 @@ describe('A. The standard the proposal is written to', () => {
     ]) {
       expect(NATURAL_ALOUD_RULE).not.toContain(avoided);
     }
-    expect(NATURAL_WRITING_REFERENCE_PASSAGES.length).toBe(3);
+    expect(NATURAL_WRITING_REFERENCE_PASSAGES.length).toBe(7);
     expect(NATURAL_WRITING_REFERENCE_PASSAGES[0]).toMatch(/brings the scale and excitement of the big screen into a compact room/);
     expect(NATURAL_WRITING_REFERENCE_PASSAGES[1]).toMatch(/creates a convincing sense of space and movement/);
     expect(NATURAL_WRITING_REFERENCE_PASSAGES[2]).toMatch(/make demanding film soundtracks so enjoyable/);
