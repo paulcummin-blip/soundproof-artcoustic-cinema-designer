@@ -284,16 +284,25 @@ export default function DealerHero() {
         {SP_WORDMARK}
       </span>
 
-      {/* Hero background image — full width, cover, centred, no blur */}
+      {/* Hero background image — full width, cover, centred; blurred/darkened/softened */}
       {heroBg && (
         <>
           <div
-            className="absolute inset-0"
+            data-hero-layer="image"
+            className="absolute"
             style={{
+              // Shared treatment for every hero image (admin and all dealers):
+              // subtle blur, darkening and softened contrast on the image
+              // layer only. Oversized inset hides blurred edges; the
+              // original upload is never modified.
+              top: -16,
+              right: -16,
+              bottom: -16,
+              left: -16,
               backgroundImage: `url(${heroBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "brightness(0.9)",
+              filter: "blur(4px) brightness(0.8) contrast(0.88) saturate(0.92)",
             }}
           />
           {/* Dark overlay — 45–50% to de-emphasise the image */}

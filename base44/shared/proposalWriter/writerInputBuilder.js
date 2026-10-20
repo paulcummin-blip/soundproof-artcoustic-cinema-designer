@@ -119,7 +119,8 @@ function allowedClaim(claim) {
     requested_by: claim?.requested_by ?? null,
     // The saved capability fields (achieved capability, target, levels, basis,
     // headroom, limiting group), each present only where the report states it.
-    ...(claim?.capability ? { capability: { ...claim.capability } } : {}),
+    // dB figures are shown to two decimals so the writer never quotes raw floats.
+    ...(claim?.capability ? { capability: roundCapabilityDb(claim.capability) } : {}),
   };
 }
 
@@ -163,6 +164,15 @@ const NO_OPTION_GUIDANCE_REQUIREMENT =
  *   paragraph, a heading or a claim.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
+const CAPABILITY_DB_FIELDS = ['achieved_capability_db', 'selected_target_db', 'headroom_or_shortfall_db'];
+function roundCapabilityDb(capability) {
+  const out = { ...capability };
+  for (const field of CAPABILITY_DB_FIELDS) {
+    if (typeof out[field] === 'number' && Number.isFinite(out[field])) out[field] = Math.round(out[field] * 100) / 100;
+  }
+  return out;
+}
+
 export function buildWriterInput({
   pack,
   promptVersion = WRITER_PROMPT_VERSION,
