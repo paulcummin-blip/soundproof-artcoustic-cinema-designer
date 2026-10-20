@@ -44,6 +44,7 @@ import { adiSectionContract, buildAdiEditorialPrompt } from '../adiEditorial/adi
 import { ADI_WORDING_OUTCOME, runAdiWordingPass } from '../adiEditorial/adiWordingPass.js';
 import { checkSelectionSpliceConservation } from '../adiEditorial/adiWordingConservation.js';
 import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from '../adiEditorial/adiRejectionDiagnostics.js';
+import { correctSectionFacts } from './adiFactCorrection.js';
 
 /** The action the caller asks for. */
 export const ADI_SECTION_ACTION = Object.freeze({
@@ -216,6 +217,8 @@ export async function improveProposalSectionWording({
       last_gpt_generated_at: marker.previous_last_gpt_generated_at ?? null,
       metadata: {
         ...withoutMarker(section.metadata),
+        ...(Object.prototype.hasOwnProperty.call(marker, 'previous_highlight_rows')
+          ? { highlight_rows: marker.previous_highlight_rows } : {}),
         // Approval is restored only for the exact content previously approved.
         approval: Object.prototype.hasOwnProperty.call(marker, 'previous_approval')
           ? marker.previous_approval
@@ -346,6 +349,25 @@ export async function improveProposalSectionWording({
     return blocked(ADI_SECTION_BLOCK.NOTHING_SELECTED, 400, 'Highlight the text to improve first.');
   }
 
+  // ── FACTS FIRST ──
+  // A statement of speaker count or seating rows that disagrees with the saved
+  // project is corrected from the saved snapshot before any wording is improved,
+  // in the body and in the Key Performance Highlights rows alike. The wording pass
+  // then works on the corrected copy.
+  const factFix = mode === ADI_SECTION_MODE.SECTION && proposal.engineering_snapshot
+    && ['single', 'system_summary'].includes(proposal.proposal_type || 'single')
+    ? correctSectionFacts({
+      body: originalBody,
+      highlightRows: section.metadata?.highlight_rows,
+      snapshot: proposal.engineering_snapshot,
+    })
+    : null;
+  const hasFactFix = Boolean(factFix && factFix.changes.length > 0);
+  const workingBody = hasFactFix ? factFix.body : originalBody;
+  const factExtra = hasFactFix && factFix.highlightRows
+    ? { highlightRows: factFix.highlightRows, previousHighlightRows: section.metadata?.highlight_rows }
+    : {};
+
   const generations = entities.ProposalGeneration?.filter
     ? await entities.ProposalGeneration.filter({ proposal_id: proposalId })
     : [];
@@ -354,13 +376,13 @@ export async function improveProposalSectionWording({
     sectionType: section.section_type,
     sectionLabel: section.title || section.section_type,
     mode: generation ? frozenProposalMode(generation) : 'single',
-    original: mode === ADI_SECTION_MODE.SELECTION ? selection : originalBody,
+    original: mode === ADI_SECTION_MODE.SELECTION ? selection : workingBody,
   });
   const prompt = buildAdiEditorialPrompt({
     sectionContract,
     sectionLabel: section.title || 'this section',
     mode,
-    currentText: mode === ADI_SECTION_MODE.SELECTION ? original : originalBody,
+    currentText: mode === ADI_SECTION_MODE.SELECTION ? original : workingBody,
     selectionText: selection,
     evidenceIdentity: {
       source: 'the version\u2019s frozen system authority',
@@ -378,7 +400,7 @@ export async function improveProposalSectionWording({
     invokeLLM,
     prompt,
     sectionContract,
-    original: mode === ADI_SECTION_MODE.SELECTION ? selection : originalBody,
+    original: mode === ADI_SECTION_MODE.SELECTION ? selection : workingBody,
     mode,
     validate: async (proposed) => {
       const entry = groundingViolationEntry(proposed, grounding);
@@ -403,6 +425,16 @@ export async function improveProposalSectionWording({
     corrected: pass.corrected === true,
     attempt_audit: pass.attempt_audit || [],
   };
+  // The wording pass may leave the copy as it is (or be refused), but a corrected
+  // fact is still saved: the corrected copy stands in as the result.
+  if (pass.outcome !== ADI_WORDING_OUTCOME.IMPROVED && hasFactFix && mode === ADI_SECTION_MODE.SECTION) {
+    const corrected = await save({
+      entities, persistRevision, proposalId, sectionId, section, body: workingBody, now, user, mode,
+      previousBody: originalBody, previousText: original, improvedText: readable(workingBody),
+      ...factExtra,
+    });
+    return result({ ...corrected, action, mode, ...telemetry });
+  }
   if (pass.outcome !== ADI_WORDING_OUTCOME.IMPROVED) {
     return result({
       applied: false,
@@ -436,6 +468,7 @@ export async function improveProposalSectionWording({
   const write = await save({
     entities, persistRevision, proposalId, sectionId, section, body: pass.text, now, user, mode,
     previousBody: originalBody, previousText: original, improvedText: readable(pass.text),
+    ...factExtra,
   });
   return result({ ...write, action, mode, ...telemetry });
 }
@@ -516,6 +549,8 @@ async function save({
   previousBody,
   previousText,
   improvedText,
+  highlightRows = null,
+  previousHighlightRows = null,
 }) {
   const sourceFingerprint = publishedSectionFingerprint(previousText);
   const improvedFingerprint = publishedSectionFingerprint(improvedText);
@@ -532,6 +567,8 @@ async function save({
     // Kept for the existing revision-identity readers.
     source_revision: sourceFingerprint,
     improved_revision: improvedFingerprint,
+    // The corrected table rows replace the stored ones; the stored ones are kept for Undo.
+    ...(highlightRows ? { previous_highlight_rows: previousHighlightRows ?? null } : {}),
   };
   const patch = {
     body,
@@ -541,6 +578,7 @@ async function save({
     last_gpt_generated_at: now,
     metadata: {
       ...(section.metadata && typeof section.metadata === 'object' ? section.metadata : {}),
+      ...(highlightRows ? { highlight_rows: highlightRows } : {}),
       adi_editorial: marker,
     },
   };

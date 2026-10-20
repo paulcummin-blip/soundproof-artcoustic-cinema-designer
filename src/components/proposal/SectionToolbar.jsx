@@ -1,7 +1,7 @@
 import React from 'react';
-import { PenLine, Plus, Minus, Wrench, Home, RefreshCw, Lock, Unlock, StickyNote, Pencil, Check, X, Loader2, ShieldCheck, Sparkles, Undo2 } from 'lucide-react';
+import { Pencil, Check, X, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
-import { REGENERATION_ACTIONS } from '@/components/proposal/proposalSections';
+import SectionToolbarMore from '@/components/proposal/SectionToolbarMore';
 import { MANUAL_EDIT_LABEL } from '@/components/proposal/proposalManualEdit';
 import {
   APPROVAL_STATUS,
@@ -9,8 +9,6 @@ import {
   approvalLabel,
   approvalMarker,
 } from '@/components/proposal/editor/sectionApprovalPresentation';
-
-const ICONS = { PenLine, Plus, Minus, Wrench, Home, RefreshCw };
 
 /**
  * Floating section toolbar — appears when a section is active.
@@ -165,7 +163,7 @@ export default function SectionToolbar({
             type="button"
             onClick={() => onImproveWording()}
             disabled={isImprovingWording}
-            title="Polish the client wording without changing the engineering."
+            title="Improve clarity and tone, and correct statements that disagree with the saved project data."
             data-adi-improve="section"
             className="flex items-center gap-1 px-2 py-1 text-xs font-semibold whitespace-nowrap text-[#213428] bg-[#EAF0EC] border border-[#BFCFC4] hover:bg-[#DDE8E0] rounded transition-colors disabled:opacity-50"
           >
@@ -174,76 +172,22 @@ export default function SectionToolbar({
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            Improve wording with ADI
+            Improve with ADI
           </button>
-          {canUndoAdi && (
-            <button
-              type="button"
-              onClick={() => onUndoWording?.()}
-              disabled={isImprovingWording}
-              title="Put back the wording ADI replaced"
-              data-adi-undo="section"
-              className="flex items-center gap-1 px-2 py-1 text-xs text-[#3E4349] hover:bg-[#F5F4F0] rounded transition-colors disabled:opacity-50"
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-              Undo
-            </button>
-          )}
-          <div className="w-px h-5 bg-[#DCDBD6]" />
         </>
       )}
 
-      {/* Regeneration actions */}
-      {REGENERATION_ACTIONS.map((action) => {
-        const Icon = ICONS[action.icon] || PenLine;
-        return (
-          <button
-            key={action.value}
-            type="button"
-            onClick={() => onRegenerate(action.value)}
-            disabled={isRegenerating}
-            title={action.label}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-[#3E4349] hover:bg-[#F5F4F0] rounded transition-colors disabled:opacity-50"
-          >
-            <Icon className="w-3.5 h-3.5" />
-            {action.label}
-          </button>
-        );
-      })}
-
-      <div className="w-px h-5 bg-[#DCDBD6]" />
-
-      {/* Lock toggle */}
-      <button
-        type="button"
-        onClick={onToggleLock}
-        title={section?.locked ? 'Unlock section' : 'Lock section'}
-        className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-          section?.locked
-            ? 'text-[#213428] font-semibold bg-[#F5F4F0]'
-            : 'text-[#3E4349] hover:bg-[#F5F4F0]'
-        }`}
-      >
-        {section?.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-        {section?.locked ? 'Locked' : 'Lock'}
-      </button>
-
-      <div className="w-px h-5 bg-[#DCDBD6]" />
-
-      {/* Dealer notes toggle */}
-      <button
-        type="button"
-        onClick={onToggleNotes}
-        title="Dealer Notes"
-        className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-          section?.dealer_notes
-            ? 'text-[#625143] font-semibold bg-[#F5F4F0]'
-            : 'text-[#3E4349] hover:bg-[#F5F4F0]'
-        }`}
-      >
-        <StickyNote className="w-3.5 h-3.5" />
-        Notes
-      </button>
+      {/* Everything else lives in one compact menu */}
+      <SectionToolbarMore
+        section={section}
+        onRegenerate={onRegenerate}
+        isRegenerating={isRegenerating}
+        onToggleLock={onToggleLock}
+        onToggleNotes={onToggleNotes}
+        onUndoWording={onImproveWording ? onUndoWording : null}
+        canUndoAdi={canUndoAdi}
+        isImprovingWording={isImprovingWording}
+      />
 
       {isManuallyEdited && !isEditing && (
         <>
