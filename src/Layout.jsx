@@ -52,7 +52,7 @@ const menuItems = [
   { title: "Room Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
   { title: "Project Library", url: "/ProjectProposalAssets", icon: Images, capability: "soundProof" },
   { title: "Proposal Centre", url: "/ProposalCentre", icon: Presentation, capability: "soundProof" },
-  { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
+  { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof", adminOnly: true },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
   { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },
   { title: "Dealer Branding", url: "/DealerBranding", icon: Palette, capability: "soundProof" },
