@@ -28,3 +28,14 @@ test("applied verification checks crossover and absolute subwoofer tuning",()=>{
  assert.equal(recommendationSettingsMatch(actual,{crossover:{...crossover,subwooferFrequencyHz:160},tuning:[tuning]}),false);
  assert.equal(recommendationSettingsMatch(actual,{crossover,tuning:[{...tuning,delayMs:8}]}),false);
 });
+import { buildPersistedBassAuthority } from '../src/components/room/bass/completedBassResultPersistence.js';
+import { COMPLETED_BASS_CACHE_VERSION, INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from '../src/lib/bassAuthorityVersion.js';
+test('large completed cache preserves current and previous contracts without rewriting eight full histories',()=>{
+ const snapshots=Object.fromEntries(Array.from({length:8},(_,i)=>['fp'+i,{job:{completedAtMs:i},graphPayload:{data:'x'.repeat(520000)}}]));
+ const existing={version:COMPLETED_BASS_CACHE_VERSION,instanceAuthorityVersion:INSTANCE_AUTHORITY_VERSION,metricSchemaVersion:RP22_BASS_METRIC_SCHEMA_VERSION,completedByFingerprint:snapshots};
+ const saved=buildPersistedBassAuthority(existing,'fp0');
+ assert.equal(saved.status,'complete');
+ assert.equal(saved.completedByFingerprint.fp0,snapshots.fp0);
+ assert.equal(saved.completedByFingerprint.fp7,snapshots.fp7);
+ assert.ok(JSON.stringify(saved).length<1250000);
+});

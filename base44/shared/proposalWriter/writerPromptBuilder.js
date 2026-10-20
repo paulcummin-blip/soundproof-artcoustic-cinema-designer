@@ -31,6 +31,11 @@
  */
 
 import { buildProposalWritingAuthority } from '../soundProofWritingAuthority.js';
+// THE CLIENT NARRATIVE PRIORITY, section by section: which client question each
+// section answers and what its copy leads on. The proposal authority already
+// carries the priority itself; this adds only the per-section emphasis, and it
+// changes no section structure, no word limit and no evidence rule.
+import { clientSectionEmphasisLines } from '../clientNarrativePriority.js';
 import { SOUND_PROOF_DESIGN_PHILOSOPHY } from '../designPhilosophyAuthority.js';
 import { clientStoryPillarLines } from '../narrativePillarGrouping.js';
 // The Sound Proof Natural Writing Standard: the editorial instructions this

@@ -133,6 +133,10 @@ export const ADI_EDITORIAL_STANDARD = [
   'remarkably stable, exceptionally precise, great speaker spacing, powerful capability,',
   'considerable reserve, highly immersive, seamless movement, serious cinema-level.',
   'State the relationship or the result instead.',
+  '',
+  // THE CLIENT NARRATIVE PRIORITY, in its editorial form: it orders the meaning
+  // the copy already carries, and it may never add one.
+  ADI_NARRATIVE_EMPHASIS,
 ].join('\n');
 
 /**
