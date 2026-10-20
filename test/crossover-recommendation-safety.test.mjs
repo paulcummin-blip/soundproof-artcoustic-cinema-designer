@@ -1,0 +1,30 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { integrationSafetyIssues } from "../src/components/room/bass/improveBassV2/crossoverIntegrationSearch.js";
+import { confirmedCalibrationCandidates } from "../src/components/room/bass/optimiseWorkflow/adiCalibrationCandidateSelection.js";
+import { recommendationResultMatches, recommendationSettingsMatch } from "../src/components/room/bass/optimiseWorkflow/crossoverApplicationVerification.js";
+const baseline={achievedP19VariationDb:1,achievedP20VariationDb:8,p14HeadroomDb:5,assessmentStartHz:20,assessmentEndHz:160,perSeatP20:[{seatId:"a",isPrimary:true,variationDbRaw:8}],physicalValidation:{passed:true}};
+const candidate={...baseline,achievedP20VariationDb:6,perSeatP20:[{seatId:"a",isPrimary:true,variationDbRaw:6}]};
+test("joint recommendation protects complete seat evidence and fixed band",()=>{
+ assert.deepEqual(integrationSafetyIssues(baseline,candidate),[]);
+ for(const patch of [{perSeatP20:[]},{assessmentEndHz:NaN},{perSeatP20:[{seatId:"a",isPrimary:false,variationDbRaw:6}]},{perSeatP20:[{seatId:"a",isPrimary:true,variationDbRaw:NaN}]},{p14HeadroomDb:3},{achievedP19VariationDb:2}]) assert.ok(integrationSafetyIssues(baseline,{...candidate,...patch}).length);
+});
+test("joint Apply owns the whole recommendation, preventing partial auto-apply",()=>{
+ assert.deepEqual(confirmedCalibrationCandidates({selection:{integrationRecommendation:{integrationVerified:true},calibrationResult:{candidateId:"delay",appliedTuning:[{delayMs:2}]}}}),[]);
+});
+const expected={...candidate,p14AchievedDb:120,achievedP18Hz:25};
+const authority={contract:{selectedCandidate:{perSeatP20Results:candidate.perSeatP20,achievedP14Db:120,achievedP18FrequencyHz:25},productAnalysis:{parameters:{p19:{variationDbRaw:1,level:4},p20:{variationDbRaw:6,level:2},p18:{value:25}}}}};
+test("applied verification compares canonical headline and every seat",()=>{
+ assert.equal(recommendationResultMatches(authority,expected),true);
+ assert.equal(recommendationResultMatches(authority,{...expected,achievedP20VariationDb:7}),false);
+ assert.equal(recommendationResultMatches(authority,{...expected,perSeatP20:[{...candidate.perSeatP20[0],variationDbRaw:NaN}]}),false);
+ assert.equal(recommendationResultMatches(authority,{...expected,p14AchievedDb:NaN}),false);
+});
+test("applied verification checks crossover and absolute subwoofer tuning",()=>{
+ const crossover={frequencyHz:160,subwooferFrequencyHz:150,speakerHpSlopeDbPerOct:24,subwooferLpSlopeDbPerOct:12};
+ const tuning={sourceId:"sub-a",gainDb:-1,delayMs:7,phaseControlDeg:60,polarity:180};
+ const actual={crossover,sources:[{id:"sub-a",tuning}]};
+ assert.equal(recommendationSettingsMatch(actual,{crossover,tuning:[tuning]}),true);
+ assert.equal(recommendationSettingsMatch(actual,{crossover:{...crossover,subwooferFrequencyHz:160},tuning:[tuning]}),false);
+ assert.equal(recommendationSettingsMatch(actual,{crossover,tuning:[{...tuning,delayMs:8}]}),false);
+});
