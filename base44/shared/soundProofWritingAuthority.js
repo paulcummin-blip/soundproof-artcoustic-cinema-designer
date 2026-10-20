@@ -27,6 +27,44 @@
 import { CLIENT_FACING_CALIBRATION_LANGUAGE } from './clientFacingCalibrationLanguage.js';
 import { clientBenefitIntentLines } from './rp22ClientBenefitIntent.js';
 import { absentFeatureFramingRule } from './proposalWriter/absentFeatureFraming.js';
+// THE CLIENT NARRATIVE PRIORITY: experience first, then the design that supports
+// it, then the engineering evidence beneath it. One priority, shared by the
+// proposal and the report, and stated once here rather than restated per section.
+import {
+  buildClientNarrativePriorityBlock,
+  CLIENT_NARRATIVE_SMELL_TEST,
+} from './clientNarrativePriority.js';
+
+/**
+ * The proposal's own sections, in the order the priority block names them. Only
+ * these are printed, so the proposal reads the emphasis it writes.
+ */
+const PROPOSAL_NARRATIVE_SECTIONS = Object.freeze([
+  'system_design_summary',
+  'spatial_resolution',
+  'dynamic_range',
+  'timbre_matching',
+  'overall_design',
+  'key_performance_highlights',
+]);
+
+/** The report's own section: the Design Intent, and the interpretation it carries. */
+const REPORT_NARRATIVE_SECTIONS = Object.freeze(['design_intent']);
+
+/** The priority, composed for the client-facing proposal. */
+export function proposalNarrativePriority() {
+  return buildClientNarrativePriorityBlock({ sections: PROPOSAL_NARRATIVE_SECTIONS });
+}
+
+/** The priority, composed for the client-facing report surfaces. */
+export function reportNarrativePriority() {
+  return buildClientNarrativePriorityBlock({ sections: REPORT_NARRATIVE_SECTIONS });
+}
+
+/** The smell test, numbered on from wherever the caller's own check ends. */
+export function narrativeSmellTestLines(startAt = 1) {
+  return CLIENT_NARRATIVE_SMELL_TEST.map((question, index) => `${startAt + index}. ${question}`);
+}
 
 // The performance language register: how strong the copy may be, decided by the
 // result the evidence states. The proposal carries it so the writer's own prose
@@ -722,5 +760,5 @@ export function buildProposalWritingAuthority() {
   }
   const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
   const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
-  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${DESIGN_INTENT_WRITING}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
+  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${proposalNarrativePriority()}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${DESIGN_INTENT_WRITING}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
 }

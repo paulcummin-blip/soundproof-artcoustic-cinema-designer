@@ -32,7 +32,7 @@
 
 import { PROPOSAL_STAGE_BOUNDARY } from './proposalStageBoundary.js';
 import { P20_USE_RULE, P20_OMIT_RULE } from './adiReportEvidenceRules.js';
-import { SOUND_PROOF_WRITING_AUTHORITY, WRITING_AUTHORITY_SELF_CHECK, DESIGN_INTENT_WRITING } from './soundProofWritingAuthority.js';
+import { SOUND_PROOF_WRITING_AUTHORITY, WRITING_AUTHORITY_SELF_CHECK, DESIGN_INTENT_WRITING, reportNarrativePriority, narrativeSmellTestLines } from './soundProofWritingAuthority.js';
 import { buildHighChannelContractBlock } from './highChannelDensityRule.js';
 
 /** Banned words and phrases. Never used in generated prose. */
@@ -493,6 +493,8 @@ const FINAL_SELF_CHECK = [
   '24. Does the opening state the real screen size/format, system layout, seating arrangement and main product families before any evaluative language?',
   '25. Is every generic claim ("convincing sense of movement", "reference-style", "future-proof", "strong foundation") replaced with the specific channel count, position or mechanism that actually causes it, or removed?',
   ...WRITING_AUTHORITY_SELF_CHECK.map((question, index) => `${26 + index}. ${question}`),
+  // The narrative smell test: run privately on the finished copy, never printed.
+  ...narrativeSmellTestLines(26 + WRITING_AUTHORITY_SELF_CHECK.length),
 ].join('\n');
 
 /**
