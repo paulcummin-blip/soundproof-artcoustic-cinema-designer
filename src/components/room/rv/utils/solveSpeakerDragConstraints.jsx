@@ -147,7 +147,8 @@ export function solveSpeakerDragConstraints({
     const freeMoveRight = { min: screenCenterX_m + eps, max: widthM - halfW - eps };
 
     let leftClamp, rightClamp;
-    if (freeMoveLcr || !constraintZones?.FL || !constraintZones?.FR) {
+    // RP22 zones are advisory only: FL/FR always move freely across the front wall.
+    if (true) {
       leftClamp  = freeMoveLeft;
       rightClamp = freeMoveRight;
     } else {
