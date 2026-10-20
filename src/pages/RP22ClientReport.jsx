@@ -26,6 +26,7 @@ import ClientReportPrintStyles from "@/components/report/client/ClientReportPrin
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
 import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
+import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
 import AdiPreparingPopup from "@/components/report/projectReport/AdiPreparingPopup";
 import {
   readReportActionIntent,
@@ -716,6 +717,34 @@ export default function RP22ClientReport() {
   // updated report is prepared automatically and replaces the previous one. Only
   // an update that cannot be finished reaches the screen, with Retry.
   const staleSavedReport = reportSnapshot.status === REPORT_SNAPSHOT_STATUS.STALE;
+
+  // Project Documents update: a current report also brings this version's Speaker
+  // Design up to date when it is missing or made for another design fingerprint.
+  useAutoStoreSpeakerDesign({
+    enabled: reportReady && !staleSavedReport && !!reportSnapshot.saved?.id && filenameIdentity.ready,
+    projectId,
+    versionId: authority.versionId || null,
+    engineeringFingerprint: snapshotFingerprints.engineeringFingerprint || null,
+    storeParameters: {
+      groups: speakerDesignCompanion.groups,
+      layout: speakerDesignCompanion.layout || null,
+      projectName: filenameIdentity.projectName || projectDetails?.name,
+      dealerName: filenameIdentity.dealerName,
+      clientName: filenameIdentity.clientName,
+      projectReference: filenameIdentity.projectReference,
+      versionName,
+      versionNumber,
+      projectId,
+      accountId: projectDetails?.account_id || null,
+      resolveSource: () => ({
+        versionId: authority.versionId || null,
+        selectedVersionIds: authority.versionId ? [authority.versionId] : [],
+        sourceRecordId: reportSnapshot.saved?.id || null,
+        sourceFingerprints: snapshotFingerprints,
+        sourceStatusAtExport: 'current',
+      }),
+    },
+  });
   const reportRegenerable = reportReady && orderedPages.length > 0;
   const autoUpdate = useAutoUpdateStaleReport({
     // The Project Library's own "update report" link already asks for this same
