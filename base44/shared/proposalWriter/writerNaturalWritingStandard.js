@@ -44,7 +44,7 @@
  * deterministic readings are untouched, and no word limit, section identity,
  * claim ground or validation rule moved.
  */
-export const NATURAL_WRITING_STANDARD_VERSION = 3;
+export const NATURAL_WRITING_STANDARD_VERSION = 4;
 
 /** The character the punctuation rule refuses: never written in client copy. */
 export const EM_DASH_CHARACTER = '\u2014';
@@ -139,6 +139,17 @@ export const NATURAL_MEASURED_LANGUAGE_RULE = 'MEASURED VOCABULARY, NOT SUPERLAT
  * arrangement is stated as what it is.
  */
 export const NATURAL_RECORDED_REASON_RULE = 'STATE WHAT IS THERE, NEVER WHY IT MIGHT HAVE BEEN CHOSEN: this copy carries the design reasons the brief and the clarifications actually record, and no others. Where a decision has a recorded reason, give it. Where none is recorded, state the arrangement itself, plainly and factually, and say nothing about why it was chosen: "The system uses six overhead channels across the two seating rows." is complete, whereas "six overheads were chosen specifically to eliminate a gap through the centre of the room" invents a reason the evidence does not carry. Never write to ensure, in order to, so that or deliberately in front of a decision whose reason is not recorded, and never invent a constraint, a client wish, a conversation or a site condition. A missing reason is not a gap to fill: it is simply not available from the current brief, so it is left out of the copy rather than guessed at or apologised for.';
+
+/**
+ * v4 (client writing quality): what each core section is FOR, so every section
+ * contributes its own idea, and an editorial review that removes repetition,
+ * awkward phrasing and unsupported claims before copy is accepted. It carries no
+ * figure or fact; it only governs how the supplied evidence is explained.
+ */
+export const NATURAL_SECTION_RESPONSIBILITY_RULE = 'WHAT EACH SECTION IS FOR (one job each, written for a homeowner, architect or interior designer): Why This Specification explains why this combination of equipment, screen and layout suits this room and the client\'s intended use. Spatial Resolution explains how the speaker placement supports pinpoint localisation, smooth movement of sound and immersion, and relates it to the physical listening area. Dynamic Range explains clarity at normal levels, the output reserve available, demanding soundtrack moments and what the bass contributes, and claims only the output the evidence supports. Timbre Matching explains consistent tonal character within each speaker group and across the seating, and keeps consistency within a group distinct from matching across different groups. Key Performance Highlights introduces the table (the table is always kept) by drawing out the few strengths that matter most in practice, without retelling the report. Overall Design brings the design intent and principal benefits together and explains why the solution is appropriate, without summarising every earlier section again. Every paragraph adds a new idea; translate every score into what the listener experiences; prefer a plain explanation to technical vocabulary; and state the design\'s compromises as honestly as its strengths.';
+
+/** The editorial pass applied to the finished copy before it is returned. */
+export const NATURAL_EDITORIAL_REVIEW_RULE = 'EDITORIAL REVIEW BEFORE YOU RETURN THE COPY: (1) list the single idea each paragraph carries and delete or merge any idea that appears twice, in this section or in another; (2) replace any phrase a client would find awkward, stiff or technical with the plain way a designer would say it; (3) remove any claim, quantity, seating arrangement or capability the evidence does not state, and any wording that sounds stronger than the result it describes; (4) check that no opening phrase, closing flourish or favourite adjective is shared by two sections; (5) confirm the speaker configuration, number of seating rows and every quantity match the supplied evidence exactly. Apply the corrections silently and return only the finished copy.';
 
 /** The review the writer applies to the whole document before returning it. */
 export const NATURAL_WRITING_REVIEW = Object.freeze([

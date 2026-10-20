@@ -152,6 +152,7 @@ export function buildAdiEditorialPrompt({
     'Every number, every level, every product name, every seating scope, every limitation and every assumption stays exactly as it is. If a sentence states a limit, a caveat or an assumption, the improved sentence states it too.',
     'You may combine, shorten or remove a sentence that adds only repetition, rhetoric or unsupported qualitative explanation. Preserve every supported engineering fact, figure, product, scope, result and genuine limitation.',
     'Read the copy for repetition first. Where the same idea (for example everyday viewing, films, or surround sound) is described more than once, state it once, in the place it fits best, and use the freed space for smoother flow. Keep each required heading and its paragraphs; do not move meaning between headings.',
+    'Judge the copy against the Sound Proof client writing standard: it should read as an experienced cinema designer explaining the design to a homeowner, with each paragraph carrying one new idea, plain wording instead of technical vocabulary, and no claim stronger than the evidence already in the copy. Improve it where it falls short, without adding any fact, figure or product the copy does not already state.',
     'Return the copy unchanged only if it genuinely has no repetition or awkward wording.',
     RULE,
     '',

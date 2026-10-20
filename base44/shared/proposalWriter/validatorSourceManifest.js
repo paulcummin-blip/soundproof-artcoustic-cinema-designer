@@ -78,7 +78,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // proposal is written to, and the approved reference passages it shows instead
   // of any example of wording to avoid. Hashed so a draft can always be traced to
   // the standard it was written under.
-  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': '499a974b496eb402c14487f6245793f5f3078a91d97a68a9c282241ac5a57aa8',
+  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': 'c52687eb092f357ffbd8698109b6dc1c64ac0a5161325e258a661cf9eeb446cd',
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',

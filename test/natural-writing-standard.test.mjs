@@ -95,7 +95,7 @@ describe('A. The standard the proposal is written to', () => {
     expect(STANDARD_TEXT).toMatch(/natural, confident, professional British English/);
     expect(STANDARD_TEXT).toMatch(/never as an engineering report, a marketing brochure, a software generated assessment, a technical validator or an assistant/);
     expect(STANDARD_TEXT).toMatch(/never forcing a contraction into a formal passage/);
-    expect(NATURAL_WRITING_STANDARD_VERSION).toBe(3);
+    expect(NATURAL_WRITING_STANDARD_VERSION).toBe(4);
   });
 
   it('states the sentence craft and the connectives it refuses', () => {

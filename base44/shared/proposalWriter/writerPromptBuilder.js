@@ -50,6 +50,8 @@ import {
   NATURAL_RECORDED_REASON_RULE,
   NATURAL_RECOMMENDATION_RULE,
   NATURAL_REPETITION_RULE,
+  NATURAL_SECTION_RESPONSIBILITY_RULE,
+  NATURAL_EDITORIAL_REVIEW_RULE,
   NATURAL_SELECTION_RULE,
   NATURAL_SENTENCE_RULE,
   NATURAL_VOICE_RULE,
@@ -283,6 +285,7 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     'Where the lower-priced option leads on one isolated result, state it accurately and then say what it means, so it is never left as a bare concession: give the result, the significance, and the difference that matters more to the client.',
     'HUMAN SALES POLISH: no sentence of 10 or more words may appear verbatim in two sections. Never copy a complete evidence sentence between sections or change only a few words. Its statement is evidence, not mandatory prose. Preserve every fact, scope and claim ID while writing naturally.',
     NATURAL_REPETITION_RULE,
+    NATURAL_SECTION_RESPONSIBILITY_RULE,
     'DESIGN JUDGEMENT: design_interpretation carries a design_philosophy block: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage approach, the bass approach, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits this brief. Explain that reasoning where it is recorded, and never invent a reason, a priority, a budget or a decision it does not record. The best design is the one that most effectively satisfies the brief while balancing performance, practicality, aesthetics and cost, so a result below the highest available level is a legitimate design decision rather than a failure. Never present the highest available level as the objective regardless of cost or practical consequence.',
     'WHY THIS SPECIFICATION CARRIES THE JUDGEMENT: it is the strongest expression of professional design judgement in the document. It explains why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. It reads as considered professional judgement from an experienced cinema designer, never as a list of products.',
     'VALUE ENGINEERING STAYS INTERNAL Reasoning: where the interpretation records that the design already takes an improvement without substantial additional expenditure, say what it gives the client in this room. Where an opportunity remains a design choice, say nothing about it. This proposal describes the finished design, so an opportunity is never written as an instruction to change the design, a next step, a future correction or an upgrade path.',
@@ -345,6 +348,7 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     // finished document: read every section together, answer the review for
     // yourself, refine the wording and print none of it.
     ...NATURAL_WRITING_REVIEW,
+    NATURAL_EDITORIAL_REVIEW_RULE,
     'Before returning, rewrite any section that merely reads a story statement aloud. Preserve the ranked evidence and its grounding, not its report-style phrasing. Earlier examples containing raw levels are illustrations of evidence, not text to reuse in prose.',
     'Confirm every reason the copy gives for a decision is one the design_philosophy block records, and that no reason was invented for a result the interpretation does not explain.',
     'Confirm the copy never states that something still needs doing, never promises a free improvement, and never treats a higher price as better value on its own.',
