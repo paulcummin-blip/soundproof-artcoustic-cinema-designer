@@ -31,5 +31,11 @@ export function neutraliseDesignStateForNewVersion(designState) {
     next.subwooferInstances = neutraliseSubwooferTuning(next.subwooferInstances);
   }
   if ("applied_calibration" in next) next.applied_calibration = null;
+  // Bass isolation: the new version starts with no inherited ADI optimiser
+  // plan, recommendation or seating-apply status. Layout, positions and
+  // crossover are kept. Results are cached per version id, so the new version
+  // shows "Calculate Bass Results" until it is calculated and optimised itself.
+  if ("optimiser_plan" in next) next.optimiser_plan = null;
+  if ("applied_seating_provenance" in next) next.applied_seating_provenance = null;
   return next;
 }
