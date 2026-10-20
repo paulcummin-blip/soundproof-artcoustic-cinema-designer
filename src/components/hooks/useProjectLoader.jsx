@@ -25,7 +25,7 @@ import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire
 import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
 import { useOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
-import { serializeOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { serializeOptimiserPlan, acknowledgeOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 import {
   COMMERCIAL_BLOCK_REASON,
   clearCommercialEdits,
@@ -805,7 +805,9 @@ appState, // Pass appState directly for setters
         const sharedData = buildSharedUpdate(data);
         await Project.update(effectiveProjectId, sharedData);
         if (activeVersionIdRef.current) {
-          await base44.entities.ProjectVersion.update(activeVersionIdRef.current, { design_state: designState });
+          const savedVersionId = activeVersionIdRef.current;
+          await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designState });
+          acknowledgeOptimiserPlanSave(effectiveProjectId, savedVersionId, designState.optimiser_plan);
         }
 
         // If the project switched while we were awaiting, our write is stale —
@@ -1147,7 +1149,9 @@ appState, // Pass appState directly for setters
         const sharedDataMS = buildSharedUpdate(projectData);
         savedProject = await Project.update(effectiveProjectId, sharedDataMS);
         if (activeVersionIdRef.current) {
-          await base44.entities.ProjectVersion.update(activeVersionIdRef.current, { design_state: designStateMS });
+          const savedVersionId = activeVersionIdRef.current;
+          await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designStateMS });
+          acknowledgeOptimiserPlanSave(effectiveProjectId, savedVersionId, designStateMS.optimiser_plan);
         }
 
         // If the project switched while we were awaiting, do not stamp state.

@@ -13,12 +13,14 @@
 
 import { evaluateStage2Placement, evaluateStage2Confirmation, evaluateStage2ConfirmationWithTuning } from "./stage2CanonicalEvaluation";
 
+import { setRoomSimulationObserver } from "../improveBassV2/improveBassV2RuntimeMetrics";
 self.onmessage = (event) => {
   const { requestId, fingerprint, phase, finalist, rawTransfer, tuningVariant, tuning, ...params } = event.data || {};
   if (!requestId) {
     self.postMessage({ type: "error", requestId: null, error: "Missing requestId" });
     return;
   }
+  setRoomSimulationObserver(kind => self.postMessage({ type: "diagnostic", requestId, fingerprint, counts: { [kind]: 1 } }));
   try {
     if (phase === "placement") {
       const result = evaluateStage2Placement({ finalist, ...params });

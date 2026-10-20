@@ -101,6 +101,7 @@ export function publishHydratedStage2(projectId, versionId, fingerprint, results
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
+    runtimeDiagnostics: results?.runtime_diagnostics || null,
     completedJobs: results?.canonical_jobs_run || 0,
     totalJobsPlanned: results?.canonical_jobs_run || 0,
     phase: "ready",
@@ -169,6 +170,7 @@ function publishStage2Progress(projectId, versionId, fingerprint, results, place
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
+    runtimeDiagnostics: results?.runtime_diagnostics || null,
     completedJobs: results?.completed_jobs || 0,
     totalJobsPlanned: results?.total_jobs_planned || 0,
     phase: results?.phase || "preparing",
@@ -191,6 +193,7 @@ function publishStage2Complete(projectId, versionId, fingerprint, results, place
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
+    runtimeDiagnostics: results?.runtime_diagnostics || null,
     completedJobs: results?.completed_jobs ?? results?.canonical_jobs_run ?? 0,
     totalJobsPlanned: results?.total_jobs_planned ?? results?.canonical_jobs_run ?? 0,
     phase: "ready",
@@ -225,6 +228,7 @@ export class Stage2PlacementController {
     this.quantityOrder = [];
     this.startTime = 0;
     this.canonicalJobsRun = 0;
+    this.runtimeDiagnostics = { roomSimulationCalls: 0, placementCount: 0, confirmationCount: 0, placementMs: 0, confirmationMs: 0 };
     this.completedJobs = 0;
     this.totalJobsPlanned = 0;
     // B last-resort state
@@ -279,6 +283,7 @@ export class Stage2PlacementController {
     this.confirmationQueued = {}; // track per-qty: confirmation already queued?
     this.quantityPlacementProcessed = {}; // qty -> count of processed (cached + completed + failed)
     this.canonicalJobsRun = 0;
+    this.runtimeDiagnostics = { roomSimulationCalls: 0, placementCount: 0, confirmationCount: 0, placementMs: 0, confirmationMs: 0 };
     this.completedJobs = 0;
     this.totalJobsPlanned = 0;
     this.confirmationJobsPlanned = 0;
@@ -493,7 +498,7 @@ export class Stage2PlacementController {
 
   dispatchToWorker(workerIndex, job) {
     const requestId = `stage2-${++this.requestSequence}`;
-    this.activeJobs.set(workerIndex, { requestId, ...job });
+    this.activeJobs.set(workerIndex, { requestId, ...job, startedAt: now() });
     // seatPriorityMap is a Map used only by the controller for ranking —
     // do not send it to the worker (it would be structured-cloned unnecessarily).
     const { seatPriorityMap, ...workerParams } = this.params;
@@ -568,6 +573,13 @@ export class Stage2PlacementController {
       this.activeJobs.delete(workerIndex);
       return;
     }
+    if (message.type === "diagnostic") {
+      const active = this.activeJobs.get(workerIndex);
+      if (active?.requestId !== message.requestId) return;
+      for (const [key, value] of Object.entries(message.counts || {}))
+        this.runtimeDiagnostics[key] = (this.runtimeDiagnostics[key] || 0) + value;
+      return;
+    }
     // Delegate to the shared terminal settlement path.
     this.settleJob(workerIndex, {
       type: message.type,
@@ -616,6 +628,8 @@ export class Stage2PlacementController {
 
     this.completedJobs++;
     this.canonicalJobsRun++;
+    this.runtimeDiagnostics[phase + "Count"] = (this.runtimeDiagnostics[phase + "Count"] || 0) + 1;
+    this.runtimeDiagnostics[phase + "Ms"] = (this.runtimeDiagnostics[phase + "Ms"] || 0) + Math.max(0, now() - active.startedAt);
 
     // ── Placement phase: cache raw transfer ──────────────────────────────
     if (phase === "placement") {
@@ -795,6 +809,7 @@ export class Stage2PlacementController {
     const activeQuantities = [...this.activeJobs.values()].map((job) => job.quantity).filter(Number.isFinite);
     const nextQuantity = activeQuantities[0] ?? this.queue[0]?.quantity ?? null;
     results.canonical_jobs_run = this.canonicalJobsRun;
+    results.runtime_diagnostics = { ...this.runtimeDiagnostics };
     results.completed_jobs = this.completedJobs;
     results.total_jobs_planned = this.totalJobsPlanned;
     // Phase label reflects the interleaved two-phase architecture. Placement
@@ -927,6 +942,7 @@ export class Stage2PlacementController {
 
     const results = this.buildResultsSnapshot();
     results.canonical_jobs_run = this.canonicalJobsRun;
+    results.runtime_diagnostics = { ...this.runtimeDiagnostics };
     results.completed_jobs = this.completedJobs;
     results.total_jobs_planned = this.totalJobsPlanned;
     results.phase = "ready";

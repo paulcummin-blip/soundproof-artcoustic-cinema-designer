@@ -30,6 +30,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
+import { waitForOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
@@ -106,6 +107,8 @@ export default function useRunOptimisationPlan({
     // value or as a readiness input. A failure to write it is reported and
     // swallowed: a diagnostic row must never break, delay or alter a run, so the
     // write is dispatched without being awaited.
+    let measuredRuntime = null;
+    let publicationDiagnostics = null;
     const logRunHistory = (facts = {}) => {
       const timings = getRunTimings(projectId, versionId);
       const live = sharedRef.current;
@@ -128,6 +131,20 @@ export default function useRunOptimisationPlan({
           ? timings.publicationRetries
           : 0,
         ...facts,
+        workerCalls: measuredRuntime ? {
+          total: measuredRuntime.workerCallCount || 0,
+          canonicalConfirmations: measuredRuntime.counts?.canonicalConfirmations || 0,
+          integrationConfirmations: measuredRuntime.counts?.integrationCanonicalConfirmations || 0,
+          roomSimulationCalls: (measuredRuntime.counts?.roomSimulationCalls || 0) + (measuredRuntime.stage2?.roomSimulationCalls || 0),
+          batchedReceiverEvaluations: measuredRuntime.counts?.batchedReceiverEvaluations || 0,
+          stage2Jobs: (measuredRuntime.stage2?.placementCount || 0) + (measuredRuntime.stage2?.confirmationCount || 0),
+        } : null,
+        runtimeBreakdown: {
+          ...(summariseElectronicStageBreakdown({ runtimeMetrics: measuredRuntime }) || {}),
+          runId: activeRun.runId,
+          timings: buildPersistedRunTimings(timings),
+          publication: publicationDiagnostics,
+        },
       })).catch(() => {});
     };
 
@@ -211,6 +228,7 @@ export default function useRunOptimisationPlan({
         // ONE RUN IDENTITY for every timing this run records — engine stages,
         // worker calls, sequential wait, the plan save and the publication.
         runId: activeRun.runId,
+        onRuntimeMetrics: report => { measuredRuntime = report; },
         shared: sharedRef.current,
         subwooferInstances: subInstancesRef.current,
         roomDims,
@@ -230,6 +248,7 @@ export default function useRunOptimisationPlan({
         deferRecommendationPublication: true,
       });
 
+      measuredRuntime = result.runtimeMetrics || measuredRuntime;
       if (result.status === "cancelled") {
         logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" });
         setStatus("idle");
@@ -377,7 +396,8 @@ export default function useRunOptimisationPlan({
         ...runRecord,
         runtimeBreakdown,
       });
-      recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
+      const savedAt = await waitForOptimiserPlanSave(projectId, versionId, activeRun.runId);
+      recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED, { at: savedAt });
 
       // ── 2. THE TERMINAL AUTHORITY, WRITTEN AT PLAN SAVE ──
       // The run is terminal here — from its own durable plan, never from a
@@ -411,6 +431,7 @@ export default function useRunOptimisationPlan({
         savedFingerprint: persistedPlan ? fingerprint : null,
       });
 
+      publicationDiagnostics = publication.results?.map(entry => ({ persisted: entry.persisted, failure: entry.failure, ...entry.diagnostics })) || [];
       const recommendationPublication = buildRecommendationPublicationRecord({
         publication,
         runId: activeRun.runId,
