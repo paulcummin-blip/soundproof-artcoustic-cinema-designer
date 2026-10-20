@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration";
-import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison";
+import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification";
+import useSharedBassAuthorityState from "../useSharedBassAuthorityState";
 
 const number = value => Number.isFinite(value) ? value.toFixed(2) : "—";
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -14,10 +15,11 @@ const crossoverText = (c, hp) => c ? String(hp ? c.frequencyHz : c.subwooferFreq
 export default function CrossoverRecommendation({
   candidate, diagnostics, shared, appState, instances, commitInstances, onRecalculate, busy,
 }) {
+  const { authorityState } = useSharedBassAuthorityState();
   const saved = appState?.splConfig?.crossoverRecommendation || null;
   const write = appState?.updateGlobalSpl;
-  const live = useRef({shared,instances,appState});
-  live.current = {shared,instances,appState};
+  const live = useRef({shared,instances,appState,authorityState});
+  live.current = {shared,instances,appState,authorityState};
   const [applying,setApplying] = useState(false);
   const [error,setError] = useState(null);
   const record = saved;
@@ -30,6 +32,17 @@ export default function CrossoverRecommendation({
       candidate,baseline:diagnostics?.baseline || null,status:"recommended",
     } });
   }, [candidate,diagnostics,write,shared?.cacheKey,saved?.candidateId,saved?.baselineCacheKey]);
+
+  // A refreshed tab resumes verification from saved settings and the normal
+  // published authority. It never marks an unfinished calculation as applied.
+  useEffect(() => {
+    if (applying || !record?.expectedConfiguration || !["applying","restoring","verification-required"].includes(record.status)) return;
+    if (authorityState.code !== "current" || shared?.calculationInProgress || shared?.cacheKey === record.beforeCacheKey) return;
+    if (!recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration)) return;
+    const restore=record.operation==="restore";
+    if (!recommendationResultMatches(shared?.completedBassAuthority,restore?record.baseline:record.candidate)) return;
+    write({crossoverRecommendation:{...record,status:restore?"restored":"applied",error:null,appliedCacheKey:shared.cacheKey,verifiedAt:new Date().toISOString()}});
+  }, [record,applying,authorityState.code,shared?.cacheKey,shared?.calculationInProgress,shared?.completedBassAuthority,shared?.authoritative,write]);
 
   if (!record?.candidate) return null;
   const recommended=record.candidate;
@@ -50,10 +63,15 @@ export default function CrossoverRecommendation({
       instances:current.instances,
       crossover:current.shared?.authoritative?.crossover,
     };
-    const nextRecord={...record,previousConfiguration:previous,status:restore?"restoring":"applying",error:null};
+    const nextRecord={...record,previousConfiguration:previous,status:restore?"restoring":"applying",operation:restore?"restore":"apply",beforeCacheKey:previousCacheKey,error:null};
     try {
       const nextInstances=restore ? previous.instances : applyCalibrationTuning(current.instances,recommended.appliedTuning);
       const nextCrossover=restore ? previous.crossover : recommended.crossover;
+      nextRecord.expectedConfiguration={crossover:nextCrossover,tuning:nextInstances.filter(s=>s.enabled!==false).map(s=>({
+        sourceId:s.id,gainDb:Number(s.gainDb)||0,delayMs:Number(s.delayMs)||0,phaseControlDeg:Number(s.phaseControlDeg??s.phaseAdjust)||0,polarity:s.polarity,
+      }))};
+      // Restored manual settings may include automatic distance alignment.
+      if(restore)nextRecord.expectedConfiguration.tuning=baseline.appliedTuning.map((t,i)=>({...t,sourceId:t.sourceId||nextRecord.expectedConfiguration.tuning[i]?.sourceId}));
       commitInstances(nextInstances);
       write({crossover:nextCrossover,crossoverRecommendation:nextRecord});
       const queued=await onRecalculate({previousCacheKey});
@@ -67,12 +85,10 @@ export default function CrossoverRecommendation({
         if (state?.cacheKey===previousCacheKey || state?.calculationInProgress) continue;
         const authority=state?.completedBassAuthority;
         if (authority?.authorityStatus!=="AUTHORITATIVE" || authority.contract?.job?.resultFingerprint!==state.cacheKey) continue;
-        const actual=extractAuthorityForComparison(authority);
+        if (live.current.authorityState.code!=="current") continue;
         const expected=restore?baseline:recommended;
-        if (!actual || !expected ||
-            ![actual.achievedP19VariationDb,actual.achievedP20VariationDb,expected.achievedP19VariationDb,expected.achievedP20VariationDb].every(Number.isFinite) ||
-            Math.abs(actual.achievedP19VariationDb-expected.achievedP19VariationDb)>0.1 ||
-            Math.abs(actual.achievedP20VariationDb-expected.achievedP20VariationDb)>0.1) {
+        if (!recommendationSettingsMatch(state.authoritative,nextRecord.expectedConfiguration) ||
+            !recommendationResultMatches(authority,expected)) {
           throw new Error("The applied calculation does not reproduce ADI's prediction. Review the result or restore the previous settings.");
         }
         write({crossoverRecommendation:{...nextRecord,status:restore?"restored":"applied",appliedCacheKey:state.cacheKey,verifiedAt:new Date().toISOString()}});
