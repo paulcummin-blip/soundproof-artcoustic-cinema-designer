@@ -25,6 +25,8 @@
  * Pure: no React, no side effects, no runtime-specific APIs.
  */
 
+import { readCapabilityFields } from './parameterCapabilityFields.js';
+
 /** The three RP22 design structures, in report order. */
 export const REPORT_STRUCTURES = Object.freeze([
   'Spatial Resolution',
@@ -148,6 +150,7 @@ export function readReliableResult(entry) {
     level,
     value,
     text: [level, value].filter(Boolean).join(' · '),
+    ...readCapabilityFields(entry),
   };
 }
 
@@ -313,6 +316,7 @@ export function splitParameterEvidence(snapshot) {
       level: result.level,
       value: result.value,
       text: result.text,
+      ...readCapabilityFields(result),
     };
     byStructure[structure].push(entry);
     used.push(entry);
@@ -351,7 +355,14 @@ export function resolveBassEvidence(snapshot) {
       });
       return null;
     }
-    return { parameter_id: id, label, level: result.level, value: result.value, text: result.text };
+    // The capability fields belong to the parameter's own row; the bass block
+    // carries only the level and value, so they are read from that row.
+    const row = parameterRows(snapshot).find((item) => Number(item.parameter_id) === id);
+    return {
+      parameter_id: id, label, level: result.level, value: result.value, text: result.text,
+      ...readCapabilityFields(row),
+      ...readCapabilityFields(result),
+    };
   };
 
   const p14 = pick(14, bass.p14);

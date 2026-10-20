@@ -26,6 +26,7 @@
  */
 
 import { validateReportEvidence } from './reportEvidenceCompleteness.js';
+import { readCapabilityFields } from './parameterCapabilityFields.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
 import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
 import { proposalEvidenceMoveIsSafe } from './designIdentityComparison.js';
@@ -193,6 +194,9 @@ function parametersFromEvidence(evidence) {
         unit: asText(entry.unit) || null,
         context: asText(entry.context) || null,
         source: asText(entry.source) || 'report_evidence',
+        // The authoritative capability fields the frozen row (or its source_row)
+        // states, each kept separate and present only where stated.
+        ...readCapabilityFields(entry),
       };
     });
 }
@@ -319,6 +323,7 @@ function engineeringFromEvidence(technicalEvidence) {
       text: entry.text,
       achieved_level: entry.level,
       formatted_value: entry.value,
+      ...readCapabilityFields(entry),
     })),
   };
 }

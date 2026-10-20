@@ -21,7 +21,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '0eb9628212716a8074c35809e950de93fdaf5e73c0acb5149bf7d4250c57189e',
+  'base44/shared/proposalWriter/writerInputBuilder.js': '73517b105f2f58ea440dddb88c38883535426424296a3f2ffaca679629edcbf9',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
@@ -47,7 +47,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
   'base44/shared/proposalWriter/writerPromptBuilder.js': '44f5a2a1959b7a484eb446e1639afdf823dab01a1712b1103be306effd6beeb1',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
-  'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
+  'base44/shared/proposalWriter/writerDesignContext.js': 'c52f116231bd4f3601f0f963125d7c5243e8723a2680ba2e07a66bf53935de74',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
   'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',
@@ -55,7 +55,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The supporting results the brief asked for: what the pack may state because
   // the client asked for it, at the scope and status the reports record.
   'base44/shared/proposalEvidence/proposalBriefRequests.js': '006dc2c68897fabaedd4c35e02f34e76fa39ab372789860f12099dfeebd18b13',
-  'base44/shared/proposalEvidence/proposalSupportingResults.js': 'c59e5098bffc6d44615f75b03c435a72d4eddd0283c2aa6cdb150ab86174d504',
+  'base44/shared/proposalEvidence/proposalSupportingResults.js': '9ca6ef67d6ff6a4ed346c094e724ec7d50f6d45ae9207d1b70f4961d2e277bc5',
   // The design philosophy: the judgement behind the recommendation, carried by
   // Stage 1 and by the writer's editorial instructions. It states no figure and
   // changes no acceptance; it is hashed so a draft can be traced to the exact

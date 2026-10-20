@@ -28,6 +28,7 @@ import {
   ASSUMED_PARAMETER_LABEL,
   isAssumedAdministrativeParameter,
 } from '../clientFacingParameterAuthority.js';
+import { readCapabilityFields } from '../parameterCapabilityFields.js';
 import { savedVersionIdentity } from './proposalEvidenceIdentity.js';
 import { stripBassWordingDeep } from './proposalEvidenceWording.js';
 import { frozenClientSystemFormat } from '../clientSystemFormat.js';
@@ -225,6 +226,8 @@ function parameterRows(snapshot, policy = null) {
         state: asText(row.state),
         authority_source: asText(row.source),
         definition: asText(row.title),
+        // The authoritative capability fields, present only where the report states them.
+        ...readCapabilityFields(row),
       };
       // An assumed parameter carries no client-facing structure, so it can never
       // be classified, can never become a difference between options, and is

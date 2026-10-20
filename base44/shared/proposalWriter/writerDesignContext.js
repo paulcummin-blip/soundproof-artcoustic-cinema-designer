@@ -40,6 +40,7 @@ import {
 } from './writerInterpretationEvidenceCheck.js';
 import { buildClarificationAnswers } from '../proposalClarification/clarificationAnswers.js';
 import { buildRp22DesignContext } from '../rp22DesignContext.js';
+import { readCapabilityFields } from '../parameterCapabilityFields.js';
 
 // The designer's own answers to ADI's clarification questions are clarification
 // authority, read from the proposal they were stored with. Re-exported so a caller
@@ -123,6 +124,8 @@ function evidenceRows(list) {
         label,
         level: asText(entry?.level),
         statement,
+        // The capability fields the evidence states, kept separate; absent stays absent.
+        ...readCapabilityFields(entry),
       };
     })
     .filter(Boolean);

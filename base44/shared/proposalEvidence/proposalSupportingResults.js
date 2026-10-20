@@ -41,6 +41,7 @@
 
 import { CLAIM_KIND, buildClaimId } from './evidencePackSchema.js';
 import { requestedSupportRules } from './proposalBriefRequests.js';
+import { readCapabilityFields } from '../parameterCapabilityFields.js';
 
 /**
  * Parameters that are never minted as a supporting result, with the reason. Each
@@ -52,6 +53,16 @@ export const NEVER_SUPPORTED_PARAMETERS = Object.freeze({
   19: 'the_reference_position_response_is_never_widened_into_a_seat_claim',
   20: 'weak_or_absent_consistency_evidence_never_supports_a_seat_consistency_claim',
   21: 'early_reflections_is_an_assumed_parameter',
+});
+
+/** The required Dynamic Range grounding: the output capability results. */
+const REQUIRED_DYNAMIC_RANGE_REQUEST = Object.freeze({
+  key: 'dynamic_range_output',
+  area: 'dynamic_range',
+  label: 'Output capability',
+  parameter_ids: Object.freeze([12, 13, 14]),
+  description: 'screen, non-screen and low-frequency output capability that grounds the required Dynamic Range section',
+  requested_by: 'required_section',
 });
 
 /** The report's own bass authority, whose results are design estimates at the RSP. */
@@ -108,6 +119,7 @@ function parameterClaim(option, request, parameterId) {
   const value = fact.value.trim();
   const scope = scopeOf(fact);
   const status = predictionStatus(fact.authority_source);
+  const capability = readCapabilityFields(fact);
 
   return {
     claim: {
@@ -132,6 +144,9 @@ function parameterClaim(option, request, parameterId) {
       authority_source: fact.authority_source || null,
       prediction_status: status,
       definition: fact.definition || null,
+      // The saved capability fields, each separate and present only where the
+      // report states it (nothing is derived for Parameters 12 or 13).
+      ...(Object.keys(capability).length > 0 ? { capability } : {}),
       requested_by: request.key,
       basis: {
         levels: level ? [level] : [],
@@ -233,10 +248,16 @@ function viewingGeometryClaim(option) {
  */
 export function buildSupportingResultClaims({ options = [], requestContext = null } = {}) {
   const list = (Array.isArray(options) ? options : []).filter(Boolean);
-  const requests = requestedSupportRules(requestContext);
+  const briefRequests = requestedSupportRules(requestContext);
+  // Dynamic Range is a required section, so its output grounding (Parameters 12,
+  // 13 and 14) is always offered as supporting results, whether or not the brief
+  // or the headline ranking names them. A parameter the brief already asked for
+  // is not minted twice.
+  const requests = [...briefRequests, REQUIRED_DYNAMIC_RANGE_REQUEST];
   const claims = [];
   const minted = [];
   const omitted = [];
+  const seen = new Set();
 
   for (const request of requests) {
     for (const option of list) {
@@ -254,6 +275,9 @@ export function buildSupportingResultClaims({ options = [], requestContext = nul
       for (const parameterId of request.parameter_ids) {
         const built = parameterClaim(option, request, parameterId);
         if (built.claim) {
+          const identity = `${option.version_id ?? ''}|${built.claim.claim_id}`;
+          if (seen.has(identity)) continue;
+          seen.add(identity);
           claims.push(built.claim);
           minted.push({ key: request.key, version_id: option.version_id ?? null, claim_id: built.claim.claim_id });
         } else {

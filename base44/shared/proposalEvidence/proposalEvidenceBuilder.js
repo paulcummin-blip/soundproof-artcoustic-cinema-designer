@@ -235,6 +235,11 @@ export function buildProposalEvidence({
   // with the seat scopes the reports themselves state — decides whether a result
   // exists and what it states. A priority can therefore say "say little about this";
   // it can never say "this published result does not exist".
+  // The supporting results are minted from the options' frozen facts before the
+  // pillars are read, so Dynamic Range can cite its output evidence (Parameters
+  // 12, 13 and 14) whether or not a headline story or the brief names them.
+  const supporting = buildSupportingResultClaims({ options, requestContext });
+
   const pillarsByVersion = new Map();
   const contextByVersion = new Map();
   let narrativeReading = null;
@@ -266,6 +271,7 @@ export function buildProposalEvidence({
       rows,
       stories,
       parameterEvidence,
+      supportingClaims: supporting.claims.filter((claim) => claim?.option?.version_id === option.version_id),
       context: {
         intent,
         room_type: context.room_type,
@@ -305,8 +311,6 @@ export function buildProposalEvidence({
   // results are minted here, from the frozen facts alone, at the exact scope and
   // status the reports record, and they are never strengths. A request the
   // evidence cannot answer mints nothing and is recorded as omitted.
-  const supporting = buildSupportingResultClaims({ options, requestContext });
-
   const compared = options.length >= 2;
 
   const classification = compared ? classifyAreas(options.map((option) => option.areas)) : [];

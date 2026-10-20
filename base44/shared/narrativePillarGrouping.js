@@ -332,6 +332,7 @@ export function buildClientStoryPillars({
   rows = [],
   stories = [],
   parameterEvidence = null,
+  supportingClaims = [],
   context = null,
 } = {}) {
   const list = Array.isArray(rows) ? rows : [];
@@ -375,9 +376,19 @@ export function buildClientStoryPillars({
       || NARRATIVE_PRIORITY.TECHNICAL_ONLY;
     const related = storiesOf(pillarKey, stories);
     const ranks = related.map((story) => Number(story?.rank)).filter((rank) => Number.isFinite(rank));
-    const claimIds = [...new Set(related.flatMap((story) => (
-      Array.isArray(story?.allowed_claim_ids) ? story.allowed_claim_ids : []
-    )))];
+    // Dynamic Range's output evidence (Parameters 12, 13 and 14) is attached as
+    // supporting claims whatever the headline ranking decided: the ranking
+    // chooses emphasis, never whether this section's necessary evidence exists.
+    const outputSupport = pillarKey === PILLAR.DYNAMIC_RANGE
+      ? (Array.isArray(supportingClaims) ? supportingClaims : [])
+        .filter((claim) => ['p12', 'p13', 'p14'].includes(String(claim?.area)))
+      : [];
+    const claimIds = [...new Set([
+      ...related.flatMap((story) => (
+        Array.isArray(story?.allowed_claim_ids) ? story.allowed_claim_ids : []
+      )),
+      ...outputSupport.map((claim) => claim.claim_id),
+    ])];
     const scope = seatScopeOf(members);
     // THE PILLAR'S OWN LEAD: the strongest result that may be told beneath this
     // pillar, with the language its own achieved result has earned. Read separately
@@ -488,6 +499,16 @@ export function buildClientStoryPillars({
         intended_use: context.intended_use ?? null,
       } : null,
       parameter_ids: members.map((member) => String(member.key).toUpperCase()),
+      // Dynamic Range's output evidence as supporting content, each result at its
+      // own saved figure. Bass extension and response stay supporting dimensions
+      // and are never a substitute for the screen and surround output results.
+      output_support: outputSupport.map((claim) => ({
+        claim_id: claim.claim_id,
+        area: claim.area,
+        statement: claim.statement,
+        level: claim.level,
+        ...(claim.capability ? { capability: claim.capability } : {}),
+      })),
       members: ordered.map((member) => evidenceMember(member, leadKeys)),
       // The whole system's readings of this story (the screen channels and surrounds,
       // inside Dynamic Range): without them the pillar would read as bass alone.

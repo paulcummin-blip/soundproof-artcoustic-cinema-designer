@@ -117,6 +117,9 @@ function allowedClaim(claim) {
     definition: claim?.definition ?? null,
     rows: Array.isArray(claim?.rows) ? claim.rows.map((row) => ({ ...row })) : [],
     requested_by: claim?.requested_by ?? null,
+    // The saved capability fields (achieved capability, target, levels, basis,
+    // headroom, limiting group), each present only where the report states it.
+    ...(claim?.capability ? { capability: { ...claim.capability } } : {}),
   };
 }
 
