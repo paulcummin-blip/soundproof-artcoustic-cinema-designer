@@ -367,6 +367,8 @@ export function evaluateStage2Confirmation(rawTransfer, {
     p18TargetBasis: p18TargetBasis || "minimum",
     perSourceComplexTransfers: rawTransfer.perSourceRspComplexTransfers || [],
     cancellationComplexTransfers: rawTransfer.cancellationComplexTransfers || null,
+    responseBasis: rawTransfer.integrationTransfers ? "combined-lcr-sub" : "sub-only",
+    crossover: rawTransfer.crossover || null,
     normalizedTransferFingerprint: null,
     calibrationFingerprint: null,
     correctabilityAssessment,
@@ -538,6 +540,7 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
     rspRawCurve,
     perSeatRawCurves: perSeatRawCurvesWithPriority,
     ...(combinedCurves || {}),
+    crossover,
     perSourceRspComplexTransfers: tuneComplexTransfers(rawTransfer.perSourceRspComplexTransfers, tuningToApply),
     // Override sources with the tuned delay/level
     sources: sources.map((s, i) => ({

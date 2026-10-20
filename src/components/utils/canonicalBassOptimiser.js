@@ -1023,6 +1023,7 @@ export function generateCanonicalCandidatePool({
   p18TargetBasis = p14TargetBasis, selectedP18RequiredExtensionHz = null,
   perSourceComplexTransfers = [], cancellationComplexTransfers = null, normalizedTransferFingerprint = null,
   calibrationFingerprint = null,
+  responseBasis = "sub-only", crossover = null,
   correctabilityAssessment = null,
 } = {}) {
   setCorrectabilityGate(correctabilityAssessment);
@@ -1355,6 +1356,7 @@ export function generateCanonicalCandidatePool({
   // When a generated bank fails validation, create sanitised and cut-only
   // candidates from the same filters. Safe cuts are retained; unsafe boosts
   // are removed. One impossible boost does not discard unrelated valid cuts.
+  for (const candidate of eqCandidates) { candidate.responseBasis = responseBasis; candidate.crossover = crossover; }
   const salvagedCandidates = [];
   const salvageDiagnosticsByProfile = {};
   const salvageTriggerDiagnosticsByProfile = {};

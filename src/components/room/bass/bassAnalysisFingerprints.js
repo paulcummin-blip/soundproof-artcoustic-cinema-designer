@@ -422,6 +422,7 @@ export function computeCalibrationFingerprint(inputs) {
       : null,
   };
 
+  if (i.combinedResponseIdentity) canonical.combinedResponse = i.combinedResponseIdentity;
   return fingerprint(canonical, "cal");
 }
 

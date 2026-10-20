@@ -1387,11 +1387,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
 
       {/* Crossover & Integration — the screen channels take part in the bass-managed response */}
       <CrossoverIntegrationPanel />
-      <CombinedResponsePanel
+      {!authoritative.combinedAuthorityEnabled && <CombinedResponsePanel
         provisional={provisionalCombined}
         combined={combinedSystem}
         hasResult={hasCurrentBassResult}
-      />
+      />}
 
       {/* Absorption Coefficients — room acoustics, useful but not the first thing a dealer needs */}
                 <CollapsiblePanel title="Absorption Coefficients" defaultOpen={false}>
