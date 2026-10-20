@@ -42,7 +42,7 @@ export const ADI_WORKING_MESSAGE = 'ADI is improving the wording…';
 export const ADI_IMPROVED_MESSAGE = 'ADI has improved the wording. Read it again before approving it.';
 
 /** What the workflow says when ADI found nothing worth changing. */
-export const ADI_UNCHANGED_MESSAGE = 'ADI read the wording and left it as it is — there was nothing to improve.';
+export const ADI_UNCHANGED_MESSAGE = 'No changes recommended.';
 
 /**
  * THE ONE MESSAGE A REFUSAL SHOWS. A rewrite that changed the supported meaning

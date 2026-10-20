@@ -151,6 +151,8 @@ export function buildAdiEditorialPrompt({
     'Do not make the text more impressive by adding plausible benefits or explanations. If an idea is not already expressed in the source copy, do not introduce it. Better wording may be simpler than the original.',
     'Every number, every level, every product name, every seating scope, every limitation and every assumption stays exactly as it is. If a sentence states a limit, a caveat or an assumption, the improved sentence states it too.',
     'You may combine, shorten or remove a sentence that adds only repetition, rhetoric or unsupported qualitative explanation. Preserve every supported engineering fact, figure, product, scope, result and genuine limitation.',
+    'Read the copy for repetition first. Where the same idea (for example everyday viewing, films, or surround sound) is described more than once, state it once, in the place it fits best, and use the freed space for smoother flow. Keep each required heading and its paragraphs; do not move meaning between headings.',
+    'Return the copy unchanged only if it genuinely has no repetition or awkward wording.',
     RULE,
     '',
     ...identityBlock({ evidenceIdentity, documentIdentity }),

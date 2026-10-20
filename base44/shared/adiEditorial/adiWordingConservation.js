@@ -81,14 +81,16 @@ const DIGITS = /\d+(?:\.\d+)?/g;
  */
 export function numericTokens(value) {
   const text = String(value || '')
-    .replace(NUMBER_WORD_PATTERN, (word) => String(NUMBER_WORDS[word.toLowerCase()]))
+    // "one" is not read as a figure: it is mostly a determiner or idiom ("one
+    // complete room"), and a real quantity change still shows as another number.
+    .replace(NUMBER_WORD_PATTERN, (word) => (word.toLowerCase() === 'one' ? ' ' : String(NUMBER_WORDS[word.toLowerCase()])))
     .replace(/(\d),(\d)/g, '$1$2');
   const found = text.match(DIGITS) || [];
   return found.map((token) => token.replace(/\.$/, ''));
 }
 
 /** The words that state a limitation, a caveat or an assumption. */
-const LIMITATION = /\b(?:not|never|cannot|can't|isn't|aren't|doesn't|don't|won't|without|lacks?|lacking|limits?|limiting|limited|only|up to|at most|remains?|requires? (?:attention|work)|to be (?:addressed|confirmed)|assum\w*|estimat\w*|approximately|about)\b/gi;
+const LIMITATION = /\b(?:not|never|cannot|can't|isn't|aren't|doesn't|don't|won't|without|lacks?|lacking|limits?|limiting|limited|only|up to|at most|requires? (?:attention|work)|to be (?:addressed|confirmed)|assum\w*|estimat\w*|approximately|about)\b/gi;
 
 /**
  * Contrastive sales rhetoric is not an engineering limitation. Removing “not
@@ -105,6 +107,12 @@ function materialLimitationText(value) {
 function limitationWords(value) {
   const found = materialLimitationText(value).match(new RegExp(LIMITATION.source, LIMITATION.flags)) || [];
   return found.map((word) => word.toLowerCase());
+}
+
+/** How many material limitations a text states; a repeated "without" counts once. */
+function limitationCount(value) {
+  const words = limitationWords(value);
+  return words.filter((word) => word !== 'without').length + (words.includes('without') ? 1 : 0);
 }
 
 /** The connectors a reason is written with. */
@@ -369,7 +377,9 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
   }
 
   // ── Scope: never widened, and never one the original did not name ───────
-  const scopes = difference(scopeTokens(before), scopeTokens(after));
+  // Scope is compared as a set: dropping a repeated mention of the same scope is
+  // removing repetition, while losing or adding a scope kind is still refused.
+  const scopes = difference([...new Set(scopeTokens(before))], [...new Set(scopeTokens(after))]);
   for (const token of scopes.added) {
     violations.push(violation(ADI_CONSERVATION_REJECTION.WIDENED_SCOPE, `added:${token}`, {
       category: 'seat scope',
@@ -388,8 +398,10 @@ export function checkWordingConservation({ original = '', improved = '' } = {}) 
   }
 
   // ── A material limitation is never removed ──────────────────────────────
-  const limitationsBefore = matchCount(materialLimitationText(before), LIMITATION);
-  const limitationsAfter = matchCount(materialLimitationText(after), LIMITATION);
+  // "without" is counted once however often it is repeated: removing a repeated
+  // "without dominating the room" is removing repetition, not a caveat.
+  const limitationsBefore = limitationCount(before);
+  const limitationsAfter = limitationCount(after);
   if (limitationsAfter < limitationsBefore) {
     const gone = difference(limitationWords(before), limitationWords(after)).dropped;
     violations.push(violation(

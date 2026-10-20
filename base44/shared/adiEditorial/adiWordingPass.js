@@ -31,6 +31,7 @@
 
 import { writerModelFor } from '../proposalWriter/writerProvider.js';
 import { checkWordingConservation } from './adiWordingConservation.js';
+import { approvalPlainText } from '../proposalApproval/sectionApprovalAuthority.js';
 import { ADI_REJECTION_STAGE, buildAdiRejectionDiagnostics } from './adiRejectionDiagnostics.js';
 import { checkAdiEditorialQuality, looksLikeHtml } from './adiEditorialStandard.js';
 import { buildAdiCorrectionPrompt } from './adiEditorialPrompt.js';
@@ -255,8 +256,9 @@ export async function runAdiWordingPass({
     // written: re-saving identical wording would churn an approval for nothing. On
     // a correction attempt the same thing means the correction has given up, so the
     // refusal that asked for it stands.
-    const unchanged = checkWordingConservation({ original, improved: proposed }).ok
-      && flat(proposed) === flat(original);
+    // Compared by the words a reader sees, not the markup: a re-wrapped or
+    // re-spaced copy that reads the same is NOT an improvement.
+    const unchanged = flat(approvalPlainText(proposed)) === flat(approvalPlainText(original));
     const refused = await refusalFor({ original, proposed, validate, validateStage });
     attemptAudit.push({
       attempt: attempts,
