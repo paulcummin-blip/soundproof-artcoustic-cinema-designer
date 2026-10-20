@@ -17,19 +17,23 @@ const p20 = r => Number.isFinite(r?.achievedP20VariationDb) ? r.achievedP20Varia
 const p19 = r => Number.isFinite(r?.achievedP19VariationDb) ? r.achievedP19VariationDb : Infinity;
 
 export function integrationSafetyIssues(baseline, candidate) {
-  if (!candidate) return ["Canonical confirmation unavailable"];
+  if (!baseline || !candidate) return ["Canonical confirmation unavailable"];
   const issues = [];
   if (p20(candidate) > p20(baseline) - 0.25) issues.push("No useful P20 improvement");
   if (candidate.physicalValidation?.passed !== true) issues.push("Physical correction constraints failed");
   if (!Number.isFinite(candidate.p14HeadroomDb) || candidate.p14HeadroomDb < 0) issues.push("Insufficient P14 headroom");
   if (candidate.p14HeadroomDb < (baseline.p14HeadroomDb ?? 0) - 1) issues.push("More than 1 dB headroom lost");
   if (p19(candidate) > p19(baseline) + 0.1) issues.push("RSP P19 regression");
-  if (Math.abs(candidate.assessmentStartHz - baseline.assessmentStartHz) > 0.001 ||
+  if (![candidate.assessmentStartHz, candidate.assessmentEndHz, baseline.assessmentStartHz, baseline.assessmentEndHz].every(Number.isFinite) ||
+      Math.abs(candidate.assessmentStartHz - baseline.assessmentStartHz) > 0.001 ||
       Math.abs(candidate.assessmentEndHz - baseline.assessmentEndHz) > 0.001) issues.push("Assessment band changed");
   const prior = new Map((baseline.perSeatP20 || []).map(s => [s.seatId,s]));
-  for (const seat of candidate.perSeatP20 || []) {
+  const nextSeats = candidate.perSeatP20 || [];
+  if (!prior.size || nextSeats.length !== prior.size || new Set(nextSeats.map(s => s.seatId)).size !== prior.size) issues.push("Assessed seat set changed");
+  for (const seat of nextSeats) {
     const before = prior.get(seat.seatId);
     if (!before) { issues.push("Assessed seat missing from baseline"); continue; }
+    if (!Number.isFinite(seat.variationDbRaw) || !Number.isFinite(before.variationDbRaw) || Boolean(seat.isPrimary) !== Boolean(before.isPrimary)) issues.push("Invalid seat evidence: " + seat.seatId);
     if (seat.variationDbRaw > before.variationDbRaw + (before.isPrimary ? 0.5 : 2)) {
       issues.push((before.isPrimary ? "Primary" : "Secondary") + " seat regression: " + seat.seatId);
     }
