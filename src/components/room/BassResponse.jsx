@@ -1393,6 +1393,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         hasResult={hasCurrentBassResult}
       />}
 
+      {engineeringMode && authoritative.combinedAuthorityEnabled && <details className="text-xs rounded border p-3">
+        <summary>Subwoofer-only response diagnostics</summary>
+        <p className="my-2">Unfiltered subwoofer response at the RSP. Official P19/P20 use the combined speakers and subwoofers.</p>
+        <table className="w-full"><thead><tr><th>Frequency</th><th>Subwoofer path</th></tr></thead>
+          <tbody>{[25,40,80,100,150,200].map(f=>{
+            const points=authoritative.subOnlyResponseCurves?.rspRawCurve||[];
+            const point=points.reduce((best,p)=>!best||Math.abs(p.frequency-f)<Math.abs(best.frequency-f)?p:best,null);
+            return <tr key={f}><td>{f} Hz</td><td>{Number.isFinite(point?.spl)?point.spl.toFixed(2)+" dB":"Unavailable"}</td></tr>;
+          })}</tbody>
+        </table>
+      </details>}
+
       {/* Absorption Coefficients — room acoustics, useful but not the first thing a dealer needs */}
                 <CollapsiblePanel title="Absorption Coefficients" defaultOpen={false}>
         <div className="pt-3">

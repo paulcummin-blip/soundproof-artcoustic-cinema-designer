@@ -40,7 +40,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
-import { useCompletedBassAuthority, isAuthoritativeBassContract } from '@/components/room/bass/completedBassResultStore';
+import { useCompletedBassAuthority, isAuthoritativeBassContract, settleCompletedBassPersistence } from '@/components/room/bass/completedBassResultStore';
 import { flushBassAuthorityWrite } from '@/components/room/bass/bassAuthorityWriteQueue';
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
@@ -236,7 +236,7 @@ export function useEngineeringPublicationEffect({
         // is 2s. Settle the existing version-scoped write first, then verify its
         // read-back identity. Never send a premature/conflicting publication.
         if (bassFingerprint) {
-          const written = await flushBassAuthorityWrite(projectId, versionId);
+          const written = await settleCompletedBassPersistence(projectId, versionId);
           if (cancelled) return;
           if (written === false) throw new Error('The current bass assessment could not be saved. Retry publication.');
           const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });

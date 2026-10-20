@@ -850,3 +850,16 @@ export function _resetCompletedBassStoreForTest() {
   projectAuthorityState.clear();
   notify();
 }
+// Publication must wait for the store's pending read/compact/enqueue chain,
+// not only for a write that has already reached the coalescing queue.
+export async function settleCompletedBassPersistence(projectId, versionId) {
+  const key=bassCacheKey(projectId,versionId);
+  let pending=writeQueues.get(key);
+  for(let attempt=0;pending && attempt<4;attempt++){
+    await pending;
+    const next=writeQueues.get(key);
+    if(next===pending)break;
+    pending=next;
+  }
+  return flushBassAuthorityWrite(projectId,versionId);
+}
