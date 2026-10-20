@@ -149,6 +149,21 @@ export function buildCombinedSystemResponse({
   const levelMatchDb = speakerReferenceLevelDb;
   const speakerTrim = Math.pow(10, levelMatchDb / 20);
 
+  const rspComplexTransfers = [
+    ...(subTransfersBySeat?.[primarySeatId] || []).map(source => ({
+      sourceId: source.sourceId,
+      points: source.points.map((point, i) => ({ frequency: frequencies[i], ...complexMultiply(point, bank.lowPass[i]) })),
+    })),
+    ...(speakerTransfersBySeat?.[primarySeatId] || []).map(source => ({
+      sourceId: source.sourceId,
+      points: source.points.map((point, i) => {
+        const shape = rollOffBank.get(normaliseModelKey(source.modelKey))?.[i] || { re: 1, im: 0 };
+        const value = complexMultiply(complexMultiply(point, bank.highPass[i]), shape);
+        const scale = speakerTrim * (source.channelWeight ?? 1);
+        return { frequency: frequencies[i], re: value.re * scale, im: value.im * scale };
+      }),
+    })),
+  ];
   const combinedBySeat = {};
   const subOnlyBySeat = {};
   for (const [seatId, path] of paths) {
@@ -180,6 +195,7 @@ export function buildCombinedSystemResponse({
     ),
     combinedBySeat,
     subOnlyBySeat,
+    rspComplexTransfers,
     primarySeatId: paths.has(primarySeatId) ? primarySeatId : (seatList[0]?.seatId ?? null),
     frequencyCount: pointCount,
   };

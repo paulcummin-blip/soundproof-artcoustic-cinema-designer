@@ -268,6 +268,8 @@ export function evaluateSeatingBatch({
         perSourcePerSeatComplexTransfers,
         autoAlignTuning,
         seatIds,
+        seatingPositions: movedSeats,
+        rspPosition: movedRsp,
       } : null,
     });
   }

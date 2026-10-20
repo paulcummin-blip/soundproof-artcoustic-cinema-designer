@@ -17,6 +17,7 @@
 // This module reuses the EXISTING production authority. It does NOT create
 // placement-specific P19/P20 maths.
 
+import { combineTunedResponse, combinedResponseCurves, tuneComplexTransfers } from "../combinedTuningResponse";
 import { simulateAuthoritativeBassResponse } from "../authoritativeBassResponseEngine";
 import { generateCanonicalCandidatePool } from "@/components/utils/canonicalBassOptimiser";
 import { selectCandidateFromPool } from "@/components/utils/bassCandidatePoolSelection";
@@ -310,6 +311,9 @@ export function evaluateStage2Placement({
     // Per-source per-seat complex transfers with ZERO tuning, for re-summation
     // with delay-only / level+delay variants in the confirmation phase.
     perSourcePerSeatComplexTransfers,
+    perSourceRspComplexTransfers: simResult.perSourceRspComplexTransfers,
+    seatingPositions,
+    rspPosition: canonicalRspPosition,
     // Auto-align tuning (placement-only) for reference
     autoAlignTuning,
     // Seat IDs in order (for re-summation)
@@ -361,7 +365,8 @@ export function evaluateStage2Confirmation(rawTransfer, {
     p14TargetBasis,
     p14TargetLevel,
     p18TargetBasis: p18TargetBasis || "minimum",
-    perSourceComplexTransfers: [],
+    perSourceComplexTransfers: rawTransfer.perSourceRspComplexTransfers || [],
+    cancellationComplexTransfers: rawTransfer.cancellationComplexTransfers || null,
     normalizedTransferFingerprint: null,
     calibrationFingerprint: null,
     correctabilityAssessment,
@@ -474,6 +479,7 @@ export function evaluateStage2Confirmation(rawTransfer, {
 export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   tuning,
   tuningVariant,
+  crossover = rawTransfer?.crossover,
   p14TargetBasis,
   p14TargetLevel,
   p14TargetDb,
@@ -523,10 +529,16 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   }));
 
   // Build a tuned raw transfer for the canonical confirmation
+  const combined = rawTransfer.integrationTransfers
+    ? combineTunedResponse(rawTransfer, tuningToApply, crossover) : null;
+  if (rawTransfer.integrationTransfers && !combined?.available) return null;
+  const combinedCurves = combinedResponseCurves(combined, rawTransfer.seatPriorityMap);
   const tunedRawTransfer = {
     ...rawTransfer,
     rspRawCurve,
     perSeatRawCurves: perSeatRawCurvesWithPriority,
+    ...(combinedCurves || {}),
+    perSourceRspComplexTransfers: tuneComplexTransfers(rawTransfer.perSourceRspComplexTransfers, tuningToApply),
     // Override sources with the tuned delay/level
     sources: sources.map((s, i) => ({
       ...s,
@@ -551,6 +563,8 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
     tuningVariant,
     tuningSearch: searchMeta,
     appliedTuning: tuningToApply,
+    crossover: combined?.available ? crossover : null,
+    responseBasis: combined?.available ? "combined-lcr-sub" : "sub-only",
   };
 }
 

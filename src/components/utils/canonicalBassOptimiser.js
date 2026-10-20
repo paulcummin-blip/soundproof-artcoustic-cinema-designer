@@ -1013,7 +1013,7 @@ export function generateCanonicalCandidatePool({
   onProgress = null, reuseExactHouseCurveEvaluations = true,
   selectedP14TargetDb = 109, p14TargetBasis = "minimum", p14TargetLevel = 1,
   p18TargetBasis = p14TargetBasis, selectedP18RequiredExtensionHz = null,
-  perSourceComplexTransfers = [], normalizedTransferFingerprint = null,
+  perSourceComplexTransfers = [], cancellationComplexTransfers = null, normalizedTransferFingerprint = null,
   calibrationFingerprint = null,
   correctabilityAssessment = null,
 } = {}) {
@@ -1201,7 +1201,7 @@ export function generateCanonicalCandidatePool({
   // Safe fallback: if complex evidence is unavailable, no region is protected.
   const identifiedProtectedNullRegions = identifyVerifiedProtectedNullRegions(
     levelNormalisedRawCurve, domains.correctionStartHz, domains.correctionEndHz, verticalOffsetDb,
-    activeSubs, usableLfHz, null, targetCurve, perSourceComplexTransfers,
+    activeSubs, usableLfHz, null, targetCurve, cancellationComplexTransfers || perSourceComplexTransfers,
   );
   // Protected null regions are an explicit no-boost policy authority. Once a
   // region is verified as a destructive cancellation, positive EQ correction

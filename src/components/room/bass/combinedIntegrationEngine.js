@@ -37,6 +37,8 @@ const SPEAKER_NEUTRAL_TUNING = Object.freeze({
   gainDb: 0, delayMs: 0, polarity: 0, phaseControlDeg: 0,
 });
 
+const speakerGeometryCache = new Map();
+
 function groupTransfersBySeat(transfers, modelKeyBySourceId, weightBySourceId) {
   const bySeat = {};
   (Array.isArray(transfers) ? transfers : []).forEach((transfer) => {
@@ -87,7 +89,10 @@ export function captureCombinedIntegrationTransfers({
   }
 
   // The ONLY extra engine pass: the screen channels as dimensionless units.
-  const speakerRun = simulateAuthoritativeBassResponse({
+  const speakerKey = JSON.stringify({ roomDims, seatingPositions, rspPosition, speakers, physics, qStrategyOverride });
+  let speakerRun = speakerGeometryCache.get(speakerKey);
+  if (!speakerRun) {
+  speakerRun = simulateAuthoritativeBassResponse({
     roomDims,
     seatingPositions,
     rspPosition,
@@ -104,6 +109,10 @@ export function captureCombinedIntegrationTransfers({
       tuning: { ...SPEAKER_NEUTRAL_TUNING },
     })),
   });
+
+  if (speakerGeometryCache.size >= 16) speakerGeometryCache.delete(speakerGeometryCache.keys().next().value);
+  speakerGeometryCache.set(speakerKey, speakerRun);
+  }
 
   const speakerTransfers = speakerRun?.perSourcePerSeatComplexTransfers || [];
   if (!speakerTransfers.length) {
