@@ -116,7 +116,6 @@ import { buildOptimiserRunWorkload } from "./optimiserRunWorkload.js";
 import AdiJourneyRunningPanel from "./AdiJourneyRunningPanel.jsx";
 import AdiJourneyEngineerDetailsSections from "./AdiJourneyEngineerDetailsSections.jsx";
 import { buildElectronicTimingRows } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
-import AdiOtherOptions from "./AdiOtherOptions.jsx";
 import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import { buildOptimiserPanelHierarchy } from "./optimiserPanelHierarchy.js";
@@ -697,7 +696,7 @@ export default function AdiOptimisationJourney({
   // repeated, and no candidate list is shown), and the three facts the decision
   // rests on, in the display authority's whole numbers only. No raw value, id or
   // fingerprint is stated in the normal experience.
-  const { otherOptions, lowFrequency: lowFrequencyResult } = buildOptimiserPanelHierarchy({
+  const { lowFrequency: lowFrequencyResult } = buildOptimiserPanelHierarchy({
     planView,
     summary,
     calibrationDecision: calibrationApplyEvidence,
@@ -1132,7 +1131,6 @@ export default function AdiOptimisationJourney({
           alternatives beside the ONE decision. Each is reviewed on its own, no
           Apply is offered per candidate, and the option that is already the
           decision is never repeated here. */}
-      {!isRunning && <AdiOtherOptions options={otherOptions} />}
 
       {/* ── LEVEL 2 — TECHNICAL DETAILS ── collapsed, and below the primary
           action. The concise professional summary: what ADI checked, the
@@ -1153,7 +1151,6 @@ export default function AdiOptimisationJourney({
             rows={summary.rows}
             lowFrequency={lowFrequencyResult}
             groups={<AdiSubwooferGroupingBlock instances={instances} roomDims={roomDims} />}
-            treatment={summary.absorption}
             design={designOpportunity}
             whyNoImprovement={whyNoImprovement}
             whyTitle={outcome === OPTIMISER_OUTCOME.NO_IMPROVEMENTS

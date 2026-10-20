@@ -145,13 +145,6 @@ export default function AdiEngineerDetailsPanel({
 
       {/* 4. LOW-FREQUENCY TREATMENT — concise advice, never a claim about an
           exact treatment location the evidence does not support. */}
-      {treatment?.reason && (
-        <div className="space-y-0.5" data-adi-treatment-advice="true">
-          <div className={GROUP_TITLE_CLASS}>Low-frequency treatment</div>
-          <div className={LINE_CLASS}>{treatment.reason}</div>
-          {treatment.location && <div className={LINE_CLASS}>{treatment.location}</div>}
-        </div>
-      )}
 
       {/* 5. SUBWOOFER GROUPS — the layout the grouped searches acted on. */}
       {groups}

@@ -40,7 +40,6 @@ import {
 } from "./optimiserWholeNumberDb.js";
 import { leverIsOfferable } from "./optimiserPlanSave.js";
 import { estimateOptimiserCalculations, resultSentence } from "./optimiserCalculationEstimate.js";
-import { resolveAbsorptionAdvice } from "./absorptionAdviceAuthority.js";
 import {
   ADI_ROW_OUTCOME,
   ADI_ROW_STATUS,
@@ -825,32 +824,9 @@ export function buildAdiDesignerSummary({
   // the recommended practical change, so a recommendation that already reaches
   // L2 does not attract absorption advice. While ADI is still working there is
   // no advice yet: the row stands as Waiting.
-  const absorption = running ? null : resolveAbsorptionAdvice({
-    p20Level: recommendedLevel ?? currentP20Level ?? baselineLevel,
-    p20DeviationDb: recommendedRow?.effect?.p20VariationDb
-      ?? currentP20Deviation
-      ?? planView?.baseline?.p20VariationDb
-      ?? null,
-    seats: planView?.baseline?.seats,
-    leverRows: absorptionLeverRows(planView),
-    // The view model's own resolved frequency (null when no credible frequency
-    // was identified), so the advice and the evidence block cannot disagree.
-    limitingFrequencyHz: limitingFrequency.hz,
-  });
-  const rows = absorption
-    ? [
-      ...leverRows,
-      {
-        key: absorption.key,
-        label: absorption.label,
-        status: absorption.status,
-        outcome: absorption.reason,
-        action: null,
-        actionText: absorption.actionText,
-        advice: true,
-      },
-    ]
-    : leverRows;
+  // REMOVED: generic low-frequency treatment advice is no longer produced.
+  const absorption = null;
+  const rows = leverRows;
 
   // Levers that were evaluated without becoming the recommendation: the failed
   // electronic and placement attempts, named for Engineer details only.
