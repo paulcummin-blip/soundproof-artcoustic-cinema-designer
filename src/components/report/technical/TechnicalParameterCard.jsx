@@ -112,6 +112,7 @@ export default function TechnicalParameterCard({
   humanTitle,
   seatGridData,
   targetBasisNote,
+  statusNote = null,
   asdrFooter = null,
   variant = "print",
   assumed = false,
@@ -261,6 +262,22 @@ export default function TechnicalParameterCard({
       >
         {param.short}
       </div>
+
+      {/* 3b. A stated assessment note carried by the published result — e.g. the
+          deliberate integrated LCR soundbar compromise behind a FAIL. */}
+      {statusNote && (
+        <div
+          style={{
+            fontSize: u.fsLabel,
+            color: "#625143",
+            fontFamily: BODY_FONT,
+            lineHeight: isScreen ? 1.45 : 1.25,
+            marginTop: u.mt1,
+          }}
+        >
+          {statusNote}
+        </div>
+      )}
 
       {/* 4. TECHNICAL METADATA */}
       <div

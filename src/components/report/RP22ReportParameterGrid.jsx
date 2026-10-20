@@ -119,6 +119,9 @@ export default function RP22ReportParameterGrid({
     const humanTitle = getHumanTitleForParam(param.id) + (param.id === 10 ? ' — Project/all-seat floor' : '');
     const category = getCategoryForParam(param.id);
     const asdrFooter = buildAsdrFooter(param.id);
+    // A stated note published with the room result (e.g. the deliberate
+    // integrated LCR soundbar compromise) is printed with its own parameter.
+    const statusNote = engineeringSummary?.roomResultsByParameter?.[param.id]?.note ?? null;
 
     const achievedValue = engineeringSummary?.reportAuthority ? atomic.value : getHudValueForParam(param, { isPrintVariant });
     const lvl = engineeringSummary?.reportAuthority ? atomic.level : getHudLevelForParam(param);
@@ -135,6 +138,7 @@ export default function RP22ReportParameterGrid({
           humanTitle={humanTitle}
           seatGridData={seatGridData}
           targetBasisNote={targetBasisNote}
+          statusNote={statusNote}
           asdrFooter={asdrFooter}
           assumed={engineeringSummary?.roomResultsByParameter?.[param.id]?.assumed === true}
         />

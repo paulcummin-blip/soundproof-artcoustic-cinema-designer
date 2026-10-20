@@ -684,6 +684,35 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const fl = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FL' || r === 'L'; });
       const fr = speakersForP3.find(s => { const r = String(s.role || '').toUpperCase(); return r === 'FR' || r === 'R'; });
 
+      // INTEGRATED LCR SOUNDBAR — one cabinet carries the left, centre and right
+      // channels, so there are no separate left/right speakers to test. The
+      // configuration is recognised from the selected soundbar model itself (the
+      // catalogue's own frontStageType), not from an LCR model selection. Our
+      // design rule is that an integrated LCR soundbar places its left and right
+      // channels outside the recommended RP22 screen-speaker zones, so both are
+      // outside: a deliberate design compromise and a COMPLETE assessment (FAIL),
+      // never a missing one. Separate LCR configurations are unaffected.
+      const frontCentre = speakersForP3.find(s => {
+        const r = String(s.role || '').toUpperCase();
+        return r === 'FC' || r === 'C';
+      });
+      if (frontCentre && isIntegratedLcrSpeaker(
+        frontCentre,
+        getSpeakerModelMeta(frontCentre.model, screen?.tvPresetKey ?? null, {}),
+      )) {
+        gradedParameters.primary[3] = {
+          title: "Number of screen wall speakers allowed outside of recommended zonal locations",
+          level: "FAIL",
+          value: 2,
+          unit: "speakers",
+          formatted: "2 speakers",
+          status: "ok",
+          integratedLcr: true,
+          note: "An integrated LCR soundbar carries the left, centre and right channels in one cabinet, so its left and right channels sit outside the recommended RP22 screen-speaker zones. This is an intentional design compromise, and the three channels are fixed within the cabinet.",
+        };
+        return;
+      }
+
       // P3 requires valid authoritative geometry for BOTH FL and FR before it
       // can be definitively scored. A missing speaker for either channel
       // means P3 cannot be evaluated → no_data.
@@ -726,7 +755,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         level: failCount > 0 ? "FAIL" : "L4",
         value: failCount,
         unit: "speakers",
-        formatted: failCount > 0 ? "Outside permitted zone tolerance" : "0 speakers",
+        formatted: `${failCount} speaker${failCount === 1 ? "" : "s"}`,
         status: "ok"
       };
     })();
