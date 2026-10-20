@@ -238,12 +238,12 @@ describe("THREE LEVELS — result, technical details, developer diagnostics", ()
     );
   });
 
-  it("renders OTHER OPTIONS on the card, and never an Apply per option", () => {
+  it("no longer renders OTHER OPTIONS or treatment advice on the card", () => {
     const journey = read(`${OPT}/AdiOptimisationJourney.jsx`);
-    assert.ok(journey.includes("<AdiOtherOptions options={otherOptions} />"));
-    const options = read(`${OPT}/AdiOtherOptions.jsx`);
-    assert.ok(options.includes('data-adi-other-option-review'), "each option is reviewed");
-    assert.ok(!/onApply/.test(options), "an option carries no Apply of its own");
+    assert.ok(!journey.includes("<AdiOtherOptions"));
+    assert.ok(!journey.includes("treatment={summary.absorption}"));
+    const panel = read(`${OPT}/AdiEngineerDetailsPanel.jsx`);
+    assert.ok(!panel.includes("data-adi-treatment-advice"));
   });
 
   it("never draws the empty design-change box", () => {

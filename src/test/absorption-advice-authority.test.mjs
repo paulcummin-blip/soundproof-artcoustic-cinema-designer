@@ -140,7 +140,7 @@ it("the advice never over-claims and never offers an applyable lever", () => {
 
 // ── The ninth row in the card ─────────────────────────────────────────────────
 
-it("the card lists absorption ninth, after seating, and never as an Apply", () => {
+it("the card lists the eight practical levers and no treatment advice", () => {
   const summary = buildAdiDesignerSummary({
     planView: staleSummaryPlan(),
     presentation: { state: "stale", statusLabel: "Re-evaluation required", showApply: false },
@@ -151,19 +151,18 @@ it("the card lists absorption ninth, after seating, and never as an Apply", () =
     limitingFrequencyHz: 43,
   });
 
-  assert.equal(summary.rows.length, 9, "all nine steps are always listed");
+  assert.equal(summary.rows.length, 6, "the practical steps are listed");
   assert.deepEqual(
     summary.rows.map((row) => row.label),
-    ["Delay", "Gain", "Phase", "Polarity", "Placement", "Layout", "Sub option", "Seating", ABSORPTION_LABEL],
-    "the fixed order is stated exactly",
+    ["Delay", "Gain", "Polarity", "Placement", "Layout", "Seating"],
+    "the fixed order is stated exactly, with no treatment row",
   );
-  assert.equal(summary.rows[8].key, ABSORPTION_ROW_KEY, "absorption is the ninth row");
-  assert.match(summary.rows[4].label, /placement/i, "placement is fifth");
-  assert.match(summary.rows[7].label, /seating/i, "seating is eighth, before absorption");
-  assert.equal(summary.rows[8].action, null, "no Apply action for absorption");
+  assert.ok(!summary.rows.some((row) => row.key === ABSORPTION_ROW_KEY), "no absorption row");
+  assert.match(summary.rows[3].label, /placement/i, "placement is fourth");
+  assert.match(summary.rows[5].label, /seating/i, "seating is last");
   assert.equal(summary.rows.filter((row) => row.action === "apply").length, 0, "nothing is applyable from stale evidence");
   assert.equal(summary.actions.canApply, false, "stale evidence offers no Apply");
-  assert.ok(summary.absorption, "the advice is exposed to the card");
+  assert.equal(summary.absorption, null, "low-frequency treatment advice is no longer produced");
 });
 
 it("no decimal dB reaches the card, and the level is stated", () => {
@@ -200,6 +199,7 @@ it("no absorption advice when the recommended practical change already reaches L
     limitingFrequencyHz: 43,
   });
   assert.equal(summary.absorption, null, "the practical change solves it — no absorption advice");
-  assert.equal(summary.rows.length, 8, "only the eight practical levers are listed");
-  assert.match(summary.rows[4].status, /Recommended/);
+  assert.equal(summary.rows.length, 6, "only the practical levers are listed");
+  const placementRow = summary.rows.find((row) => /placement/i.test(row.label));
+  assert.match(placementRow.status, /Recommended/);
 });
