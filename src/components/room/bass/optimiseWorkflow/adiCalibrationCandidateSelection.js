@@ -96,6 +96,9 @@ function acceptedCandidates(selection) {
  */
 export function confirmedCalibrationCandidates({ selection = null } = {}) {
   if (!selection) return [];
+  // Keep the confirmed joint configuration intact until its explicit Apply action.
+  // Applying a separate delay/gain candidate here would invalidate that comparison.
+  if (selection.integrationRecommendation?.integrationVerified || selection.combinedResult?.integrationVerified) return [];
   const out = [];
   const seen = new Set();
   const push = (candidate) => {
