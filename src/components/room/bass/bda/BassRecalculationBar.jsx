@@ -30,9 +30,9 @@ export default function BassRecalculationBar({
         <div
           data-bass-recalculation-warning="true"
           className="mr-auto min-w-0 rounded-md px-2.5 py-1.5"
-          style={{ border: "1px solid #FCD34D", background: "#FEF3C7" }}
+          style={{ border: "1px solid #C1B6AD", background: "#F1F0EE" }}
         >
-          <div className="font-semibold" style={{ fontSize: "11.5px", color: "#92400E" }}>
+          <div className="font-semibold" style={{ fontSize: "11.5px", color: "#625143" }}>
             {RECALCULATION_WARNING.heading}
           </div>
           <div style={{ fontSize: "11px", color: "#3E4349", lineHeight: 1.35 }}>
