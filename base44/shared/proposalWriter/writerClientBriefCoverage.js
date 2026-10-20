@@ -113,7 +113,7 @@ const GENERIC_TERMS = new Set([
 const SUBJECT_WRITER_SECTION = Object.freeze({
   front_wides: 'spatial_resolution',
   overheads: 'spatial_resolution',
-  viewing: 'spatial_resolution',
+  viewing: 'what_stays_same',
   spatial_resolution: 'spatial_resolution',
   bass_output: 'dynamic_range',
   bass_extension: 'dynamic_range',

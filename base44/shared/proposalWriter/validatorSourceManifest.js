@@ -16,7 +16,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': 'c4c0df7c2e3c823774ee5ee4085bf18b783adc2938bffe1e2c3a555adf8cb5e4',
+  'base44/shared/proposalWriter/writerContractSchema.js': '50e35bc9679682457a174fe4a0b08f59a1d2258bce925439ba0e7b11ccef465d',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
@@ -78,7 +78,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // proposal is written to, and the approved reference passages it shows instead
   // of any example of wording to avoid. Hashed so a draft can always be traced to
   // the standard it was written under.
-  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': 'ea821215f6072b3a6edc23cff344a1a57f1b1303a295970b926ed3b468866c91',
+  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': '6e426c0b818a5d6749e6cc4d2ca9e5fd3df694b8778d14dfb1240aa9d9fa8097',
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',
