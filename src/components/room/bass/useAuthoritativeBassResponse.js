@@ -667,7 +667,9 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     ? (instanceStatus === INSTANCE_STATUS.ERROR ? "subwoofer_instance_error" : "subwoofer_instances_uninitialised")
     : simulationState.request === simulationRequest && simulationState.status === "error"
       ? simulationState.error || "authoritative_simulation_error"
-      : null;
+      : simulationReady && integration.enabled && !combinedSystem?.available
+        ? "combined_response_unavailable"
+        : null;
   const hasManualRequest = !!analysisRequestId && !!analysisRequestFingerprint && analysisRequestFingerprint === fingerprints?.geometry;
   const hasBackgroundPrep = !!backgroundPrepFingerprint && backgroundPrepFingerprint === fingerprints?.geometry;
   const responseStatus = analysisBlocked

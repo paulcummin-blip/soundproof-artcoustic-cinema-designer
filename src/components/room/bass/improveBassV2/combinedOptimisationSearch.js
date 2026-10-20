@@ -164,7 +164,7 @@ export async function runCombinedOptimisation(ctx) {
     const search = await runInWorker(worker, "crossover-integration", {
       rawTransfer: currentRawTransfer, effectiveBaseline,
       p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-    }, controller.signal);
+    }, controller.signal, { timeoutMs: 120000 });
     metrics.recordWorkerCall("crossover-integration", "joint-integration", performance.now() - started, false);
     if (isStale() || isCancelled()) return { combinedCandidates: [], diagnostics: { status: "stale" } };
     const combinedCandidates = [];

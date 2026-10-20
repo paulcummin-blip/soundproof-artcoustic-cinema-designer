@@ -50,7 +50,7 @@ export default function CrossoverRecommendation({
       instances:current.instances,
       crossover:current.shared?.authoritative?.crossover,
     };
-    const nextRecord={...record,previousConfiguration:previous,status:restore?"restoring":"applying"};
+    const nextRecord={...record,previousConfiguration:previous,status:restore?"restoring":"applying",error:null};
     try {
       const nextInstances=restore ? previous.instances : applyCalibrationTuning(current.instances,recommended.appliedTuning);
       const nextCrossover=restore ? previous.crossover : recommended.crossover;
@@ -70,6 +70,7 @@ export default function CrossoverRecommendation({
         const actual=extractAuthorityForComparison(authority);
         const expected=restore?baseline:recommended;
         if (!actual || !expected ||
+            ![actual.achievedP19VariationDb,actual.achievedP20VariationDb,expected.achievedP19VariationDb,expected.achievedP20VariationDb].every(Number.isFinite) ||
             Math.abs(actual.achievedP19VariationDb-expected.achievedP19VariationDb)>0.1 ||
             Math.abs(actual.achievedP20VariationDb-expected.achievedP20VariationDb)>0.1) {
           throw new Error("The applied calculation does not reproduce ADI's prediction. Review the result or restore the previous settings.");

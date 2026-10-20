@@ -4,6 +4,15 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Prebundle the existing public frontend shared entries in development.
+  // Backend file serving stays blocked by the Base44 plugin.
+  optimizeDeps: { include: [
+    "./shared/briefRelevance.js", "./shared/narrativePriorityAuthority.js",
+    "./shared/canonicalParameterWeights.js", "./shared/reportEvidenceFingerprint.js",
+    "./shared/pinnedReportEvidenceParity.js", "./shared/seatingBoundaryPrinciple.js",
+    "./shared/strengthImportance.js", "./shared/strengthStories.js", "./shared/strengthStoryEvidence.js",
+    "./shared/reportDesignIntent/reportGeometryContext.js", "./shared/reportDesignIntent/reportVisualContext.js",
+  ] },
   plugins: [
     base44({
       // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
