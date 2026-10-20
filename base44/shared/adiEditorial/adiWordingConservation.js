@@ -86,7 +86,7 @@ export function numericTokens(value) {
     .replace(NUMBER_WORD_PATTERN, (word) => (word.toLowerCase() === 'one' ? ' ' : String(NUMBER_WORDS[word.toLowerCase()])))
     .replace(/(\d),(\d)/g, '$1$2');
   const found = text.match(DIGITS) || [];
-  return found.map((token) => token.replace(/\.$/, ''));
+  return found.map((token) => token.replace(/\.$/, '')).filter((token) => token !== '1');
 }
 
 /** The words that state a limitation, a caveat or an assumption. */
