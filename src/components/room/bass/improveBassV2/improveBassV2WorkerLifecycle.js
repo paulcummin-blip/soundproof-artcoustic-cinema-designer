@@ -104,6 +104,10 @@ export function runInWorker(worker, phase, params, signal, opts = {}) {
     function onMessage(event) {
       const data = event.data || {};
       if (data.requestId !== requestId) return;
+      if (data.type === "diagnostic") {
+        worker.onRuntimeDiagnostics?.(data.counts);
+        return;
+      }
       if (data.type === "complete") {
         settle(resolve, data.result);
       } else {

@@ -60,7 +60,7 @@ export function runCrossoverIntegrationSearch({
   if (!baseline) return { candidates: [], diagnostics: { status: "error", reason: "Baseline confirmation failed" } };
   const baselineDone = performance.now();
   const diagnostics = {
-    status: "completed", screened: 0, confirmed: 1, slopePairs: [], linkedFrequencies: [],
+    status: "completed", screened: 0, confirmed: 1, duplicateCandidatesAvoided: 0, slopePairs: [], linkedFrequencies: [],
     independentTested: 0, jointTrials: 0, rejected: [], searchVersion: "joint-crossover-v1",
     band: [baseline.assessmentStartHz,baseline.assessmentEndHz],
   };
@@ -69,7 +69,7 @@ export function runCrossoverIntegrationSearch({
   function screen(candidate) {
     candidate.crossover = normaliseCrossoverConfig(candidate.crossover, limits);
     const key = keyOf(candidate);
-    if (seen.has(key)) return seen.get(key);
+    if (seen.has(key)) { diagnostics.duplicateCandidatesAvoided++; return seen.get(key); }
     if (diagnostics.screened >= maxScreenings) return null;
     const combined = combineTunedResponse(rawTransfer, candidate.tuning, candidate.crossover);
     if (!combined?.available) return null;
@@ -110,6 +110,9 @@ export function runCrossoverIntegrationSearch({
       if(group[0])seeds.push(group[0]);
     }
   }
+  diagnostics.crossoverScreeningMs = performance.now() - baselineDone;
+  diagnostics.crossoverCandidates = diagnostics.screened;
+  const jointStarted = performance.now();
   // Keep diversity: best two for EACH slope pair plus the installed config.
   let beam=[baselineScreen,...diagnostics.slopePairs.flatMap(([hp,lp])=>seeds.filter(c=>c.crossover.speakerHpSlopeDbPerOct===hp&&c.crossover.subwooferLpSlopeDbPerOct===lp).sort((a,b)=>a.score-b.score).slice(0,2))].filter(Boolean);
   // Deterministic joint neighbourhoods change gain, delay and all-pass phase
@@ -139,6 +142,9 @@ export function runCrossoverIntegrationSearch({
     }
     beam=diagnostics.slopePairs.flatMap(([hp,lp])=>next.filter(c=>c.crossover.speakerHpSlopeDbPerOct===hp&&c.crossover.subwooferLpSlopeDbPerOct===lp).sort((a,b)=>a.score-b.score).slice(0,2));
   }
+  diagnostics.jointSearchMs = performance.now() - jointStarted;
+  diagnostics.jointCandidates = diagnostics.screened - diagnostics.crossoverCandidates;
+  const refinementStarted = performance.now();
   // Independent frequencies are modest offsets and remain visible/editable.
   // Include fresh joint tuning starts so independent-frequency refinement is
   // not evaluated solely at a frozen electronic optimum.
@@ -149,6 +155,8 @@ export function runCrossoverIntegrationSearch({
       screen({crossover:cross,tuning});
     }
   }
+  diagnostics.refinementMs = performance.now() - refinementStarted;
+  diagnostics.refinementCandidates = diagnostics.screened - diagnostics.crossoverCandidates - diagnostics.jointCandidates;
   const ranked=all.slice().sort((a,b)=>a.score-b.score);
   const diverse=diagnostics.slopePairs.flatMap(([hp,lp])=>ranked.filter(c=>c.crossover.speakerHpSlopeDbPerOct===hp&&c.crossover.subwooferLpSlopeDbPerOct===lp).slice(0,1));
   const finalists=[...new Map([...ranked.slice(0,8),...diverse].map(c=>[c.key,c])).values()];

@@ -11,6 +11,7 @@
 // The prepared field contains NO listener-dependent data. Only the listener-
 // mode coupling and transfer matrix are recomputed per offset.
 
+import { recordRoomSimulationInvocation } from "../improveBassV2/improveBassV2RuntimeMetrics";
 import { prepareSourceRoomField, evaluateReceiversFromPreparedField } from "@/bass/core/batchModalEvaluator";
 import { prepareModeBank } from "@/bass/core/rewBassEngine";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
@@ -189,6 +190,7 @@ export function evaluateSeatingBatch({
     }))];
 
     // Evaluate receivers from the prepared field (only listener-dependent terms)
+    recordRoomSimulationInvocation("batchedReceiverEvaluations");
     const receiverResult = evaluateReceiversFromPreparedField(preparedField, listeners);
 
     // Assemble perSourcePerSeatComplexTransfers (same format as production)

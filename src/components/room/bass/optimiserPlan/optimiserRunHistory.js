@@ -34,7 +34,7 @@ import { base44 } from "@/api/base44Client";
 export const OPTIMISER_RUN_HISTORY_LIMIT = 12;
 
 /** The most runtime-cost rows one history record keeps. */
-const RUNTIME_ROW_LIMIT = 24;
+const RUNTIME_ROW_LIMIT = 48;
 
 // The signed-in user's account id, resolved once per session. The history row
 // carries account_id because that is what scopes the log to the owning account
@@ -68,6 +68,14 @@ const count = (value) => (Number.isFinite(Number(value)) ? Math.max(0, Math.floo
 
 /** The compact runtime-cost rows only: key, label, value. Nothing else. */
 function compactRuntimeBreakdown(rows) {
+  if (rows && !Array.isArray(rows) && typeof rows === "object") {
+    rows = [
+      ...Object.entries(rows.measuredStages || rows.stages || {}).map(([key, value]) => ({ key, label: key, value })),
+      ...["runId", "totalWallClockMs", "counts", "stage2", "transferCache", "repeatedConfirmations", "timings", "publication"]
+        .filter(key => rows[key] != null)
+        .map(key => ({ key, label: key, value: typeof rows[key] === "object" ? JSON.stringify(rows[key]) : rows[key] })),
+    ];
+  }
   if (!Array.isArray(rows)) return [];
   return rows
     .slice(0, RUNTIME_ROW_LIMIT)

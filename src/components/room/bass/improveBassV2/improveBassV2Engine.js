@@ -458,6 +458,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   // timing recorded here reconciles with the Stage 2 wait, the plan save and the
   // publication as one run.
   const metrics = new V2RuntimeMetrics(projectId, { runId: params.runId || null, versionId });
+  metrics.recordCounts({ roomSimulationCalls: 0, batchedReceiverEvaluations: 0 });
+  worker.onRuntimeDiagnostics = counts => metrics.recordCounts(counts);
   // The wait BEFORE this engine began (acquiring or waiting for Stage 2). It is
   // measured by the orchestrator on the same run identity, so the interval
   // between the run's verdict and its evaluation figure is never unaccounted.
@@ -1814,6 +1816,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     unsubscribe();
     if (wholeRunTimer) { clearTimeout(wholeRunTimer); wholeRunTimer = null; }
     metrics.finish();
+    callbacks.onRuntimeMetrics?.(metrics.toReport());
     metrics.logReport();
     // Attach runtime metrics to the result so callers can verify placement
     // fingerprint usage and Stage 2 transfer reuse without console scraping.

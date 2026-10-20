@@ -26,6 +26,11 @@
 // top waits, counts). The full arrays travel on the result for diagnostics and
 // are never logged wholesale.
 
+// Scalar notifications only; no response arrays or acoustic inputs retained.
+let roomSimulationObserver = null;
+export function setRoomSimulationObserver(observer) { roomSimulationObserver = observer; }
+export function recordRoomSimulationInvocation(kind = "roomSimulationCalls") { roomSimulationObserver?.(kind); }
+
 const now = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
@@ -161,6 +166,7 @@ export class V2RuntimeMetrics {
   }
 
   finish() {
+    while (this.openStages.length) this.endStage(this.openStages[this.openStages.length - 1].key);
     this.endMs = now();
     this.totalWallClockMs = this.endMs - this.startMs;
   }

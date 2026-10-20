@@ -1,6 +1,7 @@
 import { captureCombinedIntegrationTransfers } from "../combinedIntegrationEngine";
 import { simulateAuthoritativeBassResponse } from "../authoritativeBassResponseEngine";
 import { runCrossoverIntegrationSearch } from "./crossoverIntegrationSearch";
+import { setRoomSimulationObserver } from "./improveBassV2RuntimeMetrics";
 let integrationContext = null;
 function attachIntegration(rawTransfer) {
   if (!integrationContext?.speakerSources?.length || !rawTransfer) return rawTransfer;
@@ -40,6 +41,7 @@ self.onmessage = (event) => {
     self.postMessage({ type: "error", requestId: null, error: "Missing requestId" });
     return;
   }
+  setRoomSimulationObserver(kind => self.postMessage({ type: "diagnostic", requestId, counts: { [kind]: 1 } }));
   try {
     if (phase === "integration-context") {
       integrationContext = params.context;

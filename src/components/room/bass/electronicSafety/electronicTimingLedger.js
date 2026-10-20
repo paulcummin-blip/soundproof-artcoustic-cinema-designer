@@ -279,6 +279,9 @@ export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTi
 
   return {
     runId: runtimeMetrics.runId || null,
+    counts: runtimeMetrics.counts || {},
+    stage2: runtimeMetrics.stage2 || null,
+    measuredStages: runtimeMetrics.stageSpans || {},
     totalWallClockMs: Number(runtimeMetrics.totalWallClockMs) || 0,
     // THE RECONCILIATION of the run's own elapsed time: worker time, the
     // sequential wait between worker calls, and what falls outside that sequence.

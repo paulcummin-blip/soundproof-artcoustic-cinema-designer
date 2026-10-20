@@ -174,6 +174,17 @@ export async function runCombinedOptimisation(ctx) {
     }, controller.signal, { timeoutMs: 120000 });
     metrics.recordWorkerCall("crossover-integration", "joint-integration", performance.now() - started, false,
       { startedAt: started, endedAt: performance.now() });
+    const d = search?.diagnostics || {};
+    for (const [key, value] of Object.entries({
+      "crossover-screening": d.crossoverScreeningMs, "joint-electronic-search": d.jointSearchMs,
+      "candidate-refinement": d.refinementMs, "integration-baseline-confirmation": d.baselineMs,
+      "integration-final-confirmations": d.confirmationMs,
+    })) if (Number.isFinite(value)) metrics.addStage(key, value);
+    metrics.recordCounts({
+      crossoverCandidates: d.crossoverCandidates || 0, jointCandidates: d.jointCandidates || 0,
+      refinementCandidates: d.refinementCandidates || 0, integrationCanonicalConfirmations: d.confirmed || 0,
+      duplicateCandidatesAvoided: d.duplicateCandidatesAvoided || 0,
+    });
     if (isStale() || isCancelled()) return { combinedCandidates: [], diagnostics: { status: "stale" } };
     const combinedCandidates = [];
     for (const [index, candidate] of (search?.candidates || []).entries()) {

@@ -235,7 +235,12 @@ export async function runOptimisation(opts) {
     integrationContext,
   };
 
+  let runtimeMetrics = null;
   const callbacks = {
+    onRuntimeMetrics: report => {
+      runtimeMetrics = { ...report, stage2: stage2Result?.runtimeDiagnostics || null };
+      opts.onRuntimeMetrics?.(runtimeMetrics);
+    },
     onProgress: (phase, label, current, total) => {
       updateProgress(projectId, versionId, phase, label, current, total);
     },
@@ -257,6 +262,7 @@ export async function runOptimisation(opts) {
 
   try {
     const result = await runImproveBassV2(projectId, versionId, params, callbacks);
+    result.runtimeMetrics = runtimeMetrics || result.runtimeMetrics;
 
     if (result.status === "cancelled") {
       setCancelled(projectId, versionId);
@@ -364,7 +370,7 @@ export async function runOptimisation(opts) {
     return result;
   } catch (err) {
     setError(projectId, versionId, err.message);
-    return { status: "error", error: err.message };
+    return { status: "error", error: err.message, runtimeMetrics };
   }
 }
 

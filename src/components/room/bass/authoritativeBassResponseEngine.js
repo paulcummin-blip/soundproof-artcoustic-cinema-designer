@@ -1,3 +1,4 @@
+import { recordRoomSimulationInvocation } from "./improveBassV2/improveBassV2RuntimeMetrics";
 import { simulateBassResponseRewCore, simulateBassResponseRewParityField, prepareModeBank } from "@/bass/core/rewBassEngine";
 import { evaluateBatchModalTransfers } from "@/bass/core/batchModalEvaluator";
 import { buildFrequencyAxis } from "@/bass/core/rewCorePrimitives";
@@ -57,6 +58,7 @@ const REFERENCE_SOURCE_DB = 94;
 const REFERENCE_SOURCE_AMPLITUDE = Math.pow(10, REFERENCE_SOURCE_DB / 20);
 
 export function simulateAuthoritativeBassResponse({ roomDims, seatingPositions, rspPosition, sources, physics, qStrategyOverride, capturePerSourcePerSeat }) {
+  recordRoomSimulationInvocation();
   if (!sources.length || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
     return { seatResponses: {}, metrics: null, audit: null, runtimeVectorCapture: { rows: [] }, perSourceRspComplexTransfers: [], perSourcePerSeatComplexTransfers: [] };
   }
