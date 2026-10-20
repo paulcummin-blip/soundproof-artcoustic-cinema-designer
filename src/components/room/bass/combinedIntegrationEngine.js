@@ -37,7 +37,7 @@ const SPEAKER_NEUTRAL_TUNING = Object.freeze({
   gainDb: 0, delayMs: 0, polarity: 0, phaseControlDeg: 0,
 });
 
-function groupTransfersBySeat(transfers, modelKeyBySourceId) {
+function groupTransfersBySeat(transfers, modelKeyBySourceId, weightBySourceId) {
   const bySeat = {};
   (Array.isArray(transfers) ? transfers : []).forEach((transfer) => {
     if (!transfer?.seatId || !Array.isArray(transfer.points)) return;
@@ -45,6 +45,7 @@ function groupTransfersBySeat(transfers, modelKeyBySourceId) {
     bySeat[transfer.seatId].push({
       sourceId: transfer.sourceId ?? String(transfer.sourceIndex),
       modelKey: modelKeyBySourceId?.[transfer.sourceId] ?? null,
+      channelWeight: weightBySourceId?.[transfer.sourceId] ?? 1,
       points: transfer.points,
     });
   });
@@ -70,6 +71,7 @@ export function captureCombinedIntegrationTransfers({
   seatingPositions,
   rspPosition,
   subTransfers,
+  subSources = [],
   speakerSources,
   physics,
   qStrategyOverride,
@@ -115,12 +117,31 @@ export function captureCombinedIntegrationTransfers({
     .map((point) => Number(point?.frequency))
     .filter(Number.isFinite);
 
+  // Fixed broad-band calibration reference, before either crossover filter.
+  // Sum source magnitudes (not coherent pressures) so a modal cancellation
+  // cannot trigger a large compensating speaker boost. Remove installed sub
+  // gains: a gain edit must change the balance, never silently retune the LCR.
+  // This reference depends on geometry/products, not crossover or tuning.
+  const weightBySourceId = Object.fromEntries(speakers.map(s => [s.id, s.channelWeight ?? 1]));
+  const gainById = Object.fromEntries(subSources.map(s => [s.id, Number(s.tuning?.gainDb) || 0]));
+  const subRsp = subTransfers.filter(t => t.seatId === "rsp");
+  const speakerRsp = speakerTransfers.filter(t => t.seatId === "rsp");
+  const references = frequenciesHz.flatMap((f, i) => {
+    if (f < 80 || f > 160) return [];
+    const sub = subRsp.reduce((sum, t) => sum + Math.hypot(t.points[i]?.re || 0, t.points[i]?.im || 0) / Math.pow(10, (gainById[t.sourceId] || 0) / 20), 0);
+    const speaker = speakerRsp.reduce((sum, t) => sum + (weightBySourceId[t.sourceId] ?? 1) * Math.hypot(t.points[i]?.re || 0, t.points[i]?.im || 0), 0);
+    return sub > 0 && speaker > 0 ? [20 * Math.log10(sub / speaker)] : [];
+  }).sort((a, b) => a - b);
+  if (!references.length) return { available: false, reason: "missing-reference-transfers" };
+  const speakerReferenceLevelDb = references[Math.floor(references.length / 2)];
   return {
     available: true,
+    speakerReferenceLevelDb,
+    levelConvention: "simultaneous-lcr-fixed-broadband-reference-v1",
     reason: null,
     frequenciesHz,
     subTransfersBySeat: groupTransfersBySeat(subTransfers),
-    speakerTransfersBySeat: groupTransfersBySeat(speakerTransfers, modelKeyBySourceId),
+    speakerTransfersBySeat: groupTransfersBySeat(speakerTransfers, modelKeyBySourceId, weightBySourceId),
     subwooferCount: new Set(subTransfers.map((transfer) => transfer.sourceId ?? transfer.sourceIndex)).size,
     speakerCount: speakers.length,
     speakerModels: [...new Set(speakers.map((speaker) => speaker.modelKey).filter(Boolean))],

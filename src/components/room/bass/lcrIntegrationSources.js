@@ -6,7 +6,7 @@
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 /** The screen channels that take part in the combined bass-managed response. */
-export const LCR_ROLES = Object.freeze(["FL", "FC", "FR"]);
+export const LCR_ROLES = Object.freeze(["FL", "FC", "FR", "FCL", "FCR"]);
 
 const ROLE_SET = new Set(LCR_ROLES);
 const FALLBACK_Z_M = 1.2;
@@ -18,7 +18,7 @@ const FALLBACK_Z_M = 1.2;
 export function buildLcrIntegrationSources(placedSpeakers) {
   return (Array.isArray(placedSpeakers) ? placedSpeakers : [])
     .map((speaker) => {
-      const role = getCanonicalRole(speaker?.role);
+      const role = ["FCL", "FCR"].includes(speaker?.role) ? speaker.role : getCanonicalRole(speaker?.role);
       if (!ROLE_SET.has(role)) return null;
       const x = Number(speaker?.position?.x);
       const y = Number(speaker?.position?.y);
@@ -27,6 +27,7 @@ export function buildLcrIntegrationSources(placedSpeakers) {
       return {
         id: `lcr-${role}`,
         role,
+        channelWeight: ["FCL", "FCR"].includes(role) ? 0.5 : 1,
         modelKey: speaker?.model ?? null,
         x,
         y,

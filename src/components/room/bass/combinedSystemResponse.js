@@ -20,18 +20,12 @@
 // smooths, grades, thresholds or re-bands — smoothing and assessment stay with
 // the existing canonical authority.
 //
-// LEVEL CONVENTION (documented)
-//   A processor is calibrated so the speakers and the subwoofer arrive at the
-//   same level at the reference seat, at the crossover frequency. The model
-//   applies exactly that: one trim is computed at the reference seat at the
-//   crossover frequency so the two paths meet there, and the same trim is
-//   applied to every seat. Seat-to-seat differences therefore come from the
-//   room, the source geometry and the crossover interaction — never from an
-//   arbitrary level choice.
-//
-//   The subwoofer path carries the real product capability curve; the speaker
-//   path is driven from a UNIT flat source, so its stored transfer is
-//   dimensionless and the trim is the only level decision.
+// LEVEL CONVENTION
+// A fixed broad-band reference is captured with the geometry, before filters
+// and independently of installed sub gains. Crossover/tuning edits never
+// re-level the speakers. Split centres share one channel's drive.
+// Redirected bass is represented by the sub branch ONCE.
+// This practical design convention is not a claim about processor calibration.
 //
 // Pure module: no React, no entity access, no engine import.
 // ---------------------------------------------------------------------------
@@ -60,22 +54,6 @@ function pointsToCurve(frequenciesHz, sumRe, sumIm) {
   return curve;
 }
 
-/** Index of the axis point closest to a target frequency (log-spaced axis). */
-function nearestAxisIndex(frequenciesHz, targetHz) {
-  const target = Number(targetHz);
-  if (!Number.isFinite(target) || !frequenciesHz.length) return -1;
-  let bestIndex = -1;
-  let bestDistance = Infinity;
-  for (let index = 0; index < frequenciesHz.length; index += 1) {
-    const distance = Math.abs(Math.log(frequenciesHz[index] / target));
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  }
-  return bestIndex;
-}
-
 /**
  * Complex-sum one path for one seat.
  *
@@ -94,8 +72,8 @@ function sumPath(sources, pointCount) {
       let value = { re: Number(point.re), im: Number(point.im) };
       if (source.filter?.[index]) value = complexMultiply(value, source.filter[index]);
       if (source.shape?.[index]) value = complexMultiply(value, source.shape[index]);
-      re[index] += value.re;
-      im[index] += value.im;
+      re[index] += value.re * (source.channelWeight ?? 1);
+      im[index] += value.im * (source.channelWeight ?? 1);
     }
   }
   return { re, im };
@@ -120,6 +98,7 @@ export function buildCombinedSystemResponse({
   speakerTransfersBySeat,
   crossover,
   primarySeatId = "rsp",
+  speakerReferenceLevelDb,
 } = {}) {
   const frequencies = Array.isArray(frequenciesHz) ? frequenciesHz.map(Number) : [];
   const seatList = (Array.isArray(seats) ? seats : []).filter((seat) => seat?.seatId);
@@ -154,6 +133,7 @@ export function buildCombinedSystemResponse({
       points: source.points,
       filter: bank.highPass,
       shape: rollOffBank.get(normaliseModelKey(source.modelKey)) || null,
+      channelWeight: source.channelWeight ?? 1,
     }));
     paths.set(seat.seatId, {
       sub: sumPath(subSources, pointCount),
@@ -163,16 +143,10 @@ export function buildCombinedSystemResponse({
     });
   }
 
-  const primary = paths.get(primarySeatId) || paths.get(seatList[0].seatId);
-  const crossoverIndex = nearestAxisIndex(frequencies, bank.subwooferHz);
-  let levelMatchDb = 0;
-  if (primary && crossoverIndex >= 0) {
-    const subMagnitude = Math.hypot(primary.sub.re[crossoverIndex], primary.sub.im[crossoverIndex]);
-    const speakerMagnitude = Math.hypot(primary.speaker.re[crossoverIndex], primary.speaker.im[crossoverIndex]);
-    if (subMagnitude > 0 && speakerMagnitude > 0) {
-      levelMatchDb = 20 * Math.log10(subMagnitude / speakerMagnitude);
-    }
+  if (!paths.has(primarySeatId) || !Number.isFinite(speakerReferenceLevelDb)) {
+    return { available: false, reason: "missing-fixed-level-reference", combinedBySeat: {}, subOnlyBySeat: {} };
   }
+  const levelMatchDb = speakerReferenceLevelDb;
   const speakerTrim = Math.pow(10, levelMatchDb / 20);
 
   const combinedBySeat = {};

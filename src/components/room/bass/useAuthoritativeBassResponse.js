@@ -334,6 +334,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       const integrationTransfers = captureCombinedIntegrationTransfers({
         roomDims, seatingPositions, rspPosition,
         subTransfers: result?.perSourcePerSeatComplexTransfers,
+        subSources: sources,
         speakerSources: integration.speakerSources, physics, qStrategyOverride: strategy,
       });
       return integrationTransfers ? { ...result, integrationTransfers } : result;
@@ -574,6 +575,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     const primarySeatId = rspPosition?.id || "rsp";
     return buildCombinedSystemResponse({
       frequenciesHz: integrationTransfers.frequenciesHz,
+      speakerReferenceLevelDb: integrationTransfers.speakerReferenceLevelDb,
       seats: Object.keys(integrationTransfers.subTransfersBySeat || {})
         .map((seatId) => ({ seatId, isRsp: seatId === primarySeatId })),
       subTransfersBySeat: integrationTransfers.subTransfersBySeat,

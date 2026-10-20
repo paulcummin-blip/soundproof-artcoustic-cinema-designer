@@ -16,6 +16,7 @@ function captureIntegrationTransfers(payload, result) {
       seatingPositions: payload.seatingPositions,
       rspPosition: payload.rspPosition,
       subTransfers: result?.perSourcePerSeatComplexTransfers,
+      subSources: payload.sources,
       speakerSources: integration.speakerSources,
       physics: payload.physics,
       qStrategyOverride: payload.qStrategyOverride,
