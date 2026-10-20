@@ -142,12 +142,12 @@ describe("Acoustic integrity — no equations or grading rules changed", () => {
   test("gradeP19FromRaw and gradeP20FromRaw are unchanged", () => {
     assert.match(
       persistenceSource,
-      /export function gradeP19FromRaw/,
+      /export const gradeP19FromRaw = gradeP19/,
       "gradeP19FromRaw must be present",
     );
     assert.match(
       persistenceSource,
-      /export function gradeP20FromRaw/,
+      /export const gradeP20FromRaw = gradeP20/,
       "gradeP20FromRaw must be present",
     );
   });
@@ -173,7 +173,7 @@ describe("Acoustic integrity — no equations or grading rules changed", () => {
     );
     assert.match(
       persistenceSource,
-      /graphPayload: graphPayloadTimings/,
+      /const graphPayload = buildGraphPayload\(contract\)/,
       "compactCompletedBassContract must still build graphPayload for full contracts",
     );
   });

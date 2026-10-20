@@ -51,6 +51,8 @@ export default function CrossoverRecommendation({
   const stale=["recommended","restored"].includes(record.status) && record.baselineCacheKey!==shared?.cacheKey;
   const pending=applying||busy;
   const limiter=worst(recommended);
+  const baselineLimiter=worst(baseline);
+  const seatLabel=id=>id ? String(id).replace(/^seat-r(\d+)-c(\d+)$/, "Row $1 seat $2") : "—";
 
   async function commitAndVerify(restore) {
     if (pending || typeof write !== "function" || typeof commitInstances !== "function") return;
@@ -111,17 +113,17 @@ export default function CrossoverRecommendation({
         <tr><td>Subwoofer low-pass</td><td>{crossoverText(baseline?.crossover,false)}</td><td>{crossoverText(recommended.crossover,false)}</td></tr>
         <tr><td>P19 deviation</td><td>{number(baseline?.achievedP19VariationDb)} dB</td><td>{number(recommended.achievedP19VariationDb)} dB</td></tr>
         <tr><td>P20 deviation</td><td>{number(baseline?.achievedP20VariationDb)} dB</td><td>{number(recommended.achievedP20VariationDb)} dB</td></tr>
+        <tr><td>Limiting seat / frequency</td><td>{seatLabel(baselineLimiter?.seatId)} · {number(baselineLimiter?.worstFrequencyHz)} Hz</td><td>{seatLabel(limiter?.seatId)} · {number(limiter?.worstFrequencyHz)} Hz</td></tr>
         <tr><td>P14 headroom</td><td>{number(baseline?.p14HeadroomDb)} dB</td><td>{number(recommended.p14HeadroomDb)} dB</td></tr>
       </tbody>
     </table>
     <table className="w-full text-xs">
       <thead><tr><th className="text-left">Subwoofer</th><th>Gain</th><th>Delay</th><th>Phase</th><th>Polarity</th></tr></thead>
       <tbody>{recommended.appliedTuning?.map((t,i)=><tr key={t.sourceId||i}>
-        <td>{t.sourceId || "Sub "+(i+1)}</td><td>{number(t.gainDb)} dB</td><td>{number(t.delayMs)} ms</td>
+        <td>{t.sourceId?.replace(/^sub-/, "").replace(/-/g," ") || "Sub "+(i+1)}</td><td>{number(t.gainDb)} dB</td><td>{number(t.delayMs)} ms</td>
         <td>{number(t.phaseControlDeg||0)}°</td><td>{t.polarity===180||t.polarity===-1?"Inverted":"Normal"}</td>
       </tr>)}</tbody>
     </table>
-    <p className="text-xs">Limiting seat: {limiter?.seatId || "—"} at {number(limiter?.worstFrequencyHz)} Hz.</p>
     <p className="text-xs">{recommended.integrationExplanation}</p>
     <p className="text-xs">Primary-seat change: {number(Math.max(0,...(recommended.perSeatP20||[]).filter(s=>s.isPrimary).map(s=>s.variationDbRaw-(baseline?.perSeatP20?.find(b=>b.seatId===s.seatId)?.variationDbRaw??s.variationDbRaw))))} dB maximum regression.</p>
     {stale && <p className="text-xs text-amber-800">Design changed — re-run ADI before applying.</p>}

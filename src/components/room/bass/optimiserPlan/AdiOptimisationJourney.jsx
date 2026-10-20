@@ -134,6 +134,7 @@ const ADI_RUN_SECONDARY_CLASS = "inline-flex items-center gap-1.5 rounded-md bor
 // the tone reads.
 
 export default function AdiOptimisationJourney({
+  jointRecommendation = null,
   projectId = null,
   versionId = null,
   completedBassAuthority = null,
@@ -183,6 +184,10 @@ export default function AdiOptimisationJourney({
   designLimitation = null,
   className = "",
 }) {
+  const jointCurrent = jointRecommendation?.candidate?.integrationVerified && (
+    jointRecommendation.baselineCacheKey === currentDesignFingerprint ||
+    jointRecommendation.appliedCacheKey === currentDesignFingerprint
+  );
   const planView = useOptimiserPlanView({
     projectId,
     versionId,
@@ -842,15 +847,15 @@ export default function AdiOptimisationJourney({
       <AdiPanelSummary
         // A confirmed improvement states its own sentence — found, or already
         // applied — in place of the generic evaluation line.
-        message={improvementResult.headlineSentence || journey.message}
+        message={jointCurrent ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.") : improvementResult.headlineSentence || journey.message}
         nextAction={presentation?.nextAction || null}
         // In the trade-off state the decision IS the trade-off: the change, the
         // seat it would cost and the measurable trade replace the ordinary
         // adjustment/benefit/comparison lines, which would state it as an offer.
         tradeOff={tradeOff?.isTradeOff ? tradeOff : null}
-        adjustment={previousCandidate || tradeOff ? null : headline.adjustment}
-        benefit={previousCandidate || tradeOff ? null : headline.benefit}
-        comparison={previousCandidate || tradeOff ? null : headline.comparison}
+        adjustment={jointCurrent || previousCandidate || tradeOff ? null : headline.adjustment}
+        benefit={jointCurrent || previousCandidate || tradeOff ? null : headline.benefit}
+        comparison={jointCurrent || previousCandidate || tradeOff ? null : headline.comparison}
         designLimitation={designLimitation}
         previousCandidateNotice={previousCandidate && !tradeOff ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
         staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
@@ -862,7 +867,7 @@ export default function AdiOptimisationJourney({
           main panel. The designer never opens Engineer details to discover the
           basic answer. Rendered only for a confirmed improvement: a trade-off and
           a physical move keep their own presentation. */}
-      {improvementResult.found && <AdiImprovementResult result={improvementResult} />}
+      {!jointCurrent && improvementResult.found && <AdiImprovementResult result={improvementResult} />}
 
       {/* ── THE ACTIONS ── one primary control for the state, decided by the
           layout model, beside the controls of the change being offered. The

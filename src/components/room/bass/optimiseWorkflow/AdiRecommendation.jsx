@@ -375,6 +375,7 @@ export default function AdiRecommendation({
 
   return (
     <AdiOptimisationJourney
+      jointRecommendation={appState?.splConfig?.crossoverRecommendation || null}
       projectId={projectId}
       versionId={versionId}
       completedBassAuthority={completedBassAuthority}
