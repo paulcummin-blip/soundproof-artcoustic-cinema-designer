@@ -767,9 +767,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
               limits={projectCrossoverLimits}
               onChange={setProjectCrossover}
               disabled={disabled || !hasSpeakerModels}
-              hint={hasSpeakerModels
-                ? `Permitted ${Math.round(projectCrossoverLimits.minHz)}–${Math.round(projectCrossoverLimits.maxHz)} Hz`
-                : 'Select the LCR model to set the crossover.'}
+              hint={hasSpeakerModels ? null : 'Select the LCR model to set the crossover.'}
             />
           </div>
 

@@ -138,9 +138,9 @@ export default function CrossoverControls({
         )}
       </div>
 
-      {(hint || !disabled) && (
+      {hint && (
         <div style={{ fontSize: 11, color: "#625143", marginTop: 8 }}>
-          {hint || `Permitted ${Math.round(limits.minHz)}–${Math.round(limits.maxHz)} Hz`}
+          {hint}
         </div>
       )}
     </div>
