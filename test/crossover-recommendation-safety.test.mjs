@@ -48,3 +48,17 @@ test("saved primary scope survives compacted candidate rows and remains enforced
  compact.contract.provenance.primarySeatIds=[];
  assert.equal(recommendationResultMatches(compact,expected),false);
 });
+
+import { computeEngineeringFingerprint } from '../src/components/proposal/engineeringAuthority/engineeringFingerprint.js';
+import { buildFrozenReportProject } from '../shared/engineeringPublicationContract.js';
+test('recommendation receipts cannot republish unchanged engineering while real crossover changes do',()=>{
+ const design={splConfig:{crossover:{frequencyHz:100,speakerHpSlopeDbPerOct:24,subwooferLpSlopeDbPerOct:24},crossoverRecommendation:{status:'applying'}}};
+ const versions={publicationContractVersion:2,bassFingerprint:'bass-a'};
+ const before=computeEngineeringFingerprint(design,versions);
+ const receipt=structuredClone(design);receipt.splConfig.crossoverRecommendation={status:'applied',verifiedAt:'later'};
+ assert.equal(computeEngineeringFingerprint(receipt,versions),before);
+ assert.deepEqual(buildFrozenReportProject(receipt).reportProject.spl_config,buildFrozenReportProject(design).reportProject.spl_config);
+ assert.equal('crossoverRecommendation' in buildFrozenReportProject(receipt).reportProject.spl_config,false);
+ receipt.splConfig.crossover.frequencyHz=150;
+ assert.notEqual(computeEngineeringFingerprint(receipt,versions),before);
+});

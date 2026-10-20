@@ -42,7 +42,6 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
 import { useCompletedBassAuthority, isAuthoritativeBassContract, settleCompletedBassPersistence } from '@/components/room/bass/completedBassResultStore';
 import { readBassReconciliationStatus } from '@/components/room/bass/bassReconciliationStatus';
-import { flushBassAuthorityWrite } from '@/components/room/bass/bassAuthorityWriteQueue';
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';

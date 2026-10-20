@@ -75,7 +75,7 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
     dolby_config:d.dolbyLayout, selected_speakers:copy(d.placedSpeakers),
     subwooferInstances:copy(d.subwooferInstances), front_subs_cfg:copy(d.frontSubsCfg), rear_subs_cfg:copy(d.rearSubsCfg),
     acoustic_treatment_enabled:d.acousticTreatmentEnabled, selected_abfuser_qty:d.selectedAbfuserQty,
-    room_elements:copy(d.roomElements), spl_config:copy(d.splConfig),
+    room_elements:copy(d.roomElements), spl_config:copy(d.splConfig ? Object.fromEntries(Object.entries(d.splConfig).filter(([key]) => key !== "crossoverRecommendation")) : d.splConfig),
     rsp_mode:d.rspMode, manual_rsp_x_m:d.manualRspX_m, manual_rsp_y_m:d.manualRspY_m,
     designated_rsp_seat_id:d.designatedRspSeatId, viewing_priority:d.viewingPriority,
     selected_speakers_by_role:copy(d.selectedSpeakersByRole),

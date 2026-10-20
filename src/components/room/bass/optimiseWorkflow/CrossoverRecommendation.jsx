@@ -42,6 +42,7 @@ export default function CrossoverRecommendation({
     if (!recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration)) return;
     const restore=record.operation==="restore";
     if (!recommendationResultMatches(shared?.completedBassAuthority,restore?record.baseline:record.candidate)) return;
+    setError(null);
     write({crossoverRecommendation:{...record,status:restore?"restored":"applied",error:null,appliedCacheKey:shared.cacheKey,verifiedAt:new Date().toISOString()}});
   }, [record,applying,authorityState.code,shared?.cacheKey,shared?.calculationInProgress,shared?.completedBassAuthority,shared?.authoritative,write]);
 
@@ -127,8 +128,8 @@ export default function CrossoverRecommendation({
     <p className="text-xs">{recommended.integrationExplanation}</p>
     <p className="text-xs">Primary-seat change: {number(Math.max(0,...(recommended.perSeatP20||[]).filter(s=>s.isPrimary).map(s=>s.variationDbRaw-(baseline?.perSeatP20?.find(b=>b.seatId===s.seatId)?.variationDbRaw??s.variationDbRaw))))} dB maximum regression.</p>
     {stale && <p className="text-xs text-amber-800">Design changed — re-run ADI before applying.</p>}
-    {record.status==="applied" && record.appliedCacheKey===shared?.cacheKey && <p className="text-xs text-green-800">Applied — calculated result verified and saved.</p>}
-    {record.status==="restored" && record.appliedCacheKey===shared?.cacheKey && <p className="text-xs text-green-800">Previous settings restored — calculated result verified and saved.</p>}
+    {record.status==="applied" && record.appliedCacheKey===shared?.cacheKey && authorityState.code==="current" && <p className="text-xs text-green-800">Applied — calculated result verified and saved.</p>}
+    {record.status==="restored" && record.appliedCacheKey===shared?.cacheKey && authorityState.code==="current" && <p className="text-xs text-green-800">Previous settings restored — calculated result verified and saved.</p>}
     {(error||record.error) && <p role="alert" className="text-xs text-red-700">{error||record.error}</p>}
     <div className="flex gap-2">
       <button className="rounded bg-[#213428] px-3 py-2 text-xs text-white disabled:opacity-40" disabled={pending||stale||!["recommended","restored"].includes(record.status)} onClick={()=>commitAndVerify(false)}>

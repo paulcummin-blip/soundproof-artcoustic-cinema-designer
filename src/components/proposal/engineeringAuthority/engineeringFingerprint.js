@@ -223,7 +223,12 @@ function normalizeSplConfig(splConfig) {
  * @returns {string} fingerprint with prefix "eng:v1:hash"
  */
 export function computeEngineeringFingerprint(designState, versions = {}) {
-  const ds = designState || {};
+  // ADI's saved recommendation/verification receipt is workflow metadata.
+  // Actual crossover and subwoofer settings remain in the engineering identity.
+  const original = designState || {};
+  const ds = original.splConfig?.crossoverRecommendation
+    ? { ...original, splConfig: Object.fromEntries(Object.entries(original.splConfig).filter(([key]) => key !== "crossoverRecommendation")) }
+    : original;
   const v = versions || {};
 
   // The screen facts an identity may hash: the ACTIVE display authority only.
