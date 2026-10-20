@@ -264,7 +264,7 @@ export default function BassDesignAssistant({
                 </div>
               ) : null}
               {previewTerminalMessage && (
-                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-[10px] font-medium text-[#7A4F1A] bg-amber-50 px-2 py-1 rounded-md border border-amber-200" style={{ zIndex: 10, maxWidth: 320 }}>
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-[10px] font-medium text-[#4A230F] bg-[#F1F0EE] px-2 py-1 rounded-md border border-[#C1B6AD]" style={{ zIndex: 10, maxWidth: 320 }}>
                   {previewTerminalMessage}
                 </div>
               )}

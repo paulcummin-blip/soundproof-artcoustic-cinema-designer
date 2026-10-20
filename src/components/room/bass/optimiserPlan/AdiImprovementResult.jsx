@@ -63,7 +63,7 @@ export default function AdiImprovementResult({ result = null, className = "" }) 
 
       {/* WHY IT IS THE DESIGNER'S DECISION, when the run held it back. */}
       {result.held?.text && (
-        <p className="text-[11px] text-[#8A5A2B] leading-relaxed" data-adi-improvement-held="true">
+        <p className="text-[11px] text-[#4A230F] leading-relaxed" data-adi-improvement-held="true">
           {result.held.text}
         </p>
       )}

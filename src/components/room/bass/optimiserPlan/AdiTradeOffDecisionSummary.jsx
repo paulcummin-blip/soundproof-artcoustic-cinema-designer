@@ -31,7 +31,7 @@ import React from "react";
 const BLOCK_GAIN = "rounded-md border border-[#DCE7DE] bg-[#F7FAF7] px-3 py-2.5";
 const BLOCK_COST = "rounded-md border border-[#F0DCC2] bg-[#FEFAF4] px-3 py-2.5";
 const TITLE_GAIN = "text-[10px] font-semibold uppercase tracking-wide text-[#213428]";
-const TITLE_COST = "text-[10px] font-semibold uppercase tracking-wide text-[#8A5A2B]";
+const TITLE_COST = "text-[10px] font-semibold uppercase tracking-wide text-[#4A230F]";
 
 /** One block of the decision: its heading, and the fact it states. */
 function DecisionBlock({ title, tone, testId, children }) {
@@ -91,7 +91,7 @@ export default function AdiTradeOffDecisionSummary({
             <div className="text-[12.5px] font-semibold text-[#1B1A1A]" data-adi-trade-off-give-up-seat="true">
               {giveUp.label}
             </div>
-            <div className="text-[12px] font-semibold text-[#8A5A2B]" data-adi-trade-off-give-up-amount="true">
+            <div className="text-[12px] font-semibold text-[#4A230F]" data-adi-trade-off-give-up-amount="true">
               {giveUp.amount}
             </div>
           </DecisionBlock>

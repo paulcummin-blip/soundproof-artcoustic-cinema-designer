@@ -55,10 +55,10 @@ function verdictPillStyle(verdict, plausibility = null) {
   // The professional plausibility gate outranks the mathematical verdict: a
   // change it refuses is never presented with the recommended styling.
   if (plausibility?.credibility === "suppressed") return { background: "#F2F1EE", border: "#D9D5CE", color: "#625143" };
-  if (plausibility?.credibility === "review") return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
+  if (plausibility?.credibility === "review") return { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" };
   if (verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
-  if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
-  if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#FBEAEA", border: "#E0A9A9", color: "#B91C1C" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" };
   return { background: "#FFFFFF", border: "#DCDBD6", color: "#3E4349" };
 }
 
@@ -230,26 +230,26 @@ export default function OptimisationPlanStatus({
   // Never reinterpreted, never turned into fabricated levers.
   if (view.status === OPTIMISER_PLAN_STATUS.UNSUPPORTED) {
     return (
-      <div className={`rounded-lg border border-[#E0C48F] bg-[#FBF3E4] p-2.5 ${className}`}>
+      <div className={`rounded-lg border border-[#C1B6AD] bg-[#F1F0EE] p-2.5 ${className}`}>
         <div className="flex items-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 text-[#8A5A2B]" />
+          <AlertTriangle className="w-3.5 h-3.5 text-[#4A230F]" />
           <span className="text-[12px] font-semibold text-[#1B1A1A]">Optimisation Plan</span>
         </div>
-        <div className="mt-1 text-[11px] text-[#8A5A2B]">{view.evidenceMessage}</div>
+        <div className="mt-1 text-[11px] text-[#4A230F]">{view.evidenceMessage}</div>
       </div>
     );
   }
 
   const isStale = view.status === OPTIMISER_PLAN_STATUS.STALE;
   const headerStyle = isStale
-    ? { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" }
+    ? { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" }
     : { background: "#F4F7F4", border: "#CFDCCF", color: "#213428" };
 
   return (
     <div className={`rounded-lg border border-[#DCDBD6] bg-white p-3 ${className}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          {isStale ? <AlertTriangle className="w-3.5 h-3.5 text-[#8A5A2B]" /> : <CheckCircle2 className="w-3.5 h-3.5 text-[#213428]" />}
+          {isStale ? <AlertTriangle className="w-3.5 h-3.5 text-[#4A230F]" /> : <CheckCircle2 className="w-3.5 h-3.5 text-[#213428]" />}
           <span className="text-[12px] font-semibold text-[#1B1A1A]">Optimisation Plan</span>
         </div>
         <span
@@ -293,7 +293,7 @@ export default function OptimisationPlanStatus({
       )}
 
       {isStale && view.staleReason && (
-        <div className="mt-2 text-[11px] text-[#8A5A2B]">{view.staleReason}</div>
+        <div className="mt-2 text-[11px] text-[#4A230F]">{view.staleReason}</div>
       )}
 
       <div className="mt-2.5 space-y-2">
@@ -332,7 +332,7 @@ export default function OptimisationPlanStatus({
               <div className="mt-1 text-[11px] font-semibold text-[#1B1A1A]">{lever.movementLabel}</div>
             )}
             {lever.practical === false && (
-              <div className="mt-1 text-[10px] text-[#8A5A2B]">
+              <div className="mt-1 text-[10px] text-[#4A230F]">
                 {PLACEMENT_THEORETICAL_NOTE}
                 {lever.theoreticalReason ? ` ${lever.theoreticalReason}` : ""}
               </div>
@@ -343,7 +343,7 @@ export default function OptimisationPlanStatus({
             )}
 
             {lever.notEvaluated && lever.notEvaluatedReason && (
-              <div className="mt-1 text-[10px] text-[#8A5A2B]">{lever.notEvaluatedReason}</div>
+              <div className="mt-1 text-[10px] text-[#4A230F]">{lever.notEvaluatedReason}</div>
             )}
 
             {lever.reason && (
@@ -355,7 +355,7 @@ export default function OptimisationPlanStatus({
             </div>
 
             {lever.tradeOff?.reason && (
-              <div className="mt-1 text-[11px] text-[#8A5A2B]">Trade-off: {lever.tradeOff.reason}</div>
+              <div className="mt-1 text-[11px] text-[#4A230F]">Trade-off: {lever.tradeOff.reason}</div>
             )}
 
             {/* Seating: the movement itself, and whether every destination
@@ -450,7 +450,7 @@ export default function OptimisationPlanStatus({
             </div>
           )}
           {view.combinedTradeOff?.reason && (
-            <div className="mt-1 text-[11px] text-[#8A5A2B]">Trade-off: {view.combinedTradeOff.reason}</div>
+            <div className="mt-1 text-[11px] text-[#4A230F]">Trade-off: {view.combinedTradeOff.reason}</div>
           )}
         </details>
       )}

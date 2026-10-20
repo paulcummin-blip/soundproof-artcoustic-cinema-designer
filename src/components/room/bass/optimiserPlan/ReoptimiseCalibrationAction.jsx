@@ -69,7 +69,7 @@ export default function ReoptimiseCalibrationAction({
       )}
 
       {!busy && disabledReason && (
-        <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{disabledReason}</div>
+        <div className="text-[11px] text-[#4A230F] leading-relaxed">{disabledReason}</div>
       )}
     </div>
   );

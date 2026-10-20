@@ -126,7 +126,7 @@ import { presentationThemeState, resolveAdiJourneyTheme } from "./adiJourneyThem
 // model (adiPanelSections.js); every other available action is drawn as a
 // secondary control, so two green buttons can never compete.
 const ADI_RUN_PRIMARY_CLASS = "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]";
-const ADI_RUN_SECONDARY_CLASS = "inline-flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#213428] transition-colors hover:border-[#213428]";
+const ADI_RUN_SECONDARY_CLASS = "inline-flex items-center gap-1.5 rounded-md border border-[#C1B6AD] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#213428] transition-colors hover:border-[#213428]";
 
 // The card's theme — the tone, icon, border and fill of each state — lives in
 // adiJourneyTheme.js. This component states the decision; the theme states how
@@ -1089,7 +1089,7 @@ export default function AdiOptimisationJourney({
         )}
 
         {retestOwnsPrimary && reoptimiseDisabledReason && (
-          <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{reoptimiseDisabledReason}</div>
+          <div className="text-[11px] text-[#625143] leading-relaxed">{reoptimiseDisabledReason}</div>
         )}
         </div>
       )}
@@ -1138,7 +1138,7 @@ export default function AdiOptimisationJourney({
           design option. Every raw diagnostic — fingerprints, ids, per-candidate
           detail, cache and job internals, search-space totals, run workload —
           is one level further down, behind the developer gate. */}
-      <details className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2" data-adi-engineer-details="true">
+      <details className="rounded-md border border-[#C1B6AD] bg-white px-3 py-2" data-adi-engineer-details="true">
         <summary className="cursor-pointer text-[11px] font-semibold text-[#625143]">
           {ADI_ENGINEER_DETAILS_TITLE}
         </summary>
@@ -1188,7 +1188,7 @@ export default function AdiOptimisationJourney({
                 instances={instances}
                 seatCount={seatCount}
                 roomDims={roomDims}
-                className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
+                className="rounded-md border border-[#C1B6AD] bg-white px-3 py-2"
               />
               <OptimiserCalculationDetail instances={instances} seatCount={seatCount} roomDims={roomDims} />
             </div>
@@ -1199,21 +1199,21 @@ export default function AdiOptimisationJourney({
 
       {/* Why the optimiser cannot run yet — always paired with the next step */}
       {showBlocked && (
-        <div className="rounded-md border border-[#E8D5AE] bg-[#FDF6E9] px-3 py-2">
+        <div className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] px-3 py-2">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-[#B45309]" />
-            <span className="text-[11px] font-semibold text-[#8A5A2B]">
+            <AlertTriangle className="h-3.5 w-3.5 text-[#4A230F]" />
+            <span className="text-[11px] font-semibold text-[#625143]">
               Optimisation Plan cannot run yet
             </span>
           </div>
-          <div className="mt-1 text-[11px] text-[#8A5A2B] leading-relaxed">
+          <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">
             {journey.blockReason.message}
           </div>
         </div>
       )}
 
       {journey.action === ADI_OPTIMISER_ACTION.RUN && !journey.canRun && !showBlocked && !runError && (
-        <div className="text-[11px] text-[#8A5A2B] leading-relaxed">
+        <div className="text-[11px] text-[#625143] leading-relaxed">
           The Optimisation Plan could not be started. Reopen the project and try again.
         </div>
       )}

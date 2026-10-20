@@ -190,18 +190,18 @@ export default function RestorePreviousDesignBar({
     const preparing = authorityCurrent && familyTotal > 0 && familyResolved < familyTotal;
     const needsUpdate = restoreResult.physicalRestored !== false;
     return (
-      <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
+      <div className="rounded-lg border border-[#C1B6AD] bg-[#F1F0EE] px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-amber-700" />
-          <span className="text-[13px] font-semibold text-amber-800">Previous design restored</span>
+          <History className="h-4 w-4 text-[#4A230F]" />
+          <span className="text-[13px] font-semibold text-[#4A230F]">Previous design restored</span>
         </div>
-        <p className="text-[11px] text-amber-700 leading-relaxed">
+        <p className="text-[11px] text-[#4A230F] leading-relaxed">
           {!needsUpdate
             ? "The previous design could not be restored. You can update bass performance for the current design."
             : preparing ? "Preparing target results\u2026" : "Bass performance needs updating."}
         </p>
         {preparing && (
-          <p className="text-[10px] text-amber-600">
+          <p className="text-[10px] text-[#625143]">
             Prepared {familyResolved} of {familyTotal} target results.
           </p>
         )}

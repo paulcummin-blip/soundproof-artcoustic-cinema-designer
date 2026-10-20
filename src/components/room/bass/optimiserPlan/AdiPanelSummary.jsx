@@ -63,7 +63,7 @@ export default function AdiPanelSummary({
       )}
 
       {nextAction && (
-        <div className="text-[11.5px] text-[#8A5A2B] leading-relaxed" data-adi-panel-next-action="true">
+        <div className="text-[11.5px] text-[#4A230F] leading-relaxed" data-adi-panel-next-action="true">
           {nextAction}
         </div>
       )}
@@ -79,7 +79,7 @@ export default function AdiPanelSummary({
             </div>
           )}
           {tradeOff.impact && (
-            <div className="text-[12.5px] font-semibold text-[#8A5A2B] leading-relaxed" data-adi-trade-off-impact="true">
+            <div className="text-[12.5px] font-semibold text-[#4A230F] leading-relaxed" data-adi-trade-off-impact="true">
               {tradeOff.impact}
             </div>
           )}
@@ -126,7 +126,7 @@ export default function AdiPanelSummary({
       {/* A design that cannot meet its selected target states the remaining
           limitation in one line — never withheld, never a paragraph. */}
       {designLimitation && (
-        <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{designLimitation}</div>
+        <div className="text-[11px] text-[#4A230F] leading-relaxed">{designLimitation}</div>
       )}
 
       {staleCopy ? (
@@ -135,7 +135,7 @@ export default function AdiPanelSummary({
           {previousBest && (
             <div className="text-[12px] font-semibold text-[#1B1A1A]">{previousBest}</div>
           )}
-          <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{staleCopy.INSTRUCTION}</div>
+          <div className="text-[11px] text-[#4A230F] leading-relaxed">{staleCopy.INSTRUCTION}</div>
         </div>
       ) : null}
     </div>

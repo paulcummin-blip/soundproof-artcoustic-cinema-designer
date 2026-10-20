@@ -33,7 +33,7 @@ const SECONDARY = "inline-flex items-center gap-1.5 rounded-md border border-[#D
 const STATUS_STYLE = {
   [PLACEMENT_KIND.RECOMMENDED]: { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" },
   [PLACEMENT_KIND.APPLIED]: { background: "#213428", border: "#213428", color: "#FFFFFF" },
-  [PLACEMENT_KIND.PREVIOUS]: { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" },
+  [PLACEMENT_KIND.PREVIOUS]: { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" },
   // A small improvement stated as a note: neutral, never the recommended green.
   [PLACEMENT_KIND.NOTE]: { background: "#F2F1EE", border: "#D9D5CE", color: "#625143" },
 };
@@ -236,7 +236,7 @@ export default function PlacementRecommendationPanel({
           instead, so the default card never carries a "Preview not yet
           available" line. */}
       {placement.notice && placement.notice !== PLACEMENT_PREVIEW_UNAVAILABLE && (
-        <div className="text-[11px] leading-relaxed text-[#8A5A2B]">{placement.notice}</div>
+        <div className="text-[11px] leading-relaxed text-[#4A230F]">{placement.notice}</div>
       )}
 
       {/* The controls, on the panel the designer acts on — never twice. */}

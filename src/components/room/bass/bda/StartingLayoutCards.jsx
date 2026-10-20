@@ -379,7 +379,7 @@ export default function StartingLayoutCards({
 
           {/* Error state — advisor failed, but fallback cards still show */}
           {advisorError && (
-            <p className="text-[11px] text-amber-700">Optimised placement unavailable — showing standard layouts. Manual placement remains available.</p>
+            <p className="text-[11px] text-[#4A230F]">Optimised placement unavailable — showing standard layouts. Manual placement remains available.</p>
           )}
 
           {/* Cards — always render when recommendations exist (advisor or fallback) */}

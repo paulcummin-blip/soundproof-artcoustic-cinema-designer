@@ -108,8 +108,8 @@ export default function AdiImprovementReviewDialog({
           )}
 
           {/* What applying it writes, stated before the designer commits. */}
-          <p className="flex items-start gap-1.5 text-[11.5px] text-[#8A5A2B] leading-relaxed" data-adi-improvement-apply-note="true">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B45309]" />
+          <p className="flex items-start gap-1.5 text-[11.5px] text-[#4A230F] leading-relaxed" data-adi-improvement-apply-note="true">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#4A230F]" />
             Applying this change writes the setting to the design. Nothing else is changed.
           </p>
 

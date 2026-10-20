@@ -857,7 +857,7 @@ export default function OptimiseAndCalculate({
             <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before optimising.</p>
           )}
           {shared?.completedBassAuthority?.authorityStatus === "STALE" && (
-            <p className="mt-2 text-[11px] font-medium text-amber-700">Previous result needs recalculation — press Recalculate Bass Results to update.</p>
+            <p className="mt-2 text-[11px] font-medium text-[#4A230F]">Previous result needs recalculation — press Recalculate Bass Results to update.</p>
           )}
         </>
       )}
@@ -1025,13 +1025,13 @@ export default function OptimiseAndCalculate({
 
       {/* ── Cancelled state (only when no published result to restore) ── */}
       {isCancelledState && !hasResults && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+        <div className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] p-3">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-700" />
-            <span className="text-[12px] font-semibold text-amber-800">Optimisation cancelled</span>
+            <AlertCircle className="h-4 w-4 text-[#4A230F]" />
+            <span className="text-[12px] font-semibold text-[#4A230F]">Optimisation cancelled</span>
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-amber-700">Current design remains unchanged.</p>
-          <button type="button" onClick={handleReset} className="mt-2 text-[11px] text-amber-700 underline underline-offset-2">
+          <p className="mt-1 text-[10px] leading-relaxed text-[#4A230F]">Current design remains unchanged.</p>
+          <button type="button" onClick={handleReset} className="mt-2 text-[11px] text-[#4A230F] underline underline-offset-2">
             Retry
           </button>
         </div>
@@ -1039,17 +1039,17 @@ export default function OptimiseAndCalculate({
 
       {/* ── Timed out state ── */}
       {isTimedOut && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+        <div className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] p-3">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-700" />
-            <span className="text-[12px] font-semibold text-amber-800">Calculation timed out</span>
+            <AlertCircle className="h-4 w-4 text-[#4A230F]" />
+            <span className="text-[12px] font-semibold text-[#4A230F]">Calculation timed out</span>
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-amber-700">{BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.TIMED_OUT]}</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-[#4A230F]">{BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.TIMED_OUT]}</p>
           <div className="mt-2 flex gap-3">
-            <button type="button" onClick={handleReset} className="text-[11px] font-semibold text-amber-700 underline underline-offset-2">
+            <button type="button" onClick={handleReset} className="text-[11px] font-semibold text-[#4A230F] underline underline-offset-2">
               Retry
             </button>
-            <button type="button" onClick={handleReset} className="text-[11px] text-amber-700 underline underline-offset-2">
+            <button type="button" onClick={handleReset} className="text-[11px] text-[#4A230F] underline underline-offset-2">
               Clear
             </button>
           </div>

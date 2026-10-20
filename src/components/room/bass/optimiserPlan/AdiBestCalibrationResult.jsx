@@ -19,8 +19,8 @@ import React from "react";
 
 const STATE_STYLE = Object.freeze({
   Applied: { background: "#213428", color: "#FFFFFF" },
-  "Held for your approval": { background: "#B45309", color: "#FFFFFF" },
-  "Review required": { background: "#B45309", color: "#FFFFFF" },
+  "Held for your approval": { background: "#4A230F", color: "#FFFFFF" },
+  "Review required": { background: "#4A230F", color: "#FFFFFF" },
 });
 
 export default function AdiBestCalibrationResult({ result = null, compact = false, className = "" }) {

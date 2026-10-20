@@ -35,8 +35,8 @@ import {
 import { buildRelativeGroupDelays } from "./relativeGroupDelayAuthority.js";
 import AdiRelativeGroupDelay from "./AdiRelativeGroupDelay.jsx";
 
-const SETTLED = { border: "#CFDCCF", background: "#F4F7F4", accent: "#213428" };
-const AWAITING = { border: "#E8D5AE", background: "#FDF6E9", accent: "#B45309" };
+const SETTLED = { border: "#C1B6AD", background: "#F1F0EE", accent: "#213428" };
+const AWAITING = { border: "#C1B6AD", background: "#F1F0EE", accent: "#4A230F" };
 
 function ValueRow({ label, before, after, highlight }) {
   return (
@@ -53,10 +53,10 @@ function ValueRow({ label, before, after, highlight }) {
 function SettingsTable({ settings }) {
   if (!settings?.length) return null;
   return (
-    <div className="overflow-hidden rounded-md border border-[#E7E5E0] bg-white">
+    <div className="overflow-hidden rounded-md border border-[#C1B6AD] bg-white">
       <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="bg-[#F7F6F3] text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+          <tr className="bg-[#F7F6F3] text-[10px] font-semibold uppercase tracking-wide text-[#625143]">
             <th className="px-2 py-1.5">Setting</th>
             <th className="px-2 py-1.5">Subwoofer</th>
             <th className="px-2 py-1.5">Previous</th>
@@ -84,7 +84,7 @@ function AppliedValuesList({ appliedCalibration, showDelay = true }) {
   if (!values.length) return null;
   return (
     <div className="space-y-0.5 text-[11px] text-[#3E4349]">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">
         Applied calibration in this design
       </div>
       {values.map((value, index) => (
@@ -96,7 +96,7 @@ function AppliedValuesList({ appliedCalibration, showDelay = true }) {
         </div>
       ))}
       {appliedCalibration.status && (
-        <div className="text-[10px] text-[#8A7B6A]">Authority: {appliedCalibration.status}</div>
+        <div className="text-[10px] text-[#625143]">Authority: {appliedCalibration.status}</div>
       )}
     </div>
   );
@@ -190,7 +190,7 @@ export default function AdiAppliedBassCalibration({
           </div>
 
           {evidence.inRoomNote && (
-            <div className="text-[10px] text-[#8A7B6A] leading-relaxed">{evidence.inRoomNote}</div>
+            <div className="text-[10px] text-[#625143] leading-relaxed">{evidence.inRoomNote}</div>
           )}
         </div>
       )}
@@ -199,7 +199,7 @@ export default function AdiAppliedBassCalibration({
           still stated — from the persisted authority, with no invented history. */}
       {!applied && hasPersistedValues && (
         <div
-          className="space-y-1.5 rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
+          className="space-y-1.5 rounded-md border border-[#C1B6AD] bg-white px-3 py-2"
           data-adi-applied-calibration="persisted"
         >
           <div className="flex items-center gap-2">

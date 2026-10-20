@@ -29,7 +29,7 @@ import {
 const DIRECTION_STYLE = {
   [TRADE_OFF_DIRECTION.IMPROVES]: { color: "#213428", label: "Improves" },
   [TRADE_OFF_DIRECTION.UNCHANGED]: { color: "#625143", label: "Unchanged" },
-  [TRADE_OFF_DIRECTION.WORSENS]: { color: "#B45309", label: "Worsens" },
+  [TRADE_OFF_DIRECTION.WORSENS]: { color: "#4A230F", label: "Worsens" },
 };
 
 const BUTTON_PRIMARY = "inline-flex items-center rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]";
@@ -95,7 +95,7 @@ export default function AdiTradeOffReviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`max-w-2xl ${className}`} data-adi-trade-off-review="true">
         <DialogHeader>
-          <DialogTitle className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#8A5A2B]" data-adi-trade-off-title="true">
+          <DialogTitle className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#4A230F]" data-adi-trade-off-title="true">
             {TRADE_OFF_TITLE}
           </DialogTitle>
         </DialogHeader>
@@ -143,7 +143,7 @@ export default function AdiTradeOffReviewDialog({
 
           {/* The regression is stated beside the Apply itself, so the designer's
               own approval is always given with it in view. */}
-          <p className="text-[12px] font-semibold text-[#8A5A2B] leading-relaxed" data-adi-trade-off-apply-note="true">
+          <p className="text-[12px] font-semibold text-[#4A230F] leading-relaxed" data-adi-trade-off-apply-note="true">
             {tradeOffApplySentence(seatLabel, amountText)}
           </p>
 

@@ -169,7 +169,7 @@ export default function CrossoverRecommendation({
     </table>
     {recommended.integrationExplanation && <p className="text-xs">{recommended.integrationExplanation}</p>}
     <p className="text-xs">Primary-seat change: {number(Math.max(0,...(recommended.perSeatP20||[]).filter(s=>s.isPrimary).map(s=>s.variationDbRaw-(baseline?.perSeatP20?.find(b=>b.seatId===s.seatId)?.variationDbRaw??s.variationDbRaw))))} dB maximum regression.</p>
-    {stale && <p className="text-xs text-amber-800">Design changed — re-run ADI before applying.</p>}
+    {stale && <p className="text-xs text-[#4A230F]">Design changed — re-run ADI before applying.</p>}
     {record.status==="applied" && record.appliedCacheKey===shared?.cacheKey && authorityState.code==="current" && <p className="text-xs text-green-800">Applied — calculated result verified and saved.</p>}
     {record.status==="restored" && record.appliedCacheKey===shared?.cacheKey && authorityState.code==="current" && <p className="text-xs text-green-800">Previous settings restored — calculated result verified and saved.</p>}
     {(error||record.error) && <p role="alert" className="text-xs text-red-700">{error||record.error}</p>}

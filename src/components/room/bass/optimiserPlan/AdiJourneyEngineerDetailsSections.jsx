@@ -224,7 +224,7 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
             <div>Evaluated result with the recommended change: {proposedP14Line}</div>
           )}
           {regression && (
-            <div className="text-[#8A5A2B]" data-adi-seat-regression="true">
+            <div className="text-[#4A230F]" data-adi-seat-regression="true">
               Trade-off: {resultModel?.affectedSeat?.label || regression.seatId}{" "}
               {regression.direction} by {regression.amountText}
               {regression.parameter ? ` (${regression.parameter})` : ""}. The change is not

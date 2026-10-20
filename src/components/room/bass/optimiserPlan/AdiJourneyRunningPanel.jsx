@@ -46,7 +46,7 @@ export default function AdiJourneyRunningPanel({
 
   return (
     <div
-      className="rounded-md border border-[#E0DCD5] bg-[#F8F7F4] px-3 py-2.5 space-y-1.5"
+      className="rounded-md border border-[#C1B6AD] bg-[#F8F8F7] px-3 py-2.5 space-y-1.5"
       data-adi-run-progress={progress.stalled ? "stalled" : "running"}
       data-adi-run-stage={progress.stageKey}
     >
@@ -79,14 +79,14 @@ export default function AdiJourneyRunningPanel({
 
       {progress.stalled && (
         <div
-          className="rounded-md border border-[#E8D5AE] bg-[#FDF6E9] px-3 py-2 space-y-1.5"
+          className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] px-3 py-2 space-y-1.5"
           data-adi-run-stalled="true"
         >
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-[#B45309]" />
-            <span className="text-[11px] font-semibold text-[#8A5A2B]">{OPTIMISER_STALL_TITLE}</span>
+            <AlertTriangle className="h-3.5 w-3.5 text-[#4A230F]" />
+            <span className="text-[11px] font-semibold text-[#625143]">{OPTIMISER_STALL_TITLE}</span>
           </div>
-          <div className="text-[11px] text-[#8A5A2B] leading-relaxed" data-adi-run-stall-sentence="true">
+          <div className="text-[11px] text-[#625143] leading-relaxed" data-adi-run-stall-sentence="true">
             {progress.stallSentence}
           </div>
 
@@ -96,7 +96,7 @@ export default function AdiJourneyRunningPanel({
                 type="button"
                 onClick={onCheckStatus}
                 data-adi-run-check="true"
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-3.5 py-1.5 text-[11.5px] font-semibold text-[#213428] transition-colors hover:border-[#213428]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#C1B6AD] bg-white px-3.5 py-1.5 text-[11.5px] font-semibold text-[#213428] transition-colors hover:border-[#213428]"
               >
                 {OPTIMISER_STALL_CHECK_LABEL}
               </button>
@@ -106,7 +106,7 @@ export default function AdiJourneyRunningPanel({
                 type="button"
                 onClick={onCancel}
                 data-adi-run-cancel="true"
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#E0DCD5] bg-white px-3.5 py-1.5 text-[11.5px] font-semibold text-[#8A5A2B] transition-colors hover:border-[#B45309]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#C1B6AD] bg-white px-3.5 py-1.5 text-[11.5px] font-semibold text-[#625143] transition-colors hover:border-[#4A230F]"
               >
                 {OPTIMISER_STALL_CANCEL_LABEL}
               </button>

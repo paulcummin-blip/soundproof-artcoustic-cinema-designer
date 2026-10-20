@@ -42,8 +42,8 @@ const PILL_VERDICTS = new Set([
 
 function verdictPillStyle(verdict) {
   if (verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
-  if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
-  if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#FBEAEA", border: "#E0A9A9", color: "#B91C1C" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" };
+  if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" };
   return { background: "#FFFFFF", border: "#DCDBD6", color: "#3E4349" };
 }
 
@@ -65,8 +65,8 @@ const COUNTER_LABEL = Object.freeze({
 const statusColor = (status) => {
   if (status === OPTIMISER_FAMILY_STATUS.REJECTED
     || status === OPTIMISER_FAMILY_STATUS.EVALUATED) return "#213428";
-  if (status === OPTIMISER_FAMILY_STATUS.FAILED) return "#B91C1C";
-  if (status === OPTIMISER_FAMILY_STATUS.NOT_TESTED_SEPARATELY) return "#8A5A2B";
+  if (status === OPTIMISER_FAMILY_STATUS.FAILED) return "#4A230F";
+  if (status === OPTIMISER_FAMILY_STATUS.NOT_TESTED_SEPARATELY) return "#4A230F";
   return "#8B7F76";
 };
 
@@ -251,7 +251,7 @@ export default function OptimiserRunEvidenceBlock({
       )}
 
       {baselineFailed && (
-        <div className="mt-1.5 text-[11px] text-[#8A5A2B] leading-relaxed">
+        <div className="mt-1.5 text-[11px] text-[#4A230F] leading-relaxed">
           The current design could not be validated, so no candidate could be compared against it.
         </div>
       )}
@@ -310,7 +310,7 @@ export default function OptimiserRunEvidenceBlock({
       )}
 
         {evidence.rejectionReasons?.length > 0 && (
-          <div className="mt-1.5 text-[11px] text-[#8A5A2B] leading-relaxed">
+          <div className="mt-1.5 text-[11px] text-[#4A230F] leading-relaxed">
             {evidence.rejectionReasons.map((reason) => <div key={reason}>{reason}</div>)}
           </div>
         )}

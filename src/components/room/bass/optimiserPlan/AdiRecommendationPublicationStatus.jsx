@@ -50,7 +50,7 @@ export default function AdiRecommendationPublicationStatus({ publication = null 
       )}
       {publication.error && (
         <div
-          className="text-[11px] text-[#8A5A2B]"
+          className="text-[11px] text-[#4A230F]"
           data-adi-recommendation-publication-failed="true"
         >
           Recommendation publication failed: {publication.error}

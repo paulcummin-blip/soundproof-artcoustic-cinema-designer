@@ -139,7 +139,7 @@ export default function AdiCalibrationSection({
             {line.text}
           </div>
           {line.note && (
-            <div className="mt-0.5 text-[11px] text-[#8A5A2B] leading-relaxed">
+            <div className="mt-0.5 text-[11px] text-[#4A230F] leading-relaxed">
               {line.note}
             </div>
           )}
@@ -152,7 +152,7 @@ export default function AdiCalibrationSection({
           tuning values are readable. */}
       {kind === ADI_CALIBRATION_KIND.HELD && (
         <div
-          className="text-[11px] font-semibold text-[#8A5A2B] leading-relaxed"
+          className="text-[11px] font-semibold text-[#4A230F] leading-relaxed"
           data-adi-calibration-held-not-applied="true"
         >
           {ADI_HELD_NOT_APPLIED_SENTENCE}

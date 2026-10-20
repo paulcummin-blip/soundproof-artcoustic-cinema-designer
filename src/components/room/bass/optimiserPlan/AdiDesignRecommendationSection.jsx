@@ -51,11 +51,11 @@ export default function AdiDesignRecommendationSection({
 
   return (
     <div
-      className={`space-y-1.5 rounded-md border border-[#E8D5AE] bg-[#FDF6E9] px-3 py-2 ${className}`}
+      className={`space-y-1.5 rounded-md border border-[#C1B6AD] bg-[#F1F0EE] px-3 py-2 ${className}`}
       data-adi-section="design"
     >
       <div className="flex items-center gap-2">
-        <MoveHorizontal className="h-3.5 w-3.5 shrink-0 text-[#B45309]" />
+        <MoveHorizontal className="h-3.5 w-3.5 shrink-0 text-[#4A230F]" />
         <span className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
           {ADI_SECTION_TITLE.DESIGN}
         </span>
@@ -87,7 +87,7 @@ export default function AdiDesignRecommendationSection({
             levelAfter={seatingRecommendation.p20LevelAfter}
           />
           {seatingRecommendation.baselineNote && (
-            <div className="text-[11px] text-[#8A5A2B] leading-relaxed">
+            <div className="text-[11px] text-[#4A230F] leading-relaxed">
               {seatingRecommendation.baselineNote}
             </div>
           )}
@@ -114,7 +114,7 @@ export default function AdiDesignRecommendationSection({
           apply/undo, re-run. */}
       {children}
 
-      <div className="text-[11px] font-medium text-[#8A5A2B] leading-relaxed">
+      <div className="text-[11px] font-medium text-[#4A230F] leading-relaxed">
         {ADI_DESIGN_NOT_APPLIED}
       </div>
     </div>

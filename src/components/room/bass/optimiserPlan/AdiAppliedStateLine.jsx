@@ -21,7 +21,7 @@ import React from "react";
 import { OPTIMISER_APPLIED_STATE } from "./optimiserResultViewModel.js";
 
 const APPLIED_STYLE = { color: "#213428" };
-const HELD_STYLE = { color: "#8A5A2B" };
+const HELD_STYLE = { color: "#4A230F" };
 
 export default function AdiAppliedStateLine({ resultModel = null, className = "" }) {
   if (!resultModel) return null;

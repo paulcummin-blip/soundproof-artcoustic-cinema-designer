@@ -174,11 +174,11 @@ export default function ImproveDesignCard({ appState, commitInstances }) {
       </div>
 
       {/* The single recommendation card — 5 fields */}
-      <div className={`rounded-lg border px-4 py-3 ${isStale ? "border-amber-300 bg-amber-50" : "border-[#BFDBFE] bg-[#EFF6FF]"}`}>
+      <div className={`rounded-lg border px-4 py-3 border-[#C1B6AD] bg-[#F1F0EE]`}>
         {isStale && (
-          <div className="mb-2 flex items-center gap-2 rounded border border-amber-300 bg-amber-100 px-2 py-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
-            <p className="text-[10px] text-amber-800">The design changed since this recommendation — recalculate to confirm it still applies.</p>
+          <div className="mb-2 flex items-center gap-2 rounded border border-[#C1B6AD] bg-[#F8F8F7] px-2 py-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-[#4A230F]" />
+            <p className="text-[10px] text-[#4A230F]">The design changed since this recommendation — recalculate to confirm it still applies.</p>
           </div>
         )}
         <div className="space-y-1.5">
