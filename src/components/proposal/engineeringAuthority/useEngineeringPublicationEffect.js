@@ -41,6 +41,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
 import { useCompletedBassAuthority, isAuthoritativeBassContract, settleCompletedBassPersistence } from '@/components/room/bass/completedBassResultStore';
+import { readBassReconciliationStatus } from '@/components/room/bass/bassReconciliationStatus';
 import { flushBassAuthorityWrite } from '@/components/room/bass/bassAuthorityWriteQueue';
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
@@ -238,7 +239,7 @@ export function useEngineeringPublicationEffect({
         if (bassFingerprint) {
           const written = await settleCompletedBassPersistence(projectId, versionId);
           if (cancelled) return;
-          if (written === false) throw new Error('The current bass assessment could not be saved. Retry publication.');
+          if (written === false) throw new Error(readBassReconciliationStatus(projectId, versionId)?.writeError || 'The current bass assessment could not be saved. Retry publication.');
           const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
           if (cancelled) return;
           if (record?.current_fingerprint !== bassFingerprint
