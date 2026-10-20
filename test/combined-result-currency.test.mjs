@@ -30,6 +30,7 @@ const crossoverAt = (hz) => ({
 
 const build = ({ crossover, sub = subPoints, speaker = speakerPoints, seats = ['rsp', 'seat-2'] }) =>
   buildCombinedSystemResponse({
+    speakerReferenceLevelDb: 0,
     frequenciesHz: frequencies,
     seats: seats.map((seatId) => ({ seatId, isRsp: seatId === 'rsp' })),
     subTransfersBySeat: Object.fromEntries(seats.map((s) => [s, [{ sourceId: 'sub-1', points: sub }]])),

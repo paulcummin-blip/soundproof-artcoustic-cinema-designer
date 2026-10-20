@@ -105,6 +105,7 @@ const crossoverAt = (hz) => ({
   subwooferLpSlopeDbPerOct: 24,
 });
 const combinedAt = (hz) => buildCombinedSystemResponse({
+    speakerReferenceLevelDb: 0,
   frequenciesHz: frequencies,
   seats: [{ seatId: 'rsp', isRsp: true }],
   subTransfersBySeat: { rsp: [{ sourceId: 'sub-1', points: subPoints }] },
@@ -127,11 +128,12 @@ test('a crossover-only change rebuilds the combined response it depends on', () 
   assert.equal(deltas.filter((delta) => delta > 1).length >= 2, true);
 });
 
-test('a crossover-only change does not invalidate the authoritative subwoofer-only result', () => {
-  // Crossover settings are not part of the bass design identity, so the same
-  // authority state still resolves Current: the sub-only result stays valid and
-  // the recalculate control never claims it would absorb the crossover change.
-  const state = stateFor();
-  assert.equal(state.code, BASS_AUTHORITY_STATE.CURRENT);
-  assert.equal(warningFor(state), false);
+test('a crossover-only change invalidates official combined results', async () => {
+  const {computeCalibrationFingerprint,computeGeometryFingerprint}=await import('../components/room/bass/bassAnalysisFingerprints.js');
+  const before={combinedResponseIdentity:{version:"combined-lcr-sub-v1",crossover:crossoverAt(100)}};
+  const after={combinedResponseIdentity:{version:"combined-lcr-sub-v1",crossover:crossoverAt(120)}};
+  assert.notEqual(computeCalibrationFingerprint(before),computeCalibrationFingerprint(after));
+  assert.equal(computeGeometryFingerprint(before),computeGeometryFingerprint(after));
+  const state = stateFor({completedBassAuthority:{...currentAuthority,authorityStatus:'STALE',currentFingerprint:'cal:combined-new'}});
+  assert.equal(warningFor(state),true);
 });

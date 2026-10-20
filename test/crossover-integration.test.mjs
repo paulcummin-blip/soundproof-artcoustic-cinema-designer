@@ -107,6 +107,7 @@ describe("combined response preserves genuine low-frequency limits", () => {
   const speakerPoints = transfer(() => 0);
 
   const combined = buildCombinedSystemResponse({
+    speakerReferenceLevelDb: 0,
     frequenciesHz: frequencies,
     seats: [{ seatId: "rsp", isRsp: true }, { seatId: "seat-2", isRsp: false }],
     subTransfersBySeat: {
@@ -144,6 +145,7 @@ describe("combined response preserves genuine low-frequency limits", () => {
 
   it("changes with the crossover frequency, without a new room transfer", () => {
     const raised = buildCombinedSystemResponse({
+    speakerReferenceLevelDb: 0,
       frequenciesHz: frequencies,
       seats: [{ seatId: "rsp", isRsp: true }],
       subTransfersBySeat: { rsp: [{ sourceId: "sub-1", points: subPoints }] },

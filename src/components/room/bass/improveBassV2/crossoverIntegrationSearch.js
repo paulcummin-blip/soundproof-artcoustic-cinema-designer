@@ -19,6 +19,7 @@ const p19 = r => Number.isFinite(r?.achievedP19VariationDb) ? r.achievedP19Varia
 export function integrationSafetyIssues(baseline, candidate) {
   if (!candidate) return ["Canonical confirmation unavailable"];
   const issues = [];
+  if (p20(candidate) > p20(baseline) - 0.25) issues.push("No useful P20 improvement");
   if (candidate.physicalValidation?.passed !== true) issues.push("Physical correction constraints failed");
   if (!Number.isFinite(candidate.p14HeadroomDb) || candidate.p14HeadroomDb < 0) issues.push("Insufficient P14 headroom");
   if (candidate.p14HeadroomDb < (baseline.p14HeadroomDb ?? 0) - 1) issues.push("More than 1 dB headroom lost");
