@@ -1578,7 +1578,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const result = computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX);
         const { maxVerticalGapDeg, gaps, worstGap, rowElevations } = result;
         
-        if (isNum(maxVerticalGapDeg)) {
+        if (new Set(rowElevations.map((row) => row.rowName)).size === 1) {
+          // A single overhead row has no adjacent row spacing to assess.
+          metrics.p9 = {
+            ...buildOverheadNotApplicableMetric(),
+            note: "Not applicable — one overhead row has no adjacent-row spacing to assess.",
+          };
+        } else if (isNum(maxVerticalGapDeg)) {
           let level9 = 1;
           if (maxVerticalGapDeg <= 50) level9 = 4;
           else if (maxVerticalGapDeg <= 60) level9 = 3;
