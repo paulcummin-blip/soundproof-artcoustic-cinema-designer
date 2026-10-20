@@ -664,7 +664,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       const instances=snapshot.allInstances.filter(s=>s.enabled!==false).map((s,i)=>({...s,position:{...s.position,...positions[i]}}));
       const configurationKey=effectiveConfigurationKey(instances,appliedTuning) + (result.crossover ? "|xo:"+JSON.stringify(result.crossover) : "");
       let hash=2166136261;for(const ch of configurationKey)hash=Math.imul(hash^ch.charCodeAt(0),16777619);
-      return {...result,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
+      return {...result,baselineCacheKey:liveCacheKey,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
         candidateId:kind==="current"?"current":kind==="phase"?(candidate.groupedPhase?.id || "phase:"+(hash>>>0).toString(16)):kind==="calibration"?(candidate.groupedDelay?.id || "calibration:"+(hash>>>0).toString(16)):candidate.id,
         groupedDelay:candidate.groupedDelay || null,
         groupedPhase:candidate.groupedPhase || null,

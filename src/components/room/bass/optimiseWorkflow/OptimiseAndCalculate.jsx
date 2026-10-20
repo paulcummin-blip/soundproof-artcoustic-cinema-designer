@@ -48,6 +48,7 @@ import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import AdiRecommendation from "./AdiRecommendation";
+import CrossoverRecommendation from "./CrossoverRecommendation";
 import useRunOptimisationPlan from "./useRunOptimisationPlan";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, canCancelBassCalculation } from "../bassCalculationLifecycle";
 import {
@@ -982,6 +983,17 @@ export default function OptimiseAndCalculate({
           />
         </div>
       )}
+
+      <CrossoverRecommendation
+        candidate={v2State?.combinedResult}
+        diagnostics={v2State?.combinedDiagnostics}
+        shared={shared}
+        appState={appState}
+        instances={subwooferInstances}
+        commitInstances={commitInstances}
+        onRecalculate={handlePhysicalRecalculate}
+        busy={isBusy || shared?.calculationInProgress || planRunStatus === "running"}
+      />
 
       {/* ── Error state ── */}
       {isError && (
