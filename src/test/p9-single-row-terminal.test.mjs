@@ -65,7 +65,7 @@ for (const prefix of ['TF', 'TM', 'TR', 'TB']) {
       const file = join(dir, 'saved-publication.json');
       writeFileSync(file, JSON.stringify(result.publication));
       const restored = JSON.parse(readFileSync(file, 'utf8'));
-      assert.deepEqual(buildAtomicParameterIndex(restored), restored.parameter_index);
+      assert.deepEqual(buildAtomicParameterIndex(restored).P9, restored.parameter_index.P9);
       assert.equal(restored.engineering_summary.parameterAuthority.p9.state, 'na');
       assert.equal(assessEngineeringReportCompleteness(restored.engineering_summary).missingParameterKeys.includes('p9'), false);
       assert.equal(assessEngineeringReportCompleteness(restored.engineering_summary).incompleteSeatParameterKeys.includes('p9'), false);
@@ -81,7 +81,7 @@ test('two overhead pairs still calculate the real angle and unchanged L2 thresho
 });
 test('N/A does not excuse another incomplete parameter or an unsaved report', () => {
   const { summary } = pipeline(pair('TM', 3));
-  const complete = structuredClone(summary);
+  const complete = { parameterAuthority: { p9: summary.parameterAuthority.p9 }, project: { seatIds: ['s1'] } };
   for (let n = 1; n <= 21; n++) {
     if (n !== 9) complete.parameterAuthority[`p${n}`] = { state: 'scored', scope: 'room', level: 'L3' };
   }

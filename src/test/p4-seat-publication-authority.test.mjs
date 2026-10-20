@@ -8,7 +8,7 @@
 //           terminal, and every seat result is preserved.
 //   TEST 2  P4 with genuinely incomplete seat results → still blocked. The
 //           terminal-state requirement is NOT relaxed.
-//   TEST 3  Calculated but unsaved → ONE "Ready to save" status, no repeated
+//   TEST 3  Calculated but unsaved → ONE "Saving" status, no repeated
 //           developer wording.
 //   TEST 4  Publication blocked by P4 only → the bass band stays in the bass
 //           domain: the completed bass result is current, no bass action is
@@ -115,10 +115,10 @@ const currentAuthority = {
   publicationBassFingerprint: 'cal:a',
 };
 
-test('TEST 3 — calculated but unsaved is one Ready to save status', () => {
+test('TEST 3 — calculated but unsaved is one Saving status', () => {
   const state = resolveBassAuthorityState(currentAuthority);
-  expect(state.label).toBe('Ready to save');
-  expect(state.actionLabel).toBe('Save Assessment');
+  expect(state.label).toBe('Saving');
+  expect(state.actionLabel).toBeNull();
   expect(state.attention).not.toBe(true);
   expect(state.message).not.toMatch(/engineering_summary|parameter_index|calculated_not_published/i);
 });
@@ -131,19 +131,18 @@ test('TEST 4 — a P4-only blocker is never named inside the bass band', () => {
       fingerprint: 'eng:a',
       message: 'The saved assessment is incomplete (engineering_summary.p4 is not terminal, parameter_index.P4.level is not a terminal published result).',
       missing: [{ key: 'engineering_summary.p4' }, { key: 'parameter_index.P4.level' }],
+      gates: [{ key: 'rp22_terminal', ok: false, detail: 'p4' }],
     },
   });
 
   // P4 is not a bass parameter, so the completed bass result stays current and no
-  // bass action is offered. What the band states instead is the real item the
-  // overall assessment is waiting for — named, never a generic "not complete" —
-  // and P4 is never presented as a bass problem.
+  // bass action is offered. Overall readiness belongs in Project Report.
   expect(state.code).toBe('current');
   expect(state.label).toBe('Performance Current');
   expect(state.attention).not.toBe(true);
-  expect(state.message).toBeNull();
+  expect(state.message).toBe('Calculated and saved.');
   expect(state.actionLabel).toBeNull();
-  expect(state.note).toBe('Waiting for P4 Maximum SPL difference between screen wall speakers.');
+  expect(state.note).toBeUndefined();
   expect(state.waitingItems).toBeUndefined();
   expect(JSON.stringify(state)).not.toMatch(/assessment needs updating/i);
 });
