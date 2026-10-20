@@ -38,6 +38,7 @@ import {
 } from "@/components/utils/subwooferInstanceCompatibility";
 import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
 import { neutraliseSubwooferTuning } from "@/components/utils/subwooferNeutralTuning";
+import { resetOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
 import { resetAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { markAppliedCalibrationUserModified } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { extractAppliedCalibrationValues, computeAppliedCalibrationBasisFingerprint } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthority.js";
@@ -306,7 +307,21 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     }
   }, [hasCanonical, instances, commitInstances]);
 
+  // Reset Subwoofer Tuning: every instance (positions, models, counts and
+  // crossover untouched) back to 0 dB / 0 ms / 0° / Normal; clears the Applied
+  // Calibration and the ADI tuning recommendation. Does not recalculate — the
+  // changed tuning makes the existing bass result out of date.
+  const resetSubwooferTuning = useCallback(() => {
+    if (!hasCanonical) return;
+    commitInstances(neutraliseSubwooferTuning(instances));
+    if (projectIdRef.current && versionIdRef.current) {
+      resetAppliedCalibrationAuthority(projectIdRef.current, versionIdRef.current);
+      resetOptimiserPlanAuthority(projectIdRef.current, versionIdRef.current);
+    }
+  }, [hasCanonical, instances, commitInstances]);
+
   return {
+    resetSubwooferTuning,
     hasCanonicalInstances: hasCanonical,
     frontModelDisplay,
     rearModelDisplay,

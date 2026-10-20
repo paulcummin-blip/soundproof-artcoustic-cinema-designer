@@ -332,6 +332,17 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             )}
           </div>
 
+          <div className="col-span-12 mt-4 flex justify-end">
+            <button
+              type="button"
+              disabled={disabled || !compat.hasCanonicalInstances}
+              onClick={compat.resetSubwooferTuning}
+              className="cursor-pointer px-3 py-1.5 text-[12px] font-semibold rounded border border-[#213428] bg-[#213428] text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Reset Subwoofer Tuning
+            </button>
+          </div>
+
           <div className="col-span-12 mt-4 border-t border-[#DCDBD6] pt-4">
             <div className="rounded-lg border border-[#E7E4DF] bg-white/70 px-4 py-4">
               <div className="flex items-start justify-between gap-4">
