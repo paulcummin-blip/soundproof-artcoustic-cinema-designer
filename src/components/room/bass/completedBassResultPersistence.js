@@ -508,9 +508,19 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   const fingerprint = currentFingerprint || compact?.job?.resultFingerprint || previous.currentFingerprint || null;
   const orderedKeys = Object.keys(completedByFingerprint)
     .sort((left, right) => Number(completedByFingerprint[right]?.job?.completedAtMs || 0) - Number(completedByFingerprint[left]?.job?.completedAtMs || 0));
-  const keptKeys = orderedKeys.slice(0, MAX_COMPLETED_SNAPSHOTS);
-  if (fingerprint && completedByFingerprint[fingerprint] && !keptKeys.includes(fingerprint)) {
-    keptKeys[keptKeys.length - 1] = fingerprint;
+  // A count cap alone allowed multi-megabyte writes on every crossover change.
+  // Keep the current contract and the latest previous result intact; spend the
+  // remaining cache budget on older snapshots. The target bank remains separate.
+  const MAX_COMPLETED_CACHE_BYTES = 1250000;
+  const priorityKeys = [fingerprint, ...orderedKeys].filter((key, index, keys) => key && completedByFingerprint[key] && keys.indexOf(key) === index);
+  const keptKeys = [];
+  let retainedBytes = 0;
+  for (const key of priorityKeys) {
+    const bytes = JSON.stringify(completedByFingerprint[key]).length;
+    if (keptKeys.length >= MAX_COMPLETED_SNAPSHOTS) break;
+    if (keptKeys.length >= 2 && retainedBytes + bytes > MAX_COMPLETED_CACHE_BYTES) continue;
+    keptKeys.push(key);
+    retainedBytes += bytes;
   }
   const bounded = Object.fromEntries(keptKeys.map((key) => [key, completedByFingerprint[key]]));
   const matching = fingerprint ? bounded[fingerprint] || null : null;
