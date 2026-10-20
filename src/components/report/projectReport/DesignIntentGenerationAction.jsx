@@ -28,6 +28,7 @@ import DesignIntentDiagnosticsPanel from '@/components/report/projectReport/Desi
 import { saveDesignIntentDiagnostics } from '@/components/report/projectReport/designIntentDiagnosticStore';
 import { saveAdiEditorialRejection } from '@/components/adi/adiEditorialRejectionStore';
 import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
+import useAutoDesignIntent, { AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
 
 const LABEL_COLOR = '#625143';
 const BODY_FONT = 'Didact Gothic, sans-serif';
@@ -65,6 +66,8 @@ export default function DesignIntentGenerationAction({
   // level, product, scope or limitation changes. The wording it replaces is kept, so
   // Undo can put it back exactly.
   const [adi, setAdi] = useState({ busy: false, message: null, canUndo: false });
+  // Automatic first pass for a newly generated report (write + ADI rewrite, once).
+  const auto = useAutoDesignIntent({ projectId, versionId, onDone: onGenerated });
 
   if (!projectId || !versionId) return null;
 
@@ -148,6 +151,19 @@ export default function DesignIntentGenerationAction({
 
   return (
     <div style={{ marginTop: 10 }}>
+      {auto.status === AUTO_INTENT.RUNNING && (
+        <div style={{ fontFamily: BODY_FONT, fontSize: 11, color: LABEL_COLOR, marginBottom: 6 }}>
+          ADI is preparing your report…
+        </div>
+      )}
+      {auto.status === AUTO_INTENT.FAILED && (
+        <div style={{ fontFamily: BODY_FONT, fontSize: 11, color: '#4A230F', marginBottom: 6 }}>
+          ADI could not finish preparing your report.{' '}
+          <button type="button" onClick={auto.retry} style={{ textDecoration: 'underline', fontWeight: 600 }}>
+            Retry
+          </button>
+        </div>
+      )}
       <button
         type="button"
         onClick={generate}

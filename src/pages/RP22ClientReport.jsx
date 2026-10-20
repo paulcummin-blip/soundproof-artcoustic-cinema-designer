@@ -25,6 +25,7 @@ import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import { useAutoDesignIntentStatus, AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
 import {
   readReportActionIntent,
   useReportActionIntent,
@@ -575,6 +576,8 @@ export default function RP22ClientReport() {
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
+  // Export waits for the automatic ADI pass on a newly generated report.
+  const autoIntentStatus = useAutoDesignIntentStatus(projectId, authority.versionId);
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
@@ -861,7 +864,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending}
+            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
