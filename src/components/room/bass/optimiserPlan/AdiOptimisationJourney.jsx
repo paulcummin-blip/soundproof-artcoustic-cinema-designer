@@ -809,6 +809,21 @@ export default function AdiOptimisationJourney({
     recommendationPublication: planView?.recommendationPublication || null,
   };
 
+  // The joint option has its own canonical verification and persisted receipt.
+  // A legacy placement-plan re-test state must not contradict that receipt.
+  // During a new run the normal progress/cancel presentation remains active.
+  if (jointCurrent && !isRunning) return (
+    <div className={`rounded-lg border border-stone-300 px-4 py-3 space-y-3 ${className}`}>
+      <div className="font-semibold">Bass Optimisation — Powered by ADI</div>
+      <p className="text-sm">{jointRecommendation.status === "applied"
+        ? "Crossover and subwoofer integration applied. See the verified result below."
+        : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below."}</p>
+      <button type="button" className="rounded border px-3 py-2 text-xs disabled:opacity-40"
+        disabled={!!runBlockReason || typeof onRunOptimisationPlan !== "function"}
+        onClick={onRunOptimisationPlan}>Run ADI Again</button>
+    </div>
+  );
+
   return (
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
