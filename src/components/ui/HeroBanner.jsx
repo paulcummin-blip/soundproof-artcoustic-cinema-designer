@@ -139,11 +139,6 @@ export default function DealerHero() {
   const hasCustomLogo = presentation.hasCustomLogo;
   const hasCustomHero = presentation.hasCustomHero;
 
-  const tooltipText = hoveredEl === "wordmark" ? "Sound Proof branding is fixed."
-    : hoveredEl === "logo" ? (hasCustomLogo ? "Change your company logo" : "Personalise this logo with your own branding. Upload your company logo from Dealer Branding.")
-    : hoveredEl === "hero" ? (hasCustomHero ? "Change your Hero Image" : "Personalise this Hero Image from Dealer Branding.")
-    : null;
-
   // Auto-adjust dark overlay based on hero image brightness (45–50%)
   useEffect(() => {
     if (!heroBg) {
@@ -393,30 +388,6 @@ export default function DealerHero() {
         )}
       </div>
 
-      {/* Hover discovery tooltip — only visible on hover, no permanent UI */}
-      {tooltipText && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 16,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "rgba(0,0,0,0.78)",
-            color: "#FFFFFF",
-            fontSize: 12,
-            fontFamily: FONT_FAMILY,
-            padding: "6px 14px",
-            borderRadius: 4,
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            zIndex: 10,
-            letterSpacing: "0.02em",
-            maxWidth: "90%",
-          }}
-        >
-          {tooltipText}
-        </div>
-      )}
     </div>
   );
 }
