@@ -37,6 +37,8 @@ import {
   MIGRATION_STATE,
 } from "@/components/utils/subwooferInstanceCompatibility";
 import { subwooferModelKey } from "@/components/utils/subwooferDisplayLabel";
+import { neutraliseSubwooferTuning } from "@/components/utils/subwooferNeutralTuning";
+import { resetAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { markAppliedCalibrationUserModified } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { extractAppliedCalibrationValues, computeAppliedCalibrationBasisFingerprint } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthority.js";
 
@@ -136,6 +138,19 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     }
   }, [appState, frontSubsCfg, rearSubsCfg]);
 
+  // --- Arrangement change (quantity / layout) ---
+  // A genuinely different arrangement starts every subwoofer neutral
+  // (0 dB, 0 ms, 0°, Normal) and drops the old Applied Calibration record, so
+  // prior ADI tuning is never carried into the new arrangement. Unchanged
+  // arrays (no-op edits) are left untouched.
+  const commitArrangementChange = useCallback((next, cfgOverrides) => {
+    if (next === instances) return;
+    commitInstances(neutraliseSubwooferTuning(next), cfgOverrides);
+    if (projectIdRef.current && versionIdRef.current) {
+      resetAppliedCalibrationAuthority(projectIdRef.current, versionIdRef.current);
+    }
+  }, [instances, commitInstances]);
+
   // --- Group model change: affects ENABLED instances only ---
   // When no enabled instances exist, mirrorInstancesToCfg sets model to null.
   // Preserve the explicitly selected model in CFG so future instance creation
@@ -160,14 +175,14 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
   const setFrontSubCount = useCallback((count) => {
     if (!hasCanonical) return;
     const next = applyCountChange(instances, "front", count, frontSubsCfg, appState?.roomDims);
-    commitInstances(next);
-  }, [hasCanonical, instances, frontSubsCfg, appState?.roomDims, commitInstances]);
+    commitArrangementChange(next);
+  }, [hasCanonical, instances, frontSubsCfg, appState?.roomDims, commitArrangementChange]);
 
   const setRearSubCount = useCallback((count) => {
     if (!hasCanonical) return;
     const next = applyCountChange(instances, "rear", count, rearSubsCfg, appState?.roomDims);
-    commitInstances(next);
-  }, [hasCanonical, instances, rearSubsCfg, appState?.roomDims, commitInstances]);
+    commitArrangementChange(next);
+  }, [hasCanonical, instances, rearSubsCfg, appState?.roomDims, commitArrangementChange]);
 
   // --- Bottom height change: affects ENABLED instances only ---
   const setFrontBottomHeight = useCallback((value) => {
@@ -188,15 +203,15 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
     const cfgWithMode = { ...frontSubsCfg, placementMode: mode };
     const next = applyPlacementPreset(instances, "front", cfgWithMode, appState?.roomDims);
     // Preserve the new placementMode in the mirrored CFG
-    commitInstances(next, { front: { placementMode: mode, isManual: false } });
-  }, [hasCanonical, instances, frontSubsCfg, appState?.roomDims, commitInstances]);
+    commitArrangementChange(next, { front: { placementMode: mode, isManual: false } });
+  }, [hasCanonical, instances, frontSubsCfg, appState?.roomDims, commitArrangementChange]);
 
   const applyRearPlacementPreset = useCallback((mode) => {
     if (!hasCanonical) return;
     const cfgWithMode = { ...rearSubsCfg, placementMode: mode };
     const next = applyPlacementPreset(instances, "rear", cfgWithMode, appState?.roomDims);
-    commitInstances(next, { rear: { placementMode: mode, isManual: false } });
-  }, [hasCanonical, instances, rearSubsCfg, appState?.roomDims, commitInstances]);
+    commitArrangementChange(next, { rear: { placementMode: mode, isManual: false } });
+  }, [hasCanonical, instances, rearSubsCfg, appState?.roomDims, commitArrangementChange]);
 
   // --- Orientation handlers: orientation stays in CFG, not on instances ---
   // Triggers the genuine-edit migration transition without touching instances
@@ -240,13 +255,13 @@ export function useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSub
 
   const moveInstanceGroup = useCallback((id, newGroup) => {
     if (!hasCanonical) return;
-    commitInstances(moveInstanceGroupByIdUtil(instances, id, newGroup));
-  }, [hasCanonical, instances, commitInstances]);
+    commitArrangementChange(moveInstanceGroupByIdUtil(instances, id, newGroup));
+  }, [hasCanonical, instances, commitArrangementChange]);
 
   const setInstanceEnabled = useCallback((id, enabled) => {
     if (!hasCanonical) return;
-    commitInstances(setInstanceEnabledByIdUtil(instances, id, enabled));
-  }, [hasCanonical, instances, commitInstances]);
+    commitArrangementChange(setInstanceEnabledByIdUtil(instances, id, enabled));
+  }, [hasCanonical, instances, commitArrangementChange]);
 
   const setInstanceCalibration = useCallback((id, calibration) => {
     if (!hasCanonical) return;

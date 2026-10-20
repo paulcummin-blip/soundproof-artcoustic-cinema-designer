@@ -24,6 +24,7 @@ import {
   resolveActiveAfterDeletion,
 } from "@/lib/versionAuthority";
 import { selectCanonicalVersions } from "@/lib/canonicalVersionSelection";
+import { neutraliseDesignStateForNewVersion } from "@/components/utils/subwooferNeutralTuning";
 
 const VERSION_BATCH_SIZE = 50;
 
@@ -190,7 +191,7 @@ export function useProjectVersionsBatched() {
       version_number: slot,
       version_name: sanitisedName,
       design_state: sourceVersion.design_state
-        ? JSON.parse(JSON.stringify(sourceVersion.design_state))
+        ? neutraliseDesignStateForNewVersion(JSON.parse(JSON.stringify(sourceVersion.design_state)))
         : {},
     });
 

@@ -20,6 +20,7 @@ import {
   sanitiseVersionName,
 } from "@/lib/versionAuthority";
 import { selectCanonicalVersions } from "@/lib/canonicalVersionSelection";
+import { neutraliseDesignStateForNewVersion } from "@/components/utils/subwooferNeutralTuning";
 
 // Lazy-migrate a single project to V1 if it hasn't been migrated yet.
 // Returns the active version ID.
@@ -169,8 +170,9 @@ export function useProjectVersions(projectId) {
           account_id: accountId,
           version_number: slot,
           version_name: sanitisedName,
+          // New version starts with neutral subwoofer tuning (no inherited ADI settings).
           design_state: sourceVersion.design_state
-            ? JSON.parse(JSON.stringify(sourceVersion.design_state))
+            ? neutraliseDesignStateForNewVersion(JSON.parse(JSON.stringify(sourceVersion.design_state)))
             : {},
         });
 
@@ -200,7 +202,7 @@ export function useProjectVersions(projectId) {
 
         await base44.entities.ProjectVersion.update(targetVersionId, {
           design_state: sourceVersion.design_state
-            ? JSON.parse(JSON.stringify(sourceVersion.design_state))
+            ? neutraliseDesignStateForNewVersion(JSON.parse(JSON.stringify(sourceVersion.design_state)))
             : {},
         });
 
