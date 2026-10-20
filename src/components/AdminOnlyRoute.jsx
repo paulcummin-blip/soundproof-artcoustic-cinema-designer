@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { isMasterAdmin } from "@/lib/accountAccess";
+import { isStrictMasterAdmin } from "@/lib/accountAccess";
 
 /**
  * Redirects non-admin users away from admin-only pages.
@@ -9,7 +9,7 @@ import { isMasterAdmin } from "@/lib/accountAccess";
  */
 export default function AdminOnlyRoute({ children, redirectTo = "/Projects" }) {
   const { user } = useAuth();
-  if (!isMasterAdmin(user)) {
+  if (!isStrictMasterAdmin(user)) {
     return <Navigate replace to={redirectTo} />;
   }
   return children;

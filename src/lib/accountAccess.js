@@ -14,6 +14,11 @@ export function isMasterAdmin(user) {
   return user?.role === "admin" || user?.access_context?.capabilities?.masterAdmin === true;
 }
 
+// Strict master-admin identity: the explicit masterAdmin capability only, never the general admin role.
+export function isStrictMasterAdmin(user) {
+  return user?.access_context?.capabilities?.masterAdmin === true;
+}
+
 export function hasCapability(user, capability) {
   if (!user) return false;
   if (isMasterAdmin(user)) return true;

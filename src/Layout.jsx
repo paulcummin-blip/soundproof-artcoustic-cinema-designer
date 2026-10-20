@@ -44,7 +44,7 @@ import DealerHero from "@/components/ui/HeroBanner";
 import BrandBar from "@/components/ui/BrandBar";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
-import { hasCapability, isMasterAdmin } from "@/lib/accountAccess";
+import { hasCapability, isStrictMasterAdmin } from "@/lib/accountAccess";
 
 
 const menuItems = [
@@ -69,7 +69,7 @@ export default function Layout({ children, currentPageName }) {
   const canUseCommercial = hasCapability(user, "commercial");
   const accountName = user?.access_context?.account?.name || null;
   const availableMenuItems = menuItems.filter((item) =>
-  (item.alwaysVisible || hasCapability(user, item.capability)) && (!item.adminOnly || isMasterAdmin(user))
+  (item.alwaysVisible || hasCapability(user, item.capability)) && (!item.adminOnly || isStrictMasterAdmin(user))
   );
   const isReportAutoPrint = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("autoPrint") === "1"
