@@ -26,7 +26,8 @@ import {
   REPORT_SNAPSHOT_TYPE,
   currentSourceFingerprints,
 } from '@/components/report/reportSnapshotAuthority';
-import { assessmentDetail, composeProjectReportVerdict } from './projectReportReadiness';
+import { composeProjectReportVerdict } from './projectReportReadiness';
+import { resolveProjectReportIssues } from './projectReportIssues';
 
 export function useProjectReportReadiness({
   projectId = null,
@@ -102,15 +103,26 @@ export function useProjectReportReadiness({
     ],
   );
 
+  // The short, user-facing reasons the status popover shows. Translated from the
+  // authorities' verdicts — never a second readiness rule.
+  const issues = useMemo(
+    () =>
+      resolveProjectReportIssues({
+        readiness,
+        reportCompleteness: authority.reportCompleteness,
+      }),
+    [readiness, authority.reportCompleteness],
+  );
+
   const verdict = useMemo(
     () =>
       composeProjectReportVerdict({
         readiness,
         snapshotStatus: report.status,
         changedKeys: report.changedKeys,
-        detail: assessmentDetail(authority.reportCompleteness),
+        issues,
       }),
-    [readiness, report.status, report.changedKeys, authority.reportCompleteness],
+    [readiness, report.status, report.changedKeys, issues],
   );
 
   return {

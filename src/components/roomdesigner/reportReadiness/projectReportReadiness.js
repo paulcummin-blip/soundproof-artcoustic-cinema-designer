@@ -30,20 +30,6 @@ const NOT_READY_FALLBACK_REASON =
   'This project has not been fully assessed yet.';
 
 /**
- * The assessment detail line, stated from the version's own completeness audit.
- * Null when nothing is outstanding.
- */
-export function assessmentDetail(reportCompleteness) {
-  const keys = Array.isArray(reportCompleteness?.missingParameterKeys)
-    ? reportCompleteness.missingParameterKeys
-    : [];
-  if (keys.length === 0) return null;
-  return keys.length === 1
-    ? '1 parameter still needs calculating.'
-    : `${keys.length} parameters still need calculating.`;
-}
-
-/**
  * Compose the button's verdict from the canonical readiness state, the saved
  * report's own status and the missing-item checklist.
  *
@@ -51,15 +37,16 @@ export function assessmentDetail(reportCompleteness) {
  * @param {object} input.readiness       deriveReportReadiness() result
  * @param {string} input.snapshotStatus  REPORT_SNAPSHOT_STATUS for the saved report
  * @param {Array}  input.changedKeys     source inputs that moved on after the save
- * @param {string} input.detail          assessment detail line, when one exists
+ * @param {Array}  input.issues          resolveProjectReportIssues() — the short
+ *                                       user-facing reasons, ready to display
  * @returns {{verdict:string, state:string, hasReport:boolean, reason:string,
- *            missing:Array, detail:string|null, canOpen:boolean, canUpdate:boolean}}
+ *            missing:Array, issues:Array, canOpen:boolean, canUpdate:boolean}}
  */
 export function composeProjectReportVerdict({
   readiness = null,
   snapshotStatus = REPORT_SNAPSHOT_STATUS.NONE,
   changedKeys = [],
-  detail = null,
+  issues = [],
 } = {}) {
   const state = readiness?.state || REPORT_STATE.NOT_READY;
   const missing = Array.isArray(readiness?.missing) ? readiness.missing : [];
@@ -75,7 +62,7 @@ export function composeProjectReportVerdict({
       hasReport: true,
       reason: buildStaleSentence(changedKeys),
       missing,
-      detail,
+      issues,
       canOpen: true,
       canUpdate: true,
     };
@@ -91,7 +78,7 @@ export function composeProjectReportVerdict({
         ? 'This report reflects the project as it stands.'
         : 'Everything this report needs is in place.',
       missing: [],
-      detail: null,
+      issues: [],
       canOpen: true,
       canUpdate: false,
     };
@@ -105,7 +92,7 @@ export function composeProjectReportVerdict({
     hasReport,
     reason: readiness?.reason || NOT_READY_FALLBACK_REASON,
     missing,
-    detail,
+    issues,
     canOpen: false,
     canUpdate: false,
   };

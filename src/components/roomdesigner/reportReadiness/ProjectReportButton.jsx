@@ -33,14 +33,14 @@ const VERDICT_STYLE = {
     status: 'Waiting',
     statusClass: 'text-[#8A6D1F]',
     icon: Clock,
-    title: 'PROJECT REPORT NOT READY',
+    title: 'Not ready yet',
   },
   [PROJECT_REPORT_VERDICT.UPDATE_REQUIRED]: {
     button: 'bg-[#B45309] text-white border-transparent hover:bg-[#92400E]',
     status: 'Update required',
     statusClass: 'text-white',
     icon: TriangleAlert,
-    title: 'PROJECT REPORT NEEDS UPDATING',
+    title: 'Report needs updating',
   },
 };
 
@@ -58,7 +58,7 @@ export default function ProjectReportButton({
   const isReady = verdict === PROJECT_REPORT_VERDICT.READY;
   const canOpen = readiness?.canOpen === true;
   const canUpdate = readiness?.canUpdate === true;
-  const missing = Array.isArray(readiness?.missing) ? readiness.missing : [];
+  const issues = Array.isArray(readiness?.issues) ? readiness.issues : [];
 
   const handleClick = () => {
     if (disabled || readiness?.loading) return;
@@ -95,7 +95,7 @@ export default function ProjectReportButton({
           <FileText className="w-4 h-4" style={{ flexShrink: 0 }} />
           <span className="flex flex-col items-start leading-tight" style={{ alignItems: 'flex-start' }}>
             <span style={{ fontSize: 9, letterSpacing: '0.08em' }}>
-              {isReady ? 'PROJECT REPORT' : style.title}
+              PROJECT REPORT
             </span>
             <span className={`inline-flex items-center gap-1 ${style.statusClass}`} style={{ fontSize: 12 }}>
               <StatusIcon className="w-3 h-3" style={{ flexShrink: 0 }} />
@@ -104,30 +104,38 @@ export default function ProjectReportButton({
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-4" sideOffset={8}>
-        <div style={{ fontSize: 11, letterSpacing: '0.08em', fontWeight: 700, color: '#1B1A1A' }}>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="p-4"
+        style={{ width: 350, maxWidth: 'calc(100vw - 24px)' }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#737373' }}>
           {style.title}
         </div>
 
-        <p className="mt-2 text-sm text-[#3E4349]">{readiness?.reason}</p>
-
-        {readiness?.detail && (
-          <p className="mt-1 text-sm font-semibold text-[#8A6D1F]">{readiness.detail}</p>
-        )}
-
-        {missing.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {missing.map((item) => (
-              <li key={item.key} className="text-xs text-[#625143]">
-                <span className="font-semibold text-[#1B1A1A]">{item.label}</span>
-                {item.action ? <span className="block">{item.action}</span> : null}
+        {/* One line per genuine outstanding item. Nothing internal, nothing
+            duplicated, no count of "incomplete parameters". */}
+        {issues.length > 0 && (
+          <ul className="mt-2 space-y-1.5">
+            {issues.map((issue) => (
+              <li
+                key={issue.key}
+                className="text-xs leading-snug text-[#3E4349]"
+              >
+                <span className="font-semibold text-[#1B1A1A]">{issue.label}</span>
+                <span> — {issue.reason}</span>
               </li>
             ))}
           </ul>
         )}
 
+        {verdict === PROJECT_REPORT_VERDICT.UPDATE_REQUIRED && readiness?.reason && (
+          <p className="mt-2 text-xs leading-snug text-[#3E4349]">{readiness.reason}</p>
+        )}
+
         {verdict === PROJECT_REPORT_VERDICT.UPDATE_REQUIRED && (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button
               size="sm"
               className="bg-[#213428] text-white hover:bg-[#3E4349]"
@@ -146,11 +154,6 @@ export default function ProjectReportButton({
           </div>
         )}
 
-        {verdict === PROJECT_REPORT_VERDICT.WAITING && (
-          <p className="mt-4 text-xs text-[#737373]">
-            The Project Report opens as soon as this project is fully assessed.
-          </p>
-        )}
       </PopoverContent>
     </Popover>
   );
