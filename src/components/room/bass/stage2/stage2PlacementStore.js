@@ -320,12 +320,14 @@ export class Stage2PlacementController {
 
       for (const f of finalists) {
         if (placementFingerprint && hasCachedRawTransfer(this.projectId, this.versionId, placementFingerprint, f.id)) {
+          this.runtimeDiagnostics.transferCacheHits = (this.runtimeDiagnostics.transferCacheHits || 0) + 1;
           const rawTransfer = getCachedRawTransfer(this.projectId, this.versionId, placementFingerprint, f.id);
           const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
           const placementRanking = buildPlacementRankingTuple(rawTransfer, seatPriorityMap);
           this.placementResults[qty].push({ finalistId: f.id, rawTransfer, placementRanking });
           this.quantityPlacementProcessed[qty]++;
         } else {
+          this.runtimeDiagnostics.transferCacheMisses = (this.runtimeDiagnostics.transferCacheMisses || 0) + 1;
           this.queue.push({ finalist: f, quantity: qty, phase: "placement" });
         }
       }

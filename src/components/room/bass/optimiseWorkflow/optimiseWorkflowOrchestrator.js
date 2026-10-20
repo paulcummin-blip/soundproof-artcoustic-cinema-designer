@@ -139,7 +139,8 @@ export async function runOptimisation(opts) {
   let stage2Result = getStage2State(projectId, versionId);
   let placementFingerprint = stage2Result?.placementFingerprint;
 
-  if (!isStage2ReadyForConsumption(stage2Result)) {
+  const reusedStage2 = isStage2ReadyForConsumption(stage2Result);
+  if (!reusedStage2) {
     if (!shared.cacheKey) {
       return { status: "error", error: "Bass result is not ready — calculate parameter results first." };
     }
@@ -245,7 +246,7 @@ export async function runOptimisation(opts) {
   let runtimeMetrics = null;
   const callbacks = {
     onRuntimeMetrics: report => {
-      runtimeMetrics = { ...report, stage2: stage2Result?.runtimeDiagnostics || null };
+      runtimeMetrics = { ...report, stage2: reusedStage2 ? { reused: true } : stage2Result?.runtimeDiagnostics || null };
       opts.onRuntimeMetrics?.(runtimeMetrics);
     },
     onProgress: (phase, label, current, total) => {

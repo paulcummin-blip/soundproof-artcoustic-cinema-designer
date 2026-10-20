@@ -1,3 +1,4 @@
+import { recordRoomSimulationInvocation } from "./improveBassV2/improveBassV2RuntimeMetrics";
 // combinedIntegrationEngine.js
 // ---------------------------------------------------------------------------
 // Captures the complex transfers the combined LCR + bass-managed subwoofer
@@ -91,6 +92,7 @@ export function captureCombinedIntegrationTransfers({
   // The ONLY extra engine pass: the screen channels as dimensionless units.
   const speakerKey = JSON.stringify({ roomDims, seatingPositions, rspPosition, speakers, physics, qStrategyOverride });
   let speakerRun = speakerGeometryCache.get(speakerKey);
+  recordRoomSimulationInvocation(speakerRun ? "speakerTransferCacheHits" : "speakerTransferCacheMisses");
   if (!speakerRun) {
   speakerRun = simulateAuthoritativeBassResponse({
     roomDims,

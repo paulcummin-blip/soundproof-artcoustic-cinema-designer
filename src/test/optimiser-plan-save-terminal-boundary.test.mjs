@@ -189,7 +189,7 @@ describe("2 · the recommendation publication is secondary", () => {
     assert.equal(record.status, RECOMMENDATION_PUBLICATION_STATUS.REFUSED);
     assert.equal(record.error, "Entity write-traffic limit reached.");
     assert.equal(record.attempts, 2);
-    assert.deepEqual(record.fingerprints, ["fp-1"]);
+    assert.deepEqual(record.fingerprints, []); // A refused write did not publish a fingerprint.
     // It is its own diagnostic: it never becomes the run's failure.
     assert.equal("failure" in record, false);
   });
