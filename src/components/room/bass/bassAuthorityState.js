@@ -41,6 +41,7 @@
  */
 
 import { BASS_AUTHORITY_STATUS } from "./completedBassResultStore";
+import { resolveOverallProjectWaiting } from "./overallProjectWaiting";
 
 export const BASS_AUTHORITY_STATE = Object.freeze({
   CALCULATING: "calculating",
@@ -286,9 +287,10 @@ export function resolveBassAuthorityState({
           attention: true,
         };
       }
-      // Non-bass gates belong to Project Report. A refusal without any
-      // recorded gate still leaves the save unconfirmed and remains retryable.
-      if (failedGates(matchingAttempt).length === 0) {
+      // Preserve the existing save-failure decision, but keep overall project
+      // explanations in Project Report rather than returning them to the bass UI.
+      const waiting = resolveOverallProjectWaiting({ attempt: matchingAttempt });
+      if (waiting.complete && failedGates(matchingAttempt).length === 0) {
         return {
           code: BASS_AUTHORITY_STATE.SAVE_FAILED,
           ...BASS_AUTHORITY_SAVE_FAILED_COPY,
