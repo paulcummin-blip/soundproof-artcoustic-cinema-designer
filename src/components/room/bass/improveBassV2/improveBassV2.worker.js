@@ -1,3 +1,27 @@
+import { captureCombinedIntegrationTransfers } from "../combinedIntegrationEngine";
+import { simulateAuthoritativeBassResponse } from "../authoritativeBassResponseEngine";
+import { runCrossoverIntegrationSearch } from "./crossoverIntegrationSearch";
+let integrationContext = null;
+function attachIntegration(rawTransfer) {
+  if (!integrationContext?.speakerSources?.length || !rawTransfer) return rawTransfer;
+  const seatingPositions = rawTransfer.seatingPositions || integrationContext.seatingPositions;
+  const rspPosition = rawTransfer.rspPosition || integrationContext.rspPosition;
+  const payload = {
+    roomDims: integrationContext.roomDims, seatingPositions, rspPosition,
+    physics: integrationContext.physics, qStrategyOverride: "ab_corrected",
+    sources: rawTransfer.sources,
+  };
+  const flat = rawTransfer.perSourceRspComplexTransfers?.length
+    ? rawTransfer.perSourceRspComplexTransfers
+    : simulateAuthoritativeBassResponse({ ...payload, seatingPositions: [] }).perSourceRspComplexTransfers;
+  const integrationTransfers = captureCombinedIntegrationTransfers({
+    ...payload, subSources: rawTransfer.sources,
+    subTransfers: rawTransfer.perSourcePerSeatComplexTransfers,
+    speakerSources: integrationContext.speakerSources,
+  });
+  if (!integrationTransfers?.available) throw new Error("Combined source transfer capture failed");
+  return { ...rawTransfer, perSourceRspComplexTransfers: flat, integrationTransfers, crossover: integrationContext.crossover };
+}
 // improveBassV2.worker.js
 // Worker for the V2 Improve Bass Response heavy computation phases.
 // Handles placement evaluation (modal simulation) and canonical confirmation
@@ -17,7 +41,16 @@ self.onmessage = (event) => {
     return;
   }
   try {
-    if (phase === "placement") {
+    if (phase === "integration-context") {
+      integrationContext = params.context;
+      self.postMessage({ type: "complete", requestId, phase, result: { ready: true } });
+    } else if (phase === "crossover-integration") {
+      const rawTransfer = attachIntegration(params.rawTransfer);
+      const result = runCrossoverIntegrationSearch({ ...params, rawTransfer,
+        crossover: integrationContext.crossover,
+        speakerModels: integrationContext.speakerSources.map(s => s.modelKey) });
+      self.postMessage({ type: "complete", requestId, phase, result });
+    } else if (phase === "placement") {
       const result = evaluateStage2Placement(params);
       self.postMessage({ type: "complete", requestId, phase: "placement", result });
     } else if (phase === "seating-batch") {
@@ -34,7 +67,7 @@ self.onmessage = (event) => {
       self.postMessage({ type: "complete", requestId, phase, result });
     } else if (phase === "confirmation") {
       const { rawTransfer, tuning, tuningVariant, ...p14Params } = params;
-      const result = evaluateStage2ConfirmationWithTuning(rawTransfer, {
+      const result = evaluateStage2ConfirmationWithTuning(attachIntegration(rawTransfer), {
         tuning,
         tuningVariant: tuningVariant || "delay-polarity-trim",
         ...p14Params,

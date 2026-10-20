@@ -85,6 +85,14 @@ export async function runOptimisation(opts) {
   );
 
   const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
+  const integrationContext = shared?.authoritative?.combinedAuthorityEnabled ? {
+    roomDims, seatingPositions,
+    rspPosition: shared.authoritative.rspPosition,
+    speakerSources: shared.authoritative.lcrSources,
+    crossover: shared.authoritative.crossover,
+    physics: shared.authoritative.physics,
+    identity: shared.authoritative.fingerprintInputs?.combinedResponseIdentity,
+  } : null;
 
   // Derive P14 target parameters from the shared bass results
   const requested = shared?.authoritative?.requested || {};
@@ -114,7 +122,7 @@ export async function runOptimisation(opts) {
   const startFingerprint = (() => {
     try {
       return computeV2DesignFingerprint({
-        subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
+        subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, integrationContext,
         p14TargetBasis: p14Params.p14TargetBasis, p14TargetLevel: p14Params.p14TargetLevel,
         p14TargetDb: p14Params.p14TargetDb, p18TargetBasis: p14Params.p18TargetBasis,
         amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
@@ -137,7 +145,7 @@ export async function runOptimisation(opts) {
     const getCurrentFingerprint = () => {
       try {
         return computeV2DesignFingerprint({
-          subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
+          subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, integrationContext,
           p14TargetBasis: p14Params.p14TargetBasis, p14TargetLevel: p14Params.p14TargetLevel,
           p14TargetDb: p14Params.p14TargetDb, p18TargetBasis: p14Params.p18TargetBasis,
           amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
@@ -213,6 +221,7 @@ export async function runOptimisation(opts) {
     stage2Result,
     placementFingerprint,
     correctabilityAssessment,
+    integrationContext,
   };
 
   const callbacks = {
@@ -226,7 +235,7 @@ export async function runOptimisation(opts) {
     getCurrentFingerprint: () => {
       try {
         return computeV2DesignFingerprint({
-          subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel,
+          subwooferInstances, roomDims, seatingPositions, rspPosition, selectedSubModel, integrationContext,
           p14TargetBasis: p14Params.p14TargetBasis, p14TargetLevel: p14Params.p14TargetLevel,
           p14TargetDb: p14Params.p14TargetDb, p18TargetBasis: p14Params.p18TargetBasis,
           amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,

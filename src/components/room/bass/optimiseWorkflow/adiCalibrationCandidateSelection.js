@@ -99,7 +99,7 @@ export function confirmedCalibrationCandidates({ selection = null } = {}) {
   const out = [];
   const seen = new Set();
   const push = (candidate) => {
-    if (!candidate || !candidate.tuning.length) return;
+    if (!candidate || !candidate.tuning.length || candidate.result?.integrationVerified) return;
     const key = `${candidate.lever}:${candidate.candidateId}`;
     if (seen.has(key)) return;
     seen.add(key);

@@ -158,6 +158,29 @@ export async function runCombinedOptimisation(ctx) {
     combinedStartTime,
   } = ctx;
 
+  if (ctx.integrationContext) {
+    onProgress("combining", "Optimising crossover, gain, delay and phase together", 0, 1);
+    const started = performance.now();
+    const search = await runInWorker(worker, "crossover-integration", {
+      rawTransfer: currentRawTransfer, effectiveBaseline,
+      p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+    }, controller.signal);
+    metrics.recordWorkerCall("crossover-integration", "joint-integration", performance.now() - started, false);
+    if (isStale() || isCancelled()) return { combinedCandidates: [], diagnostics: { status: "stale" } };
+    const combinedCandidates = [];
+    for (const [index, candidate] of (search?.candidates || []).entries()) {
+      const bound = bindConfirmation(candidate, candidate.appliedTuning, { candidateOrigin: "combined-integration" }, "calibration");
+      const check = validateConfirmedCandidate(bound, validationContext);
+      if (!check.valid) continue;
+      const result = { ...check.result, candidateId: "combined-integration-" + index, candidateOrigin: "combined",
+        combinedFrom: { crossover: true, phaseRetuned: true, delayRetuned: true, gainRetuned: true } };
+      combinedCandidates.push(result);
+      onBestSoFar({ result, candidate: { candidateOrigin: "combined" } });
+    }
+    return { combinedCandidates, diagnostics: { ...search.diagnostics, tested: search.diagnostics?.screened,
+      valid: combinedCandidates.length, baseline: search.baseline } };
+  }
+
   const diagnostics = {
     status: "incomplete",
     tested: 0,

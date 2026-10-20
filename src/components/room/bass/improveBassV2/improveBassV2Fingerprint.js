@@ -121,6 +121,7 @@ export function computeV2DesignFingerprint(params) {
 
   const applyIdentity = JSON.stringify({
     timing: STAGE2_CANONICAL_VERSION,
+    integration: params?.integrationContext?.identity || null,
     provenance: instances.map((inst) => [inst.id, inst.tuningSource || "manual"]),
     priorities: (seatingPositions || []).map((seat) => [seat.id, seat.isPrimary, seat.priority]),
     amplifierPowerPerSubW: params?.amplifierPowerPerSubW ?? null,

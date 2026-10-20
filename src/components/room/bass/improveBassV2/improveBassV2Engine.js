@@ -443,7 +443,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     currentAuthority, currentCanonicalResult, currentSources, liveCacheKey, stage2Result, placementFingerprint,
-    correctabilityAssessment,
+    correctabilityAssessment, integrationContext,
   } = params;
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
@@ -483,7 +483,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   const startFingerprint = computeV2DesignFingerprint({
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, p14TargetBasis, p14TargetLevel, p14TargetDb,
-    p18TargetBasis, amplifierPowerPerSubW,
+    p18TargetBasis, amplifierPowerPerSubW, integrationContext,
   });
 
   function isStale() {
@@ -536,6 +536,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   let runResult = null;
 
   try {
+    if (integrationContext) {
+      await runInWorker(worker, "integration-context", { context: integrationContext }, controller.signal);
+    }
     // Phase 1: Reviewing current design
     onProgress("reviewing", "Reviewing current design", 0, 1);
     const snapshot = snapshotCurrentDesign({
@@ -659,7 +662,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       const appliedTuning=bindTuningToSourceIds(tuning,snapshot.instanceIds);
       const positions=candidate.coordinates || result.coordinates || snapshot.positions;
       const instances=snapshot.allInstances.filter(s=>s.enabled!==false).map((s,i)=>({...s,position:{...s.position,...positions[i]}}));
-      const configurationKey=effectiveConfigurationKey(instances,appliedTuning);
+      const configurationKey=effectiveConfigurationKey(instances,appliedTuning) + (result.crossover ? "|xo:"+JSON.stringify(result.crossover) : "");
       let hash=2166136261;for(const ch of configurationKey)hash=Math.imul(hash^ch.charCodeAt(0),16777619);
       return {...result,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
         candidateId:kind==="current"?"current":kind==="phase"?(candidate.groupedPhase?.id || "phase:"+(hash>>>0).toString(16)):kind==="calibration"?(candidate.groupedDelay?.id || "calibration:"+(hash>>>0).toString(16)):candidate.id,
@@ -1602,6 +1605,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           effectiveBaseline: savedEffectiveBaseline,
           positionRawTransfer,
           combinedStartTime,
+          integrationContext,
         });
 
         combinedDiagnostics = combinedDiag;
@@ -1661,6 +1665,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.combinedResult=combinedResult;
     selection.combinedMaterial=combinedMaterial;
     selection.combinedDiagnostics=combinedDiagnostics;
+    selection.integrationRecommendation=combinedResult?.integrationVerified ? combinedResult : null;
     // ── Canonical objective winners + diagnostic ledger ─────────────────
     // Built from canonically CONFIRMED results only. This never changes the
     // final winner rule — it exposes which candidate best serves each
