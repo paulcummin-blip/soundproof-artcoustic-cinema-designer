@@ -32,8 +32,6 @@ import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState"
 import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
 import useBassAuthorityAutoPublication from "@/components/room/bass/bda/useBassAuthorityAutoPublication";
 import BassRecalculationBar from "@/components/room/bass/bda/BassRecalculationBar";
-import useCombinedResultRecalculation from "@/components/room/bass/useCombinedResultRecalculation";
-import { useProjectCrossover } from "@/components/room/useProjectCrossover";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -65,36 +63,20 @@ export default function BassPerformanceStrip() {
     resultFingerprint: shared?.completedBassAuthority?.currentFingerprint || null,
   });
   const saveFailed = authorityState.code === BASS_AUTHORITY_STATE.SAVE_FAILED;
-  const canRecalculate = typeof shared?.onCalculate === "function";
-
-  // ── Manual recalculation ────────────────────────────────────────────────
-  // ONE request path. The band's own action and the recalculate button below
-  // both go through requestCalculate, so a completed recalculation is
-  // recognised whichever control started it. The combined LCR + subwoofer
-  // preview keeps a validity of its own, keyed on the crossover settings it was
-  // last recalculated at: a crossover change never invalidates the
-  // subwoofer-only result, which does not use crossover settings at all.
-  const { crossover } = useProjectCrossover();
   const calculating = shared?.calculationInProgress === true;
-  const previousResultExists = !!shared?.completedBassAuthority?.contract?.job?.resultFingerprint;
-  const subOnlyCurrent = previousResultExists && (
-    authorityState.code === BASS_AUTHORITY_STATE.CURRENT
-    || authorityState.code === BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED
-    || authorityState.code === BASS_AUTHORITY_STATE.PUBLISHING
-  );
-  const hasCombinedResult = shared?.authoritative?.combinedSystem?.available === true;
-  const recalculation = useCombinedResultRecalculation({
-    projectId: shared?.scopeId,
-    versionId: shared?.versionId,
-    crossover,
-    subOnlyCurrent,
-    hasCombinedResult,
-    calculating,
-    onCalculate: shared?.onCalculate,
-  });
-  const calculate = canRecalculate ? recalculation.requestCalculate : null;
-  const stateAction = saveFailed ? autoPublication.retrySave : calculate;
-  const secondaryAction = saveFailed ? calculate : null;
+  // The permanent manual control. It is available whenever the design is
+  // calculable — including when the result is already current, and when nothing
+  // has changed at all — and every click goes straight into the existing
+  // authoritative calculation, saving and publication workflow.
+  // The control is always present; it is only disabled while the design is not
+  // calculable (no subs, no seats) or a calculation is already running.
+  const canCalculate = shared?.canCalculate === true;
+  const hasResult = !!shared?.completedBassAuthority?.contract?.job?.resultFingerprint;
+  const calculate = typeof shared?.onCalculate === "function" ? shared.onCalculate : null;
+  // The band keeps only the action that is NOT a calculation: retrying a save
+  // that did not land. Calculate / Recalculate lives in the permanent button
+  // below, so the two are never shown as duplicate controls.
+  const stateAction = saveFailed ? autoPublication.retrySave : null;
 
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
@@ -196,22 +178,15 @@ export default function BassPerformanceStrip() {
         state={authorityState}
         onPrimaryAction={stateAction}
         primaryDisabled={calculating}
-        onSecondaryAction={secondaryAction}
-        secondaryDisabled={calculating}
       />
 
-      {/* The manual recalculation control, beside the results. When the band
-          above already carries the action, that button IS the recalculation, so
-          only one is ever shown. */}
+      {/* The permanent manual calculate / recalculate control, beside the
+          RP22 results. */}
       <BassRecalculationBar
-        combinedState={recalculation.combinedState}
-        hasCombinedResult={hasCombinedResult}
-        hasPreviousResult={previousResultExists}
-        subOnlyCurrent={subOnlyCurrent}
-        showRecalculate={!!calculate && !(authorityState.actionLabel && !!stateAction)}
+        hasResult={hasResult}
         calculating={calculating}
-        canCalculate={shared?.canCalculate === true}
-        onRecalculate={calculate}
+        canCalculate={canCalculate}
+        onCalculate={calculate}
       />
     </div>
   );

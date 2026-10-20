@@ -91,17 +91,6 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
 });
 
 /**
- * The one line a RETAINED BUT OUTDATED result shows: the settings changed, so
- * the existing result must be recalculated before it is current again. This is
- * a recalculation of a result that exists, never a first calculation.
- */
-export const BASS_AUTHORITY_RECALCULATION_COPY = Object.freeze({
-  label: "Needs recalculation",
-  message: "Settings changed · Recalculate Bass Results to update.",
-  actionLabel: "Recalculate Bass Results",
-});
-
-/**
  * The one designer-facing status when the result did not become usable: one
  * label, one short explanation, and the two honest ways forward — save it again,
  * or recalculate it. It is never shown as an invitation to save by hand; the
@@ -247,15 +236,7 @@ export function resolveBassAuthorityState({
     || lifecycleState === "stale_needs_recalculation"
     || placementPreviewActive === true;
   if (contract && (placementPreviewActive || lifecycleState === "restoring")) return withCopy(BASS_AUTHORITY_STATE.PREVIEW_ONLY);
-  // A result already exists: the design has moved on from it, so what is needed
-  // is a recalculation of that result — never a first calculation. The code is
-  // unchanged (the result is still NOT current), only the copy and the action
-  // say what the designer actually has to do.
-  if (designMovedOn) {
-    return contract
-      ? { code: BASS_AUTHORITY_STATE.NEEDS_CALCULATION, ...BASS_AUTHORITY_RECALCULATION_COPY }
-      : withCopy(BASS_AUTHORITY_STATE.NEEDS_CALCULATION);
-  }
+  if (designMovedOn) return withCopy(BASS_AUTHORITY_STATE.NEEDS_CALCULATION);
 
   // Saved AND current: the completed contract is the authority for the design
   // as it stands now. This is the same completion test the readiness authority
