@@ -89,8 +89,18 @@ export default function OptionsPanel({
   const isManualOverride = isManualAbfuserOverride(abfuserQtySource);
   const overrideDiffers = isManualOverride && selectedQuantity !== recommendedQuantity;
 
+  // Switching treatment ON includes it in the system, the price and the
+  // proposal: the dealer's own quantity is restored when one exists, otherwise
+  // ADI's recommendation becomes the included quantity. Switching OFF includes
+  // nothing and never discards the recommendation or a manual quantity.
   const handleAcousticTreatmentToggle = (nextEnabled) => {
     setAcousticTreatmentEnabled(nextEnabled);
+    if (!nextEnabled) return;
+    if (isManualOverride && selectedQuantity > 0) return;
+    if (recommendedQuantity > 0) {
+      setSelectedAbfuserQty(recommendedQuantity);
+      setAbfuserQtySource("recommended");
+    }
   };
 
   // The ONLY way the recommendation becomes a priced selection. It never

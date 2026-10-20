@@ -377,17 +377,17 @@ export function describeAbfuserInclusion({ recommendedQuantity, selectedQuantity
   if (enabled === false) {
     return {
       state: "NOT_INCLUDED",
-      message: "ADI acoustic treatment recommendation not included in proposal.",
+      message: "Optional — not included in proposal.",
     };
   }
   if (selected <= 0 && recommended <= 0) {
     return {
       state: "NOT_INCLUDED",
-      message: "ADI acoustic treatment recommendation not included in proposal.",
+      message: "Optional — not included in proposal.",
     };
   }
   if (selected === recommended) {
-    return { state: "INCLUDED", message: "ADI recommendation included in proposal." };
+    return { state: "INCLUDED", message: "Acoustic treatment included in proposal." };
   }
   return {
     state: selected > recommended ? "ABOVE_RECOMMENDATION" : "BELOW_RECOMMENDATION",

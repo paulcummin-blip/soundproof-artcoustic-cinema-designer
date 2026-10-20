@@ -382,9 +382,13 @@ export function serializeProject(input = {}) {
     // Only the designer's decision is stored as the selected quantity — the ADI
     // recommendation is recalculated from geometry and is never persisted as a
     // selection. legacy_abfuser_auto_qty retains any retired automatic value.
+    // Switching treatment OFF excludes it from pricing, the proposal and the
+    // equipment quantities — it never discards the recommendation or the
+    // designer's own quantity, so switching it back on restores exactly what
+    // was chosen. The ON/OFF decision itself is stored as stored.
     acoustic_treatment_enabled: !!acousticTreatmentEnabled,
-    selected_abfuser_qty: acousticTreatmentEnabled ? (Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0))) : 0,
-    abfuser_qty_source: acousticTreatmentEnabled ? (abfuserQtySource || "none") : "none",
+    selected_abfuser_qty: Math.max(0, Math.floor(Number(selectedAbfuserQty) || 0)),
+    abfuser_qty_source: abfuserQtySource || "none",
     legacy_abfuser_auto_qty: Math.max(0, Math.floor(Number(legacyAbfuserAutoQty) || 0)),
 
     // P15/P21 assumed design levels (null = not yet assumed; effective default is L2)
