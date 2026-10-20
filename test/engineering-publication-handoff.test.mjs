@@ -101,3 +101,24 @@ test('final report source identity never includes newer live seating priorities'
   assert.match(hook,/terminalGate\?\.detail\?\.split/);
   assert.match(hook,/complete: false,\s*publicationBlocked: true/);
 });
+test('single overhead pair P9 N/A survives saved publication restore and passes report contracts', () => {
+  const p = publication();
+  const overheads = ['TML', 'TMR'].map((role, i) => ({ id: role, role, model: 'sl-evolve-1-1', position: { x: i ? 3 : 1, y: 3, z: 2.8 } }));
+  const d = state();
+  d.placedSpeakers.push(...overheads);
+  d.dolbyLayout = '5.1.2';
+  p.report_snapshot.report_project = buildFrozenReportProject(d, { projectId: 'project', versionId: 'version' }).reportProject;
+  p.report_snapshot.placedSpeakers = d.placedSpeakers;
+  p.engineering_summary.parameterAuthority.p9 = { state: 'na', scope: 'seat', level: null };
+  delete p.engineering_summary.roomResultsByParameter[9];
+  p.engineering_summary.project.reportCounts.seatResultsByParameter.p9 = d.seatingPositions.map(s => ({ seatId: s.id, priority: 'primary', state: 'na', status: 'not_applicable', applicable: false, level: 'N/A', value: null, valueFormatted: 'N/A' }));
+  p.parameter_index = buildAtomicParameterIndex(p);
+  const restored = copy(p);
+  assert.equal(restored.parameter_index.P9.level, 'N/A');
+  assert.equal(restored.parameter_index.P9.raw_value, null);
+  assert.equal(assessEngineeringReportCompleteness(restored.engineering_summary).complete, true);
+  assert.equal(auditPublicationContract(restored).allowed, true);
+  assert.equal(validateReportEvidence(evidence(restored)).complete, true);
+  restored.engineering_summary.parameterAuthority.p12.state = 'provisional';
+  assert.equal(auditPublicationContract(restored).allowed, false);
+});
