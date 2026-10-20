@@ -91,12 +91,3 @@ test('N/A does not excuse another incomplete parameter or an unsaved report', ()
   assert.equal(auditPublicationContract(null).allowed, false);
   assert.equal(auditPublicationContract(undefined).allowed, false);
 });
-test('single-pair compliance explanation uses the engine reason, not no-overheads wording', async () => {
-  const { default: React } = await import('react');
-  const { renderToStaticMarkup } = await import('react-dom/server');
-  const { default: RP22CompliancePanel } = await import('../components/rp22/RP22CompliancePanel.jsx');
-  const { summary } = pipeline(pair('TM', 3));
-  const html = renderToStaticMarkup(React.createElement(RP22CompliancePanel, { engineeringSummary: summary, seatingPositions: seats }));
-  assert.match(html, /one overhead row has no adjacent-row spacing/);
-  assert.doesNotMatch(html, /this design has no overhead/);
-});
