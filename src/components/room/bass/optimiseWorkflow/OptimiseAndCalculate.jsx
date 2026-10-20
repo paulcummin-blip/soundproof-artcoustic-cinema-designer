@@ -48,6 +48,7 @@ import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import AdiRecommendation from "./AdiRecommendation";
+import ResetSubwooferTuningButton from "./ResetSubwooferTuningButton";
 import CrossoverRecommendation from "./CrossoverRecommendation";
 import useRunOptimisationPlan from "./useRunOptimisationPlan";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, canCancelBassCalculation } from "../bassCalculationLifecycle";
@@ -929,6 +930,13 @@ export default function OptimiseAndCalculate({
           Cancel
         </button>
       )}
+
+      <ResetSubwooferTuningButton
+        appState={appState}
+        frontSubsCfg={frontSubsCfg}
+        rearSubsCfg={rearSubsCfg}
+        disabled={disabled}
+      />
 
       {/* ── Recommended Improvement: ADI Recommendation ── */}
       {/* Authoritative project state drives the zone; workflow status only
