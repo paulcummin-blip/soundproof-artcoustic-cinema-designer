@@ -39,11 +39,12 @@ export default function CrossoverRecommendation({
   // published authority. It never marks an unfinished calculation as applied.
   useEffect(() => {
     if (applying || !record?.expectedConfiguration || !["applying","restoring","verification-required"].includes(record.status)) return;
-    if (authorityState.code !== "current" || shared?.calculationInProgress || shared?.cacheKey === record.beforeCacheKey) return;
+    if (shared?.calculationInProgress || shared?.cacheKey === record.beforeCacheKey) return;
     if (verificationLogKey.current !== shared.cacheKey) {
       verificationLogKey.current = shared.cacheKey;
       console.info("Crossover Apply verification", JSON.stringify({settingsMatch:recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration),actual:extractAuthorityForComparison(shared?.completedBassAuthority),expected:record.operation==="restore"?record.baseline&&{p19:record.baseline.achievedP19VariationDb,p20:record.baseline.achievedP20VariationDb,p14:record.baseline.p14AchievedDb,p18:record.baseline.achievedP18Hz}:record.candidate&&{p19:record.candidate.achievedP19VariationDb,p20:record.candidate.achievedP20VariationDb,p14:record.candidate.p14AchievedDb,p18:record.candidate.achievedP18Hz},sources:shared?.authoritative?.sources,expectedSettings:record.expectedConfiguration}));
     }
+    if (authorityState.code !== "current") return;
     if (!recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration)) return;
     const restore=record.operation==="restore";
     if (!recommendationResultMatches(shared?.completedBassAuthority,restore?record.baseline:record.candidate)) return;
