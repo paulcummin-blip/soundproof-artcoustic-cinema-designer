@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration";
 import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification";
 import useSharedBassAuthorityState from "../useSharedBassAuthorityState";
+import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison";
 
 const number = value => Number.isFinite(value) ? value.toFixed(2) : "—";
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -22,6 +23,7 @@ export default function CrossoverRecommendation({
   live.current = {shared,instances,appState,authorityState};
   const [applying,setApplying] = useState(false);
   const [error,setError] = useState(null);
+  const verificationLogKey = useRef(null);
   const record = saved;
   useEffect(() => {
     if (!candidate?.integrationVerified || !candidate?.baselineCacheKey || typeof write !== "function") return;
@@ -38,6 +40,10 @@ export default function CrossoverRecommendation({
   useEffect(() => {
     if (applying || !record?.expectedConfiguration || !["applying","restoring","verification-required"].includes(record.status)) return;
     if (authorityState.code !== "current" || shared?.calculationInProgress || shared?.cacheKey === record.beforeCacheKey) return;
+    if (verificationLogKey.current !== shared.cacheKey) {
+      verificationLogKey.current = shared.cacheKey;
+      console.info("Crossover Apply verification", JSON.stringify({settingsMatch:recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration),actual:extractAuthorityForComparison(shared?.completedBassAuthority),expected:record.operation==="restore"?record.baseline&&{p19:record.baseline.achievedP19VariationDb,p20:record.baseline.achievedP20VariationDb,p14:record.baseline.p14AchievedDb,p18:record.baseline.achievedP18Hz}:record.candidate&&{p19:record.candidate.achievedP19VariationDb,p20:record.candidate.achievedP20VariationDb,p14:record.candidate.p14AchievedDb,p18:record.candidate.achievedP18Hz},sources:shared?.authoritative?.sources,expectedSettings:record.expectedConfiguration}));
+    }
     if (!recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration)) return;
     const restore=record.operation==="restore";
     if (!recommendationResultMatches(shared?.completedBassAuthority,restore?record.baseline:record.candidate)) return;
