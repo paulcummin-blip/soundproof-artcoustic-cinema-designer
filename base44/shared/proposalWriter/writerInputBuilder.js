@@ -164,14 +164,10 @@ const NO_OPTION_GUIDANCE_REQUIREMENT =
  *   paragraph, a heading or a claim.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
-const CAPABILITY_DB_FIELDS = ['achieved_capability_db', 'selected_target_db', 'headroom_or_shortfall_db'];
-function roundCapabilityDb(capability) {
-  const out = { ...capability };
-  for (const field of CAPABILITY_DB_FIELDS) {
-    if (typeof out[field] === 'number' && Number.isFinite(out[field])) out[field] = Math.round(out[field] * 100) / 100;
-  }
-  return out;
-}
+// The ONE rounding rule the capability figures are shown under, shared with the
+// validator, so a permitted display form can never drift from what the writer was
+// actually given.
+import { roundCapabilityDb } from './writerClaimFigures.js';
 
 export function buildWriterInput({
   pack,

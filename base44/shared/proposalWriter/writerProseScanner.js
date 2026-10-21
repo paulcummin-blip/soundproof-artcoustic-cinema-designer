@@ -22,6 +22,7 @@ import { attributeViolation } from './writerViolationAudit.js';
 import { internalLevelLanguage, unexplainedOverhead, singleOptionFraming, tonalScopeStretch, proposalSentences } from './writerSalesPolishRules.js';
 import { emDashAt, genericClaimPhrase, stockConnective } from './writerNaturalWritingRules.js';
 import { timbreInterGroupMatchIssue } from './writerTimbreMetricAuthority.js';
+import { claimFigureTokens } from './writerClaimFigures.js';
 
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
   const found = [];
@@ -259,8 +260,15 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   }
 
   context = { text };
+  // The figures these claims carry in their own saved capability evidence, in the
+  // display forms the writer contract shows them (117.38702597538882 → 117.39).
+  // The report's prose spells the same result out in its own words, so a draft
+  // quoting the capability as the writer was given it states a supported figure.
+  // Nothing wider is admitted: only a claim THIS section cites contributes, and
+  // only the value it actually states.
+  const claimFigures = claimFigureTokens(citedClaims);
   for (const token of measurementTokens(text)) {
-    if (vocabulary.measurements.has(token)) continue;
+    if (vocabulary.measurements.has(token) || claimFigures.has(token)) continue;
     report(WRITER_REJECTION.CHANGED_PARAMETER_VALUE, { section, detail: `figure_not_stated_by_the_reports:${token}` });
   }
   for (const sentence of sentenceParts(text)) {
