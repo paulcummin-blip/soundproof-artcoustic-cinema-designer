@@ -16,7 +16,10 @@ export function levelP4_screenDelta(dB) {
   if (dB <= 4) return { level: 'L3', ok: true };
   if (dB <= 5) return { level: 'L2', ok: true };
   if (dB <= 6) return { level: 'L1', ok: true };
-  return { level: 'N/A', ok: false };
+  // Beyond L1 (dB > 6) is a genuine calculated FAIL, not missing data. The
+  // non-finite guard above is the only genuine N/A. applyMapper's canFail branch
+  // recognises 'FAIL' (and rejects 'N/A') so a calculated failure stays terminal.
+  return { level: 'FAIL', ok: false };
 }
 
 export function levelP5_surSpacing(deg) {
@@ -33,7 +36,10 @@ export function levelP6_surDelta(dB) {
   if (dB <= 4) return { level: 'L3', ok: true };
   if (dB <= 6) return { level: 'L2', ok: true };
   if (dB <= 10) return { level: 'L1', ok: true };
-  return { level: 'N/A', ok: false };
+  // Beyond L1 (dB > 10) is a genuine calculated FAIL, not missing data. The
+  // non-finite guard above is the only genuine N/A. applyMapper's canFail branch
+  // recognises 'FAIL' (and rejects 'N/A') so a calculated failure stays terminal.
+  return { level: 'FAIL', ok: false };
 }
 
 export function levelP9_upperSpacing(deg) {
@@ -50,7 +56,10 @@ export function levelP10_upperDelta(dB) {
   if (dB <= 5) return { level: 'L3', ok: true };
   if (dB <= 8) return { level: 'L2', ok: true };
   if (dB <= 12) return { level: 'L1', ok: true };
-  return { level: 'N/A', ok: false };
+  // Beyond L1 (dB > 12) is a genuine calculated FAIL, not missing data. The
+  // non-finite guard above is the only genuine N/A. applyMapper's canFail branch
+  // recognises 'FAIL' (and rejects 'N/A') so a calculated failure stays terminal.
+  return { level: 'FAIL', ok: false };
 }
 
 export function levelP16_screenFR(dB) {
@@ -58,7 +67,10 @@ export function levelP16_screenFR(dB) {
   if (dB <= 1.5) return { level: 'L4', ok: true };
   if (dB <= 3.0) return { level: 'L2', ok: true };
   if (dB <= 5.0) return { level: 'L1', ok: true };
-  return { level: 'N/A', ok: false };
+  // Beyond L1 (dB > 5) is a genuine calculated FAIL, not missing data. The
+  // non-finite guard above is the only genuine N/A. applyMapper's canFail branch
+  // recognises 'FAIL' (and rejects 'N/A') so a calculated failure stays terminal.
+  return { level: 'FAIL', ok: false };
 }
 
 export function levelP17_wsFR(dB) {
