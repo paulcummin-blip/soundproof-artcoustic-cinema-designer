@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
+import { MODELS, normaliseModelKey, canonicalProductId } from "@/components/models/speakers/registry";
 import { resolveSubwooferBassCapability } from "@/components/utils/speakerModelResolver";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS as DEFAULTS } from "./bassPhysicsDefaults";
 import { deriveRequestedCalibrationConfig } from "./requestedCalibrationConfig";
@@ -128,7 +128,9 @@ export function buildAuthoritativeBassSources({
     // polarity, model, and enabled from the canonical subwooferInstances.
     const resolvedGroup = resolveSubGroup(id, group);
     const resolvedIndex = id?.includes("-right") || id?.includes("-2") ? 1 : index;
-    const modelKey = item?.modelKey ?? item?.model ?? "SUB2-12";
+    // Canonical product identity, not the display name, so a casing or alias
+    // spelling drift never changes the subwoofer product/calibration fingerprint.
+    const modelKey = canonicalProductId(item?.modelKey ?? item?.model ?? "SUB2-12");
     const instGainDb = Number(item?.gainDb);
     const instDelayMs = Number(item?.delay ?? item?.delayMs);
     const instPolarity = item?.polarity ?? 1;

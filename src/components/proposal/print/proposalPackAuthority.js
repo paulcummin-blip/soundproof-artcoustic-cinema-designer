@@ -26,6 +26,7 @@ import {
 import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
 import { systemFormat } from '@/shared/systemFormat';
 import { unresolvedQuantities } from './equipmentQuantityAuthority';
+import { canonicalProductId } from '@/components/utils/modelKeyNormaliser';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
 export function statementValue(value) {
@@ -378,8 +379,15 @@ const ROLE_LAYER_KEY = Object.freeze({
   overhead: 'overheads',
 });
 
-/** The same product however its name is punctuated. */
-const modelToken = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+/**
+ * The same product however its name is punctuated or spelled: the canonical
+ * product identity, not a display-string slug. Lowercasing alone (the old
+ * modelToken) fixed casing but not aliases such as "Mk2" vs "MkII", so two
+ * overhead positions of the one Architect product were joined as different
+ * models and a valid proposal could not export. canonicalProductId resolves
+ * both spellings to the same canonical registry key.
+ */
+const modelToken = (value) => canonicalProductId(value);
 
 function layerPositionQuantities(groups, layerRows) {
   // Which positions of which layer carry which model.

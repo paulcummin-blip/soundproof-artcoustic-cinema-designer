@@ -4,6 +4,7 @@
 // only — it holds no crossover or acoustic policy.
 
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { canonicalProductId } from "@/components/utils/modelKeyNormaliser";
 
 /** The screen channels that take part in the combined bass-managed response. */
 export const LCR_ROLES = Object.freeze(["FL", "FC", "FR", "FCL", "FCR"]);
@@ -28,7 +29,10 @@ export function buildLcrIntegrationSources(placedSpeakers) {
         id: `lcr-${role}`,
         role,
         channelWeight: ["FCL", "FCR"].includes(role) ? 0.5 : 1,
-        modelKey: speaker?.model ?? null,
+        // Canonical product identity (not the display name) so a casing or
+        // alias spelling drift (Q6-3 vs q6-3, Mk2 vs MkII) never changes the
+        // LCR combined-response identity or the calibration fingerprint.
+        modelKey: speaker?.model ? canonicalProductId(speaker.model) : null,
         x,
         y,
         z: Number.isFinite(z) ? z : FALLBACK_Z_M,

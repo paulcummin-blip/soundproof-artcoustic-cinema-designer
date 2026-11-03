@@ -21,6 +21,16 @@ export function normaliseModelKey(name = "") {
   s = s.replace(/^architect-(pas2-2)$/, "architect-$1");
   s = s.replace(/^architect-mikro$/, "architect-mikro");
 
+  // Roman-numeral "mk" suffix unification. The same Architect product is
+  // published as "Mk2" and "MkII" (and occasionally "Mk III"); these are
+  // aliases of one canonical registry key (e.g. architect-4-2-mk2), never
+  // separate products. Unify once here so every identity boundary
+  // (fingerprints, joins, pricing) resolves them to the same canonical key.
+  // iii is replaced before ii so the longer numeral is not caught by ii.
+  s = s.replace(/(mk)-?iii/g, (_, m) => `${m}3`);
+  s = s.replace(/(mk)-?ii/g, (_, m) => `${m}2`);
+  s = s.replace(/(mk)-?iv/g, (_, m) => `${m}4`);
+
   // Safety net: normalise a trailing "-s" back to "_s"
   // NOTE: this preserves the legacy registry variant keys used for ACOUSTIC
   // lookup. It must not be used for commercial product identity — use

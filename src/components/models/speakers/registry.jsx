@@ -394,7 +394,7 @@ const _MODEL_ARRAY_INDEX = new Map(MODELS.map((m, i) => [m.key, i]));
 
 // NORMALISATION — TOLERANT TO SPACES/CASE/EXTRA TEXT
 // Extracted to modelKeyNormaliser.js for Node compatibility; re-exported here.
-export { normaliseModelKey };
+export { normaliseModelKey, canonicalProductId };
 
 // DISPLAY HELPER — Remove _s suffix for UI display
 export function displayModelKey(modelKey = "") {
