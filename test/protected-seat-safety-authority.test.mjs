@@ -243,7 +243,7 @@ test("CASE A — safe candidate passes the shared authority", () => {
 test("CASE A — safe candidate remains eligible as the winner", () => {
   const selection = selectConfirmedRecommendations(
     [CASE_A_CANDIDATE],
-    makeSnapshot({ effectiveConfiguration: null }),
+    makeSnapshot({ effectiveConfiguration: null, seats: [{ id: "seat-r1-c1", isPrimary: true }] }),
     CASE_A_BASELINE,
   );
   assert.ok(selection.winner, "Case A safe candidate must remain the winner");
@@ -268,7 +268,11 @@ test("Candidate improves overall P20 and no Primary seat regresses -> safe eligi
   });
   const safety = evaluateProtectedSeatSafety(candidate, baseline);
   assert.equal(safety.safe, true);
-  const selection = selectConfirmedRecommendations([candidate], makeSnapshot(), baseline);
+  const selection = selectConfirmedRecommendations(
+    [candidate],
+    makeSnapshot({ seats: [{ id: "seat-r1-c1", isPrimary: true }] }),
+    baseline,
+  );
   assert.ok(selection.winner, "safe improvement should be the winner");
 });
 
@@ -312,7 +316,11 @@ test("Candidate makes no meaningful change -> not promoted merely because it is 
   });
   const safety = evaluateProtectedSeatSafety(candidate, baseline);
   assert.equal(safety.safe, true, "no regression, so safe");
-  const selection = selectConfirmedRecommendations([candidate], makeSnapshot(), baseline);
+  const selection = selectConfirmedRecommendations(
+    [candidate],
+    makeSnapshot({ seats: [{ id: "seat-r1-c1", isPrimary: true }] }),
+    baseline,
+  );
   assert.equal(selection.winner, null, "safe but immaterial -> no winner");
   assert.equal(selection.tradeOffs.length, 0, "no trade-off for an immaterial change");
 });
@@ -334,6 +342,17 @@ test("Candidate lacks complete Primary-seat evidence -> cannot be marked safe", 
   assert.equal(safety.safe, false, "missing primary-seat evidence must not default to safe");
   assert.equal(safety.evidenceComplete, false, "evidence flagged incomplete");
   assert.equal(safety.reason, "missing-primary-seat-evidence");
+  // A candidate with no primary-seat evidence cannot become a safe recommendation:
+  // the canonical validation refuses it (it does not cover the applicable seat set),
+  // so it is never promoted to the winner pool. Missing evidence is NOT treated
+  // as "no regression" — it is an incomplete-evidence failure.
+  const selection = selectConfirmedRecommendations(
+    [candidate],
+    makeSnapshot({ seats: [{ id: "seat-r1-c1", isPrimary: true }] }),
+    baseline,
+  );
+  assert.equal(selection.winner, null, "missing-evidence candidate is never the winner");
+  assert.equal(selection.recommendations.length, 0, "no safe recommendation without primary evidence");
 });
 
 test("Missing baseline -> unsafe and incomplete", () => {
@@ -359,9 +378,49 @@ test("P19 safety rule remains intact — a P19 primary-seat level drop is unsafe
   assert.ok(p19Regression, "P19 regression recorded");
   assert.equal(p19Regression.currentLevel, 4);
   assert.equal(p19Regression.candidateLevel, 2);
-});
+  });
 
-test("Shared authority agrees with the existing canonical Apply rule", () => {
+  test("Same-level raw regression > existing 1.0 dB tolerance is unsafe (existing rule preserved)", () => {
+  // The existing Apply-time rule: a primary seat that holds the SAME displayed
+  // RP22 level but whose raw deviation worsens by MORE than the canonical
+  // 1.0 dB tolerance is rejected. This test exercises that exact rule through
+  // the shared authority — no new tolerance is invented.
+  const baseline = makeResult({
+  candidateId: "current", candidateKind: "current", isPositionCandidate: false,
+  primary: [{ id: "seat-r1-c1", p19Raw: 1.0, p20Raw: 1.0 }], // L4 / L4
+  achievedP19VariationDb: 1.0, achievedP20VariationDb: 1.0,
+  });
+  // Same displayed level L4, but raw worsens by +1.5 dB (> 1.0 dB tolerance).
+  const candidate = makeResult({
+  candidateId: "same-level-raw",
+  primary: [{ id: "seat-r1-c1", p19Raw: 2.5, p20Raw: 2.5 }], // still L4 / L4, raw +1.5
+  achievedP19VariationDb: 2.5, achievedP20VariationDb: 2.5,
+  });
+  // gradeP20(2.5) = floor(2.5)=2 <= 2 -> L4. Same level, raw delta +1.5 > 1.0.
+  const safety = evaluateProtectedSeatSafety(candidate, baseline);
+  assert.equal(safety.safe, false, "same-level raw regression beyond tolerance is unsafe");
+  assert.equal(safety.evidenceComplete, true);
+  const regression = safety.protectedSeatRegressions.find((r) => r.parameter === "P20");
+  assert.ok(regression, "same-level raw regression recorded on P20");
+  assert.equal(regression.kind, "same-level-raw-regression");
+  assert.equal(regression.currentLevel, 4, "level held at L4");
+  assert.equal(regression.candidateLevel, 4, "level held at L4");
+  assert.equal(regression.rawDeltaDb, 1.5, "raw worsening preserved");
+  assert.equal(regression.thresholdDb, 1.0, "the EXISTING canonical tolerance is used");
+  // The shared authority agrees with the existing canonical Apply rule.
+  const canonical = hasPrimarySeatRegression(candidate, baseline);
+  assert.equal(canonical.regressed, true, "existing canonical rule also rejects");
+  assert.equal(canonical.parameter, "P19", "canonical rule reports the first regression (P19)");
+  // And it is not the safe winner.
+  const selection = selectConfirmedRecommendations(
+  [candidate],
+  makeSnapshot({ seats: [{ id: "seat-r1-c1", isPrimary: true }] }),
+  baseline,
+  );
+  assert.equal(selection.winner, null, "same-level raw regression is not the safe winner");
+  });
+
+  test("Shared authority agrees with the existing canonical Apply rule", () => {
   // The shared authority must reach the same safe/unsafe verdict as the
   // existing hasPrimarySeatRegression for a range of cases.
   const cases = [
@@ -419,4 +478,14 @@ test("Display: improvement panel suppresses 'No protected seat gets worse' when 
   assert.equal(safe.caseKey, IMPROVEMENT_CASE.REVIEW);
   assert.ok(safe.seats, "safe candidate shows the seats block");
   assert.equal(safe.seats.text, "No protected seat gets worse", "safe wording shown only when safe");
+
+  // NEVER BOTH: the unsafe candidate must not carry BOTH the safe wording AND
+  // the regression statement. The trade-off workflow owns the unsafe panel
+  // (seats = null), so the safe "No protected seat gets worse" wording never
+  // appears alongside "Not applied because a primary seat would regress".
+  assert.equal(unsafe.seats, null, "unsafe candidate never shows the safe seats wording");
+  assert.ok(
+    !unsafe.seats || safe.seats === null || unsafe.caseKey !== safe.caseKey,
+    "unsafe and safe never share both the safe wording and a regression statement",
+  );
 });
