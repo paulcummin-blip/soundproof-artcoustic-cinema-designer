@@ -111,7 +111,7 @@ test("2. fresh P17 metric is recognised as coverage_window by the reader", () =>
     assert.equal(row.basis, "coverage_window");
     assert.equal(row.windowLevel, "L4");
     assert.equal(row.windowCauseLabel, "Within 1.5 dB window");
-    assert.notMatch(row.windowCauseLabel, /earlier variance/i);
+    assert.doesNotMatch(row.windowCauseLabel, /earlier variance/i);
   }
 });
 
@@ -124,7 +124,7 @@ test("3. fresh coverage-window P17 never shows 'Graded on the earlier variance b
   const rows = rowsFor(p17BySeatId);
   for (const row of rows) {
     assert.equal(row.basis, "coverage_window");
-    assert.notMatch(row.windowCauseLabel, /earlier variance/i);
+    assert.doesNotMatch(row.windowCauseLabel, /earlier variance/i);
   }
 });
 
@@ -154,7 +154,7 @@ test("5. recalculation (fresh producer) replaces legacy authority with coverage_
   for (const row of after) {
     assert.equal(row.basis, "coverage_window");
     assert.equal(row.windowLevel, "L4");
-    assert.notMatch(row.windowCauseLabel, /earlier variance/i);
+    assert.doesNotMatch(row.windowCauseLabel, /earlier variance/i);
   }
 });
 
@@ -167,7 +167,7 @@ test("6. close/reopen: published seatHudById round-trips the coverage_window mar
     SEAT_IDS.map((id) => [id, buildP17SeatMetric(freshEngineP17({ level: "L4" }))]),
   );
   const seatHudById = Object.fromEntries(
-    SEAT_IDS.map((id) => [id, { rp22: { 17: liveMetrics[id] } }]),
+    SEAT_IDS.map((id) => [id, { rp22: { p17: liveMetrics[id] } }]),
   );
   const engineeringSummary = { seatHudById };
   // Reopen: read back from the (frozen) published summary.
@@ -176,7 +176,7 @@ test("6. close/reopen: published seatHudById round-trips the coverage_window mar
   for (const row of rows) {
     assert.equal(row.basis, "coverage_window");
     assert.equal(row.windowLevel, "L4");
-    assert.notMatch(row.windowCauseLabel, /earlier variance/i);
+    assert.doesNotMatch(row.windowCauseLabel, /earlier variance/i);
   }
 });
 
@@ -207,7 +207,7 @@ test("8. old 1.5 dB variance is diagnostic only, not the displayed grade", () =>
   assert.equal(metric.windowLevel, "L4");
   const rows = rowsFor({ "seat-r1-c1": metric });
   assert.equal(rows[0].basis, "coverage_window");
-  assert.notMatch(rows[0].windowCauseLabel, /earlier variance/i);
+  assert.doesNotMatch(rows[0].windowCauseLabel, /earlier variance/i);
 });
 
 // ── 9 & 10. Current P17 PASS (L4) and worst (L1) are terminal ─────────────

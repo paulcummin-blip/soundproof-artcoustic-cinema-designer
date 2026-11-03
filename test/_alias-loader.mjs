@@ -39,6 +39,12 @@ export async function load(url, context, nextLoad) {
     if (code.includes('import.meta.glob')) {
       code = code.replace(/import\.meta\.glob\(/g, '((import.meta.glob)||(()=>({})))(');
     }
+    // import.meta.env is a Vite build inject; in the node test runtime it is
+    // undefined, so any import.meta.env.DEV / .MODE / .PROD access crashes.
+    // Replace the whole import.meta.env reference with a benign object.
+    if (code.includes('import.meta.env')) {
+      code = code.replace(/import\.meta\.env/g, '({DEV:false,MODE:"production",PROD:true,VITE_BASE44_APP_ID:"",VITE_BASE44_BACKEND_URL:""})');
+    }
     return { format: 'module', source: code, shortCircuit: true };
   }
   if (url.endsWith('.js') && url.includes('/src/')) {
