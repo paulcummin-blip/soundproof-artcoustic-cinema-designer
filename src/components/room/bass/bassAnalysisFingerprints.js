@@ -142,13 +142,14 @@ function resolveSources(inputs) {
 //   subwoofer product/model, product capability, requested SPL/output,
 //   priority mode, graph smoothing/scale, overlay/diagnostics visibility,
 //   and open/closed panel state.
-export function computeGeometryFingerprint(inputs) {
+// The exact canonical object hashed by computeGeometryFingerprint. Extracted
+// so bassIdentityDiagnostics can capture the SAME normalized object that is
+// actually hashed — never a second approximate identity. Pure, no mutation.
+export function buildGeometryCanonical(inputs) {
   const i = inputs || {};
-
   const sources = sortById(resolveSources(i).map(normalizeSourceGeometry));
   const seats = sortById((Array.isArray(i.seatingPositions) ? i.seatingPositions : []).map(normalizeSeat));
-
-  const canonical = {
+  return {
     room: {
       w: num(i.roomDims?.widthM),
       l: num(i.roomDims?.lengthM),
@@ -201,8 +202,10 @@ export function computeGeometryFingerprint(inputs) {
     modalCoherenceMode: i.modalCoherenceMode || null,
     highOrderAxialScale: num(i.highOrderAxialScale, 4),
   };
+}
 
-  return fingerprint(canonical, "geo");
+export function computeGeometryFingerprint(inputs) {
+  return fingerprint(buildGeometryCanonical(inputs), "geo");
 }
 
 // ---------------------------------------------------------------------------
@@ -323,17 +326,16 @@ export function computeNormalizedTransferFingerprint(inputs) {
 // Geometry fingerprint + subwoofer model(s), quantity, and product-specific
 // capability/tuning inputs. Excludes requested intent, priority mode,
 // graph display settings, and diagnostics visibility.
-export function computeProductFingerprint(inputs) {
+// The exact canonical object hashed by computeProductFingerprint.
+export function buildProductCanonical(inputs) {
   const i = inputs || {};
   const geometryFp = computeGeometryFingerprint(i);
-
   const rawSources = resolveSources(i);
   const models = rawSources
     .map((s) => s?.modelKey || null)
     .filter((m) => m != null)
     .sort();
-
-  const canonical = {
+  return {
     geometry: geometryFp,
     models,
     quantity: rawSources.length,
@@ -345,8 +347,10 @@ export function computeProductFingerprint(inputs) {
     productDataVersion: i.productDataVersion ?? null,
     productCapabilities: i.productCapabilities ?? null,
   };
+}
 
-  return fingerprint(canonical, "prod");
+export function computeProductFingerprint(inputs) {
+  return fingerprint(buildProductCanonical(inputs), "prod");
 }
 
 // ---------------------------------------------------------------------------
@@ -377,10 +381,10 @@ export function computeHouseCurveFingerprint(houseCurvePoints) {
 //
 // Phase 2A: Uses live values from the selected candidate when available.
 // Falls back to current requested configuration when no candidate exists.
-export function computeCalibrationFingerprint(inputs) {
+// The exact canonical object hashed by computeCalibrationFingerprint.
+export function buildCalibrationCanonical(inputs) {
   const i = inputs || {};
   const productFp = computeProductFingerprint(i);
-
   const canonical = {
     product: productFp,
     houseCurveFingerprint: i.houseCurveFingerprint || null,
@@ -423,7 +427,11 @@ export function computeCalibrationFingerprint(inputs) {
   };
 
   if (i.combinedResponseIdentity) canonical.combinedResponse = i.combinedResponseIdentity;
-  return fingerprint(canonical, "cal");
+  return canonical;
+}
+
+export function computeCalibrationFingerprint(inputs) {
+  return fingerprint(buildCalibrationCanonical(inputs), "cal");
 }
 
 // ---------------------------------------------------------------------------
@@ -445,4 +453,45 @@ export function isValidFingerprint(fp) {
   // Accept 16-char (64-bit) or 8-char (legacy 32-bit) hashes.
   if (hash.length !== 16 && hash.length !== 8) return false;
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// 8. Canonical identity diagnostics (observability — no behaviour change)
+// ---------------------------------------------------------------------------
+// Returns the EXACT canonical objects hashed by the three fingerprint helpers,
+// plus the fingerprints themselves. Used ONLY by bassIdentityDiagnostics for
+// before/after identity comparison. Never called from the hot fingerprint
+// useMemo — only at capture points (publication, reopen). Does not mutate the
+// inputs and adds no timestamps, session ids or diagnostic ids to the identity.
+export function buildCanonicalBassIdentity(inputs, fingerprints = null) {
+  const geometry = buildGeometryCanonical(inputs);
+  const product = buildProductCanonical(inputs);
+  const calibration = buildCalibrationCanonical(inputs);
+  return {
+    geometry,
+    product,
+    calibration,
+    fingerprints: fingerprints || {
+      geometry: fingerprint(geometry, "geo"),
+      product: fingerprint(product, "prod"),
+      calibration: fingerprint(calibration, "cal"),
+    },
+  };
+}
+
+// Per-top-level-field stable-stringify of each canonical, so a diff can localize
+// to one top-level field without walking the full tree. Uses the SAME
+// stableStringify as the hash, so identical values produce identical digests.
+export function buildCanonicalFieldDigests(canonicalIdentity) {
+  const build = (obj) => {
+    if (!obj || typeof obj !== "object") return {};
+    const out = {};
+    for (const key of Object.keys(obj)) out[key] = stableStringify(obj[key]);
+    return out;
+  };
+  return {
+    geometry: build(canonicalIdentity?.geometry),
+    product: build(canonicalIdentity?.product),
+    calibration: build(canonicalIdentity?.calibration),
+  };
 }

@@ -50,6 +50,7 @@ import { getStage2State, subscribeStage2 } from "./stage2/stage2PlacementStore";
 import { capturePublicationTrace, clearPublicationTrace, diagnoseStructuralCompleteness, diagnoseAuthoritative } from "./publicationTraceStore";
 import { hasCanonicalSeatMetricAuthority, validateAssessmentEnvelopeAuthority } from "./completedBassResultPersistence";
 import { validateCanonicalBassResult } from "./canonicalBassResult";
+import { captureBassIdentity, BASS_IDENTITY_STAGE } from "./bassIdentityDiagnostics";
 
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
@@ -1223,6 +1224,16 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       // identity. publishCachedCompactBassContract rejects any contract that
       // doesn't match both, or lacks the graph payload, or isn't AUTHORITATIVE.
       const cachePublished = publishCachedCompactBassContract(scopeId, versionId, cachedContract, cacheKey, requested);
+      if (cachePublished) {
+        captureBassIdentity({
+          projectId: scopeId,
+          versionId,
+          stage: BASS_IDENTITY_STAGE.PUBLISHED,
+          fingerprintInputs,
+          fingerprints,
+          requested,
+        });
+      }
       capturePublicationTrace({
         effectPhase: "cached-compact-short-circuit",
         firstGuard: cachePublished ? null : "cached compact contract rejected before fresh publication",
@@ -1427,6 +1438,19 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // acceptance. A structurally complete but NOT_VERIFIED contract returns
     // false — treat that as a terminal rejected state, not success.
     const published = publishCompletedBassContract(scopeId, versionId, contract);
+    // Observability: capture the exact normalized identity at successful
+    // publication so it can be diffed against the reopened identity later.
+    // Never affects the fingerprint, the authority or the maths.
+    if (published) {
+      captureBassIdentity({
+        projectId: scopeId,
+        versionId,
+        stage: BASS_IDENTITY_STAGE.PUBLISHED,
+        fingerprintInputs,
+        fingerprints,
+        requested,
+      });
+    }
     if (published && timingTraceRef.current && timingTraceRef.current.trace.publicationMs === null) {
       timingTraceRef.current.mark("publicationMs");
     }

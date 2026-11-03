@@ -48,6 +48,7 @@ import {
 import { reconcileBassAuthorityWithPersisted } from "./completedBassResultStore";
 import { describeBassFreshnessDelta } from "./bassFreshnessAuthority";
 import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
+import { captureBassIdentity, BASS_IDENTITY_STAGE } from "./bassIdentityDiagnostics";
 
 export function useBassAuthorityReconciliation({
   scopeId = "free",
@@ -287,6 +288,39 @@ export function useBassAuthorityReconciliation({
     reconciliationSource,
     targetCacheHydrated,
     inputsValid,
+  ]);
+
+  // ── Bass identity diagnostics capture (BASS_REOPENED) ─────────────────
+  // After full hydration and identity readiness, capture the reconstructed
+  // identity so it can be diffed against the BASS_PUBLISHED capture. Fires only
+  // when the identity is genuinely resolved and no calculation is in flight,
+  // so it never captures a transient mid-calc identity. Observability only.
+  useEffect(() => {
+    if (!projectHydrationReady || !authorityHydrationSettled) return;
+    if (!identityEligible) return;
+    if (!fingerprints || !targetKey || !baseDesignFingerprint) return;
+    if (manualRequestActive || calculationInProgress) return;
+    captureBassIdentity({
+      projectId: scopeId,
+      versionId,
+      stage: BASS_IDENTITY_STAGE.REOPENED,
+      fingerprintInputs,
+      fingerprints,
+      requested,
+    });
+  }, [
+    projectHydrationReady,
+    authorityHydrationSettled,
+    identityEligible,
+    fingerprints,
+    targetKey,
+    baseDesignFingerprint,
+    manualRequestActive,
+    calculationInProgress,
+    scopeId,
+    versionId,
+    fingerprintInputs,
+    requested,
   ]);
 
   return { identityReadiness, identityInputsReady };
