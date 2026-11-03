@@ -692,7 +692,13 @@ function RoomDesignerWithState() {
     const subs = appState?.subwoofers || [];
     const instances = (appState?.subwooferInstances || []).filter(i => i?.enabled !== false);
     const count = instances.length || subs.length;
-    return (count === 1 || count === 2 || count === 4) ? count : null;
+    // Quantity 3 is a first-class installed subwoofer count (Stage 1 produces
+    // three_sub_result finalists; STAGE2_QUANTITY_ORDER is [1,2,3,4]). Omitting
+    // it here made resolveQuantityOrder fall back to [2,4,1], so a design whose
+    // only valid Stage 1 finalists were three-source produced zero Stage 2 jobs
+    // and the run sat idle until the global safety timeout. The authoritative
+    // supported-quantity mechanism already includes 3 — the handoff must too.
+    return (count === 1 || count === 2 || count === 3 || count === 4) ? count : null;
   }, [appState?.subwoofers, appState?.subwooferInstances]);
 
   // Subwoofer bottom height for Stage 2 acoustic-centre Z derivation.

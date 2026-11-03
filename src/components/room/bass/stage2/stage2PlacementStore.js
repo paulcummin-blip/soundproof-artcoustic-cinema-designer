@@ -365,6 +365,15 @@ export class Stage2PlacementController {
     if (this.queue.length === 0 && this.activeJobs.size === 0) {
       // All placement was cached and confirmations are queued — dispatch now.
       this.dispatchNext();
+      // EMPTY-QUEUE RULE: if there are still no jobs to run (no placement, no
+      // confirmation, no cached transfers) the run must terminate immediately
+      // with an explicit outcome. It must NEVER sit in "updating" until the
+      // global safety timeout. maybeCheckBAndComplete either completes now
+      // (all quantities final, B not eligible) or queues B work — either way
+      // the run ends honestly instead of idling for ~300 s doing no work.
+      if (this.queue.length === 0 && this.activeJobs.size === 0) {
+        this.maybeCheckBAndComplete();
+      }
       return;
     }
 

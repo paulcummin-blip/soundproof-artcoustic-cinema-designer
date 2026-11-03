@@ -30,7 +30,8 @@ import { getStage1State, subscribeStage1 } from "../stage1/stage1PlacementStore"
 import { deriveRequestedCalibrationConfig } from "../requestedCalibrationConfig";
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
-import { STAGE2_DEFAULT_QUANTITY_ORDER, STAGE2_START_DELAY_MS } from "./stage2Constants";
+import { STAGE2_START_DELAY_MS } from "./stage2Constants";
+import { resolveQuantityOrder } from "./stage2QuantityOrder";
 import { useIsDragActive } from "@/components/state/userInteractionStore";
 
 function computeTransitionHz(roomDims) {
@@ -50,13 +51,6 @@ function buildSeatPriorityMap(seatingPositions) {
     map.set(id, seat.priority === "secondary" ? "secondary" : "primary");
   });
   return map;
-}
-
-function resolveQuantityOrder(currentQuantity) {
-  if (currentQuantity === 1 || currentQuantity === 2 || currentQuantity === 3 || currentQuantity === 4) {
-    return [currentQuantity, ...STAGE2_DEFAULT_QUANTITY_ORDER.filter((q) => q !== currentQuantity)];
-  }
-  return STAGE2_DEFAULT_QUANTITY_ORDER;
 }
 
 /**
