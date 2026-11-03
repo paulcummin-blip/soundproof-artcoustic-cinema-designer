@@ -230,13 +230,23 @@ test("10. current P17 L1 (outside usable coverage) is terminal, not missing", ()
 // ── 11. Missing inputs remain incomplete ──────────────────────────────────
 
 test("11. missing P17 evidence is reported as missing, not legacy", () => {
+  // Producer: a seat with no gradeable channel produces a missing-evidence metric.
+  // The basis-marker fields are absent (not a grade), so a missing metric is never
+  // itself misread as a coverage-window grade.
   const metric = buildP17SeatMetric(null);
   assert.equal(metric.evidenceType, "missing");
   assert.equal(metric.level, "—");
-  assert.equal(metric.windowLevel, null);
-  const rows = rowsFor({ "seat-r1-c1": metric });
+  assert.ok(!metric.windowLevel, "missing metric carries no window basis");
+
+  // Reader: in production a missing P17 is an ABSENT p17 key in seatHudById
+  // (buildSeatHudSnapshot only writes `data.rp22['p17']` when a metric exists),
+  // so p17MetricsFromEngineeringSummary omits the seat and the reader sees no
+  // P17 for it — the real missing-state representation, not a present
+  // missing-shape object (which the reader would treat as evidence-available).
+  const rows = rowsFor({ "seat-r1-c1": null });
   assert.equal(rows[0].basis, "none");
   assert.equal(rows[0].evidenceAvailable, false);
+  assert.equal(rows[0].evidenceType, P17_EVIDENCE_TYPE.MISSING);
 });
 
 // ── 12. Project Report readiness succeeds with current terminal P17 ───────
@@ -258,7 +268,50 @@ function completeSummary({ p17SeatLevel = "L4" } = {}) {
       parameterAuthority[key] = { state: "scored", scope: "room", level: "L4" };
     }
   }
-  return { parameterAuthority };
+  // project.seatIds is the real production seat-id authority the completeness
+  // gate reads (falling back to Object.keys(seatHudById)). Without it, every
+  // seat-scoped scored parameter hits the empty-seatIds incomplete branch.
+  return { parameterAuthority, project: { seatIds: SEAT_IDS.slice() } };
+}
+
+/**
+ * A production-shaped Published Engineering publication, matching the shape
+ * publicationSectionReport reads: identity, timestamps, engine versions, the
+ * engineering_summary (parameterAuthority, designRating, seatPriorityFingerprint,
+ * viewing, roomResultsByParameter), the report_snapshot (analysisResult,
+ * seatingPositions, placedSpeakers, priceData, report_project) and provenance.
+ * Every section publicationSectionReport checks is populated.
+ */
+function completePublication({ p17SeatLevel = "L4" } = {}) {
+  const parameterAuthority = {};
+  for (let i = 1; i <= 21; i += 1) {
+    parameterAuthority[`p${i}`] = { state: "scored", scope: "room", level: p17SeatLevel };
+  }
+  return {
+    engineering_fingerprint: "fp-test",
+    published_at: "2026-01-01T00:00:00.000Z",
+    engine_version: "v1",
+    rp22_version: "v1",
+    algorithm_version: "v1",
+    engineering_summary: {
+      parameterAuthority,
+      designRating: { rating: { value: p17SeatLevel } },
+      seatPriorityFingerprint: "seat-fp-test",
+      viewing: { angleDeg: 36 },
+      roomResultsByParameter: {
+        12: { value: 90 }, 13: { value: 90 },
+        14: { value: 90 }, 18: { value: 90 }, 19: { value: 90 },
+      },
+    },
+    report_snapshot: {
+      analysisResult: { p1: {} },
+      seatingPositions: [{ id: "seat-r1-c1" }],
+      placedSpeakers: [{ role: "FL" }],
+      priceData: { total: 1 },
+      report_project: { roomDims: { widthM: 4, lengthM: 6 }, screen_size: 120 },
+    },
+    provenance: { source: "test" },
+  };
 }
 
 test("12a. current terminal P17 → assessment complete", () => {
@@ -269,9 +322,13 @@ test("12a. current terminal P17 → assessment complete", () => {
 });
 
 test("12b. current terminal P17 → publication ready → Project Report ready", () => {
-  const summary = completeSummary({ p17SeatLevel: "L4" });
-  const report = publicationSectionReport(summary);
-  assert.equal(report.complete, true);
+  // publicationSectionReport reads a Published Engineering publication, not a
+  // bare engineering summary. A production-shaped publication carries identity,
+  // timestamps, engine versions, the engineering_summary, the report_snapshot
+  // and provenance — every section the gate audits.
+  const publication = completePublication({ p17SeatLevel: "L4" });
+  const report = publicationSectionReport(publication);
+  assert.equal(report.complete, true, `missing: ${report.missing.map((m) => m.key).join(", ")}`);
 });
 
 test("12c. current terminal P17 at L1 (worst coverage) still completes assessment", () => {
