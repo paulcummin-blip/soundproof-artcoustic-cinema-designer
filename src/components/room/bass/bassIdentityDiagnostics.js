@@ -43,6 +43,13 @@ const scopeKey = (projectId, versionId) =>
 const listeners = new Set();
 const captures = new Map(); // key -> { published?, reopened? }
 let persisted = loadPersisted();
+// Snapshot cache for useSyncExternalStore. getSnapshot MUST return a stable
+// reference while the store is unchanged, or React detects a change on every
+// render and enters an infinite update loop. `snapshotVersion` bumps on every
+// mutation; getSnapshot rebuilds `cachedSnapshot` only when the version moves.
+let snapshotVersion = 0;
+let cachedSnapshot = null;
+let cachedSnapshotVersion = -1;
 
 function loadPersisted() {
   if (typeof localStorage === "undefined") return {};
@@ -63,6 +70,7 @@ function savePersisted() {
 }
 
 function notify() {
+  snapshotVersion += 1;
   listeners.forEach((listener) => listener());
 }
 
@@ -360,9 +368,12 @@ export function subscribeBassIdentityDiagnostics(listener) {
 }
 
 export function getBassIdentityDiagnosticsSnapshot() {
-  const out = {};
-  for (const [key, entry] of captures) out[key] = entry;
-  return out;
+  if (cachedSnapshotVersion !== snapshotVersion) {
+    cachedSnapshotVersion = snapshotVersion;
+    cachedSnapshot = {};
+    for (const [key, entry] of captures) cachedSnapshot[key] = entry;
+  }
+  return cachedSnapshot;
 }
 
 /** Test-only: forget every capture (memory + persisted). */
