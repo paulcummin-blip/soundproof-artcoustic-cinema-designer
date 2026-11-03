@@ -122,6 +122,19 @@ function makeSnapshot({ effectiveConfiguration = null, evaluationIncomplete = fa
   };
 }
 
+/**
+ * Build a snapshot whose applicable seat set is derived from the baseline's
+ * own per-seat P20 rows, so the baseline always passes seat validation and
+ * the run-completeness verdict reflects only the candidate outcomes.
+ */
+function makeSnapshotForBaseline(baselineResult, opts = {}) {
+  const seats = (baselineResult?.perSeatP20 || []).map((s) => ({
+    id: String(s.seatId),
+    isPrimary: s.isPrimary !== false,
+  }));
+  return makeSnapshot({ ...opts, seats });
+}
+
 // ---------------------------------------------------------------------------
 describe("Non-assessable candidate handling", () => {
 // A. CASE C CORNER CANDIDATE — P18 129.051 Hz, transition 91.287 Hz
@@ -162,16 +175,17 @@ it("A — non-assessable candidate adds no evaluationIssues to run-level state",
     transitionHz: 91.287,
     primary: [{ id: "seat-r1-c1", p20Raw: 3.0 }],
   });
+  const baseline = makeResult({
+    candidateId: "current",
+    candidateKind: "current",
+    primary: [{ id: "seat-r1-c1", p20Raw: 5.0 }],
+    achievedP19VariationDb: 3.0,
+    achievedP20VariationDb: 5.0,
+  });
   const selection = selectConfirmedRecommendations(
     [result],
-    makeSnapshot(),
-    makeResult({
-      candidateId: "current",
-      candidateKind: "current",
-      primary: [{ id: "seat-r1-c1", p20Raw: 5.0 }],
-      achievedP19VariationDb: 3.0,
-      achievedP20VariationDb: 5.0,
-    }),
+    makeSnapshotForBaseline(baseline),
+    baseline,
   );
   // The non-assessable candidate is recorded as an evaluation, not a run issue.
   const nonAssessable = selection.evaluations.find((e) => e.candidateId === "corner-129");
@@ -282,7 +296,7 @@ it("C — all non-assessable: run complete, no winner, not incomplete", () => {
     primary: [{ id: "seat-r1-c1", p20Raw: 3.0 }],
   });
 
-  const selection = selectConfirmedRecommendations([na1, na2], makeSnapshot(), baseline);
+  const selection = selectConfirmedRecommendations([na1, na2], makeSnapshotForBaseline(baseline), baseline);
 
   assert.equal(selection.winner, null, "no winner");
   assert.equal(selection.terminalOutcome, "no-better-evaluated", "run is complete, not incomplete");
@@ -326,7 +340,7 @@ it("D — genuine missing evidence keeps the run incomplete", () => {
   assert.equal(check.valid, false, "genuine validation failure");
   assert.ok(check.issues.length > 0, "issues returned for genuine missing evidence");
 
-  const selection = selectConfirmedRecommendations([broken], makeSnapshot(), baseline);
+  const selection = selectConfirmedRecommendations([broken], makeSnapshotForBaseline(baseline), baseline);
   // An invalid candidate makes the run incomplete.
   assert.equal(selection.terminalOutcome, "incomplete", "genuine missing evidence → incomplete");
   const invalidEval = selection.evaluations.find((e) => e.candidateId === "broken-p19");

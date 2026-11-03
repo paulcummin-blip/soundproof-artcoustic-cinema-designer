@@ -296,12 +296,36 @@ export function buildOptimiserRunEvidence({
   });
   const evaluationIncomplete = selection?.evaluationIncomplete === true || evaluationIssues.length > 0;
 
+  // NON_ASSESSABLE candidates (P18 F3 at/above the room transition → no valid
+  // P19/P20 assessment band) are terminal candidate rejections retained as
+  // DIAGNOSTIC EVIDENCE. They never made the run incomplete and never carry
+  // fabricated P19/P20 — only the identity, P18, transition and reason that
+  // explain the rejection. Engineering Mode may show these; normal dealer
+  // workflow never sees raw validator errors for them.
+  // Computed here (before the outcome) because a run whose ONLY candidates were
+  // non-assessable still evaluated work: it is NO_USEFUL_IMPROVEMENT, not
+  // EVALUATION_INCOMPLETE. Non-assessable candidates are excluded from
+  // confirmedResults, so candidatesEvaluated alone would read 0 and mislabel
+  // a complete run as incomplete.
+  const nonAssessableCandidates = (Array.isArray(selection?.nonAssessableCandidates)
+    ? selection.nonAssessableCandidates
+    : []).map((entry) => ({
+      candidateId: entry?.candidateId ?? null,
+      candidateKind: entry?.candidateKind ?? null,
+      stage: entry?.stage ?? null,
+      status: "non-assessable",
+      reason: entry?.reason ?? null,
+      achievedP18Hz: num(entry?.achievedP18Hz),
+      transitionHz: num(entry?.transitionHz),
+    }));
+  const nonAssessableCount = nonAssessableCandidates.length;
+
   const outcome = terminalOutcome
     || (failureReason
       ? OPTIMISER_TERMINAL_OUTCOME.FAILED
       : ((baselineInvalid || evaluationIncomplete)
         ? OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE
-        : (candidatesEvaluated > 0
+        : ((candidatesEvaluated > 0 || nonAssessableCount > 0)
           ? OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT
           : OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE)));
 
@@ -350,24 +374,6 @@ export function buildOptimiserRunEvidence({
     calibrationDecision,
     decisionApplied,
   });
-
-  // NON_ASSESSABLE candidates (P18 F3 at/above the room transition → no valid
-  // P19/P20 assessment band) are terminal candidate rejections retained as
-  // DIAGNOSTIC EVIDENCE. They never made the run incomplete and never carry
-  // fabricated P19/P20 — only the identity, P18, transition and reason that
-  // explain the rejection. Engineering Mode may show these; normal dealer
-  // workflow never sees raw validator errors for them.
-  const nonAssessableCandidates = (Array.isArray(selection?.nonAssessableCandidates)
-    ? selection.nonAssessableCandidates
-    : []).map((entry) => ({
-      candidateId: entry?.candidateId ?? null,
-      candidateKind: entry?.candidateKind ?? null,
-      stage: entry?.stage ?? null,
-      status: "non-assessable",
-      reason: entry?.reason ?? null,
-      achievedP18Hz: num(entry?.achievedP18Hz),
-      transitionHz: num(entry?.transitionHz),
-    }));
 
   return {
     recordKind: OPTIMISER_RECORD_KIND.RUN_EVIDENCE,
