@@ -32,12 +32,23 @@ export async function load(url, context, nextLoad) {
   if (url.endsWith('.jsx') || url.endsWith('.tsx')) {
     const source = fs.readFileSync(new URL(url).pathname, 'utf8');
     const result = transformSync(source, { loader: 'jsx', format: 'esm', jsx: 'automatic' });
-    return { format: 'module', source: result.code, shortCircuit: true };
+    let code = result.code;
+    // Vite's import.meta.glob (build-time file discovery) is not available in the
+    // node test runtime. Polyfill it to an empty object so modules that discover
+    // measured polar datasets at import time still load (with no datasets found).
+    if (code.includes('import.meta.glob')) {
+      code = code.replace(/import\.meta\.glob\(/g, '((import.meta.glob)||(()=>({})))(');
+    }
+    return { format: 'module', source: code, shortCircuit: true };
   }
   if (url.endsWith('.js') && url.includes('/src/')) {
     const source = fs.readFileSync(new URL(url).pathname, 'utf8');
     let patched = source;
     let needsPolyfill = false;
+    if (patched.includes('import.meta.glob')) {
+      patched = patched.replace(/import\.meta\.glob\(/g, '((import.meta.glob)||(()=>({})))(');
+      needsPolyfill = true;
+    }
     if (patched.includes('import.meta.env')) {
       patched = patched.replace(/import\.meta\.env/g, '({VITE_BASE44_APP_ID:"",VITE_BASE44_BACKEND_URL:""})');
       needsPolyfill = true;

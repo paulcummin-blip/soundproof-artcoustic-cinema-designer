@@ -45,6 +45,17 @@ export function buildP17SeatMetric(p17Data) {
   // or L1 grade already means.
   const level = /^L[1-4]$/.test(String(p17Data.windowLevel || "")) ? p17Data.windowLevel : null;
 
+  // ── P17 design-guide basis marker ──
+  // The engine grades each seat against the model's coverage windows and stamps
+  // windowLevel / windowLevelNumber / windowCause on the per-seat result. These
+  // are the fields p17SeatEvidenceAuthority.resolveRowBasis reads to decide
+  // coverage_window vs earlier_variance_basis. They MUST be carried through the
+  // stored metric verbatim — dropping them makes a fresh coverage-window result
+  // read as legacy after it is saved/published/reopened.
+  const windowLevel = level;
+  const windowLevelNumber = isNum(p17Data.windowLevelNumber) ? p17Data.windowLevelNumber : null;
+  const windowCause = p17Data.cause || null;
+
   return {
     value: p17Data.p17Db,
     formatted: formatP17WindowResult(level),
@@ -52,6 +63,10 @@ export function buildP17SeatMetric(p17Data) {
     windows: p17Data.windows || null,
     evidenceType: p17Data.evidenceType || null,
     cause: p17Data.cause || null,
+    // ── basis marker (read by resolveRowBasis) ──
+    windowLevel,
+    windowLevelNumber,
+    windowCause,
     worstRole: p17Data.worstRole,
     worstAngleDeg: p17Data.worstAngleDeg,
     worstLossDb: p17Data.worstLossDb,
