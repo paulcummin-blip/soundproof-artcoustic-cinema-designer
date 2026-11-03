@@ -200,6 +200,72 @@ function resolveLimitingEntry(p17) {
     .sort((a, b) => (num(b?.lossDb) ?? -1) - (num(a?.lossDb) ?? -1))[0] || null;
 }
 
+/**
+ * The speaker entry that DECIDED the coverage-window grade — the channel whose
+ * effective off-axis angle and windows produced the seat's level. This is the
+ * ONLY coherent source for a coverage-window explanation: its role, model,
+ * angle, windows, cause and level must all come from this one speaker.
+ *
+ * The engine stamps the deciding channel's identity on the top-level result
+ * (worstRole, worstAngleDeg, windows, cause, windowLevel) AND keeps a perSpeaker
+ * entry for it. It ALSO keeps `p17.limiting` — but that is the LEGACY variance
+ * speaker (largest seat-vs-RSP delta), which is a DIFFERENT speaker in general.
+ * Mixing the legacy speaker's angle with the deciding channel's windows is the
+ * defect that produced internally impossible explanations (an angle shown
+ * outside a threshold the cause says it is inside). `p17.limiting` must NEVER be
+ * used for a coverage-window explanation.
+ *
+ * Returns the deciding perSpeaker entry when one exists; otherwise synthesises
+ * an entry from the top-level fields (which the engine stamped from this same
+ * speaker) so a saved publication that did not persist perSpeaker still reads
+ * coherently. Null only when the record carries no deciding role at all.
+ */
+function resolveCoverageDecidingEntry(p17) {
+  const worstRole = p17?.worstRole;
+  if (!worstRole) return null;
+  const list = Array.isArray(p17?.perSpeaker) ? p17.perSpeaker : [];
+  const candidates = list.filter((entry) => entry?.role === worstRole);
+  if (candidates.length) {
+    if (candidates.length === 1) return candidates[0];
+    // Tie-break to the entry whose window evidence matches the seat's grade, so
+    // a role that appears twice (e.g. a dual instance) cannot pull the wrong
+    // speaker's angle into the explanation.
+    const targetCause = p17?.cause ?? null;
+    const targetLevel = p17?.windowLevelNumber ?? p17?.windowLevel ?? null;
+    const exact = candidates.find((entry) => {
+      const causeOk = targetCause ? entry?.cause === targetCause : true;
+      const levelOk = targetLevel != null
+        ? (entry?.windowLevel === targetLevel || entry?.windowLevelNumber === targetLevel)
+        : true;
+      return causeOk && levelOk;
+    });
+    return exact || candidates[0];
+  }
+  // No perSpeaker entry for the deciding role (older saved publication): the
+  // top-level fields are the deciding speaker's own evidence, so synthesise a
+  // coherent entry from them. The model is left null for applySavedSpeakerModels
+  // to fill from the version's design state under the deciding role.
+  return {
+    role: worstRole,
+    model: null,
+    position: null,
+    angleDeg: num(p17.worstAngleDeg),
+    rspAngleDeg: null,
+    geometricAngleDeg: num(p17.geometricAngleDeg),
+    rspGeometricAngleDeg: num(p17.rspGeometricAngleDeg),
+    builtInTiltDeg: num(p17.builtInTiltDeg),
+    axisBasis: p17.axisBasis ?? null,
+    coverageLimitDeg: num(p17.coverageLimitDeg),
+    windows: p17.windows ?? null,
+    cause: p17.cause ?? null,
+    windowLevel: p17.windowLevel ?? null,
+    windowLevelNumber: num(p17.windowLevelNumber),
+    evidenceType: p17.evidenceType ?? null,
+    lossAtSeat: null,
+    lossAtRsp: null,
+  };
+}
+
 /** Speakers beyond their model's −3 dB window (saved evidence keeps a per-speaker flag). */
 function resolveBeyondLimit(p17) {
   if (Array.isArray(p17?.beyondLimit) && p17.beyondLimit.length) return p17.beyondLimit;
@@ -264,17 +330,31 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
       continue;
     }
 
-    const limiting = resolveLimitingEntry(p17);
     const beyondLimit = resolveBeyondLimit(p17);
     const rawVarianceDb = num(p17.rawVarianceDb) ?? num(p17.value);
     const level = p17.level ?? null;
 
     // ── P17 design-guide basis: what actually graded this seat ──
     const grade = resolveRowBasis(p17);
+
+    // One P17 explanation must describe one coherent evidence chain. For a
+    // coverage-window result the grade was set by the deciding channel
+    // (p17.worstRole): its angle, its windows, its cause and its level all come
+    // from that one speaker. The legacy `p17.limiting` entry is the old variance
+    // speaker (largest seat-vs-RSP delta), which is a DIFFERENT speaker in
+    // general — mixing its angle with the deciding channel's windows produces an
+    // internally impossible explanation (angle outside a threshold the cause
+    // says it is inside). It is used only for the earlier variance basis, where
+    // the variance speaker IS the grading speaker.
+    const limiting = grade.basis === "coverage_window"
+      ? (resolveCoverageDecidingEntry(p17) || resolveLimitingEntry(p17))
+      : resolveLimitingEntry(p17);
+
     const limitingModel = limiting?.model ?? null;
     const limitingRole = limiting?.role ?? p17.worstRole ?? null;
     const windows = resolveRowWindows(p17, limitingModel, limitingRole);
     const evidenceType = p17.evidenceType
+      || limiting?.evidenceType
       || windows?.evidenceType
       || P17_EVIDENCE_TYPE.MISSING;
     const effectiveAngleDeg = num(limiting?.angleDeg) ?? num(p17.worstAngleDeg);
