@@ -1,6 +1,6 @@
 // components/models/speakers/registry.js
 import { SUBWOOFER_BASS_CAPABILITIES } from "@/components/data/subwooferBassCapabilities";
-import { normaliseModelKey } from "@/components/utils/modelKeyNormaliser";
+import { normaliseModelKey, canonicalProductId } from "@/components/utils/modelKeyNormaliser";
 
 // CANONICAL SPEAKER REGISTRY — DO NOT EDIT WITHOUT APPROVAL
 // Units: millimetres. Plan view uses widthMm (X) and depthMm (Y). Height is for reporting/UI.
