@@ -19,7 +19,7 @@
 // grouped-gain, and confirmation worker calls. No new equations or scaling.
 
 import { runInWorker } from "./improveBassV2WorkerLifecycle.js";
-import { effectiveConfigurationKey, validateConfirmedCandidate } from "./confirmedCandidateValidity.js";
+import { effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
 import { compareZeroFailFirst } from "./zeroFailOptimiser.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 
@@ -132,7 +132,7 @@ async function confirmCombinedCandidate(ctx, rawTransfer, tuning, candidateInfo,
   if (!response) return null;
 
   const bound = bindConfirmation(response, tuning, candidateInfo, kind);
-  return validateConfirmedCandidate(bound, validationContext);
+  return validateCandidateForRun(bound, validationContext);
 }
 
 /**
@@ -189,7 +189,7 @@ export async function runCombinedOptimisation(ctx) {
     const combinedCandidates = [];
     for (const [index, candidate] of (search?.candidates || []).entries()) {
       const bound = bindConfirmation(candidate, candidate.appliedTuning, { candidateOrigin: "combined-integration" }, "calibration");
-      const check = validateConfirmedCandidate(bound, validationContext);
+      const check = validateCandidateForRun(bound, validationContext);
       if (!check.valid) continue;
       const result = { ...check.result, candidateId: "combined-integration-" + index, candidateOrigin: "combined",
         combinedFrom: { crossover: true, phaseRetuned: true, delayRetuned: true, gainRetuned: true } };
@@ -251,8 +251,12 @@ export async function runCombinedOptimisation(ctx) {
           diagnostics.candidatesBuilt.push("calibration-only");
           onBestSoFar({ result, candidate: { candidateOrigin: "combined" } });
         } else if (check) {
-          diagnostics.invalid++;
-          diagnostics.options.push({ stage: "confirm-cal-only", issues: check.issues });
+          if (check.nonAssessable) {
+            diagnostics.options.push({ stage: "confirm-cal-only", nonAssessable: true, reason: check.reason, achievedP18Hz: check.achievedP18Hz, transitionHz: check.transitionHz });
+          } else {
+            diagnostics.invalid++;
+            diagnostics.options.push({ stage: "confirm-cal-only", issues: check.issues });
+          }
         }
       }
     } catch (err) {
@@ -305,8 +309,12 @@ export async function runCombinedOptimisation(ctx) {
           diagnostics.candidatesBuilt.push("calibration-seating");
           onBestSoFar({ result, candidate: { candidateOrigin: "combined" } });
         } else if (check) {
-          diagnostics.invalid++;
-          diagnostics.options.push({ stage: "confirm-cal-seating", issues: check.issues });
+          if (check.nonAssessable) {
+            diagnostics.options.push({ stage: "confirm-cal-seating", nonAssessable: true, reason: check.reason, achievedP18Hz: check.achievedP18Hz, transitionHz: check.transitionHz });
+          } else {
+            diagnostics.invalid++;
+            diagnostics.options.push({ stage: "confirm-cal-seating", issues: check.issues });
+          }
         }
       }
     } catch (err) {
@@ -364,8 +372,12 @@ export async function runCombinedOptimisation(ctx) {
           diagnostics.candidatesBuilt.push("position-calibration");
           onBestSoFar({ result, candidate: { ...bestPosition, candidateOrigin: "combined" } });
         } else if (check) {
-          diagnostics.invalid++;
-          diagnostics.options.push({ stage: "confirm-pos-cal", issues: check.issues });
+          if (check.nonAssessable) {
+            diagnostics.options.push({ stage: "confirm-pos-cal", nonAssessable: true, reason: check.reason, achievedP18Hz: check.achievedP18Hz, transitionHz: check.transitionHz });
+          } else {
+            diagnostics.invalid++;
+            diagnostics.options.push({ stage: "confirm-pos-cal", issues: check.issues });
+          }
         }
       }
     } catch (err) {

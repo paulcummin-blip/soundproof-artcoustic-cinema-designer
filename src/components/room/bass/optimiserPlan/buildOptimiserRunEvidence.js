@@ -283,8 +283,17 @@ export function buildOptimiserRunEvidence({
 
   // A run that failed to complete every search it started is INCOMPLETE even
   // when some candidates were confirmed — a confirmed candidate is not the same
-  // as a finished evaluation.
-  const evaluationIssues = Array.isArray(selection?.evaluationIssues) ? selection.evaluationIssues : [];
+  // as a finished evaluation. Terminal candidate rejections (NON_ASSESSABLE:
+  // P18 F3 at/above the room transition) are NOT run failures and must not
+  // make the run incomplete or appear as raw missing-field errors.
+  const rawEvaluationIssues = Array.isArray(selection?.evaluationIssues) ? selection.evaluationIssues : [];
+  const evaluationIssues = rawEvaluationIssues.filter((issue) => {
+    if (!issue) return false;
+    if (issue.nonAssessable === true && issue.nonAssessableBaseline !== true) return false;
+    if (typeof issue.error === "string" && issue.error.trim()) return true;
+    if (Array.isArray(issue.issues) && issue.issues.some(Boolean)) return true;
+    return false;
+  });
   const evaluationIncomplete = selection?.evaluationIncomplete === true || evaluationIssues.length > 0;
 
   const outcome = terminalOutcome

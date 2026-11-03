@@ -1,4 +1,4 @@
-import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
+import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
 import { extractAuthorityForComparison } from "./currentAuthorityComparison.js";
 import { selectConfirmedRecommendations } from "./confirmedRecommendationSelection.js";
 import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
@@ -660,6 +660,20 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let calibrationTuning = null;
     const calibrationCandidates = [];
     const evaluationIssues = [];
+    // NON_ASSESSABLE candidates (P18 F3 at/above the room transition → no valid
+    // P19/P20 band) are terminal candidate rejections, not missing evidence.
+    // They are recorded here for diagnostics/history and NEVER pushed into
+    // evaluationIssues, so they cannot make the whole run incomplete.
+    const nonAssessableRecords = [];
+    const recordNonAssessable = (stage, candidate, check) => {
+      nonAssessableRecords.push({
+        stage,
+        candidateId: candidate?.candidateId ?? candidate?.id ?? null,
+        reason: check?.reason ?? null,
+        achievedP18Hz: check?.achievedP18Hz ?? null,
+        transitionHz: check?.transitionHz ?? null,
+      });
+    };
     const calibrationDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,shortlistComplete:false,options:[]};
     // Gain search state (Stage 11A-gain)
     let gainResult = null;
@@ -793,12 +807,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
                   "phase",
                 )
               : null;
-            const check = validateConfirmedCandidate(result, validationContext);
+            const check = validateCandidateForRun(result, validationContext);
             phaseDiagnostics.confirmed++;
-            phaseDiagnostics.options[index].validity = {valid:check.valid,issues:check.issues};
+            phaseDiagnostics.options[index].validity = {valid:check.valid,issues:check.issues,nonAssessable:check.nonAssessable,reason:check.reason};
             phaseDiagnostics.options[index].canonical = result;
             phaseDiagnostics.options[index].validated = check.result;
-            if (check.valid) {
+            if (check.nonAssessable) {
+              phaseDiagnostics.invalid++;
+              recordNonAssessable("phase", result, check);
+            } else if (check.valid) {
               phaseCandidates.push(check.result);
               funnelCandidates.push(check.result);
               phaseDiagnostics.valid++;
@@ -857,13 +874,14 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             { startedAt: _confirmT0, endedAt: performance.now(), tuning: retained[index].tuning, transferKey: "current" });
           if(isStale()) return {status:"stale",snapshot};
           const result=response?bindConfirmation(response,retained[index].tuning,{...currentFinalist,groupedDelay:retained[index]},"calibration"):null;
-          const check=validateConfirmedCandidate(result,validationContext);
+          const check=validateCandidateForRun(result,validationContext);
           calibrationDiagnostics.confirmed++;
-          calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues};
+          calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues,nonAssessable:check.nonAssessable,reason:check.reason};
           calibrationDiagnostics.options[index].canonical=result;
           calibrationDiagnostics.options[index].validated=check.result;
           calibrationDiagnostics.options[index].canonicalMs=performance.now()-_confirmT0;
-          if(check.valid){calibrationCandidates.push(check.result);funnelCandidates.push(check.result);calibrationDiagnostics.valid++;}
+          if(check.nonAssessable){calibrationDiagnostics.invalid++;recordNonAssessable("calibration",result,check);}
+          else if(check.valid){calibrationCandidates.push(check.result);funnelCandidates.push(check.result);calibrationDiagnostics.valid++;}
           else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
         }
         calibrationDiagnostics.status=calibrationSearch?.status==="skipped"?"skipped":calibrationDiagnostics.valid?"completed-shortlist":"incomplete";
@@ -946,12 +964,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               {...buildCurrentFinalist(subwooferInstances, roomDims), groupedDelay: gainRetained[gi]}, "calibration");
             gBound.candidateKind = "gain";
             gBound.candidateId = "gain:" + (gainRetained[gi].id || gi);
-            const gCheck = validateConfirmedCandidate(gBound, validationContext);
+            const gCheck = validateCandidateForRun(gBound, validationContext);
             gainDiagnostics.confirmed++;
-            gainDiagnostics.options[gi].validity = {valid: gCheck.valid, issues: gCheck.issues};
+            gainDiagnostics.options[gi].validity = {valid: gCheck.valid, issues: gCheck.issues, nonAssessable: gCheck.nonAssessable, reason: gCheck.reason};
             gainDiagnostics.options[gi].canonical = gBound;
             gainDiagnostics.options[gi].validated = gCheck.result;
-            if (gCheck.valid) {
+            if (gCheck.nonAssessable) {
+              gainDiagnostics.invalid++;
+              recordNonAssessable("gain", gBound, gCheck);
+            } else if (gCheck.valid) {
               gainCandidates.push(gCheck.result);
               funnelCandidates.push(gCheck.result);
               gainConfirmedPairs.push({candidate: gainRetained[gi], result: gCheck.result});
@@ -1124,8 +1145,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
 
           if (currentConfirmation) {
             const current=bindConfirmation(currentConfirmation,installedTuning,currentFinalist,"current");
-            const check=validateConfirmedCandidate(current,validationContext);
-            if(check.valid){
+            const check=validateCandidateForRun(current,validationContext);
+            if(check.nonAssessable){
+              // A non-assessable Current baseline (P18 F3 at/above the room
+              // transition) means P19/P20 cannot be graded for comparison at
+              // all. That is a genuine run-level blocker, stated honestly —
+              // not "missing evidence" and not a candidate rejection.
+              evaluationIssues.push({stage:"current",error:"Current baseline is non-assessable — P19/P20 cannot be graded for comparison.",nonAssessableBaseline:true,reason:check.reason});
+            }
+            else if(check.valid){
               // A re-derived Current may only become the baseline when it IS the
               // published result, within parity tolerance. Anything else stops
               // the run: the designer is never shown a different current result.
@@ -1348,8 +1376,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             // A second tuning alternative of the same placement carries its own
             // id so both stay comparable confirmed candidates.
             if (optionIndex > 0) bound.candidateId = String(candidate.id || "position") + "::alt" + optionIndex;
-            const check=validateConfirmedCandidate(bound,validationContext);
-            if(check.valid){confirmedResults.push(check.result);funnelCandidates.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});}
+            const check=validateCandidateForRun(bound,validationContext);
+            if(check.nonAssessable){recordNonAssessable(escPhase.name,bound,check);}
+            else if(check.valid){confirmedResults.push(check.result);funnelCandidates.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});}
             else evaluationIssues.push({stage:escPhase.name,candidateId:candidate.id,issues:check.issues});
           } else evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,issues:["Missing confirmation"]});
           }
@@ -1527,8 +1556,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               sBound.candidateId = "seating:" + sc.offsetMm;
               sBound.seatingOffsetMm = sc.offsetMm;
               sBound.seatingPositions = sc.seatingPositions;
-              const sCheck = validateConfirmedCandidate(sBound, validationContext);
-              if (sCheck.valid) {
+              const sCheck = validateCandidateForRun(sBound, validationContext);
+              if (sCheck.nonAssessable) {
+                recordNonAssessable("seating", sBound, sCheck);
+              } else if (sCheck.valid) {
                 funnelCandidates.push(sCheck.result);
                 confirmedSeatingCandidates.push({
                   result: sCheck.result,
@@ -1711,6 +1742,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.phaseDiagnostics=phaseDiagnostics;
     selection.calibrationDiagnostics=calibrationDiagnostics;
     selection.evaluationIssues=evaluationIssues;
+    // Terminal NON_ASSESSABLE candidate rejections (P18 F3 at/above the room
+    // transition). Kept for diagnostics/history so engineering mode can show
+    // the P18, transition and rejection reason. They never make the run
+    // incomplete — they are not in evaluationIssues.
+    selection.nonAssessableCandidates=nonAssessableRecords;
     // Preserve the exact Stage 2 canonical-job count with the completed run so
     // the saved ADI evidence can state a truthful calculation count after reopen.
     selection.canonicalJobsRun=Number.isFinite(Number(stage2Result?.canonicalJobsRun))

@@ -38,7 +38,23 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     evaluations.push({candidateId:"current",status:"invalid",issues:baselineCheck.issues});
   }
   for (const source of candidates) {
-    const check = validateConfirmedCandidate(source, context);
+    // CANDIDATE VALIDATION vs RUN COMPLETION: a NON_ASSESSABLE candidate
+    // (P18 F3 at/above the room transition → no valid P19/P20 band) is a
+    // terminal candidate rejection, not missing evidence. It is recorded
+    // with its reason and excluded from ranking — it never makes the run
+    // incomplete and never fabricates P19/P20.
+    const check = validateCandidateForRun(source, context);
+    if (check.nonAssessable) {
+      evaluations.push({
+        candidateId: source.candidateId,
+        status: "non-assessable",
+        assessable: false,
+        reason: check.reason,
+        achievedP18Hz: check.achievedP18Hz,
+        transitionHz: check.transitionHz,
+      });
+      continue;
+    }
     if (!check.valid) { evaluations.push({candidateId:source.candidateId,status:"invalid",issues:check.issues}); continue; }
     const result = check.result;
     // A candidate is only ever COMPARED against a validated baseline. When the
@@ -119,9 +135,15 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
   const seed = {currentResult:baseline,confirmedResults:eligible,winner:null};
   const recommendations = rankRecommendations(seed).map((r,i)=>({...r,isWinner:i===0}));
   const winner = recommendations[0]?.result || null;
+  // RUN COMPLETENESS is separate from candidate validation. A NON_ASSESSABLE
+  // candidate is a terminal rejection, not missing evidence — it never makes
+  // the run incomplete. Only a genuinely INVALID candidate (missing evidence
+  // the calculation should have produced) or an engine-level incomplete flag
+  // makes the run incomplete.
   const incomplete = evaluations.some(e=>e.status==="invalid") || snapshot.evaluationIncomplete === true;
   const rejected = evaluations.some(e=>e.status==="safety-rejected");
   const below = evaluations.some(e=>e.status==="below-materiality");
+  const nonAssessableCount = evaluations.filter(e=>e.status==="non-assessable").length;
   const hasTradeOffs = limitedTradeOffs.length > 0;
   const terminalOutcome = winner ? "material" : hasTradeOffs ? "trade-off" : incomplete ? "incomplete" : rejected ? "safety-rejected" : below ? "below-materiality" : "no-better-evaluated";
   const messages = {
@@ -132,8 +154,9 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
   };
   const baselineInvalid = baselineValidation.valid !== true;
   return {isCurrent:!winner && !hasTradeOffs,winner,recommendations,currentResult:baseline,
-    confirmedResults:(results || []).filter(r=>evaluations.some(e=>e.candidateId===r.candidateId&&e.status!=="invalid")),
+    confirmedResults:(results || []).filter(r=>evaluations.some(e=>e.candidateId===r.candidateId&&e.status!=="invalid"&&e.status!=="non-assessable")),
     evaluations,baselineValidation,validationFailed:baselineInvalid,
+    nonAssessableCount,
     terminalOutcome,message:(winner||hasTradeOffs)?null:(baselineInvalid ? CURRENT_BASELINE_UNVALIDATED : messages[terminalOutcome]),
     materialityReason:recommendations[0]?.materialityReason || null,
     calibrationResult:eligible.find(r=>r.candidateKind==="calibration") || null,

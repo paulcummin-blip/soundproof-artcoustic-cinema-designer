@@ -48,8 +48,29 @@ export const NO_RETAINED_CHANGE_REASON =
 export const SEATING_NOT_SAFE_REASON_PREFIX =
   "The evaluated seating movement cannot be applied as it stands:";
 
-function evaluationIssueReason(selection) {
+/**
+ * A run-level issue is a GENUINE computation failure or genuine missing
+ * evidence — not a terminal candidate rejection. A NON_ASSESSABLE candidate
+ * (P18 F3 at/above the room transition) is a terminal candidate outcome, not
+ * a run failure: it must never make the whole run incomplete. A non-assessable
+ * Current baseline IS a genuine run blocker, because P19/P20 cannot be
+ * graded for comparison at all.
+ */
+function isGenuineRunIssue(issue) {
+  if (!issue) return false;
+  if (issue.nonAssessable === true && issue.nonAssessableBaseline !== true) return false;
+  if (typeof issue.error === "string" && issue.error.trim()) return true;
+  if (Array.isArray(issue.issues) && issue.issues.some(Boolean)) return true;
+  return false;
+}
+
+function genuineRunIssues(selection) {
   const issues = Array.isArray(selection?.evaluationIssues) ? selection.evaluationIssues : [];
+  return issues.filter(isGenuineRunIssue);
+}
+
+function evaluationIssueReason(selection) {
+  const issues = genuineRunIssues(selection);
   const first = issues[0];
   if (!first) return "The optimiser run did not complete its evaluation.";
   const stage = first?.stage ? `${first.stage}: ` : "";
@@ -91,7 +112,12 @@ export function leverIsOfferable(lever, baseline) {
  * @returns {{actionable: boolean, terminalOutcome: string|null, reason: string|null, offerableLevers: string[]}}
  */
 export function resolvePlanActionability({ plan = null, selection = null } = {}) {
-  const issues = Array.isArray(selection?.evaluationIssues) ? selection.evaluationIssues : [];
+  // RUN COMPLETENESS is separate from candidate validation. Only a GENUINE
+  // computation failure or genuine missing evidence makes the run incomplete —
+  // terminal candidate rejections (NON_ASSESSABLE, UNSAFE, below-materiality)
+  // never do. The run is complete when all scheduled candidate work terminated
+  // and valid alternatives were evaluated.
+  const issues = genuineRunIssues(selection);
   const incomplete = selection?.evaluationIncomplete === true || issues.length > 0;
 
   // A winner whose change did not survive into the plan is INCOMPLETE evidence —
