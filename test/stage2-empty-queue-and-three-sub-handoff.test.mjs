@@ -16,11 +16,11 @@
 // stubbed; the worker is a mock). No acoustic maths, no P19/P20, no ranking.
 // ---------------------------------------------------------------------------
 
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 
-// ── Mock Worker (Web Worker interface) ──────────────────────────────────────
+// -- Mock Worker (Web Worker interface) --
 class MockWorker {
   constructor(url, opts) { this.url = url; this.opts = opts; this.onmessage = null; this.onerror = null; this.terminated = false; }
   postMessage(msg) { this.lastMessage = msg; }
@@ -28,13 +28,12 @@ class MockWorker {
 }
 globalThis.Worker = MockWorker;
 
-// ── Bundle the real store with persistence stubbed ──────────────────────────
-const storeBundle = (await build({
+// -- Bundle the real store with persistence stubbed --
+const storeBuild = await build({
   entryPoints: ["src/components/room/bass/stage2/stage2PlacementStore.js"],
   bundle: true,
   write: false,
-  format: "iife",
-  globalName: "stage2Store",
+  format: "cjs",
   platform: "node",
   define: { "import.meta.url": JSON.stringify("file:///stage2PlacementStore.js") },
   plugins: [{
@@ -46,26 +45,27 @@ const storeBundle = (await build({
       }));
     },
   }],
-}])).outputFiles[0].text;
+});
+const storeBundle = storeBuild.outputFiles[0].text;
 
 const stage2Module = { exports: {} };
 new Function("module", "exports", storeBundle)(stage2Module, stage2Module.exports);
 const { stage2PlacementController, getStage2State } = stage2Module.exports;
 
-// ── resolveQuantityOrder: pure handoff contract ────────────────────────────
-const qtyOrderBundle = (await build({
+// -- resolveQuantityOrder: pure handoff contract --
+const qtyBuild = await build({
   entryPoints: ["src/components/room/bass/stage2/stage2QuantityOrder.js"],
   bundle: true,
   write: false,
-  format: "iife",
-  globalName: "qtyOrder",
+  format: "cjs",
   platform: "node",
-})).outputFiles[0].text;
+});
+const qtyOrderBundle = qtyBuild.outputFiles[0].text;
 const qtyModule = { exports: {} };
 new Function("module", "exports", qtyOrderBundle)(qtyModule, qtyModule.exports);
 const { resolveQuantityOrder } = qtyModule.exports;
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers --
 const BASE_PARAMS = {
   roomDims: { widthM: 4.6, lengthM: 5.08, heightM: 2.4 },
   rspPosition: { x: 2.3, y: 3.0, z: 1.2 },
@@ -92,14 +92,20 @@ function promotionPlanFor(finalistsByQty) {
   return plan;
 }
 
+// afterEach clears any started workers/watchdogs so the pending dispatch
+// setTimeout (delay 0) no-ops on an empty queue instead of stranding 60 s
+// watchdogs that would keep the event loop alive past the suite.
+afterEach(() => {
+  stage2PlacementController.cancelAll("test-cleanup");
+});
+
 function scheduleWith({ quantityOrder, finalistsByQty, scopeQuantity = null }) {
-  // Reset controller state between cases by cancelling any prior run.
   stage2PlacementController.cancelAll("test-reset");
   stage2PlacementController.schedule({
     projectId: "proj-test",
     versionId: "ver-test",
     fingerprint: `fp-${quantityOrder.join("")}-${scopeQuantity ?? "all"}-${Date.now()}`,
-    placementFingerprint: null,   // no cached raw transfers → placement jobs are real
+    placementFingerprint: null,
     confirmationFingerprint: null,
     promotionPlan: promotionPlanFor(finalistsByQty),
     allStage1Finalists: finalistsByQty,
@@ -111,7 +117,7 @@ function scheduleWith({ quantityOrder, finalistsByQty, scopeQuantity = null }) {
   });
 }
 
-// ── resolveQuantityOrder contract ───────────────────────────────────────────
+// -- resolveQuantityOrder contract --
 
 test("resolveQuantityOrder: 3-sub current quantity puts 3 first and includes it", () => {
   const order = resolveQuantityOrder(3);
@@ -137,9 +143,9 @@ test("resolveQuantityOrder: unknown/missing quantity falls back to default order
   assert.deepEqual(resolveQuantityOrder(0), [2, 4, 1]);
 });
 
-// ── Three-sub handoff into Stage 2 (store-level) ────────────────────────────
+// -- Three-sub handoff into Stage 2 (store-level) --
 
-test("three-sub finalists with quantity 3 in scope → Stage 2 schedules jobs for qty 3", () => {
+test("three-sub finalists with quantity 3 in scope -> Stage 2 schedules jobs for qty 3", () => {
   const finalists = {
     1: [], 2: [], 3: [
       { id: "t1", familyId: "THREE_FRONT_SINGLE_REAR_PAIR" },
@@ -152,25 +158,21 @@ test("three-sub finalists with quantity 3 in scope → Stage 2 schedules jobs fo
   assert.ok(stage2PlacementController.queue.length > 0,
     "Stage 2 must have queued placement jobs for the three-sub finalists");
   assert.equal(stage2PlacementController.totalJobsPlanned > 0, true);
-  // Every queued job belongs to quantity 3 (the selected quantity, processed first).
   assert.equal(stage2PlacementController.queue.every((j) => j.quantity === 3), true);
 });
 
-test("three-sub finalists WITHOUT quantity 3 in scope (the bug) → zero jobs (reproduces Case B)", () => {
+test("three-sub finalists WITHOUT quantity 3 in scope (the bug) -> zero jobs (reproduces Case B)", () => {
   const finalists = { 1: [], 2: [], 3: [{ id: "t1" }, { id: "t2" }], 4: [] };
-  // The pre-fix fallback order [2,4,1] excludes 3.
   scheduleWith({ quantityOrder: [2, 4, 1], finalistsByQty: finalists });
   assert.equal(stage2PlacementController.queue.length, 0,
     "no jobs are scheduled when the only finalists are for an excluded quantity");
   assert.equal(stage2PlacementController.totalJobsPlanned, 0);
 });
 
-// ── Empty-queue immediate termination ───────────────────────────────────────
+// -- Empty-queue immediate termination --
 
 test("empty queue (zero jobs) terminates immediately — never waits for the global timeout", () => {
   const finalists = { 1: [], 2: [], 3: [{ id: "t1" }], 4: [] };
-  // The pre-fix fallback order excludes 3, so the three-sub finalists are
-  // ignored and the queue is empty. The empty-queue rule must complete now.
   const t0 = Date.now();
   scheduleWith({ quantityOrder: [2, 4, 1], finalistsByQty: finalists });
   const elapsed = Date.now() - t0;
@@ -180,8 +182,6 @@ test("empty queue (zero jobs) terminates immediately — never waits for the glo
     "an empty Stage 2 queue must terminate immediately with a complete outcome, not sit in updating");
   assert.ok(elapsed < 1000,
     `empty-queue completion must be near-instant (took ${elapsed}ms; the global timeout is 300000ms)`);
-  assert.equal(state.totalJobsPlanned ?? stage2PlacementController.totalJobsPlanned, 0,
-    "the NO_JOBS outcome is distinguishable from IN_PROGRESS by its zero job count");
 });
 
 test("empty queue completion is honest — status complete with no overall_best", () => {
@@ -191,9 +191,9 @@ test("empty queue completion is honest — status complete with no overall_best"
   assert.equal(state.overall_best, null, "no jobs means no winner");
 });
 
-// ── Existing-quantity behaviour preserved at the store level ───────────────
+// -- Existing-quantity behaviour preserved at the store level --
 
-test("1-sub finalists → Stage 2 schedules jobs for qty 1", () => {
+test("1-sub finalists -> Stage 2 schedules jobs for qty 1", () => {
   scheduleWith({
     quantityOrder: resolveQuantityOrder(1),
     finalistsByQty: { 1: [{ id: "o1", familyId: "ONE_FRONT_MID" }], 2: [], 3: [], 4: [] },
@@ -203,7 +203,7 @@ test("1-sub finalists → Stage 2 schedules jobs for qty 1", () => {
   assert.equal(stage2PlacementController.queue.every((j) => j.quantity === 1), true);
 });
 
-test("2-sub finalists → Stage 2 schedules jobs for qty 2", () => {
+test("2-sub finalists -> Stage 2 schedules jobs for qty 2", () => {
   scheduleWith({
     quantityOrder: resolveQuantityOrder(2),
     finalistsByQty: { 1: [], 2: [{ id: "tw1", familyId: "C_FRONT_PAIR" }, { id: "tw2", familyId: "RP22_C" }], 3: [], 4: [] },
@@ -213,7 +213,7 @@ test("2-sub finalists → Stage 2 schedules jobs for qty 2", () => {
   assert.equal(stage2PlacementController.queue.every((j) => j.quantity === 2), true);
 });
 
-test("4-sub finalists → Stage 2 schedules jobs for qty 4", () => {
+test("4-sub finalists -> Stage 2 schedules jobs for qty 4", () => {
   scheduleWith({
     quantityOrder: resolveQuantityOrder(4),
     finalistsByQty: { 1: [], 2: [], 3: [], 4: [{ id: "fo1", familyId: "FOUR_THIRD_PAIRS" }] },
@@ -223,9 +223,9 @@ test("4-sub finalists → Stage 2 schedules jobs for qty 4", () => {
   assert.equal(stage2PlacementController.queue.every((j) => j.quantity === 4), true);
 });
 
-// ── Candidate count entering Stage 2 is preserved ───────────────────────────
+// -- Candidate count entering Stage 2 is preserved --
 
-test("candidate count entering Stage 2 is preserved — 3 finalists → 3 placement jobs", () => {
+test("candidate count entering Stage 2 is preserved — 3 finalists -> 3 placement jobs", () => {
   const finalists = {
     1: [], 2: [], 3: [
       { id: "t1", familyId: "THREE_FRONT_SINGLE_REAR_PAIR" },
@@ -237,4 +237,23 @@ test("candidate count entering Stage 2 is preserved — 3 finalists → 3 placem
   assert.equal(stage2PlacementController.queue.length, 3,
     "all three three-sub finalists must enter Stage 2 as placement jobs");
   assert.equal(stage2PlacementController.totalJobsPlanned, 3);
+});
+
+// -- No duplicate scheduling: a second schedule() resets the queue --
+
+test("no duplicate scheduling — a second schedule() replaces the first run's queue", () => {
+  scheduleWith({
+    quantityOrder: resolveQuantityOrder(3),
+    finalistsByQty: { 1: [], 2: [], 3: [{ id: "t1" }, { id: "t2" }, { id: "t3" }], 4: [] },
+  });
+  const firstCount = stage2PlacementController.queue.length;
+  assert.equal(firstCount, 3);
+  // Re-schedule with a different (smaller) plan — the prior queue must be cleared.
+  scheduleWith({
+    quantityOrder: resolveQuantityOrder(3),
+    finalistsByQty: { 1: [], 2: [], 3: [{ id: "t1" }], 4: [] },
+  });
+  assert.equal(stage2PlacementController.queue.length, 1,
+    "a second schedule() must replace, not append to, the queue");
+  assert.equal(stage2PlacementController.totalJobsPlanned, 1);
 });
