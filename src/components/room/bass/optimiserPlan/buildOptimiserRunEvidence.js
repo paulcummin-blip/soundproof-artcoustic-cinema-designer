@@ -351,6 +351,24 @@ export function buildOptimiserRunEvidence({
     decisionApplied,
   });
 
+  // NON_ASSESSABLE candidates (P18 F3 at/above the room transition → no valid
+  // P19/P20 assessment band) are terminal candidate rejections retained as
+  // DIAGNOSTIC EVIDENCE. They never made the run incomplete and never carry
+  // fabricated P19/P20 — only the identity, P18, transition and reason that
+  // explain the rejection. Engineering Mode may show these; normal dealer
+  // workflow never sees raw validator errors for them.
+  const nonAssessableCandidates = (Array.isArray(selection?.nonAssessableCandidates)
+    ? selection.nonAssessableCandidates
+    : []).map((entry) => ({
+      candidateId: entry?.candidateId ?? null,
+      candidateKind: entry?.candidateKind ?? null,
+      stage: entry?.stage ?? null,
+      status: "non-assessable",
+      reason: entry?.reason ?? null,
+      achievedP18Hz: num(entry?.achievedP18Hz),
+      transitionHz: num(entry?.transitionHz),
+    }));
+
   return {
     recordKind: OPTIMISER_RECORD_KIND.RUN_EVIDENCE,
     planVersion: OPTIMISER_PLAN_VERSION,
@@ -401,8 +419,15 @@ export function buildOptimiserRunEvidence({
       winnerCandidateId,
       actionablePlanProduced: false,
       rejectionReasons,
+      // Terminal non-assessable candidate rejections — diagnostic evidence only,
+      // available to Engineering Mode via the run evidence block. Never P19/P20,
+      // never a run failure.
+      nonAssessableCandidates,
       designUnchanged: currentDesignUnchanged === true,
     },
+    // Terminal non-assessable candidate rejections, kept as diagnostic evidence.
+    // Never read as engineering values, never P19/P20, never a run failure.
+    nonAssessableCandidates,
     // No levers: a rejected candidate is never presented as an available change.
     levers: {},
     // What the calibration searches themselves produced, so "no useful

@@ -669,6 +669,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       nonAssessableRecords.push({
         stage,
         candidateId: candidate?.candidateId ?? candidate?.id ?? null,
+        candidateKind: candidate?.candidateKind ?? null,
+        status: "non-assessable",
         reason: check?.reason ?? null,
         achievedP18Hz: check?.achievedP18Hz ?? null,
         transitionHz: check?.transitionHz ?? null,

@@ -213,6 +213,14 @@ export function resolveOptimiserPlanStatus({
       predicted: null,
       appliedCount: 0,
       disabledCount: 0,
+      // Terminal non-assessable candidate rejections — diagnostic evidence only,
+      // never engineering values, never a run failure. Engineering Mode may show
+      // these; normal dealer workflow never sees raw validator errors for them.
+      nonAssessableCandidates: Array.isArray(plan.nonAssessableCandidates)
+        ? plan.nonAssessableCandidates
+        : (Array.isArray(plan.run?.nonAssessableCandidates)
+          ? plan.run.nonAssessableCandidates
+          : []),
       notes: Array.isArray(plan.notes) ? plan.notes : [],
       savedAt: plan.savedAt || null,
       candidateId: plan.candidateId || null,

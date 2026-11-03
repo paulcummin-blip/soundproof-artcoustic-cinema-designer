@@ -160,6 +160,9 @@ export default function OptimiserRunEvidenceBlock({
   const current = evidence.current || null;
   const families = Array.isArray(evidence.families) ? evidence.families : [];
   const stageOperations = Array.isArray(evidence.stageOperations) ? evidence.stageOperations : [];
+  const nonAssessableCandidates = Array.isArray(evidence.nonAssessableCandidates)
+    ? evidence.nonAssessableCandidates
+    : [];
   const baselineFailed = evidence.baselineValidation?.valid === false;
 
   const currentP20 = deviationText(current?.p20VariationDb);
@@ -312,6 +315,36 @@ export default function OptimiserRunEvidenceBlock({
         {evidence.rejectionReasons?.length > 0 && (
           <div className="mt-1.5 text-[11px] text-[#4A230F] leading-relaxed">
             {evidence.rejectionReasons.map((reason) => <div key={reason}>{reason}</div>)}
+          </div>
+        )}
+
+        {nonAssessableCandidates.length > 0 && (
+          <div className="mt-1.5">
+            <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">
+              NON-ASSESSABLE CANDIDATES (DIAGNOSTIC ONLY)
+            </div>
+            <div className="mt-0.5 text-[10px] text-[#8B7F76] leading-relaxed">
+              These options could not be assessed for seat-to-seat bass consistency because
+              their bass extension leaves no valid assessment band. They are terminal
+              rejections, not run failures.
+            </div>
+            <div className="mt-0.5 space-y-0.5 text-[11px] text-[#625143]">
+              {nonAssessableCandidates.map((entry) => (
+                <div key={entry.candidateId || entry.stage}>
+                  <span className="text-[#1B1A1A]">
+                    {entry.candidateId || "candidate"}
+                    {entry.candidateKind ? ` · ${entry.candidateKind}` : ""}
+                    {entry.stage ? ` · ${entry.stage}` : ""}
+                  </span>
+                  {" — "}
+                  P18 {entry.achievedP18Hz != null ? `${entry.achievedP18Hz} Hz` : "unavailable"}
+                  {" · "}
+                  transition {entry.transitionHz != null ? `${entry.transitionHz} Hz` : "unavailable"}
+                  {" · "}
+                  {entry.reason || "no valid P19/P20 assessment band"}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </details>
