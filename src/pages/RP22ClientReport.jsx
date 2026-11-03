@@ -67,9 +67,6 @@ import {
 import useFrozenReportBass from '@/components/report/useFrozenReportBass';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportUpdatingNotice from "@/components/report/ReportUpdatingNotice";
-import useAutoUpdateStaleReport, {
-  AUTO_UPDATE_STATUS,
-} from "@/components/report/useAutoUpdateStaleReport";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
 import {
   REPORT_SNAPSHOT_STATUS,
@@ -746,28 +743,13 @@ export default function RP22ClientReport() {
     },
   });
   const reportRegenerable = reportReady && orderedPages.length > 0;
-  const autoUpdate = useAutoUpdateStaleReport({
-    // The Project Library's own "update report" link already asks for this same
-    // write, so that request is the one attempt and no second one is started.
-    enabled: staleSavedReport && reportRegenerable && !reportIntent.updateReport,
-    key: `${authority.versionId || ''}::${snapshotFingerprints.engineeringFingerprint || ''}`,
-    regenerate: reportSnapshot.regenerate,
-  });
-  // The stale notice is held back while the saved report is being replaced —
-  // automatically, or by a write already in flight — and while the report is not
-  // ready at all, because the blocking state already says what is missing.
-  const staleNoticeHandled = staleSavedReport && (
-    !reportRegenerable
-    || reportIntent.updateReport
-    || autoUpdate.automatic
-    || reportSnapshot.saving
-  );
-  // The automatic update was attempted and produced no stored report: the
-  // previous report is still on screen, and a retry is what resolves it.
-  const staleUpdateFailed = staleSavedReport && reportRegenerable
-    && (autoUpdate.status === AUTO_UPDATE_STATUS.FAILED || reportSnapshot.saveFailed);
-  const updatingQuietly = staleSavedReport && reportRegenerable
-    && (autoUpdate.status === AUTO_UPDATE_STATUS.RUNNING || reportSnapshot.saving);
+  // A stale saved report is NEVER regenerated automatically. It stays visible
+  // as the previous report: the banner states "Design updated" and the
+  // designer's own "Create Updated Report" action is the only thing that
+  // replaces it. Opening or viewing a stale report writes nothing — the saved
+  // report keeps the exact engineering and bass publication identities it was
+  // generated from until the designer explicitly chooses to update it.
+  const staleUpdateInProgress = staleSavedReport && reportSnapshot.saving;
 
   // The gate's own account of this report: which authority exists, whether it is
   // complete, what is missing, and whether the saved report still matches.
@@ -919,11 +901,11 @@ export default function RP22ClientReport() {
         maxWidth: 900,
         margin: "0 auto",
       }}>
-        {/* Saved report: the design has moved past it. Sound Proof prepares the
-            updated report by itself whenever it can, so nothing is announced and
-            no button is offered while that runs — the report stays fully visible
-            and is replaced in place. A notice appears only if the update could
-            not be finished, with Retry. */}
+        {/* Saved report: the design has moved past it. The saved report is a frozen
+            document, so it stays visible exactly as it was generated — the banner
+            states "Design updated" and offers "Create Updated Report". Sound Proof
+            never replaces it automatically; only the designer's own action
+            regenerates the report against the current publication. */}
         <ReportSnapshotBanner
           className="client-report-screen-only"
           status={reportSnapshot.status}
@@ -933,15 +915,15 @@ export default function RP22ClientReport() {
           generatedBy={reportSnapshot.generatedBy}
           regenerating={reportSnapshot.saving}
           onRegenerate={reportSnapshot.regenerate}
-          autoUpdating={staleNoticeHandled}
-          autoUpdateFailed={staleUpdateFailed}
+          autoUpdating={false}
+          autoUpdateFailed={false}
           evidenceIncomplete={reportSnapshot.evidenceIncomplete}
           evidenceMismatches={reportSnapshot.evidenceMismatches}
           saveFailed={reportSnapshot.saveFailed}
           blockedReason={reportSnapshot.saveBlockedReason}
           onRetry={reportSnapshot.regenerate}
         />
-        {updatingQuietly && <ReportUpdatingNotice className="client-report-screen-only" />}
+        {staleUpdateInProgress && <ReportUpdatingNotice className="client-report-screen-only" />}
         {reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.CURRENT && (
           <div className="client-report-screen-only">
             <ReportGateDiagnosticsPanel diagnostics={gateDiagnostics} />
