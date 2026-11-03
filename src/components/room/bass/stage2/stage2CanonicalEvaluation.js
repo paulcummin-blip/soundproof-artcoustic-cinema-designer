@@ -417,6 +417,11 @@ export function evaluateStage2Confirmation(rawTransfer, {
     quantity: rawTransfer.quantity,
     coordinates: rawTransfer.coordinates,
     selectedProduct: rawTransfer.selectedProduct,
+    // The room transition frequency is carried on the candidate result so the
+    // confirmed-candidate assessability authority can decide whether a valid
+    // P19/P20 assessment band exists (P18 F3 must sit BELOW the transition).
+    // This is a propagated diagnostic value — it changes no acoustic maths.
+    transitionHz: Number.isFinite(Number(rawTransfer?.transitionHz)) ? Number(rawTransfer.transitionHz) : null,
     p14TargetBasis,
     p14TargetLevel,
     p14TargetDb,

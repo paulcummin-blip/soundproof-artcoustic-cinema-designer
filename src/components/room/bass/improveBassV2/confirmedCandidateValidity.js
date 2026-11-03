@@ -83,6 +83,94 @@ export function applicableSeatsFromResult(result) {
   const rows = Array.isArray(result?.perSeatP20) ? result.perSeatP20 : [];
   return rows.map(row => ({ id: String(row?.seatId ?? ""), isPrimary: row?.isPrimary !== false }));
 }
+/**
+ * The reason a candidate is NON-ASSESSABLE: its achieved P18 bass extension
+ * sits at or above the room transition frequency, so there is no valid
+ * P19/P20 assessment band. P19 and P20 cannot be graded by definition — they
+ * are never fabricated and never reported as "missing evidence".
+ */
+export const CANDIDATE_ASSESSABILITY_REASON = {
+  NO_VALID_P19_P20_ASSESSMENT_BAND: "NO_VALID_P19_P20_ASSESSMENT_BAND",
+};
+
+const finiteNum = (value) =>
+  value !== null && value !== undefined && typeof value !== "boolean" && Number.isFinite(Number(value));
+
+/**
+ * Classify whether a candidate's result conditions permit P19/P20 assessment.
+ *
+ * NON_ASSESSABLE is a TERMINAL CANDIDATE OUTCOME, not missing evidence. When
+ * the achieved P18 F3 is at or above the room transition frequency there is no
+ * valid assessment band, so P19/P20 cannot validly be graded. The candidate is
+ * rejected for that reason — never reported as "missing P19/P20" and never
+ * fabricated.
+ *
+ * A candidate whose P18 was not achieved, or whose transition frequency is
+ * unavailable, is NOT classified as non-assessable here: those are either
+ * genuine missing evidence or a separate failure, handled by
+ * validateConfirmedCandidate. Non-assessability is decided only when both
+ * P18 and the transition frequency are known and P18 >= transition.
+ *
+ * @param {object} result - a confirmed candidate result
+ * @returns {{assessable: boolean, reason: string|null, achievedP18Hz: number|null, transitionHz: number|null}}
+ */
+export function classifyCandidateAssessability(result) {
+  const p18 = finiteNum(result?.achievedP18Hz) ? Number(result.achievedP18Hz) : null;
+  const transition = finiteNum(result?.transitionHz) ? Number(result.transitionHz) : null;
+  if (p18 == null || p18 <= 0) return { assessable: true, reason: null, achievedP18Hz: p18, transitionHz: transition };
+  if (transition == null || transition <= 0) return { assessable: true, reason: null, achievedP18Hz: p18, transitionHz: transition };
+  if (p18 >= transition) {
+    return {
+      assessable: false,
+      reason: CANDIDATE_ASSESSABILITY_REASON.NO_VALID_P19_P20_ASSESSMENT_BAND,
+      achievedP18Hz: p18,
+      transitionHz: transition,
+    };
+  }
+  return { assessable: true, reason: null, achievedP18Hz: p18, transitionHz: transition };
+}
+
+/**
+ * Unified candidate validation for the run. This is the ONE entry point the
+ * engine and the selection authority use to keep CANDIDATE VALIDATION and RUN
+ * COMPLETION separate:
+ *
+ *   NON_ASSESSABLE — terminal candidate rejection (no fabricated P19/P20,
+ *                    issues: []). Does NOT make the run incomplete.
+ *   INVALID        — genuine missing evidence the calculation should have
+ *                    produced. Issues are returned and MAY make the run
+ *                    incomplete.
+ *   VALID          — a confirmed, assessable, evidence-complete candidate.
+ *
+ * @returns {{assessable: boolean, nonAssessable: boolean, reason: string|null, valid: boolean, issues: string[], result: object|null, achievedP18Hz: number|null, transitionHz: number|null}}
+ */
+export function validateCandidateForRun(result, context = {}) {
+  const assessability = classifyCandidateAssessability(result);
+  if (!assessability.assessable) {
+    return {
+      assessable: false,
+      nonAssessable: true,
+      reason: assessability.reason,
+      achievedP18Hz: assessability.achievedP18Hz,
+      transitionHz: assessability.transitionHz,
+      valid: false,
+      issues: [],
+      result,
+    };
+  }
+  const check = validateConfirmedCandidate(result, context);
+  return {
+    assessable: true,
+    nonAssessable: false,
+    reason: null,
+    achievedP18Hz: assessability.achievedP18Hz,
+    transitionHz: assessability.transitionHz,
+    valid: check.valid,
+    issues: check.issues,
+    result: check.result,
+  };
+}
+
 export function validateConfirmedCandidate(result, context = {}) {
   // Per-seat P20 (required), plus the canonical P19 authority — ALWAYS.
   // P19 is an aggregate RSP result in this model, so the aggregate deviation and

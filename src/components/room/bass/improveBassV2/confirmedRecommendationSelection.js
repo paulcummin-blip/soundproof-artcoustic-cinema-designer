@@ -1,4 +1,4 @@
-import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
+import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 import { rankRecommendations } from "./recommendationRanker.js";
 import { extractAuthoritativeMetrics, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
