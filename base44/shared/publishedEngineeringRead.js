@@ -225,6 +225,12 @@ export function cleanPublicationForResponse(publication) {
     algorithm_version: publication.algorithm_version ?? null,
     publication_reason: publication.publication_reason ?? null,
     provenance: publication.provenance ?? null,
+    // Retained authoritative bass graph payload frozen with the publication at
+    // publish time, so a frozen report renders its own P19 graph after the
+    // bounded completed_by_fingerprint map evicts the matching contract. Null
+    // on legacy publications created before retained evidence existed — the
+    // reader then falls back to completed_by_fingerprint, or reports unavailable.
+    bass_evidence: publication.bass_evidence ?? null,
   };
 }
 

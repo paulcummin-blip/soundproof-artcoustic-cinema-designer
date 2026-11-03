@@ -23,6 +23,7 @@ import {
   collectPublicationBassFingerprints,
   loadReportCalculationFingerprints,
 } from '../../shared/cacheRetentionAuthority.js';
+import { resolveBassEvidenceForPublication } from '../../shared/bassEvidencePublication.js';
 
 /**
  * publishEngineering
@@ -172,6 +173,22 @@ export default async function(req) {
       schema_version: PUBLICATION_SCHEMA_VERSION,
       publication_contract_version: body?.publication_contract_version,
     };
+
+    // ── RETAIN BASS GRAPH PAYLOAD WITH THE PUBLICATION ─────────────────────
+    // The immutable publication must be self-contained for frozen report
+    // rendering: copy the authoritative bass graphPayload (the SAME payload the
+    // live bass result uses) into the publication at publish time. The bounded
+    // completed_by_fingerprint map can later evict the matching contract; the
+    // retained copy keeps the frozen report's P19 graph alive without
+    // recalculation. Only attached when the contract's result fingerprint
+    // matches the publication's own bass fingerprint — never an unrelated graph.
+    // Attached to NEW publications only: an existing (idempotent) publication is
+    // immutable and never enriched, so legacy publications keep no embedded graph.
+    const bassFingerprintForEvidence = incomingPublication.provenance?.bass_fingerprint || null;
+    if (bassFingerprintForEvidence) {
+      const bassEvidence = resolveBassEvidenceForPublication(cacheRecord, bassFingerprintForEvidence);
+      if (bassEvidence) incomingPublication.bass_evidence = bassEvidence;
+    }
 
     incomingPublication.parameter_index = buildAtomicParameterIndex(incomingPublication);
     const contract = auditPublicationContract(incomingPublication);
