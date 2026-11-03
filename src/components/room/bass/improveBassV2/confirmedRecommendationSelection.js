@@ -4,6 +4,7 @@ import { rankRecommendations } from "./recommendationRanker.js";
 import { extractAuthoritativeMetrics, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
 import { classifyVerifiedTradeOff } from "./tradeOffClassifier.js";
 import { countFailingSeats, hasHardSafetyRegression } from "./zeroFailOptimiser.js";
+import { evaluateProtectedSeatSafety } from "./protectedSeatSafetyAuthority.js";
 
 /** The conclusion when the current design itself could not be validated. */
 export const CURRENT_BASELINE_UNVALIDATED =
@@ -60,12 +61,25 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
       evaluations.push({candidateId:result.candidateId,status:"safety-rejected",outputPass,level:hardSafety,muted});
       continue;
     }
+    // ── PROTECTED PRIMARY-SEAT SAFETY (the ONE shared authority) ──────────
+    // A candidate that materially worsens any protected Primary seat is NOT
+    // eligible to become the recommended winner, whatever else it improves. The
+    // same authority Apply and the displayed safety summary consume decides
+    // this, so winner eligibility, Apply eligibility and the "No protected seat
+    // gets worse" wording can never disagree. An unsafe candidate is retained
+    // as a TRADE-OFF (designer choice) when the product supports trade-offs —
+    // never as a safe recommendation.
+    const protectedSafety = evaluateProtectedSeatSafety(result, baseline);
+    const protectedUnsafe = !protectedSafety.safe;
     // Zero-fail-first: fail-count reduction is a material improvement, not a
     // trade-off. Short-circuit before the trade-off classifier so candidates
     // that eliminate FAILs are always classified as material improvements.
+    // BUT a candidate that regresses a protected Primary seat is never a safe
+    // winner even when it eliminates a fail — it falls through to the trade-off
+    // classification below instead of being force-promoted to eligible.
     const currentFails = countFailingSeats(baseline);
     const candidateFails = countFailingSeats(result);
-    if (candidateFails < currentFails) {
+    if (!protectedUnsafe && candidateFails < currentFails) {
       const eliminated = currentFails - candidateFails;
       const reason = candidateFails === 0
         ? `All seats now pass P19 and P20 (eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''})`
@@ -80,8 +94,15 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     // is a trade-off (designer choice), NOT a normal recommendation.
     const tradeOff = classifyVerifiedTradeOff(baseline, result);
     if (tradeOff.isTradeOff) {
-      evaluations.push({candidateId:result.candidateId,status:"trade-off",tradeOff});
-      tradeOffs.push({ result, tradeOff, candidateId: result.candidateId });
+      evaluations.push({candidateId:result.candidateId,status:"trade-off",tradeOff,protectedSafety});
+      tradeOffs.push({ result, tradeOff, protectedSafety, candidateId: result.candidateId });
+    } else if (protectedUnsafe) {
+      // The candidate materially worsens a protected Primary seat but the
+      // verified trade-off classifier did not claim it (e.g. it improves the
+      // aggregate while dropping a primary seat's level). It is retained as a
+      // protected-seat trade-off for the designer — never a safe winner.
+      evaluations.push({candidateId:result.candidateId,status:"protected-seat-trade-off",protectedSafety});
+      tradeOffs.push({ result, tradeOff: null, protectedSafety, candidateId: result.candidateId });
     } else if (materiality.material) {
       evaluations.push({candidateId:result.candidateId,status:"material",materiality});
       eligible.push(result);

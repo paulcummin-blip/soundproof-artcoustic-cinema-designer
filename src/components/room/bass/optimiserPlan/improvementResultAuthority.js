@@ -110,6 +110,19 @@ function p20Pair(before, after) {
   return to || null;
 }
 
+/**
+ * Whether the shared protected-seat safety authority found no primary-seat
+ * regression for the decision's candidate. The decision carries `regression`
+ * from the ONE authority Apply consumed; the displayed safety summary reads
+ * that same result and never restates "No protected seat gets worse" for a
+ * candidate a primary seat regressed.
+ */
+function protectedSeatsSafe(calibrationDecision) {
+  const regression = calibrationDecision?.regression;
+  if (!regression) return true;
+  return regression.regressed !== true;
+}
+
 /** The winning candidate's id, from the record's own fields only. */
 function candidateIdOf({ planView, decision, row }) {
   return planView?.candidateId
@@ -217,10 +230,15 @@ export function resolveImprovementResult({
       // The scope the evidence supports, stated by the headline authority.
       scope: headline?.benefit || null,
     },
-    // WHAT GETS WORSE: the run recorded no protected-seat regression (a
-    // regression would be the trade-off workflow's own case), so no protected
-    // seat is made worse by the change being offered.
-    seats: { title: IMPROVEMENT_COPY.SEATS_TITLE, text: IMPROVEMENT_COPY.SEATS_SAFE },
+    // WHAT GETS WORSE: generated ONLY from the SAME shared protected-seat
+    // safety authority that decided winner eligibility and Apply eligibility
+    // (carried on the decision as `regression`). The unconditional wording is
+    // gone — a candidate a primary seat regressed can never be stated as "No
+    // protected seat gets worse" here. An unsafe candidate is owned by the
+    // trade-off workflow, which states the actual protected-seat consequence.
+    seats: protectedSeatsSafe(calibrationDecision)
+      ? { title: IMPROVEMENT_COPY.SEATS_TITLE, text: IMPROVEMENT_COPY.SEATS_SAFE }
+      : null,
     held: heldForDesigner
       ? { title: IMPROVEMENT_COPY.HELD_TITLE, text: decision?.statement || null }
       : null,

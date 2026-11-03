@@ -31,9 +31,9 @@
 import {
   MATERIALITY_DISPOSITION,
   MATERIALITY_RULE,
-  hasPrimarySeatRegression,
   isMaterialImprovement,
 } from "../improveBassV2/materialityGate.js";
+import { protectedSeatRegressionForApply } from "../improveBassV2/protectedSeatSafetyAuthority.js";
 import {
   DELAY_ALIGNMENT_TOLERANCE_DB,
   OBJECTIVE_ROLE_LABELS,
@@ -597,6 +597,11 @@ function outcome(decision, reason, statement, extra = {}) {
     offsetStatement: extra.offsetStatement || null,
     limitingSeat: extra.limitingSeat || null,
     humanCalibration: extra.humanCalibration === true,
+    // The protected primary-seat regression the shared authority found, so the
+    // improvement panel's "No protected seat gets worse" wording is generated
+    // from the SAME safety result that decided eligibility — never restated
+    // independently.
+    regression: extra.regression || null,
     inRoomNote: decision === CALIBRATION_APPLY_DECISION.APPLIED ? IN_ROOM_CONFIRMATION_NOTE : null,
   };
 }
@@ -682,7 +687,10 @@ export function resolveCalibrationAutoApply({
   //
   // A level drop, a primary-seat regression or a hand-set calibration still block
   // an automatic application whatever the ratio says.
-  const regression = hasPrimarySeatRegression(baseline, candidate);
+  // THE ONE shared protected primary-seat safety authority. Apply, winner
+  // selection and the displayed safety summary all consume this same result, so
+  // the wording can never disagree with the eligibility decision.
+  const regression = protectedSeatRegressionForApply(candidate, baseline);
   const levelDrop = damage.p19LevelDrop || damage.p20LevelDrop;
   const tradeOff = assessCalibrationTradeOff({ before, after });
   let tradeOffAppliedNote = null;
