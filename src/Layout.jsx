@@ -29,7 +29,6 @@ import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BuildDiagnosticPanel from "@/components/dev/BuildDiagnosticPanel";
 import AdiEditorialRejectionDiagnostics from "@/components/adi/AdiEditorialRejectionDiagnostics";
-import BassIdentityDiagnosticsPanel from "@/components/dev/BassIdentityDiagnosticsPanel";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
@@ -553,7 +552,6 @@ export default function Layout({ children, currentPageName }) {
             writes nothing, so this is the only place its proposed copy, its stage
             and its violations can be read. Normal use never shows it. */}
         <AdiEditorialRejectionDiagnostics />
-        <BassIdentityDiagnosticsPanel />
         <DealerIdentityDiagnostic />
         </PartnerPortalIdentityProvider>
         </AppStateProvider>
