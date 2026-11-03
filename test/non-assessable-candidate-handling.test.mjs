@@ -18,7 +18,7 @@
 // Pure functions only. No acoustic maths are changed by this suite.
 // ---------------------------------------------------------------------------
 
-import test from "node:test";
+import { describe, expect, it } from "vitest";
 import assert from "node:assert/strict";
 
 import {
@@ -123,10 +123,11 @@ function makeSnapshot({ effectiveConfiguration = null, evaluationIncomplete = fa
 }
 
 // ---------------------------------------------------------------------------
+describe("Non-assessable candidate handling", () => {
 // A. CASE C CORNER CANDIDATE — P18 129.051 Hz, transition 91.287 Hz
 // ---------------------------------------------------------------------------
 
-test("A — classifyCandidateAssessability rejects the corner candidate", () => {
+it("A — classifyCandidateAssessability rejects the corner candidate", () => {
   const result = { achievedP18Hz: 129.051, transitionHz: 91.287 };
   const verdict = classifyCandidateAssessability(result);
   assert.equal(verdict.assessable, false, "P18 >= transition → not assessable");
@@ -135,7 +136,7 @@ test("A — classifyCandidateAssessability rejects the corner candidate", () => 
   assert.equal(verdict.transitionHz, 91.287);
 });
 
-test("A — validateCandidateForRun returns non-assessable with empty issues", () => {
+it("A — validateCandidateForRun returns non-assessable with empty issues", () => {
   const result = makeResult({
     candidateId: "corner-129",
     achievedP18Hz: 129.051,
@@ -154,7 +155,7 @@ test("A — validateCandidateForRun returns non-assessable with empty issues", (
   assert.equal(check.result, result);
 });
 
-test("A — non-assessable candidate adds no evaluationIssues to run-level state", () => {
+it("A — non-assessable candidate adds no evaluationIssues to run-level state", () => {
   const result = makeResult({
     candidateId: "corner-129",
     achievedP18Hz: 129.051,
@@ -186,7 +187,7 @@ test("A — non-assessable candidate adds no evaluationIssues to run-level state
 // B. MIXED OUTCOME — 1 valid, 1 non-assessable, 1 unsafe
 // ---------------------------------------------------------------------------
 
-test("B — mixed outcome: run complete, valid survives, unsafe rejected, non-assessable excluded", () => {
+it("B — mixed outcome: run complete, valid survives, unsafe rejected, non-assessable excluded", () => {
   const baseline = makeResult({
     candidateId: "current",
     candidateKind: "current",
@@ -259,7 +260,7 @@ test("B — mixed outcome: run complete, valid survives, unsafe rejected, non-as
 // C. ALL NON-ASSESSABLE → run complete, "No valid improvement found"
 // ---------------------------------------------------------------------------
 
-test("C — all non-assessable: run complete, no winner, not incomplete", () => {
+it("C — all non-assessable: run complete, no winner, not incomplete", () => {
   const baseline = makeResult({
     candidateId: "current",
     candidateKind: "current",
@@ -300,7 +301,7 @@ test("C — all non-assessable: run complete, no winner, not incomplete", () => 
 // D. GENUINE MISSING EVIDENCE — run incomplete (distinction preserved)
 // ---------------------------------------------------------------------------
 
-test("D — genuine missing evidence keeps the run incomplete", () => {
+it("D — genuine missing evidence keeps the run incomplete", () => {
   const baseline = makeResult({
     candidateId: "current",
     candidateKind: "current",
@@ -337,7 +338,7 @@ test("D — genuine missing evidence keeps the run incomplete", () => {
 // E. PRIMARY-SEAT SAFETY — Case C unsafe winner still rejected
 // ---------------------------------------------------------------------------
 
-test("E — primary-seat safety still rejects the Case C unsafe winner", () => {
+it("E — primary-seat safety still rejects the Case C unsafe winner", () => {
   const baseline = makeResult({
     candidateId: "current",
     candidateKind: "current",
@@ -372,7 +373,7 @@ test("E — primary-seat safety still rejects the Case C unsafe winner", () => {
 // F. THREE-SUB HANDOFF — Stage 2 still receives qty 3
 // ---------------------------------------------------------------------------
 
-test("F — resolveQuantityOrder prepends 3 for a three-sub design", () => {
+it("F — resolveQuantityOrder prepends 3 for a three-sub design", () => {
   const order = resolveQuantityOrder(3);
   assert.ok(order.includes(3), "qty 3 is in the evaluation order");
   assert.equal(order[0], 3, "qty 3 is evaluated first");
@@ -384,7 +385,7 @@ test("F — resolveQuantityOrder prepends 3 for a three-sub design", () => {
 // G. PLAN SAVE — nonAssessableCandidates saved, evaluationIncomplete=false
 // ---------------------------------------------------------------------------
 
-test("G — buildOptimiserRunEvidence saves nonAssessableCandidates without incomplete", () => {
+it("G — buildOptimiserRunEvidence saves nonAssessableCandidates without incomplete", () => {
   const selection = {
     winner: null,
     currentResult: makeResult({
@@ -444,7 +445,7 @@ test("G — buildOptimiserRunEvidence saves nonAssessableCandidates without inco
   assert.equal(evidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT);
 });
 
-test("G — resolvePlanActionability: non-assessable-only run is complete, not incomplete", () => {
+it("G — resolvePlanActionability: non-assessable-only run is complete, not incomplete", () => {
   // No plan (nothing actionable), no genuine evaluationIssues, no engine incomplete.
   const selection = {
     winner: null,
@@ -461,7 +462,7 @@ test("G — resolvePlanActionability: non-assessable-only run is complete, not i
     "non-assessable-only run is not incomplete");
 });
 
-test("G — resolvePlanActionability: genuine computation failure is incomplete", () => {
+it("G — resolvePlanActionability: genuine computation failure is incomplete", () => {
   const selection = {
     winner: null,
     evaluationIssues: [{ stage: "phase", error: "worker timed out" }],
@@ -474,7 +475,7 @@ test("G — resolvePlanActionability: genuine computation failure is incomplete"
   assert.equal(verdict.actionable, false);
 });
 
-test("G — resolvePlanActionability: genuine issue with plan is incomplete", () => {
+it("G — resolvePlanActionability: genuine issue with plan is incomplete", () => {
   const selection = {
     winner: null,
     evaluationIssues: [{ stage: "calibration", issues: ["P19: missing aggregate RSP deviation"] }],
@@ -491,7 +492,7 @@ test("G — resolvePlanActionability: genuine issue with plan is incomplete", ()
 // Actionability distinction (section 5)
 // ---------------------------------------------------------------------------
 
-test("Actionability — valid safe candidate → actionable", () => {
+it("Actionability — valid safe candidate → actionable", () => {
   // A plan with an offerable lever is actionable. The lever verdict authority
   // decides offerability; here we verify the incomplete gate does not block it.
   const selection = {
@@ -516,7 +517,7 @@ test("Actionability — valid safe candidate → actionable", () => {
   assert.equal(verdict.terminalOutcome, null);
 });
 
-test("Actionability — only unsafe/non-assessable → complete, no safe improvement", () => {
+it("Actionability — only unsafe/non-assessable → complete, no safe improvement", () => {
   // No offerable levers, no genuine issues → no_useful_improvement, not incomplete.
   const selection = {
     winner: null,
@@ -531,7 +532,7 @@ test("Actionability — only unsafe/non-assessable → complete, no safe improve
     "only rejected candidates → no useful improvement, not incomplete");
 });
 
-test("Actionability — genuine computation failure → incomplete", () => {
+it("Actionability — genuine computation failure → incomplete", () => {
   const selection = {
     winner: null,
     evaluationIssues: [{ stage: "phase", error: "canonical evaluation crashed" }],
@@ -542,4 +543,5 @@ test("Actionability — genuine computation failure → incomplete", () => {
   assert.equal(verdict.actionable, false);
   assert.equal(verdict.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE,
     "genuine computation failure → incomplete");
+});
 });
