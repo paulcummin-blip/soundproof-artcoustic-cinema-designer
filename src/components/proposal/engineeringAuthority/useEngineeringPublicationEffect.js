@@ -59,6 +59,7 @@ import {
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { refreshEngineeringPublicationReaders } from '@/components/engineering/versionedEngineeringAuthority';
 import { registerEngineeringPublishTrigger } from '@/components/engineering/engineeringPublishTrigger';
+import { isLegacyP17Publication } from '@/components/utils/rp22/p17BasisStaleness';
 import { statesBassAuthority } from '@/components/engineering/versionedEngineeringAuthority';
 import {
   PUBLICATION_ATTEMPT,
@@ -111,6 +112,13 @@ export function useEngineeringPublicationEffect({
   designState: assessmentDesignState,
   bassReadiness,
   retainedFromRefresh,
+  // The durable Published Engineering publication for this version, read by the
+  // caller from readPublishedEngineering. When a saved publication still holds
+  // LEGACY P17 evidence (scored level, no windowLevel) and the current design
+  // is ready, the effect republishes through the existing canonical path ONCE
+  // so the fresh coverage-window basis is written. Null/undefined = no legacy
+  // detection (the normal path runs unchanged).
+  durablePublication = null,
 }) {
   // Read selected-version identity only; never substitute its design or project facts.
   const [selectedVersion, setSelectedVersion] = useState(null);
@@ -361,6 +369,37 @@ export function useEngineeringPublicationEffect({
     lastPublishedFingerprintRef.current = null;
     setRetrySequence((value) => value + 1);
   }, [projectId, versionId, engineeringFingerprint, preflightKey]);
+
+  // ── LEGACY P17 AUTO-REFRESH (Room Designer open boundary) ────────────────
+  // A saved publication from before the coverage-window P17 method stores a
+  // scored P17 level with no windowLevel basis marker. Its design fingerprint
+  // can still match the current design, so the durable read returns it as
+  // Current and the user is shown stale "earlier variance basis" evidence.
+  //
+  // When the caller passes the durable publication AND it is legacy AND the
+  // current RP22 preflight is ready, fire ONE republish through the existing
+  // canonical engine → publish path above. The fingerprint is not altered and
+  // no P17-only calculator is created: the full assessment is republished.
+  //
+  // `legacyRefreshFiredRef` records the exact publication key a legacy refresh
+  // was initiated for, so the bypass fires at most once per (version,
+  // fingerprint). After the fresh publication lands the durable read returns a
+  // non-legacy publication, this flag stays false on the next reopen, and the
+  // normal same-fingerprint guard prevents any further churn.
+  const legacyRefreshFiredRef = useRef(null);
+  useEffect(() => {
+    if (!projectId || !versionId || !engineeringFingerprint) return;
+    if (!durablePublication) return;
+    if (!preflight.ready) return;
+    if (!isLegacyP17Publication(durablePublication)) return;
+    const key = `${projectId}::${versionId}::${engineeringFingerprint}`;
+    if (legacyRefreshFiredRef.current === key) return;
+    legacyRefreshFiredRef.current = key;
+    // `publish` clears the same-fingerprint idempotency guard and bumps the
+    // retry sequence, which re-runs the main publication effect through the
+    // existing publishEngineering path. It publishes nothing itself.
+    publish();
+  }, [projectId, versionId, engineeringFingerprint, durablePublication, preflightKey, preflight.ready]);
 
   useEffect(() => {
     if (!projectId || !versionId) return undefined;

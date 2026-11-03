@@ -1995,6 +1995,12 @@ function RoomDesignerWithState() {
       && appState?.isProjectHydrationReady === true
       && minimumSystemMet,
     designState: engineeringPublicationDesignState,
+    // Legacy P17 auto-refresh: the saved publication for this version, read by
+    // the same durable authority the report reads. When it still holds the
+    // earlier variance basis (scored P17, no windowLevel) and the current design
+    // is ready, the publication effect republishes through the existing
+    // canonical path once, so the fresh coverage-window basis is written.
+    durablePublication: restoredEngineeringAuthority?.durable?.publication || null,
   });
 
   // Publish the current live seat-priority fingerprint so the sidebar can
