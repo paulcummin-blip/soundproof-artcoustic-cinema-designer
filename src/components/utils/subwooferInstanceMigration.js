@@ -46,7 +46,11 @@ export { INSTANCE_AUTHORITY_VERSION } from "@/lib/bassAuthorityVersion";
 const SUB_WIDTH_FALLBACK_M = 0.50;
 const SUB_HEIGHT_FALLBACK_M = 0.50;
 const SUB_DEPTH_FALLBACK_M = 0.30;
-const WALL_BUFFER_M = 0.01;
+// The wall buffer a cabinet front face keeps from the structural wall. Shared
+// with the installable-wall-centre authority so a wall-mounted cabinet's
+// acoustic centre (clearance + depth/2) is computed from the same buffer the
+// bass engine already assumes for cabinet placement.
+export const WALL_BUFFER_M = 0.01;
 
 /**
  * Resolve cabinet height in metres for a given model.
@@ -66,7 +70,16 @@ export function getCabinetHeightM(model, orientation) {
  */
 export function getCabinetWidthM(model) {
   try {
-    const dims = subDimsMM?.[model];
+    // Canonical resolution via the product registry, which normalises the model
+    // key (lowercase) so "SUB3-12" and "sub3-12" resolve to the same canonical
+    // product and the same cabinet width. Fall back to the legacy subDimsMM
+    // table (uppercased normalised key) only when the registry has no entry,
+    // then to the constant for genuinely unknown models.
+    const meta = getSpeakerModelMeta(model) || {};
+    const metaWidthM = Number(meta.widthM);
+    if (!meta.notFound && Number.isFinite(metaWidthM) && metaWidthM > 0) return metaWidthM;
+    const legacyKey = String(model || "").toUpperCase();
+    const dims = subDimsMM?.[legacyKey] ?? subDimsMM?.[model];
     const w = Number(dims?.w);
     return Number.isFinite(w) && w > 0 ? w / 1000 : SUB_WIDTH_FALLBACK_M;
   } catch {
@@ -79,7 +92,17 @@ export function getCabinetWidthM(model) {
  */
 export function getCabinetDepthM(model) {
   try {
-    const dims = subDimsMM?.[model];
+    // Canonical resolution via the product registry, which normalises the model
+    // key (lowercase) so "SUB3-12" and "sub3-12" resolve to the same canonical
+    // product and the same cabinet depth (0.255 m), not the 0.30 m fallback.
+    // Fall back to the legacy subDimsMM table (uppercased normalised key) only
+    // when the registry has no entry, then to the constant for genuinely
+    // unknown models. Never resolve dimensions from raw display text.
+    const meta = getSpeakerModelMeta(model) || {};
+    const metaDepthM = Number(meta.depthM);
+    if (!meta.notFound && Number.isFinite(metaDepthM) && metaDepthM > 0) return metaDepthM;
+    const legacyKey = String(model || "").toUpperCase();
+    const dims = subDimsMM?.[legacyKey] ?? subDimsMM?.[model];
     const d = Number(dims?.d);
     return Number.isFinite(d) && d > 0 ? d / 1000 : SUB_DEPTH_FALLBACK_M;
   } catch {

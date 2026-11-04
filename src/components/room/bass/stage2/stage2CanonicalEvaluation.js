@@ -28,6 +28,7 @@ import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
 import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION, STAGE2_CANONICAL_VERSION } from "./stage2Constants";
 import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
+import { resolveInstallableWallCentre } from "./installableWallCentreAuthority";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
 import { searchDelayOnly, searchLevelAndDelay, resumWithTuning } from "./stage2TuningSearch";
@@ -97,11 +98,27 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
     };
   });
 
-  const sourcePositions = finalist.sources.map((s, index) => ({
-    x: s.xNorm * W,
-    y: s.yNorm * L,
-    z: sourceDescriptors[index].centreZ,
-  }));
+  // Convert normalized wall points into physically installable cabinet centres
+  // BEFORE the source reaches the acoustic simulation. A cabinet mounted to the
+  // front/rear wall has finite depth: its centre sits half the depth inside the
+  // room plus the existing wall buffer, never on the wall plane itself. The
+  // exact coordinates evaluated here are the coordinates offered to the user
+  // (no post-evaluation shift). Wall identity (front/rear) is derived from the
+  // normalized yNorm, kept separate from the physical centre y.
+  const sourcePositions = finalist.sources.map((s, index) => {
+    const centre = resolveInstallableWallCentre({
+      roomDims,
+      xNorm: s.xNorm,
+      yNorm: s.yNorm,
+      modelKey: sourceDescriptors[index].modelKey,
+    });
+    return {
+      x: centre.x,
+      y: centre.y,
+      z: sourceDescriptors[index].centreZ,
+      mountingWall: centre.mountingWall,
+    };
+  });
 
   const frontSubsLive = [];
   const rearSubsLive = [];
@@ -136,6 +153,9 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       x: sourcePositions[i].x,
       y: sourcePositions[i].y,
       z: descriptor.centreZ,
+      // Wall identity (front/rear) the placement was authored for, preserved
+      // separately from the physical centre y (which is inside the room).
+      mountingWall: sourcePositions[i].mountingWall,
       // Preserve normalised position for front/rear group splitting in
       // delay/level tuning search (confirmation phase re-summation).
       yNorm: s.yNorm,
@@ -291,10 +311,19 @@ export function evaluateStage2Placement({
   const usableLfHz = computeUsableLfHz(sources);
   const transitionHz = computeTransitionHz(roomDims);
 
-  const coordinates = finalist.sources.map((s) => ({
-    x: s.xNorm * Number(roomDims.widthM),
-    y: s.yNorm * Number(roomDims.lengthM),
-  }));
+  // Recommended coordinates are the exact installable cabinet centres used for
+  // acoustic evaluation — no post-evaluation shift. The same authority and
+  // model key produce the same x/y as buildStage2Sources, so what the user sees
+  // is what the acoustic engine evaluated.
+  const coordinates = finalist.sources.map((s, i) => {
+    const centre = resolveInstallableWallCentre({
+      roomDims,
+      xNorm: s.xNorm,
+      yNorm: s.yNorm,
+      modelKey: sources[i]?.modelKey || normaliseModelKey(selectedSubModel),
+    });
+    return { x: centre.x, y: centre.y };
+  });
 
   return {
     finalistId: finalist.id,
