@@ -214,7 +214,7 @@ export function evaluateBEligibility({
  */
 export function generateBFinalist() {
   const seeds = FAMILY_SEEDS[FAMILY_IDS.RP22_B_LAST_RESORT];
-  const sources = seeds.map((s) => ({ xNorm: s.xNorm, yNorm: s.yNorm }));
+  const sources = seeds.map((s) => ({ xNorm: s.xNorm, yNorm: s.yNorm, coordinateSpace: "wall_reference" }));
   const id = `${FAMILY_IDS.RP22_B_LAST_RESORT}:${sources
     .map((s) => `${s.xNorm}_${s.yNorm}`)
     .join("|")}`;
