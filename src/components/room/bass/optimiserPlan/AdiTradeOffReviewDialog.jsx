@@ -58,7 +58,7 @@ function GroupRows({ group, rows }) {
               </>
             ) : null}
             <span className="font-semibold" style={{ color: style.color }}>
-              {style.label}
+              {row.slight ? `Slightly ${style.label.toLowerCase()}` : style.label}
               {row.delta ? ` · ${row.delta}` : ""}
             </span>
           </div>

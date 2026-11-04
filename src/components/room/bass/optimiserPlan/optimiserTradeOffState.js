@@ -200,6 +200,31 @@ function directionFor(beforeDb, afterDb) {
 }
 
 /**
+ * The displayed whole-dB direction, overlaid with the run's own raw
+ * improvement/damage evidence. Where the two DISPLAYED endpoints are equal but
+ * the run recorded a small raw change, the direction follows the raw evidence
+ * — so a small regression is never hidden behind a rounded "unchanged". The
+ * returned `slight` flag marks such a case so the wording is not overstated.
+ */
+function overallMetricDirection(beforeDb, afterDb, improvementDeltaDb, worseDb) {
+  const displayed = directionFor(beforeDb, afterDb);
+  if (displayed && displayed !== TRADE_OFF_DIRECTION.UNCHANGED) {
+    return { direction: displayed, slight: false };
+  }
+  // The displayed (floored) values are equal or missing. Check the run's own
+  // raw improvement/damage evidence for a small change the rounding hid.
+  const improvementDelta = finite(improvementDeltaDb);
+  if (improvementDelta != null && improvementDelta > 0) {
+    return { direction: TRADE_OFF_DIRECTION.IMPROVES, slight: true };
+  }
+  const worse = finite(worseDb);
+  if (worse != null && worse > 0) {
+    return { direction: TRADE_OFF_DIRECTION.WORSENS, slight: true };
+  }
+  return { direction: displayed || null, slight: false };
+}
+
+/**
  * The displayed whole-dB value inside a formatted P19/P20 string
  * ("±15 dB · L1" → 15). Produced by this module's own display authority, so the
  * read is exact rather than guessed.
@@ -228,7 +253,7 @@ function deltaPhrase(direction, delta) {
  * amount — an affected seat's retained regression evidence ("1.2 dB") — keeps
  * that figure exactly as recorded.
  */
-function row({ key, group, label, before, after, pair = null, levelBefore = null, levelAfter = null, direction, delta, deltaLabel, force = false, pairKnown = true }) {
+function row({ key, group, label, before, after, pair = null, levelBefore = null, levelAfter = null, direction, delta, deltaLabel, force = false, pairKnown = true, slight = false }) {
   if (!before && !after && !force) return null;
   const displayedDelta = displayDeltaPhrase(displayedDbOf(before), displayedDbOf(after));
   const resolvedDelta = deltaLabel != null ? deltaLabel : (displayedDelta || deltaPhrase(direction, delta));
@@ -249,6 +274,7 @@ function row({ key, group, label, before, after, pair = null, levelBefore = null
     pairKnown,
     direction: direction || TRADE_OFF_DIRECTION.UNCHANGED,
     delta: resolvedDelta,
+    slight,
   };
 }
 
@@ -266,6 +292,15 @@ function overallRows(decision) {
   const improvement = decision?.improvement || null;
   const damage = decision?.damage || null;
 
+  const p20Dir = overallMetricDirection(
+    before?.p20?.deviationDb, after?.p20?.deviationDb,
+    improvement?.p20DeltaDb, damage?.p20WorseDb,
+  );
+  const p19Dir = overallMetricDirection(
+    before?.p19?.deviationDb, after?.p19?.deviationDb,
+    improvement?.p19DeltaDb, damage?.p19WorseDb,
+  );
+
   return [
     row({
       key: "p20",
@@ -276,13 +311,17 @@ function overallRows(decision) {
       pair: deviationPair(before?.p20?.deviationDb, after?.p20?.deviationDb),
       levelBefore: levelText(before?.p20?.level),
       levelAfter: levelText(after?.p20?.level),
-      direction: directionFor(before?.p20?.deviationDb, after?.p20?.deviationDb),
+      direction: p20Dir.direction,
+      slight: p20Dir.slight,
       // THE DISPLAYED DELTA: the two displayed endpoints themselves, so the
       // change stated beside the pair always equals A − B (±15 dB → ±12 dB reads
       // "3 dB better"). The full-precision delta behind them is never printed
-      // beside rounded endpoints.
+      // beside rounded endpoints — unless the rounding hid a small raw change,
+      // in which case the slight label states it honestly.
       delta: displayDeltaDb(before?.p20?.deviationDb, after?.p20?.deviationDb),
-      deltaLabel: displayDeltaPhrase(before?.p20?.deviationDb, after?.p20?.deviationDb),
+      deltaLabel: p20Dir.slight
+        ? (p20Dir.direction === TRADE_OFF_DIRECTION.WORSENS ? "slightly worse" : "slightly better")
+        : displayDeltaPhrase(before?.p20?.deviationDb, after?.p20?.deviationDb),
     }),
     row({
       key: "p19",
@@ -293,8 +332,12 @@ function overallRows(decision) {
       pair: deviationPair(before?.p19?.deviationDb, after?.p19?.deviationDb),
       levelBefore: levelText(before?.p19?.level),
       levelAfter: levelText(after?.p19?.level),
-      direction: directionFor(before?.p19?.deviationDb, after?.p19?.deviationDb),
+      direction: p19Dir.direction,
+      slight: p19Dir.slight,
       delta: finite(improvement?.p19DeltaDb) ?? finite(damage?.p19WorseDb),
+      deltaLabel: p19Dir.slight
+        ? (p19Dir.direction === TRADE_OFF_DIRECTION.WORSENS ? "slightly worse" : "slightly better")
+        : null,
     }),
   ].filter(Boolean);
 }
@@ -570,9 +613,9 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
       level: protectedLevel,
       text: `${TRADE_OFF_METRIC.P19_PROTECTED} — ${
         p19Row.direction === TRADE_OFF_DIRECTION.IMPROVES
-          ? "Improves"
+          ? (p19Row.slight ? "Slightly improves" : "Improves")
           : p19Row.direction === TRADE_OFF_DIRECTION.WORSENS
-            ? "Worsens"
+            ? (p19Row.slight ? "Slightly worsens" : "Worsens")
             : "Unchanged"
       }${protectedLevel ? ` · ${protectedLevel}` : ""}`,
     }
@@ -612,6 +655,12 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
     objectiveLabel: record.objectiveLabel || null,
     scopeNote: seats.length > 1
       ? null
-      : (seat?.before || seat?.after ? TRADE_OFF_SCOPE_NOTE : TRADE_OFF_AFFECTED_VALUES_NOTE),
+      : !seat
+        // No seat-specific evidence was retained (no affected seat, no
+        // deterioration amount). The metric-level trade-off is already stated by
+        // the headline, decision and impact lines; no seat-scope note is shown,
+        // and no affected-seat or deterioration claim is manufactured.
+        ? null
+        : (seat.before || seat.after ? TRADE_OFF_SCOPE_NOTE : TRADE_OFF_AFFECTED_VALUES_NOTE),
   };
 }
