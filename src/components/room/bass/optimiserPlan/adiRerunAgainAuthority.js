@@ -60,10 +60,16 @@ export const ADI_RERUN_AGAIN_RUNNING_REASON = "ADI is already running.";
 let completedOutcomes = null;
 function completedOutcomeSet() {
   if (!completedOutcomes) {
+    // NON_ACTIONABLE_WINNER is a COMPLETED evaluation: the ranking found a
+    // better-performing option whose placement is not practical. The run
+    // finished and its result is trustworthy, so the designer must be able to
+    // run it again — distinct from NO_IMPROVEMENTS (nothing better found) and
+    // from TRADE_OFF (a change was offered but costs a protected seat).
     completedOutcomes = new Set([
       OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND,
       OPTIMISER_OUTCOME.PHYSICAL_CHANGE,
       OPTIMISER_OUTCOME.TRADE_OFF,
+      OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER,
       OPTIMISER_OUTCOME.NO_IMPROVEMENTS,
     ]);
   }

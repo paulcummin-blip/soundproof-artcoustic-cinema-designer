@@ -1254,7 +1254,12 @@ export default function AdiOptimisationJourney({
         </div>
       )}
 
-      {journey.action === ADI_OPTIMISER_ACTION.RUN && !journey.canRun && !showBlocked && !runError && (
+      {/* A fresh run is in flight — the RUNNING panel above owns the card, so
+          this start-failure fallback must not render beside it. The copy is
+          only honest when no run actually started AND the start attempt failed:
+          a running optimiser naturally has no terminal plan yet, no run history
+          and no first candidate, and none of those imply a start failure. */}
+      {journey.action === ADI_OPTIMISER_ACTION.RUN && !journey.canRun && !showBlocked && !runError && !isRunning && (
         <div className="text-[11px] text-[#625143] leading-relaxed">
           The Optimisation Plan could not be started. Reopen the project and try again.
         </div>
