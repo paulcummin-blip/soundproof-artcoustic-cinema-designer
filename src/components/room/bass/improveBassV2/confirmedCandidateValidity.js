@@ -151,9 +151,15 @@ export function classifyCandidateAssessability(result) {
       reason: CANDIDATE_ASSESSABILITY_REASON.NO_VALID_P19_P20_ASSESSMENT_BAND,
       achievedP18Hz: p18,
       transitionHz: transition,
+      // A band rejection is not a P14 rejection: these stay null so callers can
+      // tell the two terminal outcomes apart without checking the reason string.
+      p14AchievedDb: null,
+      p14TargetDb: null,
+      p14NotAchievedReason: null,
     };
   }
-  return { assessable: true, reason: null, achievedP18Hz: p18, transitionHz: transition };
+  return { assessable: true, reason: null, achievedP18Hz: p18, transitionHz: transition,
+    p14AchievedDb: null, p14TargetDb: null, p14NotAchievedReason: null };
 }
 
 /**
