@@ -913,8 +913,8 @@ export class Stage2PlacementController {
 
           // If the raw transfer is already cached (from a prior run or cold
           // hydration), queue the confirmation directly — skip placement.
-          if (this.placementFingerprint && hasCachedRawTransfer(this.placementFingerprint, repId)) {
-            const rawTransfer = getCachedRawTransfer(this.placementFingerprint, repId);
+          if (this.placementFingerprint && hasCachedRawTransfer(this.projectId, this.versionId, this.placementFingerprint, repId)) {
+            const rawTransfer = getCachedRawTransfer(this.projectId, this.versionId, this.placementFingerprint, repId);
             this.representativeState.set(repId, "confirmation");
             this.queue.push({
               finalist: { id: repId, familyId: rep.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },

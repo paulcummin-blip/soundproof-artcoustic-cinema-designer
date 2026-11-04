@@ -201,6 +201,8 @@ function buildCurrentFinalist(subwooferInstances, roomDims) {
  * canonically recalculated with installed tuning.
  */
 export function gatherCandidates({
+  projectId,
+  versionId,
   subwooferInstances,
   roomDims,
   stage2Result,
@@ -213,10 +215,11 @@ export function gatherCandidates({
   const stage2Finalists = extractStage2Finalists(stage2Result, quantity, roomDims);
   // FIX 1: Use the P14-independent placementFingerprint (stage2-place:v3:) for
   // raw-transfer cache retrieval — NOT the P14-dependent combined stage2
-  // fingerprint. The cache is keyed by placementFingerprint; using the wrong
-  // key produces a 100% cache miss.
+  // fingerprint. The cache is keyed by projectId::versionId::placementFingerprint;
+  // omitting the (projectId, versionId) prefix produces a 100% cache miss even
+  // when valid entries exist for this version.
   const cachedTransfers = placementFingerprint
-    ? getCachedRawTransfersForFingerprint(placementFingerprint)
+    ? getCachedRawTransfersForFingerprint(projectId, versionId, placementFingerprint)
     : new Map();
 
   const groups = activeInstanceGroups(subwooferInstances);
@@ -737,7 +740,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         // Get or compute Current's raw transfers (zero tuning)
         let currentRawTransfer = null;
         const cachedTransfers = placementFingerprint
-          ? getCachedRawTransfersForFingerprint(placementFingerprint)
+          ? getCachedRawTransfersForFingerprint(projectId, versionId, placementFingerprint)
           : new Map();
         for (const [fid, transfer] of cachedTransfers.entries()) {
           if (!transfer?.sources) continue;
@@ -1075,7 +1078,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       ...collectExcludedTheoreticalCandidates({ subwooferInstances, roomDims, stage2Result }),
     ];
     let allCandidates = tagGlobalCandidates(
-      gatherCandidates({ subwooferInstances, roomDims, stage2Result, placementFingerprint })
+      gatherCandidates({ projectId, versionId, subwooferInstances, roomDims, stage2Result, placementFingerprint })
     );
 
     // Compute raw transfers for global candidates (cached or worker)
@@ -1124,7 +1127,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         if (currentFinalist) {
           let currentRawTransfer = null;
           const cachedTransfers = placementFingerprint
-            ? getCachedRawTransfersForFingerprint(placementFingerprint)
+            ? getCachedRawTransfersForFingerprint(projectId, versionId, placementFingerprint)
             : new Map();
           for (const [fid, transfer] of cachedTransfers.entries()) {
             if (!transfer?.sources) continue;
