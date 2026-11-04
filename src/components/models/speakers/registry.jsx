@@ -88,12 +88,12 @@ export const MODELS = [
     }
   },
   { 
-    key: "architect-2-1", 
-    label: "ARCHITECT 2-1", 
-    category: "ARCHITECT", 
-    diameterMm: 240, 
-    depthMm: 120, 
-    round: true, 
+    key: "architect-2-1",
+    label: "ARCHITECT 2-1",
+    category: "ARCHITECT",
+    diameterMm: 240,
+    depthMm: 74,
+    round: true,
     sensitivity_dB_1w1m: 97, 
     sensitivity_dB_2p83: 100, 
     nominalOhms: 4, 
