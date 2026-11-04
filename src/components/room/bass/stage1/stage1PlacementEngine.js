@@ -136,6 +136,10 @@ export async function runStage1SearchForQuantity({
   // ── Coarse search ───────────────────────────────────────────────────
   const { candidates: coarseCandidates, rejected, familyCoverage } = generateStage1Candidates(quantity);
 
+  // Guard: if already cancelled before the coarse phase launches, do not
+  // enter the bounded runner (it would never launch a job and never settle).
+  if (isAborted()) return null;
+
   const coarseRun = await runBoundedConfirmations({
     jobs: coarseCandidates,
     maxConcurrency: stage1Concurrency,
@@ -184,6 +188,8 @@ export async function runStage1SearchForQuantity({
       fineJobs.push(candidate);
     }
   }
+
+  if (isAborted()) return null;
 
   const fineRun = await runBoundedConfirmations({
     jobs: fineJobs,
