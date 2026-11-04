@@ -34,6 +34,11 @@ export const STAGE1_CANDIDATE_BUDGETS = Object.freeze({
 });
 
 // Finalist count per quantity.
+// Bounded concurrency for Stage 1 independent candidate evaluation (coarse +
+// fine phases). The phase barrier (coarse completes before fine starts) is
+// preserved — only evaluations WITHIN each phase run concurrently.
+export const STAGE1_CONCURRENCY = 3;
+
 export const STAGE1_FINALIST_COUNT = Object.freeze({
   1: 5,
   2: 5,

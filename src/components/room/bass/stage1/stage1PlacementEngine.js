@@ -1,63 +1,31 @@
 // stage1PlacementEngine.js
 // Stage 1 search orchestration: generate → evaluate → screen → fine search → rank.
-// Product-independent. Reuses computeNormalizedRoomTransfer and prepareModeBank.
+// Product-independent. Evaluation is dispatched to a bounded pool of workers via
+// runBoundedConfirmations; generation, ranking, finalist selection and
+// A-prohibition validation are unchanged from the serial engine.
+//
+// PHASE BARRIER (mandatory):
+//   COARSE GENERATION → COARSE EVALUATION (bounded concurrent) → WAIT FOR ALL
+//   → COARSE RANKING / SHORTLIST → FINE GENERATION FROM SHORTLIST
+//   → FINE EVALUATION (bounded concurrent) → WAIT FOR ALL → FINALIST SELECTION.
+//   No fine candidate is evaluated before the coarse shortlist is complete.
 
-import { prepareModeBank } from "@/bass/core/rewBassEngine";
-import { computeNormalizedRoomTransfer } from "../normalizedRoomTransferEngine";
 import { DEFAULT_BEST_SUB_LAYOUT_PHYSICS } from "../best-layout/bestSubLayoutPhysicsSnapshot";
 import {
-  STAGE1_SCREENING_FREQ_MIN_HZ,
-  STAGE1_SCREENING_FREQ_MAX_HZ,
-  STAGE1_POINTS_PER_OCTAVE,
   STAGE1_FINALIST_COUNT,
   STAGE1_DIVERSITY_MIN_DISPLACEMENT_NORM,
+  STAGE1_CONCURRENCY,
   STAGE1_FALLBACK_SOURCE_HEIGHT_M,
 } from "./stage1Constants";
 import { generateStage1Candidates, generateFineCandidates } from "./stage1CandidateGenerator";
-import { screenCandidate, compareScreeningResults } from "./stage1Screening";
+import { compareScreeningResults } from "./stage1Screening";
 import { FAMILY_IDS } from "./stage1FamilyRegistry";
 import { isThreeSubFamily, threeSubFamilyBestParam } from "./stage1ThreeSubFamilies.js";
 import { validateAProhibition } from "./stage1GeometryValidator";
+import { runBoundedConfirmations } from "../improveBassV2/runBoundedConfirmations.js";
 
 const round = (v, d = 3) => Number(Number(v || 0).toFixed(d));
-
-function normToRoom(source, roomDims) {
-  return {
-    x: source.xNorm * roomDims.widthM,
-    y: source.yNorm * roomDims.lengthM,
-    z: STAGE1_FALLBACK_SOURCE_HEIGHT_M,
-  };
-}
-
-function candidateToSources(candidate, roomDims) {
-  return candidate.sources.map((s, i) => ({
-    id: `stage1-src-${i + 1}`,
-    x: s.xNorm * roomDims.widthM,
-    y: s.yNorm * roomDims.lengthM,
-    z: STAGE1_FALLBACK_SOURCE_HEIGHT_M,
-    placement: "front",
-    tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
-  }));
-}
-
-/**
- * Evaluate a single candidate: compute normalized room transfer + screening.
- */
-function evaluateCandidate(candidate, roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes) {
-  const sources = candidateToSources(candidate, roomDims);
-  const transfer = computeNormalizedRoomTransfer({
-    roomDims,
-    rspPosition,
-    seatingPositions,
-    subsForSimulation: sources,
-    physicsOptions,
-    pointsPerOctave: STAGE1_POINTS_PER_OCTAVE,
-    preparedModes,
-  });
-  if (transfer.status !== "complete") return null;
-  const screening = screenCandidate({ transferResult: transfer, seatingPositions, candidate });
-  return { ...candidate, screening, transfer };
-}
+const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 /**
  * Extract the best parameter q from a parameterised family candidate.
@@ -114,40 +82,75 @@ function selectFinalists(ranked, quantity) {
 }
 
 /**
+ * Build the runFn closure for runBoundedConfirmations: dispatch one candidate
+ * to the evaluation pool and time it. Rejects on worker error so the bounded
+ * runner records an isolated failure (never aborts siblings).
+ */
+function makeEvaluationRunFn(pool) {
+  return async function runFn(candidate) {
+    const t0 = now();
+    const result = await pool.evaluate(candidate);
+    return { result, workerMs: now() - t0 };
+  };
+}
+
+/**
+ * Collect non-null evaluated candidates from bounded-runner results, in
+ * ORIGINAL job order. Null results (incomplete transfers) and isolated
+ * failures are skipped — exactly the serial engine's `if (evaluated) push`
+ * behaviour, with order preserved by runBoundedConfirmations' index-based
+ * result array.
+ */
+function collectEvaluated(entries) {
+  const out = [];
+  for (const entry of entries) {
+    if (entry && entry.ok && entry.result != null) out.push(entry.result);
+  }
+  return out;
+}
+
+/**
  * Run Stage 1 search for a single quantity.
  * @param {object} params
- * @returns {object} Stage 1 result for this quantity
+ * @param {object} params.pool - A Stage 1 evaluation pool (has evaluate(candidate)).
+ * @param {number} [params.stage1Concurrency] - Max concurrent evaluations (default 3).
+ * @returns {Promise<object>} Stage 1 result for this quantity.
  */
-export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPositions, physicsOptions, quantity, generationId }) {
+export async function runStage1SearchForQuantity({
+  roomDims,
+  rspPosition,
+  seatingPositions,
+  physicsOptions,
+  quantity,
+  generationId,
+  pool,
+  stage1Concurrency = STAGE1_CONCURRENCY,
+}) {
   const started = performance.now();
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
-  const H = Number(roomDims.heightM);
 
-  // Prepare mode bank once (room-dependent only)
-  const engineOptions = {
-    ...physicsOptions,
-    freqMinHz: STAGE1_SCREENING_FREQ_MIN_HZ,
-    freqMaxHz: 200, // engine needs wider range for modes; screening filters to 20-80
-    smoothing: "none",
-    pointsPerOctave: STAGE1_POINTS_PER_OCTAVE,
-  };
-  const preparedModes = prepareModeBank(roomDims, engineOptions);
+  const isAborted = () => !!(generationId && generationId.cancelled);
+  const runFn = makeEvaluationRunFn(pool);
 
   // ── Coarse search ───────────────────────────────────────────────────
   const { candidates: coarseCandidates, rejected, familyCoverage } = generateStage1Candidates(quantity);
 
-  const coarseResults = [];
-  for (const candidate of coarseCandidates) {
-    if (generationId && generationId.cancelled) return null;
-    const evaluated = evaluateCandidate(candidate, roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes);
-    if (evaluated) coarseResults.push(evaluated);
-  }
+  const coarseRun = await runBoundedConfirmations({
+    jobs: coarseCandidates,
+    maxConcurrency: stage1Concurrency,
+    runFn,
+    isAborted,
+  });
+  if (isAborted()) return null;
 
+  const coarseResults = collectEvaluated(coarseRun.results);
   coarseResults.sort(compareScreeningResults);
 
   // ── Fine search for parameterised families ──────────────────────────
-  const fineResults = [];
+  // Fine candidates depend on the coarse shortlist (bestInFamily / bestParam),
+  // so the fine phase CANNOT start before the coarse phase completes. The
+  // phase barrier is the `await` on the coarse run above.
   const parameterisedFamilies = [
     FAMILY_IDS.C_FRONT_PAIR,
     FAMILY_IDS.FRONT_THIRD_PAIR,
@@ -160,28 +163,37 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
     FAMILY_IDS.THREE_FRONT_SINGLE_REAR_PAIR,
     FAMILY_IDS.THREE_FRONT_PAIR_REAR_SINGLE,
   ];
+
+  // Build the fine job list in family-then-candidate order (the same nested
+  // order the serial engine iterated), skipping duplicates of coarse
+  // candidates. Cancellation is honoured between families.
+  const fineJobs = [];
   for (const familyId of parameterisedFamilies) {
-    if (generationId && generationId.cancelled) return null;
-    // Only fine-search if this family is in the enabled set for this quantity
+    if (isAborted()) return null;
     const hasFamily = coarseResults.some((r) => r.familyId === familyId);
     if (!hasFamily) continue;
     const bestInFamily = coarseResults.find((r) => r.familyId === familyId);
     if (!bestInFamily) continue;
-    // A three-source family is refined on the pair it was built around; every
-    // other family refines its single parameter q.
     const bestParam = isThreeSubFamily(familyId)
       ? threeSubFamilyBestParam(bestInFamily)
       : extractBestParam(bestInFamily);
     const fineCandidates = generateFineCandidates(familyId, bestParam);
     for (const candidate of fineCandidates) {
-      if (generationId && generationId.cancelled) return null;
-      // Skip if duplicate of coarse candidate
       const exists = coarseResults.some((r) => r.id === candidate.id);
       if (exists) continue;
-      const evaluated = evaluateCandidate(candidate, roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes);
-      if (evaluated) fineResults.push(evaluated);
+      fineJobs.push(candidate);
     }
   }
+
+  const fineRun = await runBoundedConfirmations({
+    jobs: fineJobs,
+    maxConcurrency: stage1Concurrency,
+    runFn,
+    isAborted,
+  });
+  if (isAborted()) return null;
+
+  const fineResults = collectEvaluated(fineRun.results);
 
   // ── Combine and rank ────────────────────────────────────────────────
   const allResults = [...coarseResults, ...fineResults];
@@ -240,14 +252,30 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
     bEvaluated: false,
     searchTimingMs: round(elapsedMs, 1),
     tiersExhausted: ["coarse", "fine"],
+    // Diagnostic-only instrumentation (coarse/fine phase breakdown).
+    coarseStats: coarseRun.stats,
+    fineStats: fineRun.stats,
   };
 }
 
 /**
  * Run full Stage 1 search for all quantities (1, 2, 3, 4).
  * Suggested order: 2-sub, 4-sub, 1-sub.
+ * @param {object} params
+ * @param {object} params.pool - A Stage 1 evaluation pool shared across all
+ *   quantities (created once by the Stage 1 worker).
+ * @param {number} [params.stage1Concurrency] - Max concurrent evaluations per phase.
  */
-export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, physicsOptions, generationId, scopeQuantity = null }) {
+export async function runFullStage1Search({
+  roomDims,
+  rspPosition,
+  seatingPositions,
+  physicsOptions,
+  generationId,
+  scopeQuantity = null,
+  pool,
+  stage1Concurrency = STAGE1_CONCURRENCY,
+}) {
   const overallStart = performance.now();
   const physics = physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS;
   // The three-source quantity is appended, never inserted: the order the existing
@@ -265,8 +293,15 @@ export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, p
 
   for (const quantity of quantities) {
     if (generationId && generationId.cancelled) return null;
-    const result = runStage1SearchForQuantity({
-      roomDims, rspPosition, seatingPositions, physicsOptions: physics, quantity, generationId,
+    const result = await runStage1SearchForQuantity({
+      roomDims,
+      rspPosition,
+      seatingPositions,
+      physicsOptions: physics,
+      quantity,
+      generationId,
+      pool,
+      stage1Concurrency,
     });
     if (generationId && generationId.cancelled) return null;
     if (result) results[quantityResultKeys[quantity]] = result;
