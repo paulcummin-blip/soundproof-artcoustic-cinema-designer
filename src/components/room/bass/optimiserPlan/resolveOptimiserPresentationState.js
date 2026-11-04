@@ -261,6 +261,12 @@ export function resolveOptimiserPresentationState({
   runBlockReason = null,
   planPersisted = true,
   tradeOff = null,
+  // The Re-test (calibration apply) workflow's own busy flag. A fresh run is
+  // active when the optimiser is running (runStatus === "running") OR a
+  // re-test is in flight (reoptimiseBusy). The RUNNING presentation state must
+  // own the panel for the entire duration of either, so a historical terminal
+  // result can never appear while a fresh run is in progress.
+  reoptimiseBusy = false,
 } = {}) {
   const status = planView?.status || OPTIMISER_PLAN_STATUS.ABSENT;
   const evidence = planView?.run || null;
@@ -374,7 +380,11 @@ export function resolveOptimiserPresentationState({
   };
 
   // ── RUNNING ── never an Apply action while evaluation is in progress.
-  if (runStatus === "running") {
+  // ONE fresh-run authority: runStatus === "running" (Run ADI Again) OR
+  // reoptimiseBusy (Re-test Bass Optimisation). The panel must show RUNNING
+  // for the entire duration of either, so a historical terminal result can
+  // never appear while a fresh run is in flight.
+  if (runStatus === "running" || reoptimiseBusy === true) {
     return build(OPTIMISER_PRESENTATION_STATE.RUNNING, {
       message: OPTIMISER_PRESENTATION_COPY.RUNNING,
       showApply: false,
@@ -418,6 +428,64 @@ export function resolveOptimiserPresentationState({
     });
   }
 
+  // ── NON_ACTIONABLE_WINNER ── a ranking winner was confirmed but its placement
+  // is not a practical, wall-based installation. The improvement is real but not
+  // actionable. Distinct from NO_USEFUL_IMPROVEMENT: the panel states "improvement
+  // found but not practical", never "no improvement found". The winner id and the
+  // non-practical reason are preserved in the run evidence (Engineer details).
+  //
+  // TERMINAL-OUTCOME PRIORITY: this is the run's highest-priority terminal
+  // classification. A separate calibration trade-off is supporting evidence and
+  // never overrides it — the run found a better-performing option, the placement
+  // is simply not practical. The trade-off is shown underneath, not as the
+  // headline state.
+  if (status === OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER) {
+    return build(OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER, {
+      message: OPTIMISER_OUTCOME_COPY[OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER].message,
+      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      evidence,
+      // The calibration trade-off travels as supporting evidence so the designer
+      // can still review it underneath the run's own terminal classification.
+      tradeOff: tradeOff?.isTradeOff ? tradeOff : null,
+      rerunAgain: true,
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
+      showApply: false,
+    });
+  }
+
+  // ── PLAN_AVAILABLE ── only a genuinely evaluated, visible, applicable change.
+  // An actionable plan is the run's primary result: it outranks a calibration
+  // trade-off, which is a lever decision and never overwrites the run terminal
+  // outcome.
+  if (hasApplicableEvaluatedLever(planView)) {
+    // WHICH improvement: an electronic adjustment, or a physical change of seats,
+    // subwoofers or layout. The badge names it; the Apply controls are the same
+    // either way, and neither is ever applied by ADI on its own.
+    const planOutcome = offersPhysicalChangeOnly(planView)
+      ? OPTIMISER_OUTCOME.PHYSICAL_CHANGE
+      : OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
+    return build(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE, {
+      message: OPTIMISER_OUTCOME_COPY[planOutcome].message,
+      nextAction: OPTIMISER_OUTCOME_COPY[planOutcome].detail,
+      outcome: planOutcome,
+      // A winning plan must carry the same completed-run evidence as terminal
+      // outcomes. The plan card owns Apply; this read-only block owns the
+      // calculation count and the tested-family audit trail.
+      evidence,
+      showPlan: true,
+      showApply: true,
+      // The run control stays available after a result: the designer can always
+      // re-evaluate the design. Apply and re-run are different actions, and the
+      // run control is never a second Apply. It is worded as the deliberate
+      // re-run it now is — RUN ADI AGAIN — so a verification run is offered as
+      // its own step rather than read as a second Apply.
+      rerunAgain: true,
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
+    });
+  }
+
   // ── TRADE_OFF ── the run's best change improves the overall result but worsens
   // a protected primary seat (or materially damages the other protected
   // objective). A DESIGNER DECISION, never an optimiser success: the badge never
@@ -425,6 +493,10 @@ export function resolveOptimiserPresentationState({
   // authority, and no run or re-test control is offered until the designer has
   // decided. The seat, its own current → proposed result and how much it worsens
   // by are stated from the decision's own recorded evidence.
+  //
+  // This state is reached ONLY when no higher-priority terminal outcome exists:
+  // no non-actionable winner and no actionable plan. The calibration trade-off IS
+  // the terminal selection result in that case.
   if (tradeOff?.isTradeOff) {
     return build(OPTIMISER_PRESENTATION_STATE.TRADE_OFF, {
       message: tradeOff.headline,
@@ -463,23 +535,6 @@ export function resolveOptimiserPresentationState({
     });
   }
 
-  // ── NON_ACTIONABLE_WINNER ── a ranking winner was confirmed but its placement
-  // is not a practical, wall-based installation. The improvement is real but not
-  // actionable. Distinct from NO_USEFUL_IMPROVEMENT: the panel states "improvement
-  // found but not practical", never "no improvement found". The winner id and the
-  // non-practical reason are preserved in the run evidence (Engineer details).
-  if (status === OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER) {
-    return build(OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER, {
-      message: OPTIMISER_OUTCOME_COPY[OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER].message,
-      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
-      evidence,
-      rerunAgain: true,
-      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
-      actionLabel: ADI_RERUN_AGAIN_LABEL,
-      showApply: false,
-    });
-  }
-
   // ── EVALUATION_INCOMPLETE (terminal) ── the run finished without a usable
   // comparison. The saved reason is stated as recorded, never re-worded into a
   // design conclusion, and the evidence the run produced is shown with a re-run.
@@ -497,35 +552,6 @@ export function resolveOptimiserPresentationState({
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
       ...failureExtras,
-    });
-  }
-
-  // ── PLAN_AVAILABLE ── only a genuinely evaluated, visible, applicable change.
-  if (hasApplicableEvaluatedLever(planView)) {
-    // WHICH improvement: an electronic adjustment, or a physical change of seats,
-    // subwoofers or layout. The badge names it; the Apply controls are the same
-    // either way, and neither is ever applied by ADI on its own.
-    const planOutcome = offersPhysicalChangeOnly(planView)
-      ? OPTIMISER_OUTCOME.PHYSICAL_CHANGE
-      : OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
-    return build(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE, {
-      message: OPTIMISER_OUTCOME_COPY[planOutcome].message,
-      nextAction: OPTIMISER_OUTCOME_COPY[planOutcome].detail,
-      outcome: planOutcome,
-      // A winning plan must carry the same completed-run evidence as terminal
-      // outcomes. The plan card owns Apply; this read-only block owns the
-      // calculation count and the tested-family audit trail.
-      evidence,
-      showPlan: true,
-      showApply: true,
-      // The run control stays available after a result: the designer can always
-      // re-evaluate the design. Apply and re-run are different actions, and the
-      // run control is never a second Apply. It is worded as the deliberate
-      // re-run it now is — RUN ADI AGAIN — so a verification run is offered as
-      // its own step rather than read as a second Apply.
-      rerunAgain: true,
-      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
-      actionLabel: ADI_RERUN_AGAIN_LABEL,
     });
   }
 

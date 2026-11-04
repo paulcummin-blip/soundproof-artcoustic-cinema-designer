@@ -389,7 +389,10 @@ function seatRows(decision, regression) {
     rows.push(
       row({
         key: `seat:${seatId}`,
-        group: (proposed?.isPrimary || current?.isPrimary || isAffected)
+        // The group is decided by the per-seat evidence's own isPrimary flag,
+        // NOT by whether this seat is the affected one. An affected seat that
+        // is not a primary seat must never be grouped as "Primary seats".
+        group: (proposed?.isPrimary || current?.isPrimary)
           ? "Primary seats"
           : "Secondary seats",
         label: formatSeatLabel(seatId),
@@ -446,6 +449,30 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
   const regression = readRecordedSeatRegression(record);
   const overall = overallRows(record);
   const seats = seatRows(record, regression);
+
+  // ── PRIMARY-SEAT VERIFICATION ──
+  // The headline says "one primary seat would get worse." That claim must be
+  // traced back to the run's own per-seat evidence: the affected seat must be
+  // a genuine primary seat AND its metric must actually worsen. A secondary
+  // seat regression, overall seat consistency, another candidate or stale
+  // candidate evidence is never described as a primary-seat regression.
+  const currentP20Map = perSeatMap(record?.before, "perSeatP20");
+  const proposedP20Map = perSeatMap(record?.after, "perSeatP20");
+  const affectedIsPrimary = regression?.seatId
+    ? (currentP20Map.get(regression.seatId)?.isPrimary === true
+      || proposedP20Map.get(regression.seatId)?.isPrimary === true)
+    : false;
+  const affectedWorsens = regression?.seatId
+    ? (() => {
+      if (regression.rawDeltaDb != null) return regression.rawDeltaDb > 0;
+      const curr = currentP20Map.get(regression.seatId)?.db ?? null;
+      const prop = proposedP20Map.get(regression.seatId)?.db ?? null;
+      return curr != null && prop != null && prop > curr;
+    })()
+    : false;
+  // The headline's "one primary seat would get worse" is stated ONLY when the
+  // affected seat is a genuine primary seat and its metric actually worsens.
+  const verifiedPrimaryRegression = affectedIsPrimary && affectedWorsens;
   const affected = regression?.seatId
     ? seats.find((seat) => seat.key === `seat:${regression.seatId}`) || null
     : null;
@@ -455,7 +482,10 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
     ? {
       seatId: regression.seatId,
       label: seatLabel,
-      scope: "primary",
+      // "primary" ONLY when the per-seat evidence confirms this seat is a
+      // primary seat AND its metric actually worsens. Otherwise "secondary" —
+      // never a false "primary" label on a seat that did not regress.
+      scope: verifiedPrimaryRegression ? "primary" : "secondary",
       parameter: regression.parameter,
       before: affected?.before || null,
       after: affected?.after || null,

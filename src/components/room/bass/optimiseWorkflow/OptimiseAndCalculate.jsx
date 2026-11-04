@@ -73,6 +73,7 @@ import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import { resolveCanonicalTerminalOutcome } from "@/components/room/bass/optimiserPlan/resolveCanonicalTerminalOutcome.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -608,7 +609,7 @@ export default function OptimiseAndCalculate({
         // Gated save: an actionable plan only when an independently evaluated,
         // applyable change clears the 1 dB materiality gate and its destination
         // geometry is legal. Otherwise the run is saved as terminal evidence.
-        const { actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
+        const { actionability, actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
           plan: optimiserPlan,
           selection: result.selection,
           diagnostics: result.optimisationDiagnostics || null,
@@ -634,7 +635,14 @@ export default function OptimiseAndCalculate({
           runIdentity: activeRun,
         });
         recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
-        runTerminalStatus = persistedPlan ? "actionable_plan" : "no_useful_improvement";
+        // ONE CANONICAL TERMINAL OUTCOME: the history, presentation and saved
+        // result all read the same value, so a run can never state
+        // NON_ACTIONABLE_WINNER in its saved evidence, TRADE_OFF on its panel
+        // and NO_USEFUL_IMPROVEMENT in its history row at the same time.
+        runTerminalStatus = resolveCanonicalTerminalOutcome({
+          actionability,
+          calibrationDecision: calibrationApplication,
+        });
         if (persistedPlan) {
           setOptimiserPlanAuthority(projectId, versionId, {
             ...persistedPlan,

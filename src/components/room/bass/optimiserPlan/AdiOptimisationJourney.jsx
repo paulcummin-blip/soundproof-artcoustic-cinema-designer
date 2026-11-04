@@ -378,7 +378,11 @@ export default function AdiOptimisationJourney({
   // While ADI is working, the rows are its live progress through the fixed
   // sequence. The store is the engine's own published progress — phase,
   // phase label and stage verdicts — so nothing here is inferred.
-  const isRunning = runStatus === "running";
+  // ONE FRESH-RUN AUTHORITY: the main running state uses the same combined
+  // concept as the receipt-ownership check — runStatus === "running" (Run ADI
+  // Again) OR reoptimiseBusy (Re-test Bass Optimisation). During a fresh
+  // Re-test the panel must show RUNNING, not a historical terminal result.
+  const isRunning = freshRunActive;
   const liveState = useImproveBassV2State(projectId, versionId);
   // THE RUN'S LIVE PROGRESS — read from the engine's own published progress
   // store and the run's identity. The hook adds no count, no stage and no

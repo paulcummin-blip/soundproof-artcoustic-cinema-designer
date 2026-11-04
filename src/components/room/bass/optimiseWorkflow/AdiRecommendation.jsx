@@ -365,6 +365,10 @@ export default function AdiRecommendation({
     // A trade-off is stated as a trade-off and never as an improvement: the state
     // owns the badge, the seat line and the two designer controls.
     tradeOff,
+    // The Re-test busy flag: a fresh run is active when the optimiser is running
+    // OR a re-test is in flight. The RUNNING presentation state must own the panel
+    // for the entire duration of either.
+    reoptimiseBusy: reoptimiseBusy === true,
   });
 
   // A design that cannot meet its selected target states the remaining

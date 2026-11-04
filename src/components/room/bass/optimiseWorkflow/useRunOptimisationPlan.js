@@ -34,6 +34,7 @@ import { waitForOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/o
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import { resolveCanonicalTerminalOutcome } from "@/components/room/bass/optimiserPlan/resolveCanonicalTerminalOutcome.js";
 import { resolveCalibrationApplicationPlan } from "./adiCalibrationCandidateSelection.js";
 import { getAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import {
@@ -363,7 +364,7 @@ export default function useRunOptimisationPlan({
       // materiality gate. Any other run keeps its terminal evidence — with the
       // actual reason — instead of being called actionable because a winner
       // happened to exist.
-      const { actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
+      const { actionability, actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
         plan: optimiserPlan,
         selection: result.selection,
         diagnostics: result.optimisationDiagnostics || null,
@@ -476,7 +477,14 @@ export default function useRunOptimisationPlan({
       // publicationStatus "pending", so a later publication failure can never
       // erase this completed run's record. The row is finalised in place by
       // the success path or the catch block.
-      runTerminalStatus = persistedPlan ? "actionable_plan" : "no_useful_improvement";
+      // ONE CANONICAL TERMINAL OUTCOME: history, presentation and saved result
+      // all read the same value, so a run can never state NON_ACTIONABLE_WINNER
+      // in its saved evidence, TRADE_OFF on its panel and NO_USEFUL_IMPROVEMENT
+      // in its history row at the same time.
+      runTerminalStatus = resolveCanonicalTerminalOutcome({
+        actionability,
+        calibrationDecision,
+      });
       logRunHistory({
         terminalStatus: runTerminalStatus,
         publicationStatus: "pending",
