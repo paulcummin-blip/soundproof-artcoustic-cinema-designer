@@ -359,11 +359,12 @@ export function buildOptimiserRunEvidence({
       rejectionReasons.push("No candidate was confirmed in this run.");
     }
   }
-  // Only append the generic "no ranking winner" wording when the reason does
-  // NOT already describe a ranking winner that exists but is not practical.
-  // Appending both would conflate the two distinct terminal states: a run that
-  // found no winner at all vs. a run that found a winner whose placement is not
-  // buildable. The non-practical-winner reason already states the distinction.
+  // Only append the generic "no ranking winner" wording when the outcome is
+  // genuinely NO_USEFUL_IMPROVEMENT (no winner at all) AND the reason does not
+  // already describe a ranking winner that exists but is not practical. The
+  // NON_ACTIONABLE_WINNER outcome is a distinct terminal state — a winner exists,
+  // the improvement is real, the movement is not buildable — so the generic
+  // "no candidate was confirmed" wording is never appended to it.
   if (outcome === OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT
     && !failureReason?.startsWith?.(OPTIMISER_WINNER_NON_PRACTICAL_REASON)) {
     rejectionReasons.push(OPTIMISER_NO_WINNER_REASON);

@@ -185,7 +185,11 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
     const detail = theoreticalPlacement.theoreticalReason ? ` ${theoreticalPlacement.theoreticalReason}` : "";
     return {
       actionable: false,
-      terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
+      // A ranking winner EXISTS but its placement is not practical. This is NOT
+      // the "no ranking winner" case — the improvement is real, the movement is
+      // not buildable. The dedicated terminal outcome keeps the panel from stating
+      // "no improvement found" for a run that DID find a better-performing option.
+      terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_WINNER,
       reason: `${OPTIMISER_WINNER_NON_PRACTICAL_REASON}${detail}`,
       offerableLevers: [],
     };

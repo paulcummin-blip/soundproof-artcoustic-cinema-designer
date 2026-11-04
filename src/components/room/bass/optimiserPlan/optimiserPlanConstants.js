@@ -118,6 +118,13 @@ export const OPTIMISER_PLAN_STATUS = Object.freeze({
    * is complete and trustworthy, but there is nothing worth applying.
    */
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /**
+   * A ranking winner was confirmed but its placement is not practical. The
+   * improvement is real but not actionable as a default placement. Distinct from
+   * NO_USEFUL_IMPROVEMENT so the panel never states "no improvement found" for a
+   * run that DID find a better-performing option.
+   */
+  NON_ACTIONABLE_WINNER: "non_actionable_winner",
   /** The run itself failed. A technical failure, never a design statement. */
   FAILED: "failed",
   /**
@@ -134,6 +141,13 @@ export const OPTIMISER_PLAN_STATUS = Object.freeze({
  */
 export const OPTIMISER_TERMINAL_OUTCOME = Object.freeze({
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /**
+   * A ranking winner WAS confirmed but its placement is not a practical, wall-based
+   * installation. Distinct from NO_USEFUL_IMPROVEMENT: the improvement is real, the
+   * movement is not buildable. The panel must state "improvement found but not
+   * actionable", never "no improvement found".
+   */
+  NON_ACTIONABLE_WINNER: "non_actionable_winner",
   EVALUATION_INCOMPLETE: "evaluation_incomplete",
   FAILED: "failed",
 });

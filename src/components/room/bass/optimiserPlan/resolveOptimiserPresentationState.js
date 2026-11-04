@@ -35,6 +35,13 @@ export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
   RUNNING: "running",
   PLAN_AVAILABLE: "plan_available",
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /**
+   * A ranking winner WAS confirmed but its placement is not a practical,
+   * wall-based installation. The improvement is real but the movement is not
+   * buildable. Distinct from NO_USEFUL_IMPROVEMENT: the panel states
+   * "improvement found but not actionable", never "no improvement found".
+   */
+  NON_ACTIONABLE_WINNER: "non_actionable_winner",
   EVALUATION_INCOMPLETE: "evaluation_incomplete",
   STALE: "stale",
   FAILED: "failed",
