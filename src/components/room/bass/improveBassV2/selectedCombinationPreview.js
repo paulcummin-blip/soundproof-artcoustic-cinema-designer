@@ -140,6 +140,9 @@ export async function runSelectedCombinationPreview(params) {
           return {
             xNorm: Number(c.x) / W,
             yNorm: Number(c.y) / L,
+            // Preview coords are physical cabinet centres — pass through, no
+            // wall offset.
+            coordinateSpace: "cabinet_centre",
             sourceId: instance?.id || null,
             modelKey: instance?.model || selectedSubModel,
             bottomHeightM: Number.isFinite(Number(instance?.bottomHeightM))

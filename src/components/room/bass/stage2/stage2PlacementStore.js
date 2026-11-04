@@ -440,7 +440,7 @@ export class Stage2PlacementController {
 
     // 1. Placement-only (always)
     confirmationJobs.push({
-      finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+      finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
       quantity: qty,
       phase: "confirmation",
       rawTransfer: best.rawTransfer,
@@ -459,7 +459,7 @@ export class Stage2PlacementController {
       const delayResult = searchDelayOnly(rspTransfers, searchSources);
       for (const finalist of (delayResult.finalists || [])) {
         confirmationJobs.push({
-          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
           quantity: qty,
           phase: "confirmation",
           tuningVariant: "delay-only",
@@ -474,7 +474,7 @@ export class Stage2PlacementController {
       const levelDelayResult = searchLevelAndDelay(rspTransfers, searchSources);
       for (const finalist of (levelDelayResult.finalists || [])) {
         confirmationJobs.push({
-          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
           quantity: qty,
           phase: "confirmation",
           tuningVariant: "level-delay",
@@ -490,7 +490,7 @@ export class Stage2PlacementController {
     if (ranked.length > 1 && isPlacementTied(best, ranked[1])) {
       const alternate = ranked[1];
       confirmationJobs.push({
-        finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+        finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
         quantity: qty,
         phase: "confirmation",
         rawTransfer: alternate.rawTransfer,
@@ -668,7 +668,7 @@ export class Stage2PlacementController {
           const L = Number(this.params.roomDims?.lengthM);
           this.representativeState.set(rawTransfer.finalistId, "confirmation");
           this.queue.push({
-            finalist: { id: rawTransfer.finalistId, familyId: rawTransfer.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+            finalist: { id: rawTransfer.finalistId, familyId: rawTransfer.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
             quantity: 4,
             phase: "confirmation",
             isRepresentative: true,
@@ -681,7 +681,7 @@ export class Stage2PlacementController {
           const W = Number(this.params.roomDims?.widthM);
           const L = Number(this.params.roomDims?.lengthM);
           this.queue.push({
-            finalist: { id: rawTransfer.finalistId, familyId: rawTransfer.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+            finalist: { id: rawTransfer.finalistId, familyId: rawTransfer.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
             quantity: 4,
             phase: "confirmation",
             isB: true,
@@ -917,7 +917,7 @@ export class Stage2PlacementController {
             const rawTransfer = getCachedRawTransfer(this.placementFingerprint, repId);
             this.representativeState.set(repId, "confirmation");
             this.queue.push({
-              finalist: { id: repId, familyId: rep.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L })) },
+              finalist: { id: repId, familyId: rep.familyId, sources: rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
               quantity: 4,
               phase: "confirmation",
               isRepresentative: true,

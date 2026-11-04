@@ -125,6 +125,8 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
     sources: currentPositions.map((p) => ({
       xNorm: W > 0 ? p.x / W : 0,
       yNorm: L > 0 ? p.y / L : 0,
+      // Current installed positions are physical cabinet centres.
+      coordinateSpace: "cabinet_centre",
     })),
   };
 
@@ -138,6 +140,8 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
         sourceId: coord.sourceId,
         xNorm: W > 0 ? coord.x / W : 0,
         yNorm: L > 0 ? coord.y / L : 0,
+        // Promoted position candidates are resolved physical cabinet centres.
+        coordinateSpace: "cabinet_centre",
       })),
     };
     // Skip if duplicates current placement
