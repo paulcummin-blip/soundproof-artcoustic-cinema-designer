@@ -410,9 +410,15 @@ export default function OptimiseAndCalculate({
       phaseRef.current = "optimising";
       setOptimising(projectId, versionId);
 
+      // Pass the SAME runId minted by beginOptimiserRun above into the engine
+      // — the same argument/contract as the Run ADI Again route. The engine
+      // threads it into every runtimeMetrics record and the V2 optimisation
+      // params, so the Stage 2 wait, the search and the saved plan reconcile
+      // as ONE run. No second id is minted.
       const result = await runOptimisation({
         projectId,
         versionId,
+        runId: activeRun.runId,
         shared: sharedRef.current,
         subwooferInstances: subInstancesRef.current,
         roomDims,
