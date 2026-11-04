@@ -36,6 +36,8 @@ import { getCachedRawTransfersForFingerprint } from "../stage2/stage2RawTransfer
 import { normaliseModelKey } from "../../../utils/modelKeyNormaliser.js";
 import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improveBassV2Fingerprint.js";
 import { runInWorker, isFatalLifecycleError, V2RunTimeoutError } from "./improveBassV2WorkerLifecycle.js";
+import { createConfirmationPool } from "./v2ConfirmationPool.js";
+import { runBoundedConfirmations } from "./runBoundedConfirmations.js";
 import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
 import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
 import { isMaterialImprovement } from "./materialityGate.js";
@@ -63,6 +65,12 @@ import { selectCanonicalObjectives, explainFinalSelection, dedupeCandidates } fr
 import { buildCandidateLedger, buildProxyIndex } from "./candidateLedger.js";
 
 const MAX_CHALLENGERS = 3;
+
+// Bounded concurrency for INDEPENDENT canonical confirmations. The V2
+// engine's search phases stay sequential on one worker; only confirmation
+// batches (phase / delay / gain / position-escalation) run on a pool of this
+// many workers. Conservative start — enough to prove parallelism helps.
+const V2_CONFIRMATION_CONCURRENCY = 3;
 
 // TODO: replace with measured production threshold after Room B/C browser
 // runtime validation. 5 min is a deliberately generous provisional ceiling
@@ -458,6 +466,14 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
 
+  // ── Confirmation pool (parallel canonical confirmations) ─────────────
+  // Created alongside the single worker but left UNINITIALISED until the
+  // integration context is available. Each pool worker receives the same
+  // integration context so any confirmation job can run on any pool worker.
+  // The pool is only used for INDEPENDENT confirmation batches — search
+  // phases stay on the single worker.
+  let confirmationPool = null;
+
   // ── Run-owned AbortController (interruption mechanism) ──────────────────
   // The store remains the write authority for cancellation. The AbortController
   // is only the run-local interruption mechanism — it provides immediate worker
@@ -571,6 +587,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     if (integrationContext) {
       await runInWorker(worker, "integration-context", { context: integrationContext }, controller.signal);
     }
+    // Initialise the confirmation pool now that the integration context is
+    // available. Every pool worker gets the same context via fire-and-forget
+    // postMessage (FIFO — processed before any confirmation job).
+    confirmationPool = createConfirmationPool({
+      workerUrl: new URL("./improveBassV2.worker.js", import.meta.url),
+      size: V2_CONFIRMATION_CONCURRENCY,
+      integrationContext,
+      signal: controller.signal,
+    });
     // Phase 1: Reviewing current design
     onProgress("reviewing", "Reviewing current design", 0, 1);
     const snapshot = snapshotCurrentDesign({
@@ -804,20 +829,46 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             phaseAtReferenceDeg: candidate.phaseAtReferenceDeg,
             direction: candidate.direction,
           }));
+          // ── Bounded-concurrent phase confirmations ──────────────────────
+          // All retained phase candidates are INDEPENDENT: the same rawTransfer
+          // + a different tuning, through the same canonical chain. Dispatched
+          // to the confirmation pool with bounded concurrency; post-processing
+          // (bind, validate, push) runs in ORIGINAL order so ranking, evidence
+          // and diagnostics are identical to the serial path.
+          if (isCancelled()) return {status:"cancelled",snapshot};
+          if (isStale()) return {status:"stale",snapshot};
+          const phaseConfirmJobs = retainedPhase.map((entry) => ({
+            rawTransfer: currentRawTransfer,
+            tuning: entry.tuning,
+            tuningVariant: "phase-all-pass",
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+            correctabilityAssessment,
+          }));
+          const phaseBatch = await runBoundedConfirmations({
+            jobs: phaseConfirmJobs,
+            maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
+            isAborted: () => isCancelled() || isStale(),
+            runFn: (job) => {
+              const t0 = performance.now();
+              return confirmationPool.runConfirmation(job, controller.signal)
+                .then((response) => {
+                  const workerMs = performance.now() - t0;
+                  metrics.recordWorkerCall("confirmation", "phase:" + phaseConfirmJobs.indexOf(job),
+                    workerMs, false, { startedAt: t0, endedAt: performance.now(), tuning: job.tuning, transferKey: "current" });
+                  return { result: response ?? null, workerMs };
+                })
+                .catch((err) => {
+                  if (isFatalLifecycleError(err)) throw err;
+                  return { result: null, workerMs: performance.now() - t0, error: err };
+                });
+            },
+          });
+          metrics.addStage("electronic-canonical-confirmations", phaseBatch.stats.phaseElapsedMs);
+          if (isStale()) return {status:"stale",snapshot};
           for (let index = 0; index < retainedPhase.length; index++) {
-            if (isCancelled()) return {status:"cancelled",snapshot};
-            if (isStale()) return {status:"stale",snapshot};
             onProgress("calibrating", "Confirming grouped phase settings", index, retainedPhase.length);
-            const confirmStarted = performance.now();
-            const response = await runInWorker(worker, "confirmation", {
-              rawTransfer: currentRawTransfer,
-              tuning: retainedPhase[index].tuning,
-              tuningVariant: "phase-all-pass",
-              p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis, correctabilityAssessment,
-            }, controller.signal);
-            metrics.recordWorkerCall("confirmation", "phase:" + index, performance.now() - confirmStarted, false,
-              { startedAt: confirmStarted, endedAt: performance.now(), tuning: retainedPhase[index].tuning, transferKey: "current" });
-            if (isStale()) return {status:"stale",snapshot};
+            const entry = phaseBatch.results[index];
+            const response = entry?.ok ? entry.result : null;
             const result = response
               ? bindConfirmation(
                   response,
@@ -880,25 +931,46 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         if(calibrationSearch?.status==="ambiguous")evaluationIssues.push({stage:"calibration",error:calibrationSearch.grouping.reason});
         calibrationDiagnostics.retained=retained.length;
         calibrationDiagnostics.options=retained.map(f=>({candidateId:f.id,tuning:f.tuning,proxy:f.proxy}));
+        // ── Bounded-concurrent grouped-delay confirmations ─────────────
+        if(isCancelled()) return {status:"cancelled",snapshot};
+        if(isStale()) return {status:"stale",snapshot};
+        const calConfirmJobs = retained.map((f) => ({
+          rawTransfer: currentRawTransfer, tuning: f.tuning, tuningVariant: "delay-only",
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
+        }));
+        const calBatch = await runBoundedConfirmations({
+          jobs: calConfirmJobs,
+          maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
+          isAborted: () => isCancelled() || isStale(),
+          runFn: (job) => {
+            const t0 = performance.now();
+            return confirmationPool.runConfirmation(job, controller.signal)
+              .then((response) => {
+                const workerMs = performance.now() - t0;
+                metrics.recordWorkerCall("confirmation", "calibration:" + calConfirmJobs.indexOf(job),
+                  workerMs, false, { startedAt: t0, endedAt: performance.now(), tuning: job.tuning, transferKey: "current" });
+                return { result: response ?? null, workerMs };
+              })
+              .catch((err) => {
+                if (isFatalLifecycleError(err)) throw err;
+                return { result: null, workerMs: performance.now() - t0, error: err };
+              });
+          },
+        });
+        metrics.addStage("electronic-canonical-confirmations", calBatch.stats.phaseElapsedMs);
+        if(isStale()) return {status:"stale",snapshot};
         for (let index=0;index<retained.length;index++) {
-          if(isCancelled()) return {status:"cancelled",snapshot};
-          if(isStale()) return {status:"stale",snapshot};
           onProgress("calibrating", "Confirming grouped delay options", index, retained.length);
-          const _confirmT0=performance.now();
-          const response=await runInWorker(worker,"confirmation",{
-            rawTransfer:currentRawTransfer,tuning:retained[index].tuning,tuningVariant:"delay-only",
-            p14TargetBasis,p14TargetLevel,p14TargetDb,p18TargetBasis, correctabilityAssessment,
-          },controller.signal);
-          metrics.recordWorkerCall("confirmation","calibration:"+index,performance.now()-_confirmT0,false,
-            { startedAt: _confirmT0, endedAt: performance.now(), tuning: retained[index].tuning, transferKey: "current" });
-          if(isStale()) return {status:"stale",snapshot};
+          const entry = calBatch.results[index];
+          const response = entry?.ok ? entry.result : null;
+          const _confirmT0=0; // timing now from the batch
           const result=response?bindConfirmation(response,retained[index].tuning,{...currentFinalist,groupedDelay:retained[index]},"calibration"):null;
           const check=validateCandidateForRun(result,validationContext);
           calibrationDiagnostics.confirmed++;
           calibrationDiagnostics.options[index].validity={valid:check.valid,issues:check.issues,nonAssessable:check.nonAssessable,reason:check.reason};
           calibrationDiagnostics.options[index].canonical=result;
           calibrationDiagnostics.options[index].validated=check.result;
-          calibrationDiagnostics.options[index].canonicalMs=performance.now()-_confirmT0;
+          calibrationDiagnostics.options[index].canonicalMs=entry?.workerMs||0;
           if(check.nonAssessable){calibrationDiagnostics.invalid++;recordNonAssessable("calibration",result,check);}
           else if(check.valid){calibrationCandidates.push(check.result);funnelCandidates.push(check.result);calibrationDiagnostics.valid++;}
           else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
@@ -963,21 +1035,41 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             ? (gainSearch?.grouping?.reason || null)
             : null,
         });
+        // ── Bounded-concurrent grouped-gain confirmations ──────────────
+        if (isCancelled()) return {status: "cancelled", snapshot};
+        if (isStale()) return {status: "stale", snapshot};
+        const gainConfirmJobs = gainRetained.map((f) => ({
+          rawTransfer: savedCurrentRawTransfer, tuning: f.tuning,
+          tuningVariant: "delay-polarity-trim",
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
+        }));
+        const gainBatch = await runBoundedConfirmations({
+          jobs: gainConfirmJobs,
+          maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
+          isAborted: () => isCancelled() || isStale(),
+          runFn: (job) => {
+            const t0 = performance.now();
+            return confirmationPool.runConfirmation(job, controller.signal)
+              .then((response) => {
+                const workerMs = performance.now() - t0;
+                metrics.recordWorkerCall("confirmation", "gain:" + gainConfirmJobs.indexOf(job),
+                  workerMs, false, { startedAt: t0, endedAt: performance.now(), tuning: job.tuning, transferKey: "current" });
+                return { result: response ?? null, workerMs };
+              })
+              .catch((err) => {
+                if (isFatalLifecycleError(err)) throw err;
+                return { result: null, workerMs: performance.now() - t0, error: err };
+              });
+          },
+        });
+        metrics.addStage("electronic-canonical-confirmations", gainBatch.stats.phaseElapsedMs);
+        if (isStale()) return {status: "stale", snapshot};
         const gainCandidates = [];
         const gainConfirmedPairs = [];
         for (let gi = 0; gi < gainRetained.length; gi++) {
-          if (isCancelled()) return {status: "cancelled", snapshot};
-          if (isStale()) return {status: "stale", snapshot};
           onProgress("calibrating", "Confirming grouped gain options", gi, gainRetained.length);
-          const gConfirmT0 = performance.now();
-          const gResponse = await runInWorker(worker, "confirmation", {
-            rawTransfer: savedCurrentRawTransfer, tuning: gainRetained[gi].tuning,
-            tuningVariant: "delay-polarity-trim",
-            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
-          }, controller.signal);
-          metrics.recordWorkerCall("confirmation", "gain:"+gi, performance.now() - gConfirmT0, false,
-            { startedAt: gConfirmT0, endedAt: performance.now(), tuning: gainRetained[gi].tuning, transferKey: "current" });
-          if (isStale()) return {status: "stale", snapshot};
+          const entry = gainBatch.results[gi];
+          const gResponse = entry?.ok ? entry.result : null;
           if (gResponse) {
             const gBound = bindConfirmation(gResponse, gainRetained[gi].tuning,
               {...buildCurrentFinalist(subwooferInstances, roomDims), groupedDelay: gainRetained[gi]}, "calibration");
@@ -1359,55 +1451,85 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       onProgress(`confirming_${escPhase.name}`, escPhase.confirmLabel, 0, newPromoted.length);
       let phaseConfirmedCount = 0;
 
+      // ── Bounded-concurrent position confirmations ──────────────────
+      // Within ONE escalation phase, all promoted candidates × all their
+      // retained tuning alternatives are INDEPENDENT. Build a flat job list
+      // preserving (candidate, option) identity, run them with bounded
+      // concurrency, then post-process in ORIGINAL order. The materiality
+      // break that can stop escalation runs AFTER the full batch completes —
+      // never mid-batch — so no winner is selected on completion order.
+      if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+      if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+      const positionJobs = [];
+      const positionJobMeta = []; // { candidateIndex, optionIndex } per job
       for (let i = 0; i < newPromoted.length; i++) {
-        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
-        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-        try {
-          attemptedConfirmationIds.add(newPromoted[i].id);
-          const options=[newPromoted[i].proxyResult,...(newPromoted[i].proxyResult?.alternatives || [])];
-          // EVERY retained tuning alternative is canonically confirmed. Stopping
-          // at the first valid option could discard the better P19 / P20 /
-          // balanced candidate before it was ever measured.
-          for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
-          const option = options[optionIndex];
-          funnel[funnelKey].confirmationAttempts++;
-          // Each OPTION's own confirmation is timed separately: a shared timer
-          // outside this loop recorded the second alternative as the sum of both
-          // and hid the true cost of each canonical confirmation.
-          const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-          const result = await runInWorker(worker, "confirmation", {
+        attemptedConfirmationIds.add(newPromoted[i].id);
+        const options=[newPromoted[i].proxyResult,...(newPromoted[i].proxyResult?.alternatives || [])];
+        for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
+          positionJobs.push({
             rawTransfer: newPromoted[i].rawTransfer,
-            tuning: option?.tuning,
+            tuning: options[optionIndex]?.tuning,
             tuningVariant: "delay-polarity-trim",
             p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
-          }, controller.signal);
-          metrics.recordWorkerCall("confirmation", newPromoted[i].id,
-            (typeof performance !== "undefined" ? performance.now() : Date.now()) - _t0, false,
-            { startedAt: _t0, endedAt: (typeof performance !== "undefined" ? performance.now() : Date.now()),
-              tuning: option?.tuning, transferKey: newPromoted[i].id });
-          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+          });
+          positionJobMeta.push({ candidateIndex: i, optionIndex });
+        }
+      }
+      const positionBatch = await runBoundedConfirmations({
+        jobs: positionJobs,
+        maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
+        isAborted: () => isCancelled() || isStale(),
+        runFn: (job) => {
+          const t0 = performance.now();
+          return confirmationPool.runConfirmation(job, controller.signal)
+            .then((response) => {
+              const workerMs = performance.now() - t0;
+              const meta = positionJobMeta[positionJobs.indexOf(job)];
+              metrics.recordWorkerCall("confirmation", newPromoted[meta.candidateIndex].id,
+                workerMs, false, { startedAt: t0, endedAt: performance.now(),
+                  tuning: job.tuning, transferKey: newPromoted[meta.candidateIndex].id });
+              return { result: response ?? null, workerMs };
+            })
+            .catch((err) => {
+              if (isFatalLifecycleError(err)) throw err;
+              return { result: null, workerMs: performance.now() - t0, error: err };
+            });
+        },
+      });
+      metrics.addStage("electronic-canonical-confirmations", positionBatch.stats.phaseElapsedMs);
+      if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+      // Post-process in original (candidate, option) order
+      for (let jobIdx = 0; jobIdx < positionJobs.length; jobIdx++) {
+        const meta = positionJobMeta[jobIdx];
+        const i = meta.candidateIndex;
+        const optionIndex = meta.optionIndex;
+        const option = [newPromoted[i].proxyResult, ...(newPromoted[i].proxyResult?.alternatives || [])][optionIndex];
+        funnel[funnelKey].confirmationAttempts++;
+        const entry = positionBatch.results[jobIdx];
+        const result = entry?.ok ? entry.result : null;
+        try {
           if (result) {
             const candidate=newPromoted[i];
             const bound=bindConfirmation(result,option?.tuning,candidate,"position");
             Object.assign(bound,{isPositionCandidate:true,positionPhase:candidate.phase,
               movementDescription:candidate.movement,positionCoordinates:candidate.coordinates || result.coordinates,
               candidateOrigin:candidate.candidateOrigin || "global-placement"});
-            // A second tuning alternative of the same placement carries its own
-            // id so both stay comparable confirmed candidates.
             if (optionIndex > 0) bound.candidateId = String(candidate.id || "position") + "::alt" + optionIndex;
             const check=validateCandidateForRun(bound,validationContext);
             if(check.nonAssessable){recordNonAssessable(escPhase.name,bound,check);}
             else if(check.valid){confirmedResults.push(check.result);funnelCandidates.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});}
             else evaluationIssues.push({stage:escPhase.name,candidateId:candidate.id,issues:check.issues});
           } else evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,issues:["Missing confirmation"]});
-          }
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
           evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,error:err.message});
         }
-        onProgress(`confirming_${escPhase.name}`, `${escPhase.confirmLabel} (${i + 1}/${newPromoted.length})`, i + 1, newPromoted.length);
-        await yieldToUI();
       }
+      // Progress + yield after the batch completes (order preserved)
+      for (let i = 0; i < newPromoted.length; i++) {
+        onProgress(`confirming_${escPhase.name}`, `${escPhase.confirmLabel} (${i + 1}/${newPromoted.length})`, i + 1, newPromoted.length);
+      }
+      await yieldToUI();
 
       funnel[funnelKey].confirmed = phaseConfirmedCount;
       funnel[funnelKey].completed = !evaluationIssues.some(e=>e.stage===escPhase.name);
@@ -1899,5 +2021,6 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       // Diagnostics must never break the engine.
     }
     try { worker.terminate(); } catch { /* idempotent on already-terminated worker */ }
+    try { confirmationPool?.terminateAll(); } catch { /* pool already gone */ }
   }
 }
