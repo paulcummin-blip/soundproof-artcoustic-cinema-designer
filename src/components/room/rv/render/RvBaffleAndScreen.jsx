@@ -113,16 +113,33 @@ export default function RvBaffleAndScreen({
         </>
       )}
       {showScreen && (
-        <rect
-          x={xFrameL}
-          y={screenPlaneY}
-          width={frameW_px}
-          height={screenH_px}
-          fill="#1a1a1a"
-          stroke="#333"
-          strokeWidth="0.5"
-          pointerEvents="none"
-        />
+        <>
+          {/* Outer frame: the complete screen at overallWidth, drawn as a solid
+              dark bar. The inner viewable area is painted over it, so the dark
+              portion that remains on each side IS the border at physical scale. */}
+          <rect
+            x={xFrameL}
+            y={screenPlaneY}
+            width={frameW_px}
+            height={screenH_px}
+            fill="#1a1a1a"
+            stroke="#333"
+            strokeWidth="0.5"
+            pointerEvents="none"
+          />
+          {/* Inner viewable image: painted over the centre of the outer frame so
+              the 8 cm border reads as a distinct dark edge on each side. Geometry
+              is unchanged — same Y and depth, width is the viewable image only. */}
+          <rect
+            x={xVisibleL}
+            y={screenPlaneY}
+            width={visibleW_px}
+            height={screenH_px}
+            fill="#d4d4d4"
+            stroke="none"
+            pointerEvents="none"
+          />
+        </>
       )}
     </>
   );
