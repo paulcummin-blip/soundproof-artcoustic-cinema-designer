@@ -545,19 +545,23 @@ export default function OptimiseAndCalculate({
       });
       let calibrationApplied = false;
 
-      const publishCurrentAdiRecommendation = async () => {
+      // ── SPLIT PUBLISHER: plan-save (terminal boundary) + recommendation-publish (background) ──
+      // The plan save is the designer's terminal boundary: the moment it lands the
+      // run has a verdict. The recommendation publication is secondary work that
+      // happens after the terminal card is visible — it never blocks the UI and
+      // its failure never relabels a completed run. ONE publication per fingerprint:
+      // the no-apply path publishes once against the current fingerprint; the
+      // apply path publishes once against the post-recalculation fingerprint.
+      const saveOptimiserPlanForTerminal = () => {
         const fingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
           || sharedRef.current?.completedBassAuthority?.currentFingerprint
           || null;
-        if (!fingerprint || !result?.recommendation) return;
+        if (!fingerprint) {
+          return { fingerprint: null, persistedPlan: null, runEvidence: null, actionability: null, decision: null };
+        }
         const currentShared = sharedRef.current;
         const decision = runEngineeringDecisionModel({
           optimiserResult: getImproveBassV2State(projectId, versionId),
-          // FIX 2: Use the SAME canonical evidence builder as the display path
-          // (AdiRecommendation). Previously this passed the authority wrapper,
-          // which does not have perSeatP20 / p14AchievedDb at the top level —
-          // causing identifyProblem to see "No engineering results available"
-          // even when P20 seat data existed in the contract.
           currentResult: buildAdiBassEvidence(currentShared?.completedBassAuthority),
           designObjectives: {
             p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb,
@@ -570,26 +574,16 @@ export default function OptimiseAndCalculate({
             seatingPositions,
           },
         });
-        // The evaluated optimiser result is saved with the design version (so the
-        // plan returns on reopen) and with the published recommendation (so a
-        // proposal, its history and duplicated proposals restore the SAME plan
-        // with the fingerprint it belongs to). Built only from confirmed
-        // candidate values — never recomputed on reopen.
         const optimiserPlan = buildOptimiserPlan({
           selection: result.selection,
           baseline: result.selection?.currentResult || null,
           identity: {
             projectId,
             versionId,
-            // The design fingerprint the plan belongs to (the quantity the reader
-            // compares against on reopen) plus this run's own result fingerprint.
             designFingerprint: currentShared?.cacheKey || null,
             resultFingerprint: fingerprint,
-            // The parity record this evaluation was made under: the baseline must
-            // be the published bass result, and the record proves it.
             baselineParity: result.baselineParity || null,
             cacheKey: currentShared?.cacheKey || null,
-            // Only recorded when the authority actually carries one — never invented.
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
             target: {
               p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb
@@ -606,9 +600,6 @@ export default function OptimiseAndCalculate({
           calibrationDecision: calibrationApplication,
           decisionApplied: calibrationApplied,
         });
-        // Gated save: an actionable plan only when an independently evaluated,
-        // applyable change clears the 1 dB materiality gate and its destination
-        // geometry is legal. Otherwise the run is saved as terminal evidence.
         const { actionability, actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
           plan: optimiserPlan,
           selection: result.selection,
@@ -625,20 +616,9 @@ export default function OptimiseAndCalculate({
           },
           calibrationDecision: calibrationApplication,
           decisionApplied: calibrationApplied,
-          // The run identity minted at the start of this Re-test execution
-          // travels through to the saved plan/evidence so run.runId,
-          // run.startedAt and run.supersededRunId are non-null for every
-          // terminal outcome (actionable plan, winnerless, trade-off,
-          // evaluation-incomplete, physical/P14 rejection). The save
-          // acknowledgement (acknowledgeOptimiserPlanSave, fired by the version
-          // writer) keys on plan.run.runId, so it handshakes on this same id.
           runIdentity: activeRun,
         });
         recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
-        // ONE CANONICAL TERMINAL OUTCOME: the history, presentation and saved
-        // result all read the same value, so a run can never state
-        // NON_ACTIONABLE_WINNER in its saved evidence, TRADE_OFF on its panel
-        // and NO_USEFUL_IMPROVEMENT in its history row at the same time.
         runTerminalStatus = resolveCanonicalTerminalOutcome({
           actionability,
           calibrationDecision: calibrationApplication,
@@ -649,16 +629,27 @@ export default function OptimiseAndCalculate({
             timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
           });
         } else if (runEvidence) {
-          // A run that produced no actionable plan keeps its terminal evidence:
-          // the same slot holds what the run evaluated, so the card states the
-          // outcome after refresh and reopen instead of discarding everything.
           setOptimiserPlanAuthority(projectId, versionId, {
             ...runEvidence,
             timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
           });
         }
         recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
+        return { fingerprint, persistedPlan, runEvidence, actionability, decision };
+      };
 
+      // ONE background recommendation publication against a single fingerprint.
+      // Never throws into the run's try block — a refused publication is its own
+      // diagnostic, recorded on the history row, never a run failure.
+      const publishAdiRecommendationInBackground = (fingerprint, persistedPlan, runEvidence, decision) => {
+        if (!fingerprint || !result?.recommendation) {
+          Promise.resolve(updateOptimiserRunHistoryPublication({
+            runId: activeRun.runId, projectId, versionId,
+            publicationStatus: "published",
+            publicationCompletedAt: new Date().toISOString(),
+          })).catch(() => {});
+          return;
+        }
         const recommendationForPublication = {
           ...result.recommendation,
           optimiserPlan: persistedPlan || runEvidence || undefined,
@@ -677,18 +668,37 @@ export default function OptimiseAndCalculate({
             },
           } : null,
         };
-        const persisted = await publishRecommendation(projectId, versionId, recommendationForPublication, fingerprint);
-        if (!persisted) throw new Error("The published ADI recommendation could not be saved.");
+        publishRecommendation(projectId, versionId, recommendationForPublication, fingerprint)
+          .then((persisted) => {
+            Promise.resolve(updateOptimiserRunHistoryPublication({
+              runId: activeRun.runId, projectId, versionId,
+              publicationStatus: persisted ? "published" : "failed",
+              publicationError: persisted ? null : "The recommendation could not be published.",
+              publicationCompletedAt: new Date().toISOString(),
+            })).catch(() => {});
+          })
+          .catch((pubError) => {
+            Promise.resolve(updateOptimiserRunHistoryPublication({
+              runId: activeRun.runId, projectId, versionId,
+              publicationStatus: "failed",
+              publicationError: pubError?.message || "The recommendation could not be published.",
+              publicationCompletedAt: new Date().toISOString(),
+            })).catch(() => {});
+          });
       };
-      await publishCurrentAdiRecommendation();
 
-      // ── PRE-WRITE THE RUN HISTORY BEFORE ANY PUBLICATION WAIT ──
-      // The optimiser has completed and its plan is saved. Write the durable
-      // history row NOW with publicationStatus "pending", so a later publication
-      // failure (HTTP 429, timeout) can never erase this completed run's
-      // record. The row is finalised in place by the success path ("published")
-      // or the catch block ("failed") — whichever the publication outcome is.
-      logRunHistory({
+      // ── 1. SAVE PLAN — the terminal boundary ──
+      const {
+        fingerprint: planFingerprint,
+        persistedPlan,
+        runEvidence: planRunEvidence,
+        actionability,
+        decision: adiDecision,
+      } = saveOptimiserPlanForTerminal();
+
+      // ── 2. PRE-WRITE HISTORY (awaited so the row exists before any status update) ──
+      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
+      await logRunHistory({
         terminalStatus: runTerminalStatus,
         publicationStatus: "pending",
       });
@@ -703,9 +713,6 @@ export default function OptimiseAndCalculate({
       //   one-click behaviour — there is no existing design to protect.
       // Existing calibration: STOP — the recommendation is set, and
       //   BassDecisionActions renders the Accept/Continue decision.
-      phaseRef.current = "applying";
-      setApplying(projectId, versionId);
-
       const selection = result.selection;
       const autoApplySummary = buildAutoApplySummary(selection, subInstancesRef.current);
       const stageResults = autoApplySummary.stageResults;
@@ -725,10 +732,48 @@ export default function OptimiseAndCalculate({
       // to the designer. The only thing this path can write is the tuning.
       const hasCal = Boolean(calibrationApplication.selected);
 
-      if (calibrationApplication.tuning.length > 0) {
+      // NULL-TUNING GUARD: a validated tuning payload exists only when ADI
+      // selected a safe calibration candidate (hasCal) OR the optimiser winner
+      // carries its own appliedTuning. Null tuning (winner=null, no auto-apply)
+      // is a VALID no-apply outcome, not an exception. Do not .map(), do not
+      // apply, do not trigger post-apply recalculation.
+      const winnerTuning = autoApplySummary.tuning;
+      const hasValidTuning = hasCal
+        ? (Array.isArray(calibrationApplication.tuning) && calibrationApplication.tuning.length > 0)
+        : (Array.isArray(winnerTuning) && winnerTuning.length > 0);
+
+      // 4a. NO-APPLY COMPLETION: terminal at the durable plan save. Release the
+      // terminal UI NOW. The recommendation publication is ONE background write.
+      // No recalculation: nothing changed, so the published RP22 results still
+      // describe the current design.
+      if (!hasValidTuning) {
+        setComplete(projectId, versionId, {
+          phase: false,
+          delay: false,
+          gain: false,
+          globalBassTrim: false,
+          details: autoApplySummary.changeSummary,
+          calibration: calibrationApplication,
+        }, {
+          subPositions: autoApplySummary.hasPositions
+            ? autoApplySummary.stageResults?.subPositions?.result || null
+            : null,
+          seating: autoApplySummary.hasSeating
+            ? autoApplySummary.stageResults?.seating?.result || null
+            : null,
+          addSubs: false,
+        }, true);
+        publishAdiRecommendationInBackground(planFingerprint, persistedPlan, planRunEvidence, adiDecision);
+        return;
+      }
+
+      // 4b. APPLY PATH: a validated tuning payload exists.
+      phaseRef.current = "applying";
+      setApplying(projectId, versionId);
+
+      if (hasValidTuning) {
         const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
         const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
-        const requested = shared?.authoritative?.requested || {};
 
         const basisFp = (() => {
           try {
@@ -803,6 +848,7 @@ export default function OptimiseAndCalculate({
                 : null,
               addSubs: false,
             }, false);
+            publishAdiRecommendationInBackground(planFingerprint, persistedPlan, planRunEvidence, adiDecision);
             return;
           }
         }
@@ -830,15 +876,12 @@ export default function OptimiseAndCalculate({
       // the new current fingerprint so it survives a page refresh and is
       // available in completedBassAuthority.contract.recommendation for ADI
       // cold-load restoration.
-      await publishCurrentAdiRecommendation();
-
       // Phase 5: Publishing
       phaseRef.current = "publishing";
       setPublishing(projectId, versionId);
       await sleep(300);
 
-      // Build the summary from the settings ACTUALLY applied to the instances —
-      // not from a stage verdict, which says what was found, not what was written.
+      // Build the summary from the settings ACTUALLY applied to the instances.
       const appliedSettingKeys = new Set(
         calibrationApplication.settings.map((setting) => setting.key.split(":")[0]),
       );
@@ -847,15 +890,11 @@ export default function OptimiseAndCalculate({
         delay: appliedSettingKeys.has("delay"),
         gain: appliedSettingKeys.has("gain"),
         polarity: appliedSettingKeys.has("polarity"),
-        globalBassTrim: false, // determined from the authority after recalculation
+        globalBassTrim: false,
         details: autoApplySummary.changeSummary,
-        // The full record: what was applied, its previous and new values, the
-        // objective it served and the canonical P19/P20 before and after.
         calibration: calibrationApplication,
       };
 
-      // Check for global bass trim from the authority — read live state so the
-      // freshly recalculated authority (not the stale closure snapshot) is used.
       const liveAuthority = sharedRef.current?.completedBassAuthority;
       const globalTrim = liveAuthority?.contract?.selectedCandidate?.globalLevelAlignment
         || liveAuthority?.contract?.productAnalysis?.parameters?.globalLevelAlignment
@@ -873,40 +912,48 @@ export default function OptimiseAndCalculate({
         seating: autoApplySummary.hasSeating
           ? autoApplySummary.stageResults?.seating?.result || null
           : null,
-        addSubs: false, // could be determined from Stage 2 results in future
+        addSubs: false,
       };
 
       const noImprovements = !hasCal && !hasPhysical && !autoApplied.globalBassTrim;
 
-      // ── TERMINAL — the run's own history row, with this run's id ──
-      // startedAt/completedAt belong to THIS re-test run, never inherited from
-      // the previous optimiser result. The previous run's history row is
-      // preserved (beginOptimiserRun appends; it never overwrites).
-      //
-      // The row was pre-written with publicationStatus "pending" before the
-      // publication wait. Finalise it in place: update the existing row to
-      // "published" so the completed run's record carries the real outcome.
-      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
-      Promise.resolve(updateOptimiserRunHistoryPublication({
-        runId: activeRun.runId,
-        projectId,
-        versionId,
-        publicationStatus: "published",
-        publicationCompletedAt: new Date().toISOString(),
-      })).catch(() => {});
+      // TERMINAL: release the card, then publish in the background.
       setComplete(projectId, versionId, autoApplied, recommendations, noImprovements);
+
+      // ONE background re-publish against the POST-recalculation fingerprint,
+      // only when an apply actually changed the fingerprint. When it did not,
+      // no second write runs (the pre-apply write is the final state).
+      const postRecalcFingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
+        || sharedRef.current?.completedBassAuthority?.currentFingerprint
+        || null;
+      if (calibrationApplied && postRecalcFingerprint && postRecalcFingerprint !== planFingerprint) {
+        publishAdiRecommendationInBackground(postRecalcFingerprint, persistedPlan, planRunEvidence, adiDecision);
+      } else {
+        Promise.resolve(updateOptimiserRunHistoryPublication({
+          runId: activeRun.runId, projectId, versionId,
+          publicationStatus: "published",
+          publicationCompletedAt: new Date().toISOString(),
+        })).catch(() => {});
+      }
     } catch (err) {
       const reason = err?.message || "Optimisation failed.";
       if (optimiserCompleted) {
-        // ── PUBLICATION FAILURE, NOT OPTIMISER FAILURE ──
-        // The optimiser completed and its plan is saved. The error is from a
-        // later lifecycle event — the bass recalculation/publication, or the
-        // recommendation re-publish. This is a PUBLICATION failure, not an
-        // optimiser failure: the run's terminal status is the optimiser's own
-        // outcome, and the publication failed. Do NOT overwrite the completed
-        // plan with failure evidence (saveRunFailure) — that would relabel a
-        // completed run as incomplete.
-        const userMessage = "The optimisation completed, but the updated bass result could not be published. Retry the update.";
+        // FAILURE CLASSIFICATION BY PHASE: the optimiser completed and its plan
+        // is saved. The error is from a LATER lifecycle event, and its label must
+        // match the phase it occurred in. A tuning/apply exception is NOT a bass
+        // publication failure. A target-cache HTTP 500 is neither. Do NOT
+        // overwrite the completed plan with failure evidence.
+        const phase = phaseRef.current;
+        let userMessage;
+        if (phase === "applying") {
+          userMessage = "The optimisation completed, but the calibration could not be applied. The saved decision remains unapplied.";
+        } else if (phase === "recalculating") {
+          userMessage = "The optimisation completed, but the recalculated bass result could not be published. Retry the update.";
+        } else if (phase === "publishing") {
+          userMessage = "The optimisation completed, but the updated bass result could not be published. Retry the update.";
+        } else {
+          userMessage = "The optimisation completed, but a post-engine step could not complete. The saved plan is intact.";
+        }
         if (historyPreWritten) {
           // Finalise the pre-written "pending" row in place.
           Promise.resolve(updateOptimiserRunHistoryPublication({
