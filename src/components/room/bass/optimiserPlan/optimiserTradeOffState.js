@@ -511,8 +511,13 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
       : seatAmount
         ? `${seat.parameter} worsens by ${seatAmount}`
         : `${seat.parameter} worsens`;
+  // "Primary seat …" is stated ONLY when the per-seat evidence confirms the
+  // affected seat is a genuine primary seat AND its metric actually worsens.
+  // A secondary-seat regression is stated as "Seat …", never falsely "Primary".
   const impact = seat
-    ? `Primary seat ${seat.label}: ${seatClause}`
+    ? (verifiedPrimaryRegression
+      ? `Primary seat ${seat.label}: ${seatClause}`
+      : `Seat ${seat.label}: ${seatClause}`)
     : (worsenedMetric
       ? `${worsenedMetric.label}: ${worsenedMetric.before} → ${worsenedMetric.after}${worsenedMetric.delta ? ` (${worsenedMetric.delta})` : ""}`
       : TRADE_OFF_METRIC_NOTE);
@@ -527,8 +532,13 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
   const amountText = seat?.delta != null ? recordedAmountText(seat.delta) : null;
   const protectedLevel = p19Row?.levelAfter || p19Row?.levelBefore || null;
 
+  // The decision sentence states the seat plainly. A secondary-seat regression
+  // is never described as "one primary seat gets worse" — it names the actual
+  // seat, and only a verified primary regression carries the "primary" word.
   const decisionSentence = seat
-    ? `Overall bass consistency improves, but ${seat.label} gets worse.`
+    ? (verifiedPrimaryRegression
+      ? `Overall bass consistency improves, but primary seat ${seat.label} gets worse.`
+      : `Overall bass consistency improves, but ${seat.label} gets worse.`)
     : "Overall bass consistency improves, but one protected measure gets worse.";
 
   // THE DISPLAYED IMPROVEMENT, derived from the two displayed endpoints of the
@@ -568,10 +578,18 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
     }
     : null;
 
+  // The headline's "one primary seat would get worse" is stated ONLY when the
+  // per-seat evidence confirms a genuine primary-seat regression. A
+  // secondary-seat regression uses a metric-note headline instead — it never
+  // falsely claims a primary seat worsens.
+  const headline = kept === true
+    ? TRADE_OFF_KEPT_SENTENCE
+    : (verifiedPrimaryRegression ? TRADE_OFF_HEADLINE : TRADE_OFF_METRIC_NOTE);
+
   return {
     isTradeOff: true,
     kept: kept === true,
-    headline: kept === true ? TRADE_OFF_KEPT_SENTENCE : TRADE_OFF_HEADLINE,
+    headline,
     label: kept === true ? TRADE_OFF_KEPT_LABEL : null,
     adjustment: adjustmentLine(record),
     // THE DECISION, IN ONE SENTENCE — the first thing the review states.

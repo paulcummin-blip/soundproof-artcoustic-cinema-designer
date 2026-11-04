@@ -534,7 +534,11 @@ export default function useRunOptimisationPlan({
         runId: activeRun.runId,
         projectId,
         versionId,
-        terminalStatus: persistedPlan ? "actionable_plan" : "no_useful_improvement",
+        // ONE CANONICAL TERMINAL OUTCOME — the same value the pre-write used at
+        // line ~488. Never re-derive from persistedPlan existence here: that
+        // would overwrite a NON_ACTIONABLE_WINNER or TRADE_OFF terminal result
+        // with "actionable_plan" just because a plan object exists.
+        terminalStatus: runTerminalStatus,
         publicationStatus: recommendationPublication.status,
         publicationError: recommendationPublication.error,
         publicationCompletedAt: new Date().toISOString(),
