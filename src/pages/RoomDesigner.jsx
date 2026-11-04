@@ -71,6 +71,7 @@ import RoomDesignerControlsPanel from "@/components/roomdesigner/RoomDesignerCon
 import BassBackgroundAnalysisOwner from "@/components/room/bass/BassBackgroundAnalysisOwner";
 import FrontElevation from "@/components/room/FrontElevation";
 import SideElevation from "@/components/room/SideElevation";
+import IsometricView from "@/components/room/isometric/IsometricView";
 import { useGuardedSetter } from "@/components/roomdesigner/useGuardedSetter";
 import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useElevationDragHandlers";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
@@ -2169,7 +2170,7 @@ function RoomDesignerWithState() {
 
           {/* View selector bar */}
           <div style={{ display: 'flex', gap: 2, padding: '6px 10px', borderBottom: '1px solid #DCDBD6', background: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
-            {[['plan', 'PLAN VIEW'], ['front', 'FRONT ELEVATION'], ['side', 'SIDE ELEVATION']].map(([key, label]) => (
+            {[['plan', 'PLAN VIEW'], ['front', 'FRONT ELEVATION'], ['side', 'SIDE ELEVATION'], ['isometric', 'ISOMETRIC VIEW']].map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setLeftPanelView(key)}
