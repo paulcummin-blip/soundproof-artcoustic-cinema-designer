@@ -229,9 +229,9 @@ export default function ScreenConfiguration(props) {
   }, [seatingRowsLive, screenFrontPlaneM, viewableDimensions]);
 
   // ONE canonical screen frame, shared with the elevation drawings: the stored
-  // height from floor is the bottom of the COMPLETE frame (viewable image plus a
-  // border on every side), so the reported overall size and the frame's top
-  // position can never disagree with the drawing.
+  // height from floor is the bottom of the VIEWABLE image, so the complete
+  // frame begins one border below it. The reported overall size and the frame's
+  // top position can never disagree with the drawing.
   const screenFrame = useMemo(() => resolveScreenFrameGeometry(screenData), [screenData]);
 
   // Overall dimensions including border — read from the shared frame geometry.

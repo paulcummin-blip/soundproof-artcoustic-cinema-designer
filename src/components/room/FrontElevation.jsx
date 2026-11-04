@@ -3,6 +3,7 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
+import { resolveScreenFrameGeometry } from "@/components/models/screen/screenFrameGeometry";
 import { drawFrontSpeakerArt } from "@/components/room/front/FrontSpeakerArt";
 import FrontScreenLayer from "@/components/room/front/FrontScreenLayer";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
@@ -357,11 +358,18 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   }, [screen?.heightFromFloorM]);
   const screenFloorM = liveScreenFloorM;
   const screenCenterX = roomW / 2;
-  // Border/frame: use persisted value, else safe visual fallback
-  const hasBorderData = Number(screen?.borderThicknessM) > 0;
-  const borderM = hasBorderData ? Number(screen.borderThicknessM) : 0.05; // 5cm fallback
-  const overallW = screenData.w + borderM * 2;
-  const overallH = screenData.h + borderM * 2;
+  // Border/frame: the ONE canonical screen-frame authority. Front Elevation
+  // treats the stored height from floor as the bottom of the VIEWABLE image
+  // (the same meaning the resolver now holds), so passing the live drag floor
+  // keeps the drawing identical to the stored value while removing the
+  // duplicate border/overall calculation.
+  const screenFrame = useMemo(
+    () => resolveScreenFrameGeometry({ ...screen, heightFromFloorM: screenFloorM }),
+    [screen, screenFloorM],
+  );
+  const borderM = screenFrame.borderM;
+  const overallW = screenFrame.overallWidthM;
+  const overallH = screenFrame.overallHeightM;
 
   // TV vertical centre — only when displaying a TV (not a projector screen)
   const isTV = !!(screen?.tvPresetKey || Number(screen?.tvWidthMm) > 0);

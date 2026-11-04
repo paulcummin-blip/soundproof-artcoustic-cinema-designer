@@ -158,8 +158,8 @@ export default function SideElevation({
   }, [screen?.heightFromFloorM]);
   // ── Screen geometry: ONE authority, shared with the Screen Setup metrics and
   // the room-fit warning. The stored height from floor is the bottom of the
-  // COMPLETE frame, so the viewable image sits one border thickness above it and
-  // the frame top is viewable top + one border. The resolved bounds are handed
+  // VIEWABLE IMAGE, so the complete frame begins one border below it and the
+  // frame top is viewable top + one border. The resolved bounds are handed
   // to the drawing as they are and are NEVER clamped to the room: a screen that
   // does not fit its ceiling is drawn exactly as it is built, crossing the
   // ceiling line, so the drawing can never disagree with the calculation.
@@ -464,8 +464,8 @@ export default function SideElevation({
       const svgScale = svgRect.height / SVG_H;
       const deltaClientY = me.clientY - dragStartRef.current.clientY;
       const deltaM = -(deltaClientY / svgScale / drawH) * roomH;
-      const minFloor = 0.05;
-      const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM * 2);
+      const minFloor = borderM;
+      const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM);
       const newFloor = Math.max(minFloor, Math.min(maxFloor, dragStartRef.current.floorM + deltaM));
       setLiveFloorM(newFloor);
     };
@@ -479,8 +479,8 @@ export default function SideElevation({
       const svgScale = svgRect.height / SVG_H;
       const deltaClientY = me.clientY - dragStartRef.current.clientY;
       const deltaM = -(deltaClientY / svgScale / drawH) * roomH;
-      const minFloor = 0.05;
-      const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM * 2);
+      const minFloor = borderM;
+      const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM);
       const newFloor = Math.max(minFloor, Math.min(maxFloor, dragStartRef.current.floorM + deltaM));
       const rounded = Math.round(newFloor * 100) / 100;
       setLiveFloorM(rounded);

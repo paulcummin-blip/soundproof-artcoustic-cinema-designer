@@ -1,13 +1,14 @@
 // Single authority for the complete screen frame in room space.
 //
 // The viewable image is not the whole screen: the frame adds a border on EVERY
-// side, and the stored "height from floor" is the bottom of that COMPLETE frame.
-// So, in room coordinates:
+// side. The stored "height from floor" is the bottom of the VIEWABLE IMAGE, so
+// the complete frame begins one border below it and ends one border above the
+// viewable top. In room coordinates:
 //
-//   frame bottom   = heightFromFloorM            (the field the designer sets)
-//   viewable bottom= frame bottom + one border
-//   viewable top   = viewable bottom + viewable height
-//   frame top      = viewable top  + one border  (= frame bottom + overall height)
+//   viewable bottom = heightFromFloorM         (the field the designer sets)
+//   viewable top    = viewable bottom + viewable height
+//   frame bottom    = viewable bottom - one border   (bottom of complete frame)
+//   frame top       = viewable top    + one border   (top of complete frame)
 //
 // Every consumer — the Screen Setup metrics, the room-fit warning and the
 // elevation drawings — reads these numbers from here, so a drawing can never
@@ -34,6 +35,10 @@ export function resolveScreenBorderM(screen) {
 /**
  * Resolve the complete screen frame from the one screen configuration.
  *
+ * `heightFromFloorM` is the bottom of the VIEWABLE IMAGE above the finished
+ * floor. The complete frame (viewable image plus a border on every side) begins
+ * one border below that and ends one border above the viewable top.
+ *
  * @param {object} screen - the screen config (width/aspect/manual override,
  *                          borderThicknessM, heightFromFloorM)
  * @returns {{
@@ -48,10 +53,10 @@ export function resolveScreenFrameGeometry(screen) {
   const borderM = resolveScreenBorderM(screen);
 
   const statedFloorM = Number(screen?.heightFromFloorM);
-  const frameBottomM = Number.isFinite(statedFloorM) ? statedFloorM : DEFAULT_SCREEN_FROM_FLOOR_M;
+  const viewableBottomM = Number.isFinite(statedFloorM) ? statedFloorM : DEFAULT_SCREEN_FROM_FLOOR_M;
 
-  const viewableBottomM = frameBottomM + borderM;
   const viewableTopM = viewableBottomM + viewable.heightM;
+  const frameBottomM = viewableBottomM - borderM;
   const frameTopM = viewableTopM + borderM;
 
   return {
