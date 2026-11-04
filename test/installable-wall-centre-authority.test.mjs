@@ -347,7 +347,9 @@ test("resolvePlanActionability: theoretical placement returns the non-practical 
   };
   const result = resolvePlanActionability({ plan, selection: { evaluationIncomplete: false } });
   assert.equal(result.actionable, false, "non-practical placement is not actionable");
-  assert.equal(result.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT);
+  // A winner that exists but whose placement is not practical is a
+  // NON_ACTIONABLE_WINNER — distinct from a no-improvement run.
+  assert.equal(result.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_WINNER);
   assert.ok(result.reason.startsWith(OPTIMISER_WINNER_NON_PRACTICAL_REASON),
     "the non-practical reason is stated, not the generic no-winner reason");
   assert.ok(!result.reason.includes(OPTIMISER_NO_WINNER_REASON),
