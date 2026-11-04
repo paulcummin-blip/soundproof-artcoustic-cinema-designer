@@ -38,6 +38,7 @@ import { computeV2DesignFingerprint, isCurrentAuthorityNonStale } from "./improv
 import { runInWorker, isFatalLifecycleError, V2RunTimeoutError } from "./improveBassV2WorkerLifecycle.js";
 import { createConfirmationPool } from "./v2ConfirmationPool.js";
 import { runBoundedConfirmations } from "./runBoundedConfirmations.js";
+import { createConfirmationRunFn } from "./createConfirmationRunFn.js";
 import { V2RuntimeMetrics } from "./improveBassV2RuntimeMetrics.js";
 import { subscribeImproveBassV2, getImproveBassV2State } from "./improveBassV2Store.js";
 import { isMaterialImprovement } from "./materialityGate.js";
@@ -848,20 +849,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             jobs: phaseConfirmJobs,
             maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
             isAborted: () => isCancelled() || isStale(),
-            runFn: (job) => {
-              const t0 = performance.now();
-              return confirmationPool.runConfirmation(job, controller.signal)
-                .then((response) => {
-                  const workerMs = performance.now() - t0;
-                  metrics.recordWorkerCall("confirmation", "phase:" + phaseConfirmJobs.indexOf(job),
-                    workerMs, false, { startedAt: t0, endedAt: performance.now(), tuning: job.tuning, transferKey: "current" });
-                  return { result: response ?? null, workerMs };
-                })
-                .catch((err) => {
-                  if (isFatalLifecycleError(err)) throw err;
-                  return { result: null, workerMs: performance.now() - t0, error: err };
-                });
-            },
+            runFn: createConfirmationRunFn({
+              pool: confirmationPool, controller, metrics, isFatalLifecycleError,
+              labelFor: (_job, index) => "phase:" + index,
+              transferKeyFor: () => "current",
+            }),
           });
           metrics.addStage("electronic-canonical-confirmations", phaseBatch.stats.phaseElapsedMs);
           if (isStale()) return {status:"stale",snapshot};
@@ -942,20 +934,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           jobs: calConfirmJobs,
           maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
           isAborted: () => isCancelled() || isStale(),
-          runFn: (job) => {
-            const t0 = performance.now();
-            return confirmationPool.runConfirmation(job, controller.signal)
-              .then((response) => {
-                const workerMs = performance.now() - t0;
-                metrics.recordWorkerCall("confirmation", "calibration:" + calConfirmJobs.indexOf(job),
-                  workerMs, false, { startedAt: t0, endedAt: performance.now(), tuning: job.tuning, transferKey: "current" });
-                return { result: response ?? null, workerMs };
-              })
-              .catch((err) => {
-                if (isFatalLifecycleError(err)) throw err;
-                return { result: null, workerMs: performance.now() - t0, error: err };
-              });
-          },
+          runFn: createConfirmationRunFn({
+            pool: confirmationPool, controller, metrics, isFatalLifecycleError,
+            labelFor: (_job, index) => "calibration:" + index,
+            transferKeyFor: () => "current",
+          }),
         });
         metrics.addStage("electronic-canonical-confirmations", calBatch.stats.phaseElapsedMs);
         if(isStale()) return {status:"stale",snapshot};
@@ -1047,20 +1030,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           jobs: gainConfirmJobs,
           maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
           isAborted: () => isCancelled() || isStale(),
-          runFn: (job) => {
-            const t0 = performance.now();
-            return confirmationPool.runConfirmation(job, controller.signal)
-              .then((response) => {
-                const workerMs = performance.now() - t0;
-                metrics.recordWorkerCall("confirmation", "gain:" + gainConfirmJobs.indexOf(job),
-                  workerMs, false, { startedAt: t0, endedAt: performance.now(), tuning: job.tuning, transferKey: "current" });
-                return { result: response ?? null, workerMs };
-              })
-              .catch((err) => {
-                if (isFatalLifecycleError(err)) throw err;
-                return { result: null, workerMs: performance.now() - t0, error: err };
-              });
-          },
+          runFn: createConfirmationRunFn({
+            pool: confirmationPool, controller, metrics, isFatalLifecycleError,
+            labelFor: (_job, index) => "gain:" + index,
+            transferKeyFor: () => "current",
+          }),
         });
         metrics.addStage("electronic-canonical-confirmations", gainBatch.stats.phaseElapsedMs);
         if (isStale()) return {status: "stale", snapshot};
@@ -1479,22 +1453,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         jobs: positionJobs,
         maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
         isAborted: () => isCancelled() || isStale(),
-        runFn: (job) => {
-          const t0 = performance.now();
-          return confirmationPool.runConfirmation(job, controller.signal)
-            .then((response) => {
-              const workerMs = performance.now() - t0;
-              const meta = positionJobMeta[positionJobs.indexOf(job)];
-              metrics.recordWorkerCall("confirmation", newPromoted[meta.candidateIndex].id,
-                workerMs, false, { startedAt: t0, endedAt: performance.now(),
-                  tuning: job.tuning, transferKey: newPromoted[meta.candidateIndex].id });
-              return { result: response ?? null, workerMs };
-            })
-            .catch((err) => {
-              if (isFatalLifecycleError(err)) throw err;
-              return { result: null, workerMs: performance.now() - t0, error: err };
-            });
-        },
+        runFn: createConfirmationRunFn({
+          pool: confirmationPool, controller, metrics, isFatalLifecycleError,
+          labelFor: (_job, index) => newPromoted[positionJobMeta[index].candidateIndex].id,
+          transferKeyFor: (_job, index) => newPromoted[positionJobMeta[index].candidateIndex].id,
+        }),
       });
       metrics.addStage("electronic-canonical-confirmations", positionBatch.stats.phaseElapsedMs);
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
