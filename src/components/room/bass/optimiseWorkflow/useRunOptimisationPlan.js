@@ -397,7 +397,50 @@ export default function useRunOptimisationPlan({
         ...runRecord,
         runtimeBreakdown,
       });
-      const savedAt = await waitForOptimiserPlanSave(projectId, versionId, activeRun.runId);
+      // ── FAILURE FALLBACK ──
+      // The completed run record is already in the authority. If the version
+      // save is not acknowledged in time the completed candidate evidence must
+      // NOT be discarded and relabelled as an incomplete calculation: the run
+      // DID complete. The save failure is recorded ON TOP of the completed
+      // evidence, so the designer sees SAVE FAILED with the full evaluated run
+      // still attached, rather than a blank failure that lost the run's work.
+      let savedAt = null;
+      try {
+        savedAt = await waitForOptimiserPlanSave(projectId, versionId, activeRun.runId);
+      } catch (saveAckError) {
+        const saveFailReason = saveAckError?.message
+          || "The optimiser plan is ready, but its version save was not acknowledged. Retry saving the project.";
+        const existingCompleted = getOptimiserPlanAuthority(projectId, versionId);
+        const completedWithSaveFailure = (existingCompleted && existingCompleted.run?.runId === activeRun.runId)
+          ? {
+            ...existingCompleted,
+            failure: {
+              status: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+              category: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+              message: saveFailReason,
+              publicationError: null,
+              attempts: null,
+              at: new Date().toISOString(),
+              runId: activeRun.runId,
+            },
+          }
+          : null;
+        if (completedWithSaveFailure) {
+          setOptimiserPlanAuthority(projectId, versionId, completedWithSaveFailure);
+        } else {
+          // No completed evidence survived in the authority — fall back to the
+          // run-failure record so the terminal state is still persisted.
+          saveRunFailure(saveFailReason, { planSaveFailed: true });
+        }
+        logRunHistory({
+          terminalStatus: "publication_failed",
+          publicationStatus: "not_attempted",
+          publicationError: saveFailReason,
+        });
+        setStatus("failed");
+        setError(saveFailReason);
+        return;
+      }
       recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED, { at: savedAt });
 
       // ── 2. THE TERMINAL AUTHORITY, WRITTEN AT PLAN SAVE ──

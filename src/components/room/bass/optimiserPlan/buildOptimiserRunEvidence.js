@@ -127,7 +127,13 @@ export function buildActionableOptimiserRunSummary({
   diagnostics = null,
   runIdentity = null,
 } = {}) {
-  if (!selection?.winner) return null;
+  // RUN IDENTITY BELONGS TO THE RUN, not to the winner. An actionable plan can
+  // exist without a safe winner — a standalone placement lever that clears the
+  // materiality gate is offered on its own. The run summary (and the run id it
+  // carries) must be produced for every actionable plan, so the save
+  // acknowledgement handshake (acknowledgeOptimiserPlanSave reads plan.run.runId)
+  // fires and the completed run is never discarded as a 60s timeout. The winner
+  // is nullable on the summary; the run is not.
   const rows = Array.isArray(selection.confirmedResults) ? selection.confirmedResults : [];
   const evaluated = resolveEvaluatedCount(diagnostics, rows);
   // A winning run states the same per-family evidence a terminal run does: what
@@ -162,7 +168,7 @@ export function buildActionableOptimiserRunSummary({
     candidatesEvaluated: evaluated.count,
     candidatesEvaluatedBasis: evaluated.basis,
     resultsRetained: rows.length,
-    winnerCandidateId: selection.winner.candidateId || null,
+    winnerCandidateId: selection?.winner?.candidateId || null,
     actionablePlanProduced: true,
     rejectionReasons: [],
     // Running the plan evaluates evidence only. Applying a lever is a separate,
