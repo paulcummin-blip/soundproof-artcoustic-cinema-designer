@@ -52,6 +52,10 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
         reason: check.reason,
         achievedP18Hz: check.achievedP18Hz,
         transitionHz: check.transitionHz,
+        // P14 operating-point rejection evidence (null for a band rejection).
+        p14AchievedDb: check.p14AchievedDb ?? null,
+        p14TargetDb: check.p14TargetDb ?? null,
+        p14NotAchievedReason: check.p14NotAchievedReason ?? null,
       });
       continue;
     }

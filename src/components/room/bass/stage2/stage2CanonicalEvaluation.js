@@ -428,6 +428,14 @@ export function evaluateStage2Confirmation(rawTransfer, {
     p14AchievedDb,
     operatingOutputDb: canonicalResult.selectedOperatingOutputDb,
     requestedP14Pass: authority.requestedP14Pass,
+    // PHYSICAL / OPERATING-POINT REJECTION: when the requested P14 operating
+    // target cannot be achieved the canonical authority deliberately does NOT
+    // evaluate P18/P19/P20. Carry the explicit reason so the downstream
+    // candidate validator classifies this as a terminal candidate rejection
+    // (P14 operating point not achieved), never as missing P18/P19/P20 evidence.
+    p14NotAchievedReason: authority.requestedP14Pass === false
+      ? (authority.p19NotEvaluatedReason || "p14-operating-point-not-achieved")
+      : null,
     physicalValidation: selection.selectedCandidate.physicalValidation,
     timingVersion: STAGE2_CANONICAL_VERSION,
     p14AchievedLevel: authority.achievedP14Level ?? canonicalResult.achievedP14Level ?? null,

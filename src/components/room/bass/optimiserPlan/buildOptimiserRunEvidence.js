@@ -323,6 +323,12 @@ export function buildOptimiserRunEvidence({
       reason: entry?.reason ?? null,
       achievedP18Hz: num(entry?.achievedP18Hz),
       transitionHz: num(entry?.transitionHz),
+      // P14 operating-point rejection evidence (null for a band rejection):
+      // the requested + achieved P14 dB and the explicit reason. Engineering
+      // Mode states these; P18/P19/P20 are never fabricated for this rejection.
+      p14AchievedDb: num(entry?.p14AchievedDb),
+      p14TargetDb: num(entry?.p14TargetDb),
+      p14NotAchievedReason: entry?.p14NotAchievedReason ?? null,
     }));
   const nonAssessableCount = nonAssessableCandidates.length;
 

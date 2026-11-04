@@ -329,21 +329,26 @@ export default function OptimiserRunEvidenceBlock({
               rejections, not run failures.
             </div>
             <div className="mt-0.5 space-y-0.5 text-[11px] text-[#625143]">
-              {nonAssessableCandidates.map((entry) => (
-                <div key={entry.candidateId || entry.stage}>
-                  <span className="text-[#1B1A1A]">
-                    {entry.candidateId || "candidate"}
-                    {entry.candidateKind ? ` · ${entry.candidateKind}` : ""}
-                    {entry.stage ? ` · ${entry.stage}` : ""}
-                  </span>
-                  {" — "}
-                  P18 {entry.achievedP18Hz != null ? `${entry.achievedP18Hz} Hz` : "unavailable"}
-                  {" · "}
-                  transition {entry.transitionHz != null ? `${entry.transitionHz} Hz` : "unavailable"}
-                  {" · "}
-                  {entry.reason || "no valid P19/P20 assessment band"}
-                </div>
-              ))}
+              {nonAssessableCandidates.map((entry) => {
+                const isP14Rejection = entry.reason === "P14_OPERATING_POINT_NOT_ACHIEVED";
+                return (
+                  <div key={entry.candidateId || entry.stage}>
+                    <span className="text-[#1B1A1A]">
+                      {entry.candidateId || "candidate"}
+                      {entry.candidateKind ? ` · ${entry.candidateKind}` : ""}
+                      {entry.stage ? ` · ${entry.stage}` : ""}
+                    </span>
+                    {" — "}
+                    {isP14Rejection
+                      ? <>P14 target {entry.p14TargetDb != null ? `${entry.p14TargetDb} dB` : "unavailable"}
+                          {" · "}achieved {entry.p14AchievedDb != null ? `${entry.p14AchievedDb} dB` : "unavailable"}
+                          {" · "}{entry.p14NotAchievedReason || entry.reason || "p14-operating-point-not-achieved"}</>
+                      : <>P18 {entry.achievedP18Hz != null ? `${entry.achievedP18Hz} Hz` : "unavailable"}
+                          {" · "}transition {entry.transitionHz != null ? `${entry.transitionHz} Hz` : "unavailable"}
+                          {" · "}{entry.reason || "no valid P19/P20 assessment band"}</>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

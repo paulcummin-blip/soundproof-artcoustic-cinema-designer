@@ -674,6 +674,13 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         reason: check?.reason ?? null,
         achievedP18Hz: check?.achievedP18Hz ?? null,
         transitionHz: check?.transitionHz ?? null,
+        // P14 operating-point rejection evidence (null for a band rejection):
+        // the requested and achieved P14 dB and the explicit reason, so the
+        // run evidence and Engineering Mode can state them. P18/P19/P20 are
+        // never fabricated for this rejection.
+        p14AchievedDb: check?.p14AchievedDb ?? null,
+        p14TargetDb: check?.p14TargetDb ?? null,
+        p14NotAchievedReason: check?.p14NotAchievedReason ?? null,
       });
     };
     const calibrationDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,shortlistComplete:false,options:[]};

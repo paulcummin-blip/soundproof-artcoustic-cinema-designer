@@ -91,6 +91,7 @@ export function applicableSeatsFromResult(result) {
  */
 export const CANDIDATE_ASSESSABILITY_REASON = {
   NO_VALID_P19_P20_ASSESSMENT_BAND: "NO_VALID_P19_P20_ASSESSMENT_BAND",
+  P14_OPERATING_POINT_NOT_ACHIEVED: "P14_OPERATING_POINT_NOT_ACHIEVED",
 };
 
 const finiteNum = (value) =>
@@ -114,7 +115,32 @@ const finiteNum = (value) =>
  * @param {object} result - a confirmed candidate result
  * @returns {{assessable: boolean, reason: string|null, achievedP18Hz: number|null, transitionHz: number|null}}
  */
+/**
+ * PHYSICAL / OPERATING-POINT REJECTION — distinct from NON-ASSESSABLE and from
+ * genuine missing evidence. When the requested P14 operating target cannot
+ * be achieved, the canonical authority deliberately does NOT evaluate
+ * P18/P19/P20. That is a completed physical rejection, not a calculation
+ * failure: the candidate is terminally rejected for this reason, P18/P19/P20
+ * are never fabricated, and the run is NOT incomplete because of it. The
+ * explicit reason, the requested and achieved P14 dB travel with the verdict
+ * so Engineering Mode can state them.
+ */
 export function classifyCandidateAssessability(result) {
+  // P14 operating-point failure is checked FIRST: it is the upstream canonical
+  // prerequisite. requestedP14Pass === false (strict) is the authority's
+  // explicit FAIL — a null/non-finite P14 (genuine missing evidence) does NOT
+  // match and falls through to the normal validation path.
+  if (result?.requestedP14Pass === false) {
+    return {
+      assessable: false,
+      reason: CANDIDATE_ASSESSABILITY_REASON.P14_OPERATING_POINT_NOT_ACHIEVED,
+      achievedP18Hz: null,
+      transitionHz: finiteNum(result?.transitionHz) ? Number(result.transitionHz) : null,
+      p14AchievedDb: finiteNum(result?.p14AchievedDb) ? Number(result.p14AchievedDb) : null,
+      p14TargetDb: finiteNum(result?.p14TargetDb) ? Number(result.p14TargetDb) : null,
+      p14NotAchievedReason: result?.p14NotAchievedReason || "p14-operating-point-not-achieved",
+    };
+  }
   const p18 = finiteNum(result?.achievedP18Hz) ? Number(result.achievedP18Hz) : null;
   const transition = finiteNum(result?.transitionHz) ? Number(result.transitionHz) : null;
   if (p18 == null || p18 <= 0) return { assessable: true, reason: null, achievedP18Hz: p18, transitionHz: transition };
@@ -153,6 +179,12 @@ export function validateCandidateForRun(result, context = {}) {
       reason: assessability.reason,
       achievedP18Hz: assessability.achievedP18Hz,
       transitionHz: assessability.transitionHz,
+      // P14 operating-point rejection carries its own evidence (requested +
+      // achieved P14 dB and the explicit reason) so the run evidence and
+      // Engineering Mode can state them. Null for a band-rejection reason.
+      p14AchievedDb: assessability.p14AchievedDb ?? null,
+      p14TargetDb: assessability.p14TargetDb ?? null,
+      p14NotAchievedReason: assessability.p14NotAchievedReason ?? null,
       valid: false,
       issues: [],
       result,
