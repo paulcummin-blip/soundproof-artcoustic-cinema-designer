@@ -38,6 +38,12 @@ export const ADI_OPTIMISER_JOURNEY_STATE = Object.freeze({
   PLAN_AVAILABLE: "plan_available",
   /** Evaluation finished, evidence is complete, no candidate was worth applying. */
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /**
+   * Evaluation finished, a ranking winner WAS confirmed, but its placement is
+   * not a practical, wall-based installation. The improvement is real but not
+   * actionable. A COMPLETED state, never an error/incomplete state.
+   */
+  NON_ACTIONABLE_WINNER: "non_actionable_winner",
   /** No completed production authority exists for the live design. */
   BASELINE_REQUIRED: "baseline_required",
   /** The optimiser baseline does not match the published bass result. */
@@ -118,6 +124,7 @@ export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE]: "Re-test Needed",
   [ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE]: "Optimisation plan available",
   [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: "No Improvement Found",
+  [ADI_OPTIMISER_JOURNEY_STATE.NON_ACTIONABLE_WINNER]: "Improvement Found — Placement Not Practical",
   [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_REQUIRED]: BASELINE_PARITY_COPY.MISSING_STATUS,
   [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_MISMATCH]: BASELINE_PARITY_COPY.MISMATCH_STATUS,
   [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: "Unable To Evaluate",
@@ -416,6 +423,20 @@ export function resolveAdiOptimiserJourney({
   if (status === OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT) {
     return build(ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT, {
       message: withLead("ADI completed its search without finding a change worth applying."),
+      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      action: ADI_OPTIMISER_ACTION.RERUN,
+      showPlan: false,
+    });
+  }
+
+  // ── 4b2. NON_ACTIONABLE_WINNER — evaluation COMPLETED, winner confirmed, but
+  // placement is not practical. A completed state, never an error/incomplete
+  // state: the panel states "improvement found but not practical", never "no
+  // improvement found" and never "evaluation incomplete". The winner id and the
+  // non-practical reason are preserved in the run evidence (Engineer details).
+  if (status === OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER) {
+    return build(ADI_OPTIMISER_JOURNEY_STATE.NON_ACTIONABLE_WINNER, {
+      message: withLead("A better-performing option was found, but the placement is not practical for this room."),
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       action: ADI_OPTIMISER_ACTION.RERUN,
       showPlan: false,

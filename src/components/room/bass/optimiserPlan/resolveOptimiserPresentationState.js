@@ -565,6 +565,27 @@ export function resolveOptimiserPresentationState({
     });
   }
 
+  // ── NON_ACTIONABLE_WINNER (legacy/fallback) ── a current plan whose placement
+  // lever is outside the practical, wall-based envelope. The improvement is real
+  // (a winner exists) but the movement is not buildable. This is a COMPLETED
+  // evaluation, never an error/incomplete state. Handles plans saved before the
+  // NON_ACTIONABLE_WINNER terminal outcome was introduced (no terminalOutcome
+  // field) and any plan whose status resolved to CURRENT with a non-practical
+  // placement lever rather than to the dedicated NON_ACTIONABLE_WINNER status.
+  if (status === OPTIMISER_PLAN_STATUS.CURRENT
+    && Array.isArray(planView?.levers)
+    && planView.levers.some((lever) => lever?.practical === false)) {
+    return build(OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER, {
+      message: OPTIMISER_OUTCOME_COPY[OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER].message,
+      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      evidence,
+      rerunAgain: true,
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
+      showApply: false,
+    });
+  }
+
   if (status === OPTIMISER_PLAN_STATUS.CURRENT) {
     // A current plan whose lever-level evidence is not complete enough to apply.
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {

@@ -35,6 +35,13 @@ import {
   resolveOptimiserPresentationState,
 } from "../src/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 import {
+  ADI_OPTIMISER_JOURNEY_STATE,
+  resolveAdiOptimiserJourney,
+} from "../src/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
+import {
+  presentationThemeState,
+} from "../src/components/room/bass/optimiserPlan/adiJourneyTheme.js";
+import {
   buildOptimiserPlan,
 } from "../src/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 
@@ -365,4 +372,273 @@ test("O: evaluated = saved = plan coordinate (end-to-end identity)", () => {
   // (resolveLeverApplyMap / applyPlacement reads plan.levers[PLACEMENT].changes[].toX.)
   const applyDestination = plan.levers[OPTIMISER_LEVER.PLACEMENT].changes[0].toX;
   assert.equal(applyDestination, evaluatedX, "Apply destination === evaluated value");
+});
+
+// ---------------------------------------------------------------------------
+// 12-POINT REGRESSION — NON_ACTIONABLE_WINNER is a COMPLETED state, never
+// EVALUATION_INCOMPLETE. Genuine incomplete/no-winner/trade-off/actionable
+// states remain unchanged.
+// ---------------------------------------------------------------------------
+
+// 1. NON_ACTIONABLE_WINNER → completed presentation state (not INCOMPLETE)
+test("1: NON_ACTIONABLE_WINNER → completed presentation state, not EVALUATION_INCOMPLETE", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.state, OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER);
+  assert.notEqual(state.state, OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE,
+    "must NEVER be EVALUATION_INCOMPLETE");
+});
+
+// 2. NON_ACTIONABLE_WINNER → never EVALUATION_INCOMPLETE (explicit)
+test("2: NON_ACTIONABLE_WINNER outcome is never RETEST_NEEDED (incomplete)", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.notEqual(state.outcome, OPTIMISER_OUTCOME.RETEST_NEEDED);
+  assert.notEqual(state.outcome, OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE);
+  assert.equal(state.outcome, OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER);
+});
+
+// 3. winner ID retained (already covered by test G — re-assert here)
+test("3: winner ID retained in presentation evidence path", () => {
+  const selection = {
+    winner: { candidateId: "winner-retained-xyz" },
+    confirmedResults: [],
+    currentResult: null,
+  };
+  const evidence = buildOptimiserRunEvidence({
+    selection,
+    terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_WINNER,
+    failureReason: `${OPTIMISER_WINNER_NON_PRACTICAL_REASON} Test reason.`,
+    runIdentity: { runId: "run-3", startedAt: "2026-01-01T00:00:00Z" },
+  });
+  assert.equal(evidence.run.winnerCandidateId, "winner-retained-xyz");
+});
+
+// 4. non-practical reason retained (already covered by test H — re-assert)
+test("4: non-practical reason retained, no generic no-winner wording", () => {
+  const reason = `${OPTIMISER_WINNER_NON_PRACTICAL_REASON} Off-wall placement.`;
+  const evidence = buildOptimiserRunEvidence({
+    selection: { winner: { candidateId: "w4" }, confirmedResults: [] },
+    terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_WINNER,
+    failureReason: reason,
+    runIdentity: { runId: "run-4", startedAt: "2026-01-01T00:00:00Z" },
+  });
+  assert.ok(evidence.run.rejectionReasons.some((r) => r.includes("not practical")));
+  assert.ok(!evidence.run.rejectionReasons.some((r) => r.includes("No candidate was confirmed")));
+});
+
+// 5. actionable = false
+test("5: NON_ACTIONABLE_WINNER is not actionable (showApply = false)", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.showApply, false, "must not offer Apply");
+});
+
+// 6. genuine EVALUATION_INCOMPLETE remains unchanged
+test("6: genuine EVALUATION_INCOMPLETE remains unchanged", () => {
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.INCOMPLETE,
+    run: { runId: "inc-1", terminal: true, evidenceContractVersion: 3 },
+    planVersion: 3,
+  };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.ok(
+    state.state === OPTIMISER_PRESENTATION_STATE.FAILED
+    || state.state === OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE,
+    "genuine incomplete must stay incomplete/failed",
+  );
+  assert.equal(state.showApply, false);
+});
+
+// 7. no-ranking-winner (NO_USEFUL_IMPROVEMENT) remains unchanged
+test("7: NO_USEFUL_IMPROVEMENT remains unchanged", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.state, OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
+  assert.equal(state.outcome, OPTIMISER_OUTCOME.NO_IMPROVEMENTS);
+  assert.equal(state.showApply, false);
+});
+
+// 8. trade-off remains unchanged
+test("8: TRADE_OFF remains unchanged", () => {
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.CURRENT,
+    terminalOutcome: null,
+    run: { runId: "to-1", terminal: true, evidenceContractVersion: 3 },
+    planVersion: 3,
+  };
+  const state = resolveOptimiserPresentationState({
+    planView,
+    tradeOff: { isTradeOff: true, headline: "Trade-off found" },
+  });
+  assert.equal(state.state, OPTIMISER_PRESENTATION_STATE.TRADE_OFF);
+  assert.equal(state.outcome, OPTIMISER_OUTCOME.TRADE_OFF);
+  assert.equal(state.showApply, false);
+});
+
+// 9. actionable recommendation remains unchanged
+test("9: actionable recommendation (PLAN_AVAILABLE) remains unchanged", () => {
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.CURRENT,
+    terminalOutcome: null,
+    run: { runId: "act-1", terminal: true, evidenceContractVersion: 3 },
+    planVersion: 3,
+    levers: [
+      {
+        key: OPTIMISER_LEVER.DELAY,
+        evaluated: true,
+        changes: [{ subId: "s1", fromMs: 0, toMs: 2.5 }],
+        effect: { p20DeltaDb: -1.5, p20VariationDb: 6.0, p20Level: "L2" },
+        canApply: true,
+      },
+    ],
+  };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.showApply, true, "PLAN_AVAILABLE must still offer Apply");
+  assert.ok(
+    state.outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND
+    || state.outcome === OPTIMISER_OUTCOME.PHYSICAL_CHANGE,
+  );
+});
+
+// 10. applied-this-run remains unchanged (showApply true for PLAN_AVAILABLE)
+test("10: applied-this-run path (PLAN_AVAILABLE with showApply) remains unchanged", () => {
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.CURRENT,
+    terminalOutcome: null,
+    run: { runId: "applied-1", terminal: true, evidenceContractVersion: 3 },
+    planVersion: 3,
+    levers: [
+      {
+        key: OPTIMISER_LEVER.GAIN,
+        evaluated: true,
+        changes: [{ subId: "s1", fromDb: 0, toDb: -1.0 }],
+        effect: { p20DeltaDb: -1.0, p20VariationDb: 5.5, p20Level: "L2" },
+        canApply: true,
+      },
+    ],
+  };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.showApply, true);
+});
+
+// 11. historical receipt precedence fix remains green
+test("11: fresh NON_ACTIONABLE_WINNER overrides historical applied receipt", () => {
+  // A fresh run with NON_ACTIONABLE_WINNER must produce the NON_ACTIONABLE_WINNER
+  // presentation state — not an applied state from a historical receipt.
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER,
+    terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_WINNER,
+    run: { runId: "fresh-naw-1", terminal: true, evidenceContractVersion: 3 },
+    planVersion: 3,
+  };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.state, OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER);
+  assert.equal(state.showApply, false, "historical receipt must not override fresh NON_ACTIONABLE_WINNER");
+});
+
+// 12. exact coordinate tests remain green (already covered by tests I-O — re-assert)
+test("12: exact coordinates preserved (regression re-assertion)", () => {
+  const instances = [instanceAt("sub-1", 0.5, 0.5)];
+  const plan = buildPlanWithCoords([{ x: 0.1375, y: 9.855 }], instances);
+  const change = plan.levers[OPTIMISER_LEVER.PLACEMENT].changes[0];
+  assert.equal(change.toX, 0.1375);
+  assert.equal(change.toY, 9.855);
+});
+
+// ---------------------------------------------------------------------------
+// JOURNEY RESOLVER — NON_ACTIONABLE_WINNER has its own branch, never falls
+// through to OPTIMISATION_REQUIRED or EVALUATION_INCOMPLETE.
+// ---------------------------------------------------------------------------
+
+test("J1: journey resolver produces NON_ACTIONABLE_WINNER for NON_ACTIONABLE_WINNER status", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER };
+  const journey = resolveAdiOptimiserJourney({ planView });
+  assert.equal(journey.state, ADI_OPTIMISER_JOURNEY_STATE.NON_ACTIONABLE_WINNER,
+    "journey must be NON_ACTIONABLE_WINNER, not OPTIMISATION_REQUIRED or EVALUATION_INCOMPLETE");
+  assert.notEqual(journey.state, ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE);
+  assert.notEqual(journey.state, ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED);
+});
+
+test("J2: journey NON_ACTIONABLE_WINNER status label states 'Placement Not Practical'", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER };
+  const journey = resolveAdiOptimiserJourney({ planView });
+  assert.ok(journey.statusLabel.includes("Placement Not Practical"),
+    "status label must state 'Placement Not Practical'");
+  assert.ok(!journey.statusLabel.includes("No Improvement"),
+    "must not say 'No Improvement Found'");
+});
+
+test("J3: journey NON_ACTIONABLE_WINNER message states improvement was found", () => {
+  const planView = { status: OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER };
+  const journey = resolveAdiOptimiserJourney({ planView });
+  assert.ok(journey.message.includes("better-performing option was found"),
+    "message must state a better-performing option was found");
+  assert.ok(journey.message.includes("not practical"),
+    "message must state the placement is not practical");
+});
+
+// ---------------------------------------------------------------------------
+// THEME MAPPING — NON_ACTIONABLE_WINNER has its own theme key, never falls
+// back to OPTIMISATION_REQUIRED or EVALUATION_INCOMPLETE theme.
+// ---------------------------------------------------------------------------
+
+test("T1: presentationThemeState maps NON_ACTIONABLE_WINNER to journey theme", () => {
+  const themeState = presentationThemeState(OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER);
+  assert.equal(themeState, ADI_OPTIMISER_JOURNEY_STATE.NON_ACTIONABLE_WINNER,
+    "theme must map to NON_ACTIONABLE_WINNER, not null/fallback");
+});
+
+test("T2: presentationThemeState does not map NON_ACTIONABLE_WINNER to EVALUATION_INCOMPLETE", () => {
+  const themeState = presentationThemeState(OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER);
+  assert.notEqual(themeState, ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE);
+  assert.notEqual(themeState, ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED);
+  assert.ok(themeState != null, "theme state must not be null");
+});
+
+// ---------------------------------------------------------------------------
+// LEGACY FALLBACK — a CURRENT plan with a non-practical placement lever (no
+// terminalOutcome) resolves to NON_ACTIONABLE_WINNER, not EVALUATION_INCOMPLETE.
+// ---------------------------------------------------------------------------
+
+test("LF1: legacy CURRENT plan with non-practical placement → NON_ACTIONABLE_WINNER (not INCOMPLETE)", () => {
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.CURRENT,
+    terminalOutcome: null,
+    levers: [
+      {
+        key: OPTIMISER_LEVER.PLACEMENT,
+        evaluated: true,
+        practical: false,
+        changes: [{ subId: "s1", toX: 0.145, toY: 9.855 }],
+        effect: { p20DeltaDb: -1.5, p20VariationDb: 6.0, p20Level: "L2" },
+        canApply: false,
+      },
+    ],
+  };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.equal(state.state, OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER,
+    "legacy non-practical placement must be NON_ACTIONABLE_WINNER, not EVALUATION_INCOMPLETE");
+  assert.notEqual(state.state, OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
+  assert.equal(state.showApply, false);
+});
+
+test("LF2: legacy CURRENT plan with non-practical placement message states improvement found", () => {
+  const planView = {
+    status: OPTIMISER_PLAN_STATUS.CURRENT,
+    terminalOutcome: null,
+    levers: [
+      {
+        key: OPTIMISER_LEVER.PLACEMENT,
+        evaluated: true,
+        practical: false,
+        changes: [{ subId: "s1", toX: 0.145, toY: 9.855 }],
+        effect: { p20DeltaDb: -1.5 },
+        canApply: false,
+      },
+    ],
+  };
+  const state = resolveOptimiserPresentationState({ planView });
+  assert.ok(state.message.includes("better-performing option was found"));
+  assert.ok(state.message.includes("not practical"));
 });
