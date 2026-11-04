@@ -181,6 +181,9 @@ function buildCurrentFinalist(subwooferInstances, roomDims) {
     sources: instances.map((inst) => ({
       xNorm: (Number(inst.position?.x) || 0) / W,
       yNorm: (Number(inst.position?.y) || 0) / L,
+      // Installed positions are ALREADY physical cabinet centres — they must
+      // pass through Stage 2 unchanged, not be re-converted as wall references.
+      coordinateSpace: "cabinet_centre",
       // Carry the installed source identity into the canonical evaluator.
       // Preview and Apply must use the same per-instance model and height.
       sourceId: inst.id,
@@ -304,9 +307,13 @@ function extractStage2Finalists(stage2Result, quantity, roomDims) {
     const coords = Array.isArray(f.coordinates) ? f.coordinates : null;
     if (!coords || coords.length !== quantity) continue;
     seen.add(id);
+    // Re-evaluated Stage 2 finalists already carry RESOLVED cabinet centres
+    // (the coordinates were produced by evaluateStage2Placement). They are
+    // cabinet-centre coordinates, not wall references — tag them so Stage 2
+    // uses them directly instead of re-applying a wall offset.
     const sources = (W > 0 && L > 0)
-      ? coords.map((c) => ({ xNorm: Number(c.x) / W, yNorm: Number(c.y) / L }))
-      : coords.map(() => ({ xNorm: 0, yNorm: 0 }));
+      ? coords.map((c) => ({ xNorm: Number(c.x) / W, yNorm: Number(c.y) / L, coordinateSpace: "cabinet_centre" }))
+      : coords.map(() => ({ xNorm: 0, yNorm: 0, coordinateSpace: "cabinet_centre" }));
     mapped.push({ ...f, id, sources });
   }
   return mapped;

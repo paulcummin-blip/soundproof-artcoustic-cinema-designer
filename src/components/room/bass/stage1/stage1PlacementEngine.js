@@ -214,6 +214,9 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
     sources: f.sources.map((s) => ({
       xNorm: s.xNorm,
       yNorm: s.yNorm,
+      // Stage 1 family coordinates are WALL references (a point on a wall
+      // plane). Stage 2 resolves them ONCE into a physical cabinet centre.
+      coordinateSpace: "wall_reference",
       x: round(s.xNorm * W, 3),
       y: round(s.yNorm * L, 3),
       z: STAGE1_FALLBACK_SOURCE_HEIGHT_M,

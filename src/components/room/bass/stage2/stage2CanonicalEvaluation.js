@@ -28,7 +28,7 @@ import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
 import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION, STAGE2_CANONICAL_VERSION } from "./stage2Constants";
 import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
-import { resolveInstallableWallCentre } from "./installableWallCentreAuthority";
+import { resolveCabinetCentre, validateCabinetBoundary, COORDINATE_SPACE } from "./installableWallCentreAuthority";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
 import { searchDelayOnly, searchLevelAndDelay, resumWithTuning } from "./stage2TuningSearch";
@@ -105,11 +105,16 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
   // exact coordinates evaluated here are the coordinates offered to the user
   // (no post-evaluation shift). Wall identity (front/rear) is derived from the
   // normalized yNorm, kept separate from the physical centre y.
+  // Each source carries an EXPLICIT coordinateSpace. A wall reference is
+  // resolved ONCE into a physical cabinet centre; an already-resolved cabinet
+  // centre passes through unchanged. The domain is never inferred from
+  // whether yNorm happens to sit near 0 or 1.
   const sourcePositions = finalist.sources.map((s, index) => {
-    const centre = resolveInstallableWallCentre({
+    const centre = resolveCabinetCentre({
       roomDims,
       xNorm: s.xNorm,
       yNorm: s.yNorm,
+      coordinateSpace: s.coordinateSpace,
       modelKey: sourceDescriptors[index].modelKey,
     });
     return {
@@ -117,6 +122,8 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       y: centre.y,
       z: sourceDescriptors[index].centreZ,
       mountingWall: centre.mountingWall,
+      cabinetWidthM: centre.cabinetWidthM,
+      cabinetDepthM: centre.cabinetDepthM,
     };
   });
 
@@ -156,6 +163,10 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       // Wall identity (front/rear) the placement was authored for, preserved
       // separately from the physical centre y (which is inside the room).
       mountingWall: sourcePositions[i].mountingWall,
+      // Cabinet extents carried so the placement validator can check the full
+      // cabinet volume stays inside the room without re-resolving dimensions.
+      cabinetWidthM: sourcePositions[i].cabinetWidthM,
+      cabinetDepthM: sourcePositions[i].cabinetDepthM,
       // Preserve normalised position for front/rear group splitting in
       // delay/level tuning search (confirmation phase re-summation).
       yNorm: s.yNorm,
@@ -279,6 +290,33 @@ export function evaluateStage2Placement({
   // can be captured for later re-summation with any tuning variant.
   const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition, true);
 
+  // Validate the FULL cabinet volume is inside the room BEFORE acoustic
+  // evaluation. A cabinet that cannot fit is a terminal physical rejection —
+  // never an acoustic evaluation, never missing evidence, never a worker
+  // exception. The boundary check uses the same wall buffer on every wall.
+  const boundaryResults = sources.map((s) => validateCabinetBoundary({
+    centre: { x: s.x, y: s.y },
+    roomDims,
+    cabinetWidthM: s.cabinetWidthM,
+    cabinetDepthM: s.cabinetDepthM,
+  }));
+  const failedBoundary = boundaryResults.find((v) => !v.valid);
+  if (failedBoundary) {
+    return {
+      finalistId: finalist.id,
+      familyId: finalist.familyId,
+      quantity: finalist.sources.length,
+      coordinates: sources.map((s) => ({ x: s.x, y: s.y })),
+      selectedProduct: normaliseModelKey(selectedSubModel),
+      physicalRejection: {
+        passed: false,
+        reason: "cabinet-boundary-violation",
+        violations: failedBoundary.violations,
+      },
+      terminal: true,
+    };
+  }
+
   const physics = buildStage2Physics();
   const simResult = simulateAuthoritativeBassResponse({
     roomDims,
@@ -311,19 +349,10 @@ export function evaluateStage2Placement({
   const usableLfHz = computeUsableLfHz(sources);
   const transitionHz = computeTransitionHz(roomDims);
 
-  // Recommended coordinates are the exact installable cabinet centres used for
-  // acoustic evaluation — no post-evaluation shift. The same authority and
-  // model key produce the same x/y as buildStage2Sources, so what the user sees
-  // is what the acoustic engine evaluated.
-  const coordinates = finalist.sources.map((s, i) => {
-    const centre = resolveInstallableWallCentre({
-      roomDims,
-      xNorm: s.xNorm,
-      yNorm: s.yNorm,
-      modelKey: sources[i]?.modelKey || normaliseModelKey(selectedSubModel),
-    });
-    return { x: centre.x, y: centre.y };
-  });
+  // Recommended coordinates are the EXACT cabinet centres the acoustic engine
+  // evaluated — the sources already carry the resolved x/y from
+  // resolveCabinetCentre. No post-evaluation shift: evaluated = recommended.
+  const coordinates = sources.map((s) => ({ x: s.x, y: s.y }));
 
   return {
     finalistId: finalist.id,
@@ -377,6 +406,34 @@ export function evaluateStage2Confirmation(rawTransfer, {
   const startedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
   if (!rawTransfer || !Number.isFinite(p14TargetDb)) return null;
+
+  // A placement that failed the cabinet-boundary check carries a terminal
+  // physical rejection. It is returned as a completed candidate outcome —
+  // no P14/P18/P19/P20 is fabricated — so the run is not incomplete and no
+  // evidence is reported as missing. The candidate validity authority
+  // classifies this as a terminal physical rejection.
+  if (rawTransfer.physicalRejection) {
+    return {
+      finalistId: rawTransfer.finalistId,
+      familyId: rawTransfer.familyId,
+      quantity: rawTransfer.quantity,
+      coordinates: rawTransfer.coordinates,
+      selectedProduct: rawTransfer.selectedProduct,
+      physicalRejection: rawTransfer.physicalRejection,
+      physicalValidation: {
+        passed: false,
+        reason: rawTransfer.physicalRejection.reason,
+        violations: rawTransfer.physicalRejection.violations,
+      },
+      terminal: true,
+      transitionHz: Number.isFinite(Number(rawTransfer?.transitionHz)) ? Number(rawTransfer.transitionHz) : null,
+      p14TargetBasis,
+      p14TargetLevel,
+      p14TargetDb,
+      runtimeMs: 0,
+      algorithmVersion: "stage2-canonical-v2",
+    };
+  }
 
   const seatPriorityMap = new Map(rawTransfer.seatPriorityMap || []);
   const { rspRawCurve, perSeatRawCurves, sources, usableLfHz, transitionHz } = rawTransfer;
@@ -530,7 +587,25 @@ export function evaluateStage2ConfirmationWithTuning(rawTransfer, {
   p18TargetBasis,
   correctabilityAssessment = null,
 }) {
-  if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length) return null;
+  if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length) {
+    // A physical-rejection rawTransfer carries no transfers by design. Delegate
+    // to the base confirmation, which returns the terminal physical rejection
+    // without fabricating any acoustic evidence, then tag the tuning variant.
+    if (rawTransfer?.physicalRejection) {
+      const base = evaluateStage2Confirmation(rawTransfer, {
+        p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
+      });
+      if (!base) return null;
+      return {
+        ...base,
+        tuningVariant,
+        appliedTuning: tuning || [],
+        crossover: null,
+        responseBasis: "sub-only",
+      };
+    }
+    return null;
+  }
   if (!Number.isFinite(p14TargetDb)) return null;
 
   const { sources, perSourcePerSeatComplexTransfers, seatIds, usableLfHz, transitionHz } = rawTransfer;

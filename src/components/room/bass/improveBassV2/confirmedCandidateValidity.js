@@ -92,6 +92,7 @@ export function applicableSeatsFromResult(result) {
 export const CANDIDATE_ASSESSABILITY_REASON = {
   NO_VALID_P19_P20_ASSESSMENT_BAND: "NO_VALID_P19_P20_ASSESSMENT_BAND",
   P14_OPERATING_POINT_NOT_ACHIEVED: "P14_OPERATING_POINT_NOT_ACHIEVED",
+  PHYSICAL_PLACEMENT_REJECTED: "PHYSICAL_PLACEMENT_REJECTED",
 };
 
 const finiteNum = (value) =>
@@ -126,6 +127,23 @@ const finiteNum = (value) =>
  * so Engineering Mode can state them.
  */
 export function classifyCandidateAssessability(result) {
+  // PHYSICAL PLACEMENT REJECTION is the most upstream terminal outcome: the
+  // cabinet volume could not be kept inside the room, so no acoustic
+  // evaluation was attempted. It is a completed candidate rejection — no
+  // P14/P18/P19/P20 is fabricated — and it never makes the run incomplete or
+  // reports evidence as missing. Checked before P14 because placement is the
+  // prerequisite of every operating-point assessment.
+  if (result?.physicalRejection?.passed === false) {
+    return {
+      assessable: false,
+      reason: CANDIDATE_ASSESSABILITY_REASON.PHYSICAL_PLACEMENT_REJECTED,
+      achievedP18Hz: null,
+      transitionHz: finiteNum(result?.transitionHz) ? Number(result.transitionHz) : null,
+      p14AchievedDb: null,
+      p14TargetDb: finiteNum(result?.p14TargetDb) ? Number(result.p14TargetDb) : null,
+      p14NotAchievedReason: null,
+    };
+  }
   // P14 operating-point failure is checked FIRST: it is the upstream canonical
   // prerequisite. requestedP14Pass === false (strict) is the authority's
   // explicit FAIL — a null/non-finite P14 (genuine missing evidence) does NOT

@@ -2,6 +2,7 @@ import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults.js";
 import { STAGE2_PLACEMENT_VERSION, STAGE2_PRODUCT_ENGINEERING_VERSION } from "./stage2Constants.js";
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { resolveSubwooferBassCapability } from "@/components/utils/speakerModelResolver";
+import { resolveCabinetCentre } from "./installableWallCentreAuthority";
 
 // Companion to the existing Stage 2 finalist cache. Only completed V2 placement
 // work is admitted: full product-shaped, ZERO-tuning complex data, never flat
@@ -36,9 +37,11 @@ export function fullTransferIdentity(params, basis = FULL_TRANSFER_BASIS) {
   // consumes receiver geometry. Retag below before ANY proxy/canonical use.
   const receivers = (seatingPositions || []).map(({ priority, isPrimary, isSecondary, ...seat }) => seat);
   return exactTransferIdentity({ basis, ...input,
-    // buildStage2Sources consumes only these ordered source coordinates.
+    // buildStage2Sources consumes only these ordered source coordinates,
+    // including the explicit coordinateSpace that decides whether they are
+    // wall references (resolved once) or already-resolved cabinet centres.
     // Preserve order: a reorder safely misses rather than reusing wrong indices.
-    sources: finalist.sources.map(({ xNorm, yNorm }) => ({ xNorm, yNorm })),
+    sources: finalist.sources.map(({ xNorm, yNorm, coordinateSpace }) => ({ xNorm, yNorm, coordinateSpace })),
     receivers,
     product: MODELS.find(model => model.key === normaliseModelKey(params.selectedSubModel)),
     capability: resolveSubwooferBassCapability(params.selectedSubModel),
@@ -63,8 +66,21 @@ function completeFullTransfer(raw, params) {
       !Array.isArray(transfers) || transfers.length !== sources.length * seats.length) return false;
   const expectedSeats = ["rsp", ...(params.seatingPositions || []).map(s => String(s.id || `${s.x}-${s.y}`))];
   if (seats.some((id,i) => id !== expectedSeats[i]) || raw.selectedProduct !== normaliseModelKey(params.selectedSubModel) ||
-      sources.some((s,i) => s.x !== params.finalist.sources[i].xNorm * Number(params.roomDims.widthM) ||
-        s.y !== params.finalist.sources[i].yNorm * Number(params.roomDims.lengthM))) return false;
+      sources.some((s,i) => {
+        // The cached source position must match what resolveCabinetCentre
+        // produces for this finalist source NOW, honouring its coordinateSpace:
+        // a wall reference is resolved to a cabinet centre, a cabinet centre
+        // passes through. Comparing against raw xNorm*W would reject a valid
+        // side/corner wall-reference transfer (its x is buffer + width/2).
+        const expected = resolveCabinetCentre({
+          roomDims: params.roomDims,
+          xNorm: params.finalist.sources[i].xNorm,
+          yNorm: params.finalist.sources[i].yNorm,
+          coordinateSpace: params.finalist.sources[i].coordinateSpace,
+          modelKey: s.modelKey,
+        });
+        return s.x !== expected.x || s.y !== expected.y;
+      })) return false;
   const grid = raw.rspRawCurve;
   if (grid?.length !== 360 || grid[0]?.frequency !== 15 || Math.abs(grid.at(-1)?.frequency - 200) > 1e-10 ||
       !grid.every(p => Number.isFinite(p.frequency) && Number.isFinite(p.spl))) return false;

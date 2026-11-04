@@ -163,10 +163,10 @@ export function evaluateSeatingBatch({
   const seatPriorityMap = buildSeatPriorityMap(candidates[0]?.seatingPositions || []);
   const usableLfHz = computeUsableLfHz(sources);
   const transitionHz = computeTransitionHz(roomDims);
-  const coordinates = finalist.sources.map((s) => ({
-    x: s.xNorm * Number(roomDims.widthM),
-    y: s.yNorm * Number(roomDims.lengthM),
-  }));
+  // Recommended coordinates are the EXACT cabinet centres the acoustic engine
+  // evaluated (the built sources already carry the resolved x/y). No
+  // post-evaluation shift: evaluated = recommended.
+  const coordinates = sources.map((s) => ({ x: s.x, y: s.y }));
 
   // ── 4. Iterate offsets — evaluate receivers from prepared field ────────
   const results = [];
