@@ -84,7 +84,7 @@ import {
 // save acknowledgement and run history row carries a non-null runId regardless
 // of entry button, winner or terminal outcome.
 import { beginOptimiserRun } from "@/components/room/bass/optimiserPlan/optimiserRunAuthority.js";
-import { persistOptimiserRunHistory } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
+import { persistOptimiserRunHistory, updateOptimiserRunHistoryPublication } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
 import {
   RUN_TIMING,
   beginRunTimings,
@@ -333,11 +333,21 @@ export default function OptimiseAndCalculate({
     // history row so a winnerless re-test records "no_useful_improvement" rather
     // than "actionable_plan".
     let runTerminalStatus = "actionable_plan";
+    // ── OPTIMISER COMPLETION IS A SEPARATE LIFECYCLE EVENT FROM PUBLICATION ──
+    // Once the optimiser engine returns a result (not cancelled/error/blocked),
+    // the run has completed. A later publication failure (HTTP 429, timeout)
+    // must NOT relabel this run as "failed" or erase its history — the optimiser
+    // completed, only the publication failed.
+    let optimiserCompleted = false;
+    // The pre-written history row's existence. When true, the catch block updates
+    // the existing row instead of creating a new one — so the completed run's
+    // terminal status survives a publication failure.
+    let historyPreWritten = false;
     const logRunHistory = (facts = {}) => {
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
       const timings = getRunTimings(projectId, versionId);
       const live = sharedRef.current;
-      Promise.resolve(persistOptimiserRunHistory({
+      return persistOptimiserRunHistory({
         runId: activeRun.runId,
         projectId,
         versionId,
@@ -365,7 +375,7 @@ export default function OptimiseAndCalculate({
           runId: activeRun.runId,
           timings: buildPersistedRunTimings(timings),
         },
-      })).catch(() => {});
+      }).catch(() => null);
     };
     const saveRunFailure = (reason, extra = {}) => {
       const current = sharedRef.current;
@@ -480,6 +490,12 @@ export default function OptimiseAndCalculate({
         setWorkflowError(projectId, versionId, result.error);
         return;
       }
+
+      // ── OPTIMISER COMPLETION BOUNDARY ──
+      // The optimiser engine returned a result (not cancelled/error/blocked).
+      // From this point, the run HAS completed — a later publication failure
+      // is a publication lifecycle event, not an optimiser failure.
+      optimiserCompleted = true;
 
       // ── ADI: Consume the optimiser's authoritative result ──────────
       // ADI is a pure reasoning module. It receives the optimiser's
@@ -657,6 +673,18 @@ export default function OptimiseAndCalculate({
         if (!persisted) throw new Error("The published ADI recommendation could not be saved.");
       };
       await publishCurrentAdiRecommendation();
+
+      // ── PRE-WRITE THE RUN HISTORY BEFORE ANY PUBLICATION WAIT ──
+      // The optimiser has completed and its plan is saved. Write the durable
+      // history row NOW with publicationStatus "pending", so a later publication
+      // failure (HTTP 429, timeout) can never erase this completed run's
+      // record. The row is finalised in place by the success path ("published")
+      // or the catch block ("failed") — whichever the publication outcome is.
+      logRunHistory({
+        terminalStatus: runTerminalStatus,
+        publicationStatus: "pending",
+      });
+      historyPreWritten = true;
 
       // Phase 3: Route through the Recommendation Authority
       // The optimiser's calibration tuning is now a RECOMMENDATION, not an
@@ -846,23 +874,64 @@ export default function OptimiseAndCalculate({
       // startedAt/completedAt belong to THIS re-test run, never inherited from
       // the previous optimiser result. The previous run's history row is
       // preserved (beginOptimiserRun appends; it never overwrites).
+      //
+      // The row was pre-written with publicationStatus "pending" before the
+      // publication wait. Finalise it in place: update the existing row to
+      // "published" so the completed run's record carries the real outcome.
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
-      logRunHistory({
-        terminalStatus: runTerminalStatus,
+      Promise.resolve(updateOptimiserRunHistoryPublication({
+        runId: activeRun.runId,
+        projectId,
+        versionId,
         publicationStatus: "published",
-      });
+        publicationCompletedAt: new Date().toISOString(),
+      })).catch(() => {});
       setComplete(projectId, versionId, autoApplied, recommendations, noImprovements);
     } catch (err) {
       const reason = err?.message || "Optimisation failed.";
-      // A genuinely failed re-test still carries its runId in the saved
-      // incomplete/failure evidence and history — never a null runId.
-      saveRunFailure(reason);
-      logRunHistory({
-        terminalStatus: "failed",
-        publicationStatus: "not_attempted",
-        publicationError: reason,
-      });
-      setWorkflowError(projectId, versionId, err.message);
+      if (optimiserCompleted) {
+        // ── PUBLICATION FAILURE, NOT OPTIMISER FAILURE ──
+        // The optimiser completed and its plan is saved. The error is from a
+        // later lifecycle event — the bass recalculation/publication, or the
+        // recommendation re-publish. This is a PUBLICATION failure, not an
+        // optimiser failure: the run's terminal status is the optimiser's own
+        // outcome, and the publication failed. Do NOT overwrite the completed
+        // plan with failure evidence (saveRunFailure) — that would relabel a
+        // completed run as incomplete.
+        const userMessage = "The optimisation completed, but the updated bass result could not be published. Retry the update.";
+        if (historyPreWritten) {
+          // Finalise the pre-written "pending" row in place.
+          Promise.resolve(updateOptimiserRunHistoryPublication({
+            runId: activeRun.runId,
+            projectId,
+            versionId,
+            publicationStatus: "failed",
+            publicationError: reason,
+            publicationCompletedAt: new Date().toISOString(),
+          })).catch(() => {});
+        } else {
+          // The pre-write itself did not land (e.g. the first recommendation
+          // publish threw before it). Create the row now with the correct
+          // terminal status — the optimiser's own outcome, not "failed".
+          logRunHistory({
+            terminalStatus: runTerminalStatus,
+            publicationStatus: "failed",
+            publicationError: reason,
+          });
+        }
+        setWorkflowError(projectId, versionId, userMessage);
+      } else {
+        // ── GENUINE OPTIMISER FAILURE (before completion) ──
+        // A genuinely failed re-test still carries its runId in the saved
+        // incomplete/failure evidence and history — never a null runId.
+        saveRunFailure(reason);
+        logRunHistory({
+          terminalStatus: "failed",
+          publicationStatus: "not_attempted",
+          publicationError: reason,
+        });
+        setWorkflowError(projectId, versionId, err.message);
+      }
     } finally {
       runningRef.current = false;
       phaseRef.current = "idle";

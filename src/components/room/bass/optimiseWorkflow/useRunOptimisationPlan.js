@@ -49,7 +49,7 @@ import {
   recordRunTiming,
   runTimingAt,
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
-import { persistOptimiserRunHistory } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
+import { persistOptimiserRunHistory, updateOptimiserRunHistoryPublication } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import {
   buildRecommendationPublicationRecord,
@@ -109,11 +109,20 @@ export default function useRunOptimisationPlan({
     // write is dispatched without being awaited.
     let measuredRuntime = null;
     let publicationDiagnostics = null;
+    // ── OPTIMISER COMPLETION IS A SEPARATE LIFECYCLE EVENT FROM PUBLICATION ──
+    // Once the plan is saved and acknowledged, the run is terminal. A later
+    // publication failure must NOT relabel it as "failed" or erase its history.
+    let optimiserCompleted = false;
+    let historyPreWritten = false;
+    // The terminal status the optimiser's own outcome determined, tracked so the
+    // catch block can record it for a completed run without referencing
+    // try-scoped variables.
+    let runTerminalStatus = "actionable_plan";
     const logRunHistory = (facts = {}) => {
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
       const timings = getRunTimings(projectId, versionId);
       const live = sharedRef.current;
-      Promise.resolve(persistOptimiserRunHistory({
+      return persistOptimiserRunHistory({
         runId: activeRun.runId,
         projectId,
         versionId,
@@ -146,7 +155,7 @@ export default function useRunOptimisationPlan({
           timings: buildPersistedRunTimings(timings),
           publication: publicationDiagnostics,
         },
-      })).catch(() => {});
+      }).catch(() => null);
     };
 
     // Every fresh run gets a durable terminal record, including early or thrown
@@ -443,6 +452,12 @@ export default function useRunOptimisationPlan({
       }
       recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED, { at: savedAt });
 
+      // ── OPTIMISER COMPLETION BOUNDARY ──
+      // The plan is saved and acknowledged. From this point the run HAS
+      // completed — a later publication failure is a publication lifecycle
+      // event, not an optimiser failure.
+      optimiserCompleted = true;
+
       // ── 2. THE TERMINAL AUTHORITY, WRITTEN AT PLAN SAVE ──
       // The run is terminal here — from its own durable plan, never from a
       // publication that has not happened yet. `userTerminalAt` is this instant,
@@ -455,6 +470,18 @@ export default function useRunOptimisationPlan({
         runtimeBreakdown,
       });
       setStatus("complete");
+
+      // ── PRE-WRITE THE RUN HISTORY BEFORE THE PUBLICATION ──
+      // The run is terminal. Write the durable history row NOW with
+      // publicationStatus "pending", so a later publication failure can never
+      // erase this completed run's record. The row is finalised in place by
+      // the success path or the catch block.
+      runTerminalStatus = persistedPlan ? "actionable_plan" : "no_useful_improvement";
+      logRunHistory({
+        terminalStatus: runTerminalStatus,
+        publicationStatus: "pending",
+      });
+      historyPreWritten = true;
 
       // ── 3. THE RECOMMENDATION PUBLICATION — SECONDARY, NEVER BLOCKING ──
       // ONE publication operation per run, exactly as before, and exactly one
@@ -492,25 +519,61 @@ export default function useRunOptimisationPlan({
         recommendationPublication,
       });
 
-      logRunHistory({
+      // Finalise the pre-written "pending" row in place with the publication's
+      // real outcome — so the completed run's record carries what actually
+      // happened, and the run's own terminal status is never relabelled.
+      Promise.resolve(updateOptimiserRunHistoryPublication({
+        runId: activeRun.runId,
+        projectId,
+        versionId,
         terminalStatus: persistedPlan ? "actionable_plan" : "no_useful_improvement",
         publicationStatus: recommendationPublication.status,
         publicationError: recommendationPublication.error,
-        // The fingerprints the publication actually wrote, from its own result —
-        // diagnostic identity only.
+        publicationCompletedAt: new Date().toISOString(),
         fingerprintsPublished: recommendationPublication.fingerprints,
-        runtimeBreakdown,
-      });
+        runtimeBreakdown: {
+          ...runtimeBreakdown,
+          runId: activeRun.runId,
+          timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+          publication: publicationDiagnostics,
+        },
+      })).catch(() => {});
     } catch (err) {
       const reason = err?.message || "The optimiser could not complete. Re-run the Optimisation Plan.";
-      saveRunFailure(reason);
-      logRunHistory({
-        terminalStatus: "failed",
-        publicationStatus: "not_attempted",
-        publicationError: reason,
-      });
-      setStatus("failed");
-      setError(reason);
+      if (optimiserCompleted) {
+        // ── PUBLICATION FAILURE, NOT OPTIMISER FAILURE ──
+        // The plan was saved and the run is terminal. The error is from the
+        // secondary publication, not the optimiser. Do NOT overwrite the
+        // completed plan with failure evidence.
+        if (historyPreWritten) {
+          Promise.resolve(updateOptimiserRunHistoryPublication({
+            runId: activeRun.runId,
+            projectId,
+            versionId,
+            publicationStatus: "failed",
+            publicationError: reason,
+            publicationCompletedAt: new Date().toISOString(),
+          })).catch(() => {});
+        } else {
+          logRunHistory({
+            terminalStatus: runTerminalStatus,
+            publicationStatus: "failed",
+            publicationError: reason,
+          });
+        }
+        setStatus("failed");
+        setError("The optimisation completed, but the recommendation could not be published.");
+      } else {
+        // ── GENUINE OPTIMISER FAILURE (before completion) ──
+        saveRunFailure(reason);
+        logRunHistory({
+          terminalStatus: "failed",
+          publicationStatus: "not_attempted",
+          publicationError: reason,
+        });
+        setStatus("failed");
+        setError(reason);
+      }
     } finally {
       runningRef.current = false;
       phaseRef.current = "idle";

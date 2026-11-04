@@ -209,6 +209,60 @@ export async function persistOptimiserRunHistory(entry = {}, { prune = true } = 
   return written;
 }
 
+/**
+ * Update an existing run history row's publication fields by run_id. Never
+ * throws. Used when the run's terminal row was pre-written (publicationStatus
+ * "pending") and the publication outcome is now known — so a completed run's
+ * record is finalised in place rather than re-created.
+ *
+ * Returns { ok, id } on success, { ok: false, error: "row_not_found" } when no
+ * row exists for this run yet (so the caller can fall back to creating one).
+ */
+export async function updateOptimiserRunHistoryPublication({
+  runId = null,
+  projectId = null,
+  versionId = null,
+  publicationStatus = null,
+  publicationError = null,
+  publicationCompletedAt = null,
+  fingerprintsPublished = [],
+  publicationAttemptCount = 0,
+  terminalStatus = null,
+  runtimeBreakdown = null,
+} = {}) {
+  const run = text(runId);
+  const project = text(projectId);
+  const version = text(versionId);
+  if (!run || !project || !version) return { ok: false, error: "incomplete_run_identity" };
+  try {
+    const page = await base44.entities.OptimiserRunHistory.filter(
+      { run_id: run, project_id: project, version_id: version },
+      { sort: "-started_at", limit: 1 },
+    );
+    const rows = Array.isArray(page?.items) ? page.items : [];
+    if (rows.length === 0) return { ok: false, error: "row_not_found" };
+    const row = rows[0];
+    const update = {
+      publication_status: text(publicationStatus),
+      publication_error: text(publicationError),
+      publication_completed_at: text(publicationCompletedAt),
+      publication_attempt_count: count(publicationAttemptCount),
+    };
+    if (terminalStatus) update.terminal_status = text(terminalStatus);
+    if (Array.isArray(fingerprintsPublished) && fingerprintsPublished.length) {
+      update.fingerprints_published = [...new Set(fingerprintsPublished.filter(Boolean).map(String))].slice(0, 4);
+    }
+    if (runtimeBreakdown) {
+      update.runtime_breakdown = compactRuntimeBreakdown(runtimeBreakdown);
+    }
+    await base44.entities.OptimiserRunHistory.update(row.id, update);
+    return { ok: true, id: row.id };
+  } catch (error) {
+    console.warn("[optimiserRunHistory] history update failed:", error?.message || error);
+    return { ok: false, error: error?.message || "run_history_update_failed" };
+  }
+}
+
 /** The retained rows for one version, newest first. Read-only. */
 export async function readOptimiserRunHistory({ projectId, versionId, limit = OPTIMISER_RUN_HISTORY_LIMIT } = {}) {
   if (!projectId || !versionId) return [];
