@@ -78,6 +78,13 @@ export const OPTIMISER_OUTCOME = Object.freeze({
   IMPROVEMENTS_FOUND: "improvements_found",
   PHYSICAL_CHANGE: "physical_change",
   /**
+   * A ranking winner was found but its placement is not a practical, wall-based
+   * installation. The improvement is real but not actionable as a default.
+   * Distinct from NO_IMPROVEMENTS so the panel never states "no improvement
+   * found" for a run that DID find a better-performing option.
+   */
+  NON_ACTIONABLE_WINNER: "non_actionable_winner",
+  /**
    * The overall result improves but a protected primary seat (or the other
    * protected objective) gets worse. Not an actionable improvement: the designer
    * approves the trade-off deliberately, or keeps the current design.
@@ -97,6 +104,7 @@ export const OPTIMISER_OUTCOME_LABEL = Object.freeze({
   [OPTIMISER_OUTCOME.NO_IMPROVEMENTS]: "No Improvement Found",
   [OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]: "Improvement Found",
   [OPTIMISER_OUTCOME.PHYSICAL_CHANGE]: "Physical Change Recommended",
+  [OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER]: "Improvement Found — Placement Not Practical",
   [OPTIMISER_OUTCOME.TRADE_OFF]: "Trade-off Found",
   [OPTIMISER_OUTCOME.RETEST_NEEDED]: "Re-test Needed",
   [OPTIMISER_OUTCOME.BASS_UPDATE_REQUIRED]: "Bass Performance Needs Updating",
@@ -117,6 +125,7 @@ export const OPTIMISER_OUTCOME_BY_STATE = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.RUNNING]: null,
   [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND,
   [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: OPTIMISER_OUTCOME.NO_IMPROVEMENTS,
+  [OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER]: OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER,
   [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
   [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
   [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE,
@@ -143,6 +152,10 @@ export const OPTIMISER_OUTCOME_COPY = Object.freeze({
     // The change itself is stated with its own Apply/Undo controls below, and it
     // is never applied by ADI.
     detail: "The change is stated below. ADI has not applied it.",
+  },
+  [OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER]: {
+    message: "A better-performing option was found, but the placement is not practical for this room.",
+    detail: null,
   },
   [OPTIMISER_OUTCOME.TRADE_OFF]: {
     message: TRADE_OFF_HEADLINE,
@@ -185,6 +198,7 @@ export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.RUNNING]: "Optimisation running",
   [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND],
   [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.NO_IMPROVEMENTS],
+  [OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER],
   [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.RETEST_NEEDED],
   [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.RETEST_NEEDED],
   [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE],
@@ -442,6 +456,23 @@ export function resolveOptimiserPresentationState({
       evidence,
       // The search COMPLETED and confirmed nothing. That result is the designer's
       // to re-check deliberately at any time: RUN ADI AGAIN, on this same design.
+      rerunAgain: true,
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
+      showApply: false,
+    });
+  }
+
+  // ── NON_ACTIONABLE_WINNER ── a ranking winner was confirmed but its placement
+  // is not a practical, wall-based installation. The improvement is real but not
+  // actionable. Distinct from NO_USEFUL_IMPROVEMENT: the panel states "improvement
+  // found but not practical", never "no improvement found". The winner id and the
+  // non-practical reason are preserved in the run evidence (Engineer details).
+  if (status === OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER) {
+    return build(OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER, {
+      message: OPTIMISER_OUTCOME_COPY[OPTIMISER_OUTCOME.NON_ACTIONABLE_WINNER].message,
+      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      evidence,
       rerunAgain: true,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: ADI_RERUN_AGAIN_LABEL,

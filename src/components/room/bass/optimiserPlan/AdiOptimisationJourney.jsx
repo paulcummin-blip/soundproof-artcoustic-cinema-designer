@@ -183,10 +183,31 @@ export default function AdiOptimisationJourney({
   designLimitation = null,
   className = "",
 }) {
-  const jointCurrent = jointRecommendation?.candidate?.integrationVerified && (
-    jointRecommendation.baselineCacheKey === currentDesignFingerprint ||
-    jointRecommendation.appliedCacheKey === currentDesignFingerprint
-  );
+  const jointReceiptOwnsPanel = (() => {
+    const receiptCurrent = jointRecommendation?.candidate?.integrationVerified && (
+      jointRecommendation.baselineCacheKey === currentDesignFingerprint ||
+      jointRecommendation.appliedCacheKey === currentDesignFingerprint
+    );
+    if (!receiptCurrent) return false;
+    // FRESH RUN AUTHORITY: a fresh run's own terminal outcome outranks a
+    // historical applied receipt. The historical receipt is preserved (visible
+    // in Engineer details and via the applied calibration authority), but it
+    // must not override the current run's own outcome on the main panel. Applied
+    // wording is shown only when the current run itself produced the applied
+    // state — an old receipt alone is never enough.
+    const FRESH_RUN_SUPERSEDES_RECEIPT_STATES = new Set([
+      OPTIMISER_PRESENTATION_STATE.TRADE_OFF,
+      OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT,
+      OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER,
+      OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE,
+      OPTIMISER_PRESENTATION_STATE.FAILED,
+    ]);
+    if (presentation != null
+      && FRESH_RUN_SUPERSEDES_RECEIPT_STATES.has(presentation.state)) {
+      return false;
+    }
+    return true;
+  })();
   const planView = useOptimiserPlanView({
     projectId,
     versionId,
@@ -811,7 +832,7 @@ export default function AdiOptimisationJourney({
   // The joint option has its own canonical verification and persisted receipt.
   // A legacy placement-plan re-test state must not contradict that receipt.
   // During a new run the normal progress/cancel presentation remains active.
-  if (jointCurrent && !isRunning) return (
+  if (jointReceiptOwnsPanel && !isRunning) return (
     <div className={`rounded-lg border border-stone-300 px-4 py-3 space-y-3 ${className}`}>
       <div className="font-semibold">Bass Optimisation — Powered by ADI</div>
       <p className="text-sm">{jointRecommendation.status === "applied"
@@ -861,15 +882,15 @@ export default function AdiOptimisationJourney({
       <AdiPanelSummary
         // A confirmed improvement states its own sentence — found, or already
         // applied — in place of the generic evaluation line.
-        message={jointCurrent ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.") : improvementResult.headlineSentence || journey.message}
+        message={jointReceiptOwnsPanel ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.") : improvementResult.headlineSentence || journey.message}
         nextAction={presentation?.nextAction || null}
         // In the trade-off state the decision IS the trade-off: the change, the
         // seat it would cost and the measurable trade replace the ordinary
         // adjustment/benefit/comparison lines, which would state it as an offer.
         tradeOff={tradeOff?.isTradeOff ? tradeOff : null}
-        adjustment={jointCurrent || previousCandidate || tradeOff ? null : headline.adjustment}
-        benefit={jointCurrent || previousCandidate || tradeOff ? null : headline.benefit}
-        comparison={jointCurrent || previousCandidate || tradeOff ? null : headline.comparison}
+        adjustment={jointReceiptOwnsPanel || previousCandidate || tradeOff ? null : headline.adjustment}
+        benefit={jointReceiptOwnsPanel || previousCandidate || tradeOff ? null : headline.benefit}
+        comparison={jointReceiptOwnsPanel || previousCandidate || tradeOff ? null : headline.comparison}
         designLimitation={designLimitation}
         previousCandidateNotice={previousCandidate && !tradeOff ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
         staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
@@ -881,7 +902,7 @@ export default function AdiOptimisationJourney({
           main panel. The designer never opens Engineer details to discover the
           basic answer. Rendered only for a confirmed improvement: a trade-off and
           a physical move keep their own presentation. */}
-      {!jointCurrent && improvementResult.found && <AdiImprovementResult result={improvementResult} />}
+      {!jointReceiptOwnsPanel && improvementResult.found && <AdiImprovementResult result={improvementResult} />}
 
       {/* ── THE ACTIONS ── one primary control for the state, decided by the
           layout model, beside the controls of the change being offered. The

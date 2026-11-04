@@ -124,8 +124,8 @@ function placementChanges({ positionResult, instances }) {
       subId: instance.id,
       label: describeSub(instances, instance),
       group: instance.legacyGroup || null,
-      fromX: round(fromX), fromY: round(fromY),
-      toX: round(toX), toY: round(toY),
+      fromX, fromY,
+      toX, toY,
       distanceMm: Math.round(distanceM * 1000),
       direction: describeDirection(dx, dy),
     });
@@ -308,8 +308,8 @@ function combinedComponents({ winner, instances, seatingPositions, coordinates }
         sourceCandidateId: from.positionCandidateId || null,
         subCount: coordinates.length,
         coordinates: coordinates.map((coordinate) => ({
-          x: round(coordinate?.x),
-          y: round(coordinate?.y),
+          x: num(coordinate?.x),
+          y: num(coordinate?.y),
         })),
       }
       : null,
@@ -577,8 +577,8 @@ export function buildOptimiserPlan({
       candidateId: winner.candidateId || null,
       coordinates: Array.isArray(combinedCoordinates)
         ? combinedCoordinates.map((coordinate) => ({
-          x: round(coordinate?.x),
-          y: round(coordinate?.y),
+          x: num(coordinate?.x),
+          y: num(coordinate?.y),
         }))
         : null,
       tuning: combinedTuning(winner, instances),
