@@ -23,10 +23,9 @@
 // recalculates nothing, and changes no bass maths, scoring or RP22 grading.
 // ---------------------------------------------------------------------------
 
-import { OPTIMISER_LEVER, OPTIMISER_TERMINAL_OUTCOME } from "./optimiserPlanConstants.js";
+import { OPTIMISER_LEVER, OPTIMISER_TERMINAL_OUTCOME, OPTIMISER_WINNER_NON_PRACTICAL_REASON } from "./optimiserPlanConstants.js";
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { leverLabel } from "./optimiserLeverOrder.js";
-import { PLACEMENT_THEORETICAL_NOTE } from "./placementMoveAuthority.js";
 import {
   buildActionableOptimiserRunSummary,
   buildOptimiserRunEvidence,
@@ -176,6 +175,10 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
   // A retained placement result outside the practical envelope is stated as
   // exactly that: the improvement is real, the movement is not offered as
   // default placement, and nothing is silently dropped.
+  // A ranking winner EXISTS but its placement is not practical. This is NOT the
+  // "no ranking winner" case — the improvement is real, the movement is not
+  // buildable. The dedicated reason states exactly that distinction so the
+  // generic no-winner wording is never appended on top of it.
   const theoreticalPlacement = Object.values(levers)
     .find((lever) => lever.lever === OPTIMISER_LEVER.PLACEMENT && lever.practical === false);
   if (theoreticalPlacement) {
@@ -183,7 +186,7 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
     return {
       actionable: false,
       terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
-      reason: `${PLACEMENT_THEORETICAL_NOTE}${detail}`,
+      reason: `${OPTIMISER_WINNER_NON_PRACTICAL_REASON}${detail}`,
       offerableLevers: [],
     };
   }

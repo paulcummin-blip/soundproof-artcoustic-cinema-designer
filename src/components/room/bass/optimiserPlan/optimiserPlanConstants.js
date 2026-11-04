@@ -146,10 +146,22 @@ export const OPTIMISER_RECORD_KIND = Object.freeze({
 
 /**
  * Why a run can finish with no winner. Stated with the evidence rather than
- * presented as an available recommendation.
+ * presented as an available recommendation. This is the NO RANKING WINNER
+ * case: no candidate was confirmed, so there is nothing to offer.
  */
 export const OPTIMISER_NO_WINNER_REASON =
   "No candidate was confirmed as a winner: every evaluated candidate was rejected before a winner could be established.";
+
+/**
+ * RANKING WINNER EXISTS BUT NOT PRACTICAL. A better-performing candidate WAS
+ * confirmed by the ranking, but its placement is not a practical, wall-based
+ * installation and cannot be offered as a default. This is distinct from
+ * OPTIMISER_NO_WINNER_REASON: a winner exists, the improvement is real, the
+ * movement is not buildable. Stated with the evidence instead of the generic
+ * no-winner wording so the designer understands the distinction.
+ */
+export const OPTIMISER_WINNER_NON_PRACTICAL_REASON =
+  "A better-performing option was found, but the placement is not practical and is not offered as a default.";
 
 /** Stated with every terminal no-winner record. */
 export const OPTIMISER_DESIGN_UNCHANGED =
