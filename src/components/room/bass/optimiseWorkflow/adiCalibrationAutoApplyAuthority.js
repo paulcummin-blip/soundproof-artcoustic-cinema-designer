@@ -546,7 +546,12 @@ export function describeRearGroupOffset(settings) {
   }));
   const signed = resolveSignedRearOffsetMs({ changes });
   if (signed == null) {
-    return "The delay change is applied to the adjusted group; the physical group order is not recorded, so no signed rear offset is claimed.";
+    // NEUTRAL WORDING: this statement describes the delay change itself, not
+    // whether it was applied. The applied/held distinction is owned by the
+    // persisted terminal decision (OPTIMISER_APPLIED_STATE) and stated by
+    // AdiAppliedStateLine — never by this offset statement. A held trade-off
+    // must never read "is applied".
+    return "The delay change adjusts the evaluated group; the physical group order is not recorded, so no signed rear offset is claimed.";
   }
   if (signed === 0) return "No delay offset was needed — the current alignment is kept.";
   const magnitude = formatDelayMs(Math.abs(signed));

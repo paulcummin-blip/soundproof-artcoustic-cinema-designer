@@ -183,18 +183,33 @@ export default function AdiOptimisationJourney({
   designLimitation = null,
   className = "",
 }) {
+  // ── FRESH-RUN / BUSY AUTHORITY FOR PANEL OWNERSHIP ──
+  // The moment a new optimiser run starts — whether through "Run ADI Again"
+  // (runStatus === "running") or "Re-test Bass Optimisation" (reoptimiseBusy) —
+  // the fresh run owns the optimiser result panel. A historical applied receipt
+  // must stop presenting as the current result immediately, for the entire
+  // duration of the active run. Historical data remains stored; the receipt is
+  // not deleted. When no fresh run is active, the historical applied receipt may
+  // own the panel where appropriate.
+  const freshRunActive = runStatus === "running" || reoptimiseBusy === true;
+
   const jointReceiptOwnsPanel = (() => {
     const receiptCurrent = jointRecommendation?.candidate?.integrationVerified && (
       jointRecommendation.baselineCacheKey === currentDesignFingerprint ||
       jointRecommendation.appliedCacheKey === currentDesignFingerprint
     );
     if (!receiptCurrent) return false;
-    // FRESH RUN AUTHORITY: a fresh run's own terminal outcome outranks a
-    // historical applied receipt. The historical receipt is preserved (visible
-    // in Engineer details and via the applied calibration authority), but it
-    // must not override the current run's own outcome on the main panel. Applied
-    // wording is shown only when the current run itself produced the applied
-    // state — an old receipt alone is never enough.
+    // FRESH RUN AUTHORITY: while any fresh run is in flight (Run ADI Again or
+    // Re-test), the historical receipt must NOT own the panel — the running
+    // state owns it instead. This prevents the panel displaying "Crossover and
+    // subwoofer integration applied" during an active Re-test.
+    if (freshRunActive) return false;
+    // A fresh run's own terminal outcome outranks a historical applied receipt.
+    // The historical receipt is preserved (visible in Engineer details and via
+    // the applied calibration authority), but it must not override the current
+    // run's own outcome on the main panel. Applied wording is shown only when the
+    // current run itself produced the applied state — an old receipt alone is
+    // never enough.
     const FRESH_RUN_SUPERSEDES_RECEIPT_STATES = new Set([
       OPTIMISER_PRESENTATION_STATE.TRADE_OFF,
       OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT,
@@ -831,8 +846,10 @@ export default function AdiOptimisationJourney({
 
   // The joint option has its own canonical verification and persisted receipt.
   // A legacy placement-plan re-test state must not contradict that receipt.
-  // During a new run the normal progress/cancel presentation remains active.
-  if (jointReceiptOwnsPanel && !isRunning) return (
+  // During a new run (Run ADI Again OR Re-test) the normal progress/cancel
+  // presentation remains active and owns the panel — the historical receipt
+  // stands down for the entire duration of the fresh run.
+  if (jointReceiptOwnsPanel && !freshRunActive) return (
     <div className={`rounded-lg border border-stone-300 px-4 py-3 space-y-3 ${className}`}>
       <div className="font-semibold">Bass Optimisation — Powered by ADI</div>
       <p className="text-sm">{jointRecommendation.status === "applied"
