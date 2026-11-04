@@ -442,8 +442,14 @@ export default function useRunOptimisationPlan({
           // run-failure record so the terminal state is still persisted.
           saveRunFailure(saveFailReason, { planSaveFailed: true });
         }
+        // ── SAVE/PERSISTENCE FAILURE — NOT A PUBLICATION FAILURE ──
+        // The plan was built but its version save was not acknowledged. This is
+        // a persistence failure, not a bass publication failure: the run's own
+        // terminal status is "failed" and the publication never started. The
+        // completed evidence is preserved on top so the designer sees SAVE
+        // FAILED with the full evaluated run still attached.
         logRunHistory({
-          terminalStatus: "publication_failed",
+          terminalStatus: "failed",
           publicationStatus: "not_attempted",
           publicationError: saveFailReason,
         });
@@ -459,20 +465,7 @@ export default function useRunOptimisationPlan({
       // event, not an optimiser failure.
       optimiserCompleted = true;
 
-      // ── 2. THE TERMINAL AUTHORITY, WRITTEN AT PLAN SAVE ──
-      // The run is terminal here — from its own durable plan, never from a
-      // publication that has not happened yet. `userTerminalAt` is this instant,
-      // and it never waits for the secondary publication below.
-      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
-      recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
-      setOptimiserPlanAuthority(projectId, versionId, {
-        ...runRecord,
-        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
-        runtimeBreakdown,
-      });
-      setStatus("complete");
-
-      // ── PRE-WRITE THE RUN HISTORY BEFORE THE PUBLICATION ──
+      // ── PRE-WRITE THE RUN HISTORY BEFORE THE TERMINAL UI ──
       // The run is terminal. Write the durable history row NOW with
       // publicationStatus "pending", so a later publication failure can never
       // erase this completed run's record. The row is finalised in place by
@@ -485,9 +478,12 @@ export default function useRunOptimisationPlan({
         actionability,
         calibrationDecision,
       });
-      // PRE-WRITE HISTORY — awaited so the row exists before the publication's
-      // later status update can target it. A failure is surfaced separately as a
-      // history persistence failure, never silently converted into another state.
+      // PRE-WRITE HISTORY — awaited so the row exists before the terminal UI
+      // is released and before the publication's later status update can target
+      // it. BOTH the project-version save AND this history row must be durable
+      // before the terminal card is shown. A failure is surfaced separately as
+      // a history persistence failure, never silently converted into another
+      // state.
       {
         const historyResult = await logRunHistory({
           terminalStatus: runTerminalStatus,
@@ -502,6 +498,22 @@ export default function useRunOptimisationPlan({
           historyPreWritten = true;
         }
       }
+
+      // ── 2. THE TERMINAL AUTHORITY — RELEASED AFTER SAVE + HISTORY ──
+      // The terminal UI is released ONLY after BOTH the project-version save
+      // acknowledgement (waitForOptimiserPlanSave above) AND the history row
+      // pre-write have landed. The run is terminal here — from its own durable
+      // plan, never from a publication that has not happened yet.
+      // `userTerminalAt` is this instant, and it never waits for the secondary
+      // publication below.
+      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
+      recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
+      setOptimiserPlanAuthority(projectId, versionId, {
+        ...runRecord,
+        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+        runtimeBreakdown,
+      });
+      setStatus("complete");
 
       // ── 3. THE RECOMMENDATION PUBLICATION — SECONDARY, NEVER BLOCKING ──
       // ONE publication operation per run, exactly as before, and exactly one

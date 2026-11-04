@@ -228,16 +228,25 @@ describe("4. History pre-write — both routes", () => {
 
   it("9b: useRunOptimisationPlan awaits history pre-write before terminal status", () => {
     // In useRunOptimisationPlan, setStatus("complete") is the terminal UI release.
-    // The history pre-write (await logRunHistory) must occur AFTER setStatus("complete")
-    // per the design: the plan save is the terminal boundary, and the history
-    // pre-write follows it. But it must be AWAITED (not fire-and-forget).
-    const completeIdx = hook.indexOf('setStatus("complete")');
+    // The history pre-write (await logRunHistory) must occur BEFORE
+    // setStatus("complete") — BOTH the project-version save AND the history row
+    // must be durable before the terminal UI is released. The plan save
+    // acknowledgement (waitForOptimiserPlanSave) is also awaited before the
+    // history pre-write, so the full ordering is:
+    //   save ack → history pre-write → setStatus("complete") → publication
+    const saveAwaitIdx = hook.indexOf("await waitForOptimiserPlanSave(");
     const historyPreWriteIdx = hook.indexOf("await logRunHistory({");
-    assert.ok(completeIdx > -1, "useRunOptimisationPlan must call setStatus('complete')");
+    const completeIdx = hook.indexOf('setStatus("complete")');
+    assert.ok(saveAwaitIdx > -1, "useRunOptimisationPlan must await waitForOptimiserPlanSave");
     assert.ok(historyPreWriteIdx > -1, "useRunOptimisationPlan must await logRunHistory");
+    assert.ok(completeIdx > -1, "useRunOptimisationPlan must call setStatus('complete')");
     assert.ok(
-      historyPreWriteIdx > completeIdx,
-      "history pre-write must occur after setStatus('complete') (terminal boundary is the plan save)",
+      saveAwaitIdx < historyPreWriteIdx,
+      "history pre-write must occur AFTER the save acknowledgement await",
+    );
+    assert.ok(
+      historyPreWriteIdx < completeIdx,
+      "history pre-write must occur BEFORE setStatus('complete') (both save and history must be durable before terminal UI)",
     );
     // Must check the result
     assert.ok(
