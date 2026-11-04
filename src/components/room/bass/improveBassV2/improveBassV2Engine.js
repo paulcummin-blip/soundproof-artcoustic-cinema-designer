@@ -1626,59 +1626,69 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         seatingDiagnostics.tested = validCandidates.length;
 
         // ── Canonically confirm ALL shortlisted candidates ────────────
+        // Bounded-concurrent (same pool + runFn as the four electronic phases):
+        // each seating confirmation carries its own per-offset rawTransfer
+        // (read-only) + the same read-only tuning, through the stateless
+        // "confirmation" worker. INDEPENDENT. Post-process (bind/validate/push)
+        // runs in ORIGINAL shortlist order so candidate ID, seats, P19/P20,
+        // Primary safety, ranking, winner and trade-off are identical to serial.
         const confirmedSeatingCandidates = [];
 
-        for (let i = 0; i < shortlist.length; i++) {
-          if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
-          if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
+        const seatingConfirmJobs = shortlist.map((sc) => ({
+          rawTransfer: sc.seatingTransfer,
+          tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
+          tuningVariant: "delay-polarity-trim",
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
+          _offsetMm: sc.offsetMm,
+        }));
+        const seatingBatch = await runBoundedConfirmations({
+          jobs: seatingConfirmJobs,
+          maxConcurrency: V2_CONFIRMATION_CONCURRENCY,
+          isAborted: () => isCancelled() || isStale(),
+          runFn: createConfirmationRunFn({
+            pool: confirmationPool, controller, metrics, isFatalLifecycleError,
+            labelFor: (_job, index) => "seating-" + index,
+            transferKeyFor: (job) => "seating:" + (job?._offsetMm ?? ""),
+          }),
+        });
+        metrics.addStage("seating-canonical-confirmations", seatingBatch.stats.phaseElapsedMs);
+
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+        for (let i = 0; i < shortlist.length; i++) {
           const sc = shortlist[i];
           onProgress("finalising", `Confirming seating options (${i + 1}/${shortlist.length})`, i, shortlist.length);
-
-          try {
-            const seatingConfirmT0 = performance.now();
-            const seatingConfirmation = await runInWorker(worker, "confirmation", {
-              rawTransfer: sc.seatingTransfer,
-              tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
-              tuningVariant: "delay-polarity-trim",
-              p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
-            }, controller.signal);
-            const confirmMs = performance.now() - seatingConfirmT0;
-            metrics.recordWorkerCall("confirmation", `seating-${i}`, confirmMs, false,
-              { startedAt: seatingConfirmT0, endedAt: performance.now(),
-                tuning: existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
-                transferKey: "seating:" + sc.offsetMm });
-            seatingProfiler.recordConfirmation(sc.offsetMm, { confirmMs });
-
-            if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-
-            if (seatingConfirmation) {
-              const sBound = bindConfirmation(seatingConfirmation,
-                existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
-                currentFinalist, "current");
-              sBound.candidateKind = "seating";
-              sBound.candidateId = "seating:" + sc.offsetMm;
-              sBound.seatingOffsetMm = sc.offsetMm;
-              sBound.seatingPositions = sc.seatingPositions;
-              const sCheck = validateCandidateForRun(sBound, validationContext);
-              if (sCheck.nonAssessable) {
-                recordNonAssessable("seating", sBound, sCheck);
-              } else if (sCheck.valid) {
-                funnelCandidates.push(sCheck.result);
-                confirmedSeatingCandidates.push({
-                  result: sCheck.result,
-                  seatingOffsetMm: sc.offsetMm,
-                  seatingPositions: sc.seatingPositions,
-                });
-              }
+          const entry = seatingBatch.results[i];
+          seatingProfiler.recordConfirmation(sc.offsetMm, { confirmMs: entry?.workerMs || 0 });
+          if (entry?.ok && entry.result) {
+            const sBound = bindConfirmation(entry.result,
+              existingAuthority?.appliedTuning || savedEffectiveBaseline || [],
+              currentFinalist, "current");
+            sBound.candidateKind = "seating";
+            sBound.candidateId = "seating:" + sc.offsetMm;
+            sBound.seatingOffsetMm = sc.offsetMm;
+            sBound.seatingPositions = sc.seatingPositions;
+            const sCheck = validateCandidateForRun(sBound, validationContext);
+            if (sCheck.nonAssessable) {
+              recordNonAssessable("seating", sBound, sCheck);
+            } else if (sCheck.valid) {
+              funnelCandidates.push(sCheck.result);
+              confirmedSeatingCandidates.push({
+                result: sCheck.result,
+                seatingOffsetMm: sc.offsetMm,
+                seatingPositions: sc.seatingPositions,
+              });
             }
-          } catch (err) {
-            if (isFatalLifecycleError(err)) throw err;
-            evaluationIssues.push({ stage: "seating", candidateId: `seating:${sc.offsetMm}`, error: err.message });
+          } else if (entry && !entry.ok) {
+            // Failure isolation: preserve the error evidence, keep valid siblings.
+            evaluationIssues.push({ stage: "seating", candidateId: `seating:${sc.offsetMm}`, error: entry.error?.message || "Confirmation failed" });
           }
-
-          await yieldToUI();
         }
+        await yieldToUI();
 
         seatingDiagnostics.confirmed = confirmedSeatingCandidates.length;
 
