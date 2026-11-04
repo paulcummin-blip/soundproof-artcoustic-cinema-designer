@@ -72,10 +72,29 @@ import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
+import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
+// ONE shared run-identity authority for BOTH entry routes (Run ADI Again and
+// Re-test Bass Optimisation). The Re-test route (runCalibrationAutoApply →
+// handleStart) must mint the same run identity the Run ADI Again route mints
+// (useRunOptimisationPlan → beginOptimiserRun), so every saved plan/evidence,
+// save acknowledgement and run history row carries a non-null runId regardless
+// of entry button, winner or terminal outcome.
+import { beginOptimiserRun } from "@/components/room/bass/optimiserPlan/optimiserRunAuthority.js";
+import { persistOptimiserRunHistory } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
+import {
+  RUN_TIMING,
+  beginRunTimings,
+  buildPersistedRunTimings,
+  getRunTimings,
+  recordRunTiming,
+  runTimingAt,
+} from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
+import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
+import { OPTIMISER_FAILURE_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 
@@ -296,6 +315,87 @@ export default function OptimiseAndCalculate({
     phaseRef.current = "calculating";
     startWorkflow(projectId, versionId);
 
+    // ── RUN IDENTITY — ONE AUTHORITY FOR BOTH ENTRY ROUTES ──
+    // The Re-test Bass Optimisation route (runCalibrationAutoApply → handleStart)
+    // mints the SAME run identity the Run ADI Again route mints
+    // (useRunOptimisationPlan → beginOptimiserRun). The run id belongs to the
+    // RUN, not to the winner or the actionability: it is created once here, at
+    // the start of this execution, and survives through the engine, the plan
+    // build, the result save, the save acknowledgement and the run history —
+    // regardless of entry button, winner existence or terminal outcome.
+    const activeRun = beginOptimiserRun(projectId, versionId);
+    beginRunTimings(projectId, versionId, activeRun.runId);
+
+    // Durable history + failure-evidence helpers, mirroring useRunOptimisationPlan
+    // so both routes write through the same authorities and the same runId.
+    let measuredRuntime = null;
+    // The plan actionability decided at the save boundary, used at the terminal
+    // history row so a winnerless re-test records "no_useful_improvement" rather
+    // than "actionable_plan".
+    let runTerminalStatus = "actionable_plan";
+    const logRunHistory = (facts = {}) => {
+      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
+      const timings = getRunTimings(projectId, versionId);
+      const live = sharedRef.current;
+      Promise.resolve(persistOptimiserRunHistory({
+        runId: activeRun.runId,
+        projectId,
+        versionId,
+        designFingerprint: live?.cacheKey || null,
+        resultFingerprint: live?.completedBassAuthority?.contract?.job?.resultFingerprint
+          || live?.currentFingerprint || null,
+        startedAt: activeRun.startedAt,
+        userTerminalAt: runTimingAt(timings, RUN_TIMING.USER_TERMINAL)
+          || new Date().toISOString(),
+        terminalAt: runTimingAt(timings, RUN_TIMING.USER_TERMINAL)
+          || new Date().toISOString(),
+        ...facts,
+        workerCalls: measuredRuntime ? {
+          total: measuredRuntime.workerCallCount || 0,
+          canonicalConfirmations: measuredRuntime.counts?.canonicalConfirmations || 0,
+          integrationCanonicalConfirmations: measuredRuntime.counts?.integrationCanonicalConfirmations || 0,
+          roomSimulationCalls: (measuredRuntime.counts?.roomSimulationCalls || 0)
+            + (measuredRuntime.stage2?.roomSimulationCalls || 0),
+          batchedReceiverEvaluations: measuredRuntime.counts?.batchedReceiverEvaluations || 0,
+          stage2Jobs: (measuredRuntime.stage2?.placementCount || 0)
+            + (measuredRuntime.stage2?.confirmationCount || 0),
+        } : null,
+        runtimeBreakdown: {
+          ...(summariseElectronicStageBreakdown({ runtimeMetrics: measuredRuntime }) || {}),
+          runId: activeRun.runId,
+          timings: buildPersistedRunTimings(timings),
+        },
+      })).catch(() => {});
+    };
+    const saveRunFailure = (reason, extra = {}) => {
+      const current = sharedRef.current;
+      const evidence = buildOptimiserRunEvidence({
+        identity: {
+          projectId,
+          versionId,
+          designFingerprint: current?.cacheKey || null,
+          resultFingerprint: current?.completedBassAuthority?.contract?.job?.resultFingerprint
+            || current?.currentFingerprint || null,
+          cacheKey: current?.cacheKey || null,
+          baseDesignFingerprint: current?.baseDesignFingerprint || null,
+          baselineParity: extra.baselineParity || null,
+        },
+        baselineParity: extra.baselineParity || null,
+        failureReason: reason,
+        failure: extra.planSaveFailed ? {
+          status: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+          category: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+          message: reason,
+          publicationError: null,
+          attempts: null,
+          at: new Date().toISOString(),
+          runId: activeRun.runId,
+        } : null,
+        runIdentity: activeRun,
+      });
+      if (evidence) setOptimiserPlanAuthority(projectId, versionId, evidence);
+    };
+
     try {
       // Phase 1: Initial authoritative bass calculation (hidden)
       const sharedStart = sharedRef.current;
@@ -324,19 +424,53 @@ export default function OptimiseAndCalculate({
         appState,
       });
 
+      measuredRuntime = result.runtimeMetrics || measuredRuntime;
       if (result.status === "cancelled") {
+        logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" });
         setCancelled(projectId, versionId);
         return;
       }
       if (result.status === "error" || result.status === "stale") {
-        setWorkflowError(projectId, versionId, result.error || "Optimisation failed.");
+        const reason = result.error || "Optimisation failed.";
+        // The failed run still carries its own runId in the saved terminal
+        // evidence and history — run identity never depends on a winner.
+        saveRunFailure(reason, { baselineParity: result.baselineParity || null });
+        logRunHistory({
+          terminalStatus: "failed",
+          publicationStatus: "not_attempted",
+          publicationError: reason,
+        });
+        setWorkflowError(projectId, versionId, reason);
         return;
       }
       if (result.status === "blocked") {
         // The optimiser baseline must be the published bass result. With no
         // matching completed authority the run stopped before evaluating
-        // anything: state the reason and stop — nothing is auto-applied and no
-        // plan is saved, so nothing can be applied from it.
+        // anything: state the reason and stop — nothing is auto-applied. The
+        // block is still saved as terminal run evidence with the run's own
+        // identity, so the panel states it after refresh and the history row
+        // carries the runId.
+        const blockedShared = sharedRef.current;
+        const blockedEvidence = buildOptimiserRunEvidence({
+          identity: {
+            projectId,
+            versionId,
+            designFingerprint: blockedShared?.cacheKey || null,
+            resultFingerprint: blockedShared?.completedBassAuthority?.contract?.job?.resultFingerprint
+              || blockedShared?.currentFingerprint || null,
+            cacheKey: blockedShared?.cacheKey || null,
+            baseDesignFingerprint: blockedShared?.baseDesignFingerprint || null,
+            baselineParity: result.baselineParity || null,
+          },
+          baselineParity: result.baselineParity || null,
+          runIdentity: activeRun,
+        });
+        if (blockedEvidence) setOptimiserPlanAuthority(projectId, versionId, blockedEvidence);
+        logRunHistory({
+          terminalStatus: "blocked",
+          publicationStatus: "not_attempted",
+          publicationError: result.error || null,
+        });
         setWorkflowError(projectId, versionId, result.error);
         return;
       }
@@ -468,15 +602,32 @@ export default function OptimiseAndCalculate({
           },
           calibrationDecision: calibrationApplication,
           decisionApplied: calibrationApplied,
+          // The run identity minted at the start of this Re-test execution
+          // travels through to the saved plan/evidence so run.runId,
+          // run.startedAt and run.supersededRunId are non-null for every
+          // terminal outcome (actionable plan, winnerless, trade-off,
+          // evaluation-incomplete, physical/P14 rejection). The save
+          // acknowledgement (acknowledgeOptimiserPlanSave, fired by the version
+          // writer) keys on plan.run.runId, so it handshakes on this same id.
+          runIdentity: activeRun,
         });
+        recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
+        runTerminalStatus = persistedPlan ? "actionable_plan" : "no_useful_improvement";
         if (persistedPlan) {
-          setOptimiserPlanAuthority(projectId, versionId, persistedPlan);
+          setOptimiserPlanAuthority(projectId, versionId, {
+            ...persistedPlan,
+            timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+          });
         } else if (runEvidence) {
           // A run that produced no actionable plan keeps its terminal evidence:
           // the same slot holds what the run evaluated, so the card states the
           // outcome after refresh and reopen instead of discarding everything.
-          setOptimiserPlanAuthority(projectId, versionId, runEvidence);
+          setOptimiserPlanAuthority(projectId, versionId, {
+            ...runEvidence,
+            timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+          });
         }
+        recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
 
         const recommendationForPublication = {
           ...result.recommendation,
@@ -685,8 +836,26 @@ export default function OptimiseAndCalculate({
 
       const noImprovements = !hasCal && !hasPhysical && !autoApplied.globalBassTrim;
 
+      // ── TERMINAL — the run's own history row, with this run's id ──
+      // startedAt/completedAt belong to THIS re-test run, never inherited from
+      // the previous optimiser result. The previous run's history row is
+      // preserved (beginOptimiserRun appends; it never overwrites).
+      recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
+      logRunHistory({
+        terminalStatus: runTerminalStatus,
+        publicationStatus: "published",
+      });
       setComplete(projectId, versionId, autoApplied, recommendations, noImprovements);
     } catch (err) {
+      const reason = err?.message || "Optimisation failed.";
+      // A genuinely failed re-test still carries its runId in the saved
+      // incomplete/failure evidence and history — never a null runId.
+      saveRunFailure(reason);
+      logRunHistory({
+        terminalStatus: "failed",
+        publicationStatus: "not_attempted",
+        publicationError: reason,
+      });
       setWorkflowError(projectId, versionId, err.message);
     } finally {
       runningRef.current = false;
