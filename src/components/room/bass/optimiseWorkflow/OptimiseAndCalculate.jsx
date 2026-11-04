@@ -98,6 +98,7 @@ import { summariseElectronicStageBreakdown } from "@/components/room/bass/electr
 import { OPTIMISER_FAILURE_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
+import { canReuseCurrentBaselineForOptimiser } from "./retestPreflightAuthority.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -408,14 +409,37 @@ export default function OptimiseAndCalculate({
     };
 
     try {
-      // Phase 1: Initial authoritative bass calculation (hidden)
+      // ── Phase 1: Preflight — FAST PATH vs SLOW PATH ──
+      // The Re-test route previously called onCalculate() unconditionally and
+      // waited for the current bass publication BEFORE starting the optimiser
+      // search. When the bass authority is already AUTHORITATIVE, current and
+      // fingerprint-matched, that recalculation produces no new engineering
+      // authority — on the audited Case C baseline it wasted ~27.4 s of
+      // pre-search work. Reuse the existing currentness authority so the search
+      // starts directly against the baseline that already describes the design.
+      //
+      // This READS the existing authority: it never creates a new bass
+      // publication. The baseline identity (resultFingerprint, designFingerprint)
+      // the optimiser receives is the same it would have received after an
+      // unnecessary recalculation. If the authority is missing, stale,
+      // fingerprint-mismatched or lacks baseline evidence, take the slow path —
+      // never optimise against a stale or incomplete baseline.
       const sharedStart = sharedRef.current;
-      if (typeof sharedStart?.onCalculate === "function") {
-        sharedStart.onCalculate();
+      const preflight = canReuseCurrentBaselineForOptimiser(sharedStart);
+      if (preflight.reuse) {
+        // Fast path: baseline already current — start the search directly.
+        // No onCalculate(), no waitForCurrentPublication().
+        recordRunTiming(projectId, versionId, RUN_TIMING.CALCULATION_COMPLETE);
+      } else {
+        // Slow path: missing / stale / fingerprint-mismatch / incomplete
+        // baseline. Recalculate so the optimiser runs against a genuine
+        // current authority, then wait for its publication.
+        if (typeof sharedStart?.onCalculate === "function") {
+          sharedStart.onCalculate();
+        }
+        if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
+        recordRunTiming(projectId, versionId, RUN_TIMING.CALCULATION_COMPLETE);
       }
-
-      // Wait for the initial calculation to complete
-      if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
 
       // Phase 2: Run V2 optimisation
       phaseRef.current = "optimising";
