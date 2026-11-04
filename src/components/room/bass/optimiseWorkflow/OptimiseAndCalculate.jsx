@@ -376,7 +376,7 @@ export default function OptimiseAndCalculate({
           runId: activeRun.runId,
           timings: buildPersistedRunTimings(timings),
         },
-      }).catch(() => null);
+      });
     };
     const saveRunFailure = (reason, extra = {}) => {
       const current = sharedRef.current;
@@ -443,7 +443,7 @@ export default function OptimiseAndCalculate({
 
       measuredRuntime = result.runtimeMetrics || measuredRuntime;
       if (result.status === "cancelled") {
-        logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" });
+        logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" }).catch(() => null);
         setCancelled(projectId, versionId);
         return;
       }
@@ -456,7 +456,7 @@ export default function OptimiseAndCalculate({
           terminalStatus: "failed",
           publicationStatus: "not_attempted",
           publicationError: reason,
-        });
+        }).catch(() => null);
         setWorkflowError(projectId, versionId, reason);
         return;
       }
@@ -487,7 +487,7 @@ export default function OptimiseAndCalculate({
           terminalStatus: "blocked",
           publicationStatus: "not_attempted",
           publicationError: result.error || null,
-        });
+        }).catch(() => null);
         setWorkflowError(projectId, versionId, result.error);
         return;
       }
@@ -642,12 +642,27 @@ export default function OptimiseAndCalculate({
       // Never throws into the run's try block — a refused publication is its own
       // diagnostic, recorded on the history row, never a run failure.
       const publishAdiRecommendationInBackground = (fingerprint, persistedPlan, runEvidence, decision) => {
+        // Finalise the history row. When the pre-write landed (historyPreWritten),
+        // update it in place. When it did not, create the row from scratch here so
+        // the run's terminal record carries the publication outcome either way.
+        const finaliseHistory = (status, errorMsg) => {
+          if (historyPreWritten) {
+            return updateOptimiserRunHistoryPublication({
+              runId: activeRun.runId, projectId, versionId,
+              publicationStatus: status,
+              publicationError: errorMsg || null,
+              publicationCompletedAt: new Date().toISOString(),
+            }).then((res) => {
+              if (res?.ok === false && res?.error === "row_not_found") {
+                return logRunHistory({ terminalStatus: runTerminalStatus, publicationStatus: status, publicationError: errorMsg || null });
+              }
+              return res;
+            }).catch(() => null);
+          }
+          return logRunHistory({ terminalStatus: runTerminalStatus, publicationStatus: status, publicationError: errorMsg || null }).catch(() => null);
+        };
         if (!fingerprint || !result?.recommendation) {
-          Promise.resolve(updateOptimiserRunHistoryPublication({
-            runId: activeRun.runId, projectId, versionId,
-            publicationStatus: "published",
-            publicationCompletedAt: new Date().toISOString(),
-          })).catch(() => {});
+          finaliseHistory("published", null);
           return;
         }
         const recommendationForPublication = {
@@ -670,20 +685,10 @@ export default function OptimiseAndCalculate({
         };
         publishRecommendation(projectId, versionId, recommendationForPublication, fingerprint)
           .then((persisted) => {
-            Promise.resolve(updateOptimiserRunHistoryPublication({
-              runId: activeRun.runId, projectId, versionId,
-              publicationStatus: persisted ? "published" : "failed",
-              publicationError: persisted ? null : "The recommendation could not be published.",
-              publicationCompletedAt: new Date().toISOString(),
-            })).catch(() => {});
+            finaliseHistory(persisted ? "published" : "failed", persisted ? null : "The recommendation could not be published.");
           })
           .catch((pubError) => {
-            Promise.resolve(updateOptimiserRunHistoryPublication({
-              runId: activeRun.runId, projectId, versionId,
-              publicationStatus: "failed",
-              publicationError: pubError?.message || "The recommendation could not be published.",
-              publicationCompletedAt: new Date().toISOString(),
-            })).catch(() => {});
+            finaliseHistory("failed", pubError?.message || "The recommendation could not be published.");
           });
       };
 
@@ -697,12 +702,33 @@ export default function OptimiseAndCalculate({
       } = saveOptimiserPlanForTerminal();
 
       // ── 2. PRE-WRITE HISTORY (awaited so the row exists before any status update) ──
+      // The row MUST exist before any later publication-status update can target
+      // it. A failure to create it is surfaced separately as a history
+      // persistence failure — never silently converted into another lifecycle
+      // state. The terminal UI still releases (the plan is saved), but the
+      // background publication will create the row from scratch on its own
+      // outcome.
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
-      await logRunHistory({
-        terminalStatus: runTerminalStatus,
-        publicationStatus: "pending",
-      });
-      historyPreWritten = true;
+      phaseRef.current = "history";
+      let historyPersistenceError = null;
+      {
+        const historyResult = await logRunHistory({
+          terminalStatus: runTerminalStatus,
+          publicationStatus: "pending",
+        });
+        if (historyResult?.ok === false) {
+          historyPersistenceError = historyResult?.error
+            || "The run history could not be written.";
+          historyPreWritten = false;
+        } else {
+          historyPreWritten = true;
+        }
+      }
+      if (historyPersistenceError) {
+        console.warn("[OptimiseAndCalculate] history pre-write failed:", historyPersistenceError,
+          "— background publication will create the row from scratch.");
+      }
+      phaseRef.current = "idle";
 
       // Phase 3: Route through the Recommendation Authority
       // The optimiser's calibration tuning is now a RECOMMENDATION, not an
@@ -945,7 +971,9 @@ export default function OptimiseAndCalculate({
         // overwrite the completed plan with failure evidence.
         const phase = phaseRef.current;
         let userMessage;
-        if (phase === "applying") {
+        if (phase === "history") {
+          userMessage = "The optimisation completed, but the run history could not be written. The saved plan is intact.";
+        } else if (phase === "applying") {
           userMessage = "The optimisation completed, but the calibration could not be applied. The saved decision remains unapplied.";
         } else if (phase === "recalculating") {
           userMessage = "The optimisation completed, but the recalculated bass result could not be published. Retry the update.";
@@ -965,14 +993,13 @@ export default function OptimiseAndCalculate({
             publicationCompletedAt: new Date().toISOString(),
           })).catch(() => {});
         } else {
-          // The pre-write itself did not land (e.g. the first recommendation
-          // publish threw before it). Create the row now with the correct
-          // terminal status — the optimiser's own outcome, not "failed".
+          // The pre-write itself did not land. Create the row now with the
+          // correct terminal status — the optimiser's own outcome, not "failed".
           logRunHistory({
             terminalStatus: runTerminalStatus,
             publicationStatus: "failed",
             publicationError: reason,
-          });
+          }).catch(() => null);
         }
         setWorkflowError(projectId, versionId, userMessage);
       } else {

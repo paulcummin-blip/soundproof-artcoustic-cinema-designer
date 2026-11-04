@@ -156,7 +156,7 @@ export default function useRunOptimisationPlan({
           timings: buildPersistedRunTimings(timings),
           publication: publicationDiagnostics,
         },
-      }).catch(() => null);
+      });
     };
 
     // Every fresh run gets a durable terminal record, including early or thrown
@@ -485,11 +485,23 @@ export default function useRunOptimisationPlan({
         actionability,
         calibrationDecision,
       });
-      logRunHistory({
-        terminalStatus: runTerminalStatus,
-        publicationStatus: "pending",
-      });
-      historyPreWritten = true;
+      // PRE-WRITE HISTORY — awaited so the row exists before the publication's
+      // later status update can target it. A failure is surfaced separately as a
+      // history persistence failure, never silently converted into another state.
+      {
+        const historyResult = await logRunHistory({
+          terminalStatus: runTerminalStatus,
+          publicationStatus: "pending",
+        });
+        if (historyResult?.ok === false) {
+          console.warn("[useRunOptimisationPlan] history pre-write failed:",
+            historyResult?.error || "unknown",
+            "— publication will create the row from scratch.");
+          historyPreWritten = false;
+        } else {
+          historyPreWritten = true;
+        }
+      }
 
       // ── 3. THE RECOMMENDATION PUBLICATION — SECONDARY, NEVER BLOCKING ──
       // ONE publication operation per run, exactly as before, and exactly one
@@ -528,28 +540,35 @@ export default function useRunOptimisationPlan({
       });
 
       // Finalise the pre-written "pending" row in place with the publication's
-      // real outcome — so the completed run's record carries what actually
-      // happened, and the run's own terminal status is never relabelled.
-      Promise.resolve(updateOptimiserRunHistoryPublication({
-        runId: activeRun.runId,
-        projectId,
-        versionId,
-        // ONE CANONICAL TERMINAL OUTCOME — the same value the pre-write used at
-        // line ~488. Never re-derive from persistedPlan existence here: that
-        // would overwrite a NON_ACTIONABLE_WINNER or TRADE_OFF terminal result
-        // with "actionable_plan" just because a plan object exists.
-        terminalStatus: runTerminalStatus,
-        publicationStatus: recommendationPublication.status,
-        publicationError: recommendationPublication.error,
-        publicationCompletedAt: new Date().toISOString(),
-        fingerprintsPublished: recommendationPublication.fingerprints,
-        runtimeBreakdown: {
-          ...runtimeBreakdown,
-          runId: activeRun.runId,
-          timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
-          publication: publicationDiagnostics,
-        },
-      })).catch(() => {});
+      // real outcome. When the pre-write did not land, create the row from
+      // scratch so the run's terminal record carries the outcome either way.
+      const finaliseHistory = (status, errorMsg, fingerprints = recommendationPublication.fingerprints) => {
+        if (historyPreWritten) {
+          return updateOptimiserRunHistoryPublication({
+            runId: activeRun.runId,
+            projectId,
+            versionId,
+            terminalStatus: runTerminalStatus,
+            publicationStatus: status,
+            publicationError: errorMsg || null,
+            publicationCompletedAt: new Date().toISOString(),
+            fingerprintsPublished: fingerprints,
+            runtimeBreakdown: {
+              ...runtimeBreakdown,
+              runId: activeRun.runId,
+              timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+              publication: publicationDiagnostics,
+            },
+          }).then((res) => {
+            if (res?.ok === false && res?.error === "row_not_found") {
+              return logRunHistory({ terminalStatus: runTerminalStatus, publicationStatus: status, publicationError: errorMsg || null });
+            }
+            return res;
+          }).catch(() => null);
+        }
+        return logRunHistory({ terminalStatus: runTerminalStatus, publicationStatus: status, publicationError: errorMsg || null }).catch(() => null);
+      };
+      finaliseHistory(recommendationPublication.status, recommendationPublication.error);
     } catch (err) {
       const reason = err?.message || "The optimiser could not complete. Re-run the Optimisation Plan.";
       if (optimiserCompleted) {
@@ -565,13 +584,17 @@ export default function useRunOptimisationPlan({
             publicationStatus: "failed",
             publicationError: reason,
             publicationCompletedAt: new Date().toISOString(),
-          })).catch(() => {});
+          })).then((res) => {
+            if (res?.ok === false && res?.error === "row_not_found") {
+              logRunHistory({ terminalStatus: runTerminalStatus, publicationStatus: "failed", publicationError: reason }).catch(() => null);
+            }
+          }).catch(() => null);
         } else {
           logRunHistory({
             terminalStatus: runTerminalStatus,
             publicationStatus: "failed",
             publicationError: reason,
-          });
+          }).catch(() => null);
         }
         setStatus("failed");
         setError("The optimisation completed, but the recommendation could not be published.");
