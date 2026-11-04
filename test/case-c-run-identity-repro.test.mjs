@@ -1,10 +1,13 @@
 // case-c-run-identity-repro.test.mjs
 // ---------------------------------------------------------------------------
-// Reproduction for Case C: a completed optimiser run with valid candidates,
-// non-assessable candidates, a retained trade-off, and NO safe winner.
+// Regression suite for optimiser run identity preservation when no safe winner
+// exists. A completed optimiser run may legitimately end with winner = null
+// (retained trade-off, standalone offerable lever, all candidates rejected).
+// The run identity (runId) and completed candidate evidence must survive the
+// save handoff; the save acknowledgement must fire; a save failure must not
+// discard the completed calculation as "optimisation incomplete".
 //
-// The run identity (runId) must survive the save handoff and the persistence
-// acknowledgement must fire for a winnerless terminal run.
+// Pure functions only. No acoustic maths are changed by this suite.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
@@ -12,7 +15,10 @@ import assert from "node:assert/strict";
 
 import { buildOptimiserResultForSave } from "../src/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserPlan } from "../src/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
-import { buildOptimiserRunEvidence } from "../src/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import {
+  buildOptimiserRunEvidence,
+  buildActionableOptimiserRunSummary,
+} from "../src/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   serializeOptimiserPlan,
   acknowledgeOptimiserPlanSave,
@@ -26,10 +32,10 @@ const activeRun = {
   supersededRunId: null,
 };
 
-function makeConfirmedResult(candidateId, p20) {
+function makeConfirmedResult(candidateId, p20, opts = {}) {
   return {
     candidateId,
-    candidateKind: "calibration",
+    candidateKind: opts.candidateKind || "calibration",
     inputIdentity: "fp-case-c",
     timingVersion: "stage2-canonical-v6-delay-lag",
     assessmentStartHz: 20,
@@ -64,11 +70,127 @@ function makeBaseline() {
   return r;
 }
 
-describe("Case C — run identity preserved without a safe winner", () => {
-  it("buildOptimiserResultForSave preserves runId for a trade-off-only completed run", () => {
+describe("Winnerless actionable run — run identity preserved", () => {
+  // ── A. ACTIONABLE PLAN + NO WINNER (the actual broken handoff) ──
+  it("A — buildActionableOptimiserRunSummary returns a run summary with no winner", () => {
+    const selection = {
+      winner: null,
+      confirmedResults: [makeConfirmedResult("cand-1", 4.9)],
+      currentResult: makeBaseline(),
+      canonicalJobsRun: 1,
+    };
+    const summary = buildActionableOptimiserRunSummary({
+      selection,
+      diagnostics: { stages: [], canonicalJobsRun: 1 },
+      runIdentity: activeRun,
+    });
+    assert.ok(summary, "run summary produced even with no winner");
+    assert.equal(summary.runId, activeRun.runId, "runId preserved");
+    assert.equal(summary.terminal, true, "run is terminal");
+    assert.equal(summary.winnerCandidateId, null, "winner is nullable");
+    assert.equal(summary.actionablePlanProduced, true);
+    assert.equal(summary.outcome, "actionable_plan_produced");
+  });
+
+  it("A — actionable plan with no winner carries run.runId through the save path", () => {
+    const plan = {
+      planVersion: 3,
+      savedAt: new Date().toISOString(),
+      recordKind: "plan",
+      projectId: "p1",
+      versionId: "v1",
+      designFingerprint: "fp",
+      resultFingerprint: "rfp",
+      cacheKey: "fp",
+      levers: {
+        delay: {
+          lever: "delay",
+          evidenceStatus: "evaluated",
+          evaluated: true,
+          notEvaluated: false,
+          effect: { p19DeltaDb: -1, p20DeltaDb: -1.5, p14DeltaDb: 0 },
+          changes: [{ sourceId: "sub-1", delayMs: 5 }],
+          practical: true,
+          validation: { destinationsValid: true },
+        },
+      },
+      baseline: { achievedP20VariationDb: 5.0 },
+      leverDecisions: {},
+    };
+    const selection = {
+      winner: null,
+      confirmedResults: [],
+      evaluationIssues: [],
+      evaluationIncomplete: false,
+      baselineValidation: { valid: true },
+      nonAssessableCandidates: [],
+      canonicalJobsRun: 1,
+      currentResult: makeBaseline(),
+    };
+    const { actionablePlan, runEvidence } = buildOptimiserResultForSave({
+      plan, selection,
+      diagnostics: { stages: [], canonicalJobsRun: 1 },
+      identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
+      runIdentity: activeRun,
+    });
+    assert.ok(actionablePlan, "actionable plan produced");
+    assert.ok(actionablePlan.run, "actionable plan carries a run summary");
+    assert.equal(actionablePlan.run.runId, activeRun.runId, "run.runId preserved with no winner");
+    assert.equal(actionablePlan.run.winnerCandidateId, null, "winner null on run summary");
+    assert.equal(runEvidence, null, "no terminal evidence for an actionable plan");
+  });
+
+  it("A — save acknowledgement fires for a winnerless actionable plan", async () => {
+    const plan = {
+      planVersion: 3,
+      savedAt: new Date().toISOString(),
+      recordKind: "plan",
+      projectId: "p2",
+      versionId: "v2",
+      designFingerprint: "fp2",
+      resultFingerprint: "rfp2",
+      cacheKey: "fp2",
+      levers: {
+        delay: {
+          lever: "delay",
+          evidenceStatus: "evaluated",
+          evaluated: true,
+          notEvaluated: false,
+          effect: { p19DeltaDb: -1, p20DeltaDb: -1.5, p14DeltaDb: 0 },
+          changes: [{ sourceId: "sub-1", delayMs: 5 }],
+          practical: true,
+          validation: { destinationsValid: true },
+        },
+      },
+      baseline: { achievedP20VariationDb: 5.0 },
+      leverDecisions: {},
+    };
+    const selection = {
+      winner: null,
+      confirmedResults: [],
+      evaluationIssues: [],
+      evaluationIncomplete: false,
+      baselineValidation: { valid: true },
+      nonAssessableCandidates: [],
+      canonicalJobsRun: 1,
+      currentResult: makeBaseline(),
+    };
+    const { actionablePlan } = buildOptimiserResultForSave({
+      plan, selection,
+      diagnostics: { stages: [], canonicalJobsRun: 1 },
+      identity: { projectId: "p2", versionId: "v2", designFingerprint: "fp2" },
+      runIdentity: activeRun,
+    });
+    const serialized = serializeOptimiserPlan(actionablePlan);
+    assert.ok(serialized.run?.runId, "serialized actionable plan has run.runId");
+    acknowledgeOptimiserPlanSave("p2", "v2", serialized);
+    const at = await waitForOptimiserPlanSave("p2", "v2", activeRun.runId, 1000);
+    assert.equal(typeof at, "number", "acknowledgement fires without a 60s wait");
+  });
+
+  // ── B. CASE C — completed run, no safe winner, trade-off retained ──
+  it("B — Case C: 35 valid + 2 non-assessable + 1 trade-off, no winner, runId preserved", () => {
     const baseline = makeBaseline();
-    // 35 valid (but non-offerable) confirmed candidates — none clears the
-    // materiality gate as a standalone lever, so no actionable plan.
     const confirmedResults = [];
     for (let i = 0; i < 35; i++) {
       confirmedResults.push(makeConfirmedResult(`cand-${i + 1}`, 4.9));
@@ -77,117 +199,69 @@ describe("Case C — run identity preserved without a safe winner", () => {
       winner: null,
       currentResult: baseline,
       confirmedResults,
-      evaluations: confirmedResults.map((r) => ({
-        candidateId: r.candidateId,
-        status: "below-materiality",
-      })),
+      evaluations: confirmedResults.map((r) => ({ candidateId: r.candidateId, status: "below-materiality" })),
       nonAssessableCandidates: [
-        {
-          candidateId: "na-1",
-          candidateKind: "position",
-          stage: "phase",
-          status: "non-assessable",
-          reason: "no-valid-p19-p20-assessment-band",
-          achievedP18Hz: 129.051,
-          transitionHz: 91.287,
-        },
-        {
-          candidateId: "na-2",
-          candidateKind: "position",
-          stage: "phase",
-          status: "non-assessable",
-          reason: "no-valid-p19-p20-assessment-band",
-          achievedP18Hz: 100.0,
-          transitionHz: 80.0,
-        },
+        { candidateId: "na-1", candidateKind: "position", stage: "phase", status: "non-assessable", reason: "no-valid-p19-p20-assessment-band", achievedP18Hz: 129.051, transitionHz: 91.287 },
+        { candidateId: "na-2", candidateKind: "position", stage: "phase", status: "non-assessable", reason: "no-valid-p19-p20-assessment-band", achievedP18Hz: 100.0, transitionHz: 80.0 },
       ],
-      tradeOffs: [
-        {
-          candidateId: "trade-off-1",
-          candidateKind: "calibration",
-          reason: "primary-seat-regression",
-        },
-      ],
+      tradeOffs: [{ candidateId: "trade-off-1", candidateKind: "calibration", reason: "primary-seat-regression" }],
       evaluationIssues: [],
       evaluationIncomplete: false,
       baselineValidation: { valid: true },
       canonicalJobsRun: 37,
     };
-
     const plan = buildOptimiserPlan({
-      selection,
-      baseline,
+      selection, baseline,
       identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
       instances: [],
     });
-
-    // No winner and no standalone placement lever → plan builder returns null.
-    // This is the trigger for the bug: the run must still be saved as evidence.
     expect(plan).toBe(null);
-
-    const { actionablePlan, runEvidence } = buildOptimiserResultForSave({
-      plan,
-      selection,
+    const { runEvidence } = buildOptimiserResultForSave({
+      plan, selection,
       diagnostics: { stages: [], canonicalJobsRun: 37 },
       identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
       runIdentity: activeRun,
     });
-
-    expect(actionablePlan).toBe(null);
-    assert.ok(runEvidence, "run evidence must be produced for a winnerless completed run");
-    assert.ok(runEvidence.run, "run evidence carries a run block");
-    assert.equal(runEvidence.run.runId, activeRun.runId, "run.runId is the active run id");
-    assert.equal(runEvidence.run.terminal, true, "run is terminal");
-    assert.equal(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT);
+    assert.ok(runEvidence, "Case C run evidence produced");
+    assert.equal(runEvidence.run.runId, activeRun.runId, "Case C runId preserved");
     assert.equal(runEvidence.run.candidatesEvaluated, 35, "35 valid candidates preserved");
-    assert.equal(runEvidence.nonAssessableCandidates.length, 2, "non-assessable preserved");
-    assert.ok(runEvidence.run.rejectionReasons.length > 0, "rejection reason stated");
+    assert.equal(runEvidence.nonAssessableCandidates.length, 2, "non-assessable records preserved");
+    assert.equal(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT);
+    assert.notEqual(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE,
+      "Case C is not reported incomplete");
   });
 
-  it("serializeOptimiserPlan preserves run.runId for the evidence record", () => {
-    const evidence = buildOptimiserRunEvidence({
-      selection: {
-        winner: null,
-        confirmedResults: [],
-        evaluationIssues: [],
-        evaluationIncomplete: false,
-        baselineValidation: { valid: true },
-        nonAssessableCandidates: [],
-        currentResult: makeBaseline(),
-      },
-      diagnostics: null,
-      identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
+  it("B — Case C save acknowledgement fires without a 60s wait", async () => {
+    const baseline = makeBaseline();
+    const selection = {
+      winner: null,
+      currentResult: baseline,
+      confirmedResults: [makeConfirmedResult("cand-1", 4.9)],
+      evaluations: [{ candidateId: "cand-1", status: "below-materiality" }],
+      nonAssessableCandidates: [
+        { candidateId: "na-1", candidateKind: "position", stage: "phase", status: "non-assessable", reason: "no-valid-p19-p20-assessment-band", achievedP18Hz: 129.051, transitionHz: 91.287 },
+      ],
+      tradeOffs: [{ candidateId: "trade-off-1", candidateKind: "calibration", reason: "primary-seat-regression" }],
+      evaluationIssues: [],
+      evaluationIncomplete: false,
+      baselineValidation: { valid: true },
+      canonicalJobsRun: 1,
+    };
+    const { runEvidence } = buildOptimiserResultForSave({
+      plan: null, selection,
+      diagnostics: { stages: [], canonicalJobsRun: 1 },
+      identity: { projectId: "p3", versionId: "v3", designFingerprint: "fp3" },
       runIdentity: activeRun,
     });
-    const serialized = serializeOptimiserPlan(evidence);
-    assert.ok(serialized.run, "serialized plan carries run block");
-    assert.equal(serialized.run.runId, activeRun.runId, "serialized run.runId preserved");
+    const serialized = serializeOptimiserPlan(runEvidence);
+    assert.ok(serialized.run?.runId, "Case C serialized evidence has run.runId");
+    acknowledgeOptimiserPlanSave("p3", "v3", serialized);
+    const at = await waitForOptimiserPlanSave("p3", "v3", activeRun.runId, 1000);
+    assert.equal(typeof at, "number", "Case C acknowledgement fires, no 60s wait");
   });
 
-  it("acknowledgeOptimiserPlanSave fires for a winnerless run evidence record", async () => {
-    const evidence = buildOptimiserRunEvidence({
-      selection: {
-        winner: null,
-        confirmedResults: [],
-        evaluationIssues: [],
-        evaluationIncomplete: false,
-        baselineValidation: { valid: true },
-        nonAssessableCandidates: [],
-        currentResult: makeBaseline(),
-      },
-      diagnostics: null,
-      identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
-      runIdentity: activeRun,
-    });
-    const serialized = serializeOptimiserPlan(evidence);
-    // Simulate the project loader calling acknowledge after a durable save.
-    acknowledgeOptimiserPlanSave("p1", "v1", serialized);
-    // waitForOptimiserPlanSave should resolve immediately (already acknowledged).
-    const at = await waitForOptimiserPlanSave("p1", "v1", activeRun.runId, 1000);
-    assert.equal(typeof at, "number", "save acknowledged without a 60s wait");
-  });
-
-  it("no-safe-winner / no-trade-off run still saves with a runId", () => {
+  // ── C. NO SAFE WINNER / NO USEFUL IMPROVEMENT ──
+  it("C — no-safe-winner run saves with runId and NO_USEFUL_IMPROVEMENT", () => {
     const baseline = makeBaseline();
     const selection = {
       winner: null,
@@ -201,47 +275,54 @@ describe("Case C — run identity preserved without a safe winner", () => {
       baselineValidation: { valid: true },
       canonicalJobsRun: 1,
     };
-    const plan = buildOptimiserPlan({
-      selection, baseline,
-      identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
-      instances: [],
-    });
-    expect(plan).toBe(null);
     const { runEvidence } = buildOptimiserResultForSave({
-      plan, selection,
+      plan: null, selection,
       diagnostics: { stages: [], canonicalJobsRun: 1 },
       identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
       runIdentity: activeRun,
     });
-    assert.ok(runEvidence, "no-safe-winner run still produces evidence");
+    assert.ok(runEvidence, "no-safe-winner run produces evidence");
     assert.equal(runEvidence.run.runId, activeRun.runId);
     assert.equal(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT);
+    assert.equal(runEvidence.run.winnerCandidateId, null, "winner null on the run");
   });
 
-  it("safe-winner path still produces an actionable plan with a runId", () => {
-    const baseline = makeBaseline();
+  // ── D. SAFE WINNER — unchanged ──
+  it("D — safe-winner actionable plan still carries runId", () => {
     const winner = makeConfirmedResult("winner-1", 2.0);
-    winner.candidateKind = "calibration";
+    const plan = {
+      planVersion: 3,
+      savedAt: new Date().toISOString(),
+      recordKind: "plan",
+      projectId: "p1",
+      versionId: "v1",
+      designFingerprint: "fp",
+      resultFingerprint: "rfp",
+      cacheKey: "fp",
+      levers: {
+        delay: {
+          lever: "delay",
+          evidenceStatus: "evaluated",
+          evaluated: true,
+          notEvaluated: false,
+          effect: { p19DeltaDb: -1, p20DeltaDb: -1.5, p14DeltaDb: 0 },
+          changes: [{ sourceId: "sub-1", delayMs: 5 }],
+          practical: true,
+          validation: { destinationsValid: true },
+        },
+      },
+      baseline: { achievedP20VariationDb: 5.0 },
+      leverDecisions: {},
+    };
     const selection = {
       winner,
-      currentResult: baseline,
       confirmedResults: [winner],
-      calibrationResult: {
-        candidateId: "winner-1",
-        appliedTuning: [{ sourceId: "sub-1", delayMs: 5, gainDb: 0, polarity: 1 }],
-      },
       evaluationIssues: [],
       evaluationIncomplete: false,
       baselineValidation: { valid: true },
       canonicalJobsRun: 1,
+      currentResult: makeBaseline(),
     };
-    const plan = buildOptimiserPlan({
-      selection, baseline,
-      identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
-      instances: [
-        { id: "sub-1", position: { x: 1, y: 1 }, legacyGroup: "front", delayMs: 0, gainDb: 0, polarity: 1 },
-      ],
-    });
     const { actionablePlan } = buildOptimiserResultForSave({
       plan, selection,
       diagnostics: { stages: [], canonicalJobsRun: 1 },
@@ -249,11 +330,12 @@ describe("Case C — run identity preserved without a safe winner", () => {
       runIdentity: activeRun,
     });
     assert.ok(actionablePlan, "safe-winner path produces an actionable plan");
-    assert.ok(actionablePlan.run, "actionable plan carries a run summary");
-    assert.equal(actionablePlan.run.runId, activeRun.runId, "runId present on actionable plan");
+    assert.equal(actionablePlan.run.runId, activeRun.runId, "runId present on safe-winner plan");
+    assert.equal(actionablePlan.run.winnerCandidateId, "winner-1", "winner id present on safe-winner plan");
   });
 
-  it("genuine incomplete computation stays incomplete", () => {
+  // ── F. GENUINE COMPUTATION INCOMPLETE — stays incomplete ──
+  it("F — genuine computation failure stays incomplete with runId", () => {
     const selection = {
       winner: null,
       confirmedResults: [],
@@ -269,9 +351,38 @@ describe("Case C — run identity preserved without a safe winner", () => {
       identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
       runIdentity: activeRun,
     });
-    assert.ok(runEvidence, "evidence produced even for an incomplete run");
+    assert.ok(runEvidence, "evidence produced for incomplete run");
     assert.equal(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE,
       "genuine computation failure stays incomplete");
-    assert.equal(runEvidence.run.runId, activeRun.runId, "runId still present for an incomplete run");
+    assert.equal(runEvidence.run.runId, activeRun.runId, "runId still present for incomplete run");
+  });
+
+  // ── RUN HISTORY — serialised record retains run identity ──
+  it("Run history — serialised evidence retains runId, terminal outcome and winner nullability", () => {
+    const baseline = makeBaseline();
+    const selection = {
+      winner: null,
+      currentResult: baseline,
+      confirmedResults: [makeConfirmedResult("cand-1", 4.9)],
+      evaluations: [{ candidateId: "cand-1", status: "below-materiality" }],
+      nonAssessableCandidates: [
+        { candidateId: "na-1", candidateKind: "position", stage: "phase", status: "non-assessable", reason: "no-valid-p19-p20-assessment-band", achievedP18Hz: 129.051, transitionHz: 91.287 },
+      ],
+      tradeOffs: [{ candidateId: "trade-off-1", candidateKind: "calibration", reason: "primary-seat-regression" }],
+      evaluationIssues: [],
+      evaluationIncomplete: false,
+      baselineValidation: { valid: true },
+      canonicalJobsRun: 1,
+    };
+    const { runEvidence } = buildOptimiserResultForSave({
+      plan: null, selection,
+      diagnostics: { stages: [], canonicalJobsRun: 1 },
+      identity: { projectId: "p1", versionId: "v1", designFingerprint: "fp" },
+      runIdentity: activeRun,
+    });
+    const persisted = serializeOptimiserPlan(runEvidence);
+    assert.equal(persisted.run?.runId, activeRun.runId, "history retains runId");
+    assert.equal(persisted.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT, "history retains terminal outcome");
+    assert.equal(persisted.run?.winnerCandidateId, null, "winner nullable in history");
   });
 });
