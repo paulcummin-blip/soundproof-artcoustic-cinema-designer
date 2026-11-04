@@ -2,8 +2,8 @@
 //
 // Convention: stored listening point {x, y, z} is the EXACT centre of the head.
 // Head size is presentation-only (0.16 × 0.22 × 0.20 m) and must not alter
-// acoustic calculations. A restrained nose cue gives a visible facing direction.
-// Facing is toward the screen (negative Y) unless a per-seat facing is stored.
+// acoustic calculations. Heads are plain smooth ellipsoids with no nose, no
+// facing-direction cone and no protrusion — this view does not show facing.
 //
 // The RSP marker is a SEPARATE reference marker, not a listening head: a simple
 // small sphere sized to echo the Plan View RSP dot (Plan radius ≈ 5 px ≈ 0.05 m
@@ -47,19 +47,6 @@ export function buildHeadMesh(headData) {
   head.scale.set(HEAD_SIZE.width, HEAD_SIZE.height, HEAD_SIZE.depth);
   head.renderOrder = 0;
   group.add(head);
-
-  // Nose cue: a small cone pointing toward the screen (room -Y → Three.js -Z).
-  const noseGeo = new THREE.ConeGeometry(0.018, 0.05, 10);
-  const noseMat = new THREE.MeshStandardMaterial({
-    color: isPrimary ? 0x152420 : 0x4A3B30,
-    roughness: 0.7,
-  });
-  const nose = new THREE.Mesh(noseGeo, noseMat);
-  // Cone points +Y by default; rotate so it points -Z (toward screen in Three.js space).
-  nose.rotation.x = -Math.PI / 2;
-  nose.position.set(0, 0, -(HEAD_SIZE.depth / 2 + 0.012));
-  nose.renderOrder = 0;
-  group.add(nose);
 
   return group;
 }
