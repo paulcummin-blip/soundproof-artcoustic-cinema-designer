@@ -183,13 +183,27 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   if (isRound) {
     const diameter = modelMeta?.diameterM || safeWidthM;
     const radiusPx = (diameter / 2) * (scale || 1);
-    
+
     return (
       <g
         pointerEvents="all"
         onPointerDown={handleMouseDown}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
+        {/* Placement-zone warning — subtle Artcoustic dark-red ring, smooth fade */}
+        <circle
+          cx={canvasX}
+          cy={canvasY_raw}
+          r={radiusPx + 2}
+          fill="none"
+          stroke={PLACEMENT_WARNING_COLOR}
+          strokeWidth={2}
+          style={{
+            opacity: placementWarning ? 0.9 : 0,
+            transition: "opacity 400ms ease",
+            pointerEvents: "none",
+          }}
+        />
         <circle
           cx={canvasX}
           cy={canvasY_raw}
@@ -206,11 +220,11 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       </g>
     );
   }
-  
+
   // For rectangular speakers, render as rotated rectangle
   const w = safeWidthM * (scale || 1);
   const d = safeDepthM * (scale || 1);
-  
+
   const pathData = `M ${-w / 2},${-d / 2} L ${w / 2},${-d / 2} L ${w / 2},${d / 2} L ${-w / 2},${d / 2} Z`;
   const transform = `translate(${canvasX}, ${canvasY_raw}) rotate(${yawDeg || 0})`;
 
@@ -221,6 +235,23 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       onPointerDown={handleMouseDown}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
+      {/* Placement-zone warning — subtle Artcoustic dark-red ring, smooth fade */}
+      <rect
+        x={-w / 2 - 2}
+        y={-d / 2 - 2}
+        width={w + 4}
+        height={d + 4}
+        rx={2}
+        ry={2}
+        fill="none"
+        stroke={PLACEMENT_WARNING_COLOR}
+        strokeWidth={2}
+        style={{
+          opacity: placementWarning ? 0.9 : 0,
+          transition: "opacity 400ms ease",
+          pointerEvents: "none",
+        }}
+      />
       <path
         d={pathData}
         fill={color || "#000000"}

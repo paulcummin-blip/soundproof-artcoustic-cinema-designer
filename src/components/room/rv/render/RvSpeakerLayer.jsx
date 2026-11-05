@@ -10,6 +10,7 @@ import {
   resolveCentreCabinetFootprintM,
 } from "@/components/utils/frontStageModeAuthority";
 import { useAppState } from "@/components/AppStateProvider";
+import { usePlacementWarnings } from "@/components/room/placementZone/usePlacementWarnings";
 
 /**
  * RvSpeakerLayer — renders all bed-layer draggable speaker icons onto the SVG canvas.
