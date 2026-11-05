@@ -829,7 +829,7 @@ export class Stage2PlacementController {
       try { this.workers[workerIndex].terminate(); } catch { /* ignore */ }
       this.workers[workerIndex] = null;
     }
-    this.watchdogs.delete(workerIndex);
+    this.clearWatchdog(workerIndex);
 
     // Settle the job as failure via the shared path.
     this.settleJob(workerIndex, {
