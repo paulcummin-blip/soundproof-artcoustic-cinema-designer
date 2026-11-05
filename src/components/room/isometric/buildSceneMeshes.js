@@ -173,8 +173,10 @@ export function buildScreenMesh(screenData) {
   addSideBar(sideXOff);
 
   // Viewable image surface — white, partially transparent so LCR / front subs
-  // behind the acoustically transparent screen remain visible. depthWrite OFF +
-  // renderOrder keeps it stable behind/around the opaque frame bars.
+  // behind the acoustically transparent screen remain visible. DoubleSide keeps
+  // it visible from both viewing directions (front and behind the screen).
+  // depthWrite OFF + renderOrder keeps it stable behind/around the opaque
+  // frame bars and prevents z-fighting with coplanar transparent surfaces.
   // Presentation-only offset of +3 mm in front of the frame plane to avoid any
   // coplanar z-fight with the bars' front faces; does not move the screen.
   const viewMat = new THREE.MeshStandardMaterial({

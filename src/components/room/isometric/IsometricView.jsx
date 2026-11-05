@@ -66,7 +66,6 @@ export default function IsometricView({
   const animationFrameRef = useRef(null);
   const needsRenderRef = useRef(true);
 
-  const [cleanView, setCleanView] = useState(false);
   const [showHeads, setShowHeads] = useState(true);
   const [showRspMarker, setShowRspMarker] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
@@ -241,7 +240,6 @@ export default function IsometricView({
     if (!sceneData || !controlsRef.current) return;
     if (savedReportView) {
       applyFraming(savedReportView);
-      setCleanView(!!savedReportView.visibility?.cleanView);
       setShowHeads(savedReportView.visibility.showHeads !== false);
       setShowRspMarker(savedReportView.visibility.showRspMarker !== false);
       setIsSaved(true);
@@ -303,13 +301,11 @@ export default function IsometricView({
   }, [sceneData, showHeads, showRspMarker]);
 
   // ---- Reset View (double-tap and button) ----
+  // Reset restores the default clean isometric framing — it never restores a
+  // saved report view, so the drawing always returns to the canonical room.
   const resetView = useCallback(() => {
-    if (savedReportView) {
-      applyFraming(savedReportView);
-    } else {
-      applyFraming({ camera: {}, visibility: {} });
-    }
-  }, [savedReportView, applyFraming]);
+    applyFraming({ camera: {}, visibility: {} });
+  }, [applyFraming]);
 
   // Double-tap detection on the canvas.
   useEffect(() => {
@@ -349,9 +345,9 @@ export default function IsometricView({
         polarDeg: (polar * 180) / Math.PI,
         zoom: cam.zoom,
       },
-      visibility: { cleanView, showHeads, showRspMarker },
+      visibility: { showHeads, showRspMarker },
     };
-  }, [cleanView, showHeads, showRspMarker]);
+  }, [showHeads, showRspMarker]);
 
   const handleSaveReportView = useCallback(() => {
     const framing = captureFraming();
@@ -359,15 +355,6 @@ export default function IsometricView({
     saveReportView(projectId, versionId, framing);
     setIsSaved(true);
   }, [captureFraming, projectId, versionId]);
-
-  const handleReturnToSaved = useCallback(() => {
-    if (savedReportView) {
-      applyFraming(savedReportView);
-      setCleanView(!!savedReportView.visibility?.cleanView);
-      setShowHeads(savedReportView.visibility.showHeads !== false);
-      setShowRspMarker(savedReportView.visibility.showRspMarker !== false);
-    }
-  }, [savedReportView, applyFraming]);
 
   const btnStyle = {
     fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", padding: "6px 12px",
@@ -378,39 +365,16 @@ export default function IsometricView({
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", background: "#F8F8F7" }}>
-      {/* Controls overlay — comfortably sized touch targets, no hover required */}
-      {!cleanView && (
-        <div style={{
-          position: "absolute", top: 10, left: 10, zIndex: 5, display: "flex",
-          gap: 8, flexWrap: "wrap", alignItems: "center", pointerEvents: "auto",
-        }}>
-          <button type="button" style={btnStyle} onClick={resetView}>Reset View</button>
-          <button type="button" style={isSaved ? btnStyle : btnActive} onClick={handleReturnToSaved} disabled={!isSaved}>
-            Return to Saved View
-          </button>
-          <button type="button" style={btnActive} onClick={handleSaveReportView}>Save Report View</button>
-        </div>
-      )}
-
-      {/* Visibility toggles */}
-      {!cleanView && (
-        <div style={{
-          position: "absolute", top: 10, right: 10, zIndex: 5, display: "flex",
-          gap: 8, flexWrap: "wrap", alignItems: "center", pointerEvents: "auto",
-        }}>
-          <button type="button" style={cleanView ? btnActive : btnStyle} onClick={() => setCleanView(true)}>
-            Clean View
-          </button>
-          <button type="button" style={btnStyle} onClick={() => setCleanView(false)}>Annotated</button>
-        </div>
-      )}
-      {cleanView && (
-        <div style={{
-          position: "absolute", top: 10, right: 10, zIndex: 5, display: "flex", gap: 8,
-        }}>
-          <button type="button" style={btnStyle} onClick={() => setCleanView(false)}>Exit Clean View</button>
-        </div>
-      )}
+      {/* Controls overlay — Reset View + Save to Report only */}
+      <div style={{
+        position: "absolute", top: 10, left: 10, zIndex: 5, display: "flex",
+        gap: 8, flexWrap: "wrap", alignItems: "center", pointerEvents: "auto",
+      }}>
+        <button type="button" style={btnStyle} onClick={resetView}>Reset View</button>
+        <button type="button" style={isSaved ? btnStyle : btnActive} onClick={handleSaveReportView}>
+          Save to Report
+        </button>
+      </div>
 
       {/* The 3D canvas mount */}
       <div ref={mountRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
