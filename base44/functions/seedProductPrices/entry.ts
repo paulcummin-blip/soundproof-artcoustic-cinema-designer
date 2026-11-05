@@ -43,11 +43,16 @@ const SEED_DATA = [
   { sku: "c4-1:1449",           label: "C4-1 — 1449mm",            category: "Loudspeaker", price_ex_vat: 1733.33 },
   { sku: "c4-1:1672",           label: "C4-1 — 1672mm",            category: "Loudspeaker", price_ex_vat: 1825 },
   { sku: "c4-1:1904",           label: "C4-1 — 1904mm",            category: "Loudspeaker", price_ex_vat: 1991.67 },
+  // 1094 mm Multi variant — valid cabinet size, selectable in designs, but its
+  // commercial price is pending: price_ex_vat stays null until entered, so it is
+  // never included in a priced quotation and is shown as "price not set".
+  { sku: "multi-lcr:1094-xs",   label: "Multi (LCR) — 1094 XS (price pending)",  category: "Loudspeaker", price_ex_vat: null },
   { sku: "multi-lcr:1222-m",    label: "Multi (LCR) — 1222 M",     category: "Loudspeaker", price_ex_vat: 2383.33 },
   { sku: "multi-lcr:1441-l",    label: "Multi (LCR) — 1441 L",     category: "Loudspeaker", price_ex_vat: 2650 },
   { sku: "multi-lcr:1711-xl",   label: "Multi (LCR) — 1711 XL",   category: "Loudspeaker", price_ex_vat: 2866.67 },
   { sku: "multi-lcr:1842-xxl",  label: "Multi (LCR) — 1842 XXL",   category: "Loudspeaker", price_ex_vat: 3366.67 },
   { sku: "multi-lcr:2230-xxxl", label: "Multi (LCR) — 2230 XXXL",  category: "Loudspeaker", price_ex_vat: 4641.67 },
+  { sku: "multi-mono:1094-xs",  label: "Multi (Mono) — 1094 XS (price pending)", category: "Loudspeaker", price_ex_vat: null },
   { sku: "multi-mono:1222-m",   label: "Multi (Mono) — 1222 M",   category: "Loudspeaker", price_ex_vat: 2383.33 },
   { sku: "multi-mono:1441-l",   label: "Multi (Mono) — 1441 L",   category: "Loudspeaker", price_ex_vat: 2650 },
   { sku: "multi-mono:1711-xl",  label: "Multi (Mono) — 1711 XL",   category: "Loudspeaker", price_ex_vat: 2866.67 },

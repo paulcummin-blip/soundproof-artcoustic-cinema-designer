@@ -5,11 +5,13 @@
 // (C4-1, Multi, HSPL).
 //
 // A TV-linked soundbar is not one size: the catalogue publishes it in several
-// cabinet lengths. Which one is installed follows the SCREEN'S PHYSICAL WIDTH —
-// never its diagonal, and never a fixed default — and the length installed is
-// the closest available catalogue length. Every drawing and every measurement
-// resolves the variant here, so Front Elevation, Plan View and the reports can
-// never disagree about which cabinet is installed.
+// cabinet lengths. Which one is installed follows the SCREEN'S OVERALL PHYSICAL
+// WIDTH (frame included) — never its diagonal, and never a fixed default — and
+// the length installed is the longest available cabinet that is no more than 5 mm
+// wider than that width. HSPL is the bespoke exception: its cabinet is made to
+// measure and matches the screen's overall width exactly. Every drawing and every
+// measurement resolves the variant here, so Front Elevation, Plan View and the
+// reports can never disagree about which cabinet is installed.
 //
 // The dual-centre arrangement is the one exception: there the required variant
 // is named by the catalogue itself (the C4-1's 1222 mm cabinet), so a wider
@@ -24,7 +26,8 @@ import {
   getDualCentreCabinetLengthMm,
   getSpeakerModelMeta,
 } from '@/components/models/speakers/registry';
-import { resolveEffectiveViewableDimsM } from '@/components/models/screen/resolveEffectiveScreen';
+import { resolveEffectiveViewableDimsM, isManualOverrideActive } from '@/components/models/screen/resolveEffectiveScreen';
+import { resolveScreenFrameGeometry } from '@/components/models/screen/screenFrameGeometry';
 
 /**
  * The screen's PHYSICAL width in millimetres.
@@ -41,6 +44,51 @@ export function resolveScreenPhysicalWidthMm(screen) {
 
   const tvMm = Number(screen?.tvWidthMm);
   return Number.isFinite(tvMm) && tvMm > 0 ? tvMm : null;
+}
+
+/** True for the HSPL bespoke soundbars (made to measure, no catalogue list). */
+export function isHsplModel(modelKey) {
+  const mk = String(modelKey || "");
+  return mk.includes("hspl-lcr") || mk.includes("hspl-mono");
+}
+
+/**
+ * The screen's OVERALL physical width in millimetres, including its frame.
+ *
+ * A television preset's own `tvWidthMm` is the TV's overall physical width (bezel
+ * included) — no frame border is added on top. A projection screen's overall
+ * width is its viewable image plus a border on every side (screenFrameGeometry).
+ * This is the dimension a TV-linked soundbar's cabinet is matched against: the
+ * longest available cabinet that is no more than 5 mm wider than this figure.
+ */
+export function resolveScreenOverallWidthMm(screen) {
+  if (!screen) return null;
+  const tvMm = Number(screen.tvWidthMm);
+  const isTv = !!screen.tvPresetKey
+    || (Number.isFinite(tvMm) && tvMm > 0 && !screen.visibleWidthInches && !isManualOverrideActive(screen));
+  if (isTv && Number.isFinite(tvMm) && tvMm > 0) return tvMm;
+  const geo = resolveScreenFrameGeometry(screen);
+  const overallM = Number(geo?.overallWidthM);
+  return Number.isFinite(overallM) && overallM > 0 ? overallM * 1000 : null;
+}
+
+/**
+ * The longest available cabinet length no more than `toleranceMm` wider than the
+ * target, or null when nothing is comparable. When even the smallest length
+ * exceeds the limit, the smallest is returned (least overhang) so a cabinet is
+ * always selected for an installed design.
+ */
+export function longestCabinetWithinMm(lengthsMm, targetMm, toleranceMm = 5) {
+  const lengths = (Array.isArray(lengthsMm) ? lengthsMm : [])
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+  if (lengths.length === 0) return null;
+  const target = Number(targetMm);
+  if (!Number.isFinite(target)) return null;
+  const limit = target + Number(toleranceMm);
+  const within = lengths.filter((l) => l <= limit);
+  return within.length ? within[within.length - 1] : lengths[0];
 }
 
 /** The catalogue length closest to a target width, or null when nothing is comparable. */
@@ -78,19 +126,34 @@ export function resolveSoundbarCabinetLengthMm({
   dualCentre = false,
   explicitMm = null,
 }) {
+  // HSPL is bespoke: the cabinet is made to measure, so its length is the
+  // screen's overall physical width exactly — no catalogue list, no rounding,
+  // no tolerance. A designer's own recorded length is still preserved so a
+  // saved HSPL project is never silently resized.
+  if (isHsplModel(modelKey)) {
+    const explicit = Number(explicitMm);
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    return resolveScreenOverallWidthMm(screen);
+  }
+
   const lengths = getSoundbarCabinetLengthsMm(modelKey);
   if (lengths.length === 0) return null;
 
-  // An explicitly selected length is never overridden by a screen change.
+  // An explicitly selected length is preserved even when it is no longer in the
+  // current commercial catalogue: a saved project's historical selection is
+  // never silently migrated or resized by a catalogue change.
   const explicit = Number(explicitMm);
-  if (Number.isFinite(explicit) && lengths.includes(explicit)) return explicit;
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
 
   if (dualCentre) {
     const required = getDualCentreCabinetLengthMm(modelKey);
     if (Number.isFinite(required) && lengths.includes(required)) return required;
   }
 
-  return nearestCabinetLengthMm(lengths, resolveScreenPhysicalWidthMm(screen));
+  // Longest available cabinet no more than 5 mm wider than the screen's overall
+  // physical width (frame included). Drawings, measurements and reports all read
+  // this one resolved commercial length.
+  return longestCabinetWithinMm(lengths, resolveScreenOverallWidthMm(screen), 5);
 }
 
 /** A placed speaker's own recorded cabinet length, when it records one. */
