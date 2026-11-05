@@ -124,10 +124,10 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
     artwork: "EVOLVE 3-1 front",
     href: "https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/053510389_Evolve3-1front.png",
     native: { width: 751, height: 1024 },
-    box: { x: 139, y: 10, width: 443, height: 993 },
-    mode: ELEVATION_ART_MODE.MEASURED,
-    source: MEASUREMENT,
-    note: "STALE VIEWBOX: the file's declared box is the page, which carries wide side margins; the measured drawing bounds are used instead.",
+    box: { x: 11, y: 10, width: 730, height: 1005 },
+    mode: ELEVATION_ART_MODE.APPROVED,
+    source: "measured from the file, trimming the page border frame, to preserve the complete cabinet outline at the physical 270 × 370 mm aspect",
+    note: "The automated pass collapses onto the internal driver cluster, so the hand-measured cabinet outline is the authority: the full drawing inside the page frame (730 × 1005 px ≈ 270 × 370 mm), not the driver cluster alone.",
   },
   evolve_4_2: {
     artwork: "EVOLVE 4-2 front",
@@ -192,6 +192,15 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
     source: "measured from the file and verified in the display label parity tests",
     note: "Hand-measured crop, already shipping. C-1 keeps its own long-established line-art treatment unchanged.",
     preserveAspect: "none",
+  },
+  c41: {
+    artwork: "C4-1 default front",
+    href: "https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2adee2973_Screenshot2026-06-05at132314.png",
+    native: { width: 1024, height: 81 },
+    box: { x: 6, y: 7, width: 1014, height: 67 },
+    mode: ELEVATION_ART_MODE.APPROVED,
+    source: "measured from the file, trimming the page border frame, to preserve the cabinet body and drivers",
+    note: "The default C4-1 catalogue screenshot sits on a page with a border frame; the crop trims that frame and the page margin so the cabinet body and drivers are drawn at the footprint (no legacy enlargement, no white areas beyond the cabinet).",
   },
 });
 

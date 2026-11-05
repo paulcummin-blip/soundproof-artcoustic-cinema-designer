@@ -117,9 +117,9 @@ describe('the crop authority trims the page without touching the drawing', () =>
 
   it('the crops that carry a cabinet face agree with it when fitted', () => {
     // The measured drawings whose own proportions are the cabinet's: the crop is
-    // drawn edge to edge in the footprint without distortion. EVOLVE 3-1 is not
-    // in this list: its drawing is genuinely narrower than its cabinet, so it is
-    // fitted inside the footprint and centred instead of being stretched to it.
+    // drawn edge to edge in the footprint without distortion. The EVOLVE 3-1 crop
+    // now preserves the complete cabinet outline at 270 × 370 mm, so it agrees
+    // with its cabinet face like the other Evolve models.
     const agreeing = [
       ['q63', 280, 280],
       ['q85', 500, 600],
@@ -129,6 +129,7 @@ describe('the crop authority trims the page without touching the drawing', () =>
       ['c41_1441', 1441, 120],
       ['c41_1711', 1711, 120],
       ['evolve_2_1', 200, 200],
+      ['evolve_3_1', 270, 370],
       ['evolve_4_2', 270, 370],
       ['evolve_6_3', 270, 370],
       ['evolve_8_4', 270, 370],
@@ -170,9 +171,11 @@ describe('artwork with no trustworthy crop is drawn unchanged, and reported', ()
   });
 
   it('a fallback keeps the legacy enlargement AND the artwork original box', () => {
-    // The catalogue C4-1 drawing serves several cabinet lengths, so it has no
-    // single face to check a crop against and is drawn exactly as it always was.
-    expect(elevationArtFitRatio('c41')).toBe(ELEVATION_ART_FIT_LEGACY);
+    // A model with no elevation artwork (e.g. a subwoofer) resolves no artwork
+    // key, so it is drawn exactly as it always was: legacy enlargement and the
+    // renderer's own declared box. The default C4-1 catalogue drawing is now
+    // normalised like its variant artworks (see ELEVATION_ART_AUTHORITY.c41).
+    expect(elevationArtFitRatio(elevationArtworkKeyForModel('sub3-12'))).toBe(ELEVATION_ART_FIT_LEGACY);
     expect(rendererSource).toMatch(/\? `\$\{resolved\.box\.x\}/);
     expect(rendererSource).toMatch(/: declared\.box;/);
     expect(rendererSource).toMatch(/declared\.width/);
