@@ -346,7 +346,11 @@ export function buildOptionFacts(entry, label, { policy = null } = {}) {
         size_inches: screen.size_inches ?? null,
         display_type: screen.display_type ?? null,
         display_label: screen.display_label ?? null,
-        diagonal_inches: screen.diagonal_inches ?? null,
+        // A projection screen is never stated by its diagonal: the convention is
+        // viewable width and aspect ratio alone, so the writer's frozen pack
+        // carries no diagonal for one. The authoritative display_label carries
+        // the phrase; the viewable width and height carry the geometry.
+        diagonal_inches: screen.display_type === 'tv' ? (screen.diagonal_inches ?? null) : null,
         aspect_ratio: asText(screen.aspect_ratio),
         screen_type: asText(screen.screen_type),
         viewable_width_cm: screen.viewable_width_cm ?? null,

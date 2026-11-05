@@ -123,6 +123,7 @@ function buildIdentity({ reportType, captured, sourceFingerprint }) {
 import {
   DISPLAY_TYPE_PROJECTOR,
   DISPLAY_TYPE_TV,
+  formatDisplayPhrase,
   resolveDisplayType,
   savedDiagonalInches,
 } from '@/components/models/screen/displayTypeAuthority';
@@ -153,11 +154,20 @@ function buildScreen(captured, borderThicknessM) {
   const viewableDiagonalIn = displayType === DISPLAY_TYPE_TV
     ? round(savedDiagonalInches(screen), 1)
     : round(screen?.diagonal_inches ?? screen?.size_inches, 1);
+  // THE screen-size display rule, built from the one shared formatter so every
+  // report, proposal and ADI surface states the same display in the same words:
+  // a television by its nominal diagonal alone, a projection screen by its
+  // viewable width and aspect ratio alone. A projection screen's diagonal is
+  // never part of the label — it is not a size the convention states.
+  const viewableWidthCm = cmFromM(screen?.computed_width_m);
+  const viewableWidthIn = viewableWidthCm != null
+    ? Number(viewableWidthCm) / 2.54
+    : Number(screen?.size_inches);
   const displayLabel = displayType === DISPLAY_TYPE_TV
-    && Number.isFinite(Number(viewableDiagonalIn))
-    && Number(viewableDiagonalIn) > 0
-      ? `${Math.round(Number(viewableDiagonalIn))}" TV`
-      : null;
+    ? (Number.isFinite(Number(viewableDiagonalIn)) && Number(viewableDiagonalIn) > 0
+        ? `${Math.round(Number(viewableDiagonalIn))}" TV`
+        : null)
+    : formatDisplayPhrase({ widthInches: viewableWidthIn, aspectRatio: screen?.aspect_ratio });
   if (!screen) {
     return {
       format: null, viewable_diagonal_in: null, viewable_width_cm: null, viewable_height_cm: null,
@@ -165,7 +175,6 @@ function buildScreen(captured, borderThicknessM) {
       display_type: DISPLAY_TYPE_PROJECTOR, display_label: null,
     };
   }
-  const viewableWidthCm = cmFromM(screen.computed_width_m);
   const viewableHeightCm = cmFromM(screen.computed_height_m);
   const borderCm = asNumber(borderThicknessM) === null ? null : asNumber(borderThicknessM) * 100;
   return {
