@@ -593,7 +593,6 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // available. Every pool worker gets the same context via fire-and-forget
     // postMessage (FIFO — processed before any confirmation job).
     confirmationPool = createConfirmationPool({
-      workerUrl: new URL("./improveBassV2.worker.js", import.meta.url),
       size: V2_CONFIRMATION_CONCURRENCY,
       integrationContext,
       signal: controller.signal,
