@@ -1,4 +1,5 @@
 import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
+import { currentPlacementFailure } from "./currentPlacementEvidence.js";
 import { extractAuthorityForComparison } from "./currentAuthorityComparison.js";
 import { selectConfirmedRecommendations } from "./confirmedRecommendationSelection.js";
 import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
@@ -785,6 +786,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         }
 
         if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
+
+        // A terminal physical rejection is not a transfer payload. Current is
+        // the comparison baseline: stop with its real placement limitation,
+        // rather than asking grouped searches to consume absent acoustic data.
+        const placementFailure = currentPlacementFailure(currentRawTransfer);
+        if (placementFailure) return {
+          ...placementFailure, snapshot,
+          baselineParity: buildPersistedBaselineParity(baselineParity),
+        };
 
         // Freeze installed EFFECTIVE tuning; grouped trials add an adjustment
         // once. All recombination and canonical confirmation run in the worker.
