@@ -40,6 +40,7 @@ export default function RvSpeakerLayer({
   // so the prop is always undefined. Reading from appState ensures tvPresetKey is always current.
   const appState = useAppState();
   const resolvedScreen = appState?.screen || screen || {};
+  const warnedSpeakerIds = usePlacementWarnings();
 
   if (!toPx || !scale) return null;
   const resolveRole = getCanonicalRole || defaultGetCanonicalRole;
