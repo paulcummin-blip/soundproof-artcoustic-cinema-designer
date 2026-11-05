@@ -1012,6 +1012,7 @@ export default function AdiOptimisationJourney({
             onApply={handleApplyRecommended}
             onKeep={() => ignoreOptimiserRecommendation(ignoreKey)}
             applyBusy={isRunning}
+            applyLabel={improvementCards?.applyLabel || null}
           />
         )}
 

@@ -47,6 +47,10 @@ export default function AdiImprovementReviewDialog({
   onApply = null,
   onKeep = null,
   applyBusy = false,
+  // The action-specific Apply label — "Apply Bass Settings" / "Move Seating" /
+  // "Move Subwoofers" — from the improvement card's own action presentation.
+  // Falls back to the generic "APPLY CHANGE" when not supplied.
+  applyLabel = null,
   className = "",
 }) {
   if (!result?.found) return null;
@@ -122,7 +126,7 @@ export default function AdiImprovementReviewDialog({
                 data-adi-improvement-apply="true"
                 className={`${BUTTON_PRIMARY} ${applyBusy ? "cursor-not-allowed opacity-70" : ""}`}
               >
-                {IMPROVEMENT_COPY.APPLY_IN_REVIEW}
+                {applyLabel || IMPROVEMENT_COPY.APPLY_IN_REVIEW}
               </button>
             )}
             {onKeep && (

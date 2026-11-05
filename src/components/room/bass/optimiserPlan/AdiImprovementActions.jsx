@@ -26,6 +26,9 @@ export default function AdiImprovementActions({
   onApply = null,
   onKeep = null,
   applyBusy = false,
+  // The action-specific Apply label — "Apply Bass Settings" / "Move Seating" /
+  // "Move Subwoofers" — from the improvement card's own action presentation.
+  applyLabel = null,
   className = "",
 }) {
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -63,6 +66,7 @@ export default function AdiImprovementActions({
         onApply={onApply}
         onKeep={onKeep}
         applyBusy={applyBusy}
+        applyLabel={applyLabel}
       />
     </div>
   );

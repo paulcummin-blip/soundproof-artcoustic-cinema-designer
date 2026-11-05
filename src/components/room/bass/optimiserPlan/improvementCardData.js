@@ -29,6 +29,7 @@
 import { deviationText, levelText, wholeDbImprovement } from "./optimiserWholeNumberDb.js";
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
 import { IMPROVEMENT_CASE } from "./improvementResultAuthority.js";
+import { resolveImprovementActionPresentation } from "./improvementActionPresentation.js";
 
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -136,6 +137,18 @@ export function buildImprovementCardData({
 
   if (!isPending && !isApplied) return null;
 
+  // ── The action presentation ──
+  // Plain-English headline, proposed-changes rows, scope statement and the
+  // action-specific Apply label. Read from the SAME authorities the card
+  // already reads — nothing is fabricated.
+  const actionPresentation = resolveImprovementActionPresentation({
+    headline: hl,
+    summary,
+    placement: pl,
+    improvementResult: ir,
+    planView,
+  });
+
   // For a pending state whose evaluation ran against a different current state,
   // no before/after pair is comparable — never compare unrelated results.
   if (isPending && rm?.currentP20?.runBaselineDiffers === true) return null;
@@ -214,5 +227,12 @@ export function buildImprovementCardData({
     pillLabel,
     metrics,
     footer,
+    // ── The action presentation ──
+    actionType: actionPresentation?.actionType || null,
+    actionHeadline: actionPresentation?.actionHeadline || null,
+    appliedHeadline: actionPresentation?.appliedHeadline || null,
+    proposedChanges: actionPresentation?.proposedChanges || [],
+    scopeStatement: actionPresentation?.scopeStatement || null,
+    applyLabel: actionPresentation?.applyLabel || null,
   };
 }

@@ -68,19 +68,19 @@ export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
 });
 
 export const LEVER_APPLY_LABEL = Object.freeze({
-  [OPTIMISER_LEVER.PLACEMENT]: "Apply placement",
+  [OPTIMISER_LEVER.PLACEMENT]: "Move Subwoofers",
   [OPTIMISER_LEVER.DELAY]: "Apply delay",
   [OPTIMISER_LEVER.GAIN]: "Apply gain",
   [OPTIMISER_LEVER.POLARITY]: "Apply polarity",
-  [OPTIMISER_LEVER.SEATING]: "Apply seating",
+  [OPTIMISER_LEVER.SEATING]: "Move Seating",
 });
 
 export const LEVER_UNDO_LABEL = Object.freeze({
-  [OPTIMISER_LEVER.PLACEMENT]: "Undo placement",
+  [OPTIMISER_LEVER.PLACEMENT]: "Restore Subwoofers",
   [OPTIMISER_LEVER.DELAY]: "Undo delay",
   [OPTIMISER_LEVER.GAIN]: "Undo gain",
   [OPTIMISER_LEVER.POLARITY]: "Undo polarity",
-  [OPTIMISER_LEVER.SEATING]: "Undo seating",
+  [OPTIMISER_LEVER.SEATING]: "Restore Seating",
 });
 
 const LEVER_KEYS = new Set(Object.values(OPTIMISER_LEVER));
