@@ -12,18 +12,40 @@
  * developed here instead, beside the geometry table whose figures it explains.
  *
  * WHAT IT SAYS. The table prints each row's seats, its viewing angle and its RP23
- * result; this paragraph says what those figures mean for the audience — how the
- * picture reads from the seating, why the screen's shape and size suit the way
- * films are framed, and why the arrangement serves the whole audience rather than
- * one seat. No angle, no level and no seat count is restated.
+ * result; this paragraph says what those figures mean for the audience — stated
+ * with the actual screen size, seat count, viewing angle and RP23 level the
+ * published evidence carries. No angle, no level and no seat count is restated.
+ *
+ * THE REGISTER. The copy is written as an experienced cinema designer explaining
+ * the viewing decision to a client: clear, natural, confident, and grounded in
+ * this project's own figures. It never uses poetic, abstract or artificial
+ * descriptions of the experience — no "the picture fills the eye", no "carries
+ * the same presence", no "reads at its intended scale", no "chosen by eye". The
+ * actual screen size, seating arrangement, viewing angle and RP23 level carry the
+ * story, and each project reads differently because its figures are different.
  *
  * Read-only and pure: the display is read from the design's own display authority
  * and the rows from the published per-row viewing results. Nothing is graded,
  * recalculated or inferred, and a design with no seating returns null.
  */
 
-import { isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
+import { displayPhrase, isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
 import { viewingRows } from '@/shared/strengthStoryEvidence';
+
+const rowLabel = (index, total) => {
+  if (total <= 1) return 'the seating row';
+  if (index === 0) return 'the front row';
+  if (index === total - 1) return 'the rear row';
+  return total === 3 ? 'the middle row' : `row ${index + 1}`;
+};
+
+const angleText = (row) => {
+  if (row?.minAngleDeg == null && row?.maxAngleDeg == null) return null;
+  const min = Math.round(Number(row.minAngleDeg));
+  const max = Math.round(Number(row.maxAngleDeg));
+  if (min === max) return `${min}°`;
+  return `${min}° to ${max}°`;
+};
 
 /**
  * The viewing experience, as one paragraph of report copy, or null where the
@@ -44,22 +66,66 @@ export function buildViewingExperienceNarrative({
   const projection = !isTvDisplay(projectDetails);
   const widescreen = String(projectDetails?.aspect_ratio || '').trim().startsWith('2.35');
   const severalRows = rows.length > 1;
+  const totalSeats = rows.reduce((sum, row) => sum + Number(row.seats), 0);
 
-  const fromTheSeats = severalRows
-    ? 'The seating is arranged so the picture fills the eye from every row: the front row is close enough for the image to hold the attention without crowding it, and the rows behind keep a comfortable viewing distance rather than watching from the far end of a long room.'
-    : 'The seating is positioned so the picture fills the eye: close enough for the image to hold the attention, and far enough back that the whole frame is read at once rather than scanned.';
+  // The screen this design is built around, stated with its actual size and
+  // format by the shared display authority.
+  const screen = displayPhrase(projectDetails)
+    || (projection ? 'The projection screen' : 'The display');
 
-  const screen = !projection
-    ? 'The display is sized to the seating rather than the seating fitted around the display, so the picture reads with the same presence across the room.'
-    : widescreen
-      ? 'The 2.35:1 screen takes widescreen presentations edge to edge, so the films that use the full frame fill the screen instead of sitting inside a black border.'
-      : 'The screen is sized to the seating, so the picture carries the same presence in either framing and the image is never pushed below the height the rows are set for.';
+  // Sentence 1: the screen and the seating, with the actual seat count.
+  const seatPhrase = severalRows
+    ? `${rows.length} rows totalling ${totalSeats} seats`
+    : `a single row of ${totalSeats} seat${totalSeats === 1 ? '' : 's'}`;
+  const opening = `${screen} is paired with ${seatPhrase}.`;
 
-  const wholeAudience = severalRows
-    ? 'The result is a room judged on how the whole audience sees the film: the seating is arranged around the screen so the picture reads at its intended scale from the rows rather than from a single favoured seat.'
-    : 'The result is a viewing distance worked out from the screen size and the seating rather than chosen by eye, so the picture reads at its intended scale from the seats.';
+  // Sentence 2: the viewing angle and RP23 level, stated as published.
+  const levels = rows.map((row) => row.level).filter(Boolean);
+  const consistentLevel = levels.length > 0 && levels.every((l) => l === levels[0]);
 
-  return [fromTheSeats, screen, wholeAudience].join(' ');
+  let viewingResult;
+  if (severalRows) {
+    const perRow = rows.map((row, i) => {
+      const angle = angleText(row);
+      const level = row.level ? `RP23 ${row.level}` : null;
+      const parts = [angle, level].filter(Boolean);
+      return parts.length > 0 ? `${rowLabel(i, rows.length)} sees ${parts.join(' at ')}` : null;
+    }).filter(Boolean);
+
+    const allAngles = rows.flatMap((row) => [row.minAngleDeg, row.maxAngleDeg])
+      .filter((v) => Number.isFinite(v));
+    if (perRow.length > 0) {
+      viewingResult = perRow.join(', ') + '.';
+    } else if (allAngles.length > 0) {
+      viewingResult = `Viewing angles range from ${Math.round(Math.min(...allAngles))}° to ${Math.round(Math.max(...allAngles))}°.`;
+    } else {
+      viewingResult = null;
+    }
+  } else {
+    const angle = angleText(rows[0]);
+    const level = rows[0]?.level ? `RP23 ${rows[0].level}` : null;
+    const parts = [
+      angle ? `a ${angle} horizontal viewing angle` : null,
+      level,
+    ].filter(Boolean);
+    viewingResult = parts.length > 0
+      ? `This provides ${parts.join(', ')} across all ${totalSeats} seat${totalSeats === 1 ? '' : 's'}.`
+      : null;
+  }
+
+  // Sentence 3: the benefit, stated plainly without poetic language.
+  const benefit = severalRows
+    ? (consistentLevel
+      ? 'The viewing experience stays consistent across the rows, with the screen size and seating positions considered together rather than treated as separate decisions.'
+      : 'The viewing experience varies across the rows, as is expected with multiple seating positions in a room of this size.')
+    : 'The screen size and seating position have been considered together, so the picture scale suits the room and the viewing distance works for the seats that are there.';
+
+  // For a widescreen projection room, note the framing the aspect ratio gives.
+  const framing = (projection && widescreen)
+    ? 'The 2.35:1 screen shows widescreen films edge to edge, so the films that use the full frame fill the screen.'
+    : null;
+
+  return [opening, viewingResult, benefit, framing].filter(Boolean).join(' ');
 }
 
 export default buildViewingExperienceNarrative;

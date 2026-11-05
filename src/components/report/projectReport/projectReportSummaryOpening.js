@@ -273,7 +273,7 @@ export function buildProjectReportSummaryOpening({
     vision.push('This room is designed as a cinema, with the picture and the sound planned together from the seating outwards.');
   }
   if (overheadCount > 0) {
-    vision.push('The overhead layer is part of the original design rather than an addition to it, which is what gives the room its sense of scale.');
+    vision.push('The overhead layer is part of the original design rather than an addition to it, adding height information to the surround field.');
   } else if (surroundCount > 0 && !mediaRoom) {
     vision.push('The sound is carried around and behind the seating as well as across the front, so the audience sits inside the surround field rather than in front of it.');
   }

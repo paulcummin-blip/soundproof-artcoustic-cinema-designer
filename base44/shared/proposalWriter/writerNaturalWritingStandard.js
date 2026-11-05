@@ -206,4 +206,16 @@ export const GENERIC_CLAIM_PHRASES = Object.freeze([
   'authoritative low-frequency impact',
   'authoritative low frequency impact',
   'state of the art',
+  // Poetic / abstract viewing descriptions — replaced by the actual screen
+  // size, viewing angle and RP23 level the evidence publishes.
+  'the picture fills the eye',
+  'fills the eye',
+  'carries the same presence',
+  'reads at its intended scale',
+  'chosen by eye',
+  'the whole frame is read at once rather than scanned',
+  'the image holds the attention',
+  'strong cinematic scale',
+  'powerful dynamics',
+  'immersive sound',
 ]);
