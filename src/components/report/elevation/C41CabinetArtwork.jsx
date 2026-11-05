@@ -5,12 +5,13 @@
 // (1222, 1449, 1672, 1904 mm, plus any legacy length a saved project carries).
 //
 // The cabinet is drawn as exact vector geometry at the cabinet's TRUE physical
-// width × 120 mm height — a rectangle with the approved driver group centred at
-// a CONSTANT physical size, so the drivers never scale with the cabinet width.
-// There is no raster image and no white page: the drawing is transparent line
-// art, so it has no white background, no overhang, no stretching, no distortion
-// and no clipping. A vertically mounted cabinet is this same drawing rotated a
-// quarter turn by the caller.
+// width × 120 mm height — a white-faced rectangle with the approved driver group
+// centred at a CONSTANT physical size, so the drivers never scale with the
+// cabinet width. The style matches the Evolve 3-1 technical drawing: black
+// line art on a white cabinet face, with a clearly defined outer boundary. The
+// white fill is the cabinet's OWN rectangle only, so there is no overhang, no
+// page padding, no stretching, no distortion and no clipping. A vertically
+// mounted cabinet is this same drawing rotated a quarter turn by the caller.
 //
 // The catalogue's dimensions remain the authority: the cabinet width comes from
 // the ONE variant resolver (resolveSoundbarCabinetLengthMm) and the 120 mm
@@ -19,11 +20,17 @@
 // ---------------------------------------------------------------------------
 import React from "react";
 
-const STROKE = "#111111";
+// Technical line-art palette — black ink on a white cabinet face, matching the
+// Evolve 3-1 drawing style. The cabinet face is filled white so the dark line
+// art reads with the same contrast as the Evolve artwork; the white fill is the
+// cabinet's OWN rectangle only (no overhang, no page padding).
+const INK = "#1a1a1a";
+const FACE = "#ffffff";
 
 // Driver group — one central tweeter flanked by two woofers each side, drawn at
 // a FIXED physical size (mm) so the drivers stay the same in every cabinet
-// width. The cabinet body extends beyond the drivers on either side.
+// width. The cabinet body extends beyond the drivers on either side. These
+// dimensions are NOT changed by the styling work.
 const DRIVER_CY = 60;        // mm — vertical centre of the driver line
 const WOOFER_R1 = 28;        // mm — surround
 const WOOFER_R2 = 18;        // mm — cone
@@ -33,11 +40,24 @@ const TWEETER_R2 = 10;       // mm — dome
 const WOOFER_PITCH = 70;     // mm between adjacent woofer centres
 
 function Woofer({ cx, cy }) {
+  // Concentric rings on a white face — the same line-art treatment as the Evolve
+  // drivers. Each ring is white-filled so it reads as a clear circle against the
+  // white cabinet, with a dark outline at a consistent weight.
+  const screwR = 2.4;
+  const screwOffset = WOOFER_R1 - 5;
   return (
     <g>
-      <circle cx={cx} cy={cy} r={WOOFER_R1} fill="none" stroke={STROKE} strokeWidth={1.4} />
-      <circle cx={cx} cy={cy} r={WOOFER_R2} fill="none" stroke={STROKE} strokeWidth={1} />
-      <circle cx={cx} cy={cy} r={WOOFER_R3} fill="none" stroke={STROKE} strokeWidth={0.9} />
+      {/* Surround ring */}
+      <circle cx={cx} cy={cy} r={WOOFER_R1} fill={FACE} stroke={INK} strokeWidth={1.4} />
+      {/* Cone ring */}
+      <circle cx={cx} cy={cy} r={WOOFER_R2} fill={FACE} stroke={INK} strokeWidth={1} />
+      {/* Dust cap */}
+      <circle cx={cx} cy={cy} r={WOOFER_R3} fill={FACE} stroke={INK} strokeWidth={0.9} />
+      {/* Four fixing screws at the surround corners — a genuine cabinet detail */}
+      <circle cx={cx - screwOffset} cy={cy - screwOffset} r={screwR} fill={FACE} stroke={INK} strokeWidth={0.7} />
+      <circle cx={cx + screwOffset} cy={cy - screwOffset} r={screwR} fill={FACE} stroke={INK} strokeWidth={0.7} />
+      <circle cx={cx - screwOffset} cy={cy + screwOffset} r={screwR} fill={FACE} stroke={INK} strokeWidth={0.7} />
+      <circle cx={cx + screwOffset} cy={cy + screwOffset} r={screwR} fill={FACE} stroke={INK} strokeWidth={0.7} />
     </g>
   );
 }
@@ -45,8 +65,12 @@ function Woofer({ cx, cy }) {
 function Tweeter({ cx, cy }) {
   return (
     <g>
-      <circle cx={cx} cy={cy} r={TWEETER_R1} fill="none" stroke={STROKE} strokeWidth={1.4} />
-      <circle cx={cx} cy={cy} r={TWEETER_R2} fill="none" stroke={STROKE} strokeWidth={1} />
+      {/* Flange */}
+      <circle cx={cx} cy={cy} r={TWEETER_R1} fill={FACE} stroke={INK} strokeWidth={1.4} />
+      {/* Dome */}
+      <circle cx={cx} cy={cy} r={TWEETER_R2} fill={FACE} stroke={INK} strokeWidth={1} />
+      {/* Centre point */}
+      <circle cx={cx} cy={cy} r={1.6} fill={INK} stroke="none" />
     </g>
   );
 }
@@ -84,8 +108,8 @@ export function C41CabinetArtwork({ x, y, width, height, cabinetLengthMm }) {
   const endInset = Math.min(14, wMm * 0.04);
   const mounts = (
     <g>
-      <circle cx={endInset} cy={DRIVER_CY} r={3} fill="none" stroke={STROKE} strokeWidth={0.8} />
-      <circle cx={wMm - endInset} cy={DRIVER_CY} r={3} fill="none" stroke={STROKE} strokeWidth={0.8} />
+      <circle cx={endInset} cy={DRIVER_CY} r={3} fill={FACE} stroke={INK} strokeWidth={0.9} />
+      <circle cx={wMm - endInset} cy={DRIVER_CY} r={3} fill={FACE} stroke={INK} strokeWidth={0.9} />
     </g>
   );
 
@@ -101,16 +125,29 @@ export function C41CabinetArtwork({ x, y, width, height, cabinetLengthMm }) {
       data-c41-vector="true"
       data-c41-cabinet-length={wMm}
     >
-      {/* Cabinet outline — exact physical width × 120 mm, transparent fill. */}
+      {/* Cabinet face — white, exact physical width × 120 mm. The white fill is
+          the cabinet's OWN rectangle, so there is no overhang or page padding. */}
       <rect
         x="1.2"
         y="1.2"
         width={wMm - 2.4}
         height={117.6}
+        rx="3"
+        fill={FACE}
+        stroke={INK}
+        strokeWidth="1.6"
+      />
+      {/* Inner grill frame — a second inset outline, the same technical-drawing
+          detail the Evolve cabinets carry. */}
+      <rect
+        x="6"
+        y="6"
+        width={wMm - 12}
+        height={108}
         rx="2"
         fill="none"
-        stroke={STROKE}
-        strokeWidth="1.4"
+        stroke={INK}
+        strokeWidth="0.8"
       />
       {drivers}
       {mounts}

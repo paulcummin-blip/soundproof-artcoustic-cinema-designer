@@ -258,10 +258,14 @@ test('TEST 10 The C4-1 is drawn by the shared VECTOR renderer at its exact physi
   assert.ok(frontElevation.includes('cabinetLengthMm={cabinetLengthMm}'), 'the installed length is passed to the renderer');
 
   // The cabinet body is exact vector geometry: width = physical mm, height 120 mm,
-  // transparent fill (no white page, no overhang), never axis-stretched.
+  // a WHITE face with dark line art (Evolve 3-1 style), never axis-stretched.
   assert.ok(c41Vector.includes('0 0 ${wMm} 120'), 'viewBox maps mm 1:1');
   assert.ok(c41Vector.includes('preserveAspectRatio="xMidYMid meet"'), 'aspect is preserved, never none');
-  assert.ok(c41Vector.includes('fill="none"'), 'the cabinet fill is transparent');
+  assert.ok(c41Vector.includes('const FACE = "#ffffff"'), 'the cabinet face is white');
+  assert.ok(c41Vector.includes('const INK = "#1a1a1a"'), 'the line art is dark grey/black');
+  assert.ok(c41Vector.includes('fill={FACE}'), 'the cabinet face is filled white');
+  assert.ok(c41Vector.includes('stroke={INK}'), 'the cabinet outline is dark line art');
+  assert.ok(c41Vector.includes('fill="none"'), 'the inner grill frame is transparent (no fill outside the cabinet)');
   assert.ok(!c41Vector.includes('preserveAspectRatio="none"'), 'never axis-stretched');
   assert.ok(c41Vector.includes('width={wMm - 2.4}'), 'the rect is the exact physical width (no overhang)');
   assert.ok(c41Vector.includes('height={117.6}'), 'the rect is the physical 120 mm height');
