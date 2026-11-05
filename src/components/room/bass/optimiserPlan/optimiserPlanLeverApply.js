@@ -294,6 +294,29 @@ function buildSeatingPositions({ lever, seatingPositions, direction }) {
   return { ok: true, code: null, reason: null, seatingPositions: next, affectedSeatIds: touched };
 }
 
+/**
+ * The seating search translates the RSP with the whole seating block.
+ * Seat-linked/automatic RSP modes already follow canonical seats; a manual RSP
+ * needs the same explicit translation. Never guess for a partial/nonuniform move.
+ */
+export function buildSeatingRspUpdate({ seatingPositions, nextSeatingPositions, rspMode, manualRspY_m }) {
+  if (rspMode !== "manual_position") return { ok: true, manualRspY_m: null };
+  if (!Number.isFinite(manualRspY_m) || !Array.isArray(seatingPositions)
+    || !seatingPositions.length || !Array.isArray(nextSeatingPositions)
+    || seatingPositions.length !== nextSeatingPositions.length) return { ok: false, manualRspY_m: null };
+  const byId = new Map(seatingPositions.map((seat) => [String(seat.id), seat]));
+  const deltas = nextSeatingPositions.map((seat) => {
+    const before = byId.get(String(seat.id));
+    return before && Number.isFinite(before.y) && Number.isFinite(seat.y)
+      ? seat.y - before.y : NaN;
+  });
+  const delta = deltas[0];
+  if (!Number.isFinite(delta) || !deltas.every((value) => Number.isFinite(value) && Math.abs(value - delta) < 1e-6)) {
+    return { ok: false, manualRspY_m: null };
+  }
+  return { ok: true, manualRspY_m: manualRspY_m + delta };
+}
+
 /** Apply the evaluated seating movement. */
 export function buildSeatingApplyPositions({ lever, seatingPositions }) {
   return buildSeatingPositions({ lever, seatingPositions, direction: "to" });
