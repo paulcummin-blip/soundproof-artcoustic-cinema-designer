@@ -17,8 +17,6 @@ import { runFullStage1Search } from "./stage1PlacementEngine";
 import { createStage1EvaluationPool } from "./stage1EvaluationPool";
 import { STAGE1_CONCURRENCY } from "./stage1Constants";
 
-const evaluationWorkerUrl = new URL("./stage1Evaluation.worker.js", import.meta.url);
-
 let activeJob = null;
 
 self.onmessage = (event) => {
@@ -44,10 +42,10 @@ self.onmessage = (event) => {
     physicsOptions: payload.physicsOptions,
   };
   const pool = createStage1EvaluationPool({
-    workerUrl: evaluationWorkerUrl.href,
     size: STAGE1_CONCURRENCY,
     context,
     signal: controller.signal,
+    onProgress: detail => self.postMessage({ type: "progress", requestId, fingerprint, detail }),
   });
 
   (async () => {
@@ -67,6 +65,7 @@ self.onmessage = (event) => {
         self.postMessage({ type: "cancelled", requestId, fingerprint });
         return;
       }
+      pool.throwIfFailed();
 
       self.postMessage({ type: "complete", requestId, fingerprint, result });
     } catch (error) {
