@@ -163,6 +163,7 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
       fingerprint,
       payload: { roomDims, rspPosition, seatingPositions, physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS },
       delay: STAGE1_START_DELAY_MS,
+      ownerRequestId: requestId,
       scopeQuantity: scope,
     });
 
