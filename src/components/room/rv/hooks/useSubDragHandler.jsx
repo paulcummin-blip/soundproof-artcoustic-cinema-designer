@@ -3,6 +3,7 @@ import { findSymmetrySnap } from "@/components/room/rv/utils/subSymmetrySnap";
 import { findCoordinateSnap } from "@/components/room/rv/utils/subCoordinateSnap";
 import { getSubPlacementGuideCoordinates } from "@/components/room/bass/best-layout/subPlacementGuideCoordinates";
 import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
+import { publishSubDragLive } from "@/components/state/subDragLiveStore";
 
 // Magnetic snap tolerance — 8 screen pixels converted to room metres via the
 // current plan scale. Clamped so zoom extremes do not make snapping unusable.
@@ -191,6 +192,13 @@ export function useSubDragHandler({
 
       setSubDragTick((n) => n + 1);
     }
+
+    // Publish draft sub positions for the advisory room-response preview.
+    // The preview reads these transient positions without committing design state.
+    publishSubDragLive([
+      ...(draftFrontSubsRef.current || []),
+      ...(draftRearSubsRef.current || []),
+    ]);
 
     // No config commit during mousemove — draft refs are the live render source.
     // commitDraftSubPositions() is called once on mouseup via useMouseUpHandler.

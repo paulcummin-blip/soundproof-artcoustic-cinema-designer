@@ -3,6 +3,8 @@
 import { useCallback } from "react";
 import { sideWallX } from "@/components/room/rv/utils/rvGeometry";
 import { recordTemporaryP18P19DragEnd } from "@/components/hooks/useRP22AnalysisEngine";
+import { clearSubDragLive } from "@/components/state/subDragLiveStore";
+import { clearSeatDragLive } from "@/components/state/seatDragLiveStore";
 
 let temporaryRSPDragEndCount = 0;
 
@@ -101,6 +103,9 @@ export function useMouseUpHandler({
        // Commit final positions immediately on release
         commitDraftSubPositions();
 
+        // Clear the advisory room-response preview live store
+        clearSubDragLive();
+
         // Clear drag-time snap guide (coordinate + symmetry)
         if (typeof setSubSnapState === "function") {
           setSubSnapState(null);
@@ -132,13 +137,14 @@ export function useMouseUpHandler({
        }
 
        // Commit draft seat positions if seats were being dragged
-       if (isDraggingSeatRef?.current) {
-       if (typeof commitDraftSeatPositions === 'function') {
-         commitDraftSeatPositions();
-       }
-       if (draftSeatsRef) draftSeatsRef.current = null;
-       isDraggingSeatRef.current = false;
-       }
+        if (isDraggingSeatRef?.current) {
+        if (typeof commitDraftSeatPositions === 'function') {
+          commitDraftSeatPositions();
+        }
+        clearSeatDragLive();
+        if (draftSeatsRef) draftSeatsRef.current = null;
+        isDraggingSeatRef.current = false;
+        }
 
      // Stable SVG pointer capture is released by the shared end path.
 

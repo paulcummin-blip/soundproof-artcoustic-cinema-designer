@@ -32,6 +32,8 @@ import {
   getIdleResumeDeadline,
   isUserInteracting,
 } from "@/components/state/userInteractionStore.js";
+import { subscribeSubDragLive, getSubDragLive } from "@/components/state/subDragLiveStore";
+import { subscribeSeatDragLive, getSeatDragLive } from "@/components/state/seatDragLiveStore";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -156,6 +158,31 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   } = authoritative;
   const calibrationFingerprint = fingerprints?.calibration ?? null;
   const geometryFingerprint = fingerprints?.geometry ?? null;
+  // ── Live drag stores ────────────────────────────────────────────────
+  // Transient seat/sub positions during drag, used ONLY for the advisory
+  // room-response preview. Never committed to design state until pointer-up.
+  const subDragLive = useSyncExternalStore(subscribeSubDragLive, getSubDragLive, getSubDragLive);
+  const seatDragLive = useSyncExternalStore(subscribeSeatDragLive, getSeatDragLive, getSeatDragLive);
+  // Override source/listener positions with draft positions when dragging,
+  // so the normalized room-transfer preview follows the drag in real time.
+  const previewSources = useMemo(() => {
+    if (!subDragLive?.active || !Array.isArray(subDragLive?.subs)) return sources;
+    const draftMap = new Map(
+      subDragLive.subs
+        .filter((s) => s?.id && s?.position && Number.isFinite(Number(s.position.x)) && Number.isFinite(Number(s.position.y)))
+        .map((s) => [s.id, s]),
+    );
+    if (!draftMap.size) return sources;
+    return sources.map((src) => {
+      const draft = draftMap.get(src.id);
+      if (!draft?.position) return src;
+      return { ...src, x: Number(draft.position.x), y: Number(draft.position.y) };
+    });
+  }, [sources, subDragLive]);
+  const previewSeatingPositions = useMemo(() => {
+    if (!seatDragLive?.active || !Array.isArray(seatDragLive?.seats)) return seatingPositions;
+    return seatDragLive.seats;
+  }, [seatingPositions, seatDragLive]);
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
   // PASS 2: Use perSourceRspComplexTransfers from the authoritative simulation.
   // The authoritative engine produces these from a flat 94 dB source (same
@@ -404,30 +431,48 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     && !manualAnalysisRequest
     && !!geometryFingerprint;
 
+  // ── Room-only preview (default + stale) ─────────────────────────────
+  // roomPreviewActive: the advisory room-only preview is running whenever
+  // valid geometry exists and no manual calculation is in progress. This is
+  // broader than placementPreviewActive (which requires a stale published
+  // contract) — it covers the default pre-calculation state and any geometry
+  // change, so the graph always shows the room/layout response automatically.
+  const roomPreviewActive = !!geometryFingerprint
+    && sources.length > 0
+    && !!rspPosition
+    && !calculationInProgress
+    && !manualAnalysisRequest;
+  // roomPreviewExclusive: graph shows ONLY the room-only preview curve.
+  // True when no matching authoritative result exists (never calculated, or
+  // the physical design changed). When a matching authoritative result exists,
+  // the graph shows the full calculated layers and the room-only curve is
+  // retained as a reference layer.
+  const roomPreviewExclusive = roomPreviewActive && !completedContractMatches;
+
   // The live hook requires analysisRequestFingerprint === its own internally
   // computed geometryFingerprint (prefix "nrt"). The authoritative geometry
   // fingerprint (prefix "geo") differs, so we feed the hook's own computed
   // fingerprint back on the next render via state. This is a one-render delay
   // which is negligible given the hook's 50 ms debounce.
-  const [placementPreviewFp, setPlacementPreviewFp] = useState(null);
+  const [roomPreviewFp, setRoomPreviewFp] = useState(null);
 
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
     rspPosition,
-    seatingPositions,
-    subsForSimulation: sources,
+    seatingPositions: previewSeatingPositions,
+    subsForSimulation: previewSources,
     physicsOptions: normalizedPhysicsOptions,
-    analysisRequestId: placementPreviewActive ? "placement-preview" : null,
-    analysisRequestFingerprint: placementPreviewActive ? placementPreviewFp : null,
+    analysisRequestId: roomPreviewActive ? "room-preview" : null,
+    analysisRequestFingerprint: roomPreviewActive ? roomPreviewFp : null,
   });
 
   useEffect(() => {
-    if (placementPreviewActive && normalizedLive.geometryFingerprint && placementPreviewFp !== normalizedLive.geometryFingerprint) {
-      setPlacementPreviewFp(normalizedLive.geometryFingerprint);
-    } else if (!placementPreviewActive && placementPreviewFp !== null) {
-      setPlacementPreviewFp(null);
+    if (roomPreviewActive && normalizedLive.geometryFingerprint && roomPreviewFp !== normalizedLive.geometryFingerprint) {
+      setRoomPreviewFp(normalizedLive.geometryFingerprint);
+    } else if (!roomPreviewActive && roomPreviewFp !== null) {
+      setRoomPreviewFp(null);
     }
-  }, [placementPreviewActive, normalizedLive.geometryFingerprint, placementPreviewFp]);
+  }, [roomPreviewActive, normalizedLive.geometryFingerprint, roomPreviewFp]);
 
   const sharedAuthoritative = useMemo(() => ({
     ...authoritative,
@@ -2347,9 +2392,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
   }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
-  const placementPreviewResult = placementPreviewActive && normalizedLive.status === "ready" && normalizedLive.result
+  const roomPreviewResult = roomPreviewActive && normalizedLive.status === "ready" && normalizedLive.result
     ? normalizedLive.result
     : null;
+  const placementPreviewResult = roomPreviewResult;
   // ── Presentation-only display authority overlay ──────────────────────
   // On a cached P14 target switch, visibleCachedContract (and thus
   // effectiveContract / the graph) updates synchronously, but
@@ -2432,6 +2478,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         captureEligible,
         captureEligibilityDebug,
       };
-  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult });
+  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult, roomPreviewActive, roomPreviewExclusive, roomPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

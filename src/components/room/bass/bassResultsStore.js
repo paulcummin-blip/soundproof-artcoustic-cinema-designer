@@ -32,6 +32,9 @@ export const emptyBassResults = () => ({
   seatingPositions: [],
   placementPreviewActive: false,
   placementPreviewResult: null,
+  roomPreviewActive: false,
+  roomPreviewExclusive: false,
+  roomPreviewResult: null,
 });
 
 export function createBassResultsScope(scopeId, versionId) {

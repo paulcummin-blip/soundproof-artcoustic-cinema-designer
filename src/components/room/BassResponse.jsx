@@ -466,7 +466,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // room response is optionally shown faded and labelled "Previous result —
   // out of date".
   const placementPreviewActive = sharedBassResults?.placementPreviewActive === true;
-  const placementPreviewResult = sharedBassResults?.placementPreviewResult || null;
+  const roomPreviewActive = sharedBassResults?.roomPreviewActive === true;
+  const roomPreviewExclusive = sharedBassResults?.roomPreviewExclusive === true;
+  const placementPreviewResult = sharedBassResults?.roomPreviewResult || sharedBassResults?.placementPreviewResult || null;
 
   // Graph interaction store — bidirectional pill ↔ graph ↔ seat selection.
   // When a designer clicks a seat pill in PerSeatResults or a P20 seat pill,
@@ -494,7 +496,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const previewSeatUnavailable = previewCurve.seatUnavailable;
 
   const placementPreviewSeries = useMemo(() => {
-    if (!placementPreviewActive || !previewCurve.data?.length) return null;
+    if (!roomPreviewActive || !previewCurve.data?.length) return null;
     return {
       id: "placement-preview",
       color: "#16A34A",
@@ -504,7 +506,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         ? `Preview — ${formatSeatPillLabel(previewSeatId)}`
         : "Room Response Preview",
     };
-  }, [placementPreviewActive, previewCurve, previewSeatId, previewSeatUnavailable]);
+  }, [roomPreviewActive, previewCurve, previewSeatId, previewSeatUnavailable]);
 
   const previousResultFadedSeries = useMemo(() => {
     if (!placementPreviewActive) return null;
@@ -526,14 +528,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   }, [placementPreviewActive, multiSeriesForGraph]);
 
   const placementPreviewGraphSeries = useMemo(() => {
-    if (!placementPreviewActive) return null;
+    if (!roomPreviewActive) return null;
     const series = [];
     if (previousResultFadedSeries) series.push(previousResultFadedSeries);
     if (placementPreviewSeries) series.push(placementPreviewSeries);
     return series.length > 0 ? series : null;
-  }, [placementPreviewActive, placementPreviewSeries, previousResultFadedSeries]);
+  }, [roomPreviewActive, placementPreviewSeries, previousResultFadedSeries]);
 
-  const effectiveVisibleSeries = placementPreviewActive
+  const effectiveVisibleSeries = roomPreviewExclusive
     ? (placementPreviewGraphSeries || [])
     : visibleMultiSeries;
 
@@ -541,15 +543,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // earlier from a P20 pill, so the preview follows what the designer clicked.
   // Outside preview the existing handlers are used untouched.
   const previewAwareSelectSeat = (sid) => {
-    if (placementPreviewActive) setGraphInteraction({ selectedSeatId: sid });
+    if (roomPreviewActive) setGraphInteraction({ selectedSeatId: sid });
     selectSeat(sid);
   };
   const previewAwareSelectRsp = () => {
-    if (placementPreviewActive) setGraphInteraction({ selectedSeatId: null });
+    if (roomPreviewActive) setGraphInteraction({ selectedSeatId: null });
     selectRsp();
   };
   const previewAwareSelectAllSeats = () => {
-    if (placementPreviewActive) setGraphInteraction({ selectedSeatId: null });
+    if (roomPreviewActive) setGraphInteraction({ selectedSeatId: null });
     selectAllSeats();
   };
 
@@ -824,14 +826,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
           </div>
 
-          {/* Placement Preview banner — informational only (no workflow prompt) */}
-          {placementPreviewActive && (
+          {/* Room-only preview banner — informational only (no workflow prompt) */}
+          {roomPreviewExclusive && (
             <div style={{ border: "1px solid #F59E0B", borderRadius: 10, background: "#FFFBEB", padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>
                 Preview only — calculate bass performance to update RP22 results.
               </div>
               <div style={{ fontSize: 12, color: "#92400E", marginTop: 2 }}>
-                Subwoofer positions changed. The P14 / P18 / P19 / P20 values below are the previous result, not the current design.
+                {placementPreviewActive
+                  ? "Subwoofer positions changed. The P14 / P18 / P19 / P20 values below are the previous result, not the current design."
+                  : "This is the room/layout acoustic response. Calculate bass performance for full RP22 results."}
               </div>
             </div>
           )}
@@ -865,11 +869,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         </div>
       )}
 
-      {/* Bass Response Graph — gated when P14 target unselected */}
-      {p14Selection.noP14TargetSelected ? (
+      {/* Bass Response Graph — room-only preview shows without a P14 target;
+          full calculated layers require a target and a matching authoritative result */}
+      {p14Selection.noP14TargetSelected && !roomPreviewActive ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center", minHeight: 600, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#625143" }}>Select Bass Target</div>
-          <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view the response graph</div>
+          <div style={{ fontSize: 12, color: "#8B7F76", marginTop: 4 }}>Choose a bass target to view calculated results, or add geometry for the room-only preview</div>
         </div>
       ) : !hasCurrentBassResult && effectiveVisibleSeries.length === 0 ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 24, textAlign: "center", minHeight: 600, display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -957,7 +962,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectRsp={previewAwareSelectRsp}
               onSelectSeat={previewAwareSelectSeat}
               onSelectAll={previewAwareSelectAllSeats}
-              previewActive={placementPreviewActive}
+              previewActive={roomPreviewActive}
             />
             {/* Expert Curve View — the graph's own validation disclosure.
                 Always reachable here: expert curve controls no longer depend on
@@ -970,7 +975,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               smoothingMode={bassSmoothingMode}
               onSmoothingModeChange={setBassSmoothingMode}
               markers={rp22GraphMarkers}
-              placementPreviewActive={placementPreviewActive}
+              placementPreviewActive={roomPreviewActive}
               previousResultFaded={!!previousResultFadedSeries}
             />
           </>
@@ -986,7 +991,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectRsp={previewAwareSelectRsp}
               onSelectSeat={previewAwareSelectSeat}
               onSelectAll={previewAwareSelectAllSeats}
-              previewActive={placementPreviewActive}
+              previewActive={roomPreviewActive}
             />
 
             <BassCurveVisibilityControls
@@ -995,16 +1000,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onChange={setCurveVisibility}
             />
 
-            {!placementPreviewActive && <Rp22GraphMarkerKey markers={rp22GraphMarkers} />}
+            {!roomPreviewExclusive && <Rp22GraphMarkerKey markers={rp22GraphMarkers} />}
           </>
         )}
 
         <div className="mt-2">
-          <ParameterFocusBar disabled={!hasCurrentBassResult || placementPreviewActive} />
+          <ParameterFocusBar disabled={!hasCurrentBassResult || roomPreviewExclusive} />
         </div>
 
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
-          {placementPreviewActive && <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-semibold">
+          {roomPreviewActive && <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-semibold">
             <span style={{ color: "#16A34A" }}>
               ━━ Preview — {previewSeatId && !previewSeatUnavailable ? formatSeatPillLabel(previewSeatId) : "RSP"}
             </span>
@@ -1023,25 +1028,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               rp22Levels={[]}
               toggles={{}}
               crossoverFrequency={80}
-              showModeMarkers={placementPreviewActive ? false : (engineeringDetailCollapsed ? false : showRoomModes)}
-              modeMarkers={placementPreviewActive ? [] : (engineeringDetailCollapsed ? [] : modeMarkersForGraph)}
-              protectedNullAnnotations={placementPreviewActive ? [] : (engineeringDetailCollapsed ? [] : protectedNullAnnotations)}
+              showModeMarkers={roomPreviewExclusive ? false : (engineeringDetailCollapsed ? false : showRoomModes)}
+              modeMarkers={roomPreviewExclusive ? [] : (engineeringDetailCollapsed ? [] : modeMarkersForGraph)}
+              protectedNullAnnotations={roomPreviewExclusive ? [] : (engineeringDetailCollapsed ? [] : protectedNullAnnotations)}
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={[70, 140]}
               xDomain={effectiveVisibleSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200]}
               showAxialOnly={false}
               refDb={85}
-              disableHighlight={placementPreviewActive}
+              disableHighlight={roomPreviewExclusive}
               renderToken={qStrategy}
-              p14TotalDb={placementPreviewActive ? null : p14PresentationData.targetDb}
+              p14TotalDb={roomPreviewExclusive ? null : p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
               correctionTrace={finalBassResponse?.correctionTrace || null}
               smoothingMode={bassSmoothingMode}
-              rp22Markers={placementPreviewActive ? null : rp22GraphMarkers}
-              highlightFrequencyHz={placementPreviewActive ? null : (highlightFromInteraction?.frequencyHz ?? null)}
-              highlightLabel={placementPreviewActive ? null : (highlightFromInteraction?.label ?? null)}
-              parameterFocus={placementPreviewActive ? null : parameterFocus}
+              rp22Markers={roomPreviewExclusive ? null : rp22GraphMarkers}
+              highlightFrequencyHz={roomPreviewExclusive ? null : (highlightFromInteraction?.frequencyHz ?? null)}
+              highlightLabel={roomPreviewExclusive ? null : (highlightFromInteraction?.label ?? null)}
+              parameterFocus={roomPreviewExclusive ? null : parameterFocus}
             />
             {(isCalculating || isPreparingPreview) && engineeringDetailCollapsed && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>
@@ -1066,9 +1071,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             </div>
           )}
         </div>
-        {!engineeringDetailCollapsed && !placementPreviewActive && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
+        {!engineeringDetailCollapsed && !roomPreviewExclusive && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
 
-        {!engineeringDetailCollapsed && !placementPreviewActive && hasCurrentBassResult && (
+        {!engineeringDetailCollapsed && !roomPreviewExclusive && hasCurrentBassResult && (
           <StorytellerExplanation focus={parameterFocus} />
         )}
 
