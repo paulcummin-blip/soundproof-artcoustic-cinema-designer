@@ -20,6 +20,9 @@ export const RSP_RADIUS_M = 0.06;
 
 export function buildHeadMesh(headData) {
   const { x, y, z, isPrimary, isRsp } = headData;
+  // isPrimary here is the resolved saved seat priority (Primary = true),
+  // sourced from resolveSeatPriority in buildIsometricSceneData. The RSP
+  // marker is a separate reference marker and never reaches this branch.
   const group = new THREE.Group();
   group.position.set(x, z, y); // Three.js: Y up; room Y → Three.js Z, room Z → Three.js Y
 

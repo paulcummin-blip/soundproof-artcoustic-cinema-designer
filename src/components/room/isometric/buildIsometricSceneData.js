@@ -28,6 +28,7 @@ import { isCentreCabinetRole, resolveCentreCabinetFootprintM } from "@/component
 import { resolveSoundbarCabinetLengthMm } from "@/components/models/speakers/soundbarCabinetVariant";
 import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
 import { storedSubwooferBottomM, subwooferCentreZM } from "@/components/utils/subwooferDrawingHeight";
+import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
 const NUM = (v, fallback = 0) => {
   const n = Number(v);
@@ -223,7 +224,7 @@ export function buildHeadMeshData({ seatingPositions, mlpPoint, screen, roomDims
       kind: "head",
       id: seat?.id || `seat-${x}-${y}`,
       x, y, z,
-      isPrimary: !!seat?.isPrimary,
+      isPrimary: resolveSeatPriority(seat) === PRIMARY,
       rowNumber: seat?.rowNumber ?? null,
       isRsp: false,
       // Facing: toward the screen (negative Y). Presentation-only.
