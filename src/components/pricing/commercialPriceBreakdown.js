@@ -13,6 +13,8 @@
 
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { canonicalProductId } from "@/components/utils/modelKeyNormaliser";
+import { resolvePlacedCabinetLengthMm, isHsplModel } from "@/components/models/speakers/soundbarCabinetVariant";
+import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
 
 const VAT_RATE = 0.2;
 
@@ -29,7 +31,41 @@ function getModelLabel(modelKey) {
   return meta?.notFound ? String(modelKey) : (meta?.label || String(modelKey));
 }
 
-export function getCommercialPrice(modelKey, soundbarSelections = {}, priceMap = null, soundbarOptions = null) {
+// The mm a soundbar price option's value represents, parsed from the option's
+// own value string. C4-1 values are a plain length ("1222"); Multi values carry
+// a size code after the length ("1222-m"); HSPL values are a range
+// ("1669-1800"). Returns { lo, hi } in mm, or null when no number is present.
+function optionMmRange(value) {
+  const s = String(value || "");
+  const range = s.match(/^\s*(\d+)\s*-\s*(\d+)/);
+  if (range) return { lo: Number(range[1]), hi: Number(range[2]) };
+  const m = s.match(/^\s*(\d+)/);
+  return m ? { lo: Number(m[1]), hi: Number(m[1]) } : null;
+}
+
+/**
+ * The price option whose value matches a resolved cabinet length (mm), or null.
+ * Exact matches win; a range containing the length wins for HSPL. The resolved
+ * length is the SAME one authority the drawings use, so pricing and drawings
+ * agree on which cabinet is installed.
+ */
+function matchSoundbarOptionByMm(options, resolvedMm) {
+  if (!Array.isArray(options) || !Number.isFinite(Number(resolvedMm))) return null;
+  const mm = Number(resolvedMm);
+  let exact = null;
+  for (const opt of options) {
+    const r = optionMmRange(opt.value);
+    if (r && r.lo === mm && r.hi === mm) { exact = opt.value; break; }
+  }
+  if (exact) return exact;
+  for (const opt of options) {
+    const r = optionMmRange(opt.value);
+    if (r && mm >= r.lo && mm <= r.hi) return opt.value;
+  }
+  return null;
+}
+
+export function getCommercialPrice(modelKey, soundbarSelections = {}, priceMap = null, soundbarOptions = null, resolvedMm = null) {
   // Pricing is keyed on product identity, never on role. Canonicalising here
   // means a surround placed from a legacy "_s" id still resolves to its real
   // product, instead of falling through to an inactive legacy alias and
@@ -38,7 +74,11 @@ export function getCommercialPrice(modelKey, soundbarSelections = {}, priceMap =
   const options = (soundbarOptions || {})[key];
 
   if (options) {
-    const selectedValue = soundbarSelections[key] || options[0]?.value;
+    // The designer's own dropdown choice is preserved (never silently repriced).
+    // When no choice is recorded, pricing follows the SAME resolved cabinet
+    // length the drawings use, so a new design's price and its drawing agree.
+    const resolvedValue = matchSoundbarOptionByMm(options, resolvedMm);
+    const selectedValue = soundbarSelections[key] || resolvedValue || options[0]?.value;
     const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
     const priceExVat = selectedOption?.priceExVat;
     const hasPrice = priceExVat !== null && priceExVat !== undefined;
@@ -108,10 +148,10 @@ function addAbfuserLine(linesByKey, qty, priceMap) {
   });
 }
 
-function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections, priceMap, soundbarOptions) {
+function addProductLine(linesByKey, modelKey, qty, roles, soundbarSelections, priceMap, soundbarOptions, resolvedMm = null) {
   if (!modelKey || modelKey === 'off' || modelKey === 'OFF') return;
 
-  const resolved = getCommercialPrice(modelKey, soundbarSelections, priceMap, soundbarOptions);
+  const resolved = getCommercialPrice(modelKey, soundbarSelections, priceMap, soundbarOptions, resolvedMm);
   const lineKey = resolved.isSoundbar ? `${resolved.key}:${resolved.sizeValue}` : resolved.key;
   const existing = linesByKey.get(lineKey);
   const hasPrice = resolved.priceExVat !== null && resolved.priceExVat !== undefined;
@@ -172,6 +212,7 @@ export function computeCommercialPriceBreakdown({
   territoryCode = null,
   territoryLabel = null,
   currency = null,
+  screen = null,
 } = {}) {
   const mode = priceMode === 'exVat' ? 'exVat' : 'incVat';
   const linesByKey = new Map();
@@ -181,7 +222,18 @@ export function computeCommercialPriceBreakdown({
     if (!spk?.model || spk.model === 'off') continue;
     const role = String(spk.role || '').toUpperCase();
     if (role === 'LFE') continue;
-    addProductLine(linesByKey, String(spk.model), 1, [role], soundbarSelections, priceMap, soundbarOptions);
+    // Resolve the installed cabinet length for a TV-linked soundbar from the
+    // SAME authority the drawings use — the placed speaker's own recorded
+    // length first, then the screen — so pricing follows the drawing. The
+    // dual-centre arrangement (FCL/FCR) always uses the catalogue's named
+    // cabinet (C4-1 1222 mm), never a longer bar the screen might allow.
+    const modelKey = String(spk.model);
+    const meta = getSpeakerModelMeta(modelKey);
+    const isSoundbar = meta?.widthType === 'tv_linked';
+    const resolvedMm = isSoundbar
+      ? resolvePlacedCabinetLengthMm(spk, screen, { dualCentre: isCentreCabinetRole(spk.role) })
+      : null;
+    addProductLine(linesByKey, modelKey, 1, [role], soundbarSelections, priceMap, soundbarOptions, resolvedMm);
   }
 
   if (frontSubsCfg?.model && Number(frontSubsCfg?.count) > 0) {

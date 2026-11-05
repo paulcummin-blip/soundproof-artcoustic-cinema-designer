@@ -1,6 +1,7 @@
 import React from "react";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { C41_1222FaceIcon, C41_1441FaceIcon, C41_1711FaceIcon } from "@/components/report/C41ArtworkFaceIcons";
+import { C41CabinetArtwork } from "@/components/report/elevation/C41CabinetArtwork";
 import ProductArtwork from "@/components/report/ProductArtwork";
 import { elevationArtFitRatio } from "@/components/report/elevation/elevationArtAuthority";
 import { isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
@@ -73,11 +74,11 @@ export function drawFrontSpeakerArt(opts, ctx) {
   const isEv63 = !isEv31 && mk.includes("evolve-6-3");
   const isEv84 = mk.includes("evolve-8-4");
   const isC41 = mk.includes("c4-1");
-  // The 1222 mm, 1441 mm and 1711 mm C4-1 cabinets each have their own
-  // approved artwork; every other C4-1 length keeps the existing drawing.
-  const isC41_1222 = isC41 && Number(cabinetLengthMm) === 1222;
-  const isC41_1441 = isC41 && Number(cabinetLengthMm) === 1441;
-  const isC41_1711 = isC41 && Number(cabinetLengthMm) === 1711;
+  // Every C4-1 cabinet — confirmed (1222/1449/1672/1904) or a legacy saved
+  // length — is drawn by the shared VECTOR cabinet renderer at its exact
+  // physical width, with the driver group centred at a constant physical size.
+  // The per-variant raster icons remain imported for the legacy artwork tests,
+  // but the live elevation no longer routes C4-1 through them.
   // The C-1 is its own product ("c-1"); "c4-1" never contains that key.
   const isC1 = mk.includes("c-1");
   const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
@@ -134,7 +135,7 @@ export function drawFrontSpeakerArt(opts, ctx) {
   // cabinet's footprint (its page is cropped away), while an artwork with no
   // trustworthy crop keeps the long-standing enlargement (its page is still
   // inside the box). It is not repeated at the draw site.
-  const faceIconArtworkKey = isC41 ? (isC41_1222 ? "c41_1222" : isC41_1441 ? "c41_1441" : isC41_1711 ? "c41_1711" : "c41")
+  const faceIconArtworkKey = isC41 ? "c41"
     : isC1 ? "c1"
       : isQ63 ? "q63"
         : isQ45 ? "q45"
@@ -160,13 +161,18 @@ export function drawFrontSpeakerArt(opts, ctx) {
 
   const renderFaceIcon = () => {
     if (isC1) return <C1FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-    // Every C4-1 artwork is drawn at the cabinet's installed footprint (and
-    // rotated with the cabinet when it is mounted vertically) — never
-    // stretched onto another cabinet's shape.
-    if (isC41 && isC41_1222) return <C41_1222FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-    if (isC41 && isC41_1441) return <C41_1441FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-    if (isC41 && isC41_1711) return <C41_1711FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-    if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+    // The shared VECTOR cabinet renderer serves every C4-1 length: the cabinet
+    // box is exact vector geometry at the installed width, with the driver
+    // group centred at a constant physical size. No raster, no white page.
+    if (isC41) return (
+      <C41CabinetArtwork
+        x={adjustedX}
+        y={adjustedY}
+        width={adjustedW}
+        height={adjustedH}
+        cabinetLengthMm={cabinetLengthMm}
+      />
+    );
     if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
     if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
     if (isQ85) return <Q85FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
@@ -191,18 +197,27 @@ export function drawFrontSpeakerArt(opts, ctx) {
       )}
       {/* Body */}
       {hasFaceIcon ? (
-        <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>
-          {/* Product artwork is line art on an opaque white page — the page is
-              knocked out so the graphic shows only the cabinet's own drawing.
-              The tight opaque white backing is the cabinet's OWN scaled
-              footprint (iconBoxW × iconBoxH): a vertical cabinet brings its
-              backing round with the rotated face, and nothing larger appears. */}
-          <ProductArtwork
-            backing={{ x: cx - iconBoxW / 2, y: cy - iconBoxH / 2, width: iconBoxW, height: iconBoxH }}
-          >
+        isC41 ? (
+          /* The C4-1 vector cabinet is transparent line art — no raster page to
+             knock out and no white backing — so it is drawn directly, rotated
+             with the cabinet when it is mounted vertically. */
+          <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>
             {renderFaceIcon()}
-          </ProductArtwork>
-        </g>
+          </g>
+        ) : (
+          <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>
+            {/* Product artwork is line art on an opaque white page — the page is
+                knocked out so the graphic shows only the cabinet's own drawing.
+                The tight opaque white backing is the cabinet's OWN scaled
+                footprint (iconBoxW × iconBoxH): a vertical cabinet brings its
+                backing round with the rotated face, and nothing larger appears. */}
+            <ProductArtwork
+              backing={{ x: cx - iconBoxW / 2, y: cy - iconBoxH / 2, width: iconBoxW, height: iconBoxH }}
+            >
+              {renderFaceIcon()}
+            </ProductArtwork>
+          </g>
+        )
       ) : isRound ? (
         <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
       ) : (
