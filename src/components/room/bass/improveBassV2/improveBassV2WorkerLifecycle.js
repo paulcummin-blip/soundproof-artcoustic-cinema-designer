@@ -35,6 +35,14 @@ export class V2TimeoutError extends Error {
   }
 }
 
+/** Worker infrastructure failed; never a candidate rejection. */
+export class V2WorkerError extends Error {
+  constructor(message = "Optimisation worker failed to start. Reload the app and retry.") {
+    super(message);
+    this.name = "V2WorkerError";
+  }
+}
+
 /** Whole-run elapsed limit exceeded. name = "V2RunTimeoutError". */
 export class V2RunTimeoutError extends Error {
   constructor(message = "V2 whole-run elapsed limit exceeded") {
@@ -52,7 +60,8 @@ export class V2RunTimeoutError extends Error {
 export function isFatalLifecycleError(err) {
   return err?.name === "AbortError"
     || err?.name === "TimeoutError"
-    || err?.name === "V2RunTimeoutError";
+    || err?.name === "V2RunTimeoutError"
+    || err?.name === "V2WorkerError";
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +98,7 @@ export function runInWorker(worker, phase, params, signal, opts = {}) {
       }
       worker.removeEventListener("message", onMessage);
       worker.removeEventListener("error", onError);
+      worker.removeEventListener("messageerror", onError);
       if (signal) signal.removeEventListener("abort", onAbort);
     }
 
@@ -119,7 +129,7 @@ export function runInWorker(worker, phase, params, signal, opts = {}) {
       // Worker onerror — uncaught error inside the worker. This is a generic
       // worker failure (not a lifecycle error), so per-call catch blocks may
       // swallow it to preserve existing recoverable behaviour.
-      settle(reject, new Error("Worker error"));
+      settle(reject, new V2WorkerError(`Optimisation worker failed during ${phase}. Reload the app and retry.`));
     }
 
     function onAbort() {
@@ -134,7 +144,7 @@ export function runInWorker(worker, phase, params, signal, opts = {}) {
       // Classify by abort reason: V2RunTimeoutError → whole-run timeout;
       // everything else → user cancellation (V2AbortError).
       const reason = signal?.reason;
-      if (reason instanceof V2RunTimeoutError) {
+      if (isFatalLifecycleError(reason)) {
         settle(reject, reason);
       } else {
         settle(reject, new V2AbortError(
@@ -164,9 +174,14 @@ export function runInWorker(worker, phase, params, signal, opts = {}) {
     // ── Register listeners + start watchdog + post message ────────────────
     worker.addEventListener("message", onMessage);
     worker.addEventListener("error", onError);
+    worker.addEventListener("messageerror", onError);
     if (signal) signal.addEventListener("abort", onAbort);
     watchdog = setTimeout(onTimeout, timeoutMs);
 
-    worker.postMessage({ requestId, phase, ...params });
+    try {
+      worker.postMessage({ requestId, phase, ...params });
+    } catch (error) {
+      settle(reject, new V2WorkerError(`Optimisation worker could not receive ${phase}: ${error.message}`));
+    }
   });
 }
