@@ -1,7 +1,7 @@
 /** SHA-256 of the bundled validator sources; regenerated with every rules edit. */
 export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerOutputValidator.js': '9abc142f30279dc77f186b95d430b6f13916997492e19f8b086f11bedca0284c',
-  'base44/shared/proposalWriter/writerProseScanner.js': '0e34d76e8edcb63ca17f76ef819a22e33965475a8c1e930be5ca050f295a9cbb',
+  'base44/shared/proposalWriter/writerProseScanner.js': '514c07c23936f9c6c5918e8538a17edfdbb1a910c0dab33f09ae3f4b08963e97',
   'base44/shared/proposalWriter/writerOutputTextRules.js': 'ab466312229102216109229586a07a9e6401820ba3a548f726ee6c5c2618ed74',
   // The established-principle register: which sentences are design reasoning (an
   // established principle, or the designer's recorded intention) rather than a claim
@@ -16,7 +16,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': '6cf3a512b8c90791b87091d8a9141033549635af208751d87c20efe51f0e82be',
+  'base44/shared/proposalWriter/writerContractSchema.js': 'f9fd08165290f48fac7be5ce37de2571e43756fa4ebd61f586e7f49d12688924',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
@@ -45,7 +45,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '44f5a2a1959b7a484eb446e1639afdf823dab01a1712b1103be306effd6beeb1',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '48fc447701ea01ef40b37fa331c4440a87794b58aa8412510b7fcc1c0a3bcfe0',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
   'base44/shared/proposalWriter/writerDesignContext.js': 'c52f116231bd4f3601f0f963125d7c5243e8723a2680ba2e07a66bf53935de74',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
