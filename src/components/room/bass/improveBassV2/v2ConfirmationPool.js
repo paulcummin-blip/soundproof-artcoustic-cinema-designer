@@ -31,107 +31,95 @@
 //   runInWorker's own onAbort handler.
 // ---------------------------------------------------------------------------
 
-import { runInWorker } from "./improveBassV2WorkerLifecycle.js";
+import { runInWorker, V2AbortError, V2WorkerError, isFatalLifecycleError } from "./improveBassV2WorkerLifecycle.js";
 
-/**
- * Create a pool of V2 workers for parallel canonical confirmations.
- *
- * @param {object} opts
- * @param {string} opts.workerUrl - Worker module URL (same as the single worker)
- * @param {number} opts.size - Pool size (max concurrency). Start at 3.
- * @param {*} [opts.integrationContext] - Sent to every pool worker so any
- *   confirmation job can run on any worker.
- * @param {AbortSignal} [opts.signal] - On abort, all pool workers terminate.
- * @returns {{ acquire: function, release: function, runConfirmation: function, terminateAll: function, size: number }}
- */
-export function createConfirmationPool({ workerUrl, size, integrationContext = null, signal = null }) {
+// Keep URL construction inside new Worker so Vite bundles the worker's imports.
+function createConfirmationWorker() {
+  return new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
+}
+
+export function createConfirmationPool({
+  createWorker = createConfirmationWorker, size, integrationContext = null,
+  signal = null, startupTimeoutMs = 5000,
+}) {
   const workers = [];
-  const idleIndices = [];
+  const idle = [];
   const waiters = [];
+  const controller = new AbortController();
   let terminated = false;
+  let terminalError = null;
 
-  for (let i = 0; i < size; i += 1) {
-    const worker = new Worker(workerUrl, { type: "module" });
-    workers.push(worker);
-    idleIndices.push(i);
-    // Fire-and-forget: the worker processes this FIRST (postMessage is FIFO),
-    // so the first confirmation job dispatched to this worker finds the
-    // integration context already set. The response is harmlessly ignored
-    // (no matching requestId listener).
-    if (integrationContext) {
-      try {
-        worker.postMessage({
-          requestId: `pool-init-${i}-${Date.now()}`,
-          phase: "integration-context",
-          context: integrationContext,
-        });
-      } catch {
-        /* worker failed to accept setup — will surface on first job */
-      }
-    }
-  }
-
-  if (signal) {
-    if (signal.aborted) {
-      terminateAll();
-    } else {
-      signal.addEventListener("abort", terminateAll, { once: true });
-    }
-  }
-
-  function terminateAll() {
+  function terminateAll(reason = new V2AbortError()) {
     if (terminated) return;
     terminated = true;
-    for (const w of workers) {
-      try { w.terminate(); } catch { /* already dead */ }
+    terminalError = reason;
+    controller.abort(reason);
+    for (const worker of workers) {
+      try { worker.terminate(); } catch { /* already stopped */ }
     }
-    workers.length = 0;
-    idleIndices.length = 0;
+    idle.length = 0;
     while (waiters.length) waiters.shift()(null);
+    signal?.removeEventListener("abort", onAbort);
   }
+  function onAbort() {
+    terminateAll(isFatalLifecycleError(signal?.reason) ? signal.reason : new V2AbortError());
+  }
+  signal?.addEventListener("abort", onAbort, { once: true });
+  if (signal?.aborted) onAbort();
 
+  // Listen before startup can fail, and require acknowledgement before work.
+  // Catch immediately: pool creation can precede the first confirmation.
+  const startups = [];
+  try {
+    for (let i = 0; i < size && !terminated; i += 1) {
+      const worker = createWorker();
+      workers.push(worker);
+      startups.push(runInWorker(worker, "integration-context", { context: integrationContext },
+        controller.signal, { timeoutMs: startupTimeoutMs })
+        .then(() => { if (!terminated) idle.push(worker); })
+        .catch(error => {
+          terminateAll(isFatalLifecycleError(error) ? error : new V2WorkerError(error.message));
+        }));
+    }
+  } catch (error) {
+    terminateAll(new V2WorkerError(error.message));
+  }
+  const ready = Promise.all(startups);
+  async function ensureReady() {
+    await ready;
+    if (terminated) throw terminalError;
+  }
   function acquire() {
-    return new Promise((resolve) => {
-      if (terminated) { resolve(null); return; }
-      if (idleIndices.length > 0) {
-        resolve(workers[idleIndices.shift()]);
-        return;
-      }
-      waiters.push(resolve);
+    return new Promise(resolve => {
+      if (terminated) resolve(null);
+      else if (idle.length) resolve(idle.shift());
+      else waiters.push(resolve);
     });
   }
-
   function release(worker) {
     if (terminated) return;
-    const idx = workers.indexOf(worker);
-    if (idx < 0) return; // worker was removed (errored / terminated)
-    if (waiters.length > 0) {
-      const waiter = waiters.shift();
-      waiter(worker);
-    } else {
-      idleIndices.push(idx);
-    }
+    if (waiters.length) waiters.shift()(worker);
+    else idle.push(worker);
   }
-
-  /**
-   * Run one canonical confirmation on an idle pool worker.
-   * Returns the raw worker result (same as runInWorker).
-   */
   async function runConfirmation(params, jobSignal) {
-    const worker = await acquire();
-    if (!worker) throw new Error("Confirmation pool terminated");
+    const abortJob = () => terminateAll(
+      isFatalLifecycleError(jobSignal?.reason) ? jobSignal.reason : new V2AbortError());
+    jobSignal?.addEventListener("abort", abortJob, { once: true });
+    if (jobSignal?.aborted) abortJob();
+    let worker;
     try {
-      return await runInWorker(worker, "confirmation", params, jobSignal);
+      await ensureReady();
+      worker = await acquire();
+      if (!worker) throw terminalError || new V2AbortError();
+      return await runInWorker(worker, "confirmation", params, controller.signal);
+    } catch (error) {
+      if (isFatalLifecycleError(error)) terminateAll(error);
+      throw error;
     } finally {
-      release(worker);
+      jobSignal?.removeEventListener("abort", abortJob);
+      if (worker) release(worker);
     }
   }
-
-  return {
-    acquire,
-    release,
-    runConfirmation,
-    terminateAll,
-    get size() { return terminated ? 0 : workers.length; },
-  };
+  return { acquire, release, ensureReady, runConfirmation, terminateAll,
+    get size() { return terminated ? 0 : workers.length; } };
 }
