@@ -5,6 +5,7 @@ import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontEl
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
 import { resolveScreenFrameGeometry } from "@/components/models/screen/screenFrameGeometry";
 import { drawFrontSpeakerArt } from "@/components/room/front/FrontSpeakerArt";
+import { isFrontSpeakerEdgeToEdge } from "@/components/room/front/frontSpeakerArtworkSizing";
 import FrontScreenLayer from "@/components/room/front/FrontScreenLayer";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
 import { subwooferCentreZM } from "@/components/utils/subwooferDrawingHeight";
@@ -575,8 +576,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // All speaker/sub bounding boxes — for annotation collision detection
   const allSpeakerBoxes = useMemo(() => {
     const lcr = lcrSpeakers.map((spk, i) => {
-      const isC41 = (spk.modelKey || "").includes("c4-1");
-      const hMult = isC41 ? 1.0 : 1.20;
+      // The annotation collision box must match the drawn box, so it reads the
+      // SAME edge-to-edge authority the drawing reads: a normalised/edge-to-edge
+      // face icon is drawn at the cabinet's true height, while a padded legacy
+      // icon keeps the long-standing vertical inflation.
+      const hMult = isFrontSpeakerEdgeToEdge(spk.modelKey, spk.cabinetLengthMm) ? 1.0 : 1.20;
       const cx = rx(spk.x);
       const cy = ry(spk.z);
       const sw = Math.max(12, (spk.wM / roomW) * drawW);
@@ -802,10 +806,17 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
         {/* LCR Speakers — via drawSpeakerFront helper */}
         {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk, idx) => {
-          // A cropped, edge-to-edge icon (C4-1, C-1) is drawn at the cabinet's own
-          // catalogue size; the padded PNG icons are enlarged to compensate for
-          // their internal transparent padding.
-          const isEdgeToEdgeSpk = (spk.modelKey || "").includes("c4-1") || (spk.modelKey || "").includes("c-1");
+          // The cabinet box height follows the SAME edge-to-edge authority the
+          // face icon's own crop uses (frontSpeakerArtworkSizing). A normalised
+          // (page-cropped) artwork — every Q/Evolve/C model — or a vector face
+          // icon fills its box edge-to-edge at the cabinet's true physical
+          // height, so the box is the true 270 × 370 mm footprint and the crop
+          // fills it with no letterbox. Only a padded legacy icon keeps the
+          // long-standing vertical inflation, and there are none in the current
+          // catalogue. This replaces a stale c4-1/c-1 string check that left every
+          // other cropped icon drawn inside an over-tall box, letterboxed with a
+          // band of white backing above and below the cabinet.
+          const isEdgeToEdgeSpk = isFrontSpeakerEdgeToEdge(spk.modelKey, spk.cabinetLengthMm);
           const hMultiplier = isEdgeToEdgeSpk ? 1.0 : 1.20;
           const spkCx = rx(spk.x);
           const spkCy = ry(spk.z);
