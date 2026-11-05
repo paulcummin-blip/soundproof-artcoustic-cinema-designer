@@ -70,10 +70,11 @@ export function publishHydratedStage1(projectId, versionId, fingerprint, results
   });
 }
 
-export function markStage1Updating(projectId, versionId, fingerprint) {
+export function markStage1Updating(projectId, versionId, fingerprint, ownerRequestId = null) {
   return setMemory(projectId, versionId, {
     status: "updating",
     fingerprint,
+    ownerRequestId,
     isUpdating: true,
     errorMessage: null,
     hydratedFromCache: false,
@@ -144,7 +145,7 @@ export class Stage1PlacementController {
    * Schedule a Stage 1 search. Cancels any existing pending/active search.
    * Debounces rapid geometry changes.
    */
-  schedule({ projectId, versionId, fingerprint, payload, delay, scopeQuantity = null }) {
+  schedule({ projectId, versionId, fingerprint, payload, delay, scopeQuantity = null, ownerRequestId = null }) {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     this.cancelActive("superseded");
 
@@ -153,7 +154,7 @@ export class Stage1PlacementController {
       return;
     }
 
-    markStage1Updating(projectId, versionId, fingerprint);
+    markStage1Updating(projectId, versionId, fingerprint, ownerRequestId);
 
     const waitMs = Number.isFinite(delay) ? delay : this.startDelayMs;
     this.pendingRequest = { projectId, versionId, fingerprint };
