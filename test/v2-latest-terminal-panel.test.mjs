@@ -19,6 +19,10 @@ for (const state of ["failed","no_useful_improvement"]) {
     act(()=>{renderer=TestRenderer.create(React.createElement(Journey,{
       projectId:"terminal-test",versionId:state,currentDesignFingerprint:"same",
       jointRecommendation:receipt,onRunOptimisationPlan:()=>{},onReoptimiseCalibration:()=>{},
+      appliedCalibrationEvidence:{decision:"applied",
+        before:{p19:{deviationDb:1,level:4},p20:{deviationDb:9,level:1}},
+        after:{p19:{deviationDb:0.6,level:4},p20:{deviationDb:6.6,level:1}},
+        settings:[{instanceId:"sub-1",gainDb:-0.5,delayMs:4.25,phaseDeg:75,polarity:1}]},
       presentation:{state,outcome:state==="failed"?"unable_to_evaluate":state,
         statusLabel:state,outcomeLabel:state==="failed"?null:"No Improvement Found",
         message,notes:[],canRun:true,action:"retest",actionLabel:"Re-test Bass Optimisation",
