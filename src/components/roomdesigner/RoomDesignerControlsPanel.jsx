@@ -168,7 +168,8 @@ export default function RoomDesignerControlsPanel({
               }}
               disabled={isFrozen('dimensions')}
               speakerPositionsView={speakerPositionsView}
-              onSpeakerPositionsViewChange={setSpeakerPositionsView} />
+              onSpeakerPositionsViewChange={setSpeakerPositionsView}
+              speakerPositionsDisabled={drawingView !== "plan"} />
           </Suspense>
         </CollapsiblePanel>
 
