@@ -65,6 +65,7 @@ export default function IsometricView({
   const contentGroupRef = useRef(null);
   const animationFrameRef = useRef(null);
   const needsRenderRef = useRef(true);
+  const fitFrustumRef = useRef(null);
 
   const [showHeads, setShowHeads] = useState(true);
   const [showRspMarker, setShowRspMarker] = useState(true);
@@ -107,13 +108,24 @@ export default function IsometricView({
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    // updateStyle=false: we control canvas CSS (100%/100%/block) so the canvas
+    // always fills the mount. setSize only updates the drawing buffer. This
+    // prevents the one-frame CSS-vs-drawing-buffer mismatch that stretches the
+    // canvas during resize and reads as flicker/distortion.
+    renderer.setSize(mount.clientWidth, mount.clientHeight, false);
     mount.appendChild(renderer.domElement);
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none"; // prevent browser scroll/zoom on canvas
     rendererRef.current = renderer;
 
-    // Orthographic camera.
-    const cam = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
+    // Orthographic camera. Near/far tightened from (0.1, 1000) to (0.5, 200):
+    // ortho depth is linear, so a tighter range gives finer z resolution for
+    // coplanar transparent surfaces (the 3mm screen offset gets ~252 depth
+    // steps instead of ~50). The scene spans ~8-25m in view depth, so 0.5/200
+    // comfortably contains it at every allowed camera position.
+    const cam = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.5, 200);
     cameraRef.current = cam;
 
     // OrbitControls — installed Three.js controls.
@@ -146,18 +158,29 @@ export default function IsometricView({
     // Request a render when controls change (damping, drag, wheel).
     controls.addEventListener("change", () => { needsRenderRef.current = true; });
 
-    // Resize handling.
+    // Resize handling — guarded so the renderer only resizes when the drawing
+    // buffer dimensions actually change. Uses the latest fitFrustum via ref
+    // (the observer is created once but fitFrustum changes with sceneData).
+    // updateStyle=false keeps canvas CSS stable; only the drawing buffer is
+    // reallocated.
+    let lastW = 0, lastH = 0;
     const resizeObserver = new ResizeObserver(() => {
       const w = mount.clientWidth;
       const h = mount.clientHeight;
       if (w === 0 || h === 0) return;
-      renderer.setSize(w, h);
-      // Orthographic frustum updated by fitCameraToRoom using current zoom.
+      if (w === lastW && h === lastH) return;
+      lastW = w; lastH = h;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (renderer.getPixelRatio() !== dpr) renderer.setPixelRatio(dpr);
+      renderer.setSize(w, h, false);
+      fitFrustumRef.current?.(w, h);
       needsRenderRef.current = true;
-      // Re-fit frustum keeping current camera angle/zoom.
-      fitFrustum(w, h);
     });
     resizeObserver.observe(mount);
+
+    // Re-render on tab re-entry (RAF paused while backgrounded, scene may be stale).
+    const onVisibility = () => { if (!document.hidden) needsRenderRef.current = true; };
+    document.addEventListener("visibilitychange", onVisibility);
 
     // Render loop — only render when a frame is needed (interaction/damping).
     const tick = () => {
@@ -175,6 +198,7 @@ export default function IsometricView({
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
       resizeObserver.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
       controls.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
@@ -200,6 +224,11 @@ export default function IsometricView({
     cam.updateProjectionMatrix();
     needsRenderRef.current = true;
   }, [sceneData]);
+
+  // Keep the ref current so the ResizeObserver (created once) always calls the
+  // latest fitFrustum with the current sceneData — avoids a stale-closure where
+  // resize after a design change would fit to the old room dimensions.
+  fitFrustumRef.current = fitFrustum;
 
   // Apply a camera framing (target + azimuth + polar + zoom) to the controls.
   const applyFraming = useCallback((framing) => {

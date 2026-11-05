@@ -38,11 +38,16 @@ const PROJECTOR_COLOR = 0x3E4349;
 const ELEMENT_FILL = 0xC7C3BB;
 const ELEMENT_EDGE = 0x9B9890;
 
-// renderOrder bands — opaque first (0), transparent shells after (10+).
+// renderOrder bands — opaque first (0), then transparent surfaces in a strict
+// hierarchy. Each overlapping transparent pair gets a DISTINCT band so Three.js
+// never distance-sorts them against each other (distance sort flips as the
+// camera/frustum moves → flicker). Non-overlapping objects may share a band.
 const RENDER_ORDER_OPAQUE = 0;
-const RENDER_ORDER_WALLS = 10;
-const RENDER_ORDER_ELEMENTS = 11;
-const RENDER_ORDER_SCREEN_SURFACE = 12;
+const RENDER_ORDER_WALLS = 10;          // transparent wall planes
+const RENDER_ORDER_WALL_EDGES = 11;     // wall outlines — drawn after (on top of) planes
+const RENDER_ORDER_ELEMENTS = 12;       // transparent room-element boxes
+const RENDER_ORDER_ELEMENT_EDGES = 13;  // element outlines — after boxes
+const RENDER_ORDER_SCREEN_SURFACE = 14; // screen viewable image — after everything
 
 function opaqueBox(widthM, heightM, depthM, color, edgeColor) {
   const geo = new THREE.BoxGeometry(widthM, heightM, depthM);
@@ -105,7 +110,9 @@ export function buildRoomShell(roomDims) {
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, 0.001)), wallEdgeMat);
     edges.rotation.y = rotY;
     edges.position.set(x, y, z);
-    edges.renderOrder = RENDER_ORDER_WALLS;
+    // Edges get a HIGHER renderOrder than the wall plane so they always draw
+    // on top — never distance-sorted against their own coplanar plane.
+    edges.renderOrder = RENDER_ORDER_WALL_EDGES;
     group.add(edges);
   };
 
@@ -242,5 +249,15 @@ export function buildRoomElementMesh(el) {
   mesh.material.opacity = 0.35;
   mesh.material.depthWrite = false;
   mesh.renderOrder = RENDER_ORDER_ELEMENTS;
+  // The child edges from opaqueBox inherit renderOrder 0 and depthWrite true —
+  // fix both so they draw after the transparent box and never fight the depth
+  // buffer. Without this, transparent edges at renderOrder 0 are sorted among
+  // opaque objects and pop as the camera moves.
+  mesh.children.forEach((child) => {
+    if (child.isLineSegments) {
+      child.renderOrder = RENDER_ORDER_ELEMENT_EDGES;
+      child.material.depthWrite = false;
+    }
+  });
   return mesh;
 }
