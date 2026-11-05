@@ -163,7 +163,8 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
     box: { x: 45, y: 257, width: 2083, height: 208 },
     mode: ELEVATION_ART_MODE.APPROVED,
     source: "measured from the file and verified in the C4-1 cabinet variant tests",
-    note: "The automated pass cannot be used on a long, line-sparse soundbar drawing: its ink bound collapses onto the driver cluster, so the hand-measured crop is the authority.",
+    note: "The automated pass cannot be used on a long, line-sparse soundbar drawing: its ink bound collapses onto the driver cluster, so the hand-measured crop is the authority. The source artwork's own cabinet outline (2083 × 208 px, aspect 10.014) is ~1.7% narrower than the physical 1222 × 120 mm cabinet (aspect 10.183); fitted with meet that left a ~10 mm white band on each side inside the physical box. slice fills the physical WIDTH edge-to-edge so the cabinet's drawn left/right edges coincide with the 1222 mm boundary (no white overhang at either end), clipping only ~1 mm of the cabinet's top/bottom rule — the drivers and the cabinet's proportions are preserved, nothing is stretched.",
+    preserveAspect: "xMidYMid slice",
   },
   c41_1441: {
     artwork: "C4-1 1441 mm front",
@@ -181,7 +182,8 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
     box: { x: 35, y: 277, width: 2097, height: 149 },
     mode: ELEVATION_ART_MODE.APPROVED,
     source: "measured from the file and verified in the C4-1 cabinet variant tests",
-    note: "As the 1222 mm variant: the hand-measured crop is the authority.",
+    note: "As the 1222 mm variant: the hand-measured crop is the authority. The source outline (2097 × 149 px, aspect 14.074) is ~1.3% narrower than the physical 1711 × 120 mm cabinet (aspect 14.258); slice fills the physical width edge-to-edge so the left/right edges coincide with the 1711 mm boundary, clipping only ~0.8 mm of the top/bottom rule. Proportions and drivers preserved, nothing stretched.",
+    preserveAspect: "xMidYMid slice",
   },
   c1: {
     artwork: "C-1 front",
