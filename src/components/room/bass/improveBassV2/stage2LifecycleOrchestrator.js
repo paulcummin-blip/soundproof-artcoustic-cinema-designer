@@ -103,8 +103,13 @@ export function waitForStage2Terminal(projectId, versionId, {
       // Only the owner may stop its work. A superseded wait cannot cancel a
       // replacement run, even if both designs have the same fingerprint.
       if (result.status !== "complete" && (!requestId || heavy?.requestId === requestId)) {
-        stage1PlacementController.cancelActive(result.status);
-        stage2PlacementController.cancelAll(result.status);
+        const activeStage1 = stage1PlacementController.activeRequest || stage1PlacementController.pendingRequest;
+        if (activeStage1?.projectId === projectId && activeStage1?.versionId === versionId) {
+          stage1PlacementController.cancelActive(result.status);
+        }
+        if (stage2PlacementController.projectId === projectId && stage2PlacementController.versionId === versionId) {
+          stage2PlacementController.cancelAll(result.status);
+        }
         if (["error", "timeout"].includes(result.status)) {
           markBassHeavyActionError(projectId, versionId, heavy?.requestId, result.error);
         } else cancelBassHeavyAction(projectId, versionId, result.message || result.status);
