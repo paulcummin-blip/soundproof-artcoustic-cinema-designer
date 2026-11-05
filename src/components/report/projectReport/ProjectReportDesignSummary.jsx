@@ -36,8 +36,7 @@ import ProjectReportSummaryOpening from '@/components/report/projectReport/Proje
 import ProjectReportOpeningBlock from '@/components/report/projectReport/ProjectReportOpeningBlock';
 import ProjectReportFactsGrid from '@/components/report/projectReport/ProjectReportFactsGrid';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
-import DesignIntentGenerationAction from '@/components/report/projectReport/DesignIntentGenerationAction';
-import { DESIGN_INTENT_SOURCE } from '@/components/report/projectReport/designIntentAuthority';
+import { AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
 import {
   displayFactLabel,
   displayPhrase,
@@ -121,12 +120,12 @@ export default function ProjectReportDesignSummary({
   // authority. Null falls back to the project's own Dolby configuration.
   systemFormat = null,
   print = false,
-  // Which Design Intent is on the page — the report's own, or a validated Astra
-  // narrative — and the optional on-screen action that asks the writer for one.
-  intentSource = null,
-  projectId = null,
-  versionId = null,
-  onIntentGenerated = null,
+  // The automatic ADI Project Summary status. While generation is running the
+  // report page shows a blocking overlay; when it has failed the page shows a
+  // failure card with Retry here instead of the summary text, so an unfinished
+  // summary is never presented as the finished ADI narrative.
+  autoIntentStatus = null,
+  onRetryAutoIntent = null,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
   const seatCount = Array.isArray(seatingPositions) ? seatingPositions.length : 0;
@@ -200,7 +199,7 @@ export default function ProjectReportDesignSummary({
         <ProjectReportFactsGrid columns={columns} print={print} />
       </div>
 
-      {summaryOpening && (
+      {summaryOpening && autoIntentStatus !== AUTO_INTENT.FAILED && (
         <div style={{
           marginTop: print ? '6mm' : 20,
           marginBottom: print ? '6mm' : 20,
@@ -209,17 +208,43 @@ export default function ProjectReportDesignSummary({
         </div>
       )}
 
-      {/* The Astra Design Intent is OPTIONAL and is never part of the printed
-          document: the action is shown on screen only, so no page, no pagination
-          and no figure of the PDF depends on whether it exists or what state it is
-          in. Whatever it reports, the page above it is already complete. */}
-      {!print && (
-        <DesignIntentGenerationAction
-          projectId={projectId}
-          versionId={versionId}
-          hasNarrative={intentSource === DESIGN_INTENT_SOURCE.ASTRA}
-          onGenerated={onIntentGenerated}
-        />
+      {/* A failed generation is never shown as a finished summary: the deterministic
+          fallback is withheld and a clear failure card with Retry is shown in its
+          place. Screen only — the printed PDF is never produced in this state. */}
+      {!print && autoIntentStatus === AUTO_INTENT.FAILED && (
+        <div style={{
+          marginTop: 20,
+          padding: '18px 20px',
+          background: '#FFFFFF',
+          border: '1px solid #C1B6AD',
+          borderLeft: '4px solid #8A1A1A',
+          borderRadius: 8,
+          fontFamily: FONT_BODY,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#8A1A1A' }}>
+            ADI could not write the project summary.
+          </div>
+          <div style={{ fontSize: 12.5, color: '#625143', marginTop: 4, lineHeight: 1.5 }}>
+            The summary could not be generated from this design. Retry to generate it again.
+          </div>
+          <button
+            type="button"
+            onClick={onRetryAutoIntent}
+            style={{
+              marginTop: 12,
+              fontFamily: FONT_BODY,
+              fontSize: 12,
+              color: '#FFFFFF',
+              background: '#213428',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 16px',
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
       )}
     </div>
   );

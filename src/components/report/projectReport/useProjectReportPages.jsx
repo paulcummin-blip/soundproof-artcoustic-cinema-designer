@@ -107,6 +107,11 @@ export function useProjectReportPages({
   appState,
   projectId,
   versionId,
+  // The automatic ADI Project Summary status and its retry action. Threaded to
+  // the Project Summary page so a failed generation shows Retry there instead of
+  // the deterministic fallback.
+  autoIntentStatus = null,
+  onRetryAutoIntent = null,
 }) {
   // The front page's DESIGN INTENT: the designer's own account of the cinema this
   // report documents — the experience it is designed to deliver and the reasoning
@@ -719,10 +724,8 @@ export function useProjectReportPages({
           summaryOpening={designIntent.text}
           opening={opening}
           systemFormat={systemFormat}
-          intentSource={designIntent.source}
-          projectId={projectId}
-          versionId={versionId}
-          onIntentGenerated={reloadDesignIntent}
+          autoIntentStatus={autoIntentStatus}
+          onRetryAutoIntent={onRetryAutoIntent}
         />
       ),
     };
@@ -783,5 +786,5 @@ export function useProjectReportPages({
     // where the complete P1–P21 parameter-card sequence, the drawing set, the
     // bass curves and the single closing About Sound Proof page print.
     return [projectSummaryPage, adiHighlightsPage, systemProductsPage, ...pageList];
-  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary]);
+  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary, autoIntentStatus, onRetryAutoIntent]);
 }

@@ -27,7 +27,7 @@ import ReportTypographyStyles from "@/components/report/typography/ReportTypogra
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
 import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
 import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
-import AdiPreparingPopup from "@/components/report/projectReport/AdiPreparingPopup";
+import AdiSummaryOverlay from "@/components/report/projectReport/AdiSummaryOverlay";
 import {
   readReportActionIntent,
   useReportActionIntent,
@@ -483,6 +483,11 @@ export default function RP22ClientReport() {
   );
 
   // ── The Project Report's composition ────────────────────────────────────
+  // The automatic ADI Project Summary. Mounted before the page composition so
+  // its status is available to the Project Summary page (failure card + Retry)
+  // and to the export gate. One generation, no separate editorial pass.
+  const { status: autoIntentStatus, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId });
+
   // The page CONTENT is assembled by the report's own composition hook; the
   // composition authority (projectReportRegistry) owns the document — the section
   // order, each page's heading and continuation state, and the P1–P21 inclusion
@@ -526,6 +531,8 @@ export default function RP22ClientReport() {
     appState,
     projectId,
     versionId: authority.versionId || null,
+    autoIntentStatus,
+    onRetryAutoIntent: retryAutoIntent,
   });
 
   // The Technical plan drawings (room plan, dimensioned room plan, speaker
@@ -575,8 +582,6 @@ export default function RP22ClientReport() {
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
-  // Export waits for the automatic ADI pass on a newly generated report.
-  const { status: autoIntentStatus, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId });
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
@@ -811,7 +816,7 @@ export default function RP22ClientReport() {
       background: "#F1F0EE",
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
-      <AdiPreparingPopup status={autoIntentStatus} onRetry={retryAutoIntent} />
+      <AdiSummaryOverlay status={autoIntentStatus} />
       {/* Shared report typography system — the Visual Report preview and its
           PDF export both read their type from this one source. The preview
           keeps its own screen-adapted body sizes, so only the families,
