@@ -63,6 +63,7 @@ const lengthFor = (modelKey, screen, extra = {}) => resolveSoundbarCabinetLength
 const read = (rel) => fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
 
 const c41Artwork = read('src/components/report/C41ArtworkFaceIcons.jsx');
+const c41Vector = read('src/components/report/elevation/C41CabinetArtwork.jsx');
 const frontElevation = read('src/components/room/FrontElevation.jsx')
   + read('src/components/room/front/FrontSpeakerArt.jsx');
 const planLayer = read('src/components/room/rv/render/RvSpeakerLayer.jsx');
@@ -248,32 +249,62 @@ test('TEST 9  The C4-1 engineering data is unchanged by the variant work', () =>
 
 // ── 7. The approved 1222 mm artwork ───────────────────────────────────────
 
-test('TEST 10 The 1222 mm artwork is cropped to its ink and keeps the cabinet proportions', () => {
-  assert.ok(c41Artwork.includes('export function C41_1222FaceIcon'));
-  assert.ok(c41Artwork.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png'));
-  assert.ok(c41Artwork.includes('box: "45 257 2083 208"'), 'the surrounding whitespace is cropped');
-  // The 1222 mm cabinet is drawn through its own icon, gated on the installed length.
-  assert.ok(frontElevation.includes("const isC41_1222 = isC41 && Number(cabinetLengthMm) === 1222;"));
-  assert.ok(frontElevation.includes('if (isC41 && isC41_1222) return <C41_1222FaceIcon'));
-  // The crop is recorded in the one elevation authority.
-  assert.ok(authority.includes('c41_1222:'));
+test('TEST 10 The C4-1 is drawn by the shared VECTOR renderer at its exact physical width, centred constant-size drivers, no white overhang', () => {
+  // The shared vector renderer exists and is the live elevation's C4-1 route.
+  assert.ok(c41Vector.includes('export function C41CabinetArtwork'), 'the vector renderer is defined');
+  assert.ok(frontElevation.includes('import { C41CabinetArtwork } from "@/components/report/elevation/C41CabinetArtwork"'));
+  assert.ok(frontElevation.includes('if (isC41) return ('), 'C4-1 is routed through the vector renderer');
+  assert.ok(frontElevation.includes('<C41CabinetArtwork'));
+  assert.ok(frontElevation.includes('cabinetLengthMm={cabinetLengthMm}'), 'the installed length is passed to the renderer');
+
+  // The cabinet body is exact vector geometry: width = physical mm, height 120 mm,
+  // transparent fill (no white page, no overhang), never axis-stretched.
+  assert.ok(c41Vector.includes('0 0 ${wMm} 120'), 'viewBox maps mm 1:1');
+  assert.ok(c41Vector.includes('preserveAspectRatio="xMidYMid meet"'), 'aspect is preserved, never none');
+  assert.ok(c41Vector.includes('fill="none"'), 'the cabinet fill is transparent');
+  assert.ok(!c41Vector.includes('preserveAspectRatio="none"'), 'never axis-stretched');
+  assert.ok(c41Vector.includes('width={wMm - 2.4}'), 'the rect is the exact physical width (no overhang)');
+  assert.ok(c41Vector.includes('height={117.6}'), 'the rect is the physical 120 mm height');
+
+  // The driver group is centred (cx = wMm/2) and drawn at a CONSTANT physical size,
+  // so the drivers stay the same in every cabinet width.
+  assert.ok(c41Vector.includes('const cx = wMm / 2;'), 'drivers are centred on the cabinet');
+  assert.ok(c41Vector.includes('WOOFER_PITCH'), 'the driver pitch is a fixed physical constant');
+  assert.ok(c41Vector.includes('cx={cx - WOOFER_PITCH * 1.5}'), 'woofers are laid out at a constant pitch');
+
+  // The per-variant raster gating is gone from the live elevation.
+  assert.ok(!frontElevation.includes('isC41_1222'), 'no per-variant raster gating remains');
+  assert.ok(!frontElevation.includes('isC41_1441'), 'no per-variant raster gating remains');
+  assert.ok(!frontElevation.includes('isC41_1711'), 'no per-variant raster gating remains');
+  assert.ok(!frontElevation.includes('<C41_1222FaceIcon'), 'the raster icon is no longer the live route');
+  assert.ok(!frontElevation.includes('<C41_1441FaceIcon'), 'the raster icon is no longer the live route');
+  assert.ok(!frontElevation.includes('<C41_1711FaceIcon'), 'the raster icon is no longer the live route');
+  assert.ok(!frontElevation.includes('if (isC41) return <C41FaceIcon'), 'the catalogue raster is no longer the fallback');
+
+  // The legacy raster icons are PRESERVED in the artwork file (not deleted), so a
+  // saved project that referenced them is not lost and the crop authority stands.
+  assert.ok(c41Artwork.includes('export function C41_1222FaceIcon'), 'the legacy 1222 raster icon is preserved');
+  assert.ok(c41Artwork.includes('export function C41_1441FaceIcon'), 'the legacy 1441 raster icon is preserved');
+  assert.ok(c41Artwork.includes('export function C41_1711FaceIcon'), 'the legacy 1711 raster icon is preserved');
+  assert.ok(authority.includes('c41_1222:'), 'the crop authority is preserved');
 });
 
-test('TEST 11 The legacy 1441 mm and 1711 mm artworks are preserved for saved projects', () => {
-  // A saved project whose explicitly recorded length is a legacy 1441 or 1711 mm
-  // cabinet still draws its own approved artwork; nothing is stretched or lost.
-  assert.ok(c41Artwork.includes('export function C41_1441FaceIcon'));
-  assert.ok(c41Artwork.includes('export function C41_1711FaceIcon'));
-  assert.ok(c41Artwork.includes('box: "36 275 2095 170"'), 'the 1441 mm crop is preserved');
-  assert.ok(c41Artwork.includes('box: "35 277 2097 149"'), 'the 1711 mm crop is preserved');
-  assert.ok(frontElevation.includes('const isC41_1441 = isC41 && Number(cabinetLengthMm) === 1441;'));
-  assert.ok(frontElevation.includes('const isC41_1711 = isC41 && Number(cabinetLengthMm) === 1711;'));
-  assert.ok(frontElevation.includes('if (isC41 && isC41_1441) return <C41_1441FaceIcon'));
-  assert.ok(frontElevation.includes('if (isC41 && isC41_1711) return <C41_1711FaceIcon'));
-  // The catalogue drawing remains the fallback for any other length.
-  assert.ok(frontElevation.includes('if (isC41) return <C41FaceIcon'));
-  // The artwork is never axis-stretched.
-  assert.ok(!c41Artwork.includes('preserveAspectRatio="none"'));
+test('TEST 11 Every confirmed C4-1 length is drawn by the same vector renderer at its exact width', () => {
+  // The renderer defaults to 1222 mm only when no length is supplied; a real
+  // length is drawn at its own exact width.
+  assert.ok(c41Vector.includes(': 1222;'), 'falls back to 1222 mm only when no length is given');
+  // Each confirmed commercial length produces its own exact viewBox when passed.
+  C41_LENGTHS.forEach((mm) => {
+    // The renderer interpolates wMm into the viewBox, so each length is exact.
+    assert.ok(c41Vector.includes('0 0 ${wMm} 120'), `the renderer maps ${mm} mm 1:1`);
+  });
+  // The renderer carries a data attribute naming the installed length, so a
+  // screenshot can be forensically tied to the exact cabinet installed.
+  assert.ok(c41Vector.includes('data-c41-vector="true"'));
+  assert.ok(c41Vector.includes('data-c41-cabinet-length={wMm}'));
+  // No raster image URL is referenced by the vector renderer.
+  assert.ok(!c41Vector.includes('media.base44.com'), 'the vector renderer references no raster image');
+  assert.ok(!c41Vector.includes('.png'), 'the vector renderer references no png');
 });
 
 // ── 8. One variant authority, both drawings ───────────────────────────────

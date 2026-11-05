@@ -78,8 +78,17 @@ export function getCommercialPrice(modelKey, soundbarSelections = {}, priceMap =
     // When no choice is recorded, pricing follows the SAME resolved cabinet
     // length the drawings use, so a new design's price and its drawing agree.
     const resolvedValue = matchSoundbarOptionByMm(options, resolvedMm);
-    const selectedValue = soundbarSelections[key] || resolvedValue || options[0]?.value;
-    const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
+    // A length WAS resolved (from the placed speaker's own cabinetLengthMm or
+    // from the screen) but matched no current commercial option — a legacy
+    // saved length, or a length whose price is pending. It must NOT silently fall
+    // back to the first option: that would quote a different cabinet's price as
+    // the installed one. The line stays present (quantity intact) but unpriced.
+    // The options[0] default applies only when no length was resolved at all.
+    const hasResolved = Number.isFinite(Number(resolvedMm));
+    const fallbackValue = hasResolved ? null : options[0]?.value;
+    const selectedValue = soundbarSelections[key] || resolvedValue || fallbackValue;
+    const selectedOption = options.find((option) => option.value === selectedValue)
+      || (hasResolved ? null : options[0]);
     const priceExVat = selectedOption?.priceExVat;
     const hasPrice = priceExVat !== null && priceExVat !== undefined;
     return {
