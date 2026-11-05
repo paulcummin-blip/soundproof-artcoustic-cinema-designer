@@ -122,17 +122,21 @@ export default function CrossoverRecommendation({
   useEffect(() => {
     if (!candidate?.integrationVerified || !candidate?.baselineCacheKey || typeof write !== "function") return;
     if (candidate.baselineCacheKey !== shared?.cacheKey) return;
-    if (saved?.candidateId === candidate.candidateId && saved?.baselineCacheKey === candidate.baselineCacheKey) return;
+    if (producingPlan?.run?.terminal !== true || producingPlan?.run?.outcome !== "actionable_plan_produced"
+      || producingPlan?.designFingerprint !== candidate.baselineCacheKey
+      || producingPlan?.candidateId !== candidate.candidateId) return;
+    if (saved?.candidateId === candidate.candidateId && saved?.baselineCacheKey === candidate.baselineCacheKey
+      && (!saved.runId || saved.runId === producingPlan.run.runId)) return;
     write({ crossoverRecommendation: {
       version:1,versionId,runId:producingPlan?.run?.runId || null,candidateId:candidate.candidateId,baselineCacheKey:candidate.baselineCacheKey,
       candidate,baseline:diagnostics?.baseline || null,status:"recommended",
     } });
-  }, [candidate,diagnostics,write,shared?.cacheKey,saved?.candidateId,saved?.baselineCacheKey]);
+  }, [candidate,diagnostics,write,shared?.cacheKey,saved?.candidateId,saved?.baselineCacheKey,saved?.runId,producingPlan,versionId]);
 
   // A refreshed tab resumes verification from saved settings and the normal
   // published authority. It never marks an unfinished calculation as applied.
   useEffect(() => {
-    if (applying || !record?.expectedConfiguration || !["applying","restoring","verification-required"].includes(record.status)) return;
+    if (!receiptState?.ownsPanel || applying || !record?.expectedConfiguration || !["applying","restoring","verification-required"].includes(record.status)) return;
     if (shared?.calculationInProgress || shared?.cacheKey === record.beforeCacheKey) return;
     if (authorityState.code !== "current") return;
     if (!recommendationSettingsMatch(shared?.authoritative, record.expectedConfiguration)) return;
@@ -140,7 +144,7 @@ export default function CrossoverRecommendation({
     if (!recommendationResultMatches(shared?.completedBassAuthority,restore?record.baseline:record.candidate)) return;
     setError(null);
     write({crossoverRecommendation:{...record,status:restore?"restored":"applied",error:null,appliedCacheKey:shared.cacheKey,verifiedAt:new Date().toISOString()}});
-  }, [record,applying,authorityState.code,shared?.cacheKey,shared?.calculationInProgress,shared?.completedBassAuthority,shared?.authoritative,write]);
+  }, [record,applying,authorityState.code,shared?.cacheKey,shared?.calculationInProgress,shared?.completedBassAuthority,shared?.authoritative,write,receiptState?.ownsPanel]);
 
   if (!record?.candidate || !receiptState?.ownsPanel) return null;
   // Only this version's own recommendation for the CURRENT design is shown.
