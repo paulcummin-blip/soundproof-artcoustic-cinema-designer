@@ -8,7 +8,7 @@ const { requestBassHeavyAction, getBassHeavyAction } = await import("../src/comp
 const { markStage1Updating, markStage1Error, stage1PlacementController } = await import("../src/components/room/bass/stage1/stage1PlacementStore.js");
 const { setStage2StateForTest, Stage2PlacementController } = await import("../src/components/room/bass/stage2/stage2PlacementStore.js");
 const { requestCancel } = await import("../src/components/room/bass/improveBassV2/improveBassV2Store.js");
-const { readStage2TerminalDiagnostics } = await import("../src/components/room/bass/improveBassV2/stage2TerminalDiagnostics.js");
+const { saveStage2TerminalDiagnostics, readStage2TerminalDiagnostics } = await import("../src/components/room/bass/improveBassV2/stage2TerminalDiagnostics.js");
 class Worker {
   constructor() { this.listeners = {}; this.sent = []; this.terminated = false; }
   addEventListener(type, fn) { this.listeners[type] = fn; }
@@ -124,6 +124,32 @@ test("outer timeout cleans pending work and records actionable diagnostics", asy
   assert.equal(getBassHeavyAction("timeout", "v1").status, "error");
   assert.equal(stage1PlacementController.activeRequest, null);
   assert.ok(readStage2TerminalDiagnostics().some(r => r.runId === "timeout-run"));
+});
+test("worker constructor failure terminates without leaving queued Stage 2 work", () => {
+  const original = globalThis.Worker;
+  globalThis.Worker = class { constructor() { throw Error("worker unavailable"); } };
+  const controller = new Stage2PlacementController();
+  controller.projectId = "constructor-failure"; controller.versionId = "v1";
+  controller.currentFingerprint = "current"; controller.queue = [{ phase: "placement" }];
+  try {
+    assert.equal(controller.startWorker(0), false);
+    assert.equal(controller.queue.length, 0);
+    assert.equal(controller.activeJobs.size, 0);
+    assert.match(controller.runtimeDiagnostics.lastTerminal.error, /worker unavailable/);
+  } finally { globalThis.Worker = original; controller.cancelAll("superseded"); }
+});
+test("diagnostic receipt survives storage refusal in memory and normal storage across reload", async () => {
+  const original = globalThis.localStorage;
+  const data = new Map();
+  globalThis.localStorage = { getItem: k => data.get(k) || null, setItem: () => { throw Error("quota"); } };
+  try {
+    saveStage2TerminalDiagnostics({ runId: "quota-run", outcome: "error" });
+    assert.ok(readStage2TerminalDiagnostics().some(r => r.runId === "quota-run"));
+    globalThis.localStorage.setItem = (k,v) => data.set(k,v);
+    saveStage2TerminalDiagnostics({ runId: "durable-run", outcome: "complete" });
+    const reopened = await import("../src/components/room/bass/improveBassV2/stage2TerminalDiagnostics.js?cold-reopen");
+    assert.ok(reopened.readStage2TerminalDiagnostics().some(r => r.runId === "durable-run"));
+  } finally { globalThis.localStorage = original; }
 });
 test("stale Stage 2 message cannot steal a newer job or clear its watchdog", () => {
   const controller = new Stage2PlacementController();
