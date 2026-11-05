@@ -340,6 +340,7 @@ export default function AdiOptimisationJourney({
     // A restored failure survives the transient run store resetting to idle.
     // Baseline parity may override journey.outcome, but must not add a second retry.
     || presentation?.state === OPTIMISER_PRESENTATION_STATE.FAILED
+    || presentation?.state === OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT
     || presentation?.outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE
     || outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE;
   // A physical change is an improvement too: the panel offers Apply for both,
@@ -398,6 +399,8 @@ export default function AdiOptimisationJourney({
     || ["failed", "error"].includes(runStatus)
     || planView?.run?.outcome === "failed"
   );
+  const latestRunOwnsMessage = latestRunFailed || (!isRunning
+    && presentation?.state === OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
   // THE RUN'S LIVE PROGRESS — read from the engine's own published progress
   // store and the run's identity. The hook adds no count, no stage and no
   // percentage of its own: it ticks a clock while the run is in flight and
@@ -717,7 +720,7 @@ export default function AdiOptimisationJourney({
   });
   // The improvement the DESIGNER approves: the review owns the only Apply for it,
   // and its own "keep current design" applies nothing at all.
-  const improvementReviewActive = !latestRunFailed && improvementResult.caseKey === IMPROVEMENT_CASE.REVIEW;
+  const improvementReviewActive = !latestRunOwnsMessage && improvementResult.caseKey === IMPROVEMENT_CASE.REVIEW;
 
   // ── THE BEFORE/AFTER COMPARISON CARDS ──
   // Structured metric pairs (P20, P19) for the pending, applied-by-user and
@@ -732,7 +735,7 @@ export default function AdiOptimisationJourney({
     placement,
     planView,
   });
-  const showImprovementCards = !latestRunFailed && improvementCards != null;
+  const showImprovementCards = !latestRunOwnsMessage && improvementCards != null;
 
   // ── THE OLD CANDIDATE MOVES TO ENGINEER DETAILS ──
   // The candidate a previous run evaluated is not a recommendation in this state:
@@ -936,17 +939,17 @@ export default function AdiOptimisationJourney({
         // applied — in place of the generic evaluation line. When the comparison
         // cards carry the decision, the verbose message, adjustment, benefit and
         // comparison lines are suppressed so nothing is stated twice.
-        message={latestRunFailed ? journey.message : jointReceiptOwnsPanel
+        message={latestRunOwnsMessage ? (journey.message || "The optimisation could not complete.") : jointReceiptOwnsPanel
           ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.")
           : (showImprovementCards ? null : (improvementResult.headlineSentence || journey.message))}
         nextAction={showImprovementCards ? null : (presentation?.nextAction || null)}
         // In the trade-off state the decision IS the trade-off: the change, the
         // seat it would cost and the measurable trade replace the ordinary
         // adjustment/benefit/comparison lines, which would state it as an offer.
-        tradeOff={!latestRunFailed && tradeOff?.isTradeOff ? tradeOff : null}
-        adjustment={latestRunFailed || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.adjustment}
-        benefit={latestRunFailed || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.benefit}
-        comparison={latestRunFailed || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.comparison}
+        tradeOff={!latestRunOwnsMessage && tradeOff?.isTradeOff ? tradeOff : null}
+        adjustment={latestRunOwnsMessage || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.adjustment}
+        benefit={latestRunOwnsMessage || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.benefit}
+        comparison={latestRunOwnsMessage || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.comparison}
         designLimitation={designLimitation}
         previousCandidateNotice={previousCandidate && !tradeOff ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
         staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
@@ -985,7 +988,7 @@ export default function AdiOptimisationJourney({
         )}
 
         {!tradeOffActive && !tradeOffSettled && (<>
-        <PlacementRecommendationPanel
+        {!latestRunOwnsMessage && <PlacementRecommendationPanel
           placement={placement}
           busy={isRunning}
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
@@ -996,7 +999,7 @@ export default function AdiOptimisationJourney({
           // overlapping run cannot be launched from here either.
           onRerun={isRunning || optimiserRunOwnsRetry ? null : onRunOptimisationPlan}
           variant="actions"
-        />
+        />}
 
         {/* THE IMPROVEMENT'S OWN TWO CONTROLS — the review, which owns the ONE
             deliberate Apply for this change, and the designer's own "keep current
