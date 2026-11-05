@@ -112,6 +112,8 @@ import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { evaluateAndRecordSpeaker } from "@/components/room/placementZone/usePlacementWarnings";
+import { clearAllPlacementWarnings } from "@/components/room/placementZone/placementWarningStore";
 
 import {
   SIDE_ALLOW_OVERHANG,
@@ -1512,6 +1514,23 @@ const byId = useEntitiesById({
     if (!draftSpeakersRef.current || !onSetSpeakers) return;
     const draftSpeakers = draftSpeakersRef.current;
     const draftMap = new Map(draftSpeakers.map(s => [getSpeakerSelectionKey(s), s]));
+    // Placement-zone warning: evaluate the dragged speaker at its final,
+    // release-clamped draft position before the draft is cleared. This catches
+    // the overhead / front-wide release snap that can move a speaker back inside
+    // its zone, clearing a warning that the live-drag evaluation started.
+    if (dragType === 'speaker' && draggedItemId) {
+      const draggedDraft = draftSpeakers.find(s => s.id === draggedItemId);
+      if (draggedDraft) {
+        evaluateAndRecordSpeaker(draggedDraft, {
+          placedSpeakers,
+          seatingPositions,
+          dimensions: { widthM, lengthM, heightM },
+          mlpPoint: mlp,
+          screenFrontPlaneM,
+          getSpeakerModelMeta,
+        });
+      }
+    }
     onSetSpeakers(prev =>
       prev.map(s => {
         const draft = draftMap.get(getSpeakerSelectionKey(s));
@@ -1525,7 +1544,30 @@ const byId = useEntitiesById({
         };
       })
     );
-  }, [onSetSpeakers]);
+  }, [onSetSpeakers, dragType, draggedItemId, placedSpeakers, seatingPositions, widthM, lengthM, heightM, mlp, screenFrontPlaneM]);
+
+  // Placement-zone warning — live drag feedback. While a speaker is being
+  // dragged in Plan View, evaluate its draft position on every drag tick and
+  // record the verdict. This starts the five-second highlight the moment the
+  // speaker leaves its zone, restarts it on each further move while outside,
+  // and clears it immediately when the speaker is dragged back inside. It only
+  // runs while a real speaker drag is in progress, so opening a saved project
+  // with speakers already outside their zones never triggers a warning.
+  useEffect(() => {
+    if (dragType !== 'speaker' || !draggedItemId) return;
+    const draft = draftSpeakersRef.current;
+    if (!Array.isArray(draft)) return;
+    const spk = draft.find(s => s.id === draggedItemId);
+    if (!spk) return;
+    evaluateAndRecordSpeaker(spk, {
+      placedSpeakers,
+      seatingPositions,
+      dimensions: { widthM, lengthM, heightM },
+      mlpPoint: mlp,
+      screenFrontPlaneM,
+      getSpeakerModelMeta,
+    });
+  }, [speakerDragTick, draggedItemId, dragType, placedSpeakers, seatingPositions, widthM, lengthM, heightM, mlp, screenFrontPlaneM]);
 
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({

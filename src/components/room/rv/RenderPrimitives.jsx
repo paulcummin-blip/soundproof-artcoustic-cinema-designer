@@ -117,6 +117,8 @@ export function targetMlpY57_5(screen, roomFrontY = 0) {
 }
 
 // ---- Render primitives ----
+export const PLACEMENT_WARNING_COLOR = "#4A230F";
+
 export const SpeakerIcon = React.memo(function SpeakerIcon({
   speaker,
   canvasX,
@@ -132,9 +134,10 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   onIconLeave,
   onIconClick,
   tvPresetKey,
+  placementWarning = false,
 }) {
   const { model, role, id } = speaker || {};
-  
+
   // Resolve tvPresetKey: prefer the prop (passed by caller), fall back to appState
   const appState = useAppState();
   const resolvedTvPresetKey = appState?.screen?.tvPresetKey ?? tvPresetKey ?? null;
