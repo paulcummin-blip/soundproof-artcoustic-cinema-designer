@@ -1051,6 +1051,7 @@ function RoomDesignerWithState() {
     soundbarSelections,
     acousticTreatmentEnabled: appState?.acousticTreatmentEnabled ?? false,
     selectedAbfuserQty: includedAbfuserQty,
+    screen: _screen,
   });
 
   const publishedPriceData = useMemo(() => ({

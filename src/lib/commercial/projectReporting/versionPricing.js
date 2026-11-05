@@ -73,6 +73,27 @@ export function buildVersionPricingInputs({ designState = null, legacyProject = 
   const instances = safeArray(pick(['subwooferInstances'], ['subwooferInstances'], []));
   const legacySubs = safeArray(pick(['subwoofers'], ['subwoofers'], []));
 
+  // Reconstruct the screen object the cabinet-variant resolver reads, from the
+  // flat screen fields the design state stores — so reports resolve the SAME
+  // installed cabinet length the Room Designer does, and a version's price
+  // follows its drawing rather than a separate dropdown selection.
+  const manualConfig = safeObject(pick(['screen_manual_config'], ['screen_manual_config'], null));
+  const screen = {
+    visibleWidthInches: Number(pick(['screen_size'], ['screen_size'], 0)) || undefined,
+    aspectRatio: pick(['aspect_ratio'], ['aspect_ratio'], '16:9'),
+    tvPresetKey: pick(['tv_preset_key'], ['tv_preset_key'], null),
+    tvWidthMm: pick(['tv_width_mm'], ['tv_width_mm'], null),
+    borderThicknessM: Number(pick(['border_thickness_m'], ['border_thickness_m'], 0.08)) || 0.08,
+    manualSize: manualConfig || (pick(['manual_dimensions'], ['manual_dimensions'], false)
+      ? {
+        enabled: true,
+        mode: 'wh',
+        widthM: Number(pick(['manual_width_m'], ['manual_width_m'], 0)) || undefined,
+        heightM: Number(pick(['manual_height_m'], ['manual_height_m'], 0)) || undefined,
+      }
+      : undefined),
+  };
+
   return {
     placedSpeakers,
     manualExtras,
@@ -84,6 +105,7 @@ export function buildVersionPricingInputs({ designState = null, legacyProject = 
     rearSubsCfg: safeObject(pick(['rear_subs_cfg'], ['rear_subs_cfg'], null)),
     subwooferInstances: instances,
     legacySubwoofers: legacySubs,
+    screen,
     hasDesignState: Object.keys(state).length > 0,
   };
 }
@@ -209,6 +231,7 @@ export function deriveVersionPricing({ designState = null, legacyProject = null,
     acousticTreatmentEnabled: index === 0 ? inputs.acousticTreatmentEnabled : false,
     selectedAbfuserQty: index === 0 ? inputs.selectedAbfuserQty : 0,
     soundbarSelections: {},
+    screen: inputs.screen || null,
     priceMap: priceContext.priceMap || null,
     soundbarOptions: priceContext.soundbarOptions || null,
     priceListAvailable: priceContext.priceListAvailable === true,

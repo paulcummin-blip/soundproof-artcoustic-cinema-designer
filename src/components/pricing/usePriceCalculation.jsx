@@ -24,6 +24,7 @@ export function usePriceCalculation({
   soundbarSelections = {},
   acousticTreatmentEnabled = false,
   selectedAbfuserQty = 0,
+  screen = null,
 }) {
   const { user } = useAuth();
   const territory = user?.territory || DEFAULT_TERRITORY;
@@ -51,5 +52,6 @@ export function usePriceCalculation({
     territoryCode: territory,
     territoryLabel: territoryConfig?.label ?? null,
     currency: territoryConfig?.currency ?? null,
-  }), [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory, acousticTreatmentEnabled, selectedAbfuserQty, priceMap, soundbarOptions, priceMapLoading, territoryConfig?.label, territoryConfig?.currency]);
+    screen,
+  }), [placedSpeakers, frontSubsCfg, rearSubsCfg, difficultyMultiplier, priceMode, manualExtras, soundbarSelections, priceListAvailable, territory, acousticTreatmentEnabled, selectedAbfuserQty, priceMap, soundbarOptions, priceMapLoading, territoryConfig?.label, territoryConfig?.currency, screen]);
 }
