@@ -22,6 +22,7 @@ import {
   publishHydratedStage2,
   markStage2Idle,
   markStage2Waiting,
+  adoptStage2Request,
 } from "./stage2PlacementStore";
 import { hydrateStage2PlacementCache, isStage2CacheValid, isRawTransferCacheValid } from "./stage2PlacementPersistence";
 import { setCachedRawTransfer } from "./stage2RawTransferCache";
@@ -302,7 +303,10 @@ export function useStage2PlacementOptimiser({
 
     // If the current state already has this fingerprint and is complete, skip
     const current = getStage2State(projectId, versionId);
-    if (current.status === "complete" && current.fingerprint === fingerprint) return;
+    if (current.status === "complete" && current.fingerprint === fingerprint) {
+      adoptStage2Request(projectId, versionId, requestId);
+      return;
+    }
 
     // Build promotion plan from Stage 1 finalists
     const promotionPlan = buildPromotionPlan({
@@ -341,6 +345,7 @@ export function useStage2PlacementOptimiser({
       quantityOrder,
       scopeQuantity,
       delay: STAGE2_START_DELAY_MS,
+      ownerRequestId: requestId,
     });
   }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW]); // eslint-disable-line react-hooks/exhaustive-deps
 
