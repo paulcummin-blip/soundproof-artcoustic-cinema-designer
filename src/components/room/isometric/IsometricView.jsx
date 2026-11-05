@@ -24,6 +24,7 @@ import {
 import { buildHeadMesh } from "./buildHeadMesh";
 import { useSavedReportView } from "./useSavedReportView";
 import { saveReportView } from "./isometricReportViewStore";
+import IsometricDimensionOverlays from "./IsometricDimensionOverlays";
 
 // Orbit limits — keep the dealer above the floor and outside the room volume.
 const MIN_POLAR_DEG = 5;     // near top-down limit
@@ -56,6 +57,7 @@ export default function IsometricView({
   getSpeakerVisibility = null,
   projectId = null,
   versionId = null,
+  showRoomDims = false,
 }) {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
@@ -86,8 +88,9 @@ export default function IsometricView({
       dolbyLayout,
       getSpeakerVisibility,
       showRspMarker,
+      showRoomDims,
     }),
-    [appState, stableDimensions, placedSpeakers, seatingPositions, mlpPoint, screen, roomElements, dolbyLayout, getSpeakerVisibility, showRspMarker],
+    [appState, stableDimensions, placedSpeakers, seatingPositions, mlpPoint, screen, roomElements, dolbyLayout, getSpeakerVisibility, showRspMarker, showRoomDims],
   );
 
   // ---- Renderer / scene setup (once) ----
@@ -407,6 +410,17 @@ export default function IsometricView({
 
       {/* The 3D canvas mount */}
       <div ref={mountRef} style={{ width: "100%", height: "100%", touchAction: "none" }} />
+
+      {/* Room dimension overlays — controlled by the same overlays.ROOM_DIMS
+          toggle that controls Plan View dimensions. Rendered as SVG projected
+          from live camera coordinates so they track the room during orbit/zoom. */}
+      {showRoomDims && sceneData?.roomDims && (
+        <IsometricDimensionOverlays
+          roomDims={sceneData.roomDims}
+          cameraRef={cameraRef}
+          rendererRef={rendererRef}
+        />
+      )}
 
       {/* Loading / empty hint */}
       {!sceneData?.roomDims && (

@@ -2313,6 +2313,7 @@ function RoomDesignerWithState() {
                     getSpeakerVisibility={appState?.getSpeakerVisibility}
                     projectId={resolvedProjectId}
                     versionId={appState?.activeVersionId || null}
+                    showRoomDims={!!_overlays?.ROOM_DIMS}
                   />
                 )}
 

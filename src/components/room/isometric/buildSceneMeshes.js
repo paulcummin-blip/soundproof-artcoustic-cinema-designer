@@ -92,12 +92,14 @@ export function buildRoomShell(roomDims) {
 
   // Walls — transparent shells. depthWrite OFF + explicit renderOrder prevents
   // the depth-buffer popping that makes coplanar transparent surfaces flicker as
-  // the camera orbits. side: BackSide avoids the DoubleSide overdraw that doubles
-  // the transparent blend and worsens sort instability; the interior surface is
-  // the one we want visible from outside the cutaway shell.
+  // the camera orbits. DoubleSide so ALL four walls (including the front wall)
+  // remain visible from inside and outside as the camera orbits — the room
+  // reads as a complete transparent enclosure, never an open three-wall box.
+  // DoubleSide doubles the transparent blend on the near face, but with
+  // depthWrite:false + explicit renderOrder bands the sort stays stable.
   const wallMat = new THREE.MeshStandardMaterial({
     color: 0xFFFFFF, roughness: 0.9, transparent: true, opacity: 0.12,
-    side: THREE.BackSide, depthWrite: false,
+    side: THREE.DoubleSide, depthWrite: false,
   });
   const wallEdgeMat = new THREE.LineBasicMaterial({ color: ROOM_EDGE, transparent: true, opacity: 0.7, depthWrite: false });
 
@@ -122,15 +124,22 @@ export function buildRoomShell(roomDims) {
   makeWall(L, H, 0, H / 2, L / 2, -Math.PI / 2);
   // Right wall (x=W).
   makeWall(L, H, W, H / 2, L / 2, Math.PI / 2);
-  // Front wall (y=0) — drawn fainter, mostly open toward camera.
+  // Front wall (y=0) — same DoubleSide treatment as the other walls so it
+  // remains visible from every isometric angle. Lower opacity than the other
+  // walls keeps the front (screen-side) slightly more open toward camera.
   const frontWallMat = new THREE.MeshStandardMaterial({
-    color: 0xFFFFFF, roughness: 0.9, transparent: true, opacity: 0.05,
-    side: THREE.BackSide, depthWrite: false,
+    color: 0xFFFFFF, roughness: 0.9, transparent: true, opacity: 0.08,
+    side: THREE.DoubleSide, depthWrite: false,
   });
   const frontWall = new THREE.Mesh(new THREE.PlaneGeometry(W, H), frontWallMat);
   frontWall.position.set(W / 2, H / 2, 0);
   frontWall.renderOrder = RENDER_ORDER_WALLS;
   group.add(frontWall);
+  // Front wall edge for readability.
+  const frontEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, H, 0.001)), wallEdgeMat);
+  frontEdges.position.set(W / 2, H / 2, 0);
+  frontEdges.renderOrder = RENDER_ORDER_WALL_EDGES;
+  group.add(frontEdges);
 
   return group;
 }

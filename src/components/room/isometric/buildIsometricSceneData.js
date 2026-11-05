@@ -309,6 +309,7 @@ export function buildIsometricSceneData({
   dolbyLayout,
   getSpeakerVisibility,
   showRspMarker = true,
+  showRoomDims = false,
 }) {
   const roomDims = resolveRoomDims(appState, stableDimensions);
   const screenData = buildScreenMeshData({ screen, appStateFrontPlaneM: appState?.screenFrontPlaneM });
@@ -325,5 +326,6 @@ export function buildIsometricSceneData({
     heads: buildHeadMeshData({ seatingPositions, mlpPoint, screen, roomDims }),
     roomElements: buildRoomElementMeshData({ roomElements, roomDims }),
     showRspMarker,
+    showRoomDims,
   };
 }

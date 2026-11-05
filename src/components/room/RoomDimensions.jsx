@@ -197,7 +197,7 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
         <div style={groupTitleStyle}>Plan Overlays</div>
         <div className="space-y-3">
           <PlanDisplayToggle
-            label="Show room dimensions on plan"
+            label="Show room dimensions"
             checked={!!overlays?.ROOM_DIMS}
             onChange={handleRoomDimsToggle}
             disabled={disabled}
