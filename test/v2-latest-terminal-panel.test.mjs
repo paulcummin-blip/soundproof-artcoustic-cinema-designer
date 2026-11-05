@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import Journey from "../src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
+import { register } from "node:module";
+// Authentication only gates developer details; no account/network is needed for rendering.
+register("data:text/javascript," + encodeURIComponent(`export async function resolve(s,c,next) {
+  if(s.includes("AuthContext")) return {url:"data:text/javascript,export function useAuth(){return {user:null}}",shortCircuit:true};
+  return next(s,c);
+}`), import.meta.url);
+const {default:Journey} = await import("../src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
 
 for (const state of ["failed","no_useful_improvement"]) {
   test(state+" owns the panel over an existing applied receipt",()=>{
