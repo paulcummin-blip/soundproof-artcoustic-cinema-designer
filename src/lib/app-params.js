@@ -20,14 +20,15 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 		window.history.replaceState({}, document.title, newUrl);
 	}
 	if (searchParam) {
-		storage.setItem(storageKey, searchParam);
+		try { storage.setItem(storageKey, searchParam); } catch { /* storage full or unavailable */ }
 		return searchParam;
 	}
 	if (defaultValue) {
-		storage.setItem(storageKey, defaultValue);
+		try { storage.setItem(storageKey, defaultValue); } catch { /* storage full or unavailable */ }
 		return defaultValue;
 	}
-	const storedValue = storage.getItem(storageKey);
+	let storedValue = null;
+	try { storedValue = storage.getItem(storageKey); } catch { /* storage unavailable */ }
 	if (storedValue) {
 		return storedValue;
 	}
