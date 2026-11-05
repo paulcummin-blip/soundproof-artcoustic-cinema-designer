@@ -71,7 +71,7 @@ function compactRuntimeBreakdown(rows) {
   if (rows && !Array.isArray(rows) && typeof rows === "object") {
     rows = [
       ...Object.entries(rows.measuredStages || rows.stages || {}).map(([key, value]) => ({ key, label: key, value })),
-      ...["runId", "totalWallClockMs", "counts", "stage2", "transferCache", "repeatedConfirmations", "timings", "publication"]
+      ...["runId", "totalWallClockMs", "counts", "stage2", "stage2Terminal", "transferCache", "repeatedConfirmations", "timings", "publication"]
         .filter(key => rows[key] != null)
         .map(key => ({ key, label: key, value: typeof rows[key] === "object" ? JSON.stringify(rows[key]) : rows[key] })),
     ];
