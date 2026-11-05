@@ -68,6 +68,7 @@ export function markBassHeavyActionError(projectId, versionId, requestId, error)
   if (current.requestId !== requestId) return current;
   return publish(projectId, versionId, {
     status: "error",
+    completedAtMs: Date.now(),
     error: error || "Bass option analysis could not be completed.",
   });
 }
@@ -75,7 +76,7 @@ export function markBassHeavyActionError(projectId, versionId, requestId, error)
 export function cancelBassHeavyAction(projectId, versionId, reason = "cancelled") {
   const current = getBassHeavyAction(projectId, versionId);
   if (!current.requestId || ["idle", "cancelled"].includes(current.status)) return current;
-  return publish(projectId, versionId, { status: "cancelled", error: reason });
+  return publish(projectId, versionId, { status: "cancelled", error: reason, completedAtMs: Date.now() });
 }
 
 export function useBassHeavyAction(projectId, versionId) {
