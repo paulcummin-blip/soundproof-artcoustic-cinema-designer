@@ -15,7 +15,10 @@
 // The existing engineering workflow (Calculate + Improve Bass Response V2) is
 // retained behind an Advanced Diagnostics toggle.
 
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
+import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
+import { useLatestOptimiserRun } from "../optimiserPlan/optimiserRunAuthority.js";
 import { useSyncExternalStore } from "react";
 import { Sparkles, CheckCircle2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
@@ -280,6 +283,15 @@ export default function OptimiseAndCalculate({
     appState,
     hasCanonicalInstances,
     waitForCurrentPublication,
+  });
+  const savedJointPlan = useOptimiserPlanAuthority(projectId, versionId);
+  const latestJointRun = useLatestOptimiserRun(projectId, versionId);
+  const [jointOperation, setJointOperation] = useState(null);
+  const jointReceiptState = resolveCrossoverReceiptState({
+    record: appState?.splConfig?.crossoverRecommendation, plan: savedJointPlan,
+    latestRun: latestJointRun, versionId, projectId, fingerprint: shared?.cacheKey,
+    operation: jointOperation, runStatus: planRunStatus,
+    calculationInProgress: shared?.calculationInProgress,
   });
   // hasActiveJob: composite of independent job-tracking signals (not an alias
   // of isBusy or calculationInProgress). Observes whether ANY real cancellable
@@ -1304,6 +1316,7 @@ export default function OptimiseAndCalculate({
       {hasResults && (
         <div className={`mt-3 ${shared?.placementPreviewActive ? "opacity-45" : ""}`}>
           <AdiRecommendation
+            jointReceiptState={jointReceiptState}
             autoApplied={workflowState.autoApplied}
             v2State={v2State}
             completedBassAuthority={shared?.completedBassAuthority}
@@ -1351,6 +1364,10 @@ export default function OptimiseAndCalculate({
       )}
 
       <CrossoverRecommendation
+        receiptState={jointReceiptState}
+        onOperationChange={setJointOperation}
+        projectId={projectId}
+        producingPlan={savedJointPlan}
         candidate={v2State?.combinedResult}
         diagnostics={v2State?.combinedDiagnostics}
         shared={shared}
