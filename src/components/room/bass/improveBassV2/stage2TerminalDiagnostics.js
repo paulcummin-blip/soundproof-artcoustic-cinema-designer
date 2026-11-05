@@ -2,7 +2,10 @@
 const KEY = "sp.stage2-terminal.v1";
 let memory = [];
 export function readStage2TerminalDiagnostics() {
-  try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return memory; }
+  try {
+    const stored = JSON.parse(localStorage.getItem(KEY) || "[]");
+    return [...new Map([...stored, ...memory].map(record => [record.runId, record])).values()].slice(-20);
+  } catch { return memory; }
 }
 export function saveStage2TerminalDiagnostics(record) {
   memory = [...readStage2TerminalDiagnostics().filter(r => r.runId !== record.runId), record].slice(-20);
