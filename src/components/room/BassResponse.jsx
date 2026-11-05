@@ -469,6 +469,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const roomPreviewActive = sharedBassResults?.roomPreviewActive === true;
   const roomPreviewExclusive = sharedBassResults?.roomPreviewExclusive === true;
   const placementPreviewResult = sharedBassResults?.roomPreviewResult || sharedBassResults?.placementPreviewResult || null;
+  const roomPreviewUpdating = sharedBassResults?.roomPreviewUpdating === true;
 
   // Graph interaction store — bidirectional pill ↔ graph ↔ seat selection.
   // When a designer clicks a seat pill in PerSeatResults or a P20 seat pill,
@@ -1017,6 +1018,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               <span style={{ color: "#B45309" }}>Preview available at the RSP only.</span>
             )}
             {previousResultFadedSeries && <span style={{ color: "#6B7280" }}>━━ Previous result — out of date</span>}
+            {roomPreviewUpdating && (
+              <span style={{ color: "#16A34A" }} className="inline-flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
+                Updating…
+              </span>
+            )}
           </div>}
           {effectiveVisibleSeries.length > 0 ? (
             <>

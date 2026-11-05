@@ -2392,9 +2392,21 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
   }, [completedBassAuthority?.contract?.bassResult?.seatResults?.P19, seatingPositions]);
 
-  const roomPreviewResult = roomPreviewActive && normalizedLive.status === "ready" && normalizedLive.result
+  // Keep the last valid preview curve visible while another calculation is
+  // running. The hook retains the last accepted result in `result` across a
+  // "calculating" status, so the green curve stays on the graph instead of
+  // disappearing when a newer geometry triggers a recompute. `roomPreviewUpdating`
+  // signals that the visible curve is for a previous geometry snapshot and a
+  // newer one is in flight — the graph shows a subtle updating indication
+  // rather than removing or obscuring the curve.
+  // The plotted response corresponds to the selected listener position (RSP or
+  // focused seat) via resolvePreviewCurve; when seats move but the RSP stays
+  // fixed, the RSP curve is unchanged, so retaining it creates no false
+  // expectation of an RSP response change.
+  const roomPreviewResult = roomPreviewActive && normalizedLive.result
     ? normalizedLive.result
     : null;
+  const roomPreviewUpdating = roomPreviewActive && normalizedLive.isUpdating === true;
   const placementPreviewResult = roomPreviewResult;
   // ── Presentation-only display authority overlay ──────────────────────
   // On a cached P14 target switch, visibleCachedContract (and thus
@@ -2478,6 +2490,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         captureEligible,
         captureEligibilityDebug,
       };
-  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult, roomPreviewActive, roomPreviewExclusive, roomPreviewResult });
+  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult, roomPreviewActive, roomPreviewExclusive, roomPreviewResult, roomPreviewUpdating });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }

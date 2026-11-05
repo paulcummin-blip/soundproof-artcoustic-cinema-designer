@@ -2,7 +2,8 @@
 // normalized room-transfer engine, with a two-stage calculation.
 //
 // Stage 1 — Interactive preview:
-//   - Starts after ~50 ms debounce.
+//   - Starts after ~50 ms debounce (coalesced — a single timer fires with the
+//     latest geometry, it is NOT reset by intermediate drag coordinates).
 //   - Uses the same modal/direct acoustic engine with reflections disabled
 //     (image-source refinement off). Modal frequencies, source summation,
 //     phase, seat handling and source-position physics are unchanged.
@@ -19,18 +20,26 @@
 // room-response curve. The previous valid curve stays visible while the next
 // preview or refinement runs.
 //
+// PERSISTENT PREVIEW WORKER + IN-FLIGHT/PENDING SCHEDULING:
+//   The preview worker is created once and NEVER terminated when geometry
+//   changes. Terminating an executing preview every time a newer drag coordinate
+//   arrives caused worker starvation during continuous dragging. Instead:
+//     • At most ONE preview request is in flight.
+//     • At most ONE replaceable pending request holds the latest geometry
+//       snapshot. Intermediate movements replace the pending request; they do
+//       not terminate the in-flight computation.
+//     • When the in-flight request completes, its result is accepted only when
+//       BOTH generation and fingerprint match the current values. Otherwise it
+//       is discarded and the latest pending geometry is posted.
+//   The refinement worker is still terminated immediately when geometry
+//   changes, so a long refinement never delays the next interactive preview.
+//
 // Race protection uses a single geometry generation counter shared across both
 // stages. The generation is incremented immediately when geometry changes.
 // Preview and refined results are accepted only when BOTH generation and
 // fingerprint match the current values. A refined result may replace a preview
 // only for the same fingerprint (same generation). Older refinement results
-// never overwrite a newer preview. Model-only changes (same fingerprint) queue
-// neither preview nor refinement.
-//
-// Worker blocking prevention: separate preview and refinement workers are used.
-// The refinement worker is terminated immediately when geometry changes, so a
-// long refinement never delays the next interactive preview. The preview worker
-// is reused across calculations. Both workers are terminated on unmount.
+// never overwrite a newer preview.
 //
 // The fingerprint is truly product-independent: it excludes model key, product
 // curve, product capability, product-derived source IDs, requested SPL, EQ
@@ -98,7 +107,9 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   const [previewDurationMs, setPreviewDurationMs] = useState(null);
   const [refinementDurationMs, setRefinementDurationMs] = useState(null);
 
-  // Preview worker — reused across calculations (fast, short-lived jobs).
+  // Preview worker — created once and NEVER terminated when geometry changes.
+  // A stale in-flight preview is discarded by the generation check in onmessage,
+  // never by termination. Terminated only on unmount.
   const previewWorkerRef = useRef(null);
   // Refinement worker — terminated on geometry change, recreated on next refinement.
   const refinementWorkerRef = useRef(null);
@@ -112,9 +123,18 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   // to be accepted.
   const currentFingerprintRef = useRef(null);
 
-  // Active posted requests { generation, fingerprint }. Set when a worker is
-  // posted, cleared immediately when a newer generation supersedes it.
+  // The currently in-flight preview request { generation, fingerprint }. Set
+  // when a preview is posted, cleared when its response is handled.
   const activePreviewRequestRef = useRef(null);
+  // The single replaceable pending preview request: the latest geometry
+  // snapshot waiting for the in-flight preview to complete. Intermediate
+  // movements replace this; only the latest is ever posted.
+  const previewPendingRef = useRef(null);
+  // Latest preview payload (basePayload + previewPhysicsOptions), updated on
+  // every geometry change so the coalesced debounce timer fires with the
+  // newest geometry rather than the one that armed the timer.
+  const previewPayloadRef = useRef(null);
+
   const activeRefinementRequestRef = useRef(null);
 
   const previewTimerRef = useRef(null);
@@ -181,7 +201,26 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     [physicsOptions]
   );
 
-  // Lazily create the preview worker (reused across calculations).
+  // Post the latest pending preview request (the single replaceable snapshot).
+  // Strict generation/fingerprint check: a pending request that no longer
+  // matches the current geometry is dropped, never posted. Returns true when a
+  // request was actually posted.
+  const dispatchPendingPreview = useCallback(() => {
+    const pending = previewPendingRef.current;
+    previewPendingRef.current = null;
+    if (!pending) return false;
+    if (pending.generation !== geometryGenerationRef.current) return false;
+    if (pending.fingerprint !== currentFingerprintRef.current) return false;
+    const worker = previewWorkerRef.current;
+    if (!worker) return false;
+    activePreviewRequestRef.current = { generation: pending.generation, fingerprint: pending.fingerprint };
+    setRequestedAt(Date.now());
+    worker.postMessage(pending.message);
+    return true;
+  }, []);
+
+  // Lazily create the preview worker (reused across calculations, never
+  // terminated on geometry change).
   const ensurePreviewWorker = useCallback(() => {
     if (!previewWorkerRef.current && typeof Worker !== "undefined") {
       previewWorkerRef.current = new Worker(
@@ -191,14 +230,25 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       previewWorkerRef.current.onmessage = (e) => {
         const msg = e.data || {};
         const active = activePreviewRequestRef.current;
-        // Race protection: accept only when generation AND fingerprint match
-        // the current values. An old preview from a previous generation is
-        // discarded even if it completes during the debounce.
+
+        // No active request — nothing to do (should not happen, defensive).
         if (!active) return;
-        if (msg.generation !== active.generation) return;
-        if (msg.fingerprint !== active.fingerprint) return;
-        if (active.fingerprint !== currentFingerprintRef.current) return;
-        if (active.generation !== geometryGenerationRef.current) return;
+
+        // Race protection: accept only when generation AND fingerprint match
+        // the current values. A stale result from a superseded generation is
+        // discarded, the in-flight slot is cleared, and the latest pending
+        // geometry is posted. The in-flight computation is NEVER terminated
+        // mid-flight — it completes and is discarded here.
+        const stale = msg.generation !== active.generation
+          || msg.fingerprint !== active.fingerprint
+          || active.fingerprint !== currentFingerprintRef.current
+          || active.generation !== geometryGenerationRef.current;
+
+        if (stale) {
+          activePreviewRequestRef.current = null;
+          dispatchPendingPreview();
+          return;
+        }
 
         if (msg.type === "complete") {
           // A preview is accepted only if no refined result for this generation
@@ -206,12 +256,17 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
           // same generation, if lastValidGenerationRef === active.generation and
           // lastValidQualityRef === "refined", the refined result is newer — skip.
           if (lastValidGenerationRef.current === active.generation &&
-              lastValidQualityRef.current === "refined") return;
+              lastValidQualityRef.current === "refined") {
+            activePreviewRequestRef.current = null;
+            dispatchPendingPreview();
+            return;
+          }
 
           lastValidResultRef.current = msg.result;
           lastValidFingerprintRef.current = active.fingerprint;
           lastValidQualityRef.current = "preview";
           lastValidGenerationRef.current = active.generation;
+          activePreviewRequestRef.current = null;
           setResult(msg.result);
           setQuality("preview");
           setPreviewDurationMs(msg.result?.calculationDurationMs ?? null);
@@ -219,21 +274,59 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
           setCompletedAt(Date.now());
           setErrorMessage(null);
           setStatus("ready");
+          // After accepting, if a newer geometry is pending, dispatch it now.
+          dispatchPendingPreview();
         } else if (msg.type === "error") {
+          activePreviewRequestRef.current = null;
           setErrorMessage(msg.error || "Unknown error");
           setStatus("error");
+          // Even on error, try to process the latest pending geometry so a
+          // transient failure does not stall continuous dragging.
+          dispatchPendingPreview();
         }
       };
       previewWorkerRef.current.onerror = (e) => {
         const active = activePreviewRequestRef.current;
         if (!active || active.fingerprint !== currentFingerprintRef.current ||
-            active.generation !== geometryGenerationRef.current) return;
+            active.generation !== geometryGenerationRef.current) {
+          activePreviewRequestRef.current = null;
+          dispatchPendingPreview();
+          return;
+        }
+        activePreviewRequestRef.current = null;
         setErrorMessage(e?.message || "Preview worker error");
         setStatus("error");
+        dispatchPendingPreview();
       };
     }
     return previewWorkerRef.current;
-  }, []);
+  }, [dispatchPendingPreview]);
+
+  // Post a preview for the LATEST geometry (read from refs). Used by the
+  // coalesced debounce timer so a single timer fires with the newest geometry
+  // rather than the one that armed it.
+  const postLatestPreview = useCallback(() => {
+    previewTimerRef.current = null;
+    const fp = currentFingerprintRef.current;
+    const gen = geometryGenerationRef.current;
+    if (!fp) return;
+    const payload = previewPayloadRef.current;
+    if (!payload) return;
+    // If a preview is already in flight, the effect will have stored the
+    // pending request; the debounce must not post a second in-flight.
+    if (activePreviewRequestRef.current) return;
+    const worker = ensurePreviewWorker();
+    if (!worker) return;
+    const message = {
+      generation: gen,
+      fingerprint: fp,
+      quality: "preview",
+      payload: { ...payload.basePayload, physicsOptions: payload.previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
+    };
+    activePreviewRequestRef.current = { generation: gen, fingerprint: fp };
+    setRequestedAt(Date.now());
+    worker.postMessage(message);
+  }, [ensurePreviewWorker]);
 
   // Create a fresh refinement worker. The previous one is terminated on
   // geometry change, so this always creates a new instance when needed.
@@ -285,46 +378,60 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   }, []);
 
   // Main effect: when the fingerprint changes, increment the generation,
-  // cancel all in-flight work, then start preview and refinement timers.
+  // cancel in-flight REFINEMENT only, then schedule preview and refinement.
+  // The preview worker is NOT terminated — a stale in-flight preview is
+  // discarded by the generation check in onmessage, and the latest pending
+  // geometry is posted when it completes.
   useEffect(() => {
-    // Clear both debounce timers.
-    if (previewTimerRef.current) {
-      clearTimeout(previewTimerRef.current);
-      previewTimerRef.current = null;
-    }
+    // Clear the refinement debounce only. The preview debounce is coalesced
+    // (see below) and is NOT cleared here — a single timer fires with the
+    // latest geometry.
     if (refinementTimerRef.current) {
       clearTimeout(refinementTimerRef.current);
       refinementTimerRef.current = null;
     }
 
     // IMMEDIATELY increment the geometry generation and store the new fingerprint.
-    // This invalidates any in-flight preview or refinement response — they will
-    // fail the generation check in onmessage and be discarded.
+    // This invalidates any in-flight preview response — it will fail the
+    // generation check in onmessage and be discarded, then the latest pending
+    // geometry is posted.
     const gen = ++geometryGenerationRef.current;
     currentFingerprintRef.current = geometryFingerprint;
 
-    // Manual authority: terminate both workers when the request identity or
-    // geometry changes. A stale preview must not keep consuming CPU while the
-    // designer continues dragging.
-    if (previewWorkerRef.current) {
-      previewWorkerRef.current.terminate();
-      previewWorkerRef.current = null;
-    }
+    // Terminate the REFINEMENT worker only. The preview worker stays persistent
+    // during continuous dragging — terminating it mid-computation causes worker
+    // starvation.
     if (refinementWorkerRef.current) {
       refinementWorkerRef.current.terminate();
       refinementWorkerRef.current = null;
     }
-    activePreviewRequestRef.current = null;
     activeRefinementRequestRef.current = null;
     setIsRefining(false);
 
+    // Store the latest payload so the coalesced debounce timer and any pending
+    // request carry the newest geometry, not the one that armed the timer.
+    const basePayload = { ...canonicalInputs, subsForSimulation };
+    previewPayloadRef.current = { basePayload, previewPhysicsOptions };
+
     if (!geometryFingerprint || !analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== geometryFingerprint) {
+      // Invalid — clear any pending preview and the debounce timer. An in-flight
+      // preview (if any) completes later and is discarded by the generation check.
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = null;
+      }
+      previewPendingRef.current = null;
       setStatus("idle");
       return;
     }
 
     // Same fingerprint as the last completed result — no work needed.
     if (lastValidFingerprintRef.current === geometryFingerprint && lastValidResultRef.current) {
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = null;
+      }
+      previewPendingRef.current = null;
       setStatus("ready");
       setResult(lastValidResultRef.current);
       setQuality(lastValidQualityRef.current);
@@ -335,28 +442,34 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     setStatus("calculating");
 
     const fp = geometryFingerprint;
-    const basePayload = { ...canonicalInputs, subsForSimulation };
+    const message = {
+      generation: gen,
+      fingerprint: fp,
+      quality: "preview",
+      payload: { ...basePayload, physicsOptions: previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
+    };
 
-    // Stage 1: Preview timer (~50 ms debounce).
-    previewTimerRef.current = setTimeout(() => {
-      // Guard: a newer fingerprint may have superseded us during the debounce.
-      if (currentFingerprintRef.current !== fp) return;
-      if (geometryGenerationRef.current !== gen) return;
-
-      const worker = ensurePreviewWorker();
-      if (!worker) return;
-
-      activePreviewRequestRef.current = { generation: gen, fingerprint: fp };
-      setRequestedAt(Date.now());
-      worker.postMessage({
-        generation: gen,
-        fingerprint: fp,
-        quality: "preview",
-        payload: { ...basePayload, physicsOptions: previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
-      });
-    }, PREVIEW_DEBOUNCE_MS);
+    // If a preview is already in flight, store this as the single replaceable
+    // pending request. The in-flight computation is NOT terminated — it
+    // completes and its result is discarded by the generation check, then this
+    // pending request is posted.
+    if (activePreviewRequestRef.current) {
+      previewPendingRef.current = { generation: gen, fingerprint: fp, message };
+    } else if (!previewTimerRef.current) {
+      // No in-flight and no debounce armed: start ONE coalesced debounce timer.
+      // The timer is NOT reset by intermediate geometry changes — it fires once
+      // with the latest geometry (read from refs), coalescing rapid drag
+      // coordinates within the debounce window into a single preview post.
+      previewTimerRef.current = setTimeout(() => {
+        postLatestPreview();
+      }, PREVIEW_DEBOUNCE_MS);
+    }
+    // If a debounce timer is already armed and no preview is in flight, leave
+    // it running — it will fire with the latest geometry (refs already updated).
 
     // Stage 2: Refinement timer (~280 ms debounce after geometry stabilises).
+    // This timer IS reset on every geometry change (via the cleanup below), so
+    // refinement only fires once geometry has settled.
     refinementTimerRef.current = setTimeout(() => {
       if (currentFingerprintRef.current !== fp) return;
       if (geometryGenerationRef.current !== gen) return;
@@ -375,11 +488,9 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       });
     }, REFINEMENT_DEBOUNCE_MS);
 
+    // Cleanup: clear ONLY the refinement timer. The preview debounce timer is
+    // deliberately left running so it coalesces the next geometry change.
     return () => {
-      if (previewTimerRef.current) {
-        clearTimeout(previewTimerRef.current);
-        previewTimerRef.current = null;
-      }
       if (refinementTimerRef.current) {
         clearTimeout(refinementTimerRef.current);
         refinementTimerRef.current = null;
@@ -407,6 +518,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
         clearTimeout(refinementTimerRef.current);
         refinementTimerRef.current = null;
       }
+      activePreviewRequestRef.current = null;
+      previewPendingRef.current = null;
     };
   }, []);
 

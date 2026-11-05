@@ -35,6 +35,7 @@ export const emptyBassResults = () => ({
   roomPreviewActive: false,
   roomPreviewExclusive: false,
   roomPreviewResult: null,
+  roomPreviewUpdating: false,
 });
 
 export function createBassResultsScope(scopeId, versionId) {
