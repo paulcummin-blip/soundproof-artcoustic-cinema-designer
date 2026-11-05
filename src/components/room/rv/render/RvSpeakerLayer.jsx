@@ -189,6 +189,7 @@ export default function RvSpeakerLayer({
               onIconLeave={handleIconLeave}
               onIconClick={handleIconClick}
               tvPresetKey={tvPresetKey}
+              placementWarning={warnedSpeakerIds.has(speaker.id || resolveRole(speaker.role))}
             />
           </g>
         );

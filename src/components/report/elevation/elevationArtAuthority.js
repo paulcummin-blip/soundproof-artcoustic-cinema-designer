@@ -201,6 +201,14 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
     mode: ELEVATION_ART_MODE.APPROVED,
     source: "measured from the file, trimming the page border frame, to preserve the cabinet body and drivers",
     note: "The default C4-1 catalogue screenshot sits on a page with a border frame; the crop trims that frame and the page margin so the cabinet body and drivers are drawn at the footprint (no legacy enlargement, no white areas beyond the cabinet).",
+    // SHARED ARTWORK: this one screenshot is the fallback for every C4-1 cabinet
+    // length that has no dedicated artwork of its own (1411, 1872, 2230 mm …).
+    // Its own cabinet is drawn at ~18.9 : 1 (≈ 2230 mm), so it CANNOT be aligned
+    // to a 1411 mm cabinet (11.8 : 1) or a 1872 mm cabinet (15.6 : 1) without a
+    // large white margin on one axis. No crop can fix a mismatched source; each
+    // length needs its own artwork. See verifyElevationArtAlignment.
+    sharedArtwork: true,
+    requiresCorrectedSource: true,
   },
 });
 
@@ -315,4 +323,47 @@ export function resolveElevationArtwork(key) {
  */
 export function elevationArtFitRatio(key) {
   return resolveElevationArtwork(key).fitRatio;
+}
+
+/**
+ * Strict aspect verification — does the artwork's crop aspect agree with the
+ * physical cabinet aspect closely enough that the cabinet outline coincides
+ * with the physical box (no visible white margin)?
+ *
+ * The crop is the artwork's own cabinet outline. When its aspect matches the
+ * physical cabinet aspect, `xMidYMid meet` fills the box edge to edge. When it
+ * does not, the fit leaves a white margin on one axis; the drawing is NEVER
+ * stretched to hide that margin (see requirement: flag, do not distort).
+ *
+ * @param {string} artworkKey
+ * @param {number} physicalWidthMm
+ * @param {number} physicalHeightMm
+ * @param {number} [tolerance=0.005] — maximum acceptable aspect drift (fraction)
+ * @returns {{ pass: boolean, drift: number, cropAspect: number, physicalAspect: number, reason: string, requiresCorrectedSource: boolean }}
+ */
+export function verifyElevationArtAlignment(artworkKey, physicalWidthMm, physicalHeightMm, tolerance = 0.005) {
+  const resolved = resolveElevationArtwork(artworkKey);
+  const physicalAspect = Number(physicalWidthMm) / Number(physicalHeightMm);
+  if (!resolved || resolved.mode === ELEVATION_ART_MODE.FALLBACK || !resolved.box) {
+    return { pass: false, drift: 1, cropAspect: null, physicalAspect, reason: "no trustworthy crop (fallback)", requiresCorrectedSource: true };
+  }
+  if (!Number.isFinite(physicalAspect) || physicalAspect <= 0) {
+    return { pass: false, drift: 1, cropAspect: null, physicalAspect, reason: "physical dimensions not supplied", requiresCorrectedSource: false };
+  }
+  const cropAspect = resolved.box.width / resolved.box.height;
+  const drift = Math.abs(cropAspect / physicalAspect - 1);
+  const entry = ELEVATION_ART_AUTHORITY[artworkKey] || {};
+  const requiresCorrectedSource = entry.requiresCorrectedSource === true || drift > tolerance;
+  return {
+    pass: drift <= tolerance && !entry.requiresCorrectedSource,
+    drift,
+    cropAspect,
+    physicalAspect,
+    reason: drift <= tolerance
+      ? "crop aspect matches physical cabinet aspect"
+      : (entry.sharedArtwork
+        ? "shared artwork reused for a cabinet length it does not depict — needs a dedicated source asset"
+        : "artwork cabinet outline aspect differs from physical — needs a re-measured crop or a corrected source asset"),
+    requiresCorrectedSource,
+  };
 }
