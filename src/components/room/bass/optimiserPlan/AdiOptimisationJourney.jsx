@@ -82,6 +82,8 @@ import savedCalibrationDecision from "./savedCalibrationDecision.js";
 import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
 import AdiImprovementResult from "./AdiImprovementResult.jsx";
+import AdiImprovementCards from "./AdiImprovementCards.jsx";
+import { buildImprovementCardData } from "./improvementCardData.js";
 import AdiImprovementActions from "./AdiImprovementActions.jsx";
 import { IMPROVEMENT_CASE, resolveImprovementResult } from "./improvementResultAuthority.js";
 import AdiTradeOffActions from "./AdiTradeOffActions.jsx";
@@ -705,6 +707,21 @@ export default function AdiOptimisationJourney({
   // and its own "keep current design" applies nothing at all.
   const improvementReviewActive = improvementResult.caseKey === IMPROVEMENT_CASE.REVIEW;
 
+  // ── THE BEFORE/AFTER COMPARISON CARDS ──
+  // Structured metric pairs (P20, P19) for the pending, applied-by-user and
+  // applied-by-ADI states. Read-only: every value comes from an existing
+  // authority. Null when no comparable before/after evidence exists.
+  const improvementCards = buildImprovementCardData({
+    headline,
+    summary,
+    resultModel,
+    calibrationDecision: calibrationApplyEvidence,
+    improvementResult,
+    placement,
+    planView,
+  });
+  const showImprovementCards = improvementCards != null;
+
   // ── THE OLD CANDIDATE MOVES TO ENGINEER DETAILS ──
   // The candidate a previous run evaluated is not a recommendation in this state:
   // its adjustment, what it was measured on, the reason it was not applied and
@@ -904,28 +921,34 @@ export default function AdiOptimisationJourney({
           read in Engineer details after the re-test. */}
       <AdiPanelSummary
         // A confirmed improvement states its own sentence — found, or already
-        // applied — in place of the generic evaluation line.
-        message={jointReceiptOwnsPanel ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.") : improvementResult.headlineSentence || journey.message}
-        nextAction={presentation?.nextAction || null}
+        // applied — in place of the generic evaluation line. When the comparison
+        // cards carry the decision, the verbose message, adjustment, benefit and
+        // comparison lines are suppressed so nothing is stated twice.
+        message={jointReceiptOwnsPanel
+          ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.")
+          : (showImprovementCards ? null : (improvementResult.headlineSentence || journey.message))}
+        nextAction={showImprovementCards ? null : (presentation?.nextAction || null)}
         // In the trade-off state the decision IS the trade-off: the change, the
         // seat it would cost and the measurable trade replace the ordinary
         // adjustment/benefit/comparison lines, which would state it as an offer.
         tradeOff={tradeOff?.isTradeOff ? tradeOff : null}
-        adjustment={jointReceiptOwnsPanel || previousCandidate || tradeOff ? null : headline.adjustment}
-        benefit={jointReceiptOwnsPanel || previousCandidate || tradeOff ? null : headline.benefit}
-        comparison={jointReceiptOwnsPanel || previousCandidate || tradeOff ? null : headline.comparison}
+        adjustment={jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.adjustment}
+        benefit={jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.benefit}
+        comparison={jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.comparison}
         designLimitation={designLimitation}
         previousCandidateNotice={previousCandidate && !tradeOff ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
         staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
         previousBest={previousCandidate || tradeOff ? null : summary.previousBest}
       />
 
-      {/* THE ACTUAL RESULT — the exact adjustment, what it improves, its own P19
-          line and whether any protected seat gets worse — stated here, on the
-          main panel. The designer never opens Engineer details to discover the
-          basic answer. Rendered only for a confirmed improvement: a trade-off and
-          a physical move keep their own presentation. */}
-      {!jointReceiptOwnsPanel && improvementResult.found && <AdiImprovementResult result={improvementResult} />}
+      {/* THE BEFORE/AFTER COMPARISON CARDS — the physical change or calibration
+          adjustment, with two compact performance metric cards (P20, P19) and a
+          status pill. Neutral colours while pending; Artcoustic green once the
+          authoritative calculation has confirmed the applied result. Every value
+          is read from existing authorities — nothing is fabricated. */}
+      {!jointReceiptOwnsPanel && showImprovementCards && (
+        <AdiImprovementCards cards={improvementCards} />
+      )}
 
       {/* ── THE ACTIONS ── one primary control for the state, decided by the
           layout model, beside the controls of the change being offered. The

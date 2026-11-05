@@ -195,7 +195,10 @@ describe("the plumbing carries the reason and the fix to the panel", () => {
 
   it("renders the next step in the MAIN panel, beside the reason", () => {
     expect(summary).toContain('data-adi-panel-next-action="true"');
-    expect(journey).toMatch(/nextAction=\{presentation\?\.nextAction \|\| null\}/);
+    // The next action is suppressed only when the improvement cards carry the
+    // decision; for failure states the cards are absent and the next action
+    // passes through unchanged.
+    expect(journey).toMatch(/nextAction=\{showImprovementCards \? null : \(presentation\?\.nextAction \|\| null\)}/);
   });
 
   it("lets a failure offer its own action even while the run is blocked", () => {
