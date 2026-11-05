@@ -138,6 +138,7 @@ export async function runOptimisation(opts) {
   const stage2StartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   let stage2Result = getStage2State(projectId, versionId);
   let placementFingerprint = stage2Result?.placementFingerprint;
+  let stage2Terminal = null;
 
   const selectedQuantity = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
     .filter((instance) => instance?.enabled !== false).length;
@@ -173,6 +174,7 @@ export async function runOptimisation(opts) {
       startFingerprint,
     });
 
+    stage2Terminal = waitResult.diagnostics;
     const waitedMetrics = {
       runId, totalWallClockMs: 0,
       stageSpans: { "stage2-wait": performance.now() - stage2StartedAt },
@@ -255,7 +257,7 @@ export async function runOptimisation(opts) {
   let runtimeMetrics = null;
   const callbacks = {
     onRuntimeMetrics: report => {
-      runtimeMetrics = { ...report, stage2: reusedStage2 ? { reused: true } : stage2Result?.runtimeDiagnostics || null };
+      runtimeMetrics = { ...report, stage2Terminal, stage2: reusedStage2 ? { reused: true } : stage2Result?.runtimeDiagnostics || null };
       opts.onRuntimeMetrics?.(runtimeMetrics);
     },
     onProgress: (phase, label, current, total) => {
