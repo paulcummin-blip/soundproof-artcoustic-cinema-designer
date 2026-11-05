@@ -79,11 +79,13 @@ export function useElevationDragHandlers({
       if (linked && canon === pairPartnerRole) {
         return { ...spk, positionSource: 'user', position: linked.partner };
       }
+      // Both members of a manually moved L/R pair are user-positioned.
+      // Otherwise the zone snap can relocate the mirrored partner on its own.
       if (axis === 'x' && role === 'FL' && canon === 'FR') {
-        return { ...spk, position: { ...spk.position, x: rW - newX } };
+        return { ...spk, positionSource: 'user', position: { ...spk.position, x: rW - newX } };
       }
       if (axis === 'x' && role === 'FR' && canon === 'FL') {
-        return { ...spk, position: { ...spk.position, x: rW - newX } };
+        return { ...spk, positionSource: 'user', position: { ...spk.position, x: rW - newX } };
       }
       if (axis === 'z' && isLcrRole) {
         if (allSameModel) {
