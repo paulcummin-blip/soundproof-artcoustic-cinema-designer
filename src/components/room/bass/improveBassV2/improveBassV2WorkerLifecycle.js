@@ -126,9 +126,7 @@ export function runInWorker(worker, phase, params, signal, opts = {}) {
     }
 
     function onError() {
-      // Worker onerror — uncaught error inside the worker. This is a generic
-      // worker failure (not a lifecycle error), so per-call catch blocks may
-      // swallow it to preserve existing recoverable behaviour.
+      // Infrastructure failure is fatal; a dead worker cannot evaluate another candidate.
       settle(reject, new V2WorkerError(`Optimisation worker failed during ${phase}. Reload the app and retry.`));
     }
 

@@ -28,7 +28,7 @@ function pool(mode, extra={}){
 test("startup acknowledged before candidate; successful jobs run once",async()=>{
   const {p,workers}=pool("ok");
   const batch=await runBoundedConfirmations({jobs:[1,2,3,4,5],maxConcurrency:3,
-    runFn:value=>p.runConfirmation({value})});
+    runFn:async value=>({result:await p.runConfirmation({value})})});
   assert.deepEqual(batch.results.map(r=>r.result),[1,2,3,4,5]);
   assert.equal(workers.flatMap(w=>w.calls).filter(c=>c.phase==="confirmation").length,5);
   assert.ok(workers.every(w=>w.calls[0].phase==="integration-context"));
@@ -66,4 +66,16 @@ test("pool termination settles active and queued promises",async()=>{
 test("already aborted batch dispatches nothing and settles",async()=>{
   const result=await runBoundedConfirmations({jobs:[{}],isAborted:()=>true,runFn:()=>assert.fail("dispatched")});
   assert.equal(result.stats.jobsStarted,0);
+});
+
+test("external cancellation terminates all pool workers",async()=>{
+  const controller=new AbortController();
+  const {p,workers}=pool("job-hang",{signal:controller.signal});
+  await p.ensureReady();
+  const job=p.runConfirmation({});
+  const rejected=assert.rejects(job,{name:"AbortError"});
+  controller.abort();
+  await rejected;
+  assert.ok(workers.every(w=>w.stopped));
+  assert.equal(await p.acquire(),null);
 });

@@ -590,8 +590,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       await runInWorker(worker, "integration-context", { context: integrationContext }, controller.signal);
     }
     // Initialise the confirmation pool now that the integration context is
-    // available. Every pool worker gets the same context via fire-and-forget
-    // postMessage (FIFO — processed before any confirmation job).
+    // available. Require startup acknowledgement before searching so a failed
+    // module cannot silently consume repeated confirmation watchdogs.
     confirmationPool = createConfirmationPool({
       size: V2_CONFIRMATION_CONCURRENCY,
       integrationContext,

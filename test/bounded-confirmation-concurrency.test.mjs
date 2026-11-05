@@ -182,18 +182,8 @@ describe("Bounded confirmations — cancellation", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 10. POOL WORKERS TERMINATE
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Confirmation pool — worker termination", () => {
-  it("10: terminateAll terminates every worker and rejects new acquisitions", async () => {
-    // Source-inspection: the pool must call worker.terminate() for each worker
-    // and set a terminated guard so acquire() resolves null.
-    const POOL_PATH = join(__dirname, "..", "src/components/room/bass/improveBassV2/v2ConfirmationPool.js");
-    const src = readFileSync(POOL_PATH, "utf8");
-    assert.ok(/for \(const w of workers\)\s*\{[^}]*w\.terminate\(\)/s.test(src), "terminateAll calls w.terminate() per worker");
-    assert.ok(/terminated = true/.test(src), "terminateAll sets the terminated guard");
-    assert.ok(/if \(terminated\)\s*\{\s*resolve\(null\)/.test(src) || /if \(terminated\)\s*resolve\(null\)/.test(src), "acquire resolves null once terminated");
-    assert.ok(/signal\.addEventListener\("abort",\s*terminateAll/.test(src), "abort signal wires to terminateAll");
-  });
-});
+// Pool termination and aborted acquisitions are exercised behaviourally in
+// v2-confirmation-pool-startup.test.mjs.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 11. runId PRESERVED (createConfirmationRunFn passes index)

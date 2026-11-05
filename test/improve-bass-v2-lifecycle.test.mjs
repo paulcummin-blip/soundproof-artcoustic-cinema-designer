@@ -203,7 +203,7 @@ test("genuine worker error: not fatal, can be swallowed", async () => {
   assert.equal(worker.terminated, false, "worker should NOT be terminated for genuine failure");
 });
 
-test("worker crash (onerror): not fatal, can be swallowed", async () => {
+test("worker crash (onerror): fatal infrastructure failure", async () => {
   const worker = new MockWorker();
   const promise = runInWorker(worker, "placement", {});
   worker.sendWorkerCrash();
@@ -214,7 +214,7 @@ test("worker crash (onerror): not fatal, can be swallowed", async () => {
     error = err;
   }
   assert.ok(error, "should reject");
-  assert.equal(isFatalLifecycleError(error), false, "worker crash is NOT fatal");
+  assert.equal(isFatalLifecycleError(error), true, "worker crash must end the run");
 });
 
 // --- Single-settlement guard ---
