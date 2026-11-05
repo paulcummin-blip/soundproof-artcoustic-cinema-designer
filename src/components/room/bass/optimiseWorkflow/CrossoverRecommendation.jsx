@@ -5,7 +5,6 @@ import { recommendationResultMatches, recommendationSettingsMatch } from "./cros
 import { buildCrossoverComparison, buildRecommendationSentence, buildTuningComparison, hasSettingChanges } from "./crossoverRecommendationComparison";
 import useSharedBassAuthorityState from "../useSharedBassAuthorityState";
 
-const number = value => Number.isFinite(value) ? value.toFixed(2) : "—";
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const worst = result => (result?.perSeatP20 || []).slice().sort((a,b)=>b.variationDbRaw-a.variationDbRaw)[0];
 const dbText = value => value === null || value === undefined ? null
@@ -154,10 +153,15 @@ export default function CrossoverRecommendation({
 
   // ── State determination ──
   const dismissed = record.status === "dismissed";
-  const verifiedApplied = record.status === "applied"
-    && record.appliedCacheKey === cacheKey && authorityCurrent;
+  // The design still carries the applied snapshot when the current cache key
+  // matches the one that was verified at apply time. This stays true during a
+  // same-design re-calculation (the authority may briefly not be "current"
+  // while it re-verifies); only the Verified badge waits for the authority.
+  const appliedCacheMatches = record.status === "applied"
+    && record.appliedCacheKey === cacheKey;
+  const verifiedApplied = appliedCacheMatches && authorityCurrent;
   const appliedByAdi = verifiedApplied && record.autoApplied === true;
-  const appliedStale = record.status === "applied" && !verifiedApplied;
+  const appliedStale = record.status === "applied" && !appliedCacheMatches;
   const staleRecommended = ["recommended","restored"].includes(record.status) && record.baselineCacheKey !== cacheKey;
   const restoredVerified = record.status === "restored"
     && record.appliedCacheKey === cacheKey && authorityCurrent;
@@ -169,8 +173,6 @@ export default function CrossoverRecommendation({
 
   const pending = applying || busy;
   const limiter=worst(recommended);
-  const baselineLimiter=worst(baseline);
-  const seatLabel=id=>id ? String(id).replace(/^seat-r(\d+)-c(\d+)$/, "Row $1 seat $2") : "—";
 
   // The compared settings — used both for the pending sentence and the applied
   // "Settings now in use" list (which reads the afterText of each row).
@@ -254,10 +256,16 @@ export default function CrossoverRecommendation({
     commitAndVerify(true);
   }
 
-  // ── STATE 2 / 3: Applied and verified (designer or ADI) ──
-  if (verifiedApplied) {
+  // ── STATE 2 / 3: Applied (designer or ADI) ──
+  // The card is shown while the design still carries the applied snapshot. The
+  // badge states "Verified" only once the authoritative calculation is current;
+  // during a same-design re-calculation it states "Recalculating…" so a verified
+  // result is never claimed before the authority has caught up.
+  if (appliedCacheMatches) {
     const appliedSettings = buildAppliedSettings(crossoverRows, tuningRows);
-    const badgeLabel = appliedByAdi ? "Applied by ADI" : "Verified";
+    const badgeLabel = appliedByAdi
+      ? "Applied by ADI"
+      : (verifiedApplied ? "Verified" : "Recalculating…");
     const title = appliedByAdi ? "Bass optimisation applied by ADI" : "Bass optimisation applied";
     const subtitle = appliedByAdi
       ? "Crossover, subwoofer levels, delay and phase applied by ADI and verified."
