@@ -430,8 +430,13 @@ export default function AdiOptimisationJourney({
   // options and the review dialogs — reads this object rather than deciding the
   // result for itself.
   const resultModel = summary.resultViewModel || null;
-  const handleApplyRecommended = summary.actions.canApply && typeof onApplyLever === "function"
-    ? () => onApplyLever(summary.recommendedLever)
+  const recommendedRow = summary.recommendedLever && Array.isArray(planView?.levers)
+    ? planView.levers.find((row) => (row?.key ?? row?.lever) === summary.recommendedLever) || null
+    : null;
+  // The commit handler needs the evaluated row (including seat IDs/destinations),
+  // not the summary's lever key. Keep the existing currentness/safety permission.
+  const handleApplyRecommended = summary.actions.canApply && recommendedRow && typeof onApplyLever === "function"
+    ? () => onApplyLever(recommendedRow)
     : null;
   const handleUndoRecommended = summary.actions.canUndo && typeof onUndoLever === "function"
     ? () => onUndoLever(summary.actions.undoLever || summary.recommendedLever)
@@ -644,9 +649,6 @@ export default function AdiOptimisationJourney({
     },
     planView,
   });
-  const recommendedRow = summary.recommendedLever && Array.isArray(planView?.levers)
-    ? planView.levers.find((row) => (row?.key ?? row?.lever) === summary.recommendedLever) || null
-    : null;
   // The relative group offset of the change being decided — the installable fact
   // a delay change leads with. Read here so the headline and the evidence state
   // the same offset from the same values.
