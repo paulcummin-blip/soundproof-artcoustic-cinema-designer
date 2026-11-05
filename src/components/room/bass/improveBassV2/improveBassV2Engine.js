@@ -597,6 +597,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       integrationContext,
       signal: controller.signal,
     });
+    await confirmationPool.ensureReady();
     // Phase 1: Reviewing current design
     onProgress("reviewing", "Reviewing current design", 0, 1);
     const snapshot = snapshotCurrentDesign({
