@@ -136,6 +136,7 @@ const ADI_RUN_SECONDARY_CLASS = "inline-flex items-center gap-1.5 rounded-md bor
 
 export default function AdiOptimisationJourney({
   jointRecommendation = null,
+  jointReceiptState = null,
   projectId = null,
   versionId = null,
   completedBassAuthority = null,
@@ -195,36 +196,7 @@ export default function AdiOptimisationJourney({
   // own the panel where appropriate.
   const freshRunActive = runStatus === "running" || reoptimiseBusy === true;
 
-  const jointReceiptOwnsPanel = (() => {
-    const receiptCurrent = jointRecommendation?.candidate?.integrationVerified && (
-      jointRecommendation.baselineCacheKey === currentDesignFingerprint ||
-      jointRecommendation.appliedCacheKey === currentDesignFingerprint
-    );
-    if (!receiptCurrent) return false;
-    // FRESH RUN AUTHORITY: while any fresh run is in flight (Run ADI Again or
-    // Re-test), the historical receipt must NOT own the panel — the running
-    // state owns it instead. This prevents the panel displaying "Crossover and
-    // subwoofer integration applied" during an active Re-test.
-    if (freshRunActive) return false;
-    // A fresh run's own terminal outcome outranks a historical applied receipt.
-    // The historical receipt is preserved (visible in Engineer details and via
-    // the applied calibration authority), but it must not override the current
-    // run's own outcome on the main panel. Applied wording is shown only when the
-    // current run itself produced the applied state — an old receipt alone is
-    // never enough.
-    const FRESH_RUN_SUPERSEDES_RECEIPT_STATES = new Set([
-      OPTIMISER_PRESENTATION_STATE.TRADE_OFF,
-      OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT,
-      OPTIMISER_PRESENTATION_STATE.NON_ACTIONABLE_WINNER,
-      OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE,
-      OPTIMISER_PRESENTATION_STATE.FAILED,
-    ]);
-    if (presentation != null
-      && FRESH_RUN_SUPERSEDES_RECEIPT_STATES.has(presentation.state)) {
-      return false;
-    }
-    return true;
-  })();
+  const jointReceiptOwnsPanel = jointReceiptState?.ownsPanel === true && !freshRunActive;
   const planView = useOptimiserPlanView({
     projectId,
     versionId,
@@ -890,11 +862,15 @@ export default function AdiOptimisationJourney({
   if (jointReceiptOwnsPanel && !freshRunActive) return (
     <div className={`rounded-lg border border-stone-300 px-4 py-3 space-y-3 ${className}`}>
       <div className="font-semibold">Bass Optimisation — Powered by ADI</div>
-      <p className="text-sm">{jointRecommendation.status === "applied"
-        ? "Crossover and subwoofer integration applied. See the verified result below."
-        : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below."}</p>
+      <p className="text-sm">{jointReceiptState.state === "applying" || jointReceiptState.state === "restoring"
+        ? "Calculating and saving the selected bass settings."
+        : jointReceiptState.state === "verification-required"
+          ? "The selected bass settings still require a verified calculation. See the result below."
+          : jointReceiptState.state === "applied"
+            ? "Crossover and subwoofer integration applied. See the verified result below."
+            : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below."}</p>
       <button type="button" className="rounded border px-3 py-2 text-xs disabled:opacity-40"
-        disabled={!!runBlockReason || typeof onRunOptimisationPlan !== "function"}
+        disabled={jointReceiptState.operationActive || jointReceiptState.state === "verification-required" || !!runBlockReason || typeof onRunOptimisationPlan !== "function"}
         onClick={onRunOptimisationPlan}>Run ADI Again</button>
     </div>
   );
