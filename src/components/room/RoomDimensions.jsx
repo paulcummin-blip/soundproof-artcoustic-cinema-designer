@@ -1,8 +1,10 @@
 import React from "react";
+import { RotateCw } from "lucide-react";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/components/AppStateProvider";
 import PlanDisplayToggle from "@/components/room/PlanDisplayToggle";
+import { useRotateRoom } from "@/components/room/useRotateRoom";
 
 const roundToCm = (num) => {
   if (!Number.isFinite(num)) return null;
@@ -30,6 +32,7 @@ const formatDimension = (value) => {
 
 export default function RoomDimensions({ disabled, speakerPositionsView, onSpeakerPositionsViewChange, speakerPositionsDisabled = false }) {
   const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM, overlays, setOverlays } = useAppState();
+  const rotateRoom = useRotateRoom();
 
   const [draftDims, setDraftDims] = React.useState(() => ({
     width: formatDimension(roomDims?.widthM),
@@ -197,6 +200,23 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
           </div>
         </div>
       </div>
+
+      {/* Rotate Room — swaps effective Width and Length, screen wall stays at top */}
+      <button
+        type="button"
+        onClick={rotateRoom}
+        disabled={disabled}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{
+          borderColor: "#DCDBD6",
+          background: "#FFF",
+          color: "#1B1A1A",
+          fontFamily: "Didact Gothic, sans-serif",
+        }}
+      >
+        <RotateCw className="w-3.5 h-3.5" />
+        Rotate Room
+      </button>
 
       {/* Plan Overlays group — matching toggle rows */}
       <div>

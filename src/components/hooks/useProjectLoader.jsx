@@ -463,6 +463,7 @@ appState, // Pass appState directly for setters
           name: mergedP?.name || "Untitled Room",
           roomDims: loadedRoomDims,
           dimensions: loadedRoomDims,
+          roomOrientation: mergedP?.room_orientation || "length_front",
           screen: loadedScreen,
           seatingPositions: _parseMaybe(mergedP?.seating_positions, []),
           seatsPerRowByRow: _parseMaybe(mergedP?.seats_per_row_by_row, []),
