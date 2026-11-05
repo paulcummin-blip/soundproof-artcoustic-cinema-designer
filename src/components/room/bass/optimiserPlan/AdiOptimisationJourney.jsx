@@ -333,7 +333,9 @@ export default function AdiOptimisationJourney({
   // Re-test Needed and Unable To Evaluate are both retry states for the evidence-
   // only optimiser run. The calibration auto-apply workflow must never own this
   // button: it does not mint/persist the run identity used by terminal authority.
+  const liveState = useImproveBassV2State(projectId, versionId);
   const optimiserRunOwnsRetry = retestNeeded
+    || ["error", "cancelled"].includes(liveState.status)
     || ["failed", "error", "cancelled"].includes(runStatus)
     // A restored failure survives the transient run store resetting to idle.
     // Baseline parity may override journey.outcome, but must not add a second retry.
@@ -390,7 +392,6 @@ export default function AdiOptimisationJourney({
   // Again) OR reoptimiseBusy (Re-test Bass Optimisation). During a fresh
   // Re-test the panel must show RUNNING, not a historical terminal result.
   const isRunning = freshRunActive;
-  const liveState = useImproveBassV2State(projectId, versionId);
   // THE RUN'S LIVE PROGRESS — read from the engine's own published progress
   // store and the run's identity. The hook adds no count, no stage and no
   // percentage of its own: it ticks a clock while the run is in flight and
