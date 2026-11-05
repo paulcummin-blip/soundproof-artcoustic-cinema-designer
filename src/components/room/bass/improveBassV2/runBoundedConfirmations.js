@@ -22,6 +22,8 @@
 // count, no P14/P18/P19/P20, no ranking and no safety check.
 // ---------------------------------------------------------------------------
 
+import { isFatalLifecycleError } from "./improveBassV2WorkerLifecycle.js";
+
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 /**
@@ -51,7 +53,7 @@ export function runBoundedConfirmations({ jobs, maxConcurrency, runFn, isAborted
     sumWorkerMs: 0,
   };
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!jobs.length) {
       stats.phaseElapsedMs = now() - phaseStart;
       resolve({ results: [], stats });
@@ -71,6 +73,7 @@ export function runBoundedConfirmations({ jobs, maxConcurrency, runFn, isAborted
     }
 
     function dispatch() {
+      if (settled) return;
       // Stop launching when aborted — in-flight jobs settle on their own.
       while (active < maxConcurrency && nextIndex < jobs.length && !(isAborted && isAborted())) {
         const idx = nextIndex;
@@ -86,10 +89,16 @@ export function runBoundedConfirmations({ jobs, maxConcurrency, runFn, isAborted
           .catch((error) => {
             results[idx] = { ok: false, error, workerMs: 0 };
             stats.jobsFailed += 1;
+            // Infrastructure failure ends the run; only candidate failures are isolated.
+            if (isFatalLifecycleError(error) && !settled) {
+              settled = true;
+              reject(error);
+            }
           })
           .finally(() => {
             active -= 1;
             stats.jobsCompleted += 1;
+            if (settled) return;
             const exhausted = nextIndex >= jobs.length || (isAborted && isAborted());
             if (exhausted && active === 0) {
               finish();
@@ -101,7 +110,7 @@ export function runBoundedConfirmations({ jobs, maxConcurrency, runFn, isAborted
 
       // All jobs launched and all settled (handles the case where the last
       // dispatch filled the concurrency bound and no more dispatch is needed).
-      if (nextIndex >= jobs.length && active === 0 && !settled) {
+      if ((nextIndex >= jobs.length || isAborted?.()) && active === 0 && !settled) {
         finish();
       }
     }
