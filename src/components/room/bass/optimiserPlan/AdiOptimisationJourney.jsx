@@ -334,6 +334,7 @@ export default function AdiOptimisationJourney({
   // only optimiser run. The calibration auto-apply workflow must never own this
   // button: it does not mint/persist the run identity used by terminal authority.
   const optimiserRunOwnsRetry = retestNeeded
+    || ["failed", "error", "cancelled"].includes(runStatus)
     || outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE;
   // A physical change is an improvement too: the panel offers Apply for both,
   // and only the badge distinguishes them.
