@@ -86,6 +86,7 @@ export default function RoomDesignerControlsPanel({
   isNineBedLayout,
   speakerPositionsView,
   setSpeakerPositionsView,
+  drawingView = "plan",
   placedSpeakers,
   _seatingPositions,
   // Bass

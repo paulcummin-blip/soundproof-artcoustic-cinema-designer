@@ -103,3 +103,19 @@ export function subscribeReportView(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
+
+// getReportFraming — the single deterministic report-framing authority.
+//
+// Returns the saved report view record for (projectId, versionId) if one
+// exists, otherwise null. Null means "use the Reset View default framing"
+// (the IsometricView resolves it from the current room dimensions via the
+// same applyFraming path the drawing uses on mount).
+//
+// The live exploratory camera position is NEVER the report framing: the
+// store only ever receives a record from an explicit Save to Report, so a
+// dealer who explores without saving gets the Reset View default, not their
+// temporary angle. This is the one deterministic rule every report consumer
+// reads through.
+export function getReportFraming(projectId, versionId) {
+  return getSavedReportView(projectId, versionId);
+}

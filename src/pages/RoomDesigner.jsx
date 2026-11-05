@@ -2381,6 +2381,7 @@ function RoomDesignerWithState() {
             isNineBedLayout={isNineBedLayout}
             speakerPositionsView={speakerPositionsView}
             setSpeakerPositionsView={setSpeakerPositionsView}
+            drawingView={leftPanelView}
             placedSpeakers={placedSpeakers}
             _seatingPositions={_seatingPositions}
             frontSubsCfg={frontSubsCfg}
