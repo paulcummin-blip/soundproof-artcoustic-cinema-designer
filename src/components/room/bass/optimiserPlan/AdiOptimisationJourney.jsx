@@ -335,6 +335,10 @@ export default function AdiOptimisationJourney({
   // button: it does not mint/persist the run identity used by terminal authority.
   const optimiserRunOwnsRetry = retestNeeded
     || ["failed", "error", "cancelled"].includes(runStatus)
+    // A restored failure survives the transient run store resetting to idle.
+    // Baseline parity may override journey.outcome, but must not add a second retry.
+    || presentation?.state === OPTIMISER_PRESENTATION_STATE.FAILED
+    || presentation?.outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE
     || outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE;
   // A physical change is an improvement too: the panel offers Apply for both,
   // and only the badge distinguishes them.
