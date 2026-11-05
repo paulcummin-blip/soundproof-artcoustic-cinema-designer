@@ -117,7 +117,9 @@ export function targetMlpY57_5(screen, roomFrontY = 0) {
 }
 
 // ---- Render primitives ----
-export const PLACEMENT_WARNING_COLOR = "#4A230F";
+// Same orange-red used for room elements that clash with a speaker
+// (RvRoomElementsLayer WARN_STROKE). Applied to the speaker's own fill/stroke.
+export const PLACEMENT_WARNING_COLOR = "#C76A1B";
 
 export const SpeakerIcon = React.memo(function SpeakerIcon({
   speaker,

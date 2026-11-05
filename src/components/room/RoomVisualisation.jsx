@@ -112,7 +112,7 @@ import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import { evaluateAndRecordSpeaker, evaluatePlacementZones, recordPlacementEvaluation } from "@/components/room/placementZone/usePlacementWarnings";
+import { evaluateAndRecordAll } from "@/components/room/placementZone/evaluateAndRecordAll";
 import { clearAllPlacementWarnings } from "@/components/room/placementZone/placementWarningStore";
 
 import {
@@ -1514,31 +1514,20 @@ const byId = useEntitiesById({
     if (!draftSpeakersRef.current || !onSetSpeakers) return;
     const draftSpeakers = draftSpeakersRef.current;
     const draftMap = new Map(draftSpeakers.map(s => [getSpeakerSelectionKey(s), s]));
-    // Placement-zone warning: evaluate EVERY placed speaker at its committed
-    // position after a speaker move. Every speaker outside its applicable RP22
-    // zone turns red for five seconds; every speaker back inside clears
-    // immediately. This is not limited to the dragged speaker, so two speakers
-    // outside their zones both highlight simultaneously, and each warning
-    // corresponds to an actual zone violation.
-    const zoneCtx = {
-      placedSpeakers: null,
+    // Evaluate EVERY placed speaker at its committed position after a move, so
+    // two speakers outside their zones both highlight simultaneously.
+    const committedSpeakers = placedSpeakers.map(s => {
+      const draft = draftMap.get(getSpeakerSelectionKey(s));
+      return draft ? { ...s, position: draft.position } : s;
+    });
+    evaluateAndRecordAll(committedSpeakers, {
+      placedSpeakers: committedSpeakers,
       seatingPositions,
       dimensions: { widthM, lengthM, heightM },
       mlpPoint: mlp,
       screenFrontPlaneM,
       getSpeakerModelMeta,
-    };
-    const committedSpeakers = placedSpeakers.map(s => {
-      const draft = draftMap.get(getSpeakerSelectionKey(s));
-      return draft ? { ...s, position: draft.position } : s;
     });
-    zoneCtx.placedSpeakers = committedSpeakers;
-    const outsideIds = evaluatePlacementZones({ speakers: committedSpeakers, ...zoneCtx });
-    for (const s of committedSpeakers) {
-      const id = s.id || getCanonicalRole(s.role);
-      if (!id) continue;
-      recordPlacementEvaluation(id, outsideIds.has(id));
-    }
     onSetSpeakers(prev =>
       prev.map(s => {
         const draft = draftMap.get(getSpeakerSelectionKey(s));
@@ -1565,10 +1554,11 @@ const byId = useEntitiesById({
     if (dragType !== 'speaker' || !draggedItemId) return;
     const draft = draftSpeakersRef.current;
     if (!Array.isArray(draft)) return;
-    const spk = draft.find(s => s.id === draggedItemId);
-    if (!spk) return;
-    evaluateAndRecordSpeaker(spk, {
-      placedSpeakers,
+    // Evaluate EVERY drafted speaker on each tick, so a move that leaves two
+    // speakers outside their zones highlights both at once — not only the one
+    // being dragged.
+    evaluateAndRecordAll(draft, {
+      placedSpeakers: draft,
       seatingPositions,
       dimensions: { widthM, lengthM, heightM },
       mlpPoint: mlp,
