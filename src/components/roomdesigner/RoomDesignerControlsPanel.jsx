@@ -387,7 +387,7 @@ export default function RoomDesignerControlsPanel({
           }
           <Suspense fallback={<div>Loading...</div>}>
             <RP22CompliancePanel
-              engineeringSummary={engineeringSummary}
+              engineeringSummary={liveComplianceSummary}
               screen={_screen}
               seatingPositions={_seatingPositions}
               assumedP15Level={appState?.assumedP15Level}
