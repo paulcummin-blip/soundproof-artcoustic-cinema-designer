@@ -40,7 +40,10 @@ function createConfirmationWorker() {
 
 export function createConfirmationPool({
   createWorker = createConfirmationWorker, size, integrationContext = null,
-  signal = null, startupTimeoutMs = 5000,
+  // Includes loading the worker module graph, not acoustic computation.
+  // Live preview measured 4.8–6.9 s for healthy startup (context handling <1 ms).
+  // Keep a bounded startup allowance with headroom; evaluation deadlines are unchanged.
+  signal = null, startupTimeoutMs = 15000,
 }) {
   const workers = [];
   const idle = [];
