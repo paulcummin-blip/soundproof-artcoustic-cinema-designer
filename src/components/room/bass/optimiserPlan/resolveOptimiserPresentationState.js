@@ -419,7 +419,7 @@ export function resolveOptimiserPresentationState({
       // checked again — which input moved — is the stale reason, and it is read in
       // Engineer details beside the old candidate's own detail.
       message: OPTIMISER_RETEST_MESSAGE,
-      nextAction: OPTIMISER_RETEST_DETAIL,
+      nextAction: "The design has changed since this run. Re-test to evaluate the current settings.",
       explanation: planView?.staleReason || OPTIMISER_PRESENTATION_COPY.STALE,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
