@@ -291,8 +291,14 @@ export default function IsometricView({
   }, [fitFrustum]);
 
   // ---- Initial framing + apply saved report view on mount / version change ----
+  // The framing re-applies ONLY when the saved report view changes or the
+  // room's physical bounds change (roomDimsKey) — never on a presentation-only
+  // appState/overlay change. This is what stops toggling a Plan View overlay
+  // (e.g. Speaker Positions, or Room Dimensions via the mutual-exclusivity path)
+  // from resetting the isometric camera: those changes rebuild sceneData but
+  // do not change roomDimsKey, so this effect does not re-run.
   useEffect(() => {
-    if (!sceneData || !controlsRef.current) return;
+    if (!sceneDataRef.current || !controlsRef.current) return;
     if (savedReportView) {
       applyFraming(savedReportView);
       setShowHeads(savedReportView.visibility.showHeads !== false);
@@ -302,7 +308,8 @@ export default function IsometricView({
       applyFraming({ camera: {}, visibility: {} });
       setIsSaved(false);
     }
-  }, [savedReportView, sceneData, applyFraming]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedReportView, roomDimsKey]);
 
   // ---- Rebuild content meshes when scene data changes ----
   useEffect(() => {
