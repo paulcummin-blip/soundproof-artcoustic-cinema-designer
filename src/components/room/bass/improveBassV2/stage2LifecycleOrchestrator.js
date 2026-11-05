@@ -9,12 +9,17 @@
 // requestBassHeavyAction lifecycle and the existing mounted Stage 1/Stage 2
 // hooks in RoomDesigner.jsx. There is one canonical Stage 2 execution path.
 
-import { getStage2State, subscribeStage2 } from "../stage2/stage2PlacementStore";
+import { getStage2State, subscribeStage2, stage2PlacementController } from "../stage2/stage2PlacementStore";
 import {
   getBassHeavyAction,
   subscribeBassHeavyAction,
   cancelBassHeavyAction,
+  markBassHeavyActionError,
 } from "../bassHeavyActionStore";
+
+import { getStage1State, subscribeStage1, stage1PlacementController } from "../stage1/stage1PlacementStore";
+import { subscribeImproveBassV2 } from "./improveBassV2Store";
+import { saveStage2TerminalDiagnostics } from "./stage2TerminalDiagnostics";
 
 // Safety timeout — if Stage 2 never reaches a terminal state (e.g. the hook
 // never starts because the heavy action was rejected), the orchestrator
@@ -64,90 +69,97 @@ export function isStage2ReadyForConsumption(stage2State, quantity = null) {
  * @param {string} [options.startFingerprint] — the V2 design fingerprint at request time
  * @returns {Promise<object>}
  */
-export function waitForStage2Terminal(projectId, versionId, { isCancelled, getCurrentFingerprint, startFingerprint } = {}) {
+export function waitForStage2Terminal(projectId, versionId, {
+  isCancelled, getCurrentFingerprint, startFingerprint,
+  requestId = null, runId = null, timeoutMs = STAGE2_WAIT_TIMEOUT_MS,
+} = {}) {
   return new Promise((resolve) => {
     let resolved = false;
-    let unsubscribeStage2 = null;
-    let unsubscribeHeavy = null;
+    const subscriptions = [];
     let timeoutHandle = null;
-
-    const cleanup = () => {
-      if (unsubscribeStage2) { unsubscribeStage2(); unsubscribeStage2 = null; }
-      if (unsubscribeHeavy) { unsubscribeHeavy(); unsubscribeHeavy = null; }
-      if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null; }
-    };
-
-    const settle = (result) => {
+    const startedAtMs = Date.now();
+    const trace = [];
+    let previousSignature = null;
+    const brief = state => ({
+      status: state.status, fingerprint: state.fingerprint, ownerRequestId: state.ownerRequestId,
+      phase: state.phase, workerRequestId: state.workerRequestId, workerStarted: state.workerStarted,
+      completedJobs: state.completedJobs, totalJobsPlanned: state.totalJobsPlanned,
+      error: state.errorMessage || null, runtimeDiagnostics: state.runtimeDiagnostics || null,
+    });
+    const settle = result => {
       if (resolved) return;
       resolved = true;
-      cleanup();
-      resolve(result);
+      subscriptions.forEach(unsubscribe => unsubscribe());
+      clearTimeout(timeoutHandle);
+      const heavy = getBassHeavyAction(projectId, versionId);
+      const diagnostics = saveStage2TerminalDiagnostics({
+        runId, requestId: requestId || heavy?.requestId, projectId, versionId,
+        sourceFingerprint: heavy?.sourceFingerprint || null,
+        startedAtMs, completedAtMs: Date.now(), elapsedMs: Date.now() - startedAtMs,
+        outcome: result.status, error: result.error || result.message || null,
+        stage1: brief(getStage1State(projectId, versionId)),
+        stage2: brief(getStage2State(projectId, versionId)), trace,
+      });
+      // Only the owner may stop its work. A superseded wait cannot cancel a
+      // replacement run, even if both designs have the same fingerprint.
+      if (result.status !== "complete" && (!requestId || heavy?.requestId === requestId)) {
+        stage1PlacementController.cancelActive(result.status);
+        stage2PlacementController.cancelAll(result.status);
+        if (["error", "timeout"].includes(result.status)) {
+          markBassHeavyActionError(projectId, versionId, heavy?.requestId, result.error);
+        } else cancelBassHeavyAction(projectId, versionId, result.message || result.status);
+      }
+      resolve({ ...result, diagnostics });
     };
 
     const check = () => {
       if (resolved) return;
-
-      // Cancellation — user pressed Cancel
-      if (isCancelled && isCancelled()) {
-        cancelBassHeavyAction(projectId, versionId, "Improve Bass cancelled");
-        settle({ status: "cancelled" });
-        return;
+      const heavy = getBassHeavyAction(projectId, versionId);
+      const stage1 = getStage1State(projectId, versionId);
+      const stage2 = getStage2State(projectId, versionId);
+      const signature = JSON.stringify([heavy?.status, stage1.status, stage2.status, stage2.phase,
+        stage1.runtimeDiagnostics?.lastProgressAtMs, stage2.completedJobs]);
+      if (signature !== previousSignature) {
+        previousSignature = signature;
+        trace.push({ atMs: Date.now(), heavy: heavy?.status, stage1: stage1.status,
+          stage2: stage2.status, phase: stage2.phase, completedJobs: stage2.completedJobs });
+        if (trace.length > 24) trace.shift();
       }
-
-      // Design changed during Stage 2 — reject stale finalists
+      if (requestId && heavy?.requestId !== requestId) {
+        settle({ status: "stale", message: "Stage 2 request was superseded" }); return;
+      }
+      if (isCancelled?.()) { settle({ status: "cancelled" }); return; }
       if (startFingerprint && getCurrentFingerprint) {
         try {
           const currentFp = getCurrentFingerprint();
           if (currentFp && currentFp !== startFingerprint) {
-            cancelBassHeavyAction(projectId, versionId, "Design changed during Stage 2");
-            settle({ status: "stale", message: "Design changed during Stage 2 evaluation" });
-            return;
+            settle({ status: "stale", message: "Design changed during Stage 2 evaluation" }); return;
           }
-        } catch {
-          // If fingerprint computation fails, skip stale check (safe fallback)
-        }
+        } catch { /* no unverified result is promoted */ }
       }
-
-      // Stage 2 complete — consume evaluatedFinalists
-      const stage2 = getStage2State(projectId, versionId);
-      if (stage2.status === "complete") {
-        settle({ status: "complete", stage2 });
-        return;
-      }
-
-      // Stage 2 error — terminate cleanly
-      if (stage2.status === "error") {
-        settle({ status: "error", error: stage2.errorMessage || "Stage 2 evaluation failed" });
-        return;
-      }
-
-      // Heavy action cancelled or error (safety net — BassBackgroundAnalysisOwner
-      // cancels the heavy action when the design changes)
-      const heavy = getBassHeavyAction(projectId, versionId);
-      if (heavy?.status === "cancelled") {
-        settle({ status: "cancelled" });
-        return;
+      // Subscribe to the prerequisite directly. React may subsequently reset
+      // the disabled hook to idle; the definitive worker failure must survive.
+      if ((!requestId || stage1.ownerRequestId === requestId)
+          && ["error", "cancelled", "stale"].includes(stage1.status)) {
+        settle({ status: stage1.status, error: stage1.errorMessage || "Stage 1 placement search stopped",
+          message: stage1.status === "stale" ? "Design changed during placement search" : undefined }); return;
       }
       if (heavy?.status === "error") {
-        settle({ status: "error", error: heavy.error || "Stage 2 evaluation failed" });
-        return;
+        settle({ status: "error", error: heavy.error || "Placement analysis failed" }); return;
+      }
+      if (heavy?.status === "cancelled") { settle({ status: "cancelled" }); return; }
+      if (!requestId || stage2.ownerRequestId === requestId) {
+        if (stage2.status === "complete") { settle({ status: "complete", stage2 }); return; }
+        if (["error", "cancelled", "stale"].includes(stage2.status)) {
+          settle({ status: stage2.status, error: stage2.errorMessage || "Stage 2 evaluation stopped" }); return;
+        }
       }
     };
 
-    // Safety timeout
-    timeoutHandle = setTimeout(() => {
-      settle({ status: "timeout", error: "Stage 2 evaluation timed out" });
-    }, STAGE2_WAIT_TIMEOUT_MS);
-
-    // Check immediately (Stage 2 might already be complete)
+    timeoutHandle = setTimeout(() => settle({ status: "timeout",
+      error: "Placement analysis timed out — retry the optimisation." }), timeoutMs);
+    subscriptions.push(subscribeStage1(check), subscribeStage2(check),
+      subscribeBassHeavyAction(check), subscribeImproveBassV2(check));
     check();
-
-    // Subscribe if not yet resolved
-    if (!resolved) {
-      unsubscribeStage2 = subscribeStage2(check);
-      unsubscribeHeavy = subscribeBassHeavyAction(check);
-      // Re-check after subscribing (state might have changed between check and subscribe)
-      check();
-    }
   });
 }
