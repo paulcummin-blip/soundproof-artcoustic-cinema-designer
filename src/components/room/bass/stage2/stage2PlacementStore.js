@@ -519,11 +519,22 @@ export class Stage2PlacementController {
   }
 
   startWorker(workerIndex) {
-    const worker = new Worker(new URL("./stage2Placement.worker.js", import.meta.url), { type: "module" });
+    let worker;
+    try {
+      worker = new Worker(new URL("./stage2Placement.worker.js", import.meta.url), { type: "module" });
+    } catch (error) {
+      const fingerprint = this.currentFingerprint;
+      const message = `Stage 2 worker could not start: ${error?.message || error}`;
+      this.runtimeDiagnostics.lastTerminal = { outcome: "error", error: message, atMs: Date.now() };
+      this.cancelAll("superseded");
+      markStage2Error(this.projectId, this.versionId, fingerprint, message);
+      return false;
+    }
     worker.onmessage = (event) => { if (this.workers[workerIndex] === worker) this.handleMessage(workerIndex, event.data || {}); };
     worker.onerror = (event) => { if (this.workers[workerIndex] === worker) this.handleError(workerIndex, event?.message || "Worker error"); };
     worker.onmessageerror = () => { if (this.workers[workerIndex] === worker) this.handleError(workerIndex, "Stage 2 worker message could not be decoded"); };
     this.workers[workerIndex] = worker;
+    return true;
   }
 
   dispatchToWorker(workerIndex, job) {
@@ -574,14 +585,14 @@ export class Stage2PlacementController {
     // Start workers if needed (up to max concurrent)
     while (this.workers.length < STAGE2_MAX_CONCURRENT_JOBS && this.queue.length > 0) {
       const workerIndex = this.workers.length;
-      this.startWorker(workerIndex);
+      if (!this.startWorker(workerIndex)) return;
     }
 
     // Recreate workers terminated by the watchdog (set to null). The worker
     // pool size is preserved, but null slots must be refilled before dispatch.
     for (let i = 0; i < this.workers.length; i++) {
       if (!this.workers[i] && this.queue.length > 0) {
-        this.startWorker(i);
+        if (!this.startWorker(i)) return;
       }
     }
 
