@@ -108,6 +108,7 @@ function MetricCard({ label, afterText, beforeText, footLine, applied }) {
 // are all preserved. Only the presentation is restructured.
 export default function CrossoverRecommendation({
   candidate, diagnostics, shared, appState, instances, commitInstances, onRecalculate, busy,
+  receiptState, onOperationChange, projectId, producingPlan,
 }) {
   const { authorityState } = useSharedBassAuthorityState();
   const saved = appState?.splConfig?.crossoverRecommendation || null;
@@ -123,7 +124,7 @@ export default function CrossoverRecommendation({
     if (candidate.baselineCacheKey !== shared?.cacheKey) return;
     if (saved?.candidateId === candidate.candidateId && saved?.baselineCacheKey === candidate.baselineCacheKey) return;
     write({ crossoverRecommendation: {
-      version:1,versionId,candidateId:candidate.candidateId,baselineCacheKey:candidate.baselineCacheKey,
+      version:1,versionId,runId:producingPlan?.run?.runId || null,candidateId:candidate.candidateId,baselineCacheKey:candidate.baselineCacheKey,
       candidate,baseline:diagnostics?.baseline || null,status:"recommended",
     } });
   }, [candidate,diagnostics,write,shared?.cacheKey,saved?.candidateId,saved?.baselineCacheKey]);
@@ -141,7 +142,7 @@ export default function CrossoverRecommendation({
     write({crossoverRecommendation:{...record,status:restore?"restored":"applied",error:null,appliedCacheKey:shared.cacheKey,verifiedAt:new Date().toISOString()}});
   }, [record,applying,authorityState.code,shared?.cacheKey,shared?.calculationInProgress,shared?.completedBassAuthority,shared?.authoritative,write]);
 
-  if (!record?.candidate) return null;
+  if (!record?.candidate || !receiptState?.ownsPanel) return null;
   // Only this version's own recommendation for the CURRENT design is shown.
   // An inherited, other-version or outdated recommendation hides the whole table.
   if (record.versionId && record.versionId !== versionId) return null;
@@ -196,12 +197,13 @@ export default function CrossoverRecommendation({
   const p19LevelLine = levelLine(baseline?.achievedP19Level, recommended.achievedP19Level, p19LevelText);
 
   async function commitAndVerify(restore) {
-    if (pending || typeof write !== "function" || typeof commitInstances !== "function") return;
+    if (pending || !receiptState?.ownsPanel || (!restore && !receiptState.canApply) || typeof write !== "function" || typeof commitInstances !== "function") return;
     const current=live.current;
     if (!restore && record.baselineCacheKey!==current.shared?.cacheKey) {
       setError("The design has changed. Re-run ADI before applying this recommendation.");return;
     }
     setApplying(true);setError(null);
+    onOperationChange?.({projectId,versionId,candidateId:record.candidateId,baselineCacheKey:record.baselineCacheKey,kind:restore?"restore":"apply"});
     const previousCacheKey=current.shared?.cacheKey;
     const previous=record.previousConfiguration || {
       instances:current.instances,
@@ -242,7 +244,7 @@ export default function CrossoverRecommendation({
     } catch(e) {
       setError(e.message);
       write({crossoverRecommendation:{...nextRecord,status:"verification-required",error:e.message}});
-    } finally {setApplying(false);}
+    } finally {setApplying(false);onOperationChange?.(null);}
   }
 
   function handleIgnore() {
@@ -402,8 +404,8 @@ export default function CrossoverRecommendation({
   // the transient applying/restoring/verification-required states. Neutral
   // colours; results identified as predicted, not yet applied.
   const isRestoredPending = restoredVerified;
-  const isWorking = record.status === "applying" || record.status === "restoring";
-  const showApply = ["recommended", "restored"].includes(record.status);
+  const isWorking = receiptState.operationActive === true;
+  const showApply = receiptState.canApply;
   const showIgnore = record.status === "recommended";
   const displayError = error || record.error || null;
 
@@ -419,6 +421,8 @@ export default function CrossoverRecommendation({
           <div className="text-[12px] text-[#757575] leading-relaxed">
             {isRestoredPending
               ? "Previous settings restored. The recommendation below is available to apply again."
+              : isWorking ? "The selected settings are being calculated and saved."
+              : receiptState.state === "verification-required" ? "Apply is no longer running. Recalculate Bass Results to verify the saved settings."
               : "A combined crossover and subwoofer integration improvement is available for approval."}
           </div>
         </div>
@@ -426,7 +430,7 @@ export default function CrossoverRecommendation({
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide bg-[#F1F0EE] text-[#3E4349] border border-[#DCDBD6]"
           data-adi-pending-badge="true"
         >
-          {isWorking ? "Applying" : "Awaiting approval"}
+          {isWorking ? (receiptState.state === "restoring" ? "Restoring" : "Applying") : receiptState.state === "verification-required" ? "Verification required" : "Awaiting approval"}
         </span>
       </div>
 
