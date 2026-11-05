@@ -392,6 +392,12 @@ export default function AdiOptimisationJourney({
   // Again) OR reoptimiseBusy (Re-test Bass Optimisation). During a fresh
   // Re-test the panel must show RUNNING, not a historical terminal result.
   const isRunning = freshRunActive;
+  // The latest run owns its status even when a previous calibration is still active.
+  const latestRunFailed = !isRunning && (
+    presentation?.state === "failed"
+    || ["failed", "error"].includes(runStatus)
+    || planView?.run?.outcome === "failed"
+  );
   // THE RUN'S LIVE PROGRESS — read from the engine's own published progress
   // store and the run's identity. The hook adds no count, no stage and no
   // percentage of its own: it ticks a clock while the run is in flight and
@@ -711,7 +717,7 @@ export default function AdiOptimisationJourney({
   });
   // The improvement the DESIGNER approves: the review owns the only Apply for it,
   // and its own "keep current design" applies nothing at all.
-  const improvementReviewActive = improvementResult.caseKey === IMPROVEMENT_CASE.REVIEW;
+  const improvementReviewActive = !latestRunFailed && improvementResult.caseKey === IMPROVEMENT_CASE.REVIEW;
 
   // ── THE BEFORE/AFTER COMPARISON CARDS ──
   // Structured metric pairs (P20, P19) for the pending, applied-by-user and
@@ -726,7 +732,7 @@ export default function AdiOptimisationJourney({
     placement,
     planView,
   });
-  const showImprovementCards = improvementCards != null;
+  const showImprovementCards = !latestRunFailed && improvementCards != null;
 
   // ── THE OLD CANDIDATE MOVES TO ENGINEER DETAILS ──
   // The candidate a previous run evaluated is not a recommendation in this state:
@@ -914,7 +920,7 @@ export default function AdiOptimisationJourney({
           className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase"
           style={theme.pill}
         >
-          {outcomeLabel || headline.statusLabel || journey.statusLabel}
+          {latestRunFailed ? "Optimisation failed" : (outcomeLabel || headline.statusLabel || journey.statusLabel)}
         </span>
       </div>
 
@@ -930,17 +936,17 @@ export default function AdiOptimisationJourney({
         // applied — in place of the generic evaluation line. When the comparison
         // cards carry the decision, the verbose message, adjustment, benefit and
         // comparison lines are suppressed so nothing is stated twice.
-        message={jointReceiptOwnsPanel
+        message={latestRunFailed ? journey.message : jointReceiptOwnsPanel
           ? (jointRecommendation.status === "applied" ? "Crossover and subwoofer integration applied and verified." : "ADI found a combined crossover and subwoofer integration improvement. Review the settings below.")
           : (showImprovementCards ? null : (improvementResult.headlineSentence || journey.message))}
         nextAction={showImprovementCards ? null : (presentation?.nextAction || null)}
         // In the trade-off state the decision IS the trade-off: the change, the
         // seat it would cost and the measurable trade replace the ordinary
         // adjustment/benefit/comparison lines, which would state it as an offer.
-        tradeOff={tradeOff?.isTradeOff ? tradeOff : null}
-        adjustment={jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.adjustment}
-        benefit={jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.benefit}
-        comparison={jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.comparison}
+        tradeOff={!latestRunFailed && tradeOff?.isTradeOff ? tradeOff : null}
+        adjustment={latestRunFailed || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.adjustment}
+        benefit={latestRunFailed || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.benefit}
+        comparison={latestRunFailed || jointReceiptOwnsPanel || previousCandidate || tradeOff || showImprovementCards ? null : headline.comparison}
         designLimitation={designLimitation}
         previousCandidateNotice={previousCandidate && !tradeOff ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
         staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
