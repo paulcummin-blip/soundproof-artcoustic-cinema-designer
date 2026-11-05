@@ -77,6 +77,7 @@ export function markStage1Updating(projectId, versionId, fingerprint) {
     isUpdating: true,
     errorMessage: null,
     hydratedFromCache: false,
+    runtimeDiagnostics: { scheduledAtMs: Date.now(), jobsPosted: 0, jobsCompleted: 0, jobsFailed: 0, workersReady: 0, events: [] },
   });
 }
 
@@ -125,7 +126,7 @@ function markStage1Stopped(request, outcome) {
 
 // ── Worker controller ───────────────────────────────────────────────────
 
-class Stage1PlacementController {
+export class Stage1PlacementController {
   constructor() {
     this.worker = null;
     this.activeRequest = null;
@@ -180,6 +181,8 @@ class Stage1PlacementController {
         };
       }
 
+      setMemory(projectId, versionId, { workerRequestId: requestId, workerStarted: Date.now() });
+      this.worker.onmessageerror = () => this.handleError("Stage 1 worker message could not be decoded", true);
       this.worker.postMessage({ requestId, generationId: requestId, fingerprint, payload });
     } catch (error) {
       this.handleError(error?.message || String(error), true);
@@ -193,6 +196,21 @@ class Stage1PlacementController {
     const active = this.activeRequest;
     if (!active || message.requestId !== active.requestId) return; // stale
     if (message.fingerprint !== active.fingerprint) return; // stale fingerprint
+
+    if (message.type === "progress") {
+      const previous = getMemory(active.projectId, active.versionId).runtimeDiagnostics || { events: [] };
+      const detail = { ...message.detail, atMs: Date.now() };
+      const counters = { job_posted: "jobsPosted", job_complete: "jobsCompleted", job_error: "jobsFailed", worker_ready: "workersReady" };
+      const counter = counters[detail.event];
+      setMemory(active.projectId, active.versionId, {
+        runtimeDiagnostics: { ...previous,
+          ...(counter ? { [counter]: (previous[counter] || 0) + 1 } : {}),
+          lastProgressAtMs: detail.atMs,
+          events: [...(previous.events || []), detail].slice(-24),
+        },
+      });
+      return;
+    }
 
     if (message.type === "cancelled") {
       this.activeRequest = null;
