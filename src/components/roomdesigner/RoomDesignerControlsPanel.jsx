@@ -1,8 +1,9 @@
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useState, useMemo } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
+import { buildLiveComplianceSummary } from "@/components/rp22/buildLiveComplianceSummary";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDimensionReflowBanner from "@/components/room/RoomDimensionReflowBanner";
 
@@ -139,6 +140,24 @@ export default function RoomDesignerControlsPanel({
   abfuserRecommendation,
 }) {
   const [speakersOpen, setSpeakersOpen] = useState(false);
+
+  // Live Compliance authority: project the same live RP22 analysis result that
+  // feeds the seat HUD into the engineering-summary shape RP22CompliancePanel
+  // reads. This shows progressive live results as the design is built — room/
+  // RSP parameters from gradedParameters.primary, seat parameters from
+  // perSeatRp22 — without waiting for the completed published assessment.
+  // The frozen published authority (engineeringSummary prop) is still used by
+  // OptionsPanel / reports; only the live Compliance panel reads this adapter.
+  const liveComplianceSummary = useMemo(
+    () => buildLiveComplianceSummary({
+      analysisResult,
+      seats: _seatingPositions,
+      assumedP15Level: appState?.assumedP15Level,
+      assumedP21Level: appState?.assumedP21Level,
+    }),
+    [analysisResult, _seatingPositions, appState?.assumedP15Level, appState?.assumedP21Level],
+  );
+
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
       <div
