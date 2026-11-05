@@ -102,8 +102,9 @@ test("matching genuine Stage 2 completion resolves once; previous request is ign
 });
 test("cancellation settles with no Stage 2 progress event", async () => {
   const req = request("cancel");
+  let cancelled = false;
   const pending = waitForStage2Terminal("cancel", "v1", { requestId:req.requestId, runId:"cancel-run", isCancelled:() => cancelled, timeoutMs:1000 });
-  let cancelled = true;
+  cancelled = true;
   requestCancel("cancel", "v1");
   assert.equal((await pending).status, "cancelled");
 });
