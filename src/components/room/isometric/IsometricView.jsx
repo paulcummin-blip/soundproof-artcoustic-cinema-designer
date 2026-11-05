@@ -68,6 +68,7 @@ export default function IsometricView({
   const animationFrameRef = useRef(null);
   const needsRenderRef = useRef(true);
   const fitFrustumRef = useRef(null);
+  const sceneDataRef = useRef(null);
 
   const [showHeads, setShowHeads] = useState(true);
   const [showRspMarker, setShowRspMarker] = useState(true);
@@ -92,6 +93,22 @@ export default function IsometricView({
     }),
     [appState, stableDimensions, placedSpeakers, seatingPositions, mlpPoint, screen, roomElements, dolbyLayout, getSpeakerVisibility, showRspMarker, showRoomDims],
   );
+
+  // Keep a ref to the latest scene data so stable callbacks (fitFrustum,
+  // applyFraming) read the current room dimensions without depending on the
+  // sceneData object identity. This breaks the chain where a presentation-only
+  // appState change (e.g. toggling a Plan View overlay) rebuilds sceneData and
+  // would otherwise re-trigger the camera framing effect — resetting the
+  // isometric camera. The camera only re-frames when the room's physical bounds
+  // change or a saved report view is applied.
+  sceneDataRef.current = sceneData;
+
+  // A compact key for the room's physical bounds. The framing effect depends
+  // on this, not on sceneData, so overlay/state changes that rebuild sceneData
+  // do NOT re-frame the camera.
+  const roomDimsKey = sceneData
+    ? `${sceneData.roomDims.widthM}x${sceneData.roomDims.lengthM}x${sceneData.roomDims.heightM}`
+    : "";
 
   // ---- Renderer / scene setup (once) ----
   useEffect(() => {
@@ -214,10 +231,13 @@ export default function IsometricView({
   }, []);
 
   // Fit the orthographic frustum to the room, preserving camera angle and zoom.
+  // Reads sceneDataRef (not sceneData) so the callback is stable and does not
+  // re-create when sceneData is rebuilt by a presentation-only state change.
   const fitFrustum = useCallback((w, h) => {
     const cam = cameraRef.current;
-    if (!cam || !sceneData) return;
-    const def = computeDefaultCamera(sceneData.roomDims);
+    const sd = sceneDataRef.current;
+    if (!cam || !sd) return;
+    const def = computeDefaultCamera(sd.roomDims);
     const aspect = w / h;
     const span = def.span / 2;
     cam.left = -span * aspect;
@@ -226,7 +246,7 @@ export default function IsometricView({
     cam.bottom = -span;
     cam.updateProjectionMatrix();
     needsRenderRef.current = true;
-  }, [sceneData]);
+  }, []);
 
   // Keep the ref current so the ResizeObserver (created once) always calls the
   // latest fitFrustum with the current sceneData — avoids a stale-closure where
@@ -234,13 +254,16 @@ export default function IsometricView({
   fitFrustumRef.current = fitFrustum;
 
   // Apply a camera framing (target + azimuth + polar + zoom) to the controls.
+  // Reads sceneDataRef (not sceneData) so the callback is stable and does not
+  // re-create when sceneData is rebuilt by a presentation-only state change.
   const applyFraming = useCallback((framing) => {
     const controls = controlsRef.current;
     const cam = cameraRef.current;
     const mount = mountRef.current;
-    if (!controls || !cam || !mount || !sceneData) return;
+    const sd = sceneDataRef.current;
+    if (!controls || !cam || !mount || !sd) return;
 
-    const def = computeDefaultCamera(sceneData.roomDims);
+    const def = computeDefaultCamera(sd.roomDims);
     const target = framing?.camera?.targetX != null
       ? new THREE.Vector3(framing.camera.targetX, framing.camera.targetZ, framing.camera.targetY)
       : def.target.clone();
@@ -265,7 +288,7 @@ export default function IsometricView({
     controls.update();
     fitFrustum(mount.clientWidth, mount.clientHeight);
     needsRenderRef.current = true;
-  }, [sceneData, fitFrustum]);
+  }, [fitFrustum]);
 
   // ---- Initial framing + apply saved report view on mount / version change ----
   useEffect(() => {

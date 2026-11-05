@@ -28,7 +28,7 @@ const formatDimension = (value) => {
   return fixed.replace(/\.?0+$/, '');
 };
 
-export default function RoomDimensions({ disabled, speakerPositionsView, onSpeakerPositionsViewChange }) {
+export default function RoomDimensions({ disabled, speakerPositionsView, onSpeakerPositionsViewChange, speakerPositionsDisabled = false }) {
   const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM, overlays, setOverlays } = useAppState();
 
   const [draftDims, setDraftDims] = React.useState(() => ({
@@ -86,15 +86,19 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
     }));
   };
 
-  // Mutual exclusivity: only one of Room Dimensions / Speaker Positions can be ON.
-  // Both use the same overlays store; functional updates compose safely.
+  // Mutual exclusivity (Plan View only): only one of Room Dimensions /
+  // Speaker Positions can be ON at the same time on the plan. In Front / Side /
+  // Isometric the Speaker Positions control is disabled, so toggling Room
+  // Dimensions there must NOT touch the saved Plan View Speaker Positions
+  // preference — it is a plan-only overlay and its value is preserved.
   const handleRoomDimsToggle = (next) => {
     if (!setOverlays) return;
     setOverlays((prev) => ({ ...(prev || {}), ROOM_DIMS: next }));
-    if (next) onSpeakerPositionsViewChange("off");
+    if (next && !speakerPositionsDisabled) onSpeakerPositionsViewChange("off");
   };
 
   const handleSpeakerPositionsToggle = (next) => {
+    if (speakerPositionsDisabled) return;
     const nextView = next ? "plan" : "off";
     if (next && setOverlays) {
       setOverlays((prev) => ({ ...(prev || {}), ROOM_DIMS: false }));
@@ -103,11 +107,13 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
   };
 
   // Normalise legacy state where both were ON: prefer Room Dimensions.
+  // Plan View only — never overwrite the Plan preference from another view.
   React.useEffect(() => {
+    if (speakerPositionsDisabled) return;
     if (overlays?.ROOM_DIMS && speakerPositionsView === "plan") {
       onSpeakerPositionsViewChange("off");
     }
-  }, [overlays?.ROOM_DIMS, speakerPositionsView, onSpeakerPositionsViewChange]);
+  }, [overlays?.ROOM_DIMS, speakerPositionsView, onSpeakerPositionsViewChange, speakerPositionsDisabled]);
 
   const compactInputStyle = {
     border: "1px solid #DCDBD6",
@@ -207,7 +213,8 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
             label="Speaker Positions"
             checked={speakerPositionsView === "plan"}
             onChange={handleSpeakerPositionsToggle}
-            disabled={disabled}
+            disabled={disabled || speakerPositionsDisabled}
+            tooltip={speakerPositionsDisabled ? "Available in Plan View" : undefined}
           />
         </div>
       </div>
