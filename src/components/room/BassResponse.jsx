@@ -462,9 +462,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // When active, the graph shows ONLY the live Room Response Preview from
   // current sub positions. All engineering layers (Product + Room Maximum,
   // Final Corrected Response, House Target, RP22 overlays, P14/P18/P19/P20
-  // markers, protected-null overlays) are suppressed. The previous published
-  // room response is optionally shown faded and labelled "Previous result —
-  // out of date".
+  // markers, protected-null overlays) are suppressed. Only the live green
+  // room-only preview curve is shown.
   const placementPreviewActive = sharedBassResults?.placementPreviewActive === true;
   const roomPreviewActive = sharedBassResults?.roomPreviewActive === true;
   const roomPreviewExclusive = sharedBassResults?.roomPreviewExclusive === true;
@@ -509,32 +508,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     };
   }, [roomPreviewActive, previewCurve, previewSeatId, previewSeatUnavailable]);
 
-  const previousResultFadedSeries = useMemo(() => {
-    if (!placementPreviewActive) return null;
-    // Use the previous published graph, independent of the user's normal
-    // layer-visibility choices. Some published results have no room-response
-    // layer, so fall back to their saved final response.
-    const prevPublishedSeries = multiSeriesForGraph.find((s) => s.kind === "room-response")
-      || multiSeriesForGraph.find((s) => s.kind === "post-eq");
-    const prevCurve = prevPublishedSeries?.data || null;
-    if (!prevCurve) return null;
-    return {
-      id: "previous-result",
-      color: "#9CA3AF",
-      data: prevCurve,
-      kind: "previous-result-faded",
-      label: "Previous result — out of date",
-      strokeOpacity: 0.4,
-    };
-  }, [placementPreviewActive, multiSeriesForGraph]);
-
   const placementPreviewGraphSeries = useMemo(() => {
     if (!roomPreviewActive) return null;
-    const series = [];
-    if (previousResultFadedSeries) series.push(previousResultFadedSeries);
-    if (placementPreviewSeries) series.push(placementPreviewSeries);
-    return series.length > 0 ? series : null;
-  }, [roomPreviewActive, placementPreviewSeries, previousResultFadedSeries]);
+    return placementPreviewSeries ? [placementPreviewSeries] : null;
+  }, [roomPreviewActive, placementPreviewSeries]);
 
   const effectiveVisibleSeries = roomPreviewExclusive
     ? (placementPreviewGraphSeries || [])
@@ -977,7 +954,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSmoothingModeChange={setBassSmoothingMode}
               markers={rp22GraphMarkers}
               placementPreviewActive={roomPreviewActive}
-              previousResultFaded={!!previousResultFadedSeries}
             />
           </>
         ) : (
@@ -1017,7 +993,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             {previewSeatUnavailable && (
               <span style={{ color: "#B45309" }}>Preview available at the RSP only.</span>
             )}
-            {previousResultFadedSeries && <span style={{ color: "#6B7280" }}>━━ Previous result — out of date</span>}
             {roomPreviewUpdating && (
               <span style={{ color: "#16A34A" }} className="inline-flex items-center gap-1">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />

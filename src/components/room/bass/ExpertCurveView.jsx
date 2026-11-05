@@ -34,7 +34,6 @@ export default function ExpertCurveView({
   onSmoothingModeChange,
   markers = null,
   placementPreviewActive = false,
-  previousResultFaded = false,
 }) {
   return (
     <CollapsiblePanel title="Expert Curve View" defaultOpen={false}>
@@ -60,11 +59,7 @@ export default function ExpertCurveView({
             }}
           >
             <strong>Placement preview is provisional.</strong> The graph shows the current
-            preview curve
-            {previousResultFaded
-              ? ", with the previous result faded and labelled out of date"
-              : ""}
-            . Authoritative engineering layers are suppressed until the layout is
+            preview curve. Authoritative engineering layers are suppressed until the layout is
             recalculated.
           </div>
         )}
