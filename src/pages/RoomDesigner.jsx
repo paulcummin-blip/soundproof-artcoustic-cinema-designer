@@ -15,6 +15,7 @@ import { isRetainedSummaryStillValid } from "@/components/state/designRatingPubl
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
 import EngineeringPublicationStatus from "@/components/engineering/EngineeringPublicationStatus";
+import DealerAssessmentGuidance from "@/components/engineering/DealerAssessmentGuidance";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -2148,6 +2149,15 @@ function RoomDesignerWithState() {
 
       {isProjectMode && <EngineeringPublicationStatus publication={engineeringPublication}
         projectId={resolvedProjectId || projectIdState || null} versionId={appState?.activeVersionId || null} />}
+      {isProjectMode && (
+        <DealerAssessmentGuidance
+          publication={engineeringPublication}
+          placedSpeakers={placedSpeakers}
+          appState={appState}
+          dolbyLayout={dolbyPreset}
+          useWidesInsteadOfRears={appState?.seven_bed_layout_type === 'wides'}
+        />
+      )}
 
       {/* Persistent Workspace View selector — always visible across all three modes. */}
       <WorkspaceViewSelector viewMode={viewMode} onViewModeChange={setViewMode} />
