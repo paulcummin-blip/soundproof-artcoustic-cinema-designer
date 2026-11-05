@@ -291,8 +291,10 @@ export default function OptimiseAndCalculate({
     || heavyAction?.status === "requested"
     || heavyAction?.status === "running"
   );
-  // Cancel visibility is owned solely by bassCalculationLifecycle.
-  const canCancel = canCancelBassCalculation(bassLifecycleState, hasActiveJob);
+  // A current bass publication can coexist with a running evidence-only plan.
+  // Its active jobs use the same cancel handler even though bass itself is complete.
+  const canCancel = canCancelBassCalculation(bassLifecycleState, hasActiveJob)
+    || (planRunStatus === "running" && hasActiveJob);
   const isTimedOut = bassLifecycleState === BASS_LIFECYCLE_STATE.TIMED_OUT && !isCalculating;
   // Stale: published result exists but the subwoofer design has changed.
   // The designer must see "Update Bass Performance" — not be forced back to
