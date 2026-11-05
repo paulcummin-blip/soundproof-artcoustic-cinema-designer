@@ -150,7 +150,7 @@ export async function runOptimisation(opts) {
     setAwaitingStage2(projectId, versionId, snapshot);
     // The ADI optimisation consumes only the installed quantity's placement
     // result, so only that quantity is studied (all its families/confirmations run).
-    requestBassHeavyAction(projectId, versionId, "optimise", shared.cacheKey, {
+    const stage2Request = requestBassHeavyAction(projectId, versionId, "optimise", shared.cacheKey, {
       selectedQuantityOnly: [1, 2, 3, 4].includes(selectedQuantity),
     });
 
@@ -166,6 +166,8 @@ export async function runOptimisation(opts) {
     };
 
     const waitResult = await waitForStage2Terminal(projectId, versionId, {
+      requestId: stage2Request?.requestId,
+      runId,
       isCancelled: () => isCancelRequested(projectId, versionId),
       getCurrentFingerprint,
       startFingerprint,
@@ -175,20 +177,21 @@ export async function runOptimisation(opts) {
       runId, totalWallClockMs: 0,
       stageSpans: { "stage2-wait": performance.now() - stage2StartedAt },
       counts: {}, workerCalls: [],
-      stage2: getStage2State(projectId, versionId)?.runtimeDiagnostics || null,
+      stage2: waitResult.diagnostics?.stage2?.runtimeDiagnostics || null,
+      stage2Terminal: waitResult.diagnostics,
     };
     opts.onRuntimeMetrics?.(waitedMetrics);
     if (waitResult.status === "cancelled") {
       setCancelled(projectId, versionId);
-      return { status: "cancelled" };
+      return { status: "cancelled", runtimeMetrics: waitedMetrics };
     }
     if (waitResult.status === "stale") {
       setStale(projectId, versionId, waitResult.message);
-      return { status: "stale" };
+      return { status: "stale", error: waitResult.message, runtimeMetrics: waitedMetrics };
     }
     if (waitResult.status === "error" || waitResult.status === "timeout") {
       setError(projectId, versionId, waitResult.error);
-      return { status: "error", error: waitResult.error };
+      return { status: "error", error: waitResult.error, runtimeMetrics: waitedMetrics };
     }
 
     stage2Result = waitResult.stage2;
