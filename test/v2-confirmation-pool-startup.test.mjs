@@ -34,6 +34,26 @@ test("startup acknowledged before candidate; successful jobs run once",async()=>
   assert.ok(workers.every(w=>w.calls[0].phase==="integration-context"));
   p.terminateAll();
 });
+test("healthy module loading beyond five seconds can acknowledge before evaluation",async()=>{
+  class LoadingWorker extends WorkerMock {
+    postMessage(data) {
+      if (data.phase === "integration-context") {
+        setTimeout(() => super.postMessage(data), 5100);
+      } else super.postMessage(data);
+    }
+  }
+  const workers=[];
+  const p=createConfirmationPool({size:3,
+    createWorker:()=>{const w=new LoadingWorker();workers.push(w);return w;}});
+  try {
+    const job=p.runConfirmation({value:42});
+    assert.ok(workers.every(w=>w.calls.length===0));
+    assert.equal(await job,42);
+    assert.equal(workers.flatMap(w=>w.calls).filter(c=>c.phase==="confirmation").length,1);
+    assert.ok(workers.every(w=>w.calls[0].phase==="integration-context"));
+  } finally { p.terminateAll(); }
+});
+
 test("early module startup error ends pool before first confirmation",async()=>{
   const {p,workers}=pool("startup-error");
   await new Promise(r=>setTimeout(r,1));
