@@ -29,6 +29,7 @@ import {
   buildLeverUndoInstances,
   buildSeatingApplyPositions,
   buildSeatingUndoPositions,
+  buildSeatingRspUpdate,
 } from "../optimiserPlan/optimiserPlanLeverApply.js";
 import { readAuthoritativeP20Headline } from "../optimiserPlan/optimiserPlanMetrics.js";
 import { OPTIMISER_LEVER } from "../optimiserPlan/optimiserPlanConstants.js";
@@ -256,7 +257,14 @@ export default function AdiRecommendation({
         ? buildSeatingUndoPositions({ lever, seatingPositions })
         : buildSeatingApplyPositions({ lever, seatingPositions });
       if (!result.ok) return;
+      const rspUpdate = buildSeatingRspUpdate({
+        seatingPositions, nextSeatingPositions: result.seatingPositions,
+        rspMode: appState?.rspMode, manualRspY_m: appState?.manualRspY_m,
+      });
+      if (!rspUpdate.ok || (rspUpdate.manualRspY_m !== null && typeof appState?.setManualRspY_m !== "function")) return;
+      // Capture the previous design before updating either seats or manual RSP.
       commitSeating(result.seatingPositions);
+      if (rspUpdate.manualRspY_m !== null) appState.setManualRspY_m(rspUpdate.manualRspY_m);
       setLeverOutcome({
         leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key, direction,
       });
@@ -283,7 +291,7 @@ export default function AdiRecommendation({
     if (typeof onRecalculate === "function") {
       onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
-  }, [commitInstances, commitSeating, currentInstances, seatingPositions, completedBassAuthority, onRecalculate, shared]);
+  }, [commitInstances, commitSeating, currentInstances, seatingPositions, completedBassAuthority, onRecalculate, shared, appState]);
 
   const handleApplyLever = useCallback((lever) => {
     setLeverApplyBusy(lever?.key || null);
