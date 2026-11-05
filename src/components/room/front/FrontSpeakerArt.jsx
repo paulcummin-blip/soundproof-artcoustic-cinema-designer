@@ -20,7 +20,7 @@ import { HIGHLIGHT_GREEN } from "@/components/state/speakerSelectionStore";
  *
  * opts:
  *   key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey,
- *   tvPresetKey, labelInsideBox, labelY, onMouseDown, vertical,
+ *   tvPresetKey, labelInsideBox, labelY, onPointerDown, pointerHandlers, vertical,
  *   cabinetLengthMm, labelHighlighted
  * ctx:
  *   rx, ry, roomW, drawW, drawH, screenCenterX, overallW, screen, labelColor
@@ -31,10 +31,28 @@ import { HIGHLIGHT_GREEN } from "@/components/state/speakerSelectionStore";
 export function drawFrontSpeakerArt(opts, ctx) {
   const {
     key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey,
-    tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown,
-    vertical = false, cabinetLengthMm = null, labelHighlighted = false,
+    tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onPointerDown,
+    pointerHandlers, vertical = false, cabinetLengthMm = null, labelHighlighted = false,
   } = opts || {};
   const { rx, ry, roomW, drawW, screenCenterX, overallW, screen, labelColor } = ctx || {};
+
+  // Draggable objects use one Pointer Events lifecycle. `onPointerDown` is the
+  // per-target starter (records the object/drag mode and captures the pointer);
+  // `pointerHandlers` carries the shared move/up/cancel/lostcapture handlers
+  // bound to the same element. `touch-action: none` on the draggable element
+  // stops the page from scrolling/panning while the pointer is over it, so a
+  // drag never fights the browser — and only that element is affected.
+  const draggable = !!onPointerDown;
+  const dragStyle = draggable
+    ? { cursor: 'grab', userSelect: 'none', touchAction: 'none' }
+    : undefined;
+  // Invisible expanded hit area. The visual object stays at true physical
+  // drawing scale; this transparent rect only enlarges the tappable target so a
+  // physically small cabinet is practical to select on iPad. `pointerEvents:
+  // 'all'` makes the whole box hit-testable; it sits behind the drawing.
+  const HIT_MIN = 24;
+  const hitW = Math.max(sw, HIT_MIN);
+  const hitH = Math.max(sh, HIT_MIN);
 
   const sx = cx - sw / 2;
   const sy = cy - sh / 2;
@@ -89,7 +107,11 @@ export function drawFrontSpeakerArt(opts, ctx) {
     const artworkY = cy - artworkH / 2;
     const ArtworkComponent = useMulti65Artwork ? MultiSoundbar65ArtworkFaceIcon : useMulti77Artwork ? MultiSoundbar77ArtworkFaceIcon : useMulti100Artwork ? MultiSoundbar100ArtworkFaceIcon : MultiSoundbarArtworkFaceIcon;
     return (
-      <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
+      <g key={key} onPointerDown={onPointerDown} {...(pointerHandlers || {})} style={dragStyle}>
+        {draggable && (
+          <rect x={cx - hitW / 2} y={cy - hitH / 2} width={hitW} height={hitH}
+            fill="transparent" stroke="none" style={{ pointerEvents: 'all' }} />
+        )}
         <ArtworkComponent x={artworkX} y={artworkY} width={artworkW} height={artworkH} />
         <text x={rx(screenCenterX)} y={labelY ?? (artworkY - 10)} textAnchor="middle" fontSize={9} fill={labelFill} fontWeight={700} letterSpacing="0.04em">
           {label}
@@ -161,7 +183,12 @@ export function drawFrontSpeakerArt(opts, ctx) {
   };
 
   return (
-    <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
+    <g key={key} onPointerDown={onPointerDown} {...(pointerHandlers || {})} style={dragStyle}>
+      {/* Invisible expanded hit area — behind the drawing, true visual scale. */}
+      {draggable && (
+        <rect x={cx - hitW / 2} y={cy - hitH / 2} width={hitW} height={hitH}
+          fill="transparent" stroke="none" style={{ pointerEvents: 'all' }} />
+      )}
       {/* Body */}
       {hasFaceIcon ? (
         <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>

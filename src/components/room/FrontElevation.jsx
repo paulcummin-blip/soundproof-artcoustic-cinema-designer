@@ -29,6 +29,7 @@ import {
   publishLiveSpeakerPosition,
   useSpeakerHighlight,
 } from "@/components/state/speakerSelectionStore";
+import { useFrontPointerDrag } from "@/components/room/front/useFrontPointerDrag";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -66,7 +67,6 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
   // ── Front Elevation drag machinery ──────────────────────────────────────
   const svgRef = useRef(null);
-  const dragRef = useRef(null);
   const geomRef = useRef({});
   geomRef.current = { offsetX, offsetY, drawW, drawH, roomW, roomH };
   const onMovedRef = useRef(onLcrSpeakerMoved);
@@ -124,222 +124,227 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     return { mX: (svgP.x - ox) * rW / dW, mZ: (oy + dH - svgP.y) * rH / dH };
   }, []);
 
-  const handleLcrMouseDown = useCallback((e, role, speakerMX, speakerMZ) => {
-    e.preventDefault();
-    const start = clientToRoom(e.clientX, e.clientY);
-    if (!start) return;
-    dragRef.current = { role, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
-    if (isDraggingRef) isDraggingRef.current = true;
-    document.body.style.cursor = 'grabbing';
-    // Movement begins: the speaker is identified in the drawing and the height
-    // control that governs it lights — the same gesture as the surround view.
-    beginSpeakerHighlight([role]);
-    // Show TV centre guide immediately when dragging FL/FR in TV mode
-    if ((role === 'FL' || role === 'FR') && tvCentreRef.current !== null) {
-      setTvGuideRef.current?.({ snapped: false });
-    }
-  }, [clientToRoom, isDraggingRef]);
-
-  const handleSubMouseDown = useCallback((e, subIndex, subId, speakerMX, speakerMZ) => {
-    e.preventDefault();
-    const start = clientToRoom(e.clientX, e.clientY);
-    if (!start) return;
-    dragRef.current = { type: 'sub', subIndex, subId, speakerMX, speakerMZ, startRoomX: start.mX, startRoomZ: start.mZ, axisLocked: null };
-    if (isDraggingRef) isDraggingRef.current = true;
-    document.body.style.cursor = 'grabbing';
-  }, [clientToRoom, isDraggingRef]);
-
-  useEffect(() => {
+  // ── Pointer Events drag lifecycle (LCR speakers + front subwoofers) ──────
+  // One Pointer Events lifecycle serves every front-stage draggable object.
+  // The hook owns pointer capture, the tap/drag threshold, multi-touch safety
+  // and cancellation; the callbacks below reuse the exact same authoritative
+  // transforms, limits, snapping and pairing the mouse path used. Mouse, touch
+  // and Apple Pencil all flow through this one path. No geometry is committed on
+  // pointer-down; a tap releases without committing.
+  const handleDragMove = (drag, e) => {
+    const curr = clientToRoom(e.clientX, e.clientY);
+    if (!curr) return;
+    const dX = curr.mX - (drag.startRoomX ?? curr.mX);
+    const dZ = curr.mZ - (drag.startRoomZ ?? curr.mZ);
+    const { drawW: dW, drawH: dH, roomW: rW, roomH: rH } = geomRef.current;
+    const dXpx = Math.abs(dX / rW * dW);
+    const dZpx = Math.abs(dZ / rH * dH);
     const THRESHOLD_PX = 4;
-    const onMouseMove = (e) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const curr = clientToRoom(e.clientX, e.clientY);
-      if (!curr) return;
-      const dX = curr.mX - drag.startRoomX;
-      const dZ = curr.mZ - drag.startRoomZ;
-      const { drawW: dW, drawH: dH, roomW: rW, roomH: rH } = geomRef.current;
-      const dXpx = Math.abs(dX / rW * dW);
-      const dZpx = Math.abs(dZ / rH * dH);
-      if (!drag.axisLocked) {
-        if (Math.max(dXpx, dZpx) < THRESHOLD_PX) return;
-        drag.axisLocked = drag.role === 'FC' ? 'z' : (dXpx >= dZpx ? 'x' : 'z');
+    if (!drag.axisLocked) {
+      if (Math.max(dXpx, dZpx) < THRESHOLD_PX) return;
+      drag.axisLocked = drag.role === 'FC' ? 'z' : (dXpx >= dZpx ? 'x' : 'z');
+    }
+    const rawX = Math.max(0, Math.min(rW, drag.speakerMX + (drag.axisLocked === 'x' ? dX : 0)));
+    const rawZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
+    // Magnetic snap (50 mm threshold, room-space metres)
+    const SNAP_M = 0.05;
+    const isDragSub = drag.type === 'sub';
+    const isDraggedItem = (s) => isDragSub
+      ? (typeof s.index === 'number' && s.index === drag.subIndex)
+      : (s.role || s.label) === drag.role;
+    // A dual-centre cabinet is never a snap target for its own partner: the
+    // pair is linked, so the partner's position is derived from this drag.
+    const pairPartnerRole = centreCabinetPartnerRole(drag.role);
+    const allOtherSpks = [...lcrSpeakersRef.current, ...subItemsRef.current]
+      .filter(s => !isDraggedItem(s) && !(pairPartnerRole && (s.role || s.label) === pairPartnerRole));
+    let snappedX = rawX, snappedZ = rawZ, snapResult = null;
+    if (drag.axisLocked === 'x') {
+      const xTargets = [
+        { value: rW / 2, type: 'centre' },
+        ...allOtherSpks.map(s => ({ value: s.x, type: 'speaker' })),
+      ];
+      let best = null, bestD = SNAP_M;
+      xTargets.forEach(t => { const d = Math.abs(rawX - t.value); if (d < bestD) { bestD = d; best = t; } });
+      if (best) { snappedX = best.value; snapResult = { axis: 'x', value: best.value }; }
+    }
+    if (drag.axisLocked === 'z') {
+      const isLRPair = !isDragSub && (drag.role === 'FL' || drag.role === 'FR');
+      const zTargets = allOtherSpks
+        .filter(s => !(isLRPair && (s.role === 'FL' || s.role === 'FR')))
+        .map(s => ({ value: s.z, type: 'speaker' }));
+      // Inject TV vertical centre as a snap target for FL/FR in TV mode
+      const tvCentre = tvCentreRef.current;
+      if (isLRPair && tvCentre !== null) {
+        zTargets.push({ value: tvCentre, type: 'tv_centre' });
       }
-      const rawX = Math.max(0, Math.min(rW, drag.speakerMX + (drag.axisLocked === 'x' ? dX : 0)));
-      const rawZ = Math.max(0, Math.min(rH, drag.speakerMZ + (drag.axisLocked === 'z' ? dZ : 0)));
-      // Magnetic snap (50 mm threshold, room-space metres)
-      const SNAP_M = 0.05;
-      const isDragSub = drag.type === 'sub';
-      const isDraggedItem = (s) => isDragSub
-        ? (typeof s.index === 'number' && s.index === drag.subIndex)
-        : (s.role || s.label) === drag.role;
-      // A dual-centre cabinet is never a snap target for its own partner: the
-      // pair is linked, so the partner's position is derived from this drag.
-      const pairPartnerRole = centreCabinetPartnerRole(drag.role);
-      const allOtherSpks = [...lcrSpeakersRef.current, ...subItemsRef.current]
-        .filter(s => !isDraggedItem(s) && !(pairPartnerRole && (s.role || s.label) === pairPartnerRole));
-      let snappedX = rawX, snappedZ = rawZ, snapResult = null;
-      if (drag.axisLocked === 'x') {
-        const xTargets = [
-          { value: rW / 2, type: 'centre' },
-          ...allOtherSpks.map(s => ({ value: s.x, type: 'speaker' })),
-        ];
-        let best = null, bestD = SNAP_M;
-        xTargets.forEach(t => { const d = Math.abs(rawX - t.value); if (d < bestD) { bestD = d; best = t; } });
-        if (best) { snappedX = best.value; snapResult = { axis: 'x', value: best.value }; }
+      let best = null, bestD = SNAP_M;
+      zTargets.forEach(t => { const d = Math.abs(rawZ - t.value); if (d < bestD) { bestD = d; best = t; } });
+      if (best) { snappedZ = best.value; snapResult = { axis: 'z', value: best.value }; }
+    }
+    setActiveSnapRef.current?.(snapResult);
+    if (isDragSub) {
+      // Build local live map — do NOT call onFrontSubMoved here
+      const { roomW: rW } = geomRef.current;
+      const totalFrontSubs = subItemsRef.current.length;
+      const liveMap = { [drag.subIndex]: { x: snappedX, z: snappedZ } };
+      if (totalFrontSubs === 2 && drag.axisLocked === 'x') {
+        const otherIdx = 1 - drag.subIndex;
+        const otherCurrent = subItemsRef.current[otherIdx];
+        liveMap[otherIdx] = { x: rW - snappedX, z: liveDragSubsRef.current?.[otherIdx]?.z ?? otherCurrent?.z ?? snappedZ };
+      } else if (totalFrontSubs === 2 && drag.axisLocked === 'z') {
+        const otherIdx = 1 - drag.subIndex;
+        const otherCurrent = subItemsRef.current[otherIdx];
+        liveMap[otherIdx] = { x: liveDragSubsRef.current?.[otherIdx]?.x ?? otherCurrent?.x ?? snappedX, z: snappedZ };
+      }
+      liveDragSubsRef.current = liveMap;
+      setLiveDragSubs({ ...liveMap });
+    } else {
+      // LCR local preview — do NOT call onLcrSpeakerMoved here.
+      // Pairing logic mirrors handleLcrSpeakerMoved's setSpeakers logic.
+      const liveMap = { ...(liveDragLcrRef.current || {}) };
+      liveMap[drag.role] = { x: snappedX, z: snappedZ };
+      // Linked pair: the partner cabinet mirrors this drag instantly — x
+      // reflected about the room centreline, height shared — so the two
+      // cabinets move as one on every axis, live, before any commit.
+      if (pairPartnerRole) {
+        const partnerSpk = lcrSpeakersRef.current.find(s => s.role === pairPartnerRole);
+        const linked = linkedCentreCabinetPositions({
+          roomWidthM: rW,
+          draggedRole: drag.role,
+          draggedPosition: { x: snappedX, z: snappedZ },
+          partnerPosition: { x: partnerSpk?.x, z: partnerSpk?.z },
+        });
+        if (linked) {
+          liveMap[pairPartnerRole] = { x: linked.partner.x, z: linked.partner.z };
+        }
+      }
+      if (drag.axisLocked === 'x' && drag.role === 'FL') {
+        const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
+        liveMap['FR'] = { x: rW - snappedX, z: liveMap['FR']?.z ?? frSpk?.z ?? snappedZ };
+      }
+      if (drag.axisLocked === 'x' && drag.role === 'FR') {
+        const flSpk = lcrSpeakersRef.current.find(s => s.role === 'FL');
+        liveMap['FL'] = { x: rW - snappedX, z: liveMap['FL']?.z ?? flSpk?.z ?? snappedZ };
       }
       if (drag.axisLocked === 'z') {
-        const isLRPair = !isDragSub && (drag.role === 'FL' || drag.role === 'FR');
-        const zTargets = allOtherSpks
-          .filter(s => !(isLRPair && (s.role === 'FL' || s.role === 'FR')))
-          .map(s => ({ value: s.z, type: 'speaker' }));
-        // Inject TV vertical centre as a snap target for FL/FR in TV mode
+        const flSpk = lcrSpeakersRef.current.find(s => s.role === 'FL');
+        const fcSpk = lcrSpeakersRef.current.find(s => s.role === 'FC');
+        const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
+        const allSameModel = flSpk && fcSpk && frSpk && flSpk.modelKey === fcSpk.modelKey && fcSpk.modelKey === frSpk.modelKey;
+        const isCenterOnly = frontStageModeRef.current === 'center_only';
+        if (allSameModel) {
+          liveMap['FL'] = { x: liveMap['FL']?.x ?? flSpk?.x ?? snappedX, z: snappedZ };
+          liveMap['FC'] = { x: liveMap['FC']?.x ?? fcSpk?.x ?? snappedX, z: snappedZ };
+          liveMap['FR'] = { x: liveMap['FR']?.x ?? frSpk?.x ?? snappedX, z: snappedZ };
+        } else if (!isCenterOnly && (drag.role === 'FL' || drag.role === 'FR')) {
+          // Only sync FL↔FR in standard/integrated mode.
+          // In center_only mode FL/FR are independent — the commit does not
+          // sync them, so the preview must not either.
+          const otherRole = drag.role === 'FL' ? 'FR' : 'FL';
+          const otherSpk = lcrSpeakersRef.current.find(s => s.role === otherRole);
+          liveMap[otherRole] = { x: liveMap[otherRole]?.x ?? otherSpk?.x ?? snappedX, z: snappedZ };
+        }
+      }
+      liveDragLcrRef.current = liveMap;
+      setLiveDragLcr({ ...liveMap });
+      // The movement itself, published live: the height control shows the
+      // number being dragged to, and every speaker that is actually moving is
+      // identified — the shared height relationship included.
+      publishLiveSpeakerPosition({ role: drag.role, z: snappedZ });
+      beginSpeakerHighlight(Object.keys(liveMap));
+      if (drag.axisLocked === 'z') {
+        setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
+        // Update TV centre snap state for FL/FR
         const tvCentre = tvCentreRef.current;
-        if (isLRPair && tvCentre !== null) {
-          zTargets.push({ value: tvCentre, type: 'tv_centre' });
-        }
-        let best = null, bestD = SNAP_M;
-        zTargets.forEach(t => { const d = Math.abs(rawZ - t.value); if (d < bestD) { bestD = d; best = t; } });
-        if (best) { snappedZ = best.value; snapResult = { axis: 'z', value: best.value }; }
-      }
-      setActiveSnapRef.current?.(snapResult);
-      if (isDragSub) {
-        // Build local live map — do NOT call onFrontSubMoved here
-        const { roomW: rW } = geomRef.current;
-        const totalFrontSubs = subItemsRef.current.length;
-        const liveMap = { [drag.subIndex]: { x: snappedX, z: snappedZ } };
-        if (totalFrontSubs === 2 && drag.axisLocked === 'x') {
-          const otherIdx = 1 - drag.subIndex;
-          const otherCurrent = subItemsRef.current[otherIdx];
-          liveMap[otherIdx] = { x: rW - snappedX, z: liveDragSubsRef.current?.[otherIdx]?.z ?? otherCurrent?.z ?? snappedZ };
-        } else if (totalFrontSubs === 2 && drag.axisLocked === 'z') {
-          const otherIdx = 1 - drag.subIndex;
-          const otherCurrent = subItemsRef.current[otherIdx];
-          liveMap[otherIdx] = { x: liveDragSubsRef.current?.[otherIdx]?.x ?? otherCurrent?.x ?? snappedX, z: snappedZ };
-        }
-        liveDragSubsRef.current = liveMap;
-        setLiveDragSubs({ ...liveMap });
-      } else {
-        // LCR local preview — do NOT call onLcrSpeakerMoved here.
-        // Pairing logic mirrors handleLcrSpeakerMoved's setSpeakers logic.
-        const liveMap = { ...(liveDragLcrRef.current || {}) };
-        liveMap[drag.role] = { x: snappedX, z: snappedZ };
-        // Linked pair: the partner cabinet mirrors this drag instantly — x
-        // reflected about the room centreline, height shared — so the two
-        // cabinets move as one on every axis, live, before any commit.
-        if (pairPartnerRole) {
-          const partnerSpk = lcrSpeakersRef.current.find(s => s.role === pairPartnerRole);
-          const linked = linkedCentreCabinetPositions({
-            roomWidthM: rW,
-            draggedRole: drag.role,
-            draggedPosition: { x: snappedX, z: snappedZ },
-            partnerPosition: { x: partnerSpk?.x, z: partnerSpk?.z },
-          });
-          if (linked) {
-            liveMap[pairPartnerRole] = { x: linked.partner.x, z: linked.partner.z };
-          }
-        }
-        if (drag.axisLocked === 'x' && drag.role === 'FL') {
-          const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
-          liveMap['FR'] = { x: rW - snappedX, z: liveMap['FR']?.z ?? frSpk?.z ?? snappedZ };
-        }
-        if (drag.axisLocked === 'x' && drag.role === 'FR') {
-          const flSpk = lcrSpeakersRef.current.find(s => s.role === 'FL');
-          liveMap['FL'] = { x: rW - snappedX, z: liveMap['FL']?.z ?? flSpk?.z ?? snappedZ };
-        }
-        if (drag.axisLocked === 'z') {
-          const flSpk = lcrSpeakersRef.current.find(s => s.role === 'FL');
-          const fcSpk = lcrSpeakersRef.current.find(s => s.role === 'FC');
-          const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
-          const allSameModel = flSpk && fcSpk && frSpk && flSpk.modelKey === fcSpk.modelKey && fcSpk.modelKey === frSpk.modelKey;
-          const isCenterOnly = frontStageModeRef.current === 'center_only';
-          if (allSameModel) {
-            liveMap['FL'] = { x: liveMap['FL']?.x ?? flSpk?.x ?? snappedX, z: snappedZ };
-            liveMap['FC'] = { x: liveMap['FC']?.x ?? fcSpk?.x ?? snappedX, z: snappedZ };
-            liveMap['FR'] = { x: liveMap['FR']?.x ?? frSpk?.x ?? snappedX, z: snappedZ };
-          } else if (!isCenterOnly && (drag.role === 'FL' || drag.role === 'FR')) {
-            // Only sync FL↔FR in standard/integrated mode.
-            // In center_only mode FL/FR are independent — the commit does not
-            // sync them, so the preview must not either.
-            const otherRole = drag.role === 'FL' ? 'FR' : 'FL';
-            const otherSpk = lcrSpeakersRef.current.find(s => s.role === otherRole);
-            liveMap[otherRole] = { x: liveMap[otherRole]?.x ?? otherSpk?.x ?? snappedX, z: snappedZ };
-          }
-        }
-        liveDragLcrRef.current = liveMap;
-        setLiveDragLcr({ ...liveMap });
-        // The movement itself, published live: the height control shows the
-        // number being dragged to, and every speaker that is actually moving is
-        // identified — the shared height relationship included.
-        publishLiveSpeakerPosition({ role: drag.role, z: snappedZ });
-        beginSpeakerHighlight(Object.keys(liveMap));
-        if (drag.axisLocked === 'z') {
-          setAlignGuideRef.current?.({ draggingRole: drag.role, liveZ: snappedZ });
-          // Update TV centre snap state for FL/FR
-          const tvCentre = tvCentreRef.current;
-          if ((drag.role === 'FL' || drag.role === 'FR') && tvCentre !== null) {
-            setTvGuideRef.current?.({ snapped: Math.abs(snappedZ - tvCentre) < 0.005 });
-          }
+        if ((drag.role === 'FL' || drag.role === 'FR') && tvCentre !== null) {
+          setTvGuideRef.current?.({ snapped: Math.abs(snappedZ - tvCentre) < 0.005 });
         }
       }
-    };
-    const onMouseUp = () => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      // Commit final sub position(s) once on mouseup by exact stable id.
-      // If the paired front sub visually moved, patch both exact ids in one commit.
-      if (drag.type === 'sub') {
-        const liveMap = liveDragSubsRef.current;
-        if (liveMap && drag.axisLocked) {
-          const movedBySubId = {};
-          subItemsRef.current.forEach((sub, i) => {
-            const live = liveMap[i];
-            if (live && sub?.id) {
-              movedBySubId[sub.id] = { x: live.x, z: live.z };
-            }
-          });
-          if (Object.keys(movedBySubId).length > 0) {
-            onSubMovedRef.current?.({ movedBySubId, axis: drag.axisLocked });
+    }
+  };
+
+  // Single commit on a clean pointer release. The hook already verified the
+  // pointer moved past the tap/drag threshold before calling this.
+  const handleDragCommit = (drag) => {
+    if (drag.type === 'sub') {
+      // Commit final sub position(s) once by exact stable id. If the paired
+      // front sub visually moved, patch both exact ids in one commit.
+      const liveMap = liveDragSubsRef.current;
+      if (liveMap && drag.axisLocked) {
+        const movedBySubId = {};
+        subItemsRef.current.forEach((sub, i) => {
+          const live = liveMap[i];
+          if (live && sub?.id) {
+            movedBySubId[sub.id] = { x: live.x, z: live.z };
           }
+        });
+        if (Object.keys(movedBySubId).length > 0) {
+          onSubMovedRef.current?.({ movedBySubId, axis: drag.axisLocked });
         }
-        liveDragSubsRef.current = null;
-        setLiveDragSubs(null);
-      } else {
-        // LCR commit: one authoritative call on release (not on every mousemove).
-        const liveMap = liveDragLcrRef.current;
-        if (liveMap && drag.axisLocked) {
-          const live = liveMap[drag.role];
-          if (live) {
-            onMovedRef.current?.({ role: drag.role, newX: live.x, newZ: live.z, axis: drag.axisLocked });
-          }
-        }
-        // The number the control has been showing becomes the project's own, and
-        // only then is the live number withdrawn — in that order, so the control
-        // never flashes back to the old height for a frame. The light then holds
-        // for its five seconds and returns on its own.
-        clearLiveSpeakerPosition();
-        settleSpeakerHighlight();
-        liveDragLcrRef.current = null;
-        setLiveDragLcr(null);
       }
-      dragRef.current = null;
-      if (isDraggingRef) isDraggingRef.current = false;
-      document.body.style.cursor = '';
-      setAlignGuideRef.current?.(null);
-      setActiveSnapRef.current?.(null);
-      setTvGuideRef.current?.(null);
-    };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      // A front-stage drag that outlives the drawing must not leave a live number
-      // standing, nor a speaker lit indefinitely.
+      liveDragSubsRef.current = null;
+      setLiveDragSubs(null);
+    } else {
+      // LCR commit: one authoritative call on release (not on every move).
+      const liveMap = liveDragLcrRef.current;
+      if (liveMap && drag.axisLocked) {
+        const live = liveMap[drag.role];
+        if (live) {
+          onMovedRef.current?.({ role: drag.role, newX: live.x, newZ: live.z, axis: drag.axisLocked });
+        }
+      }
+      // The number the control has been showing becomes the project's own, and
+      // only then is the live number withdrawn — in that order, so the control
+      // never flashes back to the old height for a frame. The light then holds
+      // for its five seconds and returns on its own.
       clearLiveSpeakerPosition();
       settleSpeakerHighlight();
-    };
-  }, [clientToRoom, isDraggingRef]);
+      liveDragLcrRef.current = null;
+      setLiveDragLcr(null);
+    }
+    setAlignGuideRef.current?.(null);
+    setActiveSnapRef.current?.(null);
+    setTvGuideRef.current?.(null);
+  };
+
+  // Cancellation (pointercancel, lostpointercapture, unmount, a second
+  // pointer). No commit: drop the live preview so the drawing falls back to the
+  // last committed geometry, and withdraw the live height number and highlight.
+  const handleDragCancel = (drag) => {
+    if (drag.type === 'sub') {
+      liveDragSubsRef.current = null;
+      setLiveDragSubs(null);
+    } else {
+      clearLiveSpeakerPosition();
+      settleSpeakerHighlight();
+      liveDragLcrRef.current = null;
+      setLiveDragLcr(null);
+    }
+    setAlignGuideRef.current?.(null);
+    setActiveSnapRef.current?.(null);
+    setTvGuideRef.current?.(null);
+  };
+
+  const lcrSubDrag = useFrontPointerDrag({
+    isDraggingRef,
+    onStart: (drag) => {
+      // Record the start room coords once (the SVG CTM is stable for the drag).
+      const start = clientToRoom(drag.startClientX, drag.startClientY);
+      if (start) { drag.startRoomX = start.mX; drag.startRoomZ = start.mZ; }
+      if (drag.type === 'sub') return;
+      // Movement begins: the speaker is identified in the drawing and the
+      // height control that governs it lights — the same gesture as the
+      // surround view.
+      beginSpeakerHighlight([drag.role]);
+      // Show TV centre guide when dragging FL/FR in TV mode
+      if ((drag.role === 'FL' || drag.role === 'FR') && tvCentreRef.current !== null) {
+        setTvGuideRef.current?.({ snapped: false });
+      }
+    },
+    onMove: (drag, e) => handleDragMove(drag, e),
+    onCommit: (drag) => handleDragCommit(drag),
+    onCancel: (drag) => handleDragCancel(drag),
+  });
   // ────────────────────────────────────────────────────────────────────────
 
   // Screen
@@ -379,8 +384,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // Vertical only, and only the height from floor: this is the same field the
   // "Screen Height from Floor" numeric input writes. The drag previews locally
   // and commits once on release, so no recalculation runs on a drag frame.
+  // Uses the same Pointer Events lifecycle as the speakers: capture, tap/drag
+  // threshold, multi-touch safety and cancellation all live in the hook.
   const [screenDragging, setScreenDragging] = useState(false);
-  const screenListenersRef = useRef(null);
 
   // The drawn frame stays wholly inside the room: the border above the viewable
   // area cannot pass the ceiling, and the border below it cannot pass the floor.
@@ -390,61 +396,53 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     return { minFloor, maxFloor };
   }, [borderM, roomH, screenData.h]);
 
-  const handleScreenMouseDown = useCallback((e) => {
-    if (!onScreenHeightFromFloorChange) return;
-    e.preventDefault();
-    e.stopPropagation();
+  const readScreenFloorM = useCallback((clientY, drag) => {
     const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const { minFloor, maxFloor } = screenFloorBounds();
-    const startClientY = e.clientY;
-    const startFloorM = liveScreenFloorM;
-    screenIsDraggingRef.current = true;
-    if (isDraggingRef) isDraggingRef.current = true;
-    setScreenDragging(true);
-    document.body.style.cursor = 'grabbing';
+    if (!svgEl) return drag.startFloorM;
+    const svgRect = svgEl.getBoundingClientRect();
+    const svgScale = svgRect.height / SVG_H;
+    const deltaM = -((clientY - drag.startClientY) / svgScale / drawH) * roomH;
+    return Math.max(drag.minFloor, Math.min(drag.maxFloor, drag.startFloorM + deltaM));
+  }, [SVG_H, drawH, roomH]);
 
-    const readFloorM = (clientY) => {
-      const svgRect = svgEl.getBoundingClientRect();
-      const svgScale = svgRect.height / SVG_H;
-      const deltaM = -((clientY - startClientY) / svgScale / drawH) * roomH;
-      return Math.max(minFloor, Math.min(maxFloor, startFloorM + deltaM));
-    };
-
-    const handleMove = (me) => {
-      setLiveScreenFloorM(readFloorM(me.clientY));
-    };
-    const handleUp = (me) => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      screenListenersRef.current = null;
+  const screenDrag = useFrontPointerDrag({
+    isDraggingRef,
+    onStart: (drag) => {
+      screenIsDraggingRef.current = true;
+      setScreenDragging(true);
+    },
+    onMove: (drag, e) => {
+      const fm = readScreenFloorM(e.clientY, drag);
+      drag.lastFloorM = fm;
+      setLiveScreenFloorM(fm);
+    },
+    onCommit: (drag) => {
       screenIsDraggingRef.current = false;
-      if (isDraggingRef) isDraggingRef.current = false;
       setScreenDragging(false);
-      document.body.style.cursor = '';
-      const finalFloorM = readFloorM(me.clientY);
-      setLiveScreenFloorM(finalFloorM);
-      // One commit, at the numeric input's own 1 cm step. The existing
-      // recalculation and autosave flow then runs exactly as it does for a
-      // typed value.
-      onScreenHeightFromFloorChange(Math.round(finalFloorM * 100) / 100);
-    };
+      if (drag.lastFloorM != null) {
+        setLiveScreenFloorM(drag.lastFloorM);
+        // One commit, at the numeric input's own 1 cm step. The existing
+        // recalculation and autosave flow then runs exactly as it does for a
+        // typed value.
+        onScreenHeightFromFloorChange(Math.round(drag.lastFloorM * 100) / 100);
+      }
+    },
+    onCancel: (drag) => {
+      screenIsDraggingRef.current = false;
+      setScreenDragging(false);
+      // Restore the last committed floor so the drawing snaps back to the
+      // stored value — no unintended commit.
+      setLiveScreenFloorM(Number(screen?.heightFromFloorM) || 0.5);
+    },
+  });
 
-    screenListenersRef.current = { move: handleMove, up: handleUp };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }, [onScreenHeightFromFloorChange, liveScreenFloorM, screenFloorBounds, isDraggingRef, SVG_H, drawH, roomH]);
-
-  // A drag interrupted by unmount must never leave window listeners behind.
-  useEffect(() => () => {
-    if (screenListenersRef.current) {
-      window.removeEventListener('mousemove', screenListenersRef.current.move);
-      window.removeEventListener('mouseup', screenListenersRef.current.up);
-      screenListenersRef.current = null;
-    }
-    screenIsDraggingRef.current = false;
-    document.body.style.cursor = '';
-  }, []);
+  // Bind the screen drag target at call time so the start floor and bounds are
+  // captured fresh from the current design state.
+  const handleScreenPointerDown = useCallback((e) => {
+    if (!onScreenHeightFromFloorChange) return;
+    const { minFloor, maxFloor } = screenFloorBounds();
+    screenDrag.bindPointerDown({ type: 'screen', startFloorM: liveScreenFloorM, minFloor, maxFloor })(e);
+  }, [onScreenHeightFromFloorChange, screenFloorBounds, liveScreenFloorM, screenDrag]);
 
   // LCR speakers — always returns a plain array
   // Pass the TV preset key as `orientation` so tv_linked models (e.g. C4-1) resolve
@@ -865,9 +863,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 // FL/FC/FR keep their existing drag behaviour; a dual-centre
                 // cabinet is draggable by its own role (FCL / FCR), so its
                 // automatic position can always be adjusted by hand.
-                onMouseDown: (onLcrSpeakerMoved && (canonFront(spk.role) || isCentreCabinetRole(spk.role)))
-                  ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z)
+                onPointerDown: (onLcrSpeakerMoved && (canonFront(spk.role) || isCentreCabinetRole(spk.role)))
+                  ? lcrSubDrag.bindPointerDown({ role: spk.role, speakerMX: spk.x, speakerMZ: spk.z, axisLocked: null })
                   : undefined,
+                pointerHandlers: lcrSubDrag.elementHandlers,
               })}
               {/* Height and cabinet dimensions are no longer drawn permanently:
                   they are read on hover or tap in the speaker information card. */}
@@ -922,7 +921,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 label: sub.label,
                 zM: sub.z,
                 labelInsideBox: true,
-                onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.id, sub.x, sub.z) : undefined,
+                onPointerDown: onFrontSubMoved ? lcrSubDrag.bindPointerDown({ type: 'sub', subIndex: i, subId: sub.id, speakerMX: sub.x, speakerMZ: sub.z, axisLocked: null }) : undefined,
+                pointerHandlers: lcrSubDrag.elementHandlers,
               })}
               {/* Dimensions are read on hover or tap instead of being drawn. */}
             </g>
@@ -958,7 +958,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           frameColor={SCREEN_STROKE}
           dragging={screenDragging}
           dragEnabled={!!onScreenHeightFromFloorChange}
-          onMouseDown={handleScreenMouseDown}
+          onPointerDown={handleScreenPointerDown}
+          pointerHandlers={screenDrag.elementHandlers}
         />
 
         {/* Projector element if present */}
@@ -1030,7 +1031,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         {/* Magnetic snap guide — visible only during active snap */}
         {activeSnap && (() => {
           const SNAP_COLOR = '#10B981';
-          const drag = dragRef.current;
+          const drag = lcrSubDrag.dragRef.current;
           const dragRole = drag?.role;
           const isDragSub = drag?.type === 'sub';
           const draggedSpk = lcrSpeakers.find(s => s.role === dragRole);

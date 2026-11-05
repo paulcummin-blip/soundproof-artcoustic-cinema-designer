@@ -41,7 +41,8 @@ export default function FrontScreenLayer({
   frameColor,
   dragging,
   dragEnabled,
-  onMouseDown,
+  onPointerDown,
+  pointerHandlers,
 }) {
   // Overall frame rect (viewable + border on all sides)
   const oW = (overallW / roomW) * drawW;
@@ -57,9 +58,10 @@ export default function FrontScreenLayer({
 
   return (
     <g
-      onMouseDown={dragEnabled ? onMouseDown : undefined}
+      onPointerDown={dragEnabled ? onPointerDown : undefined}
+      {...(dragEnabled ? (pointerHandlers || {}) : {})}
       style={dragEnabled
-        ? { cursor: dragging ? 'grabbing' : 'ns-resize', userSelect: 'none' }
+        ? { cursor: dragging ? 'grabbing' : 'ns-resize', userSelect: 'none', touchAction: 'none' }
         : undefined}
     >
       {/* Drag affordance: the frame is outlined while the screen is being
