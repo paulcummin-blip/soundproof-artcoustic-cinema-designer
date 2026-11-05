@@ -1,147 +1,112 @@
-// stage1EvaluationPool.js
-// ---------------------------------------------------------------------------
-// Bounded pool of Stage 1 candidate-evaluation workers. Each worker is
-// initialised with the SAME room/source context, so any candidate job can run
-// on any idle pool worker.
-//
-// The PROVEN SCHEDULER — runBoundedConfirmations — owns dispatch ordering,
-// peak-concurrency caps, failure isolation and cancellation. This module owns
-// ONLY worker lifecycle and the per-call message round-trip.
-//
-// SCHEDULING + LIFECYCLE ONLY. No acoustic maths, no candidate count, no
-// ranking, no safety. Calculation-only — no database writes.
-//
-// CANCELLATION
-//   The pool's abort signal (from the Stage 1 run's AbortController) terminates
-//   ALL pool workers the instant the run is cancelled or completes. Queued
-//   evaluations never launch (runBoundedConfirmations checks isAborted before
-//   dispatching each job). In-flight evaluations reject as their worker is
-//   terminated, and runBoundedConfirmations records them as isolated failures.
-// ---------------------------------------------------------------------------
-
-const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
-
-/**
- * Create a bounded pool of Stage 1 evaluation workers.
- *
- * @param {object} opts
- * @param {string} opts.workerUrl - Worker module URL (stage1Evaluation.worker.js)
- * @param {number} opts.size - Pool size (max concurrency). Start at 3.
- * @param {object} opts.context - Shared room/source context sent to every
- *   pool worker on init ({ roomDims, rspPosition, seatingPositions, physicsOptions }).
- * @param {AbortSignal} [opts.signal] - On abort, all pool workers terminate.
- * @returns {{ evaluate: function, terminateAll: function, size: number }}
- */
-export function createStage1EvaluationPool({ workerUrl, size, context, signal = null }) {
-  const workers = [];
-  const idleIndices = [];
+// Lifecycle only: the existing bounded scheduler still owns candidate ordering.
+// Keep new Worker(new URL(...)) together so Vite bundles the child module and
+// its imports. Passing a pre-built URL made production embed unbundled source.
+export function createStage1EvaluationPool({
+  size, context, signal = null, onProgress = () => {},
+  workerFactory = () => new Worker(new URL("./stage1Evaluation.worker.js", import.meta.url), { type: "module" }),
+  timeoutMs = 60000,
+}) {
+  const slots = [];
+  const idle = [];
   const waiters = [];
-  const pending = new Map(); // requestId -> { resolve, reject, worker }
-  let terminated = false;
+  let stopped = false;
+  let failure = null;
+  let sequence = 0;
+  const report = (event, slot, extra = {}) => onProgress({ event, workerIndex: slot?.index ?? null, ...extra });
 
-  for (let i = 0; i < size; i += 1) {
-    const worker = new Worker(workerUrl, { type: "module" });
-    worker.addEventListener("message", (event) => {
-      const data = event.data || {};
-      // The init "ready" response has no matching pending entry — ignore it.
-      const entry = pending.get(data.requestId);
-      if (!entry) return;
-      pending.delete(data.requestId);
-      release(entry.worker);
-      if (data.type === "complete") entry.resolve(data.result);
-      else entry.reject(new Error(data.error || "Stage 1 evaluation worker failed"));
-    });
-    worker.addEventListener("error", () => {
-      // Uncaught worker error — fail any pending call on this worker. The
-      // worker itself stays alive (module workers survive onmessage errors;
-      // the worker's own try/catch replies a typed error for those).
-      for (const [rid, entry] of pending) {
-        if (entry.worker === worker) {
-          pending.delete(rid);
-          entry.reject(new Error("Stage 1 evaluation worker error"));
-        }
-      }
-    });
-    workers.push(worker);
-    idleIndices.push(i);
-    try {
-      worker.postMessage({
-        type: "init",
-        requestId: `stage1-pool-init-${i}-${Date.now()}`,
-        context,
-      });
-    } catch {
-      /* worker failed to accept setup — surfaces on first job */
+  function stop(error = new Error("Stage 1 evaluation pool terminated")) {
+    if (stopped) return;
+    stopped = true;
+    signal?.removeEventListener("abort", cancel);
+    for (const slot of slots) {
+      clearTimeout(slot.timer);
+      try { slot.worker.terminate(); } catch { /* already terminated */ }
+      slot.pending?.reject(error);
+      slot.pending = null;
     }
+    idle.length = 0;
+    while (waiters.length) waiters.shift().reject(error);
   }
-
-  if (signal) {
-    if (signal.aborted) terminateAll();
-    else signal.addEventListener("abort", terminateAll, { once: true });
+  function cancel() { stop(); }
+  function fail(slot, reason) {
+    if (stopped) return;
+    failure = new Error(reason);
+    report("worker_failure", slot, { error: reason, requestId: slot?.pending?.requestId ?? null });
+    // Infrastructure failure invalidates this search, unlike an individually
+    // non-assessable candidate. Settle every borrower and waiter immediately.
+    stop(failure);
   }
-
-  function terminateAll() {
-    if (terminated) return;
-    terminated = true;
-    for (const w of workers) {
-      try { w.terminate(); } catch { /* already dead */ }
-    }
-    workers.length = 0;
-    idleIndices.length = 0;
-    while (waiters.length) waiters.shift()(null);
-    for (const [, entry] of pending) {
-      entry.reject(new Error("Stage 1 evaluation pool terminated"));
-    }
-    pending.clear();
+  function arm(slot, phase) {
+    clearTimeout(slot.timer);
+    slot.timer = setTimeout(() => fail(slot, `Stage 1 evaluation worker ${phase} timed out`), timeoutMs);
   }
-
+  function release(slot) {
+    if (stopped) return;
+    if (waiters.length) waiters.shift().resolve(slot);
+    else idle.push(slot);
+  }
   function acquire() {
-    return new Promise((resolve) => {
-      if (terminated) { resolve(null); return; }
-      if (idleIndices.length > 0) {
-        resolve(workers[idleIndices.shift()]);
-        return;
-      }
-      waiters.push(resolve);
-    });
+    if (stopped) return Promise.reject(failure || new Error("Stage 1 evaluation pool terminated"));
+    if (idle.length) return Promise.resolve(idle.shift());
+    return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
   }
 
-  function release(worker) {
-    if (terminated) return;
-    const idx = workers.indexOf(worker);
-    if (idx < 0) return; // worker was removed (errored / terminated)
-    if (waiters.length > 0) {
-      const waiter = waiters.shift();
-      waiter(worker);
-    } else {
-      idleIndices.push(idx);
+  try {
+    for (let i = 0; i < size; i += 1) {
+      const slot = { index: i, worker: workerFactory(), pending: null, ready: false, timer: null };
+      slots.push(slot);
+      report("worker_created", slot);
+      slot.worker.addEventListener("error", event => fail(slot, event?.message || "Stage 1 evaluation worker failed to load or execute"));
+      slot.worker.addEventListener("messageerror", () => fail(slot, "Stage 1 evaluation worker message could not be decoded"));
+      slot.worker.addEventListener("message", ({ data = {} }) => {
+        if (stopped) return;
+        if (!slot.ready) {
+          if (data.requestId !== slot.initId) return;
+          if (data.type !== "ready") { fail(slot, data.error || "Stage 1 evaluation worker initialisation failed"); return; }
+          clearTimeout(slot.timer);
+          slot.ready = true;
+          report("worker_ready", slot);
+          release(slot);
+          return;
+        }
+        const entry = slot.pending;
+        if (!entry || data.requestId !== entry.requestId) return;
+        if (!["complete", "error"].includes(data.type)) return;
+        clearTimeout(slot.timer);
+        slot.pending = null;
+        report("job_" + data.type, slot, { requestId: entry.requestId, error: data.error || null });
+        release(slot);
+        if (data.type === "complete") entry.resolve(data.result);
+        else entry.reject(new Error(data.error || "Stage 1 candidate evaluation failed"));
+      });
+      slot.initId = `stage1-pool-init-${i}`;
+      arm(slot, "initialisation");
+      slot.worker.postMessage({ type: "init", requestId: slot.initId, context });
     }
+  } catch (error) {
+    fail(null, `Stage 1 evaluation worker dispatch failed: ${error?.message || error}`);
+  }
+  if (signal) {
+    if (signal.aborted) cancel();
+    else if (!stopped) signal.addEventListener("abort", cancel, { once: true });
   }
 
-  /**
-   * Evaluate one candidate on an idle pool worker.
-   * Resolves with the evaluated candidate object (or null for an incomplete
-   * transfer). Rejects on worker error or pool termination.
-   */
   async function evaluate(candidate) {
-    const worker = await acquire();
-    if (!worker) throw new Error("Stage 1 evaluation pool terminated");
-    const requestId = `stage1-eval:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    const slot = await acquire();
+    if (stopped) throw failure || new Error("Stage 1 evaluation pool terminated");
     return new Promise((resolve, reject) => {
-      pending.set(requestId, { resolve, reject, worker });
-      try {
-        worker.postMessage({ requestId, type: "evaluate", candidate });
-      } catch (err) {
-        pending.delete(requestId);
-        release(worker);
-        reject(err);
-      }
+      const requestId = `stage1-eval:${++sequence}`;
+      slot.pending = { requestId, resolve, reject };
+      arm(slot, "evaluation");
+      report("job_posted", slot, { requestId });
+      try { slot.worker.postMessage({ type: "evaluate", requestId, candidate }); }
+      catch (error) { fail(slot, `Stage 1 evaluation dispatch failed: ${error?.message || error}`); }
     });
   }
-
   return {
     evaluate,
-    terminateAll,
-    get size() { return terminated ? 0 : workers.length; },
+    terminateAll: stop,
+    throwIfFailed() { if (failure) throw failure; },
+    get size() { return stopped ? 0 : slots.length; },
   };
 }
