@@ -166,7 +166,14 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   const safeDepthM = (Number(depthM) > 0 ? Number(depthM) : modelMeta?.depthM) || 0.27;
   
   // Get color (currently always black)
-  const color = getChannelColor(role);
+  const baseColor = getChannelColor(role);
+  // Placement-zone warning recolours the speaker artwork itself (no halo/ring),
+  // matching the room-element clash treatment: the offending object changes
+  // fill/stroke. A smooth CSS transition fades it back to black after the
+  // five-second hold expires.
+  const color = placementWarning ? PLACEMENT_WARNING_COLOR : (baseColor || "#000000");
+  const strokeColor = placementWarning ? PLACEMENT_WARNING_COLOR : "#000000";
+  const warningTransition = "fill 400ms ease, stroke 400ms ease";
 
   const handleMouseDown = (e) => {
     if (e.altKey) {
@@ -190,28 +197,14 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
         onPointerDown={handleMouseDown}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
-        {/* Placement-zone warning — subtle Artcoustic dark-red ring, smooth fade */}
-        <circle
-          cx={canvasX}
-          cy={canvasY_raw}
-          r={radiusPx + 2}
-          fill="none"
-          stroke={PLACEMENT_WARNING_COLOR}
-          strokeWidth={2}
-          style={{
-            opacity: placementWarning ? 0.9 : 0,
-            transition: "opacity 400ms ease",
-            pointerEvents: "none",
-          }}
-        />
         <circle
           cx={canvasX}
           cy={canvasY_raw}
           r={radiusPx}
-          fill={color || "#000000"}
-          stroke="#000000"
+          fill={color}
+          stroke={strokeColor}
           strokeWidth={1}
-          opacity={1}
+          style={{ transition: warningTransition }}
           onMouseEnter={(e) => onIconEnter?.(e, speaker)}
           onMouseMove={(e) => onIconMove?.(e, speaker)}
           onMouseLeave={(e) => onIconLeave?.(e)}
@@ -235,29 +228,12 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       onPointerDown={handleMouseDown}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
-      {/* Placement-zone warning — subtle Artcoustic dark-red ring, smooth fade */}
-      <rect
-        x={-w / 2 - 2}
-        y={-d / 2 - 2}
-        width={w + 4}
-        height={d + 4}
-        rx={2}
-        ry={2}
-        fill="none"
-        stroke={PLACEMENT_WARNING_COLOR}
-        strokeWidth={2}
-        style={{
-          opacity: placementWarning ? 0.9 : 0,
-          transition: "opacity 400ms ease",
-          pointerEvents: "none",
-        }}
-      />
       <path
         d={pathData}
-        fill={color || "#000000"}
-        stroke="#000000"
+        fill={color}
+        stroke={strokeColor}
         strokeWidth={1}
-        opacity={1}
+        style={{ transition: warningTransition }}
         onMouseEnter={(e) => onIconEnter?.(e, speaker)}
         onMouseMove={(e) => onIconMove?.(e, speaker)}
         onMouseLeave={(e) => onIconLeave?.(e)}

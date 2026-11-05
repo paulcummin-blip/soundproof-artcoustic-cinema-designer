@@ -112,7 +112,7 @@ import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { useTooltipData } from '@/components/room/hooks/useTooltipData';
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import { useOptionalSharedBassResults } from "@/components/room/bass/bassResultsStore";
-import { evaluateAndRecordSpeaker } from "@/components/room/placementZone/usePlacementWarnings";
+import { evaluateAndRecordSpeaker, evaluatePlacementZones, recordPlacementEvaluation } from "@/components/room/placementZone/usePlacementWarnings";
 import { clearAllPlacementWarnings } from "@/components/room/placementZone/placementWarningStore";
 
 import {
@@ -1514,22 +1514,30 @@ const byId = useEntitiesById({
     if (!draftSpeakersRef.current || !onSetSpeakers) return;
     const draftSpeakers = draftSpeakersRef.current;
     const draftMap = new Map(draftSpeakers.map(s => [getSpeakerSelectionKey(s), s]));
-    // Placement-zone warning: evaluate the dragged speaker at its final,
-    // release-clamped draft position before the draft is cleared. This catches
-    // the overhead / front-wide release snap that can move a speaker back inside
-    // its zone, clearing a warning that the live-drag evaluation started.
-    if (dragType === 'speaker' && draggedItemId) {
-      const draggedDraft = draftSpeakers.find(s => s.id === draggedItemId);
-      if (draggedDraft) {
-        evaluateAndRecordSpeaker(draggedDraft, {
-          placedSpeakers,
-          seatingPositions,
-          dimensions: { widthM, lengthM, heightM },
-          mlpPoint: mlp,
-          screenFrontPlaneM,
-          getSpeakerModelMeta,
-        });
-      }
+    // Placement-zone warning: evaluate EVERY placed speaker at its committed
+    // position after a speaker move. Every speaker outside its applicable RP22
+    // zone turns red for five seconds; every speaker back inside clears
+    // immediately. This is not limited to the dragged speaker, so two speakers
+    // outside their zones both highlight simultaneously, and each warning
+    // corresponds to an actual zone violation.
+    const zoneCtx = {
+      placedSpeakers: null,
+      seatingPositions,
+      dimensions: { widthM, lengthM, heightM },
+      mlpPoint: mlp,
+      screenFrontPlaneM,
+      getSpeakerModelMeta,
+    };
+    const committedSpeakers = placedSpeakers.map(s => {
+      const draft = draftMap.get(getSpeakerSelectionKey(s));
+      return draft ? { ...s, position: draft.position } : s;
+    });
+    zoneCtx.placedSpeakers = committedSpeakers;
+    const outsideIds = evaluatePlacementZones({ speakers: committedSpeakers, ...zoneCtx });
+    for (const s of committedSpeakers) {
+      const id = s.id || getCanonicalRole(s.role);
+      if (!id) continue;
+      recordPlacementEvaluation(id, outsideIds.has(id));
     }
     onSetSpeakers(prev =>
       prev.map(s => {
