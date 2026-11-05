@@ -12,6 +12,7 @@ import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuth
 import { resolveRoomDimensionsEdited } from "@/components/utils/roomDimensionsEditedAuthority";
 import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
 import { manualScreenConfigForPersist } from "@/components/models/screen/manualScreenConfig";
+import { resolvePhysicalRoomDims, normaliseOrientation } from "@/components/utils/roomOrientationAuthority";
 
 // Helper: safely parse JSON strings or return native types unchanged
 function safeParseJson(value) {
@@ -158,21 +159,41 @@ export function serializeProject(input = {}) {
     // per-version so the optimisation plan is restored on reopen without
     // recomputation. Null = no evaluated optimiser result saved.
     optimiserPlan = null,
+
+    // Room orientation — PER-VERSION. Which physical wall pair is the screen
+    // wall. "length_front" (default) = screen on a short wall, effective dims =
+    // physical dims. "width_front" = screen on a long wall, effective W/L are
+    // swapped. The physical room dimensions written to the shared Project are
+    // derived from the effective dims + orientation so rotation never changes
+    // the physical room shared across versions.
+    roomOrientation = "length_front",
   } = input;
 
-  // Normalised room dims (support legacy dimensions as a fallback)
-  const widthM =
+  // Effective (view) room dims — what every geometry consumer reads.
+  const effectiveWidthM =
     Number(roomDims?.widthM) ||
     Number(dimensions?.width) ||
     0;
-  const lengthM =
+  const effectiveLengthM =
     Number(roomDims?.lengthM) ||
     Number(dimensions?.length) ||
     0;
-  const heightM =
+  const effectiveHeightM =
     Number(roomDims?.heightM) ||
     Number(dimensions?.height) ||
     0;
+
+  // Derive the PHYSICAL room dimensions from the effective dims + orientation.
+  // The physical room is shared on the Project entity across all versions, so
+  // rotation (which only swaps effective W/L) never changes it.
+  const orientation = normaliseOrientation(roomOrientation);
+  const physicalDims = resolvePhysicalRoomDims(
+    { widthM: effectiveWidthM, lengthM: effectiveLengthM, heightM: effectiveHeightM },
+    orientation,
+  );
+  const widthM = physicalDims.widthM;
+  const lengthM = physicalDims.lengthM;
+  const heightM = physicalDims.heightM;
 
   // Screen
   const visibleWidthInches = Number(screen?.visibleWidthInches) || 0;
@@ -226,6 +247,10 @@ export function serializeProject(input = {}) {
       },
       null
     ),
+
+    // Per-version room orientation (screen wall selection). Lives in design_state
+    // because it is a per-version design choice, not a shared physical property.
+    room_orientation: orientation,
 
     // Screen
     screen_size: visibleWidthInches,

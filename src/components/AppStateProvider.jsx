@@ -260,6 +260,20 @@ function useDesignerState() {
     }
   ));
 
+  // Per-version room orientation — which physical wall pair is the screen wall.
+  // "length_front" (default) = screen on a short wall; "width_front" = screen on
+  // a long wall (effective W/L swapped). The effective roomDims above always
+  // reflect the current orientation; the physical room on the Project entity is
+  // derived from effective + orientation at the save boundary.
+  const [roomOrientation, _setRoomOrientation] = useState(() => (
+    (__autosavePayload && __autosavePayload.roomOrientation === "width_front")
+      ? "width_front"
+      : "length_front"
+  ));
+  const setRoomOrientation = useCallback((v) => {
+    _setRoomOrientation(v === "width_front" ? "width_front" : "length_front");
+  }, []);
+
   // CRITICAL: Normalizer - ensure roomDims is NEVER {} and always has finite numbers
   const setRoomDims = useCallback((updater) => {
     _setRoomDims(prev => {
@@ -1362,6 +1376,7 @@ function useDesignerState() {
     // Apply (use the existing setters)
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
+      if (typeof p.roomOrientation === "string") setRoomOrientation(p.roomOrientation);
       if (p.dimensions) setDimensions(p.dimensions);
       if (p.seatingPositions) {
         const dims = p.roomDims || p.roomDimensions || roomDims || null;
@@ -1444,6 +1459,7 @@ function useDesignerState() {
     // Build payload (ONLY what we need to restore the room session)
     const payload = {
       roomDims,
+      roomOrientation,
       dimensions,
       seatingPositions,
       speakerSystem,
@@ -1544,6 +1560,7 @@ function useDesignerState() {
     };
     }, [
     roomDims,
+    roomOrientation,
     dimensions,
     seatingPositions,
     speakerSystem,
@@ -1610,6 +1627,7 @@ function useDesignerState() {
 
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
+      if (typeof p.roomOrientation === "string") setRoomOrientation(p.roomOrientation);
       if (p.dimensions) setDimensions(p.dimensions);
       if (p.seatingPositions) {
         const dims = p.roomDims || p.roomDimensions || roomDims || null;
@@ -1697,6 +1715,7 @@ function useDesignerState() {
   const saveWorkingCopyNow = useCallback(() => {
     const payload = {
       roomDims,
+      roomOrientation,
       dimensions,
       seatingPositions,
       speakerSystem,
@@ -2079,6 +2098,7 @@ function useDesignerState() {
     return {
     dimensions, setDimensions, 
     roomDims, setRoomDims,
+    roomOrientation, setRoomOrientation,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
     screen, setScreen, screenHeight, setScreenHeight,
     screenWall, setScreenWall, dolbyConfig, setDolbyConfig, dolbyLayout, setDolbyLayout,

@@ -171,6 +171,7 @@ appState, // Pass appState directly for setters
       name: projectNameState,
       roomDims: appState.roomDims,
       dimensions: appState.roomDims,
+      roomOrientation: appState?.roomOrientation,
       screen,
       seatingPositions: appState?.seatingPositions || seatingPositions || [],
       seatsPerRowByRow,

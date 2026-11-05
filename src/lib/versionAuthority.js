@@ -5,12 +5,19 @@
 // constants that must stay in sync between frontend and backend.
 //
 // Architecture:
-//   Project = shared room and administrative metadata.
-//   ProjectVersion = complete independent design state.
+//   Project = shared physical room and administrative metadata.
+//   ProjectVersion = complete independent design state (including the
+//   per-version room orientation — which physical wall pair is the screen wall).
 //   Project.active_version_id is the single source of truth.
 //   design_state contains every field required to completely reconstruct a
 //   design version. No per-version design field should remain on the Project
 //   entity. Future per-version fields automatically belong inside design_state.
+
+import {
+  resolveEffectiveRoomDims,
+  normaliseOrientation,
+  DEFAULT_ROOM_ORIENTATION,
+} from "@/components/utils/roomOrientationAuthority";
 
 // ─── Shared project fields (stay on Project entity) ──────────────────────
 // These are NOT moved into design_state. They represent the physical room
@@ -27,7 +34,10 @@ const SHARED_PROJECT_FIELDS = new Set([
   "room_length",
   "room_width",
   "room_height",
-  "room_orientation",
+  // room_orientation is PER-VERSION (lives in design_state). The physical room
+  // has no intrinsic orientation; which wall is the screen wall is a design
+  // choice that belongs to each version, so it must never be overwritten by the
+  // shared Project field.
   "screen_wall",
   "room_dimensions_edited",
   // Commercial / lifecycle
@@ -90,6 +100,32 @@ export function mergeProjectAndVersion(project, version) {
 
   const designState = (version && version.design_state) || {};
 
+  // The orientation is PER-VERSION — read it from design_state, never from the
+  // shared Project field. The shared Project room_orientation is legacy and
+  // must not overwrite a version's own orientation.
+  const orientation = normaliseOrientation(designState.room_orientation) || DEFAULT_ROOM_ORIENTATION;
+
+  // The physical room dimensions come from the shared Project entity. Derive
+  // the effective (view) Width/Length from the physical room + this version's
+  // orientation so every geometry consumer reads the correct dimensions.
+  const physicalDims = {
+    widthM: Number(project.room_width) || 0,
+    lengthM: Number(project.room_length) || 0,
+    heightM: Number(project.room_height) || 0,
+  };
+  let physicalRoomDimsJson = project.roomDims;
+  if (physicalRoomDimsJson && typeof physicalRoomDimsJson === "string") {
+    try {
+      const parsed = JSON.parse(physicalRoomDimsJson);
+      if (parsed && typeof parsed === "object") {
+        physicalDims.widthM = Number(parsed.widthM ?? parsed.width) || physicalDims.widthM;
+        physicalDims.lengthM = Number(parsed.lengthM ?? parsed.length) || physicalDims.lengthM;
+        physicalDims.heightM = Number(parsed.heightM ?? parsed.height) || physicalDims.heightM;
+      }
+    } catch { /* fall back to flat fields */ }
+  }
+  const effectiveDims = resolveEffectiveRoomDims(physicalDims, orientation);
+
   return {
     ...designState,
     // Shared fields from the Project override any stale copies in design_state
@@ -101,11 +137,14 @@ export function mergeProjectAndVersion(project, version) {
     project_reference: project.project_reference,
     project_status: project.project_status,
     notes: project.notes,
-    roomDims: project.roomDims,
-    room_length: project.room_length,
-    room_width: project.room_width,
-    room_height: project.room_height,
-    room_orientation: project.room_orientation,
+    // Effective dimensions (derived from physical + per-version orientation).
+    // These are what every geometry consumer reads.
+    roomDims: JSON.stringify(effectiveDims),
+    room_width: effectiveDims.widthM,
+    room_length: effectiveDims.lengthM,
+    room_height: effectiveDims.heightM,
+    // Per-version orientation — from design_state, NOT overridden by Project.
+    room_orientation: orientation,
     screen_wall: project.screen_wall,
     room_dimensions_edited: project.room_dimensions_edited,
     account_id: project.account_id,

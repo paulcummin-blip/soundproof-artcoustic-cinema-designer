@@ -133,6 +133,16 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setRoomDims({ widthM: nextWidthM, lengthM: nextLengthM, heightM: nextHeightM });
   }
 
+  // 1b) ROOM ORIENTATION — per-version. mergedP carries the version's own
+  // orientation (resolved by mergeProjectAndVersion from design_state). The
+  // shared Project orientation is legacy and never overwrites this.
+  if (typeof appState?.setRoomOrientation === "function") {
+    const orientationRaw = p?.room_orientation;
+    appState.setRoomOrientation(
+      orientationRaw === "width_front" ? "width_front" : "length_front",
+    );
+  }
+
   // 2) SCREEN
   const screenSizeInches = Number(p?.screen_size) || 120;
   const aspectRatio = p?.aspect_ratio || "16:9";
