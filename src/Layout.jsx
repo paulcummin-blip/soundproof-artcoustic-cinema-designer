@@ -476,6 +476,7 @@ export default function Layout({ children, currentPageName }) {
                   currency={priceSummary.currency}
                   priceListAvailable={priceSummary.priceListAvailable}
                   incompletePriceCount={priceSummary.incompletePriceCount}
+                  breakdown={priceSummary.breakdown}
                 />
               </div>
             )}
