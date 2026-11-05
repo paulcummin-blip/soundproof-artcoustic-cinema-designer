@@ -79,6 +79,10 @@ export function getStage2State(projectId, versionId) {
   return getMemory(projectId, versionId);
 }
 
+export function adoptStage2Request(projectId, versionId, ownerRequestId) {
+  return setMemory(projectId, versionId, { ownerRequestId });
+}
+
 export function subscribeStage2(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -265,7 +269,7 @@ export class Stage2PlacementController {
     this.watchdogs = new Map();
   }
 
-  schedule({ projectId, versionId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay, scopeQuantity = null }) {
+  schedule({ projectId, versionId, fingerprint, placementFingerprint, confirmationFingerprint, promotionPlan, allStage1Finalists, stage1Complete, params, quantityOrder, delay, scopeQuantity = null, ownerRequestId = null }) {
     this.cancelAll("superseded");
     // SELECTED-QUANTITY SCOPE: when the caller consumes ONE quantity (ADI
     // optimisation of the installed sub count), only that quantity is placed and
@@ -285,6 +289,7 @@ export class Stage2PlacementController {
     this.placementFingerprint = placementFingerprint || null;
     this.confirmationFingerprint = confirmationFingerprint || null;
     this.params = params;
+    this.ownerRequestId = ownerRequestId;
     this.completedResults = {};
     this.quantityEvaluated = {};
     this.quantityFinal = {};
@@ -356,6 +361,7 @@ export class Stage2PlacementController {
     }
 
     markStage2Updating(projectId, versionId, fingerprint, {
+      ownerRequestId,
       phase: this.queue.length > 0 ? "placement" : "confirmation",
       completedJobs: 0,
       totalJobsPlanned: this.totalJobsPlanned,
@@ -378,7 +384,8 @@ export class Stage2PlacementController {
     }
 
     const waitMs = Number.isFinite(delay) ? delay : STAGE2_START_DELAY_MS;
-    setTimeout(() => {
+    this.startTimer = setTimeout(() => {
+      this.startTimer = null;
       if (this.currentFingerprint !== fingerprint) return; // stale
       this.dispatchNext();
     }, waitMs);
@@ -513,8 +520,9 @@ export class Stage2PlacementController {
 
   startWorker(workerIndex) {
     const worker = new Worker(new URL("./stage2Placement.worker.js", import.meta.url), { type: "module" });
-    worker.onmessage = (event) => this.handleMessage(workerIndex, event.data || {});
-    worker.onerror = (event) => this.handleError(workerIndex, event?.message || "Worker error");
+    worker.onmessage = (event) => { if (this.workers[workerIndex] === worker) this.handleMessage(workerIndex, event.data || {}); };
+    worker.onerror = (event) => { if (this.workers[workerIndex] === worker) this.handleError(workerIndex, event?.message || "Worker error"); };
+    worker.onmessageerror = () => { if (this.workers[workerIndex] === worker) this.handleError(workerIndex, "Stage 2 worker message could not be decoded"); };
     this.workers[workerIndex] = worker;
   }
 
@@ -591,9 +599,7 @@ export class Stage2PlacementController {
     // The job belongs to a superseded run; its counters must not affect the
     // current run's expected/done convergence.
     if (message.fingerprint !== this.currentFingerprint) {
-      this.clearWatchdog(workerIndex);
-      this.activeJobs.delete(workerIndex);
-      return;
+      return; // Never release ownership/watchdog of a newer job.
     }
     if (message.type === "diagnostic") {
       const active = this.activeJobs.get(workerIndex);
@@ -607,6 +613,7 @@ export class Stage2PlacementController {
       type: message.type,
       result: message.result,
       requestId: message.requestId,
+      errorMessage: message.error,
     });
   }
 
@@ -633,6 +640,8 @@ export class Stage2PlacementController {
     const active = this.activeJobs.get(workerIndex);
     if (!active) return; // already settled or stale — exactly-once guard
 
+    if (!["complete", "error"].includes(outcome.type)) return;
+
     // Exactly-once: verify requestId if provided (prevents late duplicate
     // terminal events from a worker that already settled via watchdog).
     if (outcome.requestId && active.requestId !== outcome.requestId) return;
@@ -648,6 +657,9 @@ export class Stage2PlacementController {
     const phase = active.phase || "placement";
     const isSuccess = outcome.type === "complete" && outcome.result;
 
+    this.runtimeDiagnostics.lastTerminal = { requestId: active.requestId, finalistId: active.finalist?.id,
+      quantity: qty, phase, outcome: isSuccess ? "complete" : "error", error: outcome.errorMessage || null, atMs: Date.now() };
+    if (!isSuccess) this.runtimeDiagnostics.failedJobs = (this.runtimeDiagnostics.failedJobs || 0) + 1;
     this.completedJobs++;
     this.canonicalJobsRun++;
     this.runtimeDiagnostics[phase + "Count"] = (this.runtimeDiagnostics[phase + "Count"] || 0) + 1;
@@ -1040,6 +1052,16 @@ export class Stage2PlacementController {
   }
 
   cancelAll(outcome = "cancelled") {
+    const hadWork = this.queue.length > 0 || this.activeJobs.size > 0 || this.startTimer;
+    if (this.startTimer) clearTimeout(this.startTimer);
+    this.startTimer = null;
+    if (hadWork && !["complete", "superseded"].includes(outcome)) {
+      setMemory(this.projectId, this.versionId, {
+        status: outcome === "request-fingerprint-stale" ? "stale" : "cancelled",
+        errorMessage: outcome, runtimeDiagnostics: { ...this.runtimeDiagnostics },
+      });
+    }
+    this.currentFingerprint = null;
     this.queue = [];
     // Clear all watchdogs — no terminal settlement will fire for cancelled jobs.
     for (const timer of this.watchdogs.values()) {
