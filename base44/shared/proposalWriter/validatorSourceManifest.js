@@ -56,7 +56,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The supporting results the brief asked for: what the pack may state because
   // the client asked for it, at the scope and status the reports record.
   'base44/shared/proposalEvidence/proposalBriefRequests.js': '006dc2c68897fabaedd4c35e02f34e76fa39ab372789860f12099dfeebd18b13',
-  'base44/shared/proposalEvidence/proposalSupportingResults.js': '9ca6ef67d6ff6a4ed346c094e724ec7d50f6d45ae9207d1b70f4961d2e277bc5',
+  'base44/shared/proposalEvidence/proposalSupportingResults.js': '0d8265bcb32df1e05ced4b6405df02978bfccf2afadd88f36b38f042eb2ff65e',
   // The design philosophy: the judgement behind the recommendation, carried by
   // Stage 1 and by the writer's editorial instructions. It states no figure and
   // changes no acceptance; it is hashed so a draft can be traced to the exact
