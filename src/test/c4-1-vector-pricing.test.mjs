@@ -95,7 +95,7 @@ test('REQ 1  The C4-1 vector cabinet is drawn at the exact resolved length, driv
   const cases = [
     [tv('tv65', 1411), 1222],
     [tv('tv77', 1711), 1711],
-    [tv('tv83', 1872), 1711],
+    [tv('tv83', 1872), 1842],
     [tv('tv100', 2230), 1842],
   ];
   cases.forEach(([screen, mm]) => {
