@@ -28,7 +28,6 @@
  */
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { base44 } from '@/api/base44Client';
-import { WRITING_AUTHORITY_VERSION } from '@/shared/writingAuthorityVersion';
 
 export const INTENT_UPDATED_EVENT = 'adi-design-intent-updated';
 

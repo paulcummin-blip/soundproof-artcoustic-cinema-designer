@@ -171,7 +171,6 @@ export function buildDesignIntentRecord({
   geometryFingerprint = null,
   visualFingerprint = null,
   visualContext = null,
-  writingAuthorityVersion = null,
   providerIdentity = {},
   generatedBy = null,
   generatedAt = null,
@@ -187,11 +186,6 @@ export function buildDesignIntentRecord({
     evidence_pack_fingerprint: asText(evidencePackFingerprint),
     input_fingerprint: asText(inputFingerprint),
     geometry_fingerprint: asText(geometryFingerprint),
-    // The editorial currency this narrative was written under. Separate from the
-    // engineering fingerprints: an accepted narrative may still match its engineering
-    // evidence while being editorially out of date. Null on records written before
-    // this field existed, which the refresh check reads as stale.
-    writing_authority_version: writingAuthorityVersion,
     // THE PICTURES the words were written from, and which revision of each file:
     // the identity of the selection, never a storage address, so nothing saved here
     // can depend on a link that expires or moves.
