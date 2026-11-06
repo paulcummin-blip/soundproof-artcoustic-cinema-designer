@@ -3,7 +3,7 @@
 // WHAT   The C4-1, Multi (LCR/Mono) and HSPL soundbars are published in several
 //        cabinet lengths. This suite asserts the CONFIRMED commercial reality:
 //
-//          C4-1            1222, 1441, 1672, 1904 mm   (ProductPrice catalogue)
+//          C4-1            1222, 1441, 1711, 1904 mm   (ProductPrice catalogue)
 //          Multi LCR/Mono  1094, 1222, 1441, 1711, 1842, 2230 mm
 //                          (1094 mm is valid and selectable; its price is pending)
 //          HSPL            bespoke — made to the screen's overall width exactly
@@ -49,7 +49,7 @@ import {
 } from '@/components/utils/frontStageModeAuthority';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
-const C41_LENGTHS = [1222, 1441, 1672, 1904];
+const C41_LENGTHS = [1222, 1441, 1711, 1904];
 const MULTI_LENGTHS = [1094, 1222, 1441, 1711, 1842, 2230];
 
 const tv = (key, mm) => ({ tvPresetKey: key, tvWidthMm: mm, aspectRatio: '16:9' });
@@ -112,21 +112,21 @@ test('TEST 2  The screen OVERALL width (frame included) decides the cabinet', ()
 test('TEST 3  C4-1 installs the longest cabinet no more than 5 mm wider than the overall width', () => {
   // TV presets: overall width = tvWidthMm.
   assert.equal(lengthFor('c4-1', tv('tv65', 1411)), 1222, '1411 → 1441 is 30 mm too wide; 1222 fits');
-  assert.equal(lengthFor('c4-1', tv('tv77', 1711)), 1672, '1711 → 1672 fits (1904 is 193 mm too wide)');
-  assert.equal(lengthFor('c4-1', tv('tv83', 1872)), 1672, '1872 → 1672 fits (1904 is 32 mm too wide)');
+  assert.equal(lengthFor('c4-1', tv('tv77', 1711)), 1711, '1711 → 1711 fits (1904 is 193 mm too wide)');
+  assert.equal(lengthFor('c4-1', tv('tv83', 1872)), 1711, '1872 → 1711 fits (1904 is 32 mm too wide)');
   assert.equal(lengthFor('c4-1', tv('tv100', 2230)), 1904, '2230 → 1904 fits');
 
   // Manual projection widths: overall = viewable + 2 × border (default 50 mm).
   assert.equal(lengthFor('c4-1', manualWh(1.222, 0.687)), 1222);
   assert.equal(lengthFor('c4-1', manualWh(1.441, 0.8106)), 1441, '1441 viewable → 1541 overall → 1441 fits');
-  assert.equal(lengthFor('c4-1', manualWh(1.672, 0.9405)), 1672);
+  assert.equal(lengthFor('c4-1', manualWh(1.672, 0.9405)), 1711);
   assert.equal(lengthFor('c4-1', manualWh(1.904, 1.071)), 1904);
   assert.equal(lengthFor('c4-1', widthInches(48.11)), 1222);
 });
 
 test('TEST 4  longestCabinetWithinMm selects the longest that fits, else the smallest', () => {
   assert.equal(longestCabinetWithinMm(C41_LENGTHS, 1411, 5), 1222);
-  assert.equal(longestCabinetWithinMm(C41_LENGTHS, 1711, 5), 1672);
+  assert.equal(longestCabinetWithinMm(C41_LENGTHS, 1711, 5), 1711);
   assert.equal(longestCabinetWithinMm(C41_LENGTHS, 2230, 5), 1904);
   // When even the smallest exceeds the limit, the smallest is returned.
   assert.equal(longestCabinetWithinMm(C41_LENGTHS, 1000, 5), 1222);
@@ -163,12 +163,12 @@ test('TEST 6  HSPL is bespoke: the cabinet matches the screen overall width exac
 
 test('TEST 7  An explicitly recorded length is preserved, even a legacy one', () => {
   // A current commercial length survives any screen change.
-  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1672 }, tv('tv65', 1411)), 1672);
+  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1711 }, tv('tv65', 1411)), 1711);
   // A legacy length no longer in the commercial catalogue is STILL preserved:
   // a saved project's historical selection is never silently resized. (1449 mm
-  // is the retired typo SKU; 1711 mm was never a C4-1 catalogue length.)
+  // and 1672 mm are the retired C4-1 SKUs.)
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1449 }, manualWh(2.4, 1.35)), 1449);
-  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1711 }, tv('tv65', 1411)), 1711);
+  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1672 }, tv('tv65', 1411)), 1672);
   // HSPL preserves its recorded length too.
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'hspl-mono', cabinetLengthMm: 2000 }, tv('tv100', 2230)), 2000);
 });

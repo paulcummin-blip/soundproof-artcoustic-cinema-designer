@@ -74,7 +74,7 @@ export function drawFrontSpeakerArt(opts, ctx) {
   const isEv63 = !isEv31 && mk.includes("evolve-6-3");
   const isEv84 = mk.includes("evolve-8-4");
   const isC41 = mk.includes("c4-1");
-  // Every C4-1 cabinet — confirmed (1222/1441/1672/1904) or a legacy saved
+  // Every C4-1 cabinet — confirmed (1222/1441/1711/1904) or a legacy saved
   // length — is drawn by the shared VECTOR cabinet renderer at its exact
   // physical width, with the driver group centred at a constant physical size.
   // The per-variant raster icons remain imported for the legacy artwork tests,
