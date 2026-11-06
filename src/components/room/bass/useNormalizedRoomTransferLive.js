@@ -77,6 +77,8 @@ const REFINEMENT_DEBOUNCE_MS = 280;
 // refinement uses the full 96 points/octave (320 points for 20–200 Hz).
 const PREVIEW_POINTS_PER_OCTAVE = 8;
 
+onst SINGLE_LISTENER_POINTS_PER_OCTAVE = 32; // 121 samples over 15–200 Hz
+
 function hasValidListener(rspPosition, seatingPositions) {
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) return true;
   if (Array.isArray(seatingPositions) && seatingPositions.some(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))) return true;
@@ -92,11 +94,14 @@ function hasValidRoom(roomDims) {
   return roomDims && Number.isFinite(roomDims.widthM) && Number.isFinite(roomDims.lengthM) && Number.isFinite(roomDims.heightM);
 }
 
-export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null, followCurrentGeometry = false, interactionActive = false, previewContextKey = null, isInteractionActive = null }) {
+export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null, followCurrentGeometry = false, interactionActive = false, previewContextKey = null, isInteractionActive = null, previewListenerSelection = null }) {
   const canonicalInputs = useMemo(
     () => canonicalizeNormalizedRoomInputs({ roomDims, rspPosition, seatingPositions }),
     [roomDims, rspPosition, seatingPositions]
   );
+  const previewSelectionKey = JSON.stringify(previewListenerSelection);
+  const previewPointsPerOctave = ["rsp", "seat"].includes(previewListenerSelection?.mode)
+    ? SINGLE_LISTENER_POINTS_PER_OCTAVE : PREVIEW_POINTS_PER_OCTAVE;
   const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -330,7 +335,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       generation: gen,
       fingerprint: fp,
       quality: "preview",
-      payload: { ...payload.basePayload, physicsOptions: payload.previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
+      payload: { ...payload.basePayload, physicsOptions: payload.previewPhysicsOptions,
+        pointsPerOctave: payload.pointsPerOctave, listenerSelection: payload.listenerSelection },
     };
     activePreviewRequestRef.current = { generation: gen, fingerprint: fp, epoch: interactionRef.current.epoch, dragging: interactionRef.current.dragging };
     setRequestedAt(Date.now());
@@ -397,7 +403,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     const requestedFingerprint = followCurrentGeometry ? geometryFingerprint : analysisRequestFingerprint;
     const enabled = !!geometryFingerprint && !!analysisRequestId &&
       requestedFingerprint === geometryFingerprint;
-    const interactionKey = JSON.stringify([previewContextKey, interactionActive, enabled]);
+    const interactionKey = JSON.stringify([previewContextKey, interactionActive, enabled, previewSelectionKey]);
     if (interactionRef.current.key !== interactionKey) {
       interactionRef.current = {
         key: interactionKey, epoch: interactionRef.current.epoch + 1,
@@ -432,7 +438,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     // Store the latest payload so the coalesced debounce timer and any pending
     // request carry the newest geometry, not the one that armed the timer.
     const basePayload = { ...canonicalInputs, subsForSimulation };
-    previewPayloadRef.current = { basePayload, previewPhysicsOptions };
+    previewPayloadRef.current = { basePayload, previewPhysicsOptions,
+      pointsPerOctave: previewPointsPerOctave, listenerSelection: previewListenerSelection };
 
     if (!enabled) {
       // Invalid — clear any pending preview and the debounce timer. An in-flight
@@ -469,7 +476,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       generation: gen,
       fingerprint: fp,
       quality: "preview",
-      payload: { ...basePayload, physicsOptions: previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
+      payload: { ...basePayload, physicsOptions: previewPhysicsOptions,
+        pointsPerOctave: previewPointsPerOctave, listenerSelection: previewListenerSelection },
     };
 
     // If a preview is already in flight, store this as the single replaceable
@@ -520,7 +528,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint, followCurrentGeometry, interactionActive, previewContextKey, isInteractionActive]);
+  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint, followCurrentGeometry, interactionActive, previewContextKey, isInteractionActive, previewSelectionKey]);
 
   // Cleanup on unmount — terminate both workers and clear both timers.
   useEffect(() => {
