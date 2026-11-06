@@ -544,7 +544,7 @@ export default function BassGraph({
                         >
                             {schroederFrequency > 200
                                 ? `Schroeder (${schroederFrequency.toFixed(0)} Hz off-scale)`
-                                : `Schroeder (${schroederFrequency.toFixed(1)} Hz)`}
+                                : `Schroeder (${schroederFrequency.toFixed(0)} Hz)`}
                         </text>
                     )}
                 </LineChart>
