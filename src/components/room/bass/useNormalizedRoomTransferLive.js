@@ -91,7 +91,7 @@ function hasValidRoom(roomDims) {
   return roomDims && Number.isFinite(roomDims.widthM) && Number.isFinite(roomDims.lengthM) && Number.isFinite(roomDims.heightM);
 }
 
-export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null }) {
+export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null, followCurrentGeometry = false }) {
   const canonicalInputs = useMemo(
     () => canonicalizeNormalizedRoomInputs({ roomDims, rspPosition, seatingPositions }),
     [roomDims, rspPosition, seatingPositions]
@@ -413,7 +413,11 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     const basePayload = { ...canonicalInputs, subsForSimulation };
     previewPayloadRef.current = { basePayload, previewPhysicsOptions };
 
-    if (!geometryFingerprint || !analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== geometryFingerprint) {
+    // Automatic room preview requests this render's geometry directly. An
+    // owner-to-hook fingerprint feedback render would cancel the coalescing
+    // timer on every drag update. Explicit requests still require an exact match.
+    const requestedFingerprint = followCurrentGeometry ? geometryFingerprint : analysisRequestFingerprint;
+    if (!geometryFingerprint || !analysisRequestId || !requestedFingerprint || requestedFingerprint !== geometryFingerprint) {
       // Invalid — clear any pending preview and the debounce timer. An in-flight
       // preview (if any) completes later and is discarded by the generation check.
       if (previewTimerRef.current) {
@@ -497,7 +501,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint]);
+  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint, followCurrentGeometry]);
 
   // Cleanup on unmount — terminate both workers and clear both timers.
   useEffect(() => {
