@@ -63,7 +63,8 @@
 //     refinementDurationMs,        // last refinement calculation duration (ms), or null
 //   }
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
+import { classifyRoomPreviewResponse } from "./roomPreviewDisplayPolicy";
 import { computeNormalizedTransferFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { buildPreviewPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
 import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
@@ -91,7 +92,7 @@ function hasValidRoom(roomDims) {
   return roomDims && Number.isFinite(roomDims.widthM) && Number.isFinite(roomDims.lengthM) && Number.isFinite(roomDims.heightM);
 }
 
-export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null }) {
+export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPositions, subsForSimulation, physicsOptions, analysisRequestId = null, analysisRequestFingerprint = null, followCurrentGeometry = false, interactionActive = false, previewContextKey = null, isInteractionActive = null }) {
   const canonicalInputs = useMemo(
     () => canonicalizeNormalizedRoomInputs({ roomDims, rspPosition, seatingPositions }),
     [roomDims, rspPosition, seatingPositions]
@@ -122,6 +123,10 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   // changes, before the debounce. An in-flight worker response must match this
   // to be accepted.
   const currentFingerprintRef = useRef(null);
+  // Separate gesture/context lifetime from individual coordinate generations.
+  // End/restart, disable, or canonical design/version changes invalidate old work.
+  const interactionRef = useRef({ key: null, epoch: 0, dragging: false });
+  const interactionReaderRef = useRef(null);
 
   // The currently in-flight preview request { generation, fingerprint }. Set
   // when a preview is posted, cleared when its response is handled.
@@ -213,7 +218,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     if (pending.fingerprint !== currentFingerprintRef.current) return false;
     const worker = previewWorkerRef.current;
     if (!worker) return false;
-    activePreviewRequestRef.current = { generation: pending.generation, fingerprint: pending.fingerprint };
+    activePreviewRequestRef.current = { generation: pending.generation, fingerprint: pending.fingerprint, epoch: pending.epoch, dragging: pending.dragging };
     setRequestedAt(Date.now());
     worker.postMessage(pending.message);
     return true;
@@ -234,17 +239,19 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
         // No active request — nothing to do (should not happen, defensive).
         if (!active) return;
 
-        // Race protection: accept only when generation AND fingerprint match
-        // the current values. A stale result from a superseded generation is
-        // discarded, the in-flight slot is cleared, and the latest pending
-        // geometry is posted. The in-flight computation is NEVER terminated
-        // mid-flight — it completes and is discarded here.
-        const stale = msg.generation !== active.generation
-          || msg.fingerprint !== active.fingerprint
-          || active.fingerprint !== currentFingerprintRef.current
-          || active.generation !== geometryGenerationRef.current;
-
-        if (stale) {
+        const admission = classifyRoomPreviewResponse({
+          message: msg, active,
+          generation: geometryGenerationRef.current,
+          fingerprint: currentFingerprintRef.current,
+          epoch: interactionRef.current.epoch,
+          // Read the live store as well: release/cancel closes admission even
+          // before React has committed the corresponding render.
+          interactionActive: interactionRef.current.dragging &&
+            interactionReaderRef.current?.() === true,
+          displayedGeneration: lastValidGenerationRef.current,
+        });
+        if (admission === "foreign") return;
+        if (admission === "discard") {
           activePreviewRequestRef.current = null;
           dispatchPendingPreview();
           return;
@@ -273,7 +280,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
           setCalculationDurationMs(msg.result?.calculationDurationMs ?? null);
           setCompletedAt(Date.now());
           setErrorMessage(null);
-          setStatus("ready");
+          // Intermediate frames remain explicitly updating, never current.
+          setStatus(admission === "intermediate" ? "calculating" : "ready");
           // After accepting, if a newer geometry is pending, dispatch it now.
           dispatchPendingPreview();
         } else if (msg.type === "error") {
@@ -323,7 +331,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       quality: "preview",
       payload: { ...payload.basePayload, physicsOptions: payload.previewPhysicsOptions, pointsPerOctave: PREVIEW_POINTS_PER_OCTAVE },
     };
-    activePreviewRequestRef.current = { generation: gen, fingerprint: fp };
+    activePreviewRequestRef.current = { generation: gen, fingerprint: fp, epoch: interactionRef.current.epoch, dragging: interactionRef.current.dragging };
     setRequestedAt(Date.now());
     worker.postMessage(message);
   }, [ensurePreviewWorker]);
@@ -345,6 +353,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
         if (msg.fingerprint !== active.fingerprint) return;
         if (active.fingerprint !== currentFingerprintRef.current) return;
         if (active.generation !== geometryGenerationRef.current) return;
+        if (active.generation < lastValidGenerationRef.current) return;
 
         if (msg.type === "complete") {
           // Refined result replaces preview for the same fingerprint (same generation).
@@ -382,7 +391,20 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   // The preview worker is NOT terminated — a stale in-flight preview is
   // discarded by the generation check in onmessage, and the latest pending
   // geometry is posted when it completes.
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Commit these guards before a worker message can observe a newly rendered
+    // design with the old admission rules.
+    const requestedFingerprint = followCurrentGeometry ? geometryFingerprint : analysisRequestFingerprint;
+    const enabled = !!geometryFingerprint && !!analysisRequestId &&
+      requestedFingerprint === geometryFingerprint;
+    const interactionKey = JSON.stringify([previewContextKey, interactionActive, enabled]);
+    if (interactionRef.current.key !== interactionKey) {
+      interactionRef.current = {
+        key: interactionKey, epoch: interactionRef.current.epoch + 1,
+        dragging: enabled && interactionActive && !!previewContextKey,
+      };
+    }
+    interactionReaderRef.current = isInteractionActive;
     // Clear the refinement debounce only. The preview debounce is coalesced
     // (see below) and is NOT cleared here — a single timer fires with the
     // latest geometry.
@@ -413,7 +435,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     const basePayload = { ...canonicalInputs, subsForSimulation };
     previewPayloadRef.current = { basePayload, previewPhysicsOptions };
 
-    if (!geometryFingerprint || !analysisRequestId || !analysisRequestFingerprint || analysisRequestFingerprint !== geometryFingerprint) {
+    if (!enabled) {
       // Invalid — clear any pending preview and the debounce timer. An in-flight
       // preview (if any) completes later and is discarded by the generation check.
       if (previewTimerRef.current) {
@@ -426,7 +448,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     }
 
     // Same fingerprint as the last completed result — no work needed.
-    if (lastValidFingerprintRef.current === geometryFingerprint && lastValidResultRef.current) {
+    if (lastValidFingerprintRef.current === geometryFingerprint && lastValidResultRef.current && lastValidQualityRef.current === "refined") {
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
         previewTimerRef.current = null;
@@ -435,6 +457,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       setStatus("ready");
       setResult(lastValidResultRef.current);
       setQuality(lastValidQualityRef.current);
+      lastValidGenerationRef.current = gen;
       return;
     }
 
@@ -454,7 +477,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     // completes and its result is discarded by the generation check, then this
     // pending request is posted.
     if (activePreviewRequestRef.current) {
-      previewPendingRef.current = { generation: gen, fingerprint: fp, message };
+      previewPendingRef.current = { generation: gen, fingerprint: fp, message, epoch: interactionRef.current.epoch, dragging: interactionRef.current.dragging };
     } else if (!previewTimerRef.current) {
       // No in-flight and no debounce armed: start ONE coalesced debounce timer.
       // The timer is NOT reset by intermediate geometry changes — it fires once
@@ -497,7 +520,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint]);
+  }, [geometryFingerprint, analysisRequestId, analysisRequestFingerprint, followCurrentGeometry, interactionActive, previewContextKey, isInteractionActive]);
 
   // Cleanup on unmount — terminate both workers and clear both timers.
   useEffect(() => {
