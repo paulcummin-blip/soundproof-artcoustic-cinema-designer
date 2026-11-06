@@ -178,6 +178,7 @@ export default function useRunOptimisationPlan({
         },
         baselineParity: extra.baselineParity || null,
         failureReason: reason,
+        terminalOutcome: extra.terminalOutcome || null,
         // THE PLAN COULD NOT BE SAVED. This is a real optimiser failure and it is
         // recorded as itself — the analysis produced no result that could be saved
         // for this design — with the two actions that answer it (retry, or keep
@@ -261,8 +262,12 @@ export default function useRunOptimisationPlan({
 
       measuredRuntime = result.runtimeMetrics || measuredRuntime;
       if (result.status === "cancelled") {
+        // Cancellation must own a durable terminal record after cold reopen.
+        saveRunFailure("Optimisation cancelled by the user before completion.", {
+          terminalOutcome: "evaluation_incomplete",
+        });
         logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" });
-        setStatus("idle");
+        setStatus("complete");
         return;
       }
       if (result.status === "error" || result.status === "stale") {
