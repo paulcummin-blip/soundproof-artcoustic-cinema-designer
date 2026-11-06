@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { buildOptimiserRunEvidence } from "../components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import { serializeOptimiserPlan } from "../components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { resolveOptimiserPlanStatus } from "../components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js";
+import { resolveOptimiserPresentationState } from "../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 import {resolveCrossoverReceiptState as resolve} from "../components/room/bass/optimiseWorkflow/crossoverReceiptState.js";
 const base={
  projectId:"test-project",versionId:"test-version",fingerprint:"before",
@@ -12,6 +16,17 @@ const base={
  latestRun:{runId:"run-1"}
 };
 const withRecord=changes=>({...base,record:{...base.record,...changes}});
+test("cancelled run survives serialization and suppresses historical receipt after reopen",()=>{
+ const saved=buildOptimiserRunEvidence({identity:{projectId:base.projectId,versionId:base.versionId,designFingerprint:"before",cacheKey:"before"},runIdentity:{runId:"run-2",startedAt:new Date().toISOString()},failureReason:"Optimisation cancelled by the user before completion.",terminalOutcome:"evaluation_incomplete"});
+ const plan=JSON.parse(JSON.stringify(serializeOptimiserPlan(saved)));
+ const planView=resolveOptimiserPlanStatus({plan,currentDesignFingerprint:"before",instances:[],seatingPositions:[]});
+ const presentation=resolveOptimiserPresentationState({planView,runStatus:"idle"});
+ assert.equal(plan.run.runId,"run-2");
+ assert.equal(presentation.state,"evaluation_incomplete");
+ assert.equal(presentation.message,"Optimisation cancelled before completion.");
+ assert.equal(presentation.showApply,false);
+ assert.equal(resolve({...base,plan,latestRun:null}).ownsPanel,false);
+});
 test("completed current recommendation is actionable",()=>assert.equal(resolve(base).canApply,true));
 test("intentional fingerprint transition belongs to the live Apply",()=>{
  const result=resolve({...withRecord({status:"applying"}),fingerprint:"after",operation:{projectId:base.projectId,versionId:base.versionId,candidateId:"joint-1",baselineCacheKey:"before",kind:"apply"}});
