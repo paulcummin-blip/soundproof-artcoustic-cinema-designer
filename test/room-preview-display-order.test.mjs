@@ -178,3 +178,24 @@ test('cancelling back to a cached refined position raises the display generation
   assert.equal(h.render('a').result.id, 'refined-a');
   assert.equal(h.render('a').status, 'ready');
 });
+test('listener selection changes invalidate in-flight drag work without changing full geometry identity', () => {
+  const h=harness();h.setLiveDragging(true);
+  h.render('a',{interactionActive:true,previewListenerSelection:{mode:'rsp'}});h.tick(50);
+  const w=h.workers[0];
+  assert.equal(w.messages[0].message.payload.pointsPerOctave,32);
+  h.render('a',{previewListenerSelection:{mode:'seat',seatId:'s2'}});
+  w.complete(0,{id:'wrong-rsp'});
+  assert.equal(h.render('a').result,null);
+  assert.equal(w.messages[1].message.fingerprint,'a');
+  assert.equal(w.messages[1].message.payload.listenerSelection.seatId,'s2');
+  w.complete(1,{id:'s2'});
+  assert.equal(h.render('a').result.id,'s2');
+  h.render('b',{previewListenerSelection:{mode:'all'}});h.tick(50);
+  assert.equal(w.messages.at(-1).message.payload.pointsPerOctave,8);
+  h.setLiveDragging(false);h.render('b',{interactionActive:false});h.tick(280);
+  const refined=h.workers.at(-1).messages[0].message;
+  assert.equal(refined.quality,'refined');
+  assert.equal(refined.payload.listenerSelection,undefined);
+  assert.equal(refined.payload.pointsPerOctave,undefined);
+});
+
