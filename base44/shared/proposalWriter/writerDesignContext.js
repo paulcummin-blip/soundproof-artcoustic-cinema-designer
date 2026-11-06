@@ -417,6 +417,38 @@ export function resolveDesignInterpretation({
 }
 
 /**
+ * The Stage 1 comparison reading, as the writer input carries it. Read from the
+ * saved proposal's metadata, where Stage 1 placed it. Carried as the interpretation
+ * of what the options share and what changes, never as a source of figures and
+ * never as a recommendation. Absent (supplied: false) for a single-option proposal
+ * or a comparison whose Stage 1 reading is not on the proposal.
+ */
+export function buildComparisonReading({ proposal = null } = {}) {
+  const reading = proposal?.metadata?.comparison_reading || null;
+  if (!reading || typeof reading !== 'object' || Array.isArray(reading)) {
+    return {
+      rule: COMPARISON_READING_RULE,
+      supplied: false,
+      labels: [],
+      shared: [],
+      changes: [],
+    };
+  }
+  const textList = (list) => (Array.isArray(list) ? list
+    .filter((entry) => typeof entry === 'string' && entry.trim().length > 0) : []);
+  const labels = textList(reading.labels);
+  const shared = textList(reading.shared);
+  const changes = textList(reading.changes);
+  return {
+    rule: COMPARISON_READING_RULE,
+    supplied: shared.length > 0 || changes.length > 0,
+    labels,
+    shared,
+    changes,
+  };
+}
+
+/**
  * The designer's own brief, as the writer input carries it. The client brief and
  * the narrative brief are read from the proposal; the approved designer notes are
  * supplied by the caller, which reads them from the proposal's own sections.
@@ -450,6 +482,7 @@ export function emptyDesignContext() {
       view: null,
     },
     editorial_brief: buildEditorialBrief({}),
+    comparison_reading: buildComparisonReading({}),
     clarification_answers: buildClarificationAnswers({}),
     // The RP22 professional design context. With no evidence it carries nothing.
     rp22_design_context: buildRp22DesignContext({}),
@@ -467,6 +500,11 @@ export function normaliseDesignContext(value) {
     editorial_brief: value?.editorial_brief?.supplied === true
       ? { ...empty.editorial_brief, ...value.editorial_brief }
       : empty.editorial_brief,
+    // The Stage 1 comparison reading, carried as the interpretation of what the
+    // options share and what changes, never a recommendation and never figures.
+    comparison_reading: value?.comparison_reading?.supplied === true
+      ? { ...empty.comparison_reading, ...value.comparison_reading }
+      : empty.comparison_reading,
     // The designer's own clarification answers. A passed question is carried as
     // passed even when no answer exists, so the writer can never invent one.
     clarification_answers: value?.clarification_answers
@@ -504,6 +542,12 @@ export function buildWriterDesignContext({
   return {
     design_interpretation: designInterpretation,
     editorial_brief: buildEditorialBrief({ proposal, dealerNotes }),
+    // The Stage 1 comparison reading, read from the saved proposal: the
+    // interpretation of what the options share and what changes between them.
+    // Alongside the designer's brief, it is the primary authority for the
+    // narrative purpose of the comparison; engineering evidence remains the
+    // authority for every technical and performance claim.
+    comparison_reading: buildComparisonReading({ proposal }),
     // The designer's own answers to ADI's clarification questions: design intent
     // for the decisions the frozen evidence records no reason for. Read from the
     // proposal the answers were stored with, or from the caller when the proposal

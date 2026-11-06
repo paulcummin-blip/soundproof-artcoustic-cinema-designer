@@ -242,6 +242,19 @@ export function buildWriterInput({
     // such rather than left blank, so the audit always shows what was read.
     design_interpretation: context.design_interpretation,
     editorial_brief: context.editorial_brief,
+    // THE STAGE 1 COMPARISON READING. For a comparison proposal, this is the
+    // interpretation of what the options share and what changes between them.
+    // Alongside the designer's brief, it is the primary authority for the
+    // NARRATIVE PURPOSE of the comparison: what each design is for and how the
+    // room would be used. Engineering evidence remains the authority for every
+    // technical and performance claim, and the comparison reading never supplies
+    // a figure, a level or a product. It never decides which option is better:
+    // a higher RP22 score, a larger speaker system, a larger screen or a higher
+    // price never makes one option universally preferable, and one option is
+    // recommended over another only where the designer's stated brief gives a
+    // clear priority that supports it. Absent (supplied: false) for a
+    // single-option proposal.
+    comparison_reading: context.comparison_reading,
     // THE DESIGNER'S NARRATIVE STEER. What this proposal should weigh more
     // heavily, and what it should leave out of the client-facing narrative,
     // carried as SOFT PREFERENCES: subjects, never instructions and never a
