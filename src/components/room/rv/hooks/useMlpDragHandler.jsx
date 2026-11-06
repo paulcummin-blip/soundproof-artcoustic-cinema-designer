@@ -22,6 +22,7 @@
 import { useCallback } from "react";
 import { computeMlpProximityGuides } from "@/components/room/rv/utils/geometry/computeProximityGuides";
 import { recordTemporaryP18P19DragMove } from "@/components/hooks/useRP22AnalysisEngine";
+import { publishRspDragLive } from "@/components/state/rspDragLiveStore";
 
 let temporaryRSPDragMoveCount = 0;
 
@@ -77,6 +78,10 @@ export function useMlpDragHandler({
       });
       if (guides) setMlpDragInfo({ visible: true, x: roundedX, y: roundedY, ...guides });
     }
+
+    // Publish the transient RSP coordinate so the room-only preview follows the
+    // drag without waiting for the canonical commit on pointer release.
+    publishRspDragLive({ x: roundedX, y: roundedY, z: 1.2 });
   }, [lengthM, widthM, setMlpDragInfo]);
 
   return { handleMlpDrag };

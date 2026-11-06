@@ -78,6 +78,7 @@ import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler"
 import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
 import { subscribeMlpGrab, getMlpGrab, setMlpGrab } from "@/components/state/mlpGrabStore";
 import { clearSeatDragLive } from "@/components/state/seatDragLiveStore";
+import { clearRspDragLive } from "@/components/state/rspDragLiveStore";
 import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
 import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
 import { useShiftSeatsToAngle } from "@/components/room/rv/hooks/useShiftSeatsToAngle";
@@ -2245,6 +2246,7 @@ const byId = useEntitiesById({
     setMlpGrab(false);
     mlpDragActiveRef.current = false;
     setMlpDragInfo(null);
+    clearRspDragLive();
   }, [_computeMlpYFromPointer, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, onClearDesignatedRspSeatId]);
 
   // Cancel: Escape while GRABBED → restore last committed Y → LOCKED.
@@ -2252,6 +2254,7 @@ const byId = useEntitiesById({
     setMlpGrab(false);
     mlpDragActiveRef.current = false;
     setMlpDragInfo(null);
+    clearRspDragLive();
   }, []);
 
   // SVG background mousedown — while GRABBED, any click on the canvas places.

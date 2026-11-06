@@ -5,6 +5,7 @@ import { sideWallX } from "@/components/room/rv/utils/rvGeometry";
 import { recordTemporaryP18P19DragEnd } from "@/components/hooks/useRP22AnalysisEngine";
 import { clearSubDragLive } from "@/components/state/subDragLiveStore";
 import { clearSeatDragLive } from "@/components/state/seatDragLiveStore";
+import { clearRspDragLive } from "@/components/state/rspDragLiveStore";
 
 let temporaryRSPDragEndCount = 0;
 
@@ -85,6 +86,10 @@ export function useMouseUpHandler({
         committedRspCoordinate: hasY ? { x: null, y: finalY, z: 1.2 } : null,
         exactStateSetter: "onSetManualRspY_m (Y-only commit on release)",
       });
+      // Clear the advisory room-response preview live store. The canonical RSP
+      // commit above has already set the new Y, so the preview reverts to the
+      // committed coordinate without a jump.
+      clearRspDragLive();
     }
 
     // Signal to RoomDesigner that dragging ended

@@ -34,6 +34,7 @@ import {
 } from "@/components/state/userInteractionStore.js";
 import { subscribeSubDragLive, getSubDragLive } from "@/components/state/subDragLiveStore";
 import { subscribeSeatDragLive, getSeatDragLive } from "@/components/state/seatDragLiveStore";
+import { subscribeRspDragLive, getRspDragLive } from "@/components/state/rspDragLiveStore";
 
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
@@ -163,6 +164,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // room-response preview. Never committed to design state until pointer-up.
   const subDragLive = useSyncExternalStore(subscribeSubDragLive, getSubDragLive, getSubDragLive);
   const seatDragLive = useSyncExternalStore(subscribeSeatDragLive, getSeatDragLive, getSeatDragLive);
+  const rspDragLive = useSyncExternalStore(subscribeRspDragLive, getRspDragLive, getRspDragLive);
   // Override source/listener positions with draft positions when dragging,
   // so the normalized room-transfer preview follows the drag in real time.
   const previewSources = useMemo(() => {
@@ -183,6 +185,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     if (!seatDragLive?.active || !Array.isArray(seatDragLive?.seats)) return seatingPositions;
     return seatDragLive.seats;
   }, [seatingPositions, seatDragLive]);
+  // Override RSP with the draft coordinate while dragging so the preview follows the marker.
+  const previewRspPosition = useMemo(() => (rspDragLive?.active && rspDragLive?.rsp) ? rspDragLive.rsp : rspPosition, [rspPosition, rspDragLive]);
   const normalizedPhysicsOptions = useNormalizedPhysicsOptions(authoritative);
   // PASS 2: Use perSourceRspComplexTransfers from the authoritative simulation.
   // The authoritative engine produces these from a flat 94 dB source (same
@@ -458,7 +462,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
 
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
-    rspPosition,
+    rspPosition: previewRspPosition,
     seatingPositions: previewSeatingPositions,
     subsForSimulation: previewSources,
     physicsOptions: normalizedPhysicsOptions,
