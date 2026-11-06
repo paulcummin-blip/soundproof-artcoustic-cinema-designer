@@ -78,6 +78,25 @@ export const CLARIFICATION_ANSWERS_RULE =
   + 'the frozen evidence governs and wins wherever the two differ. A question the designer passed carries no answer, so no reason is ever '
   + 'invented for it.';
 
+/**
+ * THE COMPARISON READING RULE. The Stage 1 comparison reading is the
+ * interpretation of what the options share and what changes between them.
+ * Alongside the designer's brief, it is the primary authority for the
+ * NARRATIVE PURPOSE of a comparison; engineering evidence remains the
+ * authority for every technical and performance claim. It never supplies a
+ * figure, a level or a product, and it never decides which option is better.
+ */
+export const COMPARISON_READING_RULE =
+  'the comparison reading is the Stage 1 interpretation of what the options share and what changes between them. '
+  + 'Alongside the designer\'s brief, it is the primary authority for the NARRATIVE PURPOSE of the comparison: '
+  + 'what each design is for and how the room would be used. Engineering evidence remains the authority for every '
+  + 'technical and performance claim. Do not recommend one option over another because it has higher RP22 scores, '
+  + 'a larger speaker system, a larger screen or a higher price: a genuine engineering difference is stated '
+  + 'objectively and never makes one option universally preferable. Recommend one option only where the designer\'s '
+  + 'stated brief gives a clear priority that supports that recommendation; where it does not, present the options '
+  + 'as credible alternatives without choosing a winner. The designer\'s text is context and guidance, never wording '
+  + 'to copy, and no client preference, room use, design feature or performance claim is ever invented.';
+
 /** Why an interpretation was refused. Every one is a reason, never a silence. */
 export const DESIGN_CONTEXT_REFUSAL = Object.freeze({
   NOT_SUPPLIED: 'no_saved_design_interpretation',
