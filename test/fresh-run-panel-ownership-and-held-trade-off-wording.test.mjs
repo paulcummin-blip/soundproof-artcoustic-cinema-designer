@@ -31,6 +31,11 @@ const TRADE_OFF_STATE_PATH = "src/components/room/bass/optimiserPlan/optimiserTr
 describe("Defect 1 — Fresh Re-test panel ownership", () => {
   const source = readSource(JOURNEY_PATH);
 
+  it("Apply recalculation is not presented as a fresh optimiser run", () => {
+    const workflow = fs.readFileSync("src/components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx", "utf8");
+    assert.ok(workflow.includes("reoptimiseBusy={isCalculating && !jointReceiptState.operationActive}"));
+  });
+
   it("1: freshRunActive combines isRunning (runStatus) and reoptimiseBusy", () => {
     assert.ok(
       source.includes("const freshRunActive = runStatus === \"running\" || reoptimiseBusy === true;"),
