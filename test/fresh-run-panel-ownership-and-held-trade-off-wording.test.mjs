@@ -32,7 +32,7 @@ describe("Defect 1 — Fresh Re-test panel ownership", () => {
   const source = readSource(JOURNEY_PATH);
 
   it("Apply recalculation is not presented as a fresh optimiser run", () => {
-    const workflow = fs.readFileSync("src/components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx", "utf8");
+    const workflow = readSource("src/components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx");
     assert.ok(workflow.includes("reoptimiseBusy={isCalculating && !jointReceiptState.operationActive}"));
   });
 
