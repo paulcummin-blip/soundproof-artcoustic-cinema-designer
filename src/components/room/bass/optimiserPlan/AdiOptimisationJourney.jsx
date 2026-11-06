@@ -241,13 +241,15 @@ export default function AdiOptimisationJourney({
   // authority publishes.)
   const parityStatus = planView?.baselineParity?.status || null;
   const parityBlocked = parityStatus === "MISSING" || parityStatus === "MISMATCH" || parityStatus === "UNKNOWN";
+  const terminalRunOwnsPresentation = planView?.run?.terminal === true
+    && ["failed", "evaluation_incomplete"].includes(planView.run.outcome);
 
   // A publication failure the designer has not yet acknowledged IS the panel's
   // state: it is resolved before the presentation state, so a copy that describes
   // the run as evaluated can never override the failure that stopped it.
   const journey = publicationFailureActive
     ? resolved
-    : presentation && !parityBlocked
+    : presentation && (!parityBlocked || terminalRunOwnsPresentation)
     ? {
       ...resolved,
       state: presentationThemeState(presentation.state) || resolved.state,
