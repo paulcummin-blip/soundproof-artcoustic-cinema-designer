@@ -174,7 +174,10 @@ test('TEST 5 — the blocking message names every blocked version and the source
 
 test('TEST 6 — Step 3 states the documents, and only the unavailable Next blocks the step', () => {
   expect(VERSIONS_STEP).toContain("import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable'");
-  expect(VERSIONS_STEP).toContain('<VersionReadinessTable gate={readiness} projectId={projectId} />');
+  expect(VERSIONS_STEP).toContain('<VersionReadinessTable');
+  expect(VERSIONS_STEP).toContain('gate={readiness}');
+  expect(VERSIONS_STEP).toContain('projectId={projectId}');
+  expect(VERSIONS_STEP).toContain('onGenerateSpeakerDesign={onGenerateSpeakerDesign}');
   // The version choice itself is never interrupted.
   expect(WIZARD).toContain('versionsValid, // step 2');
   expect(VERSIONS_STEP).not.toMatch(/disabled=\{!readiness/);
