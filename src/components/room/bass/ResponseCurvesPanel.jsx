@@ -32,8 +32,6 @@ export default function ResponseCurvesPanel({
   smoothingMode,
   onSmoothingModeChange,
   markers = null,
-  roomStatusLabel = "Live room response",
-  roomStatusTone = "live",
 }) {
   const segmentStyle = (active, enabled) => ({
     flex: 1,
