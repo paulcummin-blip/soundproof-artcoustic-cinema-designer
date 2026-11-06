@@ -2,8 +2,23 @@
  * versionDocumentStatus.js
  * ------------------------
  * Per-version document status for the Room Designer version switcher: for each
- * design version, whether its saved reports are current and where its newest
- * proposal stands.
+ * design version, whether its saved Project Report is current or needs
+ * updating, and where its newest proposal stands.
+ *
+ * Sound Proof has ONE report: the Project Report (ReportSnapshot
+ * report_type 'project'). The legacy Visual and Technical reports are retired
+ * as status sources and are never consulted here. This derivation therefore
+ * uses the SAME canonical report and the SAME fingerprint status authority the
+ * report pages, the Project Library and the Proposal Centre use:
+ *
+ *   - the canonical saved report per version is resolved by collapseLiveReports
+ *     (the one shared selection rule);
+ *   - that report's Current / Stale state is resolved by resolveSnapshotStatus,
+ *     the same fingerprint comparison useReportSnapshot and the readiness
+ *     authority use.
+ *
+ * No separate status calculation is introduced, and no issued PDF export is
+ * required: a valid current ReportSnapshot is enough.
  *
  * Every value is derived for one exact version, so one version's report or
  * proposal state can never appear against another version. Nothing is written
@@ -16,20 +31,31 @@
 import {
   collapseLiveReports,
 } from '@/components/library/librarySourceStatus';
-import { isSnapshotRestorable } from '@/components/report/reportSnapshotAuthority';
+import {
+  isSnapshotRestorable,
+  resolveSnapshotStatus,
+} from '@/components/report/reportSnapshotAuthority';
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
 import { getStatusLabel } from '@/components/proposal/proposalLifecycle';
 
-const REPORT_TYPES = ['visual', 'technical'];
+/** The ONE report type the selector states. Legacy 'visual'/'technical' are retired. */
+const REPORT_TYPES = ['project'];
 
-export const NO_REPORTS_LABEL = 'No reports yet';
-export const CURRENT_REPORTS_LABEL = 'Current reports';
-export const REPORTS_NEED_UPDATING_LABEL = 'Reports need updating';
+export const NO_REPORTS_LABEL = 'No report yet';
+export const CURRENT_REPORTS_LABEL = 'Project Report current';
+export const REPORTS_NEED_UPDATING_LABEL = 'Project Report needs updating';
 export const REPORT_STATE = Object.freeze({
   CURRENT: 'current',
   STALE: 'stale',
   MISSING: 'missing',
 });
+
+/** The current fingerprint held for one version id, from a Map or a plain object. */
+function fingerprintFor(byVersion, versionId) {
+  if (!byVersion || !versionId) return null;
+  if (typeof byVersion.get === 'function') return byVersion.get(versionId) ?? null;
+  return byVersion[versionId] ?? null;
+}
 
 /**
  * Derive each version's document status from the project's saved reports and
@@ -64,16 +90,39 @@ export function deriveVersionDocumentStatus({
     return entries.get(versionId);
   };
 
+  // Every version the caller knows about gets an entry, so a version with no
+  // report and no proposal still receives the authority's "No report yet"
+  // label rather than a fallback the component invents.
+  if (currentFingerprintByVersion) {
+    const versionIds = typeof currentFingerprintByVersion.keys === 'function'
+      ? [...currentFingerprintByVersion.keys()]
+      : Object.keys(currentFingerprintByVersion);
+    versionIds.forEach((versionId) => { entryFor(versionId); });
+  }
+
   // ONE saved report per version and report type — the CANONICAL one, resolved
-  // by the same rule every other surface uses, so a newer stale or incomplete
-  // duplicate cannot make this version read "Reports need updating" while the
-  // Library and the report pages show a Current report.
+  // by the same rule every other surface uses (collapseLiveReports →
+  // selectCanonicalReportSnapshot), so a newer stale or incomplete duplicate
+  // cannot make this version read "needs updating" while the Library and the
+  // report pages show a Current report.
   collapseLiveReports(snapshots, { currentFingerprintByVersion })
     .filter(isSnapshotRestorable)
     .forEach((snapshot) => {
       if (!REPORT_TYPES.includes(snapshot.report_type)) return;
-      const entry = entryFor(snapshot.version_id);
-      if (entry) entry.reportStatusByType[snapshot.report_type] = snapshot.status || 'current';
+      const versionId = snapshot.version_id;
+      const entry = entryFor(versionId);
+      if (!entry) return;
+      // The status the report pages and the Proposal Centre read: the saved
+      // report's own fingerprints compared against the version's current
+      // published authority. No second status calculation is introduced here.
+      const resolution = resolveSnapshotStatus({
+        saved: snapshot,
+        currentFingerprints: {
+          engineeringFingerprint: fingerprintFor(currentFingerprintByVersion, versionId) || null,
+        },
+      });
+      if (resolution.status === 'none') return;
+      entry.reportStatusByType[snapshot.report_type] = resolution.status;
     });
 
   // Proposals arrive newest first, so the first one naming a version is that
@@ -97,8 +146,8 @@ export function deriveVersionDocumentStatus({
     statusByVersionId.set(versionId, {
       reportsState,
       reportsGenerated: generated,
-      // The dealer's words: a version's reports are either current, or the design
-      // has moved on and they need updating. No internal state name is rendered.
+      // The dealer's words: a version's Project Report is current, or the design
+      // has moved on and it needs updating. No internal state name is rendered.
       reportsLabel: generated.length === 0
         ? NO_REPORTS_LABEL
         : (stale ? REPORTS_NEED_UPDATING_LABEL : CURRENT_REPORTS_LABEL),

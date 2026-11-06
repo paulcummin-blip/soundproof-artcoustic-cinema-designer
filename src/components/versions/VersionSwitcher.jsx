@@ -193,7 +193,7 @@ export default function VersionSwitcher({
   const statusLineFor = (version) => {
     if (statusLoading) return 'Checking reports and proposals…';
     const status = statusByVersionId.get(version.id);
-    const parts = [status?.reportsLabel || 'No reports yet'];
+    const parts = [status?.reportsLabel || 'No report yet'];
     if (status?.proposalLabel) parts.push(`Proposal: ${status.proposalLabel}`);
     return parts.join(' · ');
   };

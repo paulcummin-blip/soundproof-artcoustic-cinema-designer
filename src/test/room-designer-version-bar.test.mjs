@@ -5,6 +5,11 @@
  * show: when unsaved work must be protected before another version opens, and
  * that each version's report/proposal status is derived for that version alone
  * (never mixed with another version's).
+ *
+ * The report status follows the ONE canonical Project Report and the SAME
+ * fingerprint comparison the report pages, the Project Library and the
+ * Proposal Centre use. Legacy 'visual'/'technical' report types are retired
+ * and never satisfy the selector.
  */
 
 import { describe, test, expect } from 'vitest';
@@ -16,6 +21,8 @@ import {
 } from '@/components/versions/versionSwitchSafety';
 import {
   NO_REPORTS_LABEL,
+  CURRENT_REPORTS_LABEL,
+  REPORTS_NEED_UPDATING_LABEL,
   REPORT_STATE,
   deriveVersionDocumentStatus,
 } from '@/components/versions/versionDocumentStatus';
@@ -26,10 +33,11 @@ const V4 = 'version-4-level-4';
 const snapshot = (overrides) => ({
   id: `snap-${overrides.version_id}-${overrides.report_type}`,
   version_id: V1,
-  report_type: 'visual',
+  report_type: 'project',
   status: 'current',
   report_schema_version: 1,
   payload: { pages: [] },
+  source_fingerprints: { engineeringFingerprint: 'eng-v1', calculationFingerprint: null, seatPriorityFingerprint: null },
   generated_at: '2026-10-01T10:00:00.000Z',
   ...overrides,
 });
@@ -42,6 +50,8 @@ const proposal = (overrides) => ({
   updated_date: '2026-10-02T10:00:00.000Z',
   ...overrides,
 });
+
+const fpByVersion = (entries) => new Map(entries);
 
 describe('unsaved version change protection', () => {
   test('TEST 1 — unsaved work is protected, settled autosave is not', () => {
@@ -75,33 +85,37 @@ describe('unsaved version change protection', () => {
 });
 
 describe('per-version document status', () => {
-  test('TEST 5 — each version carries its own report status', () => {
+  test('TEST 5 — each version carries its own Project Report status', () => {
     const status = deriveVersionDocumentStatus({
       snapshots: [
-        snapshot({ version_id: V1, report_type: 'visual', status: 'current' }),
-        snapshot({ version_id: V1, report_type: 'technical', status: 'current' }),
-        snapshot({ version_id: V4, report_type: 'visual', status: 'stale' }),
+        snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: 'eng-v1' } }),
+        snapshot({ version_id: V4, source_fingerprints: { engineeringFingerprint: 'eng-v4-old' } }),
       ],
       proposals: [],
+      currentFingerprintByVersion: fpByVersion([
+        [V1, 'eng-v1'],
+        [V4, 'eng-v4-new'],
+      ]),
     });
 
     expect(status.get(V1).reportsState).toBe(REPORT_STATE.CURRENT);
-    expect(status.get(V1).reportsLabel).toBe('Current reports');
+    expect(status.get(V1).reportsLabel).toBe(CURRENT_REPORTS_LABEL);
+    expect(status.get(V1).reportsGenerated).toEqual(['project']);
     expect(status.get(V4).reportsState).toBe(REPORT_STATE.STALE);
-    // The dealer's words for a version whose reports the design moved past.
-    expect(status.get(V4).reportsLabel).toBe('Reports need updating');
-    expect(status.get(V4).reportsGenerated).toEqual(['visual']);
+    expect(status.get(V4).reportsLabel).toBe(REPORTS_NEED_UPDATING_LABEL);
+    expect(status.get(V4).reportsGenerated).toEqual(['project']);
   });
 
   test('TEST 6 — a version with no saved report says so, and no status leaks across versions', () => {
     const status = deriveVersionDocumentStatus({
-      snapshots: [snapshot({ version_id: V1 })],
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: 'eng-v1' } })],
       proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, 'eng-v1'], [V4, 'eng-v4']]),
     });
 
-    expect(status.get(V1).reportsLabel).toBe('Current reports');
-    expect(status.get(V4)).toBeUndefined();
-    expect(NO_REPORTS_LABEL).toBe('No reports yet');
+    expect(status.get(V1).reportsLabel).toBe(CURRENT_REPORTS_LABEL);
+    expect(status.get(V4).reportsLabel).toBe(NO_REPORTS_LABEL);
+    expect(NO_REPORTS_LABEL).toBe('No report yet');
   });
 
   test('TEST 7 — a proposal is reported against the versions it was built from', () => {
@@ -111,6 +125,7 @@ describe('per-version document status', () => {
         proposal({ id: 'p-comparison', status: 'generated', selected_version_ids: [V1, V4] }),
         proposal({ id: 'p-older', status: 'draft', version_id: V4, updated_date: '2026-09-01T10:00:00.000Z' }),
       ],
+      currentFingerprintByVersion: fpByVersion([[V1, 'eng-v1'], [V4, 'eng-v4']]),
     });
 
     expect(status.get(V1).proposal.id).toBe('p-comparison');
@@ -118,27 +133,43 @@ describe('per-version document status', () => {
     expect(status.get(V1).proposalLabel).toBe(status.get(V4).proposalLabel);
   });
 
-  test('TEST 8 — the newest report per version and type is the one that counts', () => {
+  test('TEST 8 — the canonical report per version is the one that counts, by the shared rule', () => {
     const status = deriveVersionDocumentStatus({
       snapshots: [
-        snapshot({ id: 'older', version_id: V1, report_type: 'visual', status: 'stale', generated_at: '2026-09-01T10:00:00.000Z' }),
-        snapshot({ id: 'newer', version_id: V1, report_type: 'visual', status: 'current', generated_at: '2026-10-03T10:00:00.000Z' }),
+        snapshot({ id: 'older', version_id: V1, generated_at: '2026-09-01T10:00:00.000Z', source_fingerprints: { engineeringFingerprint: 'eng-v1' } }),
+        snapshot({ id: 'newer', version_id: V1, generated_at: '2026-10-03T10:00:00.000Z', source_fingerprints: { engineeringFingerprint: 'eng-v1' } }),
       ],
       proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, 'eng-v1']]),
     });
 
     expect(status.get(V1).reportsState).toBe(REPORT_STATE.CURRENT);
-    expect(status.get(V1).reportsGenerated).toEqual(['visual']);
+    expect(status.get(V1).reportsGenerated).toEqual(['project']);
   });
 
   test('TEST 9 — a report payload that cannot be restored is not counted as a report', () => {
     const status = deriveVersionDocumentStatus({
       snapshots: [
-        snapshot({ version_id: V4, report_type: 'visual', report_schema_version: 0, payload: {} }),
+        snapshot({ version_id: V4, report_schema_version: 0, payload: {} }),
       ],
       proposals: [],
     });
 
     expect(status.get(V4)).toBeUndefined();
+  });
+
+  test('TEST 10 — a legacy visual/technical report never satisfies the selector', () => {
+    const status = deriveVersionDocumentStatus({
+      snapshots: [
+        snapshot({ version_id: V1, report_type: 'visual', status: 'current' }),
+        snapshot({ version_id: V1, report_type: 'technical', status: 'current' }),
+      ],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, 'eng-v1']]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.MISSING);
+    expect(status.get(V1).reportsLabel).toBe(NO_REPORTS_LABEL);
+    expect(status.get(V1).reportsGenerated).toEqual([]);
   });
 });
