@@ -45,7 +45,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '48fc447701ea01ef40b37fa331c4440a87794b58aa8412510b7fcc1c0a3bcfe0',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '8a09fb09f34fc8c518bd328072a217c20f30ccf23c1d465ab08add3dd2608735',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
   'base44/shared/proposalWriter/writerDesignContext.js': 'c52f116231bd4f3601f0f963125d7c5243e8723a2680ba2e07a66bf53935de74',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
