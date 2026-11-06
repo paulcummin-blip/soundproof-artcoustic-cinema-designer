@@ -453,12 +453,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // retained as a reference layer.
   const roomPreviewExclusive = roomPreviewActive && !completedContractMatches;
 
-  // The live hook requires analysisRequestFingerprint === its own internally
-  // computed geometryFingerprint (prefix "nrt"). The authoritative geometry
-  // fingerprint (prefix "geo") differs, so we feed the hook's own computed
-  // fingerprint back on the next render via state. This is a one-render delay
-  // which is negligible given the hook's 50 ms debounce.
-  const [roomPreviewFp, setRoomPreviewFp] = useState(null);
+  // Automatic preview follows the hook's current normalized geometry in the
+  // same render. Feeding its fingerprint back through state cancels the preview
+  // timer on each intermediate drag coordinate and starves continuous updates.
 
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
@@ -467,16 +464,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     subsForSimulation: previewSources,
     physicsOptions: normalizedPhysicsOptions,
     analysisRequestId: roomPreviewActive ? "room-preview" : null,
-    analysisRequestFingerprint: roomPreviewActive ? roomPreviewFp : null,
+    followCurrentGeometry: true,
   });
-
-  useEffect(() => {
-    if (roomPreviewActive && normalizedLive.geometryFingerprint && roomPreviewFp !== normalizedLive.geometryFingerprint) {
-      setRoomPreviewFp(normalizedLive.geometryFingerprint);
-    } else if (!roomPreviewActive && roomPreviewFp !== null) {
-      setRoomPreviewFp(null);
-    }
-  }, [roomPreviewActive, normalizedLive.geometryFingerprint, roomPreviewFp]);
 
   const sharedAuthoritative = useMemo(() => ({
     ...authoritative,
