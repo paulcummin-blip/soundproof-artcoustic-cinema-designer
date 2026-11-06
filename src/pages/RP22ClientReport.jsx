@@ -27,7 +27,7 @@ import ReportTypographyStyles from "@/components/report/typography/ReportTypogra
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
 import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
 import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
-import AdiSummaryOverlay from "@/components/report/projectReport/AdiSummaryOverlay";
+import ReportLoadingOverlay from "@/components/report/ReportLoadingOverlay";
 import {
   readReportActionIntent,
   useReportActionIntent,
@@ -649,6 +649,55 @@ export default function RP22ClientReport() {
 
   const reportReady = readiness.state === REPORT_STATE.READY;
 
+  // ── Unified report loading overlay ──────────────────────────────────────
+  // One continuous loading experience replaces the detailed preparation
+  // checklist and the separate late ADI banner. The report stays hidden until
+  // the complete report AND the accepted ADI narrative are both ready, so no
+  // unfinished section is ever revealed and no second loading banner appears.
+  //
+  //   Building Report — project state, engineering evidence, report sections
+  //                     and document data are being assembled.
+  //   Writing Report  — ADI is generating the project summary.
+  //
+  // Both stages are driven by the report's actual lifecycle states (report
+  // readiness and the ADI auto-intent status) — no artificial timers, no
+  // simulated progress. A saved, complete report (an accepted narrative already
+  // on its saved snapshot) opens without either generation stage.
+  const savedNarrativeAccepted =
+    savedReport.saved?.payload?.design_intent?.status === 'accepted';
+  const adiComplete = autoIntentStatus === AUTO_INTENT.COMPLETE;
+  const adiRunning = autoIntentStatus === AUTO_INTENT.RUNNING;
+  // ADI failure only counts when the assessment itself is ready (so the report
+  // genuinely reached ADI) and there is no already-accepted saved narrative
+  // (a saved complete report reuses its narrative and never shows this error).
+  const adiFailed = autoIntentStatus === AUTO_INTENT.FAILED && reportReady && !savedNarrativeAccepted;
+  // The report is fully ready to display once engineering/pages are ready AND
+  // the ADI narrative is accepted — either just generated or reused from the
+  // saved snapshot.
+  const reportFullyReady = reportReady && (adiComplete || savedNarrativeAccepted);
+  const generationFailed = readiness.state === REPORT_STATE.FAILED || adiFailed;
+  // The overlay stage: "writing" once ADI is generating; "building" otherwise.
+  const overlayStage = adiRunning ? 'writing' : 'building';
+  // The generation-stage heading ("Building Report"/"Writing Report") is shown
+  // only when a generation is genuinely expected — i.e. once the saved-report
+  // fingerprint has resolved and there is no accepted narrative on the saved
+  // snapshot. A saved, complete report (or one still being read back) shows a
+  // neutral loader instead, so it opens without either generation stage.
+  const showGenerationStage = savedReport.resolved && !savedNarrativeAccepted;
+  // The retry/recovery action for a failed generation, by failure kind. ADI
+  // failure reuses the existing ADI retry; an authority/export failure reuses
+  // the existing read/export retry.
+  const failedRetry = adiFailed
+    ? retryAutoIntent
+    : authorityReadFailed
+      ? authority.retry
+      : exportError
+        ? handleExport
+        : undefined;
+  const failedReason = adiFailed
+    ? 'The project summary could not be written. Try again, or return to the project.'
+    : (readiness.reason || 'The report could not be generated.');
+
   // Leaving Preparing closes the window, so a later attempt measures its own wait.
   React.useEffect(() => {
     if (readiness.state !== REPORT_STATE.PREPARING) clearPreparingWindow(preparingWindowKey);
@@ -781,19 +830,6 @@ export default function RP22ClientReport() {
     blockReason: readiness.reason || authority.reportCompleteness?.reason || null,
   });
 
-  const progressItems = [
-    { key: "project", label: "Project loaded", done: !hydrating && !!projectDetails },
-    { key: "room", label: "Room geometry", done: Number(roomDims?.widthM) > 0 && Number(roomDims?.lengthM) > 0 },
-    { key: "speakers", label: "Speaker layout", done: Array.isArray(placedSpeakers) && placedSpeakers.length > 0 },
-    { key: "rp22", label: "RP22 assessment", done: authority.reportComplete === true },
-    {
-      key: "bass",
-      label: "Bass assessment",
-      done: authority.reportComplete === true && !!bassPerformance,
-      running: hydrating || (!bassPerformance && !!engineeringSummary),
-    },
-  ];
-
   const handleBackToProject = () => {
     if (!projectId) return;
     navigate(`/RoomDesigner?projectId=${projectId}`);
@@ -823,7 +859,6 @@ export default function RP22ClientReport() {
       background: "#F1F0EE",
       fontFamily: "Didact Gothic, Century Gothic, sans-serif",
     }}>
-      <AdiSummaryOverlay status={autoIntentStatus} />
       {/* Shared report typography system — the Visual Report preview and its
           PDF export both read their type from this one source. The preview
           keeps its own screen-adapted body sizes, so only the families,
@@ -936,7 +971,7 @@ export default function RP22ClientReport() {
           onRetry={reportSnapshot.regenerate}
         />
         {staleUpdateInProgress && <ReportUpdatingNotice className="client-report-screen-only" />}
-        {reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.CURRENT && (
+        {reportFullyReady && reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.CURRENT && (
           <div className="client-report-screen-only">
             <ReportGateDiagnosticsPanel diagnostics={gateDiagnostics} />
           </div>
@@ -954,28 +989,33 @@ export default function RP22ClientReport() {
           }}>
             Open a project from the Room Designer to view its Project Report.
           </div>
-        ) : !reportReady ? (
+        ) : generationFailed ? (
           <div className="client-report-screen-only">
             <ReportStatePanel
-              state={readiness.state}
+              state={REPORT_STATE.FAILED}
+              reportLabel="Project Report"
+              reason={failedReason}
+              onReturn={handleBackToProject}
+              onRetry={failedRetry}
+              retryLabel="Retry"
+              diagnostics={gateDiagnostics}
+            />
+          </div>
+        ) : readiness.state === REPORT_STATE.NOT_READY ? (
+          <div className="client-report-screen-only">
+            <ReportStatePanel
+              state={REPORT_STATE.NOT_READY}
               reportLabel="Project Report"
               missing={readiness.missing}
               nextAction={readiness.nextAction}
               reason={readiness.reason}
-              progressItems={progressItems}
-              elapsedSeconds={stateSeconds}
               onReturn={handleBackToProject}
-              onRetry={
-                authorityReadFailed ? authority.retry
-                  : exportError ? handleExport
-                  : (assessmentIncomplete || publicationStale) ? handleUpdateProjectReport
-                  : undefined
-              }
+              onRetry={(assessmentIncomplete || publicationStale) ? handleUpdateProjectReport : undefined}
               retryLabel={assessmentIncomplete ? "Complete Assessment" : "Update Project Report"}
               diagnostics={gateDiagnostics}
             />
           </div>
-        ) : orderedPages.length === 0 ? (
+        ) : reportReady && orderedPages.length === 0 ? (
           <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
             borderRadius: 16,
@@ -988,6 +1028,8 @@ export default function RP22ClientReport() {
           }}>
             No active report pages.
           </div>
+        ) : !reportFullyReady ? (
+          <ReportLoadingOverlay stage={showGenerationStage ? overlayStage : 'loading'} />
         ) : (
           orderedPages.map((page, i) => (
             <ClientReportPage
@@ -1015,7 +1057,7 @@ export default function RP22ClientReport() {
             detail, the primary-seat bass curves and the single closing About
             Sound Proof page. Nothing about those pages is edited, re-sectioned,
             split apart or given a competing presentation. */}
-        {reportReady && orderedPages.length > 0 && <TechnicalReportDocument p19Graph={p19Graph} />}
+        {reportFullyReady && orderedPages.length > 0 && <TechnicalReportDocument p19Graph={p19Graph} />}
         {exportError && (
           <div className="client-report-screen-only" style={{
             marginTop: 16,
