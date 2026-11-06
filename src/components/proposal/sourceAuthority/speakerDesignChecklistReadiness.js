@@ -46,6 +46,9 @@ export const SPEAKER_DESIGN_MISSING_COPY =
 export const SPEAKER_DESIGN_STALE_COPY =
   `The stored Speaker Design PDF was created before the design changed. ${SPEAKER_DESIGN_CHECKLIST_COPY}`;
 
+/** The action label for a missing Speaker Design PDF — generates it directly. */
+export const SPEAKER_DESIGN_GENERATE_LABEL = 'Generate Speaker Design PDF';
+
 /**
  * The row's own status words: an absent checklist is Missing and one the design
  * has moved past is Stale, so the designer is told which of the two it is.
@@ -151,14 +154,25 @@ export function resolveSpeakerDesignCell({
 }
 
 /**
- * The ONE action a checklist row offers: the Project Report workflow, which
- * writes the Speaker Design with the report. No second button and no second
- * workflow exists — an updated report is requested for a checklist the design has
- * moved past, and a new one where nothing is stored.
+ * The action a checklist row offers.
+ *
+ * MISSING — a "generate" action: the Speaker Design PDF is created and stored
+ *   directly from the version's own saved design, through the existing storage
+ *   pipeline, WITHOUT regenerating the current Project Report. The component
+ *   handles this via a callback (`onGenerateSpeakerDesign`), not a URL.
+ * STALE / INCOMPLETE / UNAVAILABLE — the Project Report workflow, which writes
+ *   the Speaker Design with the report. These are URL actions because an
+ *   existing document the design has moved past needs the report's update
+ *   workflow.
  */
 export function buildSpeakerDesignAction({ state = null, projectId = null, versionId = null } = {}) {
   if (!state || state === READINESS_STATE.CURRENT || state === READINESS_STATE.CHECKING) return null;
-  return buildProjectReportAction({ state, projectId, versionId });
+  if (state === READINESS_STATE.MISSING) {
+    return { kind: 'generate', label: SPEAKER_DESIGN_GENERATE_LABEL, state, versionId };
+  }
+  const reportAction = buildProjectReportAction({ state, projectId, versionId });
+  if (!reportAction) return null;
+  return { kind: 'url', label: reportAction.label, url: reportAction.url, state, versionId };
 }
 
 export default resolveSpeakerDesignCell;

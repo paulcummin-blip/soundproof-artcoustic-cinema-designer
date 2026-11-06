@@ -40,7 +40,11 @@ import {
 import {
   recordIssuedExportInBackground,
   snapshotIssuedComposition,
+  storeIssuedDocument,
 } from '@/components/library/issuedDocument/recordIssuedExport';
+import { clearPendingExport } from '@/components/library/issuedDocument/pendingIssuedExportStore';
+import { writeExportStorageDiagnostic } from '@/components/library/issuedDocument/exportStorageDiagnosticLog';
+import { asExportStorageError, buildExportStorageDiagnostic } from '@/components/library/issuedDocument/exportStorageFailure';
 
 /**
  * Shown when the report's Library copy landed but the schedule's did not. It
@@ -143,6 +147,88 @@ export function storeSpeakerDesignInBackground(parameters = {}) {
       ? snapshotIssuedComposition(ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN, node)
       : { nodeHtml: '' },
   });
+}
+
+/**
+ * Create and store the version's Current Speaker Design PDF, awaiting capture,
+ * upload and ProjectAssetExport record creation.
+ *
+ * This is the SAME storage pipeline `storeSpeakerDesignInBackground` uses — the
+ * same identity, the same composition snapshot, the same `storeIssuedDocument`
+ * capture/upload/record path — but it returns a Promise so a caller that needs to
+ * know the outcome (the Proposal Centre's "Generate Speaker Design PDF" action)
+ * can await it and report success or failure, rather than firing it in the
+ * background.
+ *
+ * On success, returns the stored `ProjectAssetExport` record. On failure, the
+ * `ExportStorageError` is written to the export-storage diagnostic log and
+ * re-thrown, so the caller can show the real reason and keep the status as
+ * "Not generated".
+ *
+ * @param {Object} parameters — the same parameters as `storeSpeakerDesignInBackground`
+ * @returns {Promise<Object>} the stored ProjectAssetExport record
+ */
+export async function storeSpeakerDesign(parameters = {}) {
+  const {
+    groups = [],
+    layout = null,
+    projectName = null,
+    dealerName = null,
+    clientName = null,
+    projectReference = null,
+    versionName = null,
+    versionNumber = null,
+    projectId = null,
+    accountId = null,
+    resolveSource = null,
+    exportedBy = null,
+  } = parameters;
+
+  if (!projectId) {
+    throw new Error('Speaker Design storage requires a project id.');
+  }
+
+  const filename = buildSpeakerDesignFilename({
+    projectName,
+    dealerName,
+    clientName,
+    projectReference,
+    versionName,
+    versionNumber,
+  });
+  const node = buildSpeakerDesignIssuedNode({ groups, layout, projectName, clientName, versionName });
+
+  const identity = {
+    projectId,
+    accountId,
+    documentType: ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN,
+    title: issuedDocumentLabel(ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN),
+    filename,
+    resolveSource,
+    exportedBy,
+    storageFailureTitle: SPEAKER_DESIGN_STORAGE_FAILURE_TITLE,
+    retryExport: () => storeSpeakerDesignInBackground(parameters),
+  };
+
+  const snapshot = node
+    ? snapshotIssuedComposition(ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN, node)
+    : { nodeHtml: '' };
+
+  try {
+    const { record, pendingKey } = await storeIssuedDocument({ identity, snapshot });
+    clearPendingExport(pendingKey);
+    return record;
+  } catch (error) {
+    const identified = asExportStorageError(error);
+    writeExportStorageDiagnostic(buildExportStorageDiagnostic({
+      failure: identified,
+      identity: { ...identity, filename },
+      filename,
+      storagePath: identified.storagePath,
+      partial: identified.partial,
+    }));
+    throw identified;
+  }
 }
 
 export default storeSpeakerDesignInBackground;
