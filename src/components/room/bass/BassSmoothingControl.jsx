@@ -1,5 +1,4 @@
 import React from "react";
-import { bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 
 // Canonical P19/P20 assessment uses 1/3-octave power-domain smoothing
 // (applyBassSmoothing(..., "third")). The bass graph defaults to the same
@@ -51,9 +50,6 @@ export default function BassSmoothingControl({ value, onChange }) {
           Published P19/P20 use 1/3-octave smoothing.
         </span>
       )}
-      <span style={{ fontSize: 10, color: "#8B7F76", fontFamily: "monospace" }}>
-        ({bassSmoothingLabel(value)})
-      </span>
     </div>
   );
 }

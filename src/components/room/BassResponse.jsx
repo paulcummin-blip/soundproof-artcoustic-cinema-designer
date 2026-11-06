@@ -12,13 +12,12 @@ import ModalResonanceLineToggles from "@/components/room/bass/ModalResonanceLine
 import NullDepthAuditBadge from "@/components/room/bass/NullDepthAuditBadge";
 import BassDiagnosticsPanel from "@/components/room/bass/BassDiagnosticsPanel";
 import Case099RewThreeRoomBenchmark from "@/components/room/bass/Case099RewThreeRoomBenchmark";
-import { bassSmoothingLabel } from "@/components/room/bass/bassGraphSmoothing";
 import BassEngineeringDetails from "@/components/room/bass/BassEngineeringDetails";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { REW_PARITY_PRESET, REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
-import { buildBassGraphSeries, detailedEqStatusText } from "@/components/room/bass/bassGraphDomainBuilder";
+import { buildBassGraphSeries } from "@/components/room/bass/bassGraphDomainBuilder";
 import { usePublishBestSubLayoutInputs } from "@/components/room/bass/best-layout/usePublishBestSubLayoutInputs";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useEngineeringMode } from "@/components/state/useEngineeringMode";
@@ -29,12 +28,10 @@ import ProtectedNullWarningSummary from "@/components/room/bass/ProtectedNullWar
 import { finalOptimisedBassAuthorityMatches } from "@/components/room/bass/finalOptimisedBassResponse";
 import SeatResponseScopeControls from "@/components/room/bass/SeatResponseScopeControls";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
-import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
-import BassSmoothingControl from "@/components/room/bass/BassSmoothingControl";
+import { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import { formatP20MarkerLabel } from "@/components/room/bass/p20DisplayAuthority";
-import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
-import ExpertCurveView from "@/components/room/bass/ExpertCurveView";
+import ResponseCurvesPanel from "@/components/room/bass/ResponseCurvesPanel";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
 import CopyEqForensicTraceButton from "@/components/room/bass/CopyEqForensicTraceButton";
 import EqDiscoveryAuditPanel from "@/components/room/bass/EqDiscoveryAuditPanel";
@@ -225,6 +222,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const [showRsp, setShowRsp] = useState(true);
   const [showRealSeatOverlays, setShowRealSeatOverlays] = useState(false);
   const [curveVisibility, setCurveVisibility] = useState(DEFAULT_BASS_CURVE_VISIBILITY);
+  // Response Curves display mode: "room" (live room-only) or "calculated"
+  // (authoritative layers). The engine locks to "room" while the calculated
+  // result is stale; the designer can otherwise choose. Presentation only.
+  const [curveDisplayMode, setCurveDisplayMode] = useState("calculated");
 
   // Design EQ is part of the authoritative bass assessment path. It is fixed on;
   // the graph controls below change presentation only and never change RP22 results.
@@ -537,9 +538,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     return placementPreviewSeries ? [placementPreviewSeries] : null;
   }, [roomPreviewActive, isAllSeatsSelected, allSeatsPreviewSeries, placementPreviewSeries]);
 
-  const effectiveVisibleSeries = roomPreviewExclusive
-    ? (placementPreviewGraphSeries || [])
+  // Response Curves display mode. The engine forces Room when the calculated
+  // result is stale (roomPreviewExclusive) or absent; otherwise the designer's
+  // choice is honoured. Stale calculated curves are never shown.
+  const calculatedAvailable = hasCurrentBassResult && !roomPreviewExclusive;
+  const effectiveCurveMode = (roomPreviewExclusive || !calculatedAvailable) ? "room" : curveDisplayMode;
+  const showCalculatedOverlays = effectiveCurveMode === "calculated";
+
+  // Room-only series: the live preview curves, or the raw physical response
+  // when no preview is running. Never includes calculated EQ/target layers.
+  const roomOnlySeries = useMemo(() => {
+    if (roomPreviewActive || roomPreviewExclusive) return placementPreviewGraphSeries || [];
+    return multiSeriesForGraph.filter((series) => series.kind === "raw");
+  }, [roomPreviewActive, roomPreviewExclusive, placementPreviewGraphSeries, multiSeriesForGraph]);
+
+  const effectiveVisibleSeries = effectiveCurveMode === "room"
+    ? roomOnlySeries
     : visibleMultiSeries;
+
+  const roomStatusLabel = roomPreviewExclusive
+    ? "Preview only — recalculate for RP22 results"
+    : "Live room response";
+  const roomStatusTone = roomPreviewExclusive ? "preview" : "live";
 
   // During preview only, an explicit pill choice must win over a seat focused
   // earlier from a P20 pill, so the preview follows what the designer clicked.
@@ -726,10 +746,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   // that the RENDERED series carry the same hashes as the contract receipt.
   const canonicalMetricPublication = bassAnalysisContract?.metricPublication || null;
 
-  const graphStatusText = detailedEqStatusText({
-    designEqEnabled, hasMatchingDetailedResult: hasValidDetailedResult,
-    detailedStatus, optimisationResult, error: detailedError,
-  });
   const graphPostEqSeries = multiSeriesForGraph.find((series) => series.kind === "post-eq");
   const graphCandidateId = graphPostEqSeries?.candidateId || null;
   const graphFilterBankSignature = graphPostEqSeries?.filterBankSignature || null;
@@ -828,19 +844,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             <Badge className="bg-[#F8F8F7] text-[#1B1A1A] border-[#DCDBD6]">Seats: {seatingPositions?.length ?? 0}</Badge>
           </div>
 
-          {/* Room-only preview banner — informational only (no workflow prompt) */}
-          {roomPreviewExclusive && (
-            <div style={{ border: "1px solid #F59E0B", borderRadius: 10, background: "#FFFBEB", padding: "10px 14px", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>
-                Preview only — calculate bass performance to update RP22 results.
-              </div>
-              <div style={{ fontSize: 12, color: "#92400E", marginTop: 2 }}>
-                {placementPreviewActive
-                  ? "Subwoofer positions changed. The P14 / P18 / P19 / P20 values below are the previous result, not the current design."
-                  : "This is the room/layout acoustic response. Calculate bass performance for full RP22 results."}
-              </div>
-            </div>
-          )}
+          {/* Room-only preview status is shown subtly inside the Response Curves panel */}
         </>
       )}
       
@@ -934,10 +938,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
                 </select>
               </div>
             )}
-            {/* Smoothing — always visible. Defaults to 1/3-octave to match the
-                canonical P19/P20 assessment authority. "None" is raw diagnostic
-                detail and is flagged as such. */}
-            <BassSmoothingControl value={bassSmoothingMode} onChange={setBassSmoothingMode} />
             {engineeringMode && includeDiagnostics && (
               <>
                 {designEqEnabled && Array.isArray(seatingPositions) && seatingPositions.length > 0 && (
@@ -966,18 +966,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               onSelectAll={previewAwareSelectAllSeats}
               previewActive={roomPreviewActive}
             />
-            {/* Expert Curve View — the graph's own validation disclosure.
-                Always reachable here: expert curve controls no longer depend on
-                the global Options → Expert View toggle. Closed by default, so
-                the simple ADI presentation is unchanged. */}
-            <ExpertCurveView
+            {/* Response Curves panel — one compact control surface for the graph.
+                 Replaces the legacy Expert Curve View. Room = live room-only
+                 preview; Calculated = authoritative layers (only when valid). */}
+            <ResponseCurvesPanel
+              mode={effectiveCurveMode}
+              onModeChange={setCurveDisplayMode}
+              roomAvailable={roomPreviewActive || roomPreviewExclusive || multiSeriesForGraph.some((s) => s.kind === "raw")}
+              calculatedAvailable={calculatedAvailable}
               curveVisibility={curveVisibility}
               onCurveVisibilityChange={setCurveVisibility}
               layerAvailability={layerAvailability}
               smoothingMode={bassSmoothingMode}
               onSmoothingModeChange={setBassSmoothingMode}
-              markers={rp22GraphMarkers}
-              placementPreviewActive={roomPreviewActive}
+              markers={showCalculatedOverlays ? rp22GraphMarkers : null}
+              roomStatusLabel={roomStatusLabel}
+              roomStatusTone={roomStatusTone}
             />
           </>
         ) : (
@@ -995,13 +999,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               previewActive={roomPreviewActive}
             />
 
-            <BassCurveVisibilityControls
-              visibility={curveVisibility}
-              availability={layerAvailability}
-              onChange={setCurveVisibility}
+            <ResponseCurvesPanel
+              mode={effectiveCurveMode}
+              onModeChange={setCurveDisplayMode}
+              roomAvailable={roomPreviewActive || roomPreviewExclusive || multiSeriesForGraph.some((s) => s.kind === "raw")}
+              calculatedAvailable={calculatedAvailable}
+              curveVisibility={curveVisibility}
+              onCurveVisibilityChange={setCurveVisibility}
+              layerAvailability={layerAvailability}
+              smoothingMode={bassSmoothingMode}
+              onSmoothingModeChange={setBassSmoothingMode}
+              markers={showCalculatedOverlays ? rp22GraphMarkers : null}
+              roomStatusLabel={roomStatusLabel}
+              roomStatusTone={roomStatusTone}
             />
-
-            {!roomPreviewExclusive && <Rp22GraphMarkerKey markers={rp22GraphMarkers} />}
           </>
         )}
 
@@ -1046,23 +1057,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               crossoverFrequency={80}
               showModeMarkers={roomPreviewExclusive ? false : (engineeringDetailCollapsed ? false : showRoomModes)}
               modeMarkers={roomPreviewExclusive ? [] : (engineeringDetailCollapsed ? [] : modeMarkersForGraph)}
-              protectedNullAnnotations={roomPreviewExclusive ? [] : (engineeringDetailCollapsed ? [] : protectedNullAnnotations)}
+              protectedNullAnnotations={showCalculatedOverlays && !engineeringDetailCollapsed ? protectedNullAnnotations : []}
               linearHzAxis={false}
               rewStyleMode={true}
               yDomain={[70, 140]}
               xDomain={effectiveVisibleSeries[0]?.data?.some(p => p.frequency > 200) ? [15, 300] : [15, 200]}
               showAxialOnly={false}
               refDb={85}
-              disableHighlight={roomPreviewExclusive}
+              disableHighlight={!showCalculatedOverlays}
               renderToken={qStrategy}
-              p14TotalDb={roomPreviewExclusive ? null : p14PresentationData.targetDb}
-              operatingLevelOffsetDb={operatingLevelOffsetDb}
-              correctionTrace={finalBassResponse?.correctionTrace || null}
+              p14TotalDb={showCalculatedOverlays ? p14PresentationData.targetDb : null}
+              operatingLevelOffsetDb={showCalculatedOverlays ? operatingLevelOffsetDb : 0}
+              correctionTrace={showCalculatedOverlays ? (finalBassResponse?.correctionTrace || null) : null}
               smoothingMode={bassSmoothingMode}
-              rp22Markers={roomPreviewExclusive ? null : rp22GraphMarkers}
-              highlightFrequencyHz={roomPreviewExclusive ? null : (highlightFromInteraction?.frequencyHz ?? null)}
-              highlightLabel={roomPreviewExclusive ? null : (highlightFromInteraction?.label ?? null)}
-              parameterFocus={roomPreviewExclusive ? null : parameterFocus}
+              rp22Markers={showCalculatedOverlays ? rp22GraphMarkers : null}
+              highlightFrequencyHz={showCalculatedOverlays ? (highlightFromInteraction?.frequencyHz ?? null) : null}
+              highlightLabel={showCalculatedOverlays ? (highlightFromInteraction?.label ?? null) : null}
+              parameterFocus={showCalculatedOverlays ? parameterFocus : null}
             />
             {(isCalculating || isPreparingPreview) && engineeringDetailCollapsed && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(248, 247, 244, 0.6)", borderRadius: 8, pointerEvents: "none" }}>
@@ -1093,16 +1104,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           <StorytellerExplanation focus={parameterFocus} />
         )}
 
-        {!engineeringDetailCollapsed && (
-          <>
-            <div style={{ fontSize: 10, color: '#8B7F76', fontFamily: 'monospace', marginTop: 4 }}>
-              Displayed smoothing: {bassSmoothingLabel(bassSmoothingMode)}
-            </div>
-            <div style={{ fontSize: 10, color: designEqEnabled ? '#213428' : '#8B7F76', fontFamily: 'monospace', marginTop: 2 }}>
-              {graphStatusText}
-            </div>
-          </>
-        )}
         {/* P14 target inline summary removed — target is shown in Bass Target Settings above */}
         {engineeringMode && includeDiagnostics && p14IntegrationDiagnostic && p14IntegrationDiagnostic.integratedCWeightedDb != null && (() => {
           const err = Math.abs(p14IntegrationDiagnostic.errorDb || 0);
