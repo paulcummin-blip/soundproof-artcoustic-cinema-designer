@@ -16,7 +16,6 @@
 
 import React from "react";
 import BassCurveVisibilityControls from "@/components/room/bass/BassCurveVisibilityControls";
-import BassSmoothingControl from "@/components/room/bass/BassSmoothingControl";
 import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
 
 const FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -29,8 +28,6 @@ export default function ResponseCurvesPanel({
   curveVisibility,
   onCurveVisibilityChange,
   layerAvailability,
-  smoothingMode,
-  onSmoothingModeChange,
   markers = null,
 }) {
   const segmentStyle = (active, enabled) => ({
@@ -80,20 +77,13 @@ export default function ResponseCurvesPanel({
       </div>
 
       {/* Mode content */}
-      {mode === "room" ? (
-        <div style={{ marginTop: 10 }}>
-          <BassSmoothingControl value={smoothingMode} onChange={onSmoothingModeChange} />
-        </div>
-      ) : calculatedAvailable ? (
+      {mode === "room" ? null : calculatedAvailable ? (
         <div style={{ marginTop: 10 }}>
           <BassCurveVisibilityControls
             visibility={curveVisibility}
             availability={layerAvailability}
             onChange={onCurveVisibilityChange}
           />
-          <div style={{ marginTop: 8 }}>
-            <BassSmoothingControl value={smoothingMode} onChange={onSmoothingModeChange} />
-          </div>
           {markers ? (
             <div style={{ marginTop: 6 }}>
               <Rp22GraphMarkerKey markers={markers} />

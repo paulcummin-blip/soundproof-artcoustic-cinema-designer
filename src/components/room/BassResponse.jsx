@@ -45,6 +45,7 @@ import { buildProvisionalCombinedAssessment } from "@/components/room/bass/provi
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { resolvePreviewSeatId, resolvePreviewCurve, buildAllSeatsPreviewSeries } from "@/components/room/bass/previewSeatCurveAuthority";
+import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { buildParameterFocus } from "@/components/room/bass/storyteller/parameterFocusOverlays";
 import ParameterFocusBar from "@/components/room/bass/storyteller/ParameterFocusBar";
 import StorytellerExplanation from "@/components/room/bass/storyteller/StorytellerExplanation";
@@ -507,7 +508,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     return {
       id: "placement-preview",
       color: "#16A34A",
-      data: previewCurve.data,
+      data: applyBassSmoothing(previewCurve.data, "third"),
       kind: "room-response-preview",
       label: previewSeatId && !previewSeatUnavailable
         ? `Preview — ${formatSeatPillLabel(previewSeatId)}`
@@ -527,7 +528,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
       getSeatColor,
       formatLabel: formatSeatPillLabel,
     });
-    return series.length > 0 ? series : null;
+    // Standardise the display at 1/3-octave smoothing so every listening
+    // position's response is directly comparable. Identical per-curve
+    // processing only — no cross-curve normalisation, no averaging together.
+    const smoothed = series.map((s) => ({ ...s, data: applyBassSmoothing(s.data, "third") }));
+    return smoothed.length > 0 ? smoothed : null;
   }, [roomPreviewActive, isAllSeatsSelected, placementPreviewResult, orderedSeats, seatingPositions]);
 
   const placementPreviewGraphSeries = useMemo(() => {
@@ -972,8 +977,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               curveVisibility={curveVisibility}
               onCurveVisibilityChange={setCurveVisibility}
               layerAvailability={layerAvailability}
-              smoothingMode={bassSmoothingMode}
-              onSmoothingModeChange={setBassSmoothingMode}
               markers={showCalculatedOverlays ? rp22GraphMarkers : null}
             />
           </>
@@ -1000,8 +1003,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               curveVisibility={curveVisibility}
               onCurveVisibilityChange={setCurveVisibility}
               layerAvailability={layerAvailability}
-              smoothingMode={bassSmoothingMode}
-              onSmoothingModeChange={setBassSmoothingMode}
               markers={showCalculatedOverlays ? rp22GraphMarkers : null}
             />
           </>
