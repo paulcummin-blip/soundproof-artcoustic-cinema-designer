@@ -40,7 +40,7 @@ describe("Defect 1 — Fresh Re-test panel ownership", () => {
 
   it("2: jointReceiptOwnsPanel is suppressed when freshRunActive is true", () => {
     assert.ok(
-      source.includes("if (freshRunActive) return false;"),
+      source.includes("jointReceiptState?.ownsPanel === true && !freshRunActive"),
       "jointReceiptOwnsPanel must return false when freshRunActive is true",
     );
   });
@@ -61,11 +61,11 @@ describe("Defect 1 — Fresh Re-test panel ownership", () => {
     // The FRESH_RUN_SUPERSEDES_RECEIPT_STATES check still exists for terminal
     // states, and when freshRunActive is false the receipt may own the panel.
     assert.ok(
-      source.includes("FRESH_RUN_SUPERSEDES_RECEIPT_STATES"),
+      readSource("src/components/room/bass/optimiseWorkflow/crossoverReceiptState.js").includes('plan.run?.outcome !== "actionable_plan_produced"'),
       "The terminal-state supersede check must remain for when no fresh run is active",
     );
     assert.ok(
-      source.includes("if (freshRunActive) return false;"),
+      source.includes("jointReceiptState?.ownsPanel === true && !freshRunActive"),
       "freshRunActive guard exists before the terminal-state check",
     );
   });
