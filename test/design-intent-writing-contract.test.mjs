@@ -74,10 +74,10 @@ describe('A. No writing contract requires a recommendation opening', () => {
     expect(buildWritingStyleContract({})).toContain(DESIGN_INTENT_WRITING);
     expect(buildProposalWritingAuthority()).toContain(DESIGN_INTENT_WRITING);
     expect(DESIGN_INTENT_WRITING).toMatch(/never offered as a recommendation and it never opens on one/i);
-    // The licence to vary the approved wording is gone: where the section's own brief
-    // supplies approved sentence frames, they are the register the copy is written in.
-    expect(DESIGN_INTENT_WRITING).toMatch(/approved sentence frames, they are the register/i);
-    expect(DESIGN_INTENT_WRITING).toMatch(/variation from the approved wording is not a quality goal/i);
+    // The frames guide the content and evidence each paragraph covers rather than
+    // fixing the wording: the writer develops them naturally from the evidence.
+    expect(DESIGN_INTENT_WRITING).toMatch(/approved sentence frames, they guide the content and evidence/i);
+    expect(DESIGN_INTENT_WRITING).toMatch(/natural expression are the goal, not verbatim repetition/i);
     expect(DESIGN_INTENT_WRITING).not.toMatch(/no fixed narrative structure/i);
     // And the copy is stated as what it is: a controlled engineering summary.
     expect(DESIGN_INTENT_WRITING).toMatch(/controlled engineering summary/i);
@@ -174,14 +174,14 @@ describe('C. The final Design Intent language rules reach the prompt', () => {
 describe('D. The approved sentence frames govern the copy', () => {
   const frameText = DESIGN_INTENT_SENTENCE_FRAMES.map((entry) => entry.frame).join(' ');
 
-  it('writes the frames as they stand, and stops inviting the writer to phrase its own', () => {
+  it('guides the frames as content and evidence, and lets the writer express them naturally', () => {
     expect(DESIGN_INTENT_SENTENCE_FRAMES).toHaveLength(3);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/APPROVED SENTENCE FRAMES/);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/take each frame as it stands/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/Prefer the frame unchanged/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/Variation is not a quality goal/i);
-    // And the paraphrase route is named as a defect, not a style preference.
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/NEVER PARAPHRASE A FRAME INTO A WEAKER FORM/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/take each frame as your starting point/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/Prefer the frame's content and evidence/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/natural expression are the goal/i);
+    // And the weak-paraphrase route is still named, so the meaning is never weakened.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/KEEP THE MEANING, EXPRESS IT NATURALLY/i);
     // Every frame is populated from this project's own evidence, and no bracket is
     // ever left in the copy.
     for (const entry of DESIGN_INTENT_SENTENCE_FRAMES) {
@@ -240,7 +240,7 @@ describe('D. The approved sentence frames govern the copy', () => {
     // The authority the Design Intent prompt is composed from states the frames rule,
     // so the writer reads it whether the copy is the report's block or a proposal's.
     const authority = buildProposalWritingAuthority();
-    expect(authority).toMatch(/approved sentence frames, they are the register/i);
+    expect(authority).toMatch(/approved sentence frames, they guide the content and evidence/i);
     expect(authority).toMatch(/controlled engineering summary/i);
     expect(authority).not.toMatch(/no fixed narrative structure/i);
   });

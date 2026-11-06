@@ -197,7 +197,7 @@ export const DESIGN_INTENT_WRITING = [
   '',
   'This copy is design intent: an experienced cinema designer explaining a system they believe in.',
   '',
-  'It is never offered as a recommendation and it never opens on one. This copy is a controlled engineering summary. Where the section\'s own brief supplies approved sentence frames, they are the register it is written in: write them as they stand and populate them from this project\'s own evidence, because variation from the approved wording is not a quality goal. Accuracy, clarity and professional tone are.',
+  'It is never offered as a recommendation and it never opens on one. This copy is a controlled engineering summary. Where the section\'s own brief supplies approved sentence frames, they guide the content and evidence each paragraph covers rather than fixing the wording: develop each paragraph naturally in confident, professional British English and populate it from this project\'s own evidence. The meaning and the evidence stay; the wording is the writer\'s own, so accuracy, clarity and natural expression are the goal, not verbatim repetition.',
   '',
   'WHAT THE COPY COMMUNICATES',
   '- What makes this particular cinema special.',
