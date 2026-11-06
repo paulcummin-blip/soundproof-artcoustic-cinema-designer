@@ -1352,7 +1352,7 @@ export default function OptimiseAndCalculate({
             // "Update Bass Performance" action above already runs this same
             // workflow, so the card does not offer a second run button for it.
             onReoptimiseCalibration={hasResults && !isStale ? runCalibrationAutoApply : null}
-            reoptimiseBusy={isCalculating}
+            reoptimiseBusy={isCalculating && !jointReceiptState.operationActive}
             reoptimiseDisabledReason={reoptimiseDisabledReason}
             // The journey card's stall notice states the ONE cancel path, whose
             // availability is owned solely by bassCalculationLifecycle. No
