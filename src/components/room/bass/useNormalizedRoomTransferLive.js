@@ -16,9 +16,8 @@
 //   - Replaces the preview only when its fingerprint still matches the current
 //     geometry. It may take ~1 s at present.
 //
-// The fast preview is for interaction. The refined result is the authoritative
-// room-response curve. The previous valid curve stays visible while the next
-// preview or refinement runs.
+// Both paths are advisory room-only curves, never RP22 publication authority.
+// The previous accepted curve stays visible while the next calculation runs.
 //
 // PERSISTENT PREVIEW WORKER + IN-FLIGHT/PENDING SCHEDULING:
 //   The preview worker is created once and NEVER terminated when geometry
@@ -28,18 +27,19 @@
 //     • At most ONE replaceable pending request holds the latest geometry
 //       snapshot. Intermediate movements replace the pending request; they do
 //       not terminate the in-flight computation.
-//     • When the in-flight request completes, its result is accepted only when
-//       BOTH generation and fingerprint match the current values. Otherwise it
-//       is discarded and the latest pending geometry is posted.
+//     • During the same active drag/context, completed previews may advance
+//       the display in strictly increasing generation order. On release/cancel,
+//       only the exact current generation and fingerprint may be accepted.
+//       The latest pending geometry is posted after each completed request.
 //   The refinement worker is still terminated immediately when geometry
 //   changes, so a long refinement never delays the next interactive preview.
 //
 // Race protection uses a single geometry generation counter shared across both
 // stages. The generation is incremented immediately when geometry changes.
-// Preview and refined results are accepted only when BOTH generation and
-// fingerprint match the current values. A refined result may replace a preview
-// only for the same fingerprint (same generation). Older refinement results
-// never overwrite a newer preview.
+// Every response must match its dispatched request. Intermediate previews also
+// require the active gesture/context epoch and a newer display generation.
+// Refined results always require exact current generation/fingerprint matching;
+// they can replace the same-generation preview but never a newer result.
 //
 // The fingerprint is truly product-independent: it excludes model key, product
 // curve, product capability, product-derived source IDs, requested SPL, EQ
@@ -109,8 +109,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   const [refinementDurationMs, setRefinementDurationMs] = useState(null);
 
   // Preview worker — created once and NEVER terminated when geometry changes.
-  // A stale in-flight preview is discarded by the generation check in onmessage,
-  // never by termination. Terminated only on unmount.
+  // Display admission is checked in onmessage; never terminate mid-calculation.
+  // Terminated only on unmount.
   const previewWorkerRef = useRef(null);
   // Refinement worker — terminated on geometry change, recreated on next refinement.
   const refinementWorkerRef = useRef(null);
@@ -120,8 +120,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
   const geometryGenerationRef = useRef(0);
 
   // The latest requested fingerprint — updated IMMEDIATELY when the fingerprint
-  // changes, before the debounce. An in-flight worker response must match this
-  // to be accepted.
+  // changes, before the debounce. Settled and refined responses must match it.
+  // Intermediate drag previews retain their own dispatched fingerprint.
   const currentFingerprintRef = useRef(null);
   // Separate gesture/context lifetime from individual coordinate generations.
   // End/restart, disable, or canonical design/version changes invalidate old work.
@@ -216,6 +216,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     if (!pending) return false;
     if (pending.generation !== geometryGenerationRef.current) return false;
     if (pending.fingerprint !== currentFingerprintRef.current) return false;
+    if (pending.epoch !== interactionRef.current.epoch) return false;
     const worker = previewWorkerRef.current;
     if (!worker) return false;
     activePreviewRequestRef.current = { generation: pending.generation, fingerprint: pending.fingerprint, epoch: pending.epoch, dragging: pending.dragging };
@@ -388,9 +389,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
 
   // Main effect: when the fingerprint changes, increment the generation,
   // cancel in-flight REFINEMENT only, then schedule preview and refinement.
-  // The preview worker is NOT terminated — a stale in-flight preview is
-  // discarded by the generation check in onmessage, and the latest pending
-  // geometry is posted when it completes.
+  // The preview worker is NOT terminated. Completion admission preserves
+  // display order within a drag, then the latest pending geometry is posted.
   useLayoutEffect(() => {
     // Commit these guards before a worker message can observe a newly rendered
     // design with the old admission rules.
@@ -414,9 +414,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     }
 
     // IMMEDIATELY increment the geometry generation and store the new fingerprint.
-    // This invalidates any in-flight preview response — it will fail the
-    // generation check in onmessage and be discarded, then the latest pending
-    // geometry is posted.
+    // Refined/settled acceptance tracks this exact generation. While dragging,
+    // earlier completed previews may display only in increasing request order.
     const gen = ++geometryGenerationRef.current;
     currentFingerprintRef.current = geometryFingerprint;
 
@@ -447,7 +446,8 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
       return;
     }
 
-    // Same fingerprint as the last completed result — no work needed.
+    // Only a refined exact cache hit is complete. A cached preview still
+    // needs refinement for the settled geometry.
     if (lastValidFingerprintRef.current === geometryFingerprint && lastValidResultRef.current && lastValidQualityRef.current === "refined") {
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
@@ -474,7 +474,7 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
 
     // If a preview is already in flight, store this as the single replaceable
     // pending request. The in-flight computation is NOT terminated — it
-    // completes and its result is discarded by the generation check, then this
+    // completes, is admitted or discarded by the display policy, then this
     // pending request is posted.
     if (activePreviewRequestRef.current) {
       previewPendingRef.current = { generation: gen, fingerprint: fp, message, epoch: interactionRef.current.epoch, dragging: interactionRef.current.dragging };
