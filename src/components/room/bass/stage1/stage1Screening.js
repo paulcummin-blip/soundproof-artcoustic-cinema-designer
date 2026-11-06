@@ -187,40 +187,44 @@ export function screenCandidate({ transferResult, seatingPositions, candidate })
  * Returns negative if a ranks higher (better), positive if b ranks higher.
  */
 export function compareScreeningResults(a, b) {
-  const ta = a.rankingTuple;
-  const tb = b.rankingTuple;
+  // The comparator receives EVALUATED CANDIDATES ({ ...candidate, screening,
+  // transfer }). The screening metrics live on the `.screening` field — reading
+  // them from the top level returns undefined, producing NaN comparisons that
+  // leave candidates in generation order. Resolve the screening object once.
+  const sa = a?.screening ?? a;
+  const sb = b?.screening ?? b;
   const tol = STAGE1_TIE_TOLERANCE;
 
   // 1. Primary severe-problem count (minimise)
-  if (a.primarySevereProblemCount !== b.primarySevereProblemCount) {
-    return a.primarySevereProblemCount - b.primarySevereProblemCount;
+  if (sa.primarySevereProblemCount !== sb.primarySevereProblemCount) {
+    return sa.primarySevereProblemCount - sb.primarySevereProblemCount;
   }
 
   // 2. Worst Primary spatial variation (minimise)
-  if (Math.abs(a.worstPrimarySpatialVariation - b.worstPrimarySpatialVariation) > tol.variationDb) {
-    return a.worstPrimarySpatialVariation - b.worstPrimarySpatialVariation;
+  if (Math.abs(sa.worstPrimarySpatialVariation - sb.worstPrimarySpatialVariation) > tol.variationDb) {
+    return sa.worstPrimarySpatialVariation - sb.worstPrimarySpatialVariation;
   }
 
   // 3. Primary broad response quality / smoothness (maximise)
-  if (Math.abs(a.primaryResponseSmoothness - b.primaryResponseSmoothness) > tol.smoothnessDb) {
-    return b.primaryResponseSmoothness - a.primaryResponseSmoothness;
+  if (Math.abs(sa.primaryResponseSmoothness - sb.primaryResponseSmoothness) > tol.smoothnessDb) {
+    return sb.primaryResponseSmoothness - sa.primaryResponseSmoothness;
   }
 
   // 4. Primary RSP/seat coherence (maximise)
-  if (Math.abs(a.primaryRspCoherence - b.primaryRspCoherence) > tol.coherenceDb) {
-    return b.primaryRspCoherence - a.primaryRspCoherence;
+  if (Math.abs(sa.primaryRspCoherence - sb.primaryRspCoherence) > tol.coherenceDb) {
+    return sb.primaryRspCoherence - sa.primaryRspCoherence;
   }
 
   // 5. Secondary consistency (minimise)
-  if (Math.abs(a.secondarySpatialConsistency - b.secondarySpatialConsistency) > tol.variationDb) {
-    return a.secondarySpatialConsistency - b.secondarySpatialConsistency;
+  if (Math.abs(sa.secondarySpatialConsistency - sb.secondarySpatialConsistency) > tol.variationDb) {
+    return sa.secondarySpatialConsistency - sb.secondarySpatialConsistency;
   }
 
   // 6. Efficiency (maximise) — late tiebreaker
-  if (Math.abs(a.efficiencyIndicator - b.efficiencyIndicator) > tol.efficiencyDb) {
-    return b.efficiencyIndicator - a.efficiencyIndicator;
+  if (Math.abs(sa.efficiencyIndicator - sb.efficiencyIndicator) > tol.efficiencyDb) {
+    return sb.efficiencyIndicator - sa.efficiencyIndicator;
   }
 
   // 7. Practical family preference (lower rank = better)
-  return a.familyPreferenceRank - b.familyPreferenceRank;
+  return sa.familyPreferenceRank - sb.familyPreferenceRank;
 }

@@ -68,14 +68,16 @@ export function getCabinetHeightM(model, orientation) {
 /**
  * Resolve cabinet width in metres for a given model.
  */
-export function getCabinetWidthM(model) {
+export function getCabinetWidthM(model, orientation) {
   try {
     // Canonical resolution via the product registry, which normalises the model
     // key (lowercase) so "SUB3-12" and "sub3-12" resolve to the same canonical
-    // product and the same cabinet width. Fall back to the legacy subDimsMM
-    // table (uppercased normalised key) only when the registry has no entry,
-    // then to the constant for genuinely unknown models.
-    const meta = getSpeakerModelMeta(model) || {};
+    // product and the same cabinet width. Orientation is passed through so a
+    // horizontal SUB4-12 resolves its swapped width (1.70 m, not 0.44 m).
+    // Fall back to the legacy subDimsMM table (uppercased normalised key) only
+    // when the registry has no entry, then to the constant for genuinely
+    // unknown models.
+    const meta = getSpeakerModelMeta(model, orientation) || {};
     const metaWidthM = Number(meta.widthM);
     if (!meta.notFound && Number.isFinite(metaWidthM) && metaWidthM > 0) return metaWidthM;
     const legacyKey = String(model || "").toUpperCase();

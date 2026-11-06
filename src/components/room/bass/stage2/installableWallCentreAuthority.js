@@ -102,6 +102,7 @@ export function resolveInstallableWallCentre({
   modelKey = null,
   cabinetDepthM = null,
   cabinetWidthM = null,
+  orientation = null,
 }) {
   const W = Number(roomDims?.widthM);
   const L = Number(roomDims?.lengthM);
@@ -122,7 +123,7 @@ export function resolveInstallableWallCentre({
     : getCabinetDepthM(modelKey);
   const widthM = Number.isFinite(cabinetWidthM) && cabinetWidthM > 0
     ? cabinetWidthM
-    : getCabinetWidthM(modelKey);
+    : getCabinetWidthM(modelKey, orientation);
   const halfDepth = depthM / 2;
   const halfWidth = widthM / 2;
 
@@ -196,6 +197,7 @@ export function resolveCabinetCentre({
   modelKey = null,
   cabinetDepthM = null,
   cabinetWidthM = null,
+  orientation = null,
 }) {
   const space = String(coordinateSpace ?? "");
   if (space !== COORDINATE_SPACE.WALL_REFERENCE && space !== COORDINATE_SPACE.CABINET_CENTRE) {
@@ -214,11 +216,11 @@ export function resolveCabinetCentre({
     : getCabinetDepthM(modelKey);
   const widthM = Number.isFinite(cabinetWidthM) && cabinetWidthM > 0
     ? cabinetWidthM
-    : getCabinetWidthM(modelKey);
+    : getCabinetWidthM(modelKey, orientation);
 
   if (space === COORDINATE_SPACE.WALL_REFERENCE) {
     return {
-      ...resolveInstallableWallCentre({ roomDims, xNorm, yNorm, modelKey, cabinetDepthM, cabinetWidthM }),
+      ...resolveInstallableWallCentre({ roomDims, xNorm, yNorm, modelKey, cabinetDepthM, cabinetWidthM, orientation }),
       coordinateSpace: COORDINATE_SPACE.WALL_REFERENCE,
     };
   }

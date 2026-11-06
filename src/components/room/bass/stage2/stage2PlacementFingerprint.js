@@ -86,6 +86,8 @@ export function computeStage2PlacementFingerprint({
   selectedSubModel,
   subwooferBottomHeightM,
   amplifierPowerPerSubW,
+  frontOrientation = null,
+  rearOrientation = null,
 }) {
   if (!stage1Fingerprint) return null;
   if (!selectedSubModel) return null;
@@ -114,9 +116,11 @@ export function computeStage2PlacementFingerprint({
     amplifierPowerPerSubW: Number.isFinite(Number(amplifierPowerPerSubW))
       ? Math.round(Number(amplifierPowerPerSubW) * 100) / 100
       : "default",
+    frontOrientation: frontOrientation || "default",
+    rearOrientation: rearOrientation || "default",
   };
 
-  return `stage2-place:v3:${hash64(stable(canonical))}`;
+  return `stage2-place:v4:${hash64(stable(canonical))}`;
 }
 
 /**

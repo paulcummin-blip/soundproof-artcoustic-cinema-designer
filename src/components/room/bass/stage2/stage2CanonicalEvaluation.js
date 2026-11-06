@@ -75,7 +75,7 @@ function buildStage2Physics() {
 // for sub ID generation (front-sub-left, front-sub-right, rear-sub-left, ...).
 const STAGE2_POSITION_LABELS = ["left", "right"];
 
-export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition, zeroTuning = false) {
+export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, rspPosition, zeroTuning = false, frontOrientation = null, rearOrientation = null) {
   const W = Number(roomDims.widthM);
   const L = Number(roomDims.lengthM);
   const fallbackBottomHeightM = (subwooferBottomHeightM != null && Number.isFinite(Number(subwooferBottomHeightM)))
@@ -86,15 +86,23 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
   // A finalist may move an installed source, but it must not replace that
   // source's model or acoustic height. Carry these per-source values through
   // preview so the same applied instances produce the same canonical result.
+  // Orientation is resolved per source from the project's front/rear group
+  // orientation (a horizontal SUB4-12 swaps width and height), falling back to
+  // an explicit source override if the finalist carries one.
   const sourceDescriptors = finalist.sources.map((source) => {
     const modelKey = normaliseModelKey(source?.modelKey || source?.model || fallbackModelKey);
     const bottomHeightM = Number.isFinite(Number(source?.bottomHeightM))
       ? Math.max(0, Number(source.bottomHeightM))
       : fallbackBottomHeightM;
+    const group = Number(source?.yNorm) < 0.5 ? "front" : "rear";
+    const orientation = source?.orientation
+      || (group === "front" ? frontOrientation : rearOrientation)
+      || null;
     return {
       modelKey,
       bottomHeightM,
-      centreZ: deriveCentreZ({ bottomHeightM, model: modelKey, orientation: source?.orientation }),
+      orientation,
+      centreZ: deriveCentreZ({ bottomHeightM, model: modelKey, orientation }),
     };
   });
 
@@ -108,7 +116,8 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
   // Each source carries an EXPLICIT coordinateSpace. A wall reference is
   // resolved ONCE into a physical cabinet centre; an already-resolved cabinet
   // centre passes through unchanged. The domain is never inferred from
-  // whether yNorm happens to sit near 0 or 1.
+  // whether yNorm happens to sit near 0 or 1. Orientation is passed so a
+  // horizontal SUB4-12 resolves its correct cabinet width for boundary checks.
   const sourcePositions = finalist.sources.map((s, index) => {
     const centre = resolveCabinetCentre({
       roomDims,
@@ -116,6 +125,7 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       yNorm: s.yNorm,
       coordinateSpace: s.coordinateSpace,
       modelKey: sourceDescriptors[index].modelKey,
+      orientation: sourceDescriptors[index].orientation,
     });
     return {
       x: centre.x,
@@ -160,6 +170,10 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       x: sourcePositions[i].x,
       y: sourcePositions[i].y,
       z: descriptor.centreZ,
+      // Cabinet orientation resolved from the project's front/rear group
+      // orientation. Preserved so confirmation re-summation and downstream
+      // consumers see the same orientation the placement was evaluated with.
+      orientation: descriptor.orientation,
       // Wall identity (front/rear) the placement was authored for, preserved
       // separately from the physical centre y (which is inside the room).
       mountingWall: sourcePositions[i].mountingWall,
@@ -271,6 +285,8 @@ export function evaluateStage2Placement({
   selectedSubModel,
   amplifierPowerPerSubW,
   subwooferBottomHeightM,
+  frontOrientation = null,
+  rearOrientation = null,
 }) {
   if (!finalist?.sources?.length || !roomDims?.widthM || !selectedSubModel) {
     return null;
@@ -288,7 +304,7 @@ export function evaluateStage2Placement({
 
   // Run simulation with ZERO tuning so per-source per-seat complex transfers
   // can be captured for later re-summation with any tuning variant.
-  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition, true);
+  const sources = buildStage2Sources(finalist, roomDims, selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM, canonicalRspPosition, true, frontOrientation, rearOrientation);
 
   // Validate the FULL cabinet volume is inside the room BEFORE acoustic
   // evaluation. A cabinet that cannot fit is a terminal physical rejection —

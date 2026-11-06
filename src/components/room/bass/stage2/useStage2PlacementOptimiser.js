@@ -80,6 +80,8 @@ export function useStage2PlacementOptimiser({
   splConfig,
   currentQuantity,
   subwooferBottomHeightM,
+  frontOrientation = null,
+  rearOrientation = null,
   enabled = true,
   requestId = null,
   selectedQuantityOnly = false,
@@ -159,8 +161,10 @@ export function useStage2PlacementOptimiser({
       selectedSubModel,
       subwooferBottomHeightM,
       amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
+      frontOrientation,
+      rearOrientation,
     });
-  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW]);
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW, frontOrientation, rearOrientation]);
 
   // Compute P14-dependent confirmation fingerprint (placement + P14).
   // p18TargetBasis is NOT included — it is a presentation-only grading view.
@@ -341,6 +345,8 @@ export function useStage2PlacementOptimiser({
         p18TargetBasis: p14Target.p18TargetBasis,
         seatPriorityMap,
         subwooferBottomHeightM,
+        frontOrientation,
+        rearOrientation,
       },
       quantityOrder,
       scopeQuantity,

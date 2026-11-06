@@ -730,6 +730,8 @@ function RoomDesignerWithState() {
     splConfig: appState?.splConfig,
     currentQuantity: _stage2CurrentQty,
     subwooferBottomHeightM: _stage2SubBottomHeightM,
+    frontOrientation: appState?.frontSubsCfg?.orientation ?? null,
+    rearOrientation: appState?.rearSubsCfg?.orientation ?? null,
     enabled: recommendationsActive,
     requestId: recommendationsActive ? bassHeavyAction.requestId : null,
     selectedQuantityOnly: bassHeavyAction?.selectedQuantityOnly === true,
