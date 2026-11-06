@@ -126,7 +126,7 @@ export default function CrossoverRecommendation({
       || producingPlan?.designFingerprint !== candidate.baselineCacheKey
       || producingPlan?.candidateId !== candidate.candidateId) return;
     if (saved?.candidateId === candidate.candidateId && saved?.baselineCacheKey === candidate.baselineCacheKey
-      && (!saved.runId || saved.runId === producingPlan.run.runId)) return;
+      && saved.runId === producingPlan.run.runId) return;
     write({ crossoverRecommendation: {
       version:1,versionId,runId:producingPlan?.run?.runId || null,candidateId:candidate.candidateId,baselineCacheKey:candidate.baselineCacheKey,
       candidate,baseline:diagnostics?.baseline || null,status:"recommended",
