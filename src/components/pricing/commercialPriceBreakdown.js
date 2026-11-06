@@ -15,6 +15,7 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import { canonicalProductId } from "@/components/utils/modelKeyNormaliser";
 import { resolvePlacedCabinetLengthMm, isHsplModel } from "@/components/models/speakers/soundbarCabinetVariant";
 import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
+import { subwooferAmplifierCount } from "@/components/pricing/subwooferAmplifierAuthority";
 
 const VAT_RATE = 0.2;
 
@@ -225,7 +226,12 @@ export function computeCommercialPriceBreakdown({
 } = {}) {
   const mode = priceMode === 'exVat' ? 'exVat' : 'incVat';
   const linesByKey = new Map();
-  let subwooferCount = 0;
+
+  // The derived CPH-1000D subwoofer amplifier count, from the ONE authority both
+  // the System summary and the Speaker Design schedule read (see
+  // subwooferAmplifierAuthority). Stated once here so the priced breakdown and
+  // the equipment schedule can never show a different amplifier number.
+  const subwooferCount = subwooferAmplifierCount({ frontSubsCfg, rearSubsCfg });
 
   for (const spk of placedSpeakers) {
     if (!spk?.model || spk.model === 'off') continue;
@@ -247,13 +253,11 @@ export function computeCommercialPriceBreakdown({
 
   if (frontSubsCfg?.model && Number(frontSubsCfg?.count) > 0) {
     const count = Number(frontSubsCfg.count) || 0;
-    subwooferCount += count;
     addProductLine(linesByKey, frontSubsCfg.model, count, ['SUB (Front)'], soundbarSelections, priceMap, soundbarOptions);
   }
 
   if (rearSubsCfg?.model && Number(rearSubsCfg?.count) > 0) {
     const count = Number(rearSubsCfg.count) || 0;
-    subwooferCount += count;
     addProductLine(linesByKey, rearSubsCfg.model, count, ['SUB (Rear)'], soundbarSelections, priceMap, soundbarOptions);
   }
 

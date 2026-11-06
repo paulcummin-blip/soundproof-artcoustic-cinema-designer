@@ -96,8 +96,21 @@ test('the Qty column is the physical count, and the system total is unchanged', 
   assert.equal(rowByPosition.get('Front subwoofers').quantityLabel, '2');
   assert.equal(rowByPosition.get('Rear subwoofers').quantityLabel, '2');
 
-  // The design holds 20 physical loudspeakers; stating them is not recounting them.
-  assert.equal(quantities.reduce((total, value) => total + value, 0), 20);
+  // The amplification row: one CPH-1000D per subwoofer, from the SAME authority
+  // the pricing engine uses (4 subwoofers here → 4 amplifiers).
+  const ampRow = design.rows.find((row) => row.group === 'amplification');
+  assert.ok(ampRow, 'an amplification row is stated');
+  assert.equal(ampRow.position, 'Subwoofer amplifier');
+  assert.equal(ampRow.model, 'CPH-1000D');
+  assert.equal(ampRow.quantityLabel, '4', 'one CPH-1000D per subwoofer (4 subs)');
+
+  // The design holds 20 physical loudspeakers; stating them is not recounting
+  // them. The amplification row is equipment, not loudspeakers, so it is
+  // excluded from the loudspeaker total.
+  const loudspeakerTotal = design.rows
+    .filter((row) => row.group !== 'amplification' && row.group !== 'acoustic_treatment')
+    .reduce((total, row) => total + Number(row.quantityLabel), 0);
+  assert.equal(loudspeakerTotal, 20);
   design.rows.forEach((row) => assert.match(row.quantityLabel, /^\d+$/, 'a Qty is a plain number'));
 });
 

@@ -31,6 +31,11 @@ import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
 import { centreCabinetOrientation, hasInstalledModel } from '@/components/utils/frontStageModeAuthority';
 import { frontStagePlacementNote } from '@/components/models/screen/frontStagePlacementAuthority';
+import {
+  subwooferAmplifierCount,
+  SUBWOOFER_AMPLIFIER_MODEL,
+  SUBWOOFER_AMPLIFIER_POSITION,
+} from '@/components/pricing/subwooferAmplifierAuthority';
 
 /** The layer headings, in the order the panel states them. */
 export const SPEAKER_DESIGN_GROUPS = Object.freeze([
@@ -41,15 +46,6 @@ export const SPEAKER_DESIGN_GROUPS = Object.freeze([
   { key: 'amplification', title: 'Amplification' },
   { key: 'acoustic_treatment', title: 'Acoustic treatment' },
 ]);
-
-/**
- * The derived subwoofer amplifier the pricing engine adds one of per subwoofer
- * (see commercialPriceBreakdown.js). Stated from the SAME subwoofer total the
- * schedule already states, so the amplifier count can never disagree with the
- * subwoofers beside it or with the System summary's priced line.
- */
-const SUBWOOFER_AMPLIFIER_MODEL = 'CPH-1000D';
-const SUBWOOFER_AMPLIFIER_POSITION = 'Subwoofer amplifier';
 
 /**
  * The acoustic treatment panel, stated with the SAME label and quantity the
@@ -257,21 +253,22 @@ export function buildSpeakerDesignRows({
     });
   }
 
-  // Amplification: the derived subwoofer amplifier, one per subwoofer — the
-  // SAME count the pricing engine's priced breakdown (the System summary) adds
-  // as a CPH-1000D line. The count is the total subwoofers the schedule itself
-  // just stated, so the amplifier row can never disagree with the subwoofers
-  // beside it. No subwoofers = no amplifier row, exactly as the pricing engine
-  // produces no CPH-1000D line when there are no subwoofers.
-  const subwooferTotal = subwooferScheduleEntries.reduce((sum, entry) => sum + (Number(entry.total) || 0), 0);
-  if (subwooferTotal > 0) {
+  // Amplification: the derived subwoofer amplifier, from the SAME authority the
+  // pricing engine (the System summary's priced breakdown) uses — see
+  // subwooferAmplifierAuthority. The count is NOT re-derived from the subwoofer
+  // rows above; it is the pricing engine's own CPH-1000D count, so the amplifier
+  // row can never disagree with the System summary's priced line or with the
+  // subwoofers beside it. No subwoofers = no amplifier row, exactly as the
+  // pricing engine produces no CPH-1000D line when there are no subwoofers.
+  const amplifierCount = subwooferAmplifierCount({ frontSubsCfg, rearSubsCfg });
+  if (amplifierCount > 0) {
     rows.push({
       key: 'AMP_SUB',
       group: 'amplification',
       position: SUBWOOFER_AMPLIFIER_POSITION,
       model: SUBWOOFER_AMPLIFIER_MODEL,
-      quantity: subwooferTotal,
-      quantityLabel: String(subwooferTotal),
+      quantity: amplifierCount,
+      quantityLabel: String(amplifierCount),
       note: null,
     });
   }
