@@ -1,5 +1,6 @@
 // components/pricing/PriceSummary.jsx
 import React from 'react';
+import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 
 /**
  * Price summary card for the sidebar.
@@ -12,7 +13,55 @@ import React from 'react';
  * resolver via Layout — PriceSummary does NOT resolve territory independently and
  * does NOT recalculate the total. `breakdown` is the same line array the pricing
  * engine returns, so the card is never a second, manually-maintained product list.
+ *
+ * Display ordering only: the breakdown already combines identical models (by
+ * canonical product key) with their correct total quantity, and already omits
+ * categories with no selected products. SystemRows simply presents those lines
+ * in a fixed category order — LCR, then surrounds/wides, then overheads, then
+ * subwoofers, then amplifiers (CPH-1000D), then ABFUSERS — without adding any
+ * category headings. Quantities, pricing and product selection are untouched.
  */
+const LCR_CANON = new Set(['FL', 'FC', 'FR']);
+
+function isOverheadCanon(canon) {
+  return canon.startsWith('T') || /^(UFL|UFR|UBL|UBR)$/.test(canon);
+}
+
+// Fixed display category order. Lower numbers render first. A line that shares
+// roles across categories (e.g. one model used as both LCR and surround) takes
+// the earliest category it belongs to, so identical models stay on one line.
+const CATEGORY_LCR = 1;
+const CATEGORY_SURROUND_WIDE = 2;
+const CATEGORY_OVERHEAD = 3;
+const CATEGORY_SUBWOOFER = 4;
+const CATEGORY_AMPLIFIER = 5;
+const CATEGORY_ABFUSER = 6;
+const CATEGORY_OTHER = 9;
+
+function lineCategory(line) {
+  if (line?.isAbfuser) return CATEGORY_ABFUSER;
+  const roles = Array.isArray(line?.rolesList) ? line.rolesList : [];
+  if (roles.includes('Subwoofer amp')) return CATEGORY_AMPLIFIER;
+  if (roles.some((r) => String(r).includes('SUB ('))) return CATEGORY_SUBWOOFER;
+  let isLcr = false;
+  let isSurroundWide = false;
+  let isOverhead = false;
+  for (const r of roles) {
+    const canon = getCanonicalRole(r);
+    if (LCR_CANON.has(canon)) {
+      isLcr = true;
+    } else if (isOverheadCanon(canon)) {
+      isOverhead = true;
+    } else {
+      isSurroundWide = true;
+    }
+  }
+  if (isLcr) return CATEGORY_LCR;
+  if (isSurroundWide) return CATEGORY_SURROUND_WIDE;
+  if (isOverhead) return CATEGORY_OVERHEAD;
+  return CATEGORY_OTHER;
+}
+
 function SystemRows({ breakdown }) {
   if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
   const rows = breakdown
@@ -20,11 +69,24 @@ function SystemRows({ breakdown }) {
       const name = String(line?.description || '').trim();
       const qty = Number(line?.qty ?? line?.count) || 0;
       if (!name || qty <= 0) return null;
-      return { name, qty, key: `${name}:${qty}:${line?.model || ''}` };
+      return {
+        name,
+        qty,
+        model: line?.model || '',
+        category: lineCategory(line),
+        key: `${line?.model || name}:${name}:${qty}`,
+      };
     })
     .filter(Boolean);
 
   if (rows.length === 0) return null;
+
+  // Stable sort by the fixed category order; preserves the breakdown's own
+  // relative order within a category (identical models are already combined
+  // by the pricing engine, so no further merging is needed here).
+  const ordered = [...rows].sort(
+    (a, b) => (a.category - b.category) || 0,
+  );
 
   return (
     <div style={{ marginBottom: 10 }}>
@@ -32,7 +94,7 @@ function SystemRows({ breakdown }) {
         System
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {rows.map((row) => (
+        {ordered.map((row) => (
           <div
             key={row.key}
             style={{
