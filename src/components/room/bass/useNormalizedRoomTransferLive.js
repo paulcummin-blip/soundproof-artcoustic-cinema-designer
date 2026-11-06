@@ -77,7 +77,7 @@ const REFINEMENT_DEBOUNCE_MS = 280;
 // refinement uses the full 96 points/octave (320 points for 20–200 Hz).
 const PREVIEW_POINTS_PER_OCTAVE = 8;
 
-onst SINGLE_LISTENER_POINTS_PER_OCTAVE = 32; // 121 samples over 15–200 Hz
+const SINGLE_LISTENER_POINTS_PER_OCTAVE = 32; // 121 samples over 15–200 Hz
 
 function hasValidListener(rspPosition, seatingPositions) {
   if (rspPosition && Number.isFinite(rspPosition.x) && Number.isFinite(rspPosition.y)) return true;
