@@ -454,7 +454,7 @@ export default function BassGraph({
                     {rewStyleMode && isMulti && renderedMultiSeries.map((s) => (
                       <Line
                         key={s.id}
-                        type="linear"
+                        type="monotone"
                          dataKey={`spl_${s.id}`}
                         stroke={s.color}
                         strokeWidth={s.strokeWidth ?? 2}
@@ -468,7 +468,7 @@ export default function BassGraph({
                     ))}
                     {rewStyleMode && !isMulti && (
                       <Line 
-                          type="linear" 
+                          type="monotone" 
                           dataKey="spl"
                           stroke="#213428" 
                           strokeWidth={2} 
@@ -484,7 +484,7 @@ export default function BassGraph({
                       <>
                         {/* Black curve (inside limits: refDb ± 6 dB) */}
                         <Line 
-                            type="linear" 
+                            type="monotone" 
                             dataKey="splGood"
                             stroke="#213428" 
                             strokeWidth={2} 
@@ -496,7 +496,7 @@ export default function BassGraph({
 
                         {/* Red curve (outside limits: > refDb+6 or < refDb-6) */}
                         <Line 
-                            type="linear" 
+                            type="monotone" 
                             dataKey="splBad"
                             stroke="#dc2626" 
                             strokeWidth={2} 
