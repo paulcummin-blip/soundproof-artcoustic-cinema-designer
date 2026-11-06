@@ -61,9 +61,6 @@ const subs = {
 const design = buildSpeakerDesignRows({ placedSpeakers: PLACED_SPEAKERS, ...subs });
 const rowByPosition = new Map(design.rows.map((row) => [row.position, row]));
 
-/** Every Qty the schedule states, as numbers. */
-const quantities = design.rows.map((row) => Number(row.quantityLabel));
-
 /* ── 1 — the Model column ──────────────────────────────────────────────────── */
 
 test('the Model column states the model name alone — never its own count', () => {

@@ -165,31 +165,38 @@ test('the schedule states Position, Model and Qty only — never a Notes column'
   assert.match(markup, /Original Design/);
 });
 
-/* ── 4 — the export order and the shared version ──────────────────────────── */
+/* ── 4 — the atomic publication: both documents, same version ─────────────── */
 
-test('the report export stores the report first, then the schedule, from the same version', () => {
-  const reportStorage = EXPORT_HOOK.indexOf('recordIssuedExportInBackground({');
-  const companionStorage = EXPORT_HOOK.indexOf('storeSpeakerDesignInBackground({');
-  assert.ok(reportStorage > -1, 'the report’s own Library copy is still stored');
-  assert.ok(companionStorage > -1, 'the schedule is stored too');
-  assert.ok(reportStorage < companionStorage, 'the Project Report is saved first');
-  assert.ok(
-    EXPORT_HOOK.lastIndexOf('snapshotIssuedComposition(issuedDocument.documentType)') < companionStorage,
-    'the report’s snapshot is taken before the schedule is built',
-  );
+test('the report export stores the report and the schedule together, from the same version', () => {
+  // The atomic publication workflow stores BOTH the Project Report PDF and the
+  // companion Speaker Design PDF through one call, so neither document is ever
+  // stored without the other from the designer's single export action.
+  const publicationCall = EXPORT_HOOK.indexOf('storeProjectReportPublication({');
+  assert.ok(publicationCall > -1, 'the export uses the atomic publication workflow');
 
-  // SAME version: the schedule takes the report's own identity resolver, so it
-  // can only ever belong to the version the report was made from.
+  // The report's own composition snapshot is captured BEFORE the publication is
+  // fired, so the stored report is the document the designer printed.
+  const snapshotCapture = EXPORT_HOOK.indexOf('snapshotIssuedComposition(issuedDocument.documentType)');
+  assert.ok(snapshotCapture > -1 && snapshotCapture < publicationCall, 'the report snapshot is taken before publication');
+
+  // Both documents are handed to the same publication from the SAME version:
+  // the schedule takes the report's own identity resolver, so it can only ever
+  // belong to the version the report was made from.
   assert.match(EXPORT_HOOK, /resolveSource: issuedDocument\.resolveSource \|\| null/);
   assert.match(EXPORT_HOOK, /projectId: issuedDocument\.projectId/);
   assert.match(EXPORT_HOOK, /accountId: issuedDocument\.accountId \|\| null/);
 
-  // It is only attempted when the report has a project and the version holds a
-  // speaker design — nothing is claimed to exist when there is nothing to state.
+  // The schedule is only attempted when the report has a project and the
+  // version holds a speaker design — nothing is claimed to exist when there is
+  // nothing to state.
   assert.match(
     EXPORT_HOOK,
     /speakerDesignCompanion\?\.groups\?\.length > 0 && issuedDocument\?\.projectId/,
   );
+
+  // The publication is awaited before it is treated as complete, so a storage
+  // failure surfaces instead of being swallowed by the print path.
+  assert.match(EXPORT_HOOK, /\.catch\(\(\) => \(\{ stored: \[\], failed: \[\], complete: false \}\)\)/);
 });
 
 test('the report page builds the schedule from the report’s own frozen design', () => {
