@@ -461,6 +461,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   const {
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+    frontOrientation, rearOrientation,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     currentAuthority, currentCanonicalResult, currentSources, liveCacheKey, stage2Result, placementFingerprint,
     correctabilityAssessment, integrationContext,
@@ -563,10 +564,12 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       return await fullTransferReuseCache.getOrCompute({
         projectId, runId: transferRunId, signal: controller.signal, isStale,
         params: { finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
-          selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM },
+          selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          frontOrientation, rearOrientation },
         compute: () => runInWorker(worker, "placement", {
           finalist: authoritativeFinalist, roomDims, rspPosition, seatingPositions,
           selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          frontOrientation, rearOrientation,
         }, controller.signal),
         onOperation: operation => {
           metrics.recordTransferOperation({ ...operation, logicalCandidateId: candidateId,
@@ -1569,6 +1572,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             finalist: currentFinalist, roomDims, rspPosition,
             candidates: validCandidates,
             selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+            frontOrientation, rearOrientation,
           }, controller.signal);
           const batchMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - batchT0;
 

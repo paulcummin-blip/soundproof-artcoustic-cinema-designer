@@ -50,6 +50,8 @@ export function evaluateSeatingBatch({
   selectedSubModel,
   amplifierPowerPerSubW,
   subwooferBottomHeightM,
+  frontOrientation = null,
+  rearOrientation = null,
 }) {
   if (!finalist?.sources?.length || !roomDims?.widthM || !selectedSubModel || !candidates?.length) {
     return { candidates: [], timing: { totalMs: 0, preparedSourceRoomMs: 0, perOffsetMs: [] } };
@@ -70,7 +72,7 @@ export function evaluateSeatingBatch({
 
   const sources = buildStage2Sources(
     finalist, roomDims, selectedSubModel, amplifierPowerPerSubW,
-    subwooferBottomHeightM, canonicalRspBase, true,
+    subwooferBottomHeightM, canonicalRspBase, true, frontOrientation, rearOrientation,
   );
 
   // ── 2. Prepare the source/room field ONCE ──────────────────────────────

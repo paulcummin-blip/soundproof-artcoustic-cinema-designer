@@ -240,6 +240,8 @@ export async function runOptimisation(opts) {
     selectedSubModel,
     amplifierPowerPerSubW: amplifierPowerPerSubW || frontSubsCfg?.amplifierPowerW || 0,
     subwooferBottomHeightM,
+    frontOrientation: frontSubsCfg?.orientation ?? null,
+    rearOrientation: rearSubsCfg?.orientation ?? null,
     p14TargetBasis: p14Params.p14TargetBasis,
     p14TargetLevel: p14Params.p14TargetLevel,
     p14TargetDb: p14Params.p14TargetDb,
