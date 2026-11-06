@@ -65,6 +65,17 @@ const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATIN
 
 export default function BassBackgroundAnalysisOwner({ children, scopeId = "free", versionId = "free", engineeringPublication = null }) {
   const appState = useAppState();
+  // Ephemeral graph workload only; never persisted into design/engineering state.
+  const previewSelectionContext = JSON.stringify([scopeId, versionId]);
+  const [previewSelectionRequest, setPreviewSelectionRequest] = useState(null);
+  const onRoomPreviewSelection = useCallback((selection) => {
+    setPreviewSelectionRequest((current) => {
+      const next = { context: previewSelectionContext, selection };
+      return JSON.stringify(current) === JSON.stringify(next) ? current : next;
+    });
+  }, [previewSelectionContext]);
+  const previewListenerSelection = previewSelectionRequest?.context === previewSelectionContext
+    ? previewSelectionRequest.selection : null;
   const recommendationsActive = useRecommendationGate();
   const calcAllTargetsRequest = useCalculateAllTargetsRequest();
   const lastInteractionAt = useSyncExternalStore(
@@ -474,6 +485,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     interactionActive: previewDragActive,
     previewContextKey: JSON.stringify([scopeId, versionId, calibrationFingerprint]),
     isInteractionActive: isRoomPreviewDragActive,
+    previewListenerSelection,
   });
 
   const sharedAuthoritative = useMemo(() => ({
@@ -2492,6 +2504,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         captureEligible,
         captureEligibilityDebug,
       };
-  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult, roomPreviewActive, roomPreviewExclusive, roomPreviewResult, roomPreviewUpdating });
+  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult, roomPreviewActive, roomPreviewExclusive, roomPreviewResult, roomPreviewUpdating, onRoomPreviewSelection });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
