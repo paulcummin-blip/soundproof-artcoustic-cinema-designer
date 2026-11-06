@@ -372,7 +372,8 @@ export default function AdiOptimisationJourney({
     || planView?.run?.outcome === "failed"
   );
   const latestRunOwnsMessage = latestRunFailed || (!isRunning
-    && presentation?.state === OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
+    && [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT,
+      OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE].includes(presentation?.state));
   // THE RUN'S LIVE PROGRESS — read from the engine's own published progress
   // store and the run's identity. The hook adds no count, no stage and no
   // percentage of its own: it ticks a clock while the run is in flight and
