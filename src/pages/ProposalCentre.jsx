@@ -104,9 +104,6 @@ export default function ProposalCentre() {
             >
               Proposal Centre
             </h1>
-            <p className="text-sm text-[#8A8477] mt-4 max-w-md leading-relaxed">
-              The publishing environment for every proposal — create, refine, and export.
-            </p>
           </div>
           <button
             onClick={() => openWizard()}
