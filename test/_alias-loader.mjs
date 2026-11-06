@@ -14,6 +14,10 @@ function tryResolve(basePath) {
   return null;
 }
 export async function resolve(specifier, context, nextResolve) {
+  // Built-in node: specifiers must short-circuit — returning them directly
+  // lets Node's built-in loader handle them. Calling nextResolve in a custom
+  // chain can strip the "node:" prefix (ERR_MODULE_NOT_FOUND for package 'test').
+  if (specifier.startsWith('node:')) return { url: specifier, shortCircuit: true };
   if (specifier.startsWith('@/')) {
     const resolved = tryResolve(srcDir + specifier.slice(2));
     if (resolved) return nextResolve(pathToFileURL(resolved).href, context);
