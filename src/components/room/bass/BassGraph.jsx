@@ -8,25 +8,7 @@ import { P14_EQ_ASSESSMENT_RANGE_HZ } from '@/components/utils/p14CapabilityAuth
 import { formatSplDisplay } from '@/components/utils/splDisplayFormatter';
 import LimitingSeatLabel from '@/components/room/bass/storyteller/LimitingSeatLabel';
 
-// REW mode plot range debug (proof we're plotting the right numbers)
-const RewPlotRangeDebug = ({ chartData, yDomain }) => {
-  const finite = chartData.map(p => p?.spl).filter(v => Number.isFinite(Number(v)));
-  if (finite.length === 0) return null;
-  
-  const min = Math.min(...finite);
-  const max = Math.max(...finite);
-  
-  return (
-    <div className="text-[9px] text-gray-500 mb-1">
-      Plot min/max: {Number.isFinite(min) ? min.toFixed(2) : 'N/A'} / {Number.isFinite(max) ? max.toFixed(2) : 'N/A'} dB
-      {yDomain && yDomain[0] !== undefined && (
-        <span className="ml-1 text-blue-500">(Y-axis locked to {yDomain[0].toFixed(0)} / {yDomain[1].toFixed(0)} dB)</span>
-      )}
-    </div>
-  );
-};
-
-export default function BassGraph({ 
+export default function BassGraph({
   responseData, 
   multiSeries,
   flexHeight = false,
@@ -294,14 +276,6 @@ export default function BassGraph({
 
     return (
         <div className="w-full h-[575px]" style={flexHeight ? { minHeight: 400 } : undefined}>
-            {rewStyleMode && (
-                <>
-                    <div className="text-[10px] text-gray-500 mb-1 flex items-center justify-between">
-                        <span>X-axis scale: {linearHzAxis ? 'LINEAR' : 'LOG'}</span>
-                    </div>
-                    <RewPlotRangeDebug chartData={chartData} yDomain={yDomain} />
-                </>
-            )}
             <ResponsiveContainer>
                 <LineChart key={chartRenderKey} data={isMulti ? multiChartData : chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />

@@ -47,7 +47,7 @@ import CombinedResponsePanel from "@/components/room/bass/CombinedResponsePanel"
 import { buildProvisionalCombinedAssessment } from "@/components/room/bass/provisionalCombinedAssessment";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
-import { resolvePreviewSeatId, resolvePreviewCurve } from "@/components/room/bass/previewSeatCurveAuthority";
+import { resolvePreviewSeatId, resolvePreviewCurve, buildAllSeatsPreviewSeries } from "@/components/room/bass/previewSeatCurveAuthority";
 import { buildParameterFocus } from "@/components/room/bass/storyteller/parameterFocusOverlays";
 import ParameterFocusBar from "@/components/room/bass/storyteller/ParameterFocusBar";
 import StorytellerExplanation from "@/components/room/bass/storyteller/StorytellerExplanation";
@@ -212,6 +212,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     setShowRsp(true);
     setSelectedSeatIds(["rsp"]);
   };
+
+  // "All seats" is selected when every real listening position is in the selection
+  // and none other (RSP) is. Used to drive the simultaneous all-seats preview overlay.
+  const isAllSeatsSelected = orderedSeats.length > 1
+    && selectedSeatIds.length === orderedSeats.length
+    && orderedSeats.every((seat) => selectedSeatIds.includes(seat.id || `${seat.x}-${seat.y}`));
 
   // Presentation-only state. Production response inputs and physics are owned by the room-scoped authority.
   const [isDraggingSub, setIsDraggingSub] = useState(false);
@@ -508,10 +514,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     };
   }, [roomPreviewActive, previewCurve, previewSeatId, previewSeatUnavailable]);
 
+  // All-seats overlay: every listening position's own room-only preview curve,
+  // drawn simultaneously. No averaging, summing or normalisation — each curve is
+  // the preview engine's own per-seat responseData, colour-keyed to its seat.
+  const allSeatsPreviewSeries = useMemo(() => {
+    if (!roomPreviewActive || !isAllSeatsSelected) return null;
+    const series = buildAllSeatsPreviewSeries({
+      previewResult: placementPreviewResult,
+      orderedSeats,
+      seatingPositions,
+      getSeatColor,
+      formatLabel: formatSeatPillLabel,
+    });
+    return series.length > 0 ? series : null;
+  }, [roomPreviewActive, isAllSeatsSelected, placementPreviewResult, orderedSeats, seatingPositions]);
+
   const placementPreviewGraphSeries = useMemo(() => {
     if (!roomPreviewActive) return null;
+    if (isAllSeatsSelected && allSeatsPreviewSeries && allSeatsPreviewSeries.length > 0) {
+      return allSeatsPreviewSeries;
+    }
     return placementPreviewSeries ? [placementPreviewSeries] : null;
-  }, [roomPreviewActive, placementPreviewSeries]);
+  }, [roomPreviewActive, isAllSeatsSelected, allSeatsPreviewSeries, placementPreviewSeries]);
 
   const effectiveVisibleSeries = roomPreviewExclusive
     ? (placementPreviewGraphSeries || [])
@@ -988,7 +1012,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         <div className={engineeringDetailCollapsed ? "mt-2 flex-1 min-h-[400px] relative" : "mt-2"}>
           {roomPreviewActive && <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-semibold">
             <span style={{ color: "#16A34A" }}>
-              ━━ Preview — {previewSeatId && !previewSeatUnavailable ? formatSeatPillLabel(previewSeatId) : "RSP"}
+              ━━ Preview — {isAllSeatsSelected ? "All seats" : (previewSeatId && !previewSeatUnavailable ? formatSeatPillLabel(previewSeatId) : "RSP")}
             </span>
             {previewSeatUnavailable && (
               <span style={{ color: "#B45309" }}>Preview available at the RSP only.</span>
@@ -1000,6 +1024,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               </span>
             )}
           </div>}
+          {roomPreviewActive && isAllSeatsSelected && allSeatsPreviewSeries && allSeatsPreviewSeries.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2 text-[11px]" style={{ color: "#3E4349" }}>
+              {allSeatsPreviewSeries.map((series) => (
+                <span key={series.id} className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-[3px] rounded-full" style={{ background: series.color }} />
+                  {series.label}
+                </span>
+              ))}
+            </div>
+          )}
           {effectiveVisibleSeries.length > 0 ? (
             <>
             <BassGraph

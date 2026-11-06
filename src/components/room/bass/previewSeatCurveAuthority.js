@@ -73,3 +73,47 @@ export function resolvePreviewCurve({ previewResult = null, previewSeatId = null
     seatUnavailable: !!previewSeatId && !seatCurve,
   };
 }
+
+/**
+ * Build the simultaneous all-seats preview overlay: one graph series per real
+ * listening position, each carrying that seat's OWN preview curve verbatim.
+ *
+ * No averaging, summing, normalising or other combination is performed — every
+ * series is the preview engine's own per-seat responseData, placed on the graph
+ * with its own colour and label. Seats the preview result carries no curve for
+ * are omitted (they contribute no line). The RSP reference position is NOT
+ * included here; it has its own dedicated button and is never substituted for a
+ * seat curve.
+ *
+ * Pure/presentation-only — changes no calculation, no optimiser, no RP22 grading.
+ *
+ * @param {object} previewResult - preview engine result with seatCurves
+ * @param {Array} orderedSeats - ordered real listening positions
+ * @param {Array} seatingPositions - raw seating positions (index fallback)
+ * @param {Function} getSeatColor - seatId → colour string
+ * @param {Function} formatLabel - seatId → display label
+ * @returns {Array} graph series objects (id, color, data, kind, label)
+ */
+export function buildAllSeatsPreviewSeries({
+  previewResult = null,
+  orderedSeats = [],
+  seatingPositions = [],
+  getSeatColor = () => "#213428",
+  formatLabel = (id) => id,
+} = {}) {
+  const seatCurves = previewResult?.seatCurves || [];
+  if (!seatCurves.length) return [];
+  return orderedSeats
+    .map((seat) => {
+      const sid = seatIdentity(seat);
+      const curve = resolvePreviewSeatCurve({ seatCurves, previewSeatId: sid, seatingPositions });
+      return {
+        id: sid,
+        color: getSeatColor(sid),
+        data: curve?.responseData || [],
+        kind: "room-response-preview",
+        label: formatLabel(sid),
+      };
+    })
+    .filter((series) => series.data.length > 0);
+}

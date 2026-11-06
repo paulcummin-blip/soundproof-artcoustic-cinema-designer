@@ -32,6 +32,5 @@ export default function SeatResponseScopeControls({ rspPosition, orderedSeats = 
         return <button type="button" key={id} onClick={() => onSelectSeat(id)} title={label} style={pillStyle(active, getSeatColor(id))}>{label}</button>;
       })}
     </div>)}
-    {previewActive && <div style={{ fontSize: 11, color: "#625143" }}>Preview is advisory and uses current sub positions.</div>}
   </div>;
 }
