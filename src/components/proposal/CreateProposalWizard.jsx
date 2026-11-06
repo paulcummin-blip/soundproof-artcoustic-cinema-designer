@@ -17,7 +17,6 @@ import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAu
 import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
 import { isReadinessRefusalMessage, resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
-import { useSpeakerDesignGeneration } from '@/components/proposal/sourceAuthority/useSpeakerDesignGeneration';
 import ProposalPreparationPanel from '@/components/proposal/preparation/ProposalPreparationPanel';
 import useProposalPreparation from '@/components/proposal/wizard/useProposalPreparation';
 import useAdiKnowledgeGate from '@/components/proposal/wizard/useAdiKnowledgeGate';
@@ -246,18 +245,6 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       ? 'Open this version in Room Designer, finish the remaining calculations, then regenerate the reports.'
       : baseReadiness.detail,
   };
-
-  // The Speaker Design PDF generation action: a per-version "Generate Speaker
-  // Design PDF" that stores the schedule directly from the version's saved
-  // design, WITHOUT regenerating the current Project Report. Reuses the same
-  // storage pipeline the Project Report uses, so the stored schedule is
-  // identical. Non-blocking: a missing Speaker Design never blocks generation
-  // when the required reports are current.
-  const speakerDesignGeneration = useSpeakerDesignGeneration(selectedProjectId);
-  const generatingVersionIds = useMemo(
-    () => new Set(selectedVersionIds.filter((id) => speakerDesignGeneration.isGenerating(id))),
-    [selectedVersionIds, speakerDesignGeneration],
-  );
 
   // A refused generation leaves its reason on screen. That reason is a readiness
   // verdict, and the readiness result above is the only thing that states one:
@@ -728,9 +715,6 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           versions={canonicalVersions}
           collisions={versionCollisions}
           loading={versionsLoading}
-          onGenerateSpeakerDesign={speakerDesignGeneration.generate}
-          generatingVersionIds={generatingVersionIds}
-          speakerDesignErrors={speakerDesignGeneration.errors}
         />
       )}
 
@@ -778,9 +762,6 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
             className="mb-8"
             onRetry={readinessError ? retryReadiness : null}
             detailed
-            onGenerateSpeakerDesign={speakerDesignGeneration.generate}
-            generatingVersionIds={generatingVersionIds}
-            speakerDesignErrors={speakerDesignGeneration.errors}
           />
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />

@@ -33,10 +33,13 @@ import {
   preparePrintDocument,
 } from "@/components/report/printReadiness";
 import {
-  recordIssuedExportInBackground,
   snapshotIssuedComposition,
 } from "@/components/library/issuedDocument/recordIssuedExport";
-import { storeSpeakerDesignInBackground } from "@/components/report/speakerDesign/speakerDesignIssuedDocument";
+import {
+  storeProjectReportPublication,
+  retryPublicationDocument,
+  PUBLICATION_DOCUMENT,
+} from "@/components/report/projectReport/storeProjectReportPublication";
 
 // Version metadata is optional — only present when the project has a saved
 // named design version. The filename helper appends it when meaningful.
@@ -92,6 +95,16 @@ export function useClientReportPdfExport({
 }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
+  // The publication state: both the Project Report PDF and the companion
+  // Speaker Design PDF must land before the publication is treated as complete.
+  //   idle       — no export has run yet
+  //   storing    — capture, upload and record creation are in flight
+  //   complete   — both documents are stored
+  //   incomplete — one or both documents failed; retry stores only the missing one
+  const [publication, setPublication] = useState({
+    status: "idle",
+    failed: [],
+  });
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
   // The app-owned window the report is printed from, when one could be opened.
@@ -99,6 +112,10 @@ export function useClientReportPdfExport({
   // The export action itself, held stably so a failed Library storage can offer
   // "Retry export and store" against this very export.
   const retryExportRef = useRef(null);
+  // The last export's stored parameters, held so a targeted retry can re-store
+  // only the document that failed — from the SAME saved authority, without
+  // regenerating the one that succeeded or re-running the whole export.
+  const lastExportRef = useRef(null);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
@@ -145,45 +162,69 @@ export function useClientReportPdfExport({
     setExporting(true);
     setError(null);
 
-    // The issued copy is taken from the SAME composition this export prints and
-    // stored in the background. The export is never delayed by it, and a storage
-    // failure never costs the designer the PDF they exported.
-    if (issuedDocument?.documentType) {
-      recordIssuedExportInBackground({
-        identity: {
+    // The Project Report PDF and the companion Speaker Design PDF are stored
+    // together, from the SAME saved project/version authority and engineering
+    // fingerprint, through the existing storage pipeline. Both are awaited
+    // before the publication is treated as complete: if either fails, the
+    // publication reads incomplete and a targeted retry re-stores only the
+    // document that failed — never the one that succeeded.
+    const reportSnapshot = issuedDocument?.documentType
+      ? snapshotIssuedComposition(issuedDocument.documentType)
+      : null;
+    const reportIdentity = issuedDocument?.documentType
+      ? {
           ...issuedDocument,
           filename: title,
           // A storage failure that could not be retried from the held PDF can
           // re-run this export, and says so on the button that does it.
           retryExport: () => retryExportRef.current?.(),
-        },
-        snapshot: snapshotIssuedComposition(issuedDocument.documentType),
-      });
-    }
+        }
+      : null;
+    const speakerDesignParams = (speakerDesignCompanion?.groups?.length > 0 && issuedDocument?.projectId)
+      ? {
+          groups: speakerDesignCompanion.groups,
+          layout: speakerDesignCompanion.layout || null,
+          projectName,
+          // The dealer segment is the same one the report itself is named with, so
+          // the schedule's own download and this stored copy cannot disagree.
+          dealerName,
+          clientName,
+          projectReference,
+          versionName,
+          versionNumber,
+          projectId: issuedDocument.projectId,
+          accountId: issuedDocument.accountId || null,
+          resolveSource: issuedDocument.resolveSource || null,
+          exportedBy: issuedDocument.exportedBy || null,
+        }
+      : null;
 
-    // The version's Current Speaker Design travels with the report: same project,
-    // same version, same source fingerprints, its own document type. It is
-    // started after the report's own storage, so a schedule that cannot be
-    // created never costs the report its Library copy, and it names itself on
-    // failure, with a retry that re-runs it from the same version.
-    if (speakerDesignCompanion?.groups?.length > 0 && issuedDocument?.projectId) {
-      storeSpeakerDesignInBackground({
-        groups: speakerDesignCompanion.groups,
-        layout: speakerDesignCompanion.layout || null,
-        projectName,
-        // The dealer segment is the same one the report itself is named with, so
-        // the schedule's own download and this stored copy cannot disagree.
-        dealerName,
-        clientName,
-        projectReference,
-        versionName,
-        versionNumber,
-        projectId: issuedDocument.projectId,
-        accountId: issuedDocument.accountId || null,
-        resolveSource: issuedDocument.resolveSource || null,
-        exportedBy: issuedDocument.exportedBy || null,
-      });
-    }
+    lastExportRef.current = { reportIdentity, reportSnapshot, speakerDesignParams };
+    setPublication({ status: "storing", failed: [] });
+
+    // Fire both storages in parallel. The print below runs alongside them; the
+    // publication promise is awaited after the print so the designer is never
+    // blocked, but the publication is only complete once both documents land.
+    const publicationPromise = storeProjectReportPublication({
+      reportIdentity,
+      reportSnapshot,
+      speakerDesignParams,
+      projectId: issuedDocument?.projectId || null,
+      versionId: null,
+    }).catch(() => ({ stored: [], failed: [], complete: false }));
+
+    // The publication state follows the storage outcome: both documents must
+    // land before it reads complete. The print runs alongside the storage and
+    // is never blocked by it.
+    publicationPromise.then((outcome) => {
+      if (outcome.complete) {
+        setPublication({ status: "complete", failed: [] });
+      } else if (outcome.failed.length > 0) {
+        setPublication({ status: "incomplete", failed: outcome.failed });
+      } else {
+        setPublication({ status: "idle", failed: [] });
+      }
+    });
 
     try {
       // 1. Wait for fonts
@@ -261,5 +302,43 @@ export function useClientReportPdfExport({
 
   retryExportRef.current = handleExport;
 
-  return { exporting, error, handleExport };
+  // A targeted retry that re-stores only the document that failed — from the
+  // SAME saved authority, without regenerating the one that succeeded or
+  // re-running the whole export.
+  const retryMissing = useCallback(async (documentKey) => {
+    const last = lastExportRef.current;
+    if (!last) return;
+    setPublication((prev) => ({
+      ...prev,
+      status: "storing",
+      failed: prev.failed.filter((entry) => entry.key !== documentKey),
+    }));
+    const result = await retryPublicationDocument({
+      key: documentKey,
+      reportIdentity: last.reportIdentity,
+      reportSnapshot: last.reportSnapshot,
+      speakerDesignParams: last.speakerDesignParams,
+    });
+    if (result.ok) {
+      // Re-evaluate the remaining failures: if none remain, the publication is
+      // complete; otherwise the incomplete state persists for the other document.
+      setPublication((prev) => {
+        const remaining = prev.failed.filter((entry) => entry.key !== documentKey);
+        return remaining.length > 0
+          ? { status: "incomplete", failed: remaining }
+          : { status: "complete", failed: [] };
+      });
+    } else {
+      setPublication((prev) => ({
+        status: "incomplete",
+        failed: prev.failed.some((entry) => entry.key === documentKey)
+          ? prev.failed.map((entry) => entry.key === documentKey
+            ? { key: documentKey, error: result.error }
+            : entry)
+          : [...prev.failed, { key: documentKey, error: result.error }],
+      }));
+    }
+  }, []);
+
+  return { exporting, error, handleExport, publication, retryMissing, PUBLICATION_DOCUMENT };
 }
