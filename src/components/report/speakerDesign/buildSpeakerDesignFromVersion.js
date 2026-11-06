@@ -113,6 +113,9 @@ export function buildSpeakerDesignFromVersion(merged) {
   const screen = extractScreen(merged);
   const isVisible = layoutVisibilityFilter(dolbyLayout, sevenBedLayoutType);
 
+  const acousticTreatmentEnabled = !!(merged?.acoustic_treatment_enabled ?? merged?.acousticTreatmentEnabled ?? false);
+  const selectedAbfuserQty = Math.floor(Number(merged?.selected_abfuser_qty ?? merged?.selectedAbfuserQty) || 0);
+
   const result = buildSpeakerDesignRows({
     placedSpeakers,
     frontSubsCfg,
@@ -120,6 +123,8 @@ export function buildSpeakerDesignFromVersion(merged) {
     subwooferInstances,
     screen,
     isVisible,
+    acousticTreatmentEnabled,
+    selectedAbfuserQty,
   });
 
   const layout = systemFormat({

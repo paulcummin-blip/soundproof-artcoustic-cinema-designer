@@ -38,7 +38,26 @@ export const SPEAKER_DESIGN_GROUPS = Object.freeze([
   { key: 'surrounds', title: 'Surrounds / wides' },
   { key: 'overheads', title: 'Overheads' },
   { key: 'subwoofers', title: 'Subwoofers' },
+  { key: 'amplification', title: 'Amplification' },
+  { key: 'acoustic_treatment', title: 'Acoustic treatment' },
 ]);
+
+/**
+ * The derived subwoofer amplifier the pricing engine adds one of per subwoofer
+ * (see commercialPriceBreakdown.js). Stated from the SAME subwoofer total the
+ * schedule already states, so the amplifier count can never disagree with the
+ * subwoofers beside it or with the System summary's priced line.
+ */
+const SUBWOOFER_AMPLIFIER_MODEL = 'CPH-1000D';
+const SUBWOOFER_AMPLIFIER_POSITION = 'Subwoofer amplifier';
+
+/**
+ * The acoustic treatment panel, stated with the SAME label and quantity the
+ * report's Products Selected block and the pricing engine use. The quantity
+ * is the designer's own selected Abfuser quantity — never an inferred count.
+ */
+const ACOUSTIC_TREATMENT_MODEL = 'Artcoustic Abfuser';
+const ACOUSTIC_TREATMENT_POSITION = 'Acoustic treatment panels';
 
 /**
  * The position rows, in the order above. `key` is the canonical role the row
@@ -130,6 +149,8 @@ function frontStageNote({ screen, rowKey, speakers }) {
  * @param {Array}    [input.subwooferInstances] — its subwoofer instances
  * @param {Object}   [input.screen] — the version's saved display identity and screen construction
  * @param {Function} [input.isVisible] — (role, model) => boolean, the design's own visibility rule
+ * @param {boolean}  [input.acousticTreatmentEnabled] — the version's acoustic treatment flag (same as pricing engine)
+ * @param {number}   [input.selectedAbfuserQty] — the designer's selected Abfuser quantity (same as pricing engine)
  * @returns {{ groups: Array<{ key, title, rows }>, rows: Array<Object>, isEmpty: boolean }}
  */
 export function buildSpeakerDesignRows({
@@ -139,6 +160,8 @@ export function buildSpeakerDesignRows({
   subwooferInstances = [],
   screen = null,
   isVisible = null,
+  acousticTreatmentEnabled = false,
+  selectedAbfuserQty = 0,
 } = {}) {
   const speakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   const visible = typeof isVisible === 'function' ? isVisible : () => true;
@@ -220,7 +243,8 @@ export function buildSpeakerDesignRows({
 
   // Subwoofers come from the version's own configuration, through the same
   // derivation the schedule states them with.
-  for (const entry of subwooferEntries({ frontSubsCfg, rearSubsCfg, subwooferInstances })) {
+  const subwooferScheduleEntries = subwooferEntries({ frontSubsCfg, rearSubsCfg, subwooferInstances });
+  for (const entry of subwooferScheduleEntries) {
     const models = new Map(entry.models.map(({ name, count }) => [name, count]));
     rows.push({
       key: `SUB_${entry.side || 'other'}`,
@@ -229,6 +253,43 @@ export function buildSpeakerDesignRows({
       model: modelCell(models),
       quantity: entry.total,
       quantityLabel: String(entry.total),
+      note: null,
+    });
+  }
+
+  // Amplification: the derived subwoofer amplifier, one per subwoofer — the
+  // SAME count the pricing engine's priced breakdown (the System summary) adds
+  // as a CPH-1000D line. The count is the total subwoofers the schedule itself
+  // just stated, so the amplifier row can never disagree with the subwoofers
+  // beside it. No subwoofers = no amplifier row, exactly as the pricing engine
+  // produces no CPH-1000D line when there are no subwoofers.
+  const subwooferTotal = subwooferScheduleEntries.reduce((sum, entry) => sum + (Number(entry.total) || 0), 0);
+  if (subwooferTotal > 0) {
+    rows.push({
+      key: 'AMP_SUB',
+      group: 'amplification',
+      position: SUBWOOFER_AMPLIFIER_POSITION,
+      model: SUBWOOFER_AMPLIFIER_MODEL,
+      quantity: subwooferTotal,
+      quantityLabel: String(subwooferTotal),
+      note: null,
+    });
+  }
+
+  // Acoustic treatment: the designer's own selected Abfuser quantity, stated
+  // with the SAME label the report's Products Selected block uses. The quantity
+  // is never inferred — it is the saved selected_abfuser_qty, gated by the
+  // version's acoustic_treatment_enabled flag, exactly as the pricing engine
+  // gates the Abfuser priced line.
+  const abfuserQty = Math.floor(Number(selectedAbfuserQty) || 0);
+  if (acousticTreatmentEnabled && abfuserQty > 0) {
+    rows.push({
+      key: 'ABFUSER',
+      group: 'acoustic_treatment',
+      position: ACOUSTIC_TREATMENT_POSITION,
+      model: ACOUSTIC_TREATMENT_MODEL,
+      quantity: abfuserQty,
+      quantityLabel: String(abfuserQty),
       note: null,
     });
   }

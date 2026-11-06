@@ -568,6 +568,11 @@ export default function RP22ClientReport() {
       },
       isVisible: appState?.getSpeakerVisibility
         || layoutVisibilityFilter(appState?.dolbyLayout, appState?.sevenBedLayoutType),
+      // The designer's own acoustic treatment selection — the SAME inputs the
+      // pricing engine and the report's Products Selected block read — so the
+      // Abfuser row states the same quantity the System summary prices.
+      acousticTreatmentEnabled: appState?.acousticTreatmentEnabled === true,
+      selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
     }).groups,
   }), [
     placedSpeakers,
@@ -579,6 +584,8 @@ export default function RP22ClientReport() {
     appState?.getSpeakerVisibility,
     appState?.dolbyLayout,
     appState?.sevenBedLayoutType,
+    appState?.acousticTreatmentEnabled,
+    appState?.selectedAbfuserQty,
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
