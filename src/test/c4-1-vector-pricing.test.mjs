@@ -39,7 +39,7 @@ const manualWh = (widthM, heightM) => ({
 // C4-1 plain-length SKUs, Multi length-with-suffix SKUs, HSPL range SKUs.
 // 1094 mm Multi is deliberately UNPRICED (priceExVat: null).
 function mockIndex() {
-  const c41Options = [1222, 1441, 1711, 1904].map((mm) => ({
+  const c41Options = [1222, 1441, 1711, 1842].map((mm) => ({
     value: String(mm),
     label: `C4-1 — ${mm} mm`,
     priceExVat: mm === 1222 ? 1000 : mm === 1441 ? 1200 : mm === 1711 ? 1400 : 1600,
@@ -96,7 +96,7 @@ test('REQ 1  The C4-1 vector cabinet is drawn at the exact resolved length, driv
     [tv('tv65', 1411), 1222],
     [tv('tv77', 1711), 1711],
     [tv('tv83', 1872), 1711],
-    [tv('tv100', 2230), 1904],
+    [tv('tv100', 2230), 1842],
   ];
   cases.forEach(([screen, mm]) => {
     const resolved = resolveSoundbarCabinetLengthMm({ modelKey: 'c4-1', screen });
@@ -125,7 +125,7 @@ test('REQ 2  C4-1 pricing resolves to the same cabinet length the drawing instal
   assert.equal(line.count, 3, 'three LCR cabinets are priced at the one resolved length');
   // No other C4-1 length is priced.
   assert.ok(!c41Line(breakdown, 1222), 'the 1222 mm option is not priced for a 1711 mm screen');
-  assert.ok(!c41Line(breakdown, 1904), 'the 1904 mm option is not priced for a 1711 mm screen');
+  assert.ok(!c41Line(breakdown, 1842), 'the 1842 mm option is not priced for a 1711 mm screen');
 });
 
 test('REQ 2b  Multi LCR pricing resolves to the same cabinet length the drawing installs', () => {
@@ -232,10 +232,10 @@ test('REQ 6  A screen-width change updates the resolved C4-1 variant and its pri
   assert.equal(c41Line(breakdown, 1711).price, 1400);
   assert.ok(!c41Line(breakdown, 1222), 'the previous 1222 mm is no longer priced');
 
-  // Widen again to 2230 mm → 1904 mm cabinet.
+  // Widen again to 2230 mm → 1842 mm cabinet.
   breakdown = price([{ role: 'L', model: 'c4-1' }], tv('tv100', 2230));
-  assert.equal(resolveSoundbarCabinetLengthMm({ modelKey: 'c4-1', screen: tv('tv100', 2230) }), 1904);
-  assert.equal(c41Line(breakdown, 1904).price, 1600);
+  assert.equal(resolveSoundbarCabinetLengthMm({ modelKey: 'c4-1', screen: tv('tv100', 2230) }), 1842);
+  assert.equal(c41Line(breakdown, 1842).price, 1600);
 });
 
 test('REQ 6b  A manual projection-screen width change updates the resolved variant', () => {
@@ -256,7 +256,7 @@ test('REQ 7  The cabinet-length resolution touches no acoustic field, coordinate
   // Resolving the variant changes ONLY the cabinet width; every acoustic field
   // is identical across the confirmed lengths, and the resolution functions
   // carry no coordinate, centre or RP22 argument.
-  const metas = [1222, 1441, 1711, 1904].map((mm) =>
+  const metas = [1222, 1441, 1711, 1842].map((mm) =>
     getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: mm }),
   );
   const ACOUSTIC = [
@@ -273,7 +273,7 @@ test('REQ 7  The cabinet-length resolution touches no acoustic field, coordinate
   });
   // Only the width fields follow the length.
   metas.forEach((m, i) => {
-    assert.equal(m.widthM, [1222, 1441, 1711, 1904][i] / 1000);
+    assert.equal(m.widthM, [1222, 1441, 1711, 1842][i] / 1000);
     assert.equal(m.heightM, 0.12);
     assert.equal(m.depthM, 0.081);
   });

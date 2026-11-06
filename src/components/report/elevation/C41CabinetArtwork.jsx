@@ -2,7 +2,7 @@
 // C41CabinetArtwork.jsx
 // ---------------------------------------------------------------------------
 // The shared VECTOR cabinet renderer for every confirmed C4-1 cabinet variant
-// (1222, 1441, 1711, 1904 mm, plus any legacy length a saved project carries).
+// (1222, 1441, 1711, 1842 mm, plus any legacy length a saved project carries).
 //
 // The cabinet is drawn as exact vector geometry at the cabinet's TRUE physical
 // width × 120 mm height — a white-faced rectangle with the approved driver group

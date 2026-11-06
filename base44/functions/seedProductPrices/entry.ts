@@ -42,7 +42,7 @@ const SEED_DATA = [
   { sku: "c4-1:1222",           label: "C4-1 — 1222mm",            category: "Loudspeaker", price_ex_vat: 1616.67 },
   { sku: "c4-1:1441",           label: "C4-1 — 1441mm",            category: "Loudspeaker", price_ex_vat: 1733.33 },
   { sku: "c4-1:1711",           label: "C4-1 — 1711mm",            category: "Loudspeaker", price_ex_vat: 1825 },
-  { sku: "c4-1:1904",           label: "C4-1 — 1904mm",            category: "Loudspeaker", price_ex_vat: 1991.67 },
+  { sku: "c4-1:1842",           label: "C4-1 — 1842mm",            category: "Loudspeaker", price_ex_vat: 1991.67 },
   // 1094 mm Multi variant — valid cabinet size, selectable in designs, but its
   // commercial price is pending: price_ex_vat stays null until entered, so it is
   // never included in a priced quotation and is shown as "price not set".
@@ -211,6 +211,29 @@ export default async function(req) {
       existingBySku.set(C41_1672_NEW_SKU, { ...oldRec, sku: C41_1672_NEW_SKU, label: 'C4-1 — 1711mm' });
       updated++;
       details.push({ sku: C41_1672_OLD_SKU, action: 'renamed_to', to: C41_1672_NEW_SKU });
+    }
+
+    // ── One-time SKU correction: C4-1 1904 mm → 1842 mm ──────────────────────
+    // The 1904 mm C4-1 cabinet was a catalogue typo for the verified 1842 mm
+    // product (1842 × 120 × 81 mm, matching the Multi LCR/Mono 1842 mm length).
+    // Rename the existing ProductPrice record in place so the corrected SKU is
+    // the single C4-1 18xx entry — no duplicate product is created and the
+    // existing retail price is preserved. A saved project that explicitly
+    // recorded 1904 mm keeps drawing at 1904 mm (its own recorded length is
+    // preserved by the variant authority); only the commercial SKU identity is
+    // corrected.
+    const C41_1904_OLD_SKU = 'c4-1:1904';
+    const C41_1904_NEW_SKU = 'c4-1:1842';
+    if (existingBySku.has(C41_1904_OLD_SKU) && !existingBySku.has(C41_1904_NEW_SKU)) {
+      const oldRec = existingBySku.get(C41_1904_OLD_SKU)!;
+      await base44.asServiceRole.entities.ProductPrice.update(oldRec.id, {
+        sku: C41_1904_NEW_SKU,
+        label: 'C4-1 — 1842mm',
+      });
+      existingBySku.delete(C41_1904_OLD_SKU);
+      existingBySku.set(C41_1904_NEW_SKU, { ...oldRec, sku: C41_1904_NEW_SKU, label: 'C4-1 — 1842mm' });
+      updated++;
+      details.push({ sku: C41_1904_OLD_SKU, action: 'renamed_to', to: C41_1904_NEW_SKU });
     }
 
     for (let index = 0; index < SEED_DATA.length; index++) {
