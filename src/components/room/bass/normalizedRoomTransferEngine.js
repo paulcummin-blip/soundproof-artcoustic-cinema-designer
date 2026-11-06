@@ -128,6 +128,7 @@ export function computeNormalizedRoomTransfer({
   physicsOptions = {},
   pointsPerOctave,
   preparedModes,
+  listenerSelection = null,
 }) {
   const startedAtMs = (typeof performance !== "undefined" && performance.now)
     ? performance.now()
@@ -164,7 +165,20 @@ export function computeNormalizedRoomTransfer({
     };
   }
 
-  const listeners = buildListeners(rspPosition, seatingPositions);
+  // Selection limits advisory preview work, not the geometry fingerprint.
+  // Filter AFTER assigning private keys so seat indices retain their identity.
+  const allListeners = buildListeners(rspPosition, seatingPositions);
+  const selectedListeners = listenerSelection?.mode === "rsp"
+    ? allListeners.filter((listener) => listener.__isRsp)
+    : listenerSelection?.mode === "all"
+      ? allListeners.filter((listener) => !listener.__isRsp)
+      : listenerSelection?.mode === "seat"
+        ? allListeners.filter((listener) => !listener.__isRsp &&
+            (listener.__originalId || `${listener.x}-${listener.y}`) === listenerSelection.seatId)
+        : allListeners;
+  // An ambiguous/missing focused identity must not silently select another seat.
+  const listeners = listenerSelection?.mode === "seat" && selectedListeners.length !== 1
+    ? [] : selectedListeners;
   if (listeners.length === 0) {
     return {
       status: "error",
@@ -367,5 +381,6 @@ export function computeNormalizedRoomTransfer({
     geometryFingerprint,
     normalizationReference: NORMALIZATION_REFERENCE,
     calculationDurationMs: Math.max(0, completedAtMs - startedAtMs),
+    ...(listenerSelection ? { listenerSelection } : {}),
   };
 }
