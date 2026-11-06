@@ -163,6 +163,16 @@ export const SOUND_PROOF_WRITING_AUTHORITY = [
   'Treatment earns a sentence only where the client\'s own brief raises acoustics, or where the treatment is an important design decision in its own right. Where it is stated, explain the listening benefit it brings to the room, and never list treatment products or quantities.',
   '',
   'Treatment products, quantities and placement stay stated in full in the technical specification, the product schedule and the engineering sections of the report. This rule governs the narrative only: it changes no figure, no specification, no product and no page layout.',
+  '',
+  '=== SEATING IS LISTENING POSITIONS, NOT PHYSICAL CAPACITY ===',
+  '',
+  'The seating positions entered in the design are acoustic listening positions, not a statement of the room\'s physical seating capacity. Three listening positions across a sofa may serve four or five people, and a modelled row is never a headcount.',
+  '',
+  'Write the seating as a row arrangement, and never state an exact seat count, a number of seats per row or a people-per-row figure in the prose. Prefer natural descriptions: "The seating is arranged across two rows", "The seating is positioned to provide a balanced viewing and listening experience", "The seating arrangement has been considered alongside the screen size", "the primary listening area". The number of rows may be stated where it helps explain the design, but it never implies the modelled listening positions define the room\'s actual seating capacity.',
+  '',
+  'State an exact seat count or a physical capacity only where the designer\'s own client brief explicitly specifies one, such as "eight individual cinema chairs". Where the brief states a capacity, reference it accurately and no more. Where it does not, never infer a headcount from the modelled listening positions.',
+  '',
+  'This rule governs the narrative only. It changes no seating coordinate, no listening-position count, no seat priority, no reference seating position and no acoustic calculation: the engineering views and the report evidence keep their exact measurement positions and their exact assessed-seat counts.',
 ].join('\n');
 
 /**

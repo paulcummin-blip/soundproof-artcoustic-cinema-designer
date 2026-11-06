@@ -131,11 +131,11 @@ export const COMPARISON_REPORT_INSTRUCTIONS = [
 export const SYSTEM_SUMMARY_SECTION_PROMPTS = {
   system_design_summary: `Open the report by describing the design.
 
-Open with the design concept: what this room has been designed as, and why it takes this form. The At a Glance page already states the room dimensions, the screen size, the viewing distance, the seating numbers and the system format, so do not restate them here: refer to the room and the system by what they are for rather than by their measurements.
+Open with the design concept: what this room has been designed as, and why it takes this form. The At a Glance page already states the room dimensions, the screen size, the viewing distance, the seating rows and the system format, so do not restate them here: refer to the room and the system by what they are for rather than by their measurements.
 
 Then cover, in this order:
 - what has been designed for this room, and what it is trying to achieve
-- why the design takes this form, including the seating and viewing context, how many seats there are for a reason, and how the room is used
+- why the design takes this form, including the seating and viewing context, how the seating is arranged across the room for a reason, and how the room is used
 - the main loudspeaker and subwoofer package, by family or model, and why each was chosen
 - how those parts work together as one system rather than as separate components
 - what the room delivers as a result, and how that experience should feel

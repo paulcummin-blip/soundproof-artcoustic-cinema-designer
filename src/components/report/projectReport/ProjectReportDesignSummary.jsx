@@ -128,7 +128,6 @@ export default function ProjectReportDesignSummary({
   onRetryAutoIntent = null,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
-  const seatCount = Array.isArray(seatingPositions) ? seatingPositions.length : 0;
 
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -137,8 +136,12 @@ export default function ProjectReportDesignSummary({
     ? `${widthM.toFixed(2)} × ${lengthM.toFixed(2)} × ${heightM.toFixed(2)} m (W × L × H)`
     : null;
 
-  const seatingFact = seatCount > 0
-    ? `${seatRows.length} row${seatRows.length === 1 ? '' : 's'} · ${seatCount} seat${seatCount === 1 ? '' : 's'}`
+  // The seating positions entered in Room Designer are acoustic listening
+  // positions, not a statement of the room's physical seating capacity: three
+  // positions across a sofa may serve four or five people. The fact sheet states
+  // the row arrangement, never a precise listener count.
+  const seatingFact = seatRows.length > 0
+    ? `${seatRows.length} row${seatRows.length === 1 ? '' : 's'}`
     : null;
 
   // One row per loudspeaker layer, each carrying that layer's own models and

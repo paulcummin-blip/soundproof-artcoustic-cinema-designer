@@ -66,17 +66,18 @@ export function buildViewingExperienceNarrative({
   const projection = !isTvDisplay(projectDetails);
   const widescreen = String(projectDetails?.aspect_ratio || '').trim().startsWith('2.35');
   const severalRows = rows.length > 1;
-  const totalSeats = rows.reduce((sum, row) => sum + Number(row.seats), 0);
 
   // The screen this design is built around, stated with its actual size and
   // format by the shared display authority.
   const screen = displayPhrase(projectDetails)
     || (projection ? 'The projection screen' : 'The display');
 
-  // Sentence 1: the screen and the seating, with the actual seat count.
+  // Sentence 1: the screen and the seating, stated as a row arrangement. The
+  // seating positions are acoustic listening positions, not a physical seating
+  // capacity, so the opening states the rows and never a precise listener count.
   const seatPhrase = severalRows
-    ? `${rows.length} rows totalling ${totalSeats} seats`
-    : `a single row of ${totalSeats} seat${totalSeats === 1 ? '' : 's'}`;
+    ? `${rows.length} seating rows`
+    : 'a single seating row';
   const opening = `${screen} is paired with ${seatPhrase}.`;
 
   // Sentence 2: the viewing angle and RP23 level, stated as published.
@@ -109,7 +110,7 @@ export function buildViewingExperienceNarrative({
       level,
     ].filter(Boolean);
     viewingResult = parts.length > 0
-      ? `This provides ${parts.join(', ')} across all ${totalSeats} seat${totalSeats === 1 ? '' : 's'}.`
+      ? `This provides ${parts.join(', ')} across the seating row.`
       : null;
   }
 

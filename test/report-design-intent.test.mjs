@@ -126,13 +126,13 @@ describe('the Design Intent brief', () => {
 
   it('opens on the cinema experience and keeps the detailed decisions until last', () => {
     // Paragraph one is the cinema the client is buying: the display and its format,
-    // and the seat count and row arrangement, both filled from this project's own
+    // and the row arrangement, both filled from this project's own
     // evidence rather than from any stored figure.
     const [experience, spatial, capability] = DESIGN_INTENT_SENTENCE_FRAMES;
     expect(experience.id).toBe('cinema_experience');
     expect(experience.label).toMatch(/PARAGRAPH ONE: THE CINEMA EXPERIENCE/);
     expect(experience.frame).toMatch(/this project's own display and its format/);
-    expect(experience.frame).toMatch(/this project's own seat count and row arrangement/);
+    expect(experience.frame).toMatch(/this project's own row arrangement/);
     // The system that carries the experience follows it, and the capability closes
     // the block: spatial resolution and timbre matching, then dynamic range and bass.
     expect(spatial.label).toMatch(/PARAGRAPH TWO/);

@@ -415,7 +415,7 @@ const LANGUAGE = [
   '- Use the active voice.',
   '- Use practical, specific explanations.',
   '- Keep the room, the design, the system, the seating area and the listening result as the subject of the sentence.',
-  '- Include numbers where they help: screen size, viewing distance, viewing angle, channel count, dBC capability, RP22 level, seat count.',
+  '- Include numbers where they help: screen size, viewing distance, viewing angle, channel count, dBC capability, RP22 level. State the seating as a row arrangement, never an exact seat count or a people-per-row figure, unless the client brief explicitly specifies a physical capacity.',
   '- Carry at most one or two supplied values in a paragraph. Every value is predicted or calculated: never call it measured, proven or confirmed.',
 
   '- Vary how sentences open. Never repeat the same opening construction within a section.',
