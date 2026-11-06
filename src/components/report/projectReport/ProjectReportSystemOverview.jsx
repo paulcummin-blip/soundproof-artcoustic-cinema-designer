@@ -120,8 +120,9 @@ export default function ProjectReportSystemOverview({
     return entries.length > 0;
   });
 
-  // The viewing geometry table is a plain four-column table — Row, Seats, Viewing
-  // angle, RP23 — so every heading sits directly above its own values and each row
+  // The viewing geometry table is a plain four-column table — Row, Listening
+  // Positions, Viewing angle, RP23 — so every heading sits directly above its own
+  // values and each row
   // stays together. Its columns are aligned to the specification schedule printed
   // above it: Row stands in the schedule's Role column, Seats begins where MODEL &
   // QUANTITY begins, Viewing angle begins where SYSTEM ROLE & ENGINEERING LINK
@@ -212,7 +213,7 @@ export default function ProjectReportSystemOverview({
           }} />
           <div style={{
             display: 'grid',
-            // FOUR tracks for four columns: Row, Seats, Viewing angle, RP23 — each
+            // FOUR tracks for four columns: Row, Listening Positions, Viewing angle, RP23 — each
             // starting on the specification schedule's own column edge, at the
             // schedule's own column gap. The track count must always equal the number
             // of cells each row contributes: one more track and every row's cells
@@ -226,7 +227,7 @@ export default function ProjectReportSystemOverview({
             color: '#3E4349',
           }}>
             <div style={geometryHeading}>Row</div>
-            <div style={geometryHeading}>Seats</div>
+            <div style={geometryHeading}>Listening Positions</div>
             <div style={geometryHeading}>Viewing angle</div>
             <div style={{ ...geometryHeading, ...geometryRight }}>RP23</div>
             {geometry.map((row) => (

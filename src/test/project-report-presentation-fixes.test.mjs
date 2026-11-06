@@ -326,11 +326,11 @@ test("the geometry table is ONE grid of FOUR tracks, matching the cells each row
   // THE INVARIANT THIS REGRESSION BROKE: a track count larger than the cells a row
   // contributes leaves a spare track, and the next row's first cell is pulled up
   // into the row above. The two must match exactly.
-  assert.equal(trackCount, 4, `four tracks for Row, Seats, Viewing angle, RP23 (found ${trackCount})`);
+  assert.equal(trackCount, 4, `four tracks for Row, Listening Positions, Viewing angle, RP23 (found ${trackCount})`);
   assert.equal(trackCount, cells.length / rowCount, 'the tracks match the cells a row contributes');
 
   // The four headings read in column order…
-  assert.deepEqual(cells.slice(0, 4).map(cellText), ['Row', 'Seats', 'Viewing angle', 'RP23']);
+  assert.deepEqual(cells.slice(0, 4).map(cellText), ['Row', 'Listening Positions', 'Viewing angle', 'RP23']);
 
   // …and each row states its own four cells in that same order — label, seats,
   // viewing angle, RP23 — so no value can sit under another column's heading and
@@ -380,7 +380,7 @@ test("the RP23 column ends on the schedule's right edge, and the other columns r
   // the table ends on the same right boundary as the specification above it.
   assert.equal((section.match(/text-align:right/g) || []).length, 3);
   assert.match(section, /<div style="[^"]*text-align:right[^"]*">RP23<\/div>/);
-  assert.doesNotMatch(section, /text-align:right[^>]*>(?:(?!<\/div>).)*Seats/s);
+  assert.doesNotMatch(section, /text-align:right[^>]*>(?:(?!<\/div>).)*Listening Positions/s);
   assert.doesNotMatch(section, /text-align:right[^"]*">Viewing angle/);
 
   // Both rows' own RP23 results render in that one column, as the canonical pill.
