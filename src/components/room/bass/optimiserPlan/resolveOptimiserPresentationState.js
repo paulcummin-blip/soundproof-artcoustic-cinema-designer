@@ -391,6 +391,20 @@ export function resolveOptimiserPresentationState({
     });
   }
 
+  // A user-cancelled run has no evaluated recommendation. Keep its own durable
+  // terminal state, rather than reviving a historical applied receipt.
+  if (status === OPTIMISER_PLAN_STATUS.INCOMPLETE
+    && evidence?.rejectionReasons?.includes("Optimisation cancelled by the user before completion.")) {
+    return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
+      message: "Optimisation cancelled before completion.",
+      nextAction: "Re-test to complete the evaluation. Your existing settings are unchanged.",
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      showApply: false,
+      evidence,
+    });
+  }
+
   // ── FAILED ── a technical execution failure, never a design statement. The
   // panel states why it failed and what to do next; the engine's own error text
   // stays in the state and in Engineer details. Persisted failure status owns the
