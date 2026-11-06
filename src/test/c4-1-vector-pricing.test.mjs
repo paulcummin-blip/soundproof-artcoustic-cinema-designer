@@ -39,10 +39,10 @@ const manualWh = (widthM, heightM) => ({
 // C4-1 plain-length SKUs, Multi length-with-suffix SKUs, HSPL range SKUs.
 // 1094 mm Multi is deliberately UNPRICED (priceExVat: null).
 function mockIndex() {
-  const c41Options = [1222, 1449, 1672, 1904].map((mm) => ({
+  const c41Options = [1222, 1441, 1672, 1904].map((mm) => ({
     value: String(mm),
     label: `C4-1 — ${mm} mm`,
-    priceExVat: mm === 1222 ? 1000 : mm === 1449 ? 1200 : mm === 1672 ? 1400 : 1600,
+    priceExVat: mm === 1222 ? 1000 : mm === 1441 ? 1200 : mm === 1672 ? 1400 : 1600,
   }));
   const multiOptions = [
     { value: '1094-m', label: 'Multi — 1094 mm', priceExVat: null },
@@ -184,10 +184,11 @@ test('REQ 4  An explicitly recorded legacy length is preserved in both drawing a
 
 test('REQ 4b  An explicit legacy length no longer in the commercial catalogue is still preserved', () => {
   const screen = tv('tv100', 2230);
-  const speaker = { role: 'L', model: 'c4-1', cabinetLengthMm: 1441 };
-  assert.equal(resolvePlacedCabinetLengthMm(speaker, screen), 1441);
+  // 1449 mm is the retired typo SKU — no longer a commercial C4-1 length.
+  const speaker = { role: 'L', model: 'c4-1', cabinetLengthMm: 1449 };
+  assert.equal(resolvePlacedCabinetLengthMm(speaker, screen), 1449);
   const breakdown = price([speaker], screen);
-  // 1441 is no longer a commercial C4-1 length, so no priced option matches it;
+  // 1449 is no longer a commercial C4-1 length, so no priced option matches it;
   // the line is present (quantity intact) but unpriced — never a silent fallback
   // to a different length.
   const line = breakdown.breakdown.find((l) => l.model === 'c4-1');
@@ -255,7 +256,7 @@ test('REQ 7  The cabinet-length resolution touches no acoustic field, coordinate
   // Resolving the variant changes ONLY the cabinet width; every acoustic field
   // is identical across the confirmed lengths, and the resolution functions
   // carry no coordinate, centre or RP22 argument.
-  const metas = [1222, 1449, 1672, 1904].map((mm) =>
+  const metas = [1222, 1441, 1672, 1904].map((mm) =>
     getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: mm }),
   );
   const ACOUSTIC = [
@@ -272,7 +273,7 @@ test('REQ 7  The cabinet-length resolution touches no acoustic field, coordinate
   });
   // Only the width fields follow the length.
   metas.forEach((m, i) => {
-    assert.equal(m.widthM, [1222, 1449, 1672, 1904][i] / 1000);
+    assert.equal(m.widthM, [1222, 1441, 1672, 1904][i] / 1000);
     assert.equal(m.heightM, 0.12);
     assert.equal(m.depthM, 0.081);
   });

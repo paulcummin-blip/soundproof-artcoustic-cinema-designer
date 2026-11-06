@@ -3,7 +3,7 @@
 // WHAT   The C4-1, Multi (LCR/Mono) and HSPL soundbars are published in several
 //        cabinet lengths. This suite asserts the CONFIRMED commercial reality:
 //
-//          C4-1            1222, 1449, 1672, 1904 mm   (ProductPrice catalogue)
+//          C4-1            1222, 1441, 1672, 1904 mm   (ProductPrice catalogue)
 //          Multi LCR/Mono  1094, 1222, 1441, 1711, 1842, 2230 mm
 //                          (1094 mm is valid and selectable; its price is pending)
 //          HSPL            bespoke — made to the screen's overall width exactly
@@ -49,7 +49,7 @@ import {
 } from '@/components/utils/frontStageModeAuthority';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
-const C41_LENGTHS = [1222, 1449, 1672, 1904];
+const C41_LENGTHS = [1222, 1441, 1672, 1904];
 const MULTI_LENGTHS = [1094, 1222, 1441, 1711, 1842, 2230];
 
 const tv = (key, mm) => ({ tvPresetKey: key, tvWidthMm: mm, aspectRatio: '16:9' });
@@ -111,14 +111,14 @@ test('TEST 2  The screen OVERALL width (frame included) decides the cabinet', ()
 
 test('TEST 3  C4-1 installs the longest cabinet no more than 5 mm wider than the overall width', () => {
   // TV presets: overall width = tvWidthMm.
-  assert.equal(lengthFor('c4-1', tv('tv65', 1411)), 1222, '1411 → 1449 is 38 mm too wide; 1222 fits');
+  assert.equal(lengthFor('c4-1', tv('tv65', 1411)), 1222, '1411 → 1441 is 30 mm too wide; 1222 fits');
   assert.equal(lengthFor('c4-1', tv('tv77', 1711)), 1672, '1711 → 1672 fits (1904 is 193 mm too wide)');
   assert.equal(lengthFor('c4-1', tv('tv83', 1872)), 1672, '1872 → 1672 fits (1904 is 32 mm too wide)');
   assert.equal(lengthFor('c4-1', tv('tv100', 2230)), 1904, '2230 → 1904 fits');
 
   // Manual projection widths: overall = viewable + 2 × border (default 50 mm).
   assert.equal(lengthFor('c4-1', manualWh(1.222, 0.687)), 1222);
-  assert.equal(lengthFor('c4-1', manualWh(1.441, 0.8106)), 1449, '1441 viewable → 1541 overall → 1449 fits');
+  assert.equal(lengthFor('c4-1', manualWh(1.441, 0.8106)), 1441, '1441 viewable → 1541 overall → 1441 fits');
   assert.equal(lengthFor('c4-1', manualWh(1.672, 0.9405)), 1672);
   assert.equal(lengthFor('c4-1', manualWh(1.904, 1.071)), 1904);
   assert.equal(lengthFor('c4-1', widthInches(48.11)), 1222);
@@ -165,8 +165,9 @@ test('TEST 7  An explicitly recorded length is preserved, even a legacy one', ()
   // A current commercial length survives any screen change.
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1672 }, tv('tv65', 1411)), 1672);
   // A legacy length no longer in the commercial catalogue is STILL preserved:
-  // a saved project's historical selection is never silently resized.
-  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1441 }, manualWh(2.4, 1.35)), 1441);
+  // a saved project's historical selection is never silently resized. (1449 mm
+  // is the retired typo SKU; 1711 mm was never a C4-1 catalogue length.)
+  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1449 }, manualWh(2.4, 1.35)), 1449);
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1711 }, tv('tv65', 1411)), 1711);
   // HSPL preserves its recorded length too.
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'hspl-mono', cabinetLengthMm: 2000 }, tv('tv100', 2230)), 2000);
@@ -348,7 +349,7 @@ test('TEST 14 Model, orientation and variant are restored on reopen', () => {
   // A single-centre installation re-resolves to the same variant on reload.
   const screen1449 = manualWh(1.449, 0.815);
   assert.equal(lengthFor('c4-1', screen1449), lengthFor('c4-1', JSON.parse(JSON.stringify(screen1449))));
-  // An explicitly stored legacy length is restored verbatim.
+  // An explicitly stored length is restored verbatim.
   assert.equal(
     resolvePlacedCabinetLengthMm(JSON.parse(JSON.stringify({ model: 'c4-1', cabinetLengthMm: 1441 })), screen1449),
     1441,
