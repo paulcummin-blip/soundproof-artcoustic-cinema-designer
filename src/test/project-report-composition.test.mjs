@@ -223,7 +223,7 @@ test('TEST 4 — the Technical pages follow the Visual pages with the card block
   assertInOrder(page, ['orderedPages.map(', '<TechnicalReportDocument']);
   // The document's ONE saved P19 curve payload travels into the Technical pages,
   // so the Project Report's own P19 page and the Technical page draw one curve.
-  assert.match(page, /\{reportReady && orderedPages\.length > 0 && <TechnicalReportDocument p19Graph=\{p19Graph\} \/>\}/);
+  assert.match(page, /\{reportFullyReady && orderedPages\.length > 0 && <TechnicalReportDocument p19Graph=\{p19Graph\} \/>\}/);
 
   // …and the mounted document is the Technical Report's own component.
   const embed = read(TECHNICAL_DOCUMENT);
