@@ -171,6 +171,7 @@ export function buildDesignIntentRecord({
   geometryFingerprint = null,
   visualFingerprint = null,
   visualContext = null,
+  writingAuthorityVersion = null,
   providerIdentity = {},
   generatedBy = null,
   generatedAt = null,
