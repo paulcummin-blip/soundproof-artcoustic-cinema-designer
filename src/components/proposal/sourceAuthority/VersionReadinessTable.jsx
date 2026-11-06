@@ -30,6 +30,7 @@ import {
 } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import {
   SPEAKER_DESIGN_LABEL,
+  SPEAKER_DESIGN_GENERATE_LABEL,
   buildSpeakerDesignAction,
 } from '@/components/proposal/sourceAuthority/speakerDesignChecklistReadiness';
 import ProjectDocumentsStatus from './ProjectDocumentsStatus';
@@ -77,7 +78,13 @@ function ReadinessCell({ cell }) {
   );
 }
 
-function VersionRow({ row, projectId }) {
+function VersionRow({
+  row,
+  projectId,
+  onGenerateSpeakerDesign = null,
+  generatingVersionIds = null,
+  speakerDesignErrors = null,
+}) {
   const cell = row.project || row.cells?.project || null;
   const blocked = !!cell && !cell.current && !cell.checking;
   const action = blocked
@@ -93,6 +100,8 @@ function VersionRow({ row, projectId }) {
   const checklistAction = checklistBlocked && cell?.current
     ? buildSpeakerDesignAction({ state: checklist.state, projectId, versionId: row.versionId })
     : null;
+  const generating = !!(generatingVersionIds?.has(row.versionId));
+  const speakerDesignError = speakerDesignErrors?.[row.versionId] || null;
 
   return (
     <div className="py-4 border-b border-[#EAE8E3]" data-readiness-version={row.versionId}>
@@ -132,13 +141,38 @@ function VersionRow({ row, projectId }) {
         </div>
       )}
 
-      {checklistBlocked && checklist.reason && (
+      {checklistBlocked && checklist.reason && !checklistAction && (
         <p className="text-[12px] text-[#7A5A10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
           {checklist.reason}
         </p>
       )}
 
-      {checklistAction && (
+      {checklistBlocked && checklist.reason && checklistAction?.kind === 'generate' && (
+        <p className="text-[12px] text-[#7A5A10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
+          {checklist.reason}
+        </p>
+      )}
+
+      {speakerDesignError && checklistAction?.kind === 'generate' && (
+        <p className="text-[12px] text-[#7A2E10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
+          {speakerDesignError}
+        </p>
+      )}
+
+      {checklistAction?.kind === 'generate' && (
+        <button
+          type="button"
+          disabled={generating}
+          onClick={() => onGenerateSpeakerDesign?.(row.versionId)}
+          className="inline-flex items-center gap-1.5 mt-2 mr-2 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
+        >
+          {generating && <Loader2 className="w-3 h-3 animate-spin" />}
+          {generating ? 'Generating…' : checklistAction.label || SPEAKER_DESIGN_GENERATE_LABEL}
+        </button>
+      )}
+
+      {checklistAction?.kind === 'url' && (
         <a
           href={withProposalContext(checklistAction.url)}
           className="inline-block mt-2 mr-2 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
@@ -184,9 +218,21 @@ export default function VersionReadinessTable({
   className = '',
   onRetry = null,
   detailed = false,
+  onGenerateSpeakerDesign = null,
+  generatingVersionIds = null,
+  speakerDesignErrors = null,
 }) {
   if (!detailed) {
-    return <ProjectDocumentsStatus gate={gate} projectId={projectId} className={className} />;
+    return (
+      <ProjectDocumentsStatus
+        gate={gate}
+        projectId={projectId}
+        className={className}
+        onGenerateSpeakerDesign={onGenerateSpeakerDesign}
+        generatingVersionIds={generatingVersionIds}
+        speakerDesignErrors={speakerDesignErrors}
+      />
+    );
   }
   if (!gate?.available) return null;
 
@@ -206,7 +252,14 @@ export default function VersionReadinessTable({
       )}
 
       {(gate.rows || []).map((row) => (
-        <VersionRow key={row.versionId} row={row} projectId={projectId} />
+        <VersionRow
+          key={row.versionId}
+          row={row}
+          projectId={projectId}
+          onGenerateSpeakerDesign={onGenerateSpeakerDesign}
+          generatingVersionIds={generatingVersionIds}
+          speakerDesignErrors={speakerDesignErrors}
+        />
       ))}
 
       {!gate.checking && !gate.ready && gate.message && (

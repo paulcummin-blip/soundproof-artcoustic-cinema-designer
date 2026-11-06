@@ -28,6 +28,9 @@ export default function VersionSelectStep({
   versions = [],
   collisions = [],
   loading = false,
+  onGenerateSpeakerDesign = null,
+  generatingVersionIds = null,
+  speakerDesignErrors = null,
 }) {
   const typeDef = getProposalType(proposalType);
   const isComparison = proposalType === 'comparison';
@@ -119,7 +122,13 @@ export default function VersionSelectStep({
 
       {/* Per-version document status — the proposal is built from current sources
           only, and this card is where the designer sees it. */}
-      <VersionReadinessTable gate={readiness} projectId={projectId} />
+      <VersionReadinessTable
+        gate={readiness}
+        projectId={projectId}
+        onGenerateSpeakerDesign={onGenerateSpeakerDesign}
+        generatingVersionIds={generatingVersionIds}
+        speakerDesignErrors={speakerDesignErrors}
+      />
     </div>
   );
 }

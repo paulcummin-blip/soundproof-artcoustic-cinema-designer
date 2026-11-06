@@ -165,7 +165,7 @@ export function useSpeakerDesignGeneration(projectId) {
     }
   }, [projectId, generatingSet]);
 
-  return { generate, isGenerating, getError, clearError };
+  return { generate, isGenerating, getError, clearError, errors: errorMap };
 }
 
 export default useSpeakerDesignGeneration;
