@@ -56,6 +56,11 @@ import { validateCanonicalBassResult } from "./canonicalBassResult";
 import { captureBassIdentity, BASS_IDENTITY_STAGE } from "./bassIdentityDiagnostics";
 
 
+// Synchronous release/cancel guard for advisory preview admission.
+function isRoomPreviewDragActive() {
+  return !!(getSubDragLive().active || getSeatDragLive().active || getRspDragLive().active);
+}
+
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
 export default function BassBackgroundAnalysisOwner({ children, scopeId = "free", versionId = "free", engineeringPublication = null }) {
@@ -453,12 +458,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // retained as a reference layer.
   const roomPreviewExclusive = roomPreviewActive && !completedContractMatches;
 
-  // The live hook requires analysisRequestFingerprint === its own internally
-  // computed geometryFingerprint (prefix "nrt"). The authoritative geometry
-  // fingerprint (prefix "geo") differs, so we feed the hook's own computed
-  // fingerprint back on the next render via state. This is a one-render delay
-  // which is negligible given the hook's 50 ms debounce.
-  const [roomPreviewFp, setRoomPreviewFp] = useState(null);
+  // Bind automatic preview to this render's normalized geometry. The canonical
+  // design key stays stable through transient moves, but changes on commit or
+  // any engineering/version change, ending intermediate-frame eligibility.
+  const previewDragActive = !!(subDragLive.active || seatDragLive.active || rspDragLive.active);
 
   const normalizedLive = useNormalizedRoomTransferLive({
     roomDims,
@@ -467,16 +470,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     subsForSimulation: previewSources,
     physicsOptions: normalizedPhysicsOptions,
     analysisRequestId: roomPreviewActive ? "room-preview" : null,
-    analysisRequestFingerprint: roomPreviewActive ? roomPreviewFp : null,
+    followCurrentGeometry: true,
+    interactionActive: previewDragActive,
+    previewContextKey: JSON.stringify([scopeId, versionId, calibrationFingerprint]),
+    isInteractionActive: isRoomPreviewDragActive,
   });
-
-  useEffect(() => {
-    if (roomPreviewActive && normalizedLive.geometryFingerprint && roomPreviewFp !== normalizedLive.geometryFingerprint) {
-      setRoomPreviewFp(normalizedLive.geometryFingerprint);
-    } else if (!roomPreviewActive && roomPreviewFp !== null) {
-      setRoomPreviewFp(null);
-    }
-  }, [roomPreviewActive, normalizedLive.geometryFingerprint, roomPreviewFp]);
 
   const sharedAuthoritative = useMemo(() => ({
     ...authoritative,
