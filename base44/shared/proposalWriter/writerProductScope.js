@@ -301,6 +301,33 @@ function attributedOptions({ span, position, options, everyOption }) {
   }
   if (hits.length === 0) return /\bboth\b/i.test(span.text) ? everyOption : null;
   const local = position - span.start;
+
+  // A "from <old> to <new>" change of direction: a mention that sits in the
+  // new-state clause (after the "to" that follows a "from") is attributed to
+  // the option named in that clause — the nearest alias at or after the mention
+  // in the new clause — not the preceding option the design is moving away from.
+  // "from the C4-1 ... in Original Design to Q4-3 speakers in 120\" Projector"
+  // names Q4-3 for 120" Projector, not for Original Design. The "to" only marks
+  // the new direction when the sentence also states a "from", so an ordinary
+  // "tuned to Level 4" is unchanged. A mention whose new clause names no option
+  // falls back to the nearest-preceding rule below.
+  const fromAt = /\bfrom\b/i.exec(span.text);
+  if (fromAt) {
+    const toPattern = /\bto\b/gi;
+    let m = toPattern.exec(span.text);
+    let changeTo = -1;
+    while (m) {
+      if (m.index > fromAt.index) { changeTo = m.index + m[0].length; break; }
+      m = toPattern.exec(span.text);
+    }
+    if (changeTo !== -1 && local >= changeTo) {
+      const newClause = hits.filter((hit) => hit.at >= changeTo);
+      const following = newClause.filter((hit) => hit.at >= local).sort((a, b) => a.at - b.at)[0]
+        || newClause.sort((a, b) => Math.abs(a.at - local) - Math.abs(b.at - local))[0];
+      if (following) return new Set([following.id]);
+    }
+  }
+
   const preceding = hits.filter((hit) => hit.at <= local).sort((a, b) => b.at - a.at)[0];
   const chosen = preceding || hits.sort((a, b) => a.at - b.at)[0];
   return new Set([chosen.id]);

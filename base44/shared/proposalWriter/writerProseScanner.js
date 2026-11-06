@@ -24,6 +24,59 @@ import { emDashAt, genericClaimPhrase, stockConnective } from './writerNaturalWr
 import { timbreInterGroupMatchIssue } from './writerTimbreMetricAuthority.js';
 import { claimFigureTokens } from './writerClaimFigures.js';
 
+/**
+ * Whether a clause that tripped a no-claimed-change block is in fact a neutral
+ * factual EQUIPMENT change the section cites, not the graded performance claim
+ * the block protects.
+ *
+ * A graded area such as P17 ("Surround and overhead timbre") shares its
+ * distinctive heads ("overhead", "surround") with the equipment areas
+ * ("Overheads", "Surrounds"). A clause that states an equipment change in that
+ * shared family — "six overhead speakers replace the overhead pair" — is a
+ * factual equipment change, grounded by a cited factual_change claim for the
+ * equipment area, and is NOT a claim about P17 timbre. It is exempted only when
+ * it names no word unique to the graded area's performance label (e.g. "timbre"),
+ * so a clause that does name the graded performance ("improve the overhead
+ * timbre") is still refused exactly as before.
+ *
+ * Pure: reads the pack's areas, the cited claims and the clause text only.
+ */
+function isFactualEquipmentChange(clause, { pack = null, citedClaims = [], blockPatterns = null, block = null, keyword = null } = {}) {
+  if (typeof clause !== 'string' || clause.length === 0) return false;
+  if (!keyword || typeof blockPatterns !== 'function' || !block) return false;
+  const areas = Array.isArray(pack?.areas) ? pack.areas : [];
+  if (areas.length === 0) return false;
+
+  // Equipment areas whose distinctive heads include the matched keyword.
+  const equipmentAreas = areas.filter((area) => area?.kind === 'equipment'
+    && blockPatterns({ area: area.area, scope: area.area }, pack).heads.includes(keyword));
+  if (equipmentAreas.length === 0) return false;
+
+  // A cited factual change for one of those equipment areas grounds the clause.
+  const equipmentAreaKeys = new Set(equipmentAreas.map((area) => area.area));
+  const hasFactual = Array.isArray(citedClaims) && citedClaims.some((claim) => claim?.kind === 'factual_change'
+    && equipmentAreaKeys.has(claim?.area));
+  if (!hasFactual) return false;
+
+  // The graded area whose no-claimed-change block fired (the block's own area).
+  const gradedKey = block?.area || block?.scope || null;
+  const gradedArea = areas.find((area) => area?.area === gradedKey && area?.kind === 'graded');
+  if (!gradedArea) return false;
+
+  // The graded area's performance-specific heads are those it does not share with
+  // any equipment area. A clause that names one of them ("timbre") is a graded
+  // performance claim, not an equipment change — the block still fires.
+  const equipmentHeads = new Set(areas
+    .filter((area) => area?.kind === 'equipment')
+    .flatMap((area) => blockPatterns({ area: area.area, scope: area.area }, pack).heads));
+  const gradedHeads = blockPatterns({ area: gradedArea.area, scope: gradedArea.area }, pack).heads;
+  const performanceWords = gradedHeads.filter((head) => !equipmentHeads.has(head));
+  if (performanceWords.length === 0) return false;
+
+  const clauseText = clause.toLowerCase();
+  return !performanceWords.some((head) => new RegExp(`\\b${head}\\w*\\b`, 'i').test(clauseText));
+}
+
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
   const found = [];
   const citedKinds = Array.isArray(claimKinds) ? claimKinds : [];
@@ -121,6 +174,16 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
         const match = claimsArea(claimed, patterns);
         if (!match || isDenied(claimed, match.at)) continue;
         if (CHANNEL_FAMILY.test(match.keyword) && !CHANGE_SIGNAL.test(claimed)) continue;
+        // A no-claimed-change block on a graded area (e.g. P17 surround/overhead
+        // timbre) must not fire on a neutral factual equipment change. When the
+        // matched head is shared with an equipment area whose factual change the
+        // section cites, and the clause names no word unique to the graded area's
+        // performance label, the clause is an equipment change — not the graded
+        // performance claim the block protects. "Six overhead speakers replace
+        // the overhead pair" is an equipment change; "improve the overhead timbre"
+        // names the graded performance and is still refused.
+        if (block?.reason === 'no_claimed_change'
+          && isFactualEquipmentChange(claimed, { pack: input?.evidence_pack, citedClaims, blockPatterns, block, keyword: match.keyword })) continue;
         // A clause explaining why an approach is used claims no change in any
         // area, so it makes no blocked claim: see writerPrincipleRegister.js. This
         // is a SEMANTIC, clause-scoped distinction, never a blanket exemption. It
