@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useRef } from "react";
+import React, { useMemo, useEffect, useLayoutEffect, useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -493,11 +493,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     selectedSeatIds,
   });
 
+  const previewListenerSelection = useMemo(() => isAllSeatsSelected
+    ? { mode: "all" }
+    : previewSeatId ? { mode: "seat", seatId: previewSeatId } : { mode: "rsp" },
+  [isAllSeatsSelected, previewSeatId]);
+  const onRoomPreviewSelection = sharedBassResults?.onRoomPreviewSelection;
+  useLayoutEffect(() => {
+    onRoomPreviewSelection?.(previewListenerSelection);
+  }, [onRoomPreviewSelection, previewListenerSelection]);
+  // A scoped response may never stand in for another graph selection. Full
+  // settled results remain reusable because they contain every listener.
+  const scopedPreviewResult = placementPreviewResult?.listenerSelection &&
+    JSON.stringify(placementPreviewResult.listenerSelection) !== JSON.stringify(previewListenerSelection)
+    ? null : placementPreviewResult;
+
   const previewCurve = useMemo(() => resolvePreviewCurve({
-    previewResult: placementPreviewResult,
+    previewResult: scopedPreviewResult,
     previewSeatId,
     seatingPositions,
-  }), [placementPreviewResult, previewSeatId, seatingPositions]);
+  }), [scopedPreviewResult, previewSeatId, seatingPositions]);
 
   // A seat is focused but the preview carries no curve for it — the graph stays
   // on the RSP preview and says so.
@@ -522,7 +536,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
   const allSeatsPreviewSeries = useMemo(() => {
     if (!roomPreviewActive || !isAllSeatsSelected) return null;
     const series = buildAllSeatsPreviewSeries({
-      previewResult: placementPreviewResult,
+      previewResult: scopedPreviewResult,
       orderedSeats,
       seatingPositions,
       getSeatColor,
@@ -533,7 +547,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     // processing only — no cross-curve normalisation, no averaging together.
     const smoothed = series.map((s) => ({ ...s, data: applyRoomPreviewDisplaySmoothing(s.data) }));
     return smoothed.length > 0 ? smoothed : null;
-  }, [roomPreviewActive, isAllSeatsSelected, placementPreviewResult, orderedSeats, seatingPositions]);
+  }, [roomPreviewActive, isAllSeatsSelected, scopedPreviewResult, orderedSeats, seatingPositions]);
 
   const placementPreviewGraphSeries = useMemo(() => {
     if (!roomPreviewActive) return null;
