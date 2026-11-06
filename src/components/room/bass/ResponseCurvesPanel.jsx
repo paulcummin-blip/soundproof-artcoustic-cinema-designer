@@ -47,8 +47,6 @@ export default function ResponseCurvesPanel({
     fontFamily: FONT,
   });
 
-  const dotColor = roomStatusTone === "preview" ? "#B45309" : "#16A34A";
-
   return (
     <div style={{ fontFamily: FONT }}>
       {/* Segmented control — Room | Calculated */}
@@ -84,22 +82,7 @@ export default function ResponseCurvesPanel({
       {/* Mode content */}
       {mode === "room" ? (
         <div style={{ marginTop: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600 }}>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: dotColor,
-                display: "inline-block",
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ color: dotColor }}>{roomStatusLabel}</span>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <BassSmoothingControl value={smoothingMode} onChange={onSmoothingModeChange} />
-          </div>
+          <BassSmoothingControl value={smoothingMode} onChange={onSmoothingModeChange} />
         </div>
       ) : calculatedAvailable ? (
         <div style={{ marginTop: 10 }}>

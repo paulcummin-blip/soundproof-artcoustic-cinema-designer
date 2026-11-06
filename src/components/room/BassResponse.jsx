@@ -556,11 +556,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     ? roomOnlySeries
     : visibleMultiSeries;
 
-  const roomStatusLabel = roomPreviewExclusive
-    ? "Preview only — recalculate for RP22 results"
-    : "Live room response";
-  const roomStatusTone = roomPreviewExclusive ? "preview" : "live";
-
   // During preview only, an explicit pill choice must win over a seat focused
   // earlier from a P20 pill, so the preview follows what the designer clicked.
   // Outside preview the existing handlers are used untouched.
@@ -980,8 +975,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               smoothingMode={bassSmoothingMode}
               onSmoothingModeChange={setBassSmoothingMode}
               markers={showCalculatedOverlays ? rp22GraphMarkers : null}
-              roomStatusLabel={roomStatusLabel}
-              roomStatusTone={roomStatusTone}
             />
           </>
         ) : (
@@ -1010,8 +1003,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               smoothingMode={bassSmoothingMode}
               onSmoothingModeChange={setBassSmoothingMode}
               markers={showCalculatedOverlays ? rp22GraphMarkers : null}
-              roomStatusLabel={roomStatusLabel}
-              roomStatusTone={roomStatusTone}
             />
           </>
         )}
