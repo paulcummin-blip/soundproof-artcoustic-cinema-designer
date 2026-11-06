@@ -1098,9 +1098,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
             </div>
           )}
         </div>
-        {!engineeringDetailCollapsed && !roomPreviewExclusive && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
+        {!engineeringDetailCollapsed && showCalculatedOverlays && <ProtectedNullWarningSummary annotations={protectedNullAnnotations} />}
 
-        {!engineeringDetailCollapsed && !roomPreviewExclusive && hasCurrentBassResult && (
+        {!engineeringDetailCollapsed && showCalculatedOverlays && hasCurrentBassResult && (
           <StorytellerExplanation focus={parameterFocus} />
         )}
 
