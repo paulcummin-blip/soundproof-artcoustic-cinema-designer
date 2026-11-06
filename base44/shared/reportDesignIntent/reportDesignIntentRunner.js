@@ -51,6 +51,7 @@ import {
   DESIGN_INTENT_STATUS,
   buildDesignIntentRecord,
 } from './reportDesignIntentRecord.js';
+import { WRITING_AUTHORITY_VERSION } from '../writingAuthorityVersion.js';
 
 /** Why a Design Intent attempt produced no narrative. */
 export const DESIGN_INTENT_REFUSAL = Object.freeze({
@@ -97,6 +98,7 @@ function refusal(code, detail) {
       status: code === DESIGN_INTENT_REFUSAL.PROVIDER_FAILED
         ? DESIGN_INTENT_STATUS.FAILED
         : DESIGN_INTENT_STATUS.REJECTED,
+      writingAuthorityVersion: WRITING_AUTHORITY_VERSION,
       rejection: { code, detail: detail || null },
     }),
   };
@@ -351,6 +353,7 @@ export async function runReportDesignIntent({
         geometryFingerprint: geometryFingerprintOf(geometry),
         visualFingerprint: visualFingerprintOf(visual),
         visualContext: visualContextIdentity(visual),
+        writingAuthorityVersion: WRITING_AUTHORITY_VERSION,
         providerIdentity: {
           provider: provider.provider ?? null,
           model: provider.model ?? null,
@@ -434,6 +437,7 @@ export async function runReportDesignIntent({
         geometryFingerprint: geometryFingerprintOf(geometry),
         visualFingerprint: visualFingerprintOf(visual),
         visualContext: visualContextIdentity(visual),
+        writingAuthorityVersion: WRITING_AUTHORITY_VERSION,
         providerIdentity,
         generatedAt: now,
         generatedBy: user?.full_name || user?.email || null,
@@ -458,6 +462,7 @@ export async function runReportDesignIntent({
     // current once the designer has replaced them.
     visualFingerprint: visualFingerprintOf(visual),
     visualContext: visualContextIdentity(visual),
+    writingAuthorityVersion: WRITING_AUTHORITY_VERSION,
     providerIdentity,
     generatedAt: now,
     generatedBy: user?.full_name || user?.email || null,
