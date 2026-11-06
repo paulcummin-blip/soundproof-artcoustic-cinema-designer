@@ -25,6 +25,7 @@
 
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
 import { normaliseDesignContext } from './writerDesignContext.js';
+import { buildOptionEvidenceSummary } from './writerOptionEvidenceSummary.js';
 import { buildEvidenceClassification } from './writerEvidenceClasses.js';
 import { normaliseOptionGuidance } from './writerOptionGuidance.js';
 import { requiredMultiCabinetChannels } from './writerMultiCabinetRules.js';
@@ -234,6 +235,11 @@ export function buildWriterInput({
       mode,
       options,
       areas: (Array.isArray(pack.areas) ? pack.areas : []).map((entry) => ({ ...entry })),
+      // A clearly separated, easily readable summary of each option's own
+      // products, RP22 parameter values and levels, and the exact claim IDs that
+      // belong to it, so the writer attributes a product or a result only to the
+      // version it belongs to. Derived from the pack; not a second authority.
+      option_evidence_summary: buildOptionEvidenceSummary(pack),
     },
     // The frozen pack itself: the writer's only source of facts, carried verbatim.
     evidence_pack: pack,

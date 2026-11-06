@@ -133,7 +133,17 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // register at its best. Every principle the standard stated is unchanged. No
 // section identity, word limit, figure, level, product, claim-grounding or
 // validation rule changed.
-const CURRENT = 'proposal-writer-prompt-27';
+// Generation 28 is the comparison-attribution refinement: the writer is given a
+// clearly separated per-option evidence summary (products, RP22 parameter values
+// and levels, and the exact own/shared claim IDs that belong to each option) and
+// is told to name each option only by its saved version name, attribute a product
+// or a result only to the option whose summary lists it, cite only the specific
+// option-and-parameter claim IDs for each substantive sentence, keep P16/P17
+// tonal claims grounded in the option's own tonal evidence (never bass claims),
+// and keep the P12 screen-stage difference distinct from P13/P16 using "screen
+// stage" (two words) rather than a hyphenated form. No section identity, word
+// limit, figure, level, product, claim-grounding or validation rule changed.
+const CURRENT = 'proposal-writer-prompt-28';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

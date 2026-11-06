@@ -16,12 +16,12 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': 'f9fd08165290f48fac7be5ce37de2571e43756fa4ebd61f586e7f49d12688924',
+  'base44/shared/proposalWriter/writerContractSchema.js': 'b8b25447cdc2007e3f84ddb163d41621fbb7b49b5b00504ca052c9df0dbc6b0f',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '73517b105f2f58ea440dddb88c38883535426424296a3f2ffaca679629edcbf9',
+  'base44/shared/proposalWriter/writerInputBuilder.js': '47377f31a9494f70f0deff1da3bc9f0a5124cbabd1c50a196650d4a61c31ea63',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
@@ -45,9 +45,10 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '8a09fb09f34fc8c518bd328072a217c20f30ccf23c1d465ab08add3dd2608735',
+  'base44/shared/proposalWriter/writerOptionEvidenceSummary.js': '7b503c07645b7437940de705ec809f4da5ddbccaf0c6d5b7212c516589c79524',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '9875d979b25948f9e6fba33a63cfb86cdaa22aaca444b3cd5ce4d0693de4411b',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
-  'base44/shared/proposalWriter/writerDesignContext.js': 'c52f116231bd4f3601f0f963125d7c5243e8723a2680ba2e07a66bf53935de74',
+  'base44/shared/proposalWriter/writerDesignContext.js': '66509c693e58db98774ce8abd345de2c4d3199f2a2e67c5f42d0d3fe835ab70f',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
   'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',

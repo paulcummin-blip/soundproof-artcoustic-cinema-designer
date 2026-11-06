@@ -229,7 +229,7 @@ export const WRITER_CONTRACT_VERSION = 2;
 // identity, word limit, claim ground, figure, level, product or validation rule
 // moved, so a draft filed under an earlier generation is still read against the
 // agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-27';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-28';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
