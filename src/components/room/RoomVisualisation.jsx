@@ -69,6 +69,7 @@ import { finishPointerDrag, isDragPointer, primaryButtonHeld, releaseDragCapture
 import { isSeatHudDismissalPointerDown } from "@/components/room/rv/utils/seatHudSelectionAuthority";
 import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
+import { clientToRoom } from "@/components/room/rv/utils/rvPointerToRoom";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
@@ -2212,21 +2213,19 @@ const byId = useEntitiesById({
   // Compute a clamped Y (1 cm resolution, room-bounded) from a pointer event.
   const _computeMlpYFromPointer = useCallback((e) => {
     if (!svgRef.current) return null;
-    const svgElement = svgRef.current;
-    const point = svgElement.createSVGPoint();
-    point.x = e.clientX;
-    point.y = e.clientY;
-    const ctm = svgElement.getScreenCTM();
-    if (!ctm) return null;
-    const svgPoint = point.matrixTransform(ctm.inverse());
-    const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+    // Placement must undo the same zoom/pan transform as the live move.
+    const cursorRoom = clientToRoom({
+      svgElement: svgRef.current, clientX: e.clientX, clientY: e.clientY,
+      roomRect, scale, viewOffsetPx,
+    });
+    if (!cursorRoom) return null;
     const roomLen = Number(lengthM) || 6.0;
     const MARGIN = 0.20;
     const rawY = Number(cursorRoom?.y);
     if (!Number.isFinite(rawY)) return null;
     const clampedY = Math.max(MARGIN, Math.min(roomLen - MARGIN, rawY));
     return Math.round(clampedY * 100) / 100;
-  }, [svgRef, canvasToRoom, lengthM]);
+  }, [svgRef, roomRect, scale, viewOffsetPx, lengthM]);
 
   // Single click to place: commit floating Y, switch to manual_position, exit
   // GRABBED.  The click location determines the final Y.
