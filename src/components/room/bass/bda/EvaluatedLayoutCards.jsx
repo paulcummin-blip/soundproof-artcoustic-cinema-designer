@@ -14,10 +14,12 @@
 // Selecting an option is a two-step approval: click to select, then click
 // "Apply" to confirm. Apply uses the existing quantity-aware Apply authority
 // (quantityPlacementApplyAuthority) so 1→2, 2→4 and 4→1 transitions preserve
-// models, coordinates, orientations and heights, keep a snapshot for exact
-// Undo, and are fingerprint-protected against stale candidates. The
-// authoritative recalculation is triggered by the caller after Apply (the
-// existing bass-analysis lifecycle).
+// models, coordinates, orientations and heights, and are fingerprint-protected
+// against stale candidates. The pre-apply checkpoint is captured by the
+// caller's checkpointed commit wrapper, so the existing RestorePreviousDesignBar
+// owns exact Undo for every quantity transition. This card holds no second,
+// temporary Undo mechanism. The authoritative recalculation is triggered by the
+// existing bass-analysis lifecycle after Apply.
 //
 // No grades, no lengthy explanations, no extra controls. Compact and visually
 // consistent with Sound Proof.
@@ -25,10 +27,7 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  buildInstanceSnapshot,
-  restoreInstanceSnapshot,
   buildQuantityApplyInstances,
-  buildQuantityApplyProvenance,
   resolveQuantityApplyState,
 } from "@/components/room/bass/optimiserPlan/quantityPlacementApplyAuthority";
 import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecommendationUtils";
@@ -223,13 +222,9 @@ export default function EvaluatedLayoutCards({
   rearSubsCfg,
   commitInstances,
   currentDesignFingerprint,
-  onApplied,
-  onUndoAvailable,
-  undoAvailable,
 }) {
   const [selectedQuantity, setSelectedQuantity] = useState(null);
   const [applyError, setApplyError] = useState(null);
-  const [snapshot, setSnapshot] = useState(null);
 
   const currentSources = useMemo(() => currentSourcesFrom(subwooferInstances), [subwooferInstances]);
 
@@ -268,7 +263,6 @@ export default function EvaluatedLayoutCards({
       setApplyError(STALE_OR_BLOCKED[applyState.blockReason] || "This layout can no longer be applied.");
       return;
     }
-    const previous = buildInstanceSnapshot(subwooferInstances);
     const result = buildQuantityApplyInstances({
       coordinates: coords,
       quantity: option.quantity,
@@ -281,36 +275,16 @@ export default function EvaluatedLayoutCards({
       frontCoords: front,
       rearCoords: rear,
     });
-    setSnapshot(previous);
+    // The pre-apply checkpoint is captured by the caller's
+    // checkpointedCommitInstances (passed in as commitInstances), so the
+    // existing RestorePreviousDesignBar owns exact Undo for the 1→2, 2→4 and
+    // 4→1 quantity transitions. This card holds no second, temporary snapshot.
     commitInstances(result.instances, {
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
     });
-    const provenance = buildQuantityApplyProvenance({
-      snapshot: previous,
-      candidateId: option.finalistId,
-      quantity: option.quantity,
-      coordinates: coords,
-      candidateFingerprint: option.fingerprint,
-    });
-    onApplied?.(provenance);
     setSelectedQuantity(null);
   };
-
-  const handleUndo = () => {
-    if (!snapshot || typeof commitInstances !== "function") return;
-    commitInstances(restoreInstanceSnapshot(snapshot), {
-      front: { placementMode: "manual", isManual: true },
-      rear: { placementMode: "manual", isManual: true },
-    });
-    setSnapshot(null);
-    setApplyError(null);
-    onUndoAvailable?.(false);
-  };
-
-  React.useEffect(() => {
-    onUndoAvailable?.(Boolean(snapshot));
-  }, [snapshot, onUndoAvailable]);
 
   const evaluating = status === "evaluating";
   const waiting = status === "waiting";
@@ -373,12 +347,6 @@ export default function EvaluatedLayoutCards({
           )}
           {!evaluating && options.length === 0 && !waiting && (
             <p className="text-[11px] text-[#625143]">No evaluated layouts available. Manual placement remains available.</p>
-          )}
-          {undoAvailable && (
-            <button type="button" onClick={handleUndo}
-              className="w-full rounded-md border border-[#D9D5CE] px-3 py-2 text-[11px] font-medium text-[#1B1A1A] hover:bg-[#F3F1EC]">
-              Undo applied layout
-            </button>
           )}
           {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}
         </div>

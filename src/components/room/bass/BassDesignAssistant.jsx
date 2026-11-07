@@ -199,8 +199,6 @@ export default function BassDesignAssistant({
     appState,
     amplifierPowerPerSubW,
   });
-  const [evaluatedUndoAvailable, setEvaluatedUndoAvailable] = useState(false);
-
   // Stages 2–3 are visible only when the layout has been chosen
   const layoutChosen = hasSubwoofers && !showLayoutCards;
 
@@ -274,8 +272,6 @@ export default function BassDesignAssistant({
           rearSubsCfg={rearSubsCfg}
           commitInstances={wrappedCommitInstances}
           currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
-          onUndoAvailable={setEvaluatedUndoAvailable}
-          undoAvailable={evaluatedUndoAvailable}
         />
       )}
       {showLayoutCards && evaluatedRecommendations.status === "complete"
@@ -301,8 +297,6 @@ export default function BassDesignAssistant({
           rearSubsCfg={rearSubsCfg}
           commitInstances={wrappedCommitInstances}
           currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
-          onUndoAvailable={setEvaluatedUndoAvailable}
-          undoAvailable={evaluatedUndoAvailable}
         />
       )}
       {showLayoutCards
