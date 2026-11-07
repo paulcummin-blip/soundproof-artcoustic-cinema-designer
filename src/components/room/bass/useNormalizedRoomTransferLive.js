@@ -65,6 +65,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { classifyRoomPreviewResponse } from "./roomPreviewDisplayPolicy";
+import { canUseExactRoomPreviewBatch } from "./exactRoomPreviewBatch";
 import { computeNormalizedTransferFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { buildPreviewPhysicsOptions } from "@/components/room/bass/normalizedPhysicsOptionsBuilder";
 import { canonicalizeNormalizedRoomInputs } from "@/components/room/bass/normalizedRoomInputAdapters";
@@ -100,8 +101,13 @@ export function useNormalizedRoomTransferLive({ roomDims, rspPosition, seatingPo
     [roomDims, rspPosition, seatingPositions]
   );
   const previewSelectionKey = JSON.stringify(previewListenerSelection);
-  const previewPointsPerOctave = ["rsp", "seat"].includes(previewListenerSelection?.mode)
-    ? SINGLE_LISTENER_POINTS_PER_OCTAVE : PREVIEW_POINTS_PER_OCTAVE;
+  // Exact batch reuse makes the full settled grid practical for All Seats.
+  // Unsupported physics retain the previous preview path and density.
+  const previewPointsPerOctave = previewListenerSelection?.mode === "all" &&
+    canUseExactRoomPreviewBatch(physicsOptions, subsForSimulation)
+    ? 96
+    : ["rsp", "seat"].includes(previewListenerSelection?.mode)
+      ? SINGLE_LISTENER_POINTS_PER_OCTAVE : PREVIEW_POINTS_PER_OCTAVE;
   const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
