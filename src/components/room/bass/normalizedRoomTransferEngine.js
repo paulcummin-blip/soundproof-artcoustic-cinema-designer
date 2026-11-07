@@ -273,6 +273,18 @@ export function computeNormalizedRoomTransfer({
 
   listeners.forEach((listener) => {
     const listenerKey = listener.__listenerKey;
+    if (batchTransfers?.summed) {
+      // All Seats requires the physical sum only, not individual-source RSP
+      // evidence. Publish this complete listener set atomically below.
+      const response = batchTransfers.byListener.get(listenerKey).get(0);
+      seatResponses[listenerKey] = {
+        freqsHz: response.freqsHz,
+        splDb: response.complexPressure.map(cp => complexToDb(cp.re, cp.im)),
+        isRsp: false, originalId: listener.__originalId,
+        seatIndex: Number.isFinite(listener.__seatIndex) ? listener.__seatIndex : null,
+      };
+      return;
+    }
     let sumRe = null;
     let sumIm = null;
     let freqsHz = null;
@@ -283,7 +295,7 @@ export function computeNormalizedRoomTransfer({
 
       const listenerZ = Number.isFinite(Number(listener.z)) ? Number(listener.z) : 1.2;
 
-      const rewResult = batchTransfers?.get(listenerKey)?.get(sourceIndex) ?? simulateBassResponseRewCore(
+      const rewResult = batchTransfers?.byListener.get(listenerKey)?.get(sourceIndex) ?? simulateBassResponseRewCore(
         {
           widthM: roomDims.widthM,
           lengthM: roomDims.lengthM,
