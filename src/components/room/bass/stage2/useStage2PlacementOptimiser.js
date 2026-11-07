@@ -34,6 +34,7 @@ import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwoo
 import { STAGE2_START_DELAY_MS } from "./stage2Constants";
 import { resolveQuantityOrder } from "./stage2QuantityOrder";
 import { useIsDragActive } from "@/components/state/userInteractionStore";
+import { normaliseRecommendationScope } from "../stage1/stage1RecommendationScope";
 
 function computeTransitionHz(roomDims) {
   const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
@@ -85,8 +86,14 @@ export function useStage2PlacementOptimiser({
   enabled = true,
   requestId = null,
   selectedQuantityOnly = false,
+  recommendationQuantities = null,
 }) {
   const scopeQuantity = selectedQuantityOnly && [1, 2, 3, 4].includes(currentQuantity) ? currentQuantity : null;
+  // A cross-quantity recommendation run evaluates 1, 2 and 4 together. It is
+  // distinct from the single-quantity scope and from the full search (which
+  // includes 3). 3-sub results are excluded from this workflow but remain
+  // fully supported by the existing Stage 1/Stage 2 search elsewhere.
+  const recScope = normaliseRecommendationScope(recommendationQuantities);
   const state = useSyncExternalStore(
     subscribeStage2,
     () => getStage2State(projectId, versionId),
@@ -182,6 +189,8 @@ export function useStage2PlacementOptimiser({
   // p18TargetBasis is NOT included — it is a presentation-only grading view.
   // A selected-quantity run carries a scoped identity so its partial result can
   // never be mistaken for the all-quantity study of the same design.
+  // A cross-quantity recommendation run carries its own scoped identity
+  // (1,2,4) so its partial result is never mistaken for the full study.
   const fingerprint = useMemo(() => {
     if (!stage1Fingerprint || !stage1Finalists || !selectedSubModel || !p14Target) return null;
     const base = computeStage2Fingerprint({
@@ -194,8 +203,10 @@ export function useStage2PlacementOptimiser({
       subwooferBottomHeightM,
       amplifierPowerPerSubW: resolvedAmplifierPowerPerSubW,
     });
-    return scopeQuantity ? `${base}|sel:${scopeQuantity}` : base;
-  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW, scopeQuantity]);
+    if (scopeQuantity) return `${base}|sel:${scopeQuantity}`;
+    if (recScope) return `${base}|rec:${recScope.join(",")}`;
+    return base;
+  }, [stage1Fingerprint, stage1Finalists, selectedSubModel, p14Target, subwooferBottomHeightM, resolvedAmplifierPowerPerSubW, scopeQuantity, recScope]);
 
   // Hydration on mount / project change
   useEffect(() => {
@@ -320,7 +331,10 @@ export function useStage2PlacementOptimiser({
       four_sub_result: { finalists: stage1Finalists?.[4] || [] },
     });
 
-    const quantityOrder = resolveQuantityOrder(currentQuantity);
+    // A cross-quantity recommendation run evaluates its quantity set (1, 2, 4)
+    // directly, in ascending order. This replaces the default order (which
+    // includes 3) without affecting any existing caller.
+    const quantityOrder = recScope || resolveQuantityOrder(currentQuantity);
 
     const seatPriorityMap = buildSeatPriorityMap(seatingPositions);
 
@@ -353,7 +367,7 @@ export function useStage2PlacementOptimiser({
       delay: STAGE2_START_DELAY_MS,
       ownerRequestId: requestId,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return state;
 }

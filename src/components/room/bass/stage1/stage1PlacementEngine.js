@@ -299,6 +299,7 @@ export async function runFullStage1Search({
   physicsOptions,
   generationId,
   scopeQuantity = null,
+  recommendationQuantities = null,
   pool,
   stage1Concurrency = STAGE1_CONCURRENCY,
 }) {
@@ -308,7 +309,16 @@ export async function runFullStage1Search({
   // quantities are searched in is unchanged.
   // A selected-quantity run searches only the installed quantity (all its families
   // and candidates still run). Compare passes no scope and searches every quantity.
-  const quantities = [1, 2, 3, 4].includes(scopeQuantity) ? [scopeQuantity] : [2, 4, 1, 3];
+  // A cross-quantity recommendation run searches exactly its quantity set
+  // (1, 2, 4 — 3 is excluded from this workflow but remains supported elsewhere).
+  let quantities;
+  if (Array.isArray(recommendationQuantities) && recommendationQuantities.length > 0) {
+    quantities = recommendationQuantities.slice().sort((a, b) => a - b);
+  } else if ([1, 2, 3, 4].includes(scopeQuantity)) {
+    quantities = [scopeQuantity];
+  } else {
+    quantities = [2, 4, 1, 3];
+  }
   const quantityResultKeys = {
     1: "one_sub_result",
     2: "two_sub_result",

@@ -145,7 +145,7 @@ export class Stage1PlacementController {
    * Schedule a Stage 1 search. Cancels any existing pending/active search.
    * Debounces rapid geometry changes.
    */
-  schedule({ projectId, versionId, fingerprint, payload, delay, scopeQuantity = null, ownerRequestId = null }) {
+  schedule({ projectId, versionId, fingerprint, payload, delay, scopeQuantity = null, recommendationQuantities = null, ownerRequestId = null }) {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     this.cancelActive("superseded");
 
@@ -162,7 +162,9 @@ export class Stage1PlacementController {
       this.timer = null;
       this.pendingRequest = null;
       const scoped = Number.isFinite(scopeQuantity) ? scopeQuantity : null;
-      this.start({ projectId, versionId, fingerprint, payload: { ...payload, scopeQuantity: scoped }, scopeQuantity: scoped });
+      const rec = Array.isArray(recommendationQuantities) && recommendationQuantities.length > 0
+        ? recommendationQuantities.slice().sort((a, b) => a - b) : null;
+      this.start({ projectId, versionId, fingerprint, payload: { ...payload, scopeQuantity: scoped, recommendationQuantities: rec }, scopeQuantity: scoped });
     }, waitMs);
   }
 

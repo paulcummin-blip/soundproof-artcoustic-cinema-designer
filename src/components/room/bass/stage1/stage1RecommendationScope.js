@@ -1,0 +1,94 @@
+// stage1RecommendationScope.js
+// ---------------------------------------------------------------------------
+// Cross-quantity recommendation scope for the ADI Subwoofer Design workflow.
+//
+// The three-option Subwoofer Design recommendation evaluates 1, 2 and 4
+// subwoofer arrangements together from ONE fixed room, seating and RSP
+// snapshot. This module defines the quantity set for that workflow WITHOUT
+// touching the existing single-quantity scope, the 3-subwoofer search, or any
+// existing caller.
+//
+// Existing scopes (unchanged):
+//   - scopeQuantity = null  → full search (1, 2, 3, 4 in family order)
+//   - scopeQuantity = N     → single-quantity search (ADI installed-count)
+//
+// New scope (this module):
+//   - recommendationQuantities = [1, 2, 4] → cross-quantity recommendation
+//
+// The 3-subwoofer search remains fully supported elsewhere — it is simply not
+// part of this recommendation workflow. No acoustic physics, RP22 scoring or
+// existing search logic is changed.
+// ---------------------------------------------------------------------------
+
+/**
+ * The fixed quantity set for the three-option Subwoofer Design recommendation.
+ * 1, 2 and 4 subwoofers — the front/rear wall arrangements a designer chooses
+ * between. 3 is excluded from this workflow but remains supported by the
+ * existing Stage 1/Stage 2 search.
+ */
+export const RECOMMENDATION_QUANTITIES = Object.freeze([1, 2, 4]);
+
+/**
+ * Is a quantity set a valid cross-quantity recommendation scope?
+ * Must be a non-empty array of supported subwoofer quantities (1, 2 or 4),
+ * in ascending order, with no duplicates.
+ *
+ * @param {Array|*} quantities
+ * @returns {boolean}
+ */
+export function isRecommendationQuantitySet(quantities) {
+  if (!Array.isArray(quantities) || quantities.length === 0) return false;
+  const valid = new Set([1, 2, 4]);
+  for (const q of quantities) {
+    if (!valid.has(q)) return false;
+  }
+  // Must be ascending and unique.
+  for (let i = 1; i < quantities.length; i += 1) {
+    if (quantities[i] <= quantities[i - 1]) return false;
+  }
+  return true;
+}
+
+/**
+ * Normalise a caller-provided recommendation scope into the canonical
+ * quantity set, or null when the caller did not request a recommendation scope.
+ *
+ * @param {Array|null|undefined} recommendationQuantities
+ * @returns {number[]|null} the normalised quantity set, or null
+ */
+export function normaliseRecommendationScope(recommendationQuantities) {
+  if (!Array.isArray(recommendationQuantities) || recommendationQuantities.length === 0) return null;
+  // Accept [1,2,4] or any subset in any order — normalise to ascending unique.
+  const valid = recommendationQuantities
+    .filter((q) => q === 1 || q === 2 || q === 4)
+    .filter((q, index, arr) => arr.indexOf(q) === index);
+  if (valid.length === 0) return null;
+  valid.sort((a, b) => a - b);
+  return valid;
+}
+
+/**
+ * Resolve the quantity search order for a Stage 1 / Stage 2 run given both the
+ * existing scopeQuantity and the new recommendationQuantities scope.
+ *
+ * Precedence: recommendationQuantities (cross-quantity) takes priority over
+ * scopeQuantity (single-quantity), which takes priority over the default full
+ * search. This preserves every existing caller's behaviour — none of them
+ * pass recommendationQuantities, so they all resolve exactly as before.
+ *
+ * @param {object} params
+ * @param {number|null} [params.scopeQuantity]
+ * @param {Array|null} [params.recommendationQuantities]
+ * @param {number[]|null} [params.defaultOrder]
+ * @returns {number[]|null} quantity order, or null when no scope applies (full search)
+ */
+export function resolveRecommendationQuantityOrder({
+  scopeQuantity = null,
+  recommendationQuantities = null,
+  defaultOrder = null,
+} = {}) {
+  const rec = normaliseRecommendationScope(recommendationQuantities);
+  if (rec) return rec;
+  if ([1, 2, 3, 4].includes(scopeQuantity)) return [scopeQuantity];
+  return defaultOrder || null;
+}

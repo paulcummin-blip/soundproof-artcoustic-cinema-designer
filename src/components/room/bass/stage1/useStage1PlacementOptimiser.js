@@ -16,6 +16,7 @@ import { hydrateStage1PlacementCache, isStage1CacheValid } from "./stage1Placeme
 import { DEFAULT_BEST_SUB_LAYOUT_PHYSICS } from "../best-layout/bestSubLayoutPhysicsSnapshot";
 import { STAGE1_START_DELAY_MS } from "./stage1Constants";
 import { useIsDragActive } from "@/components/state/userInteractionStore";
+import { normaliseRecommendationScope } from "./stage1RecommendationScope";
 
 /**
  * Run Stage 1 placement search for an explicit heavy-action request.
@@ -27,7 +28,7 @@ import { useIsDragActive } from "@/components/state/userInteractionStore";
  * @param {Array} params.seatingPositions — [{ id, x, y, z?, priority? }]
  * @param {object} params.physicsOptions — modal physics options (optional)
  */
-export function useStage1PlacementOptimiser({ projectId, versionId = "free", roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null, scopeQuantity = null }) {
+export function useStage1PlacementOptimiser({ projectId, versionId = "free", roomDims, rspPosition, seatingPositions, physicsOptions, enabled = true, requestId = null, scopeQuantity = null, recommendationQuantities = null }) {
   const state = useSyncExternalStore(
     subscribeStage1,
     () => getStage1State(projectId, versionId),
@@ -51,9 +52,13 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
   });
   const scope = [1, 2, 3, 4].includes(scopeQuantity) ? scopeQuantity : null;
-  // A scoped run carries its own identity so its partial result is never
-  // mistaken for the all-quantity study of the same design.
-  const fingerprint = baseFingerprint && scope ? `${baseFingerprint}|sel:${scope}` : baseFingerprint;
+  // A cross-quantity recommendation run searches 1, 2 and 4 together. It
+  // carries its own fingerprint identity so its partial result is never
+  // mistaken for the all-quantity study (which includes 3) of the same design.
+  const recScope = normaliseRecommendationScope(recommendationQuantities);
+  const fingerprint = baseFingerprint && scope
+    ? `${baseFingerprint}|sel:${scope}`
+    : (baseFingerprint && recScope ? `${baseFingerprint}|rec:${recScope.join(",")}` : baseFingerprint);
 
   // ── Hydration on mount / project change ──────────────────────────────
   useEffect(() => {
@@ -165,12 +170,13 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
       delay: STAGE1_START_DELAY_MS,
       ownerRequestId: requestId,
       scopeQuantity: scope,
+      recommendationQuantities: recScope,
     });
 
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, baseFingerprint, scope, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, baseFingerprint, scope, recScope, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {

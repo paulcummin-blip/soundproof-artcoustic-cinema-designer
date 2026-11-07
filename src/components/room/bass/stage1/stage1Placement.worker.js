@@ -57,6 +57,7 @@ self.onmessage = (event) => {
         physicsOptions: payload.physicsOptions,
         generationId: cancellationChecker,
         scopeQuantity: payload.scopeQuantity ?? null,
+        recommendationQuantities: payload.recommendationQuantities ?? null,
         pool,
         stage1Concurrency: STAGE1_CONCURRENCY,
       });
