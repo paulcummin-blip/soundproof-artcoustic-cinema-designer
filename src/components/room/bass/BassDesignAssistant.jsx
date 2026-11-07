@@ -45,6 +45,7 @@ import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePrevious
 import BassGraphShellSkeleton from "@/components/room/bass/bda/BassGraphShellSkeleton";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
+import { createApplyRecalcSettleState, resolveApplyRecalcSettle } from "@/components/room/bass/bda/applyRecalcSettleAuthority";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -168,28 +169,61 @@ export default function BassDesignAssistant({
 
   // ── Authoritative recalculation after an evaluated-card Apply ──
   // The card commits the new arrangement synchronously then calls onApplied.
-  // This effect runs once the live bass fingerprint has propagated to the
-  // shared context (next render), and calls the EXISTING onCalculate. Because
-  // onCalculate keys its manual request off the current cacheKey — which now
-  // reflects the applied arrangement — calculation never starts before the
-  // commit has propagated, and manualRequestMatchesCurrent rejects any result
-  // belonging to the previous arrangement. The cards keep showing the Stage 2
-  // predicted P19/P20 while the authoritative assessment is in flight; the
-  // BassPerformanceStrip shows the achieved P19/P20 once it completes.
-  const pendingApplyRecalcRef = useRef(false);
+  // The committed subwoofer instances propagate through the calibration chain
+  // (instances → sources → RSP → calibration fingerprint) over several
+  // renders, so the live calculation fingerprint is briefly TRANSIENT before it
+  // settles on the new arrangement's identity. Firing onCalculate against the
+  // transient fingerprint would dispatch a manual request that no longer
+  // matches the settled design, so manualRequestMatchesCurrent would flip
+  // false and the request would be cancelled, leaving the previous
+  // arrangement's result displayed as current.
+  //
+  // This effect therefore WAITs: it records the pre-apply calculation
+  // fingerprint, waits for the live fingerprint to transition away from it
+  // (proving the committed arrangement has entered the chain) and then to
+  // stabilise across the threshold of consecutive renders, and only then fires
+  // exactly one onCalculate against the settled, committed identity. The
+  // pending request is retained until the fingerprint settles (or a bounded
+  // safety valve releases it cleanly so the UI never hangs on "Calculating…").
+  // Existing fingerprint, generation and stale-result cancellation protections
+  // are preserved: onCalculate keys its manual request off the current
+  // cacheKey, which now genuinely reflects the applied arrangement, so
+  // manualRequestMatchesCurrent stays true and the authoritative assessment
+  // completes and publishes the achieved P19/P20 for the new design.
+  const applySettleRef = useRef(null);
   const [applyRecalcPulse, setApplyRecalcPulse] = useState(0);
+  const [applySettleTick, setApplySettleTick] = useState(0);
   const handleEvaluatedApplied = useCallback(() => {
-    pendingApplyRecalcRef.current = true;
+    applySettleRef.current = createApplyRecalcSettleState(shared?.fingerprint || null);
     setApplyRecalcPulse((p) => p + 1);
-  }, []);
+  }, [shared?.fingerprint]);
   useEffect(() => {
-    if (!pendingApplyRecalcRef.current) return;
+    const settleState = applySettleRef.current;
+    if (!settleState?.pending) return;
     if (typeof shared?.onCalculate !== "function") return;
-    if (!shared?.canCalculate) return;
-    if (shared?.calculationInProgress) return;
-    pendingApplyRecalcRef.current = false;
-    shared.onCalculate();
-  }, [applyRecalcPulse, shared?.onCalculate, shared?.canCalculate, shared?.calculationInProgress]);
+    const liveFp = shared?.fingerprint || null;
+    const gateReady = !!liveFp
+      && !!shared?.canCalculate
+      && !shared?.calculationInProgress;
+    const { state: next, action } = resolveApplyRecalcSettle(settleState, liveFp, gateReady);
+    applySettleRef.current = next;
+    if (action === "fire") {
+      shared.onCalculate();
+    } else if (action === "observe") {
+      // Force one confirmation render so stability can be observed even when
+      // the fingerprint stops changing (no shared-context dep would re-trigger).
+      setApplySettleTick((t) => t + 1);
+    }
+    // "wait" relies on shared-context dep changes to re-run; "release" is
+    // terminal and never ticks, so the UI never hangs on "Calculating…".
+  }, [
+    applyRecalcPulse,
+    applySettleTick,
+    shared?.onCalculate,
+    shared?.canCalculate,
+    shared?.calculationInProgress,
+    shared?.fingerprint,
+  ]);
 
   // Stages 2–4 are visible once a subwoofer arrangement exists. The
   // recommendation cards remain visible alongside them at all times.
