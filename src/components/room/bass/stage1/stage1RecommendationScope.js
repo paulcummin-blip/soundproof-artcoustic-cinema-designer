@@ -28,6 +28,10 @@
  */
 export const RECOMMENDATION_QUANTITIES = Object.freeze([1, 2, 4]);
 
+// At most seven supported subsets. Stable immutable identities prevent the
+// scheduling effects from restarting on their own store notifications.
+const canonicalScopes = new Map([["1,2,4", RECOMMENDATION_QUANTITIES]]);
+
 /**
  * Is a quantity set a valid cross-quantity recommendation scope?
  * Must be a non-empty array of supported subwoofer quantities (1, 2 or 4),
@@ -64,7 +68,9 @@ export function normaliseRecommendationScope(recommendationQuantities) {
     .filter((q, index, arr) => arr.indexOf(q) === index);
   if (valid.length === 0) return null;
   valid.sort((a, b) => a - b);
-  return valid;
+  const key = valid.join(",");
+  if (!canonicalScopes.has(key)) canonicalScopes.set(key, Object.freeze(valid));
+  return canonicalScopes.get(key);
 }
 
 /**
