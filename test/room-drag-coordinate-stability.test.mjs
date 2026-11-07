@@ -143,6 +143,31 @@ describe("canonical pointer conversion", () => {
     }).x).toBeCloseTo(2.0, 9);
   });
 
+  test("RSP click-to-place commits the live room coordinate through zoom and pan", () => {
+    // Execute the production callback, including its clamp and rounding.
+    const source = fs.readFileSync(new URL("../src/components/room/RoomVisualisation.jsx", import.meta.url), "utf8");
+    const start = source.indexOf("const _computeMlpYFromPointer = useCallback");
+    const end = source.indexOf("// Single click to place:", start);
+    const factory = new Function("useCallback", "clientToRoom", "svgRef", "roomRect",
+      "scale", "viewOffsetPx", "lengthM", "canvasToRoom",
+      source.slice(start, end) + "\nreturn _computeMlpYFromPointer;");
+    for (const view of [...VIEWS, { zoom: 0.79692078229014, panX: 0, panY: 0 }]) {
+      const svgRef = { current: makeSvgWithZoomGroup(view) };
+      const place = factory(fn => fn, clientToRoom, svgRef, ROOM_RECT, SCALE,
+        VIEW_OFFSET, 6, point => canvasPointToRoom({ point, roomRect: ROOM_RECT,
+          scale: SCALE, viewOffsetPx: VIEW_OFFSET }));
+      for (const y of [0.5, 3.19, 4.6, 5.7]) {
+        const event = roomToScreen({ x_m: 2.25, y_m: y, ...view });
+        expect(place(event)).toBe(y);
+        expect(place(event)).toBe(Math.round(toRoom({ ...event, view }).y * 100) / 100);
+      }
+      expect(place(roomToScreen({ x_m: 2.25, y_m: -1, ...view }))).toBe(0.2);
+      expect(place(roomToScreen({ x_m: 2.25, y_m: 7, ...view }))).toBe(5.8);
+      svgRef.current = null;
+      expect(place({ clientX: 10, clientY: 10 })).toBeNull();
+    }
+  });
+
   test("the converter fails closed without geometry rather than inventing a point", () => {
     const svg = makeSvg();
     expect(clientToRoom({ svgElement: svg, clientX: 10, clientY: 10, roomRect: null, scale: SCALE, viewOffsetPx: VIEW_OFFSET })).toBeNull();
