@@ -31,7 +31,10 @@ self.onmessage = (e) => {
   }
 
   try {
-    const result = computeNormalizedRoomTransfer(payload || {});
+    const result = computeNormalizedRoomTransfer({
+      ...(payload || {}),
+      useExactPreviewBatch: quality === "preview" && payload?.listenerSelection?.mode === "all",
+    });
 
     if (result && result.status === "error") {
       self.postMessage({
