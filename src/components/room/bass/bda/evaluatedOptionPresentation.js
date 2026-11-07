@@ -92,7 +92,10 @@ function worstP20ForPriority(perSeatP20, seatPriorityMap, priority) {
 export function resultEvidenceIsValid(result) {
   if (!result || result.terminal === true || result.physicalRejection) return false;
   if (result.requestedP14Pass === false) return false;
-  if (!Number.isFinite(Number(result.achievedP19Level))) return false;
+  // Explicit null guard: Number(null) === 0, which Number.isFinite accepts.
+  // A null/undefined P19 level must never be treated as a valid Level 0.
+  const p19Level = result.achievedP19Level;
+  if (p19Level == null || !Number.isFinite(Number(p19Level)) || Number(p19Level) < 0) return false;
   return true;
 }
 
@@ -170,6 +173,7 @@ export function buildEvaluatedOption(result, seatPriorityMap, context) {
  */
 export function selectEvaluatedOptions(stage2State, seatPriorityMap, context) {
   if (!stage2State || stage2State.status !== "complete") return [];
+  const runFingerprint = stage2State.fingerprint || null;
   const buckets = [
     { quantity: 1, result: stage2State.one_sub_result?.bestFinalist },
     { quantity: 2, result: stage2State.two_sub_result?.bestFinalist },
@@ -179,7 +183,13 @@ export function selectEvaluatedOptions(stage2State, seatPriorityMap, context) {
   for (const bucket of buckets) {
     if (!bucket.result) continue;
     const option = buildEvaluatedOption(bucket.result, seatPriorityMap, context);
-    if (option) options.push(option);
+    if (option) {
+      // Stamp the Stage 2 run fingerprint so the quantity-aware Apply stale
+      // guard can reject an option whose evaluation no longer matches the
+      // current design.
+      option.fingerprint = runFingerprint;
+      options.push(option);
+    }
   }
   return options;
 }

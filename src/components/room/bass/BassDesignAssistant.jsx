@@ -33,6 +33,7 @@ import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwoofe
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
+import EvaluatedLayoutCards from "@/components/room/bass/bda/EvaluatedLayoutCards";
 import { useEvaluatedPlacementRecommendations } from "@/components/room/bass/bda/useEvaluatedPlacementRecommendations";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
@@ -254,7 +255,60 @@ export default function BassDesignAssistant({
       )}
 
       {/* ── Choose Layout (when no layout applied) ── */}
-      {showLayoutCards && (
+      {/* Evaluated 1/2/4 recommendations replace the generic starting-layout
+          cards once the cross-quantity Stage 1/2 evaluation has completed. The
+          generic cards remain only as the first-step picker before a sub
+          model and design target exist (status "waiting"). While evaluating,
+          a loading state is shown — generic layouts are never presented as
+          evaluated recommendations. */}
+      {showLayoutCards && evaluatedRecommendations.status === "complete"
+        && evaluatedRecommendations.options.length > 0 && (
+        <EvaluatedLayoutCards
+          options={evaluatedRecommendations.options}
+          status={evaluatedRecommendations.status}
+          roomDims={roomDims}
+          seatingPositions={seatingPositions}
+          rspPosition={rspPosition}
+          subwooferInstances={subwooferInstances}
+          frontSubsCfg={frontSubsCfg}
+          rearSubsCfg={rearSubsCfg}
+          commitInstances={wrappedCommitInstances}
+          currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
+          onUndoAvailable={setEvaluatedUndoAvailable}
+          undoAvailable={evaluatedUndoAvailable}
+        />
+      )}
+      {showLayoutCards && evaluatedRecommendations.status === "complete"
+        && evaluatedRecommendations.options.length === 0 && (
+        <div className="rounded-lg border border-[#E7E4DF] bg-[#F8F7F4] p-4">
+          <h4 className="text-[15px] font-semibold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
+            Choose Subwoofer Layout
+          </h4>
+          <p className="mt-1 text-[12px] text-[#625143]">
+            ADI could not find a credible front or rear wall arrangement for this room. Adjust the room dimensions or seating, or place subwoofers manually.
+          </p>
+        </div>
+      )}
+      {showLayoutCards && evaluatedRecommendations.status === "evaluating" && (
+        <EvaluatedLayoutCards
+          options={[]}
+          status="evaluating"
+          roomDims={roomDims}
+          seatingPositions={seatingPositions}
+          rspPosition={rspPosition}
+          subwooferInstances={subwooferInstances}
+          frontSubsCfg={frontSubsCfg}
+          rearSubsCfg={rearSubsCfg}
+          commitInstances={wrappedCommitInstances}
+          currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
+          onUndoAvailable={setEvaluatedUndoAvailable}
+          undoAvailable={evaluatedUndoAvailable}
+        />
+      )}
+      {showLayoutCards
+        && (evaluatedRecommendations.status === "waiting"
+          || evaluatedRecommendations.status === "idle"
+          || evaluatedRecommendations.status === "error") && (
         <StartingLayoutCards
           roomDims={roomDims}
           seatingPositions={seatingPositions}
