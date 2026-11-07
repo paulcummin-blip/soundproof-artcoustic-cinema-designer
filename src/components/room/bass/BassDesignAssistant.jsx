@@ -33,6 +33,7 @@ import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwoofe
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
+import { useEvaluatedPlacementRecommendations } from "@/components/room/bass/bda/useEvaluatedPlacementRecommendations";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
 import BassPerformanceStrip from "@/components/room/bass/bda/BassPerformanceStrip";
@@ -41,6 +42,7 @@ import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePrevious
 import BassGraphShellSkeleton from "@/components/room/bass/bda/BassGraphShellSkeleton";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
+import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -159,6 +161,12 @@ export default function BassDesignAssistant({
     rear: rearSubsCfg?.bottomHeightM,
   }), [frontSubsCfg?.bottomHeightM, rearSubsCfg?.bottomHeightM]);
 
+  // Resolved per-sub amplifier power for the cross-quantity recommendation
+  // run. Falls back to the same default the bass engine applies.
+  const amplifierPowerPerSubW = Number.isFinite(Number(appState?.splConfig?.subwooferAmplifierPowerW))
+    ? Number(appState.splConfig.subwooferAmplifierPowerW)
+    : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
+
   const handleLayoutApplied = () => {
     setShowLayoutCards(false);
   };
@@ -173,6 +181,24 @@ export default function BassDesignAssistant({
     appState?.setSubwooferInstancesStatus?.(INSTANCE_STATUS.VALID);
     handleLayoutApplied();
   };
+
+  // ── Evaluated 1/2/4-subwoofer recommendations ──
+  // Drives the existing Stage 1 + Stage 2 cross-quantity recommendation run
+  // using the current room, fixed RSP and listening-position priorities, and
+  // maps the evaluated best finalist per quantity into the Starting Layout
+  // cards. The hook opens the recommendation gate while this surface is
+  // mounted and self-cancels during drags / on fingerprint staleness.
+  const evaluatedRecommendations = useEvaluatedPlacementRecommendations({
+    roomDims,
+    rspPosition,
+    seatingPositions,
+    frontSubsCfg,
+    rearSubsCfg,
+    subwooferInstances,
+    appState,
+    amplifierPowerPerSubW,
+  });
+  const [evaluatedUndoAvailable, setEvaluatedUndoAvailable] = useState(false);
 
   // Stages 2–3 are visible only when the layout has been chosen
   const layoutChosen = hasSubwoofers && !showLayoutCards;
