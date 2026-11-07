@@ -103,9 +103,14 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     // any pending/active search and stay idle. This eliminates speculative
     // Stage 1 worker starts during dragging or when the panel is closed.
     if (!enabled || !requestId) {
+      const previousRequest = explicitRequestRef.current.requestId;
       explicitRequestRef.current = { requestId: null, fingerprint: null };
-      stage1PlacementController.cancelActive("explicit-action-required");
-      markStage1Idle(projectId, versionId);
+      // Multiple consumers share this controller. An inactive consumer must
+      // never cancel the background search (or another explicit request).
+      if (previousRequest && getStage1State(projectId, versionId).ownerRequestId === previousRequest) {
+        stage1PlacementController.cancelActive("explicit-action-required");
+        markStage1Idle(projectId, versionId);
+      }
       return;
     }
 
