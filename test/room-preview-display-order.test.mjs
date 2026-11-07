@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { classifyRoomPreviewResponse } from '../src/components/room/bass/roomPreviewDisplayPolicy.js';
+import { canUseExactRoomPreviewBatch } from '../src/components/room/bass/exactRoomPreviewBatch.js';
 
 // Execute the production hook with deterministic hooks/timers and a controllable
 // worker. Physics is stubbed: these tests exercise dispatch and acceptance only.
@@ -24,7 +25,7 @@ function harness() {
     }
   }
   const context = vm.createContext({
-    classifyRoomPreviewResponse, URL, Worker, Date: { now: () => time },
+    classifyRoomPreviewResponse, canUseExactRoomPreviewBatch, URL, Worker, Date: { now: () => time },
     setTimeout: (fn, delay) => { const id = ++timerId; timers.set(id, { fn, at: time + delay }); return id; },
     clearTimeout: id => timers.delete(id),
     useRef: initial => { const i = cursor++; return slots[i] ??= { current: initial }; },
