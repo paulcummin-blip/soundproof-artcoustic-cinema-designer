@@ -35,6 +35,7 @@
 import { simulateBassResponseRewCore, prepareModeBank } from "@/bass/core/rewBassEngine";
 import { computeGeometryFingerprint } from "@/components/room/bass/bassAnalysisFingerprints";
 import { REW_SOURCE_CURVES } from "@/components/room/bass/rewSourceCurves";
+import { canUseExactRoomPreviewBatch, buildExactRoomPreviewTransfers } from "./exactRoomPreviewBatch";
 
 // Reuse the EXACT production flat-source definition — no second curve.
 const FLAT_SOURCE_CURVE = REW_SOURCE_CURVES.flat_rew_reference;
@@ -129,6 +130,7 @@ export function computeNormalizedRoomTransfer({
   pointsPerOctave,
   preparedModes,
   listenerSelection = null,
+  useExactPreviewBatch = false,
 }) {
   const startedAtMs = (typeof performance !== "undefined" && performance.now)
     ? performance.now()
@@ -257,6 +259,14 @@ export function computeNormalizedRoomTransfer({
     ? preparedModes
     : prepareModeBank(roomDims, engineOptions);
 
+  // Opt-in is supplied only by the advisory preview worker. Authoritative,
+  // Stage 1, and settled refinement callers retain their existing path.
+  const batchTransfers = useExactPreviewBatch && canUseExactRoomPreviewBatch(physicsOptions, subsForSimulation)
+    ? buildExactRoomPreviewTransfers({ roomDims, listeners, sources: subsForSimulation,
+        physics: physicsOptions, preparedModes: precomputedModes, pointsPerOctave,
+        sourceCurve: FLAT_SOURCE_CURVE })
+    : null;
+
   const seatResponses = {};
   let perSourceRspComplexTransfers = [];
   let frequencies = [];
@@ -273,7 +283,7 @@ export function computeNormalizedRoomTransfer({
 
       const listenerZ = Number.isFinite(Number(listener.z)) ? Number(listener.z) : 1.2;
 
-      const rewResult = simulateBassResponseRewCore(
+      const rewResult = batchTransfers?.get(listenerKey)?.get(sourceIndex) ?? simulateBassResponseRewCore(
         {
           widthM: roomDims.widthM,
           lengthM: roomDims.lengthM,
