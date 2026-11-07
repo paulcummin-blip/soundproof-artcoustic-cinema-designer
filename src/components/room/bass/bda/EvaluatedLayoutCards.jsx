@@ -31,6 +31,7 @@ import {
   resolveQuantityApplyState,
 } from "@/components/room/bass/optimiserPlan/quantityPlacementApplyAuthority";
 import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 import { formatDb } from "@/components/utils/formatDb";
 
@@ -50,24 +51,6 @@ function p19Phrase(p19) {
   return variation ? `${level} · ${variation}` : level;
 }
 
-// One short, evidence-supported phrase describing the main strength or
-// compromise of an evaluated option. It reads only the option's own
-// candidate-specific P19/P20 evidence — it invents no result and introduces no
-// separate placement grade.
-function strengthPhrase(option) {
-  if (!option) return "";
-  if (!option.valid) return "Placement could not be fully verified for this room.";
-  const p19Level = Number.isFinite(Number(option.p19?.level)) ? Number(option.p19.level) : null;
-  const p20Var = Number.isFinite(Number(option.p20Primary?.variationDb))
-    ? Number(option.p20Primary.variationDb) : null;
-  const strongExtension = p19Level != null && p19Level >= 3;
-  const evenSeats = p20Var != null && p20Var <= 1.5;
-  if (strongExtension && evenSeats) return "Strong low-frequency extension with even seat-to-seat response.";
-  if (strongExtension) return "Strong low-frequency extension; seat consistency is the main compromise.";
-  if (evenSeats) return "Even seat-to-seat response; low-frequency extension is the main compromise.";
-  return "Balanced extension and seat consistency for this room.";
-}
-
 function sourcesFromOption(option) {
   return (option?.coordinates || []).map((coord) => ({
     x: Number(coord.x),
@@ -76,21 +59,86 @@ function sourcesFromOption(option) {
   }));
 }
 
-function currentSourcesFrom(subs) {
-  return (Array.isArray(subs) ? subs : [])
-    .filter((sub) => sub?.enabled !== false)
+// Expected cabinet rotation for a wall placement. The recommendation surfaces
+// only front/rear-wall arrangements, so orientation is a deterministic read of
+// the wall the active cabinet sits at.
+const EXPECTED_ROTATION_BY_PLACEMENT = { front: 0, rear: 180 };
+
+function approxEqual(value, target, tolerance) {
+  return Math.abs(Number(value) - Number(target)) <= tolerance;
+}
+
+/**
+ * Full active-arrangement match between the live enabled subwoofer instances
+ * and an evaluated option. A recommendation is "Applied" only when the current
+ * canonical design matches the option on EVERY relevant attribute:
+ *
+ *   - enabled quantity (exact count of enabled cabinets)
+ *   - exact active cabinet positions, grouped by wall
+ *   - subwoofer model (all enabled cabinets share the option's model)
+ *   - cabinet orientation per wall (front 0°, rear 180°)
+ *   - cabinet bottom height (all enabled cabinets match the option height)
+ *
+ * Disabled or historical instances are excluded up front, so an arrangement
+ * that merely coincides with a stale or disabled cabinet can never produce a
+ * false match. This is stricter than coordinatesMatch alone and is the single
+ * authority for the "Applied" badge and the Manual-arrangement state.
+ */
+export function arrangementMatchesOption(instances, option) {
+  if (!option) return false;
+  const enabled = (Array.isArray(instances) ? instances : []).filter((i) => i?.enabled !== false);
+  if (enabled.length === 0) return false;
+  if (enabled.length !== Number(option.quantity)) return false;
+
+  const currentSources = enabled
     .map((sub) => {
-      const position = sub?.position || sub;
+      const position = sub?.position || {};
       const group = sub?.group || sub?.legacyGroup;
       const placement = group === "rear" ? "rear" : "front";
       return {
-        id: sub?.id,
         x: Number(position?.x),
         y: Number(position?.y),
         placement,
+        rotationDeg: Number.isFinite(Number(sub?.rotationDeg)) ? Number(sub.rotationDeg) : 0,
+        bottomHeightM: Number.isFinite(Number(sub?.bottomHeightM)) ? Number(sub.bottomHeightM) : null,
+        model: sub?.model || null,
       };
     })
-    .filter((source) => Number.isFinite(source.x) && Number.isFinite(source.y));
+    .filter((s) => Number.isFinite(s.x) && Number.isFinite(s.y));
+
+  const recSources = (Array.isArray(option.coordinates) ? option.coordinates : []).map((c) => ({
+    x: Number(c.x),
+    y: Number(c.y),
+    placement: c.placement,
+  }));
+
+  // Exact positions per wall (unordered within each wall group).
+  if (!coordinatesMatch(currentSources, recSources)) return false;
+
+  // Model: every enabled cabinet must share the option's model.
+  const optModel = normaliseModelKey(option.model);
+  if (!optModel) return false;
+  const allSameModel = currentSources.every((s) => normaliseModelKey(s.model) === optModel);
+  if (!allSameModel) return false;
+
+  // Cabinet height: every enabled cabinet matches the option's bottom height.
+  const optHeight = Number(option.bottomHeightM);
+  if (Number.isFinite(optHeight)) {
+    const heightOk = currentSources.every(
+      (s) => Number.isFinite(s.bottomHeightM) && approxEqual(s.bottomHeightM, optHeight, 0.01),
+    );
+    if (!heightOk) return false;
+  }
+
+  // Orientation: each enabled cabinet's rotation matches its wall's expected
+  // rotation. A front cabinet rotated to 180° (or a rear at 0°) is a different
+  // arrangement even if its centre coordinate coincides.
+  const orientOk = currentSources.every((s) =>
+    approxEqual(s.rotationDeg, EXPECTED_ROTATION_BY_PLACEMENT[s.placement] ?? 0, 0.5),
+  );
+  if (!orientOk) return false;
+
+  return true;
 }
 
 function RoomPlanPreview({ roomDims, seatingPositions, layoutSources, rspPosition }) {
@@ -200,7 +248,6 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
         <MetricRow label="P20 Primary" value={option.valid ? p20Phrase(option.p20Primary) : "—"} muted={!option.valid} />
         <MetricRow label="P20 Secondary" value={option.valid ? p20Phrase(option.p20Secondary) : "—"} muted={!option.valid} />
       </div>
-      <div className="mt-1.5 text-[10px] leading-tight text-[#625143]">{strengthPhrase(option)}</div>
       {!option.valid && option.terminal && (
         <div className="mt-1.5 text-[9px] text-[#8A7B6A]">Placement could not be evaluated for this room.</div>
       )}
@@ -245,8 +292,6 @@ export default function EvaluatedLayoutCards({
   const [selectedQuantity, setSelectedQuantity] = useState(null);
   const [applyError, setApplyError] = useState(null);
 
-  const currentSources = useMemo(() => currentSourcesFrom(subwooferInstances), [subwooferInstances]);
-
   const optionsByQuantity = useMemo(() => {
     const map = {};
     for (const option of (Array.isArray(options) ? options : [])) {
@@ -261,7 +306,7 @@ export default function EvaluatedLayoutCards({
     [selectedOption],
   );
 
-  const isApplied = (option) => Boolean(option) && coordinatesMatch(currentSources, sourcesFromOption(option));
+  const isApplied = (option) => arrangementMatchesOption(subwooferInstances, option);
 
   const handleConfirmApply = (option) => {
     setApplyError(null);
