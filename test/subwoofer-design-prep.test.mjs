@@ -178,7 +178,7 @@ test('3a. buildP20SubgroupSummary: valid 2+ primary seats produce a floor', () =
   const summary = buildP20SubgroupSummary(perSeatP20, seats, 'primary');
   assert.equal(summary.available, true);
   assert.equal(summary.seatCount, 2);
-  assert.equal(summary.floor, 3, 'lowest level across the group (s2 at L3)');
+  assert.equal(summary.floor, 'L3', 'lowest level across the group (s2 at L3)');
   assert.equal(summary.reason, null);
 });
 
@@ -228,7 +228,7 @@ test('3f. buildP20SubgroupSummary does NOT average levels — uses lowest floor'
     { seatId: 's3', variationDbRaw: 4.5, level: 2 },
   ];
   const summary = buildP20SubgroupSummary(perSeatP20, seats, 'primary');
-  assert.equal(summary.floor, 2, 'lowest level (L2), not an average');
+  assert.equal(summary.floor, 'L2', 'lowest level (L2), not an average');
   assert.equal(summary.seats.length, 3);
   assert.equal(summary.seats[2].level, 2);
 });

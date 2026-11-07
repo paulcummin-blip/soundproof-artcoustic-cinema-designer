@@ -87,7 +87,7 @@ export function buildZeroTuningPhysicalResponse(rawTransfer) {
 
   const zeroTuning = sources.map(() => ({ ...ZERO_TUNING }));
   const seatResponses = resumWithTuning(transfers, zeroTuning, seatIds);
-  const { rspRawCurve, perSeatRawCurves } = buildResponseCurves(seatResponses);
+  const { rspRawCurve, perSeatRawCurves } = buildResponseCurvesLocal(seatResponses);
   if (!rspRawCurve.length) return null;
 
   return { rspRawCurve, perSeatRawCurves };
