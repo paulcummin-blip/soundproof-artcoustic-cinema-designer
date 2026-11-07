@@ -27,8 +27,8 @@ import { resolveSubwooferBassCapability } from "@/components/utils/speakerModelR
 import { MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from "../bassPhysicsDefaults";
 import { STAGE2_FALLBACK_SOURCE_HEIGHT_M, STAGE2_PRODUCT_ENGINEERING_VERSION, STAGE2_CANONICAL_VERSION } from "./stage2Constants";
-import { deriveCentreZ } from "@/components/utils/subwooferInstanceMigration";
-import { resolveCabinetCentre, validateCabinetBoundary, COORDINATE_SPACE } from "./installableWallCentreAuthority";
+import { deriveCentreZ, getCabinetHeightM } from "@/components/utils/subwooferInstanceMigration";
+import { resolveCabinetCentre, validateCabinetBoundary, validateCabinetOverlap, COORDINATE_SPACE } from "./installableWallCentreAuthority";
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence";
 import { buildAuthoritativeAutoAlignDelays } from "../useAuthoritativeBassResponse";
 import { searchDelayOnly, searchLevelAndDelay, resumWithTuning } from "./stage2TuningSearch";
@@ -103,6 +103,7 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       bottomHeightM,
       orientation,
       centreZ: deriveCentreZ({ bottomHeightM, model: modelKey, orientation }),
+      cabinetHeightM: getCabinetHeightM(modelKey, orientation),
     };
   });
 
@@ -178,9 +179,11 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
       // separately from the physical centre y (which is inside the room).
       mountingWall: sourcePositions[i].mountingWall,
       // Cabinet extents carried so the placement validator can check the full
-      // cabinet volume stays inside the room without re-resolving dimensions.
+      // cabinet volume stays inside the room and detect cabinet-to-cabinet
+      // overlap without re-resolving dimensions.
       cabinetWidthM: sourcePositions[i].cabinetWidthM,
       cabinetDepthM: sourcePositions[i].cabinetDepthM,
+      cabinetHeightM: descriptor.cabinetHeightM,
       // Preserve normalised position for front/rear group splitting in
       // delay/level tuning search (confirmation phase re-summation).
       yNorm: s.yNorm,
@@ -328,6 +331,29 @@ export function evaluateStage2Placement({
         passed: false,
         reason: "cabinet-boundary-violation",
         violations: failedBoundary.violations,
+      },
+      terminal: true,
+    };
+  }
+
+  // Validate that no two cabinets physically overlap BEFORE acoustic
+  // evaluation. Overlapping cabinets (e.g. two 1.70 m wide horizontal subs
+  // with centres closer than 1.70 m) are physically impossible — a terminal
+  // rejection, never an acoustic evaluation. The check uses the resolved
+  // cabinet extents (width, depth, height) and the cabinet-centre
+  // coordinates; cabinets at different heights do not collide.
+  const overlapResult = validateCabinetOverlap({ sources });
+  if (!overlapResult.valid) {
+    return {
+      finalistId: finalist.id,
+      familyId: finalist.familyId,
+      quantity: finalist.sources.length,
+      coordinates: sources.map((s) => ({ x: s.x, y: s.y })),
+      selectedProduct: normaliseModelKey(selectedSubModel),
+      physicalRejection: {
+        passed: false,
+        reason: "cabinet-overlap-violation",
+        violations: overlapResult.violations,
       },
       terminal: true,
     };

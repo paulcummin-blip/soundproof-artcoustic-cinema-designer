@@ -2,7 +2,10 @@
 // Stage 1 Subwoofer Placement Optimiser — versions, caps, tolerances.
 // Product-independent, P14-independent, EQ-independent geometric search.
 
-export const STAGE1_PLACEMENT_ALGORITHM_VERSION = "stage1-placement-v1";
+// v2: the ranking comparator is now a deterministic transitive banded-key
+// sort (no circular preferences, no generation-order dependence). Finalist
+// selection can differ from v1, so cached v1 results are rejected once.
+export const STAGE1_PLACEMENT_ALGORITHM_VERSION = "stage1-placement-v2";
 // v3: the three-source family set was added, so a cached Stage 1 result written
 // under v2 has no three_sub_result and is not a current family policy.
 export const STAGE1_FAMILY_POLICY_VERSION = "stage1-family-policy-v3-three-source";

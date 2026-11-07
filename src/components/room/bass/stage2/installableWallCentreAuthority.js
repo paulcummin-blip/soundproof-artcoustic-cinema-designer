@@ -69,6 +69,23 @@ function wallRefsFromNorms(xNorm, yNorm) {
 }
 
 /**
+ * Whether a normalised point sits on a wall boundary (xNorm 0/1 or yNorm 0/1).
+ * A point on a wall is a WALL_REFERENCE Stage 2 offsets into the room; a point
+ * off every wall is an inset CABINET_CENTRE used directly. This is the single
+ * test the Stage 1 finalist builder uses to stamp each source's
+ * coordinateSpace — the domain is explicit, never inferred from whether a
+ * value happens to sit near 0 or 1 after the fact.
+ *
+ * @param {number} xNorm
+ * @param {number} yNorm
+ * @returns {boolean}
+ */
+export function isWallReferencePoint(xNorm, yNorm) {
+  const refs = wallRefsFromNorms(xNorm, yNorm);
+  return refs.onXWall || refs.onYWall;
+}
+
+/**
  * Convert one WALL-REFERENCE normalised position into the physically
  * installable cabinet centre, in metres, inside the room. This is the ONE
  * conversion from wall reference to cabinet centre.
@@ -294,5 +311,58 @@ export function validateCabinetBoundary({
   if (x > W - halfW - bufferM + eps) violations.push("right-wall-intersection");
   if (y < halfD + bufferM - eps) violations.push("front-wall-intersection");
   if (y > L - halfD - bufferM + eps) violations.push("rear-wall-intersection");
+  return { valid: violations.length === 0, violations };
+}
+
+/**
+ * Validate that no two resolved cabinets physically overlap. Two cabinets
+ * overlap only when their footprints intersect in ALL three dimensions (X
+ * width, Y depth, Z height) — cabinets at different heights do not collide
+ * even when their floor footprints coincide. Each cabinet's extents come
+ * from the authoritative cabinet geometry already resolved by
+ * resolveCabinetCentre (cabinetWidthM, cabinetDepthM) and the cabinet
+ * height resolved by the source builder (cabinetHeightM), evaluated at the
+ * cabinet-centre coordinates the acoustic engine used.
+ *
+ * Touching (distance exactly equal to the sum of half-extents) is allowed;
+ * only a genuine intersection is rejected. A small tolerance avoids
+ * flagging floating-point touching as an overlap.
+ *
+ * @param {object} args
+ * @param {Array} args.sources — resolved sources with x, y, z,
+ *   cabinetWidthM, cabinetDepthM, cabinetHeightM
+ * @param {number} [args.toleranceM] — overlap tolerance in metres (default 1mm)
+ * @returns {{ valid: boolean, violations: Array }}
+ */
+export function validateCabinetOverlap({ sources, toleranceM = 0.001 }) {
+  const list = Array.isArray(sources) ? sources : [];
+  const violations = [];
+  for (let i = 0; i < list.length; i += 1) {
+    for (let j = i + 1; j < list.length; j += 1) {
+      const a = list[i];
+      const b = list[j];
+      const ax = Number(a?.x), ay = Number(a?.y), az = Number(a?.z);
+      const bx = Number(b?.x), by = Number(b?.y), bz = Number(b?.z);
+      const aw = Number(a?.cabinetWidthM), ad = Number(a?.cabinetDepthM), ah = Number(a?.cabinetHeightM);
+      const bw = Number(b?.cabinetWidthM), bd = Number(b?.cabinetDepthM), bh = Number(b?.cabinetHeightM);
+      // Skip a pair whose geometry is incomplete — it cannot be judged and
+      // must not produce a false overlap rejection.
+      if (![ax, ay, az, bx, by, bz, aw, ad, ah, bw, bd, bh].every(Number.isFinite)) continue;
+      const dx = Math.abs(ax - bx);
+      const dy = Math.abs(ay - by);
+      const dz = Math.abs(az - bz);
+      const overlapX = dx < (aw / 2 + bw / 2 - toleranceM);
+      const overlapY = dy < (ad / 2 + bd / 2 - toleranceM);
+      const overlapZ = dz < (ah / 2 + bh / 2 - toleranceM);
+      if (overlapX && overlapY && overlapZ) {
+        violations.push({
+          pair: [i, j],
+          centreDistanceM: { x: dx, y: dy, z: dz },
+          minSeparationM: { x: aw / 2 + bw / 2, y: ad / 2 + bd / 2, z: ah / 2 + bh / 2 },
+          reason: "cabinet-overlap",
+        });
+      }
+    }
+  }
   return { valid: violations.length === 0, violations };
 }

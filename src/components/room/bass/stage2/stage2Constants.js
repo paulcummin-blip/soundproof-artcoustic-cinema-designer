@@ -17,7 +17,11 @@ export const STAGE2_PRODUCT_ENGINEERING_VERSION = "product-engineering-v5";
 // cabinet orientation added to placement geometry (a horizontal SUB4-12
 // resolves its swapped width and height, correcting cabinet boundary checks
 // and acoustic-centre Z).
-export const STAGE2_PLACEMENT_VERSION = "stage2-placement-v4";
+// v5: Stage 1 finalists now carry a per-source coordinateSpace (wall
+// reference vs cabinet centre) so inset positions resolve correctly, and
+// cabinet-to-cabinet overlap is rejected before acoustic evaluation. Old
+// placement caches are rejected once.
+export const STAGE2_PLACEMENT_VERSION = "stage2-placement-v5";
 
 // Maximum concurrent canonical finalist evaluation jobs.
 export const STAGE2_MAX_CONCURRENT_JOBS = 2;

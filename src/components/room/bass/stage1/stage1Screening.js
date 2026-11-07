@@ -180,51 +180,89 @@ export function screenCandidate({ transferResult, seatingPositions, candidate })
   };
 }
 
-// ── Lexicographic comparator ───────────────────────────────────────────
+// ── Deterministic transitive ranking key ─────────────────────────────────
 
 /**
- * Compare two screening results lexicographically.
+ * Quantise a screening metric into a tolerance band so two values within the
+ * same tolerance round to the same integer band. Banding replaces the old
+ * pairwise tolerance comparison: a banded tuple is a total order, so the
+ * resulting ranking is transitive and independent of candidate input order.
+ *
+ * @param {number} value
+ * @param {number} tolerance
+ * @returns {number} integer band (higher band = higher raw value)
+ */
+function band(value, tolerance) {
+  const v = Number.isFinite(Number(value)) ? Number(value) : 0;
+  const t = Number.isFinite(tolerance) && tolerance > 0 ? tolerance : 1;
+  return Math.round(v / t);
+}
+
+/**
+ * Build a deterministic, transitive sort key from the EXISTING screening
+ * metrics and the intended ranking hierarchy. Each tolerance-banded metric
+ * is quantised into an integer band using the same tolerances the old
+ * pairwise comparator used. Minimise objectives keep the band (lower =
+ * better = sorts earlier); maximise objectives negate the band (higher =
+ * better = more negative = sorts earlier). The candidate id is appended as
+ * the final stable tie-break, making the order a total order independent of
+ * input order — no circular preferences, no NaN, no generation-order
+ * dependence.
+ *
+ * No new acoustic weights or placement grades are introduced: the hierarchy
+ * and tolerances are the existing ones; only the comparison is made
+ * transitive.
+ *
+ * @param {object} candidate — evaluated candidate ({ ...candidate, screening })
+ * @returns {{ key: number[], id: string }}
+ */
+export function buildScreeningSortKey(candidate) {
+  const s = candidate?.screening ?? candidate ?? {};
+  const tol = STAGE1_TIE_TOLERANCE;
+  // Hierarchy (the intended lexicographic order, unchanged):
+  //   1. primarySevereProblemCount   (minimise, integer)
+  //   2. worstPrimarySpatialVariation (minimise, tol.variationDb)
+  //   3. primaryResponseSmoothness    (maximise, tol.smoothnessDb)
+  //   4. primaryRspCoherence           (maximise, tol.coherenceDb)
+  //   5. secondarySpatialConsistency  (minimise, tol.variationDb)
+  //   6. efficiencyIndicator          (maximise, tol.efficiencyDb)
+  //   7. familyPreferenceRank         (minimise, integer)
+  const key = [
+    Number.isFinite(Number(s.primarySevereProblemCount)) ? Number(s.primarySevereProblemCount) : 0,
+    band(s.worstPrimarySpatialVariation, tol.variationDb),
+    -band(s.primaryResponseSmoothness, tol.smoothnessDb),
+    -band(s.primaryRspCoherence, tol.coherenceDb),
+    band(s.secondarySpatialConsistency, tol.variationDb),
+    -band(s.efficiencyIndicator, tol.efficiencyDb),
+    Number.isFinite(Number(s.familyPreferenceRank)) ? Number(s.familyPreferenceRank) : 0,
+  ];
+  return { key, id: String(candidate?.id ?? "") };
+}
+
+/**
+ * Compare two screening results by their deterministic banded sort keys.
  * Returns negative if a ranks higher (better), positive if b ranks higher.
+ *
+ * This replaces the old pairwise tolerance comparator, which was
+ * non-transitive (A could beat B, B beat C, C beat A) because each criterion
+ * fell through to the next only when the difference was within tolerance —
+ * and tolerance-band equivalence is not transitive. The banded-key
+ * comparison is a lexicographic comparison of integer tuples, which is a
+ * total order: transitive, free of NaN, and independent of candidate
+ * generation order. The candidate id is the final tie-break, not a
+ * workaround — every preceding element is a real screening metric, so
+ * shuffling or reversing candidate input never changes the final ranking.
  */
 export function compareScreeningResults(a, b) {
-  // The comparator receives EVALUATED CANDIDATES ({ ...candidate, screening,
-  // transfer }). The screening metrics live on the `.screening` field — reading
-  // them from the top level returns undefined, producing NaN comparisons that
-  // leave candidates in generation order. Resolve the screening object once.
-  const sa = a?.screening ?? a;
-  const sb = b?.screening ?? b;
-  const tol = STAGE1_TIE_TOLERANCE;
-
-  // 1. Primary severe-problem count (minimise)
-  if (sa.primarySevereProblemCount !== sb.primarySevereProblemCount) {
-    return sa.primarySevereProblemCount - sb.primarySevereProblemCount;
+  const ka = buildScreeningSortKey(a);
+  const kb = buildScreeningSortKey(b);
+  for (let i = 0; i < ka.key.length; i += 1) {
+    if (ka.key[i] !== kb.key[i]) return ka.key[i] - kb.key[i];
   }
-
-  // 2. Worst Primary spatial variation (minimise)
-  if (Math.abs(sa.worstPrimarySpatialVariation - sb.worstPrimarySpatialVariation) > tol.variationDb) {
-    return sa.worstPrimarySpatialVariation - sb.worstPrimarySpatialVariation;
-  }
-
-  // 3. Primary broad response quality / smoothness (maximise)
-  if (Math.abs(sa.primaryResponseSmoothness - sb.primaryResponseSmoothness) > tol.smoothnessDb) {
-    return sb.primaryResponseSmoothness - sa.primaryResponseSmoothness;
-  }
-
-  // 4. Primary RSP/seat coherence (maximise)
-  if (Math.abs(sa.primaryRspCoherence - sb.primaryRspCoherence) > tol.coherenceDb) {
-    return sb.primaryRspCoherence - sa.primaryRspCoherence;
-  }
-
-  // 5. Secondary consistency (minimise)
-  if (Math.abs(sa.secondarySpatialConsistency - sb.secondarySpatialConsistency) > tol.variationDb) {
-    return sa.secondarySpatialConsistency - sb.secondarySpatialConsistency;
-  }
-
-  // 6. Efficiency (maximise) — late tiebreaker
-  if (Math.abs(sa.efficiencyIndicator - sb.efficiencyIndicator) > tol.efficiencyDb) {
-    return sb.efficiencyIndicator - sa.efficiencyIndicator;
-  }
-
-  // 7. Practical family preference (lower rank = better)
-  return sa.familyPreferenceRank - sb.familyPreferenceRank;
+  // Stable, deterministic tie-break on candidate identity. This is the ONLY
+  // use of identity: it makes the order a total order so shuffling or
+  // reversing the candidate input never changes the final ranking.
+  if (ka.id < kb.id) return -1;
+  if (ka.id > kb.id) return 1;
+  return 0;
 }

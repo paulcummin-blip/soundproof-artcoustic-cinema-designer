@@ -23,6 +23,7 @@ import { FAMILY_IDS } from "./stage1FamilyRegistry";
 import { isThreeSubFamily, threeSubFamilyBestParam } from "./stage1ThreeSubFamilies.js";
 import { validateAProhibition } from "./stage1GeometryValidator";
 import { runBoundedConfirmations } from "../improveBassV2/runBoundedConfirmations.js";
+import { isWallReferencePoint, COORDINATE_SPACE } from "../stage2/installableWallCentreAuthority";
 
 const round = (v, d = 3) => Number(Number(v || 0).toFixed(d));
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -232,9 +233,15 @@ export async function runStage1SearchForQuantity({
     sources: f.sources.map((s) => ({
       xNorm: s.xNorm,
       yNorm: s.yNorm,
-      // Stage 1 family coordinates are WALL references (a point on a wall
-      // plane). Stage 2 resolves them ONCE into a physical cabinet centre.
-      coordinateSpace: "wall_reference",
+      // Each source's coordinate domain is determined by its position: a
+      // point on a wall boundary (xNorm 0/1 or yNorm 0/1) is a WALL reference
+      // Stage 2 offsets into the room; an inset point is already a cabinet
+      // centre and is used directly. The domain is explicit, never inferred
+      // after the fact, so a valid inset position is resolved rather than
+      // rejected as a malformed wall reference.
+      coordinateSpace: isWallReferencePoint(s.xNorm, s.yNorm)
+        ? COORDINATE_SPACE.WALL_REFERENCE
+        : COORDINATE_SPACE.CABINET_CENTRE,
       x: round(s.xNorm * W, 3),
       y: round(s.yNorm * L, 3),
       z: STAGE1_FALLBACK_SOURCE_HEIGHT_M,
