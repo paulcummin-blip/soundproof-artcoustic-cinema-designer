@@ -288,6 +288,7 @@ export default function EvaluatedLayoutCards({
   rearSubsCfg,
   commitInstances,
   currentDesignFingerprint,
+  onApplied,
 }) {
   const [selectedQuantity, setSelectedQuantity] = useState(null);
   const [applyError, setApplyError] = useState(null);
@@ -334,7 +335,11 @@ export default function EvaluatedLayoutCards({
       defaults: {
         model: option.model || frontSubsCfg?.model || rearSubsCfg?.model || null,
         bottomHeightM: option.bottomHeightM,
-        orientation: rear.length > 0 && front.length === 0 ? 180 : 0,
+        // Per-group cabinet axis orientation, resolved the SAME way Stage 2
+        // resolves it (front group → frontSubsCfg.orientation, rear group →
+        // rearSubsCfg.orientation). Never a facing rotation.
+        frontOrientation: frontSubsCfg?.orientation ?? null,
+        rearOrientation: rearSubsCfg?.orientation ?? null,
       },
       frontCoords: front,
       rearCoords: rear,
@@ -348,6 +353,13 @@ export default function EvaluatedLayoutCards({
       rear: { placementMode: "manual", isManual: true },
     });
     setSelectedQuantity(null);
+    // Trigger the existing authoritative bass recalculation after the new
+    // arrangement has committed. The caller arms a fingerprint-aware effect
+    // that runs once the live bass fingerprint reflects the applied design,
+    // so calculation never starts before the commit has propagated and stale
+    // results from the previous arrangement are rejected by the manual
+    // request's fingerprint identity check.
+    if (typeof onApplied === "function") onApplied();
   };
 
   const evaluating = status === "evaluating";

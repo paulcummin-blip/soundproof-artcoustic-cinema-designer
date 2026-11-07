@@ -27,7 +27,7 @@
 // frozen workflow over the existing interface. The Subwoofer Design
 // Experience is now the product authority.
 
-import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
@@ -166,6 +166,31 @@ export default function BassDesignAssistant({
   const recKey = `${recProjectId || "free"}::${recVersionId || "free"}`;
   const evaluatedRecommendations = useEvaluatedRecommendations(recKey);
 
+  // ── Authoritative recalculation after an evaluated-card Apply ──
+  // The card commits the new arrangement synchronously then calls onApplied.
+  // This effect runs once the live bass fingerprint has propagated to the
+  // shared context (next render), and calls the EXISTING onCalculate. Because
+  // onCalculate keys its manual request off the current cacheKey — which now
+  // reflects the applied arrangement — calculation never starts before the
+  // commit has propagated, and manualRequestMatchesCurrent rejects any result
+  // belonging to the previous arrangement. The cards keep showing the Stage 2
+  // predicted P19/P20 while the authoritative assessment is in flight; the
+  // BassPerformanceStrip shows the achieved P19/P20 once it completes.
+  const pendingApplyRecalcRef = useRef(false);
+  const [applyRecalcPulse, setApplyRecalcPulse] = useState(0);
+  const handleEvaluatedApplied = useCallback(() => {
+    pendingApplyRecalcRef.current = true;
+    setApplyRecalcPulse((p) => p + 1);
+  }, []);
+  useEffect(() => {
+    if (!pendingApplyRecalcRef.current) return;
+    if (typeof shared?.onCalculate !== "function") return;
+    if (!shared?.canCalculate) return;
+    if (shared?.calculationInProgress) return;
+    pendingApplyRecalcRef.current = false;
+    shared.onCalculate();
+  }, [applyRecalcPulse, shared?.onCalculate, shared?.canCalculate, shared?.calculationInProgress]);
+
   // Stages 2–4 are visible once a subwoofer arrangement exists. The
   // recommendation cards remain visible alongside them at all times.
   const layoutChosen = hasSubwoofers;
@@ -243,6 +268,7 @@ export default function BassDesignAssistant({
           commitInstances={wrappedCommitInstances}
           currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
           hasSubwoofers={hasSubwoofers}
+          onApplied={handleEvaluatedApplied}
         />
       )}
       {evaluatedRecommendations.status === "complete"
@@ -269,6 +295,7 @@ export default function BassDesignAssistant({
           commitInstances={wrappedCommitInstances}
           currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
           hasSubwoofers={hasSubwoofers}
+          onApplied={handleEvaluatedApplied}
         />
       )}
       {(evaluatedRecommendations.status === "waiting"

@@ -38,6 +38,40 @@ import { generateStableId } from "@/components/utils/stableIdGenerator";
 
 const POSITION_TOLERANCE_M = 0.01;
 
+// Cabinet facing rotation by wall group. Rear-wall cabinets face into the
+// room at 180°, front-wall cabinets at 0°. This matches the rotation the
+// Stage 2 evaluation assumes for front/rear-wall families and the rotation
+// the full-arrangement matcher checks, so an applied rear cabinet is
+// physically identical to its predicted P19/P20.
+const ROTATION_BY_GROUP = { front: 0, rear: 180 };
+
+function coordMatchesGroup(coord, groupCoords) {
+  return Array.isArray(groupCoords)
+    && groupCoords.some((c) => Math.abs(Number(c.x) - Number(coord.x)) < 0.01
+      && Math.abs(Number(c.y) - Number(coord.y)) < 0.01);
+}
+
+function groupForCoord(coord, frontCoords, rearCoords) {
+  if (coordMatchesGroup(coord, rearCoords)) return "rear";
+  if (coordMatchesGroup(coord, frontCoords)) return "front";
+  return null;
+}
+
+function rotationForGroup(group) {
+  return group === "rear" ? ROTATION_BY_GROUP.rear : ROTATION_BY_GROUP.front;
+}
+
+// Cabinet axis orientation (e.g. a horizontal SUB4-12 swaps width/height) for
+// a wall group. The candidate option does not carry per-source orientation,
+// so it is resolved from the project's front/rear group config — the SAME
+// resolution Stage 2 uses (group === "front" ? frontOrientation : rearOrientation).
+// Never inferred as a facing rotation.
+function groupOrientationForGroup(group, defaults) {
+  if (group === "rear") return defaults.rearOrientation ?? defaults.orientation ?? null;
+  if (group === "front") return defaults.frontOrientation ?? defaults.orientation ?? null;
+  return defaults.orientation ?? null;
+}
+
 /**
  * Build a snapshot of the complete current subwoofer-instance state for exact
  * Undo. Captures every instance (enabled and disabled), their IDs, models,
@@ -142,13 +176,20 @@ export function buildQuantityApplyInstances({
   };
 
   // First pass: match each candidate coordinate to an existing instance.
+  // The matched instance keeps its ID, model, calibration and height, but its
+  // cabinet rotation is set from the candidate coordinate's wall group so the
+  // applied geometry is physically identical to the evaluated P19/P20 (a
+  // rear-wall coordinate always faces 180°, a front-wall coordinate 0°).
   for (const coord of targetCoords) {
     const matched = matchInstance(coord, current);
     if (matched) {
+      const coordGroup = groupForCoord(coord, frontCoords, rearCoords);
       next.push({
         ...matched,
         position: { x: Number(coord.x), y: Number(coord.y) },
         enabled: true,
+        rotationDeg: rotationForGroup(coordGroup),
+        orientation: groupOrientationForGroup(coordGroup, defaults) ?? matched.orientation ?? null,
       });
     }
   }
@@ -171,8 +212,8 @@ export function buildQuantityApplyInstances({
       enabled: true,
       position: { x: Number(coord.x), y: Number(coord.y) },
       bottomHeightM: Number.isFinite(Number(defaults.bottomHeightM)) ? Number(defaults.bottomHeightM) : 0,
-      rotationDeg: 0,
-      orientation: defaults.orientation || null,
+      rotationDeg: rotationForGroup(group),
+      orientation: groupOrientationForGroup(group, defaults),
       positionSource: "recommendation",
       legacyGroup: group,
       symmetryLinkId: null,
