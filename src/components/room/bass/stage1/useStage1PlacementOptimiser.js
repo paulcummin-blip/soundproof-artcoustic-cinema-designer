@@ -176,7 +176,7 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     return () => {
       // Cleanup on unmount — cancel active search
     };
-  }, [fingerprint, baseFingerprint, scope, recScope, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fingerprint, baseFingerprint, scope, recScope, projectId, hydrationDone, hydratedCache, enabled, requestId, isInteracting]);
 
   // ── Cleanup on unmount ───────────────────────────────────────────────
   useEffect(() => {
