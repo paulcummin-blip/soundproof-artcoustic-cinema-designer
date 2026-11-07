@@ -25,6 +25,9 @@ const RoomElements = React.lazy(() =>
 const BassDesignAssistant = React.lazy(() =>
   import("@/components/room/bass/BassDesignAssistant").then((m) => ({ default: m.default }))
 );
+const EvaluatedRecommendationBackgroundRunner = React.lazy(() =>
+  import("@/components/room/bass/bda/EvaluatedRecommendationBackgroundRunner").then((m) => ({ default: m.default }))
+);
 
 export default function RoomDesignerControlsPanel({
   appState,
@@ -165,6 +168,20 @@ export default function RoomDesignerControlsPanel({
         className="space-y-3">
 
         <RoomDimensionReflowBanner />
+
+        {/* Always-mounted background runner for the evaluated 1/2/4-subwoofer
+            recommendations. Owns the single Stage 1/2 evaluation so the
+            Subwoofer Design accordion can open/close without starting,
+            cancelling or restarting the search. Renders nothing. */}
+        <Suspense fallback={null}>
+          <EvaluatedRecommendationBackgroundRunner
+            appState={appState}
+            roomDims={stableDimensions}
+            seatingPositions={seatingPositions}
+            frontSubsCfg={frontSubsCfg}
+            rearSubsCfg={rearSubsCfg}
+          />
+        </Suspense>
 
         <CollapsiblePanel
           title="Room Dimensions"

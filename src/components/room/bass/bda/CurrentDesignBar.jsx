@@ -144,14 +144,16 @@ export default function CurrentDesignBar({
           <Settings2 className="h-3.5 w-3.5" />
           Change Speakers
         </button>
-        <button
-          type="button"
-          onClick={onChangeLayout}
-          className="flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#213428] transition-colors hover:bg-[#F5F5F0]"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Change Layout
-        </button>
+        {onChangeLayout && (
+          <button
+            type="button"
+            onClick={onChangeLayout}
+            className="flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#213428] transition-colors hover:bg-[#F5F5F0]"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Change Layout
+          </button>
+        )}
       </div>
     </div>
   );

@@ -50,6 +50,24 @@ function p19Phrase(p19) {
   return variation ? `${level} · ${variation}` : level;
 }
 
+// One short, evidence-supported phrase describing the main strength or
+// compromise of an evaluated option. It reads only the option's own
+// candidate-specific P19/P20 evidence — it invents no result and introduces no
+// separate placement grade.
+function strengthPhrase(option) {
+  if (!option) return "";
+  if (!option.valid) return "Placement could not be fully verified for this room.";
+  const p19Level = Number.isFinite(Number(option.p19?.level)) ? Number(option.p19.level) : null;
+  const p20Var = Number.isFinite(Number(option.p20Primary?.variationDb))
+    ? Number(option.p20Primary.variationDb) : null;
+  const strongExtension = p19Level != null && p19Level >= 3;
+  const evenSeats = p20Var != null && p20Var <= 1.5;
+  if (strongExtension && evenSeats) return "Strong low-frequency extension with even seat-to-seat response.";
+  if (strongExtension) return "Strong low-frequency extension; seat consistency is the main compromise.";
+  if (evenSeats) return "Even seat-to-seat response; low-frequency extension is the main compromise.";
+  return "Balanced extension and seat consistency for this room.";
+}
+
 function sourcesFromOption(option) {
   return (option?.coordinates || []).map((coord) => ({
     x: Number(coord.x),
@@ -182,6 +200,7 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
         <MetricRow label="P20 Primary" value={option.valid ? p20Phrase(option.p20Primary) : "—"} muted={!option.valid} />
         <MetricRow label="P20 Secondary" value={option.valid ? p20Phrase(option.p20Secondary) : "—"} muted={!option.valid} />
       </div>
+      <div className="mt-1.5 text-[10px] leading-tight text-[#625143]">{strengthPhrase(option)}</div>
       {!option.valid && option.terminal && (
         <div className="mt-1.5 text-[9px] text-[#8A7B6A]">Placement could not be evaluated for this room.</div>
       )}

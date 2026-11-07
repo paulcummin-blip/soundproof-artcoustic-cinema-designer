@@ -34,7 +34,9 @@ import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibili
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import EvaluatedLayoutCards from "@/components/room/bass/bda/EvaluatedLayoutCards";
-import { useEvaluatedPlacementRecommendations } from "@/components/room/bass/bda/useEvaluatedPlacementRecommendations";
+import { useEvaluatedRecommendations } from "@/components/room/bass/bda/evaluatedRecommendationsStore";
+import { useActiveProjectId } from "@/components/state/project-session";
+import { deriveRspPosition, deriveAmplifierPowerPerSubW } from "@/components/room/bass/bda/recommendationInputs";
 import ChooseDesignTarget from "@/components/room/bass/bda/ChooseDesignTarget";
 import CurrentDesignBar from "@/components/room/bass/bda/CurrentDesignBar";
 import BassPerformanceStrip from "@/components/room/bass/bda/BassPerformanceStrip";
@@ -43,7 +45,6 @@ import RestorePreviousDesignBar from "@/components/room/bass/bda/RestorePrevious
 import BassGraphShellSkeleton from "@/components/room/bass/bda/BassGraphShellSkeleton";
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
-import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -134,73 +135,40 @@ export default function BassDesignAssistant({
     return () => window.removeEventListener("b44-bass-drag-start", handler);
   }, []);
 
-  // Fix flash: initialize based on whether subs already exist at first render.
-  // This prevents the one-frame flash of layout cards on projects that
-  // already have subwoofers.
-  const [showLayoutCards, setShowLayoutCards] = useState(!hasSubwoofers);
-  const hadSubsRef = useRef(hasSubwoofers);
-
-  // Collapse layout cards when subwoofers first appear (async hydration)
-  useEffect(() => {
-    if (hasSubwoofers && !hadSubsRef.current) {
-      setShowLayoutCards(false);
-    }
-    hadSubsRef.current = hasSubwoofers;
-  }, [hasSubwoofers]);
-
-  // RSP position for the layout advisor
-  const rspPosition = useMemo(() => {
-    const appRsp = appState?.mlp;
-    if (Number.isFinite(appRsp?.x) && Number.isFinite(appRsp?.y)) return appRsp;
-    const widthM = Number(roomDims?.widthM ?? roomDims?.width);
-    const y = Number(appState?.mlpY_m);
-    return Number.isFinite(widthM) && Number.isFinite(y) ? { x: widthM / 2, y, z: 1.2 } : null;
-  }, [appState?.mlp, appState?.mlpY_m, roomDims]);
+  // RSP position for the layout advisor — shared derivation so this surface
+  // and the always-mounted background runner never diverge.
+  const rspPosition = useMemo(() => deriveRspPosition(appState, roomDims), [appState, roomDims]);
 
   const sourceHeights = useMemo(() => ({
     front: frontSubsCfg?.bottomHeightM,
     rear: rearSubsCfg?.bottomHeightM,
   }), [frontSubsCfg?.bottomHeightM, rearSubsCfg?.bottomHeightM]);
 
-  // Resolved per-sub amplifier power for the cross-quantity recommendation
-  // run. Falls back to the same default the bass engine applies.
-  const amplifierPowerPerSubW = Number.isFinite(Number(appState?.splConfig?.subwooferAmplifierPowerW))
-    ? Number(appState.splConfig.subwooferAmplifierPowerW)
-    : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
-
-  const handleLayoutApplied = () => {
-    setShowLayoutCards(false);
-  };
-
-  // Wrap checkpointed commitInstances to auto-collapse after apply.
-  // The checkpoint is captured by checkpointedCommitInstances BEFORE the
-  // original commit runs.
+  // Wrap checkpointed commitInstances so applying a validated layout also
+  // marks the instance status valid. The pre-apply checkpoint is captured by
+  // checkpointedCommitInstances BEFORE the original commit runs, so the
+  // existing RestorePreviousDesignBar owns exact Undo. Recommendation cards
+  // persist after apply — they are not collapsed here.
   const wrappedCommitInstances = (instances, ...rest) => {
     checkpointedCommitInstances(instances, ...rest);
     // Applying a validated starting layout is also the recovery path for a
     // previously malformed empty-model layout restored from persistence.
     appState?.setSubwooferInstancesStatus?.(INSTANCE_STATUS.VALID);
-    handleLayoutApplied();
   };
 
   // ── Evaluated 1/2/4-subwoofer recommendations ──
-  // Drives the existing Stage 1 + Stage 2 cross-quantity recommendation run
-  // using the current room, fixed RSP and listening-position priorities, and
-  // maps the evaluated best finalist per quantity into the Starting Layout
-  // cards. The hook opens the recommendation gate while this surface is
-  // mounted and self-cancels during drags / on fingerprint staleness.
-  const evaluatedRecommendations = useEvaluatedPlacementRecommendations({
-    roomDims,
-    rspPosition,
-    seatingPositions,
-    frontSubsCfg,
-    rearSubsCfg,
-    subwooferInstances,
-    appState,
-    amplifierPowerPerSubW,
-  });
-  // Stages 2–3 are visible only when the layout has been chosen
-  const layoutChosen = hasSubwoofers && !showLayoutCards;
+  // The Stage 1 + Stage 2 cross-quantity evaluation is owned by an
+  // always-mounted background runner (independent of this accordion), so the
+  // search runs in the background and is already available when the designer
+  // opens the section. This surface only reads the published results.
+  const recProjectId = useActiveProjectId();
+  const recVersionId = appState?.activeVersionId || null;
+  const recKey = `${recProjectId || "free"}::${recVersionId || "free"}`;
+  const evaluatedRecommendations = useEvaluatedRecommendations(recKey);
+
+  // Stages 2–4 are visible once a subwoofer arrangement exists. The
+  // recommendation cards remain visible alongside them at all times.
+  const layoutChosen = hasSubwoofers;
 
   return (
     <div className="rounded-xl border border-[#DCDBD6] bg-white p-4 space-y-4" data-bda-workflow="true">
@@ -229,7 +197,6 @@ export default function BassDesignAssistant({
           bassLifecycleState={effectiveBassLifecycleState}
           statusText={isPlacementPreview ? "Subwoofer positions changed. Previewing room response only." : null}
           onChangeSpeakers={onChangeSpeakerConfig}
-          onChangeLayout={() => setShowLayoutCards(true)}
         />
       )}
 
@@ -252,14 +219,17 @@ export default function BassDesignAssistant({
         />
       )}
 
-      {/* ── Choose Layout (when no layout applied) ── */}
-      {/* Evaluated 1/2/4 recommendations replace the generic starting-layout
-          cards once the cross-quantity Stage 1/2 evaluation has completed. The
-          generic cards remain only as the first-step picker before a sub
-          model and design target exist (status "waiting"). While evaluating,
-          a loading state is shown — generic layouts are never presented as
-          evaluated recommendations. */}
-      {showLayoutCards && evaluatedRecommendations.status === "complete"
+      {/* ── Choose Layout (Starting Layout area) ── */}
+      {/* The evaluated 1/2/4 recommendations live here permanently. They are
+          computed in the background by an always-mounted runner, so they are
+          ready when the designer opens the section and remain visible after a
+          recommendation is applied. The generic starting-layout cards remain
+          only as the first-step picker before a sub model and design target
+          exist (status "waiting"). While evaluating, a loading state is
+          shown — generic layouts are never presented as evaluated
+          recommendations. Cards persist after Apply; switching options and
+          manual positioning stay available alongside them. */}
+      {evaluatedRecommendations.status === "complete"
         && evaluatedRecommendations.options.length > 0 && (
         <EvaluatedLayoutCards
           options={evaluatedRecommendations.options}
@@ -272,9 +242,10 @@ export default function BassDesignAssistant({
           rearSubsCfg={rearSubsCfg}
           commitInstances={wrappedCommitInstances}
           currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
+          hasSubwoofers={hasSubwoofers}
         />
       )}
-      {showLayoutCards && evaluatedRecommendations.status === "complete"
+      {evaluatedRecommendations.status === "complete"
         && evaluatedRecommendations.options.length === 0 && (
         <div className="rounded-lg border border-[#E7E4DF] bg-[#F8F7F4] p-4">
           <h4 className="text-[15px] font-semibold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
@@ -285,7 +256,7 @@ export default function BassDesignAssistant({
           </p>
         </div>
       )}
-      {showLayoutCards && evaluatedRecommendations.status === "evaluating" && (
+      {evaluatedRecommendations.status === "evaluating" && (
         <EvaluatedLayoutCards
           options={[]}
           status="evaluating"
@@ -297,12 +268,12 @@ export default function BassDesignAssistant({
           rearSubsCfg={rearSubsCfg}
           commitInstances={wrappedCommitInstances}
           currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
+          hasSubwoofers={hasSubwoofers}
         />
       )}
-      {showLayoutCards
-        && (evaluatedRecommendations.status === "waiting"
-          || evaluatedRecommendations.status === "idle"
-          || evaluatedRecommendations.status === "error") && (
+      {(evaluatedRecommendations.status === "waiting"
+        || evaluatedRecommendations.status === "idle"
+        || evaluatedRecommendations.status === "error") && (
         <StartingLayoutCards
           roomDims={roomDims}
           seatingPositions={seatingPositions}
