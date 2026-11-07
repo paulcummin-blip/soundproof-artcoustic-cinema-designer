@@ -275,9 +275,14 @@ export function useStage2PlacementOptimiser({
     // any pending/active evaluation and stay idle. This eliminates speculative
     // Stage 2 worker starts during dragging or when the panel is closed.
     if (!enabled || !requestId) {
+      const previousRequest = explicitRequestRef.current.requestId;
       explicitRequestRef.current = { requestId: null, fingerprint: null };
-      stage2PlacementController.cancelAll("explicit-action-required");
-      markStage2Idle(projectId, versionId);
+      // Multiple consumers share this controller. An inactive consumer must
+      // never cancel the background search (or another explicit request).
+      if (previousRequest && getStage2State(projectId, versionId).ownerRequestId === previousRequest) {
+        stage2PlacementController.cancelAll("explicit-action-required");
+        markStage2Idle(projectId, versionId);
+      }
       return;
     }
 
