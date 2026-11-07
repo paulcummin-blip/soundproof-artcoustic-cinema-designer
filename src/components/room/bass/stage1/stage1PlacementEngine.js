@@ -24,6 +24,7 @@ import { isThreeSubFamily, threeSubFamilyBestParam } from "./stage1ThreeSubFamil
 import { validateAProhibition } from "./stage1GeometryValidator";
 import { runBoundedConfirmations } from "../improveBassV2/runBoundedConfirmations.js";
 import { isWallReferencePoint, COORDINATE_SPACE } from "../stage2/installableWallCentreAuthority";
+import { dedupeByPhysicalArrangement } from "./stage1PhysicalArrangementFingerprint";
 
 const round = (v, d = 3) => Number(Number(v || 0).toFixed(d));
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -211,8 +212,20 @@ export async function runStage1SearchForQuantity({
   const deduped = Array.from(seen.values());
   deduped.sort(compareScreeningResults);
 
+  // ── Collapse physical duplicates before the shortlist limit ────────
+  // Different search-family names can resolve to the same physical
+  // arrangement (same quantity, same multiset of cabinet centres). The id
+  // encodes the family name, so id-based dedup leaves both; the family-
+  // diversity finalist pass would then waste a slot on a physical
+  // duplicate. Collapsing here — on the actual evaluated coordinates,
+  // permutation-invariant, keeping the highest-ranked representative —
+  // removes duplicates BEFORE the shortlist limit is applied, so a
+  // duplicate family can no longer exclude a genuinely distinct candidate.
+  // No acoustic physics, scoring weights or Stage 2 geometry are touched.
+  const physicallyDistinct = dedupeByPhysicalArrangement(deduped);
+
   // ── Select finalists with diversity ─────────────────────────────────
-  const finalists = selectFinalists(deduped, quantity);
+  const finalists = selectFinalists(physicallyDistinct, quantity);
 
   // ── A-prohibition validation on finalists ──────────────────────────
   let aProhibitionPass = true;
