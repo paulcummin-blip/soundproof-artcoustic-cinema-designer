@@ -1,6 +1,6 @@
 // Preview-only adapter to the existing exact batch modal evaluator.
 // No cached response interpolation: every source/listener uses its exact coordinates.
-import { evaluateBatchModalTransfers } from "@/bass/core/batchModalEvaluator";
+import { prepareSourceRoomField, evaluateReceiversFromPreparedField } from "@/bass/core/batchModalEvaluator";
 import { buildFrequencyAxis } from "@/bass/core/rewCorePrimitives";
 import { buildNormalizedPhysicsOptions } from "./normalizedPhysicsOptionsBuilder";
 
@@ -25,18 +25,39 @@ export function canUseExactRoomPreviewBatch(physics, sources) {
 export function buildExactRoomPreviewTransfers({
   roomDims, listeners, sources, physics, preparedModes, pointsPerOctave, sourceCurve,
 }) {
-  const batch = evaluateBatchModalTransfers({
+  const prepared = prepareSourceRoomField({
     roomDims,
     sources: sources.map(source => ({ ...source, sourceCurve })),
-    listeners: listeners.map(listener => ({
-      id: listener.__listenerKey, x: listener.x, y: listener.y,
-      z: Number.isFinite(Number(listener.z)) ? Number(listener.z) : 1.2,
-    })),
     precomputedModes: preparedModes,
     physics,
     qStrategyOverride: "ab_corrected",
     precomputedFreqsHz: buildFrequencyAxis(15, 200, pointsPerOctave),
   });
+  // When every source has identical tuning and spectrum, linear superposition
+  // permits summing their spatial mode couplings before the listener loop.
+  // Use the existing evaluator unchanged; retain separate transfers whenever
+  // RSP per-source evidence is required or tuning differs.
+  const tuningKey = source => JSON.stringify([
+    source.tuning?.gainDb ?? 0, source.tuning?.delayMs ?? 0,
+    source.tuning?.polarity ?? 0,
+    source.tuning?.phaseControlDeg ?? source.tuning?.phaseAdjust ?? 0,
+  ]);
+  const summed = listeners.every(listener => !listener.__isRsp) &&
+    sources.every(source => tuningKey(source) === tuningKey(sources[0]));
+  let field = prepared;
+  if (summed && prepared.nSources > 1) {
+    const coupling = new Float64Array(prepared.nModes);
+    for (let source = 0; source < prepared.nSources; source++) {
+      for (let mode = 0; mode < prepared.nModes; mode++) {
+        coupling[mode] += prepared.sourceModeCoupling[source * prepared.nModes + mode];
+      }
+    }
+    field = { ...prepared, nSources: 1, sourceModeCoupling: coupling };
+  }
+  const batch = evaluateReceiversFromPreparedField(field, listeners.map(listener => ({
+    id: listener.__listenerKey, x: listener.x, y: listener.y,
+    z: Number.isFinite(Number(listener.z)) ? Number(listener.z) : 1.2,
+  })));
   const byListener = new Map();
   for (const transfer of batch.perSourcePerListenerTransfers) {
     if (!byListener.has(transfer.listenerId)) byListener.set(transfer.listenerId, new Map());
@@ -45,5 +66,5 @@ export function buildExactRoomPreviewTransfers({
       complexPressure: transfer.points,
     });
   }
-  return byListener;
+  return { byListener, summed };
 }
