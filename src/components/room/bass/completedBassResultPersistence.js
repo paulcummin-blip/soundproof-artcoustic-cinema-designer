@@ -508,9 +508,17 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   const fingerprint = currentFingerprint || compact?.job?.resultFingerprint || previous.currentFingerprint || null;
   const orderedKeys = Object.keys(completedByFingerprint)
     .sort((left, right) => Number(completedByFingerprint[right]?.job?.completedAtMs || 0) - Number(completedByFingerprint[left]?.job?.completedAtMs || 0));
-  // A count cap alone allowed multi-megabyte writes on every crossover change.
-  // Keep the current contract and the latest previous result intact; spend the
-  // remaining cache budget on older snapshots. The target bank remains separate.
+  // The completed-contract map is bounded by TOTAL serialised size, not just
+  // entry count. The currently selected authoritative contract (the current
+  // fingerprint) is ALWAYS retained — it is the P19/P20 authority every report
+  // and the readiness gate read — even when its size alone exceeds the
+  // configured budget. Dropping it would silently truncate engineering
+  // evidence; when it alone exceeds the platform's write limit the write queue
+  // fails explicitly with HTTP 429, which is reported as an unsaved assessment.
+  // Every OTHER contract must fit within the remaining budget. The
+  // first-two exemption that let two ~1 MB contracts combine into a ~2 MB
+  // write — above the platform limit — is removed. The P14 target bank
+  // remains a separate persistence path for contracts evicted here.
   const MAX_COMPLETED_CACHE_BYTES = 1250000;
   const priorityKeys = [fingerprint, ...orderedKeys].filter((key, index, keys) => key && completedByFingerprint[key] && keys.indexOf(key) === index);
   const keptKeys = [];
@@ -518,7 +526,16 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   for (const key of priorityKeys) {
     const bytes = JSON.stringify(completedByFingerprint[key]).length;
     if (keptKeys.length >= MAX_COMPLETED_SNAPSHOTS) break;
-    if (keptKeys.length >= 2 && retainedBytes + bytes > MAX_COMPLETED_CACHE_BYTES) continue;
+    // The current authoritative contract is always retained regardless of
+    // budget — never silently truncated. An oversized current contract
+    // produces an explicit write failure (HTTP 429) instead.
+    if (key === fingerprint) {
+      keptKeys.push(key);
+      retainedBytes += bytes;
+      continue;
+    }
+    // Every other contract must fit within the remaining budget.
+    if (retainedBytes + bytes > MAX_COMPLETED_CACHE_BYTES) continue;
     keptKeys.push(key);
     retainedBytes += bytes;
   }
