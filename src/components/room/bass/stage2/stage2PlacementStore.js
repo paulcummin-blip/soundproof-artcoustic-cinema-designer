@@ -19,6 +19,7 @@ import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion.js";
 import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort.js";
 import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry.js";
 import { buildPlacementRankingTuple, comparePlacementResults, isPlacementTied } from "./stage2PlacementRanking.js";
+import { selectPracticalBest } from "./stage2PracticalPlacementPreference.js";
 import {
   getCachedRawTransfer,
   setCachedRawTransfer,
@@ -1044,7 +1045,20 @@ export class Stage2PlacementController {
       // lexicographic ranking. Family preference (tuple position 12) ensures a
       // practical candidate wins any acoustic tie against B.
       const ranked = [...rankable].sort(compareStage2Results);
-      const best = ranked[0];
+      // PRACTICAL PLACEMENT PREFERENCE: default to the best conventional
+      // front/rear-wall arrangement. A side/mixed-wall arrangement (RP22 D,
+      // RP22 G, ONE_SIDE_QUARTER, RP22 B_LAST_RESORT) may displace it only
+      // with a compelling whole-Level engineering benefit or a confirmed
+      // shared-null resolution. The acoustic ranking and every candidate's
+      // P19/P20 evidence are unchanged — only the selected bestFinalist may
+      // differ from ranked[0].
+      const practicalGetRawTransfer = (result) => {
+        if (!result?.finalistId || !this.placementFingerprint) return null;
+        try {
+          return getCachedRawTransfer(this.projectId, this.versionId, this.placementFingerprint, result.finalistId) || null;
+        } catch { return null; }
+      };
+      const best = selectPracticalBest(ranked, { getRawTransfer: practicalGetRawTransfer });
       snapshot[quantityMap[qty]] = {
         quantity: qty,
         evaluatedFinalists: ranked,
