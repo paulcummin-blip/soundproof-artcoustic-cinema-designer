@@ -51,14 +51,6 @@ function p19Phrase(p19) {
   return variation ? `${level} · ${variation}` : level;
 }
 
-function sourcesFromOption(option) {
-  return (option?.coordinates || []).map((coord) => ({
-    x: Number(coord.x),
-    y: Number(coord.y),
-    placement: coord.placement,
-  }));
-}
-
 // Expected cabinet rotation for a wall placement. The recommendation surfaces
 // only front/rear-wall arrangements, so orientation is a deterministic read of
 // the wall the active cabinet sits at.
@@ -139,56 +131,6 @@ export function arrangementMatchesOption(instances, option) {
   if (!orientOk) return false;
 
   return true;
-}
-
-function RoomPlanPreview({ roomDims, seatingPositions, layoutSources, rspPosition }) {
-  const width = Number(roomDims?.widthM) || 1;
-  const length = Number(roomDims?.lengthM) || 1;
-  const pad = Math.max(width, length) * 0.08;
-  const seatRadius = Math.max(0.08, Math.min(width, length) * 0.035);
-  const subRadius = Math.max(0.1, Math.min(width, length) * 0.05);
-  return (
-    <svg
-      viewBox={`${-pad} ${-pad} ${width + pad * 2} ${length + pad * 2}`}
-      className="w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]"
-      style={{ minHeight: 180 }}
-      role="img"
-      aria-label="Room plan showing seating and evaluated subwoofer positions"
-    >
-      <text x={width / 2} y={-pad * 0.25} textAnchor="middle" fontSize={Math.max(0.12, pad * 0.45)} fill="#8A7B6A">FRONT</text>
-      <rect x="0" y="0" width={width} height={length} fill="white" stroke="#BFB9AE" strokeWidth={Math.max(0.02, subRadius * 0.1)} />
-      <line x1={0} y1={0} x2={width} y2={0} stroke="#1B1A1A" strokeWidth={Math.max(0.04, subRadius * 0.22)} />
-      {rspPosition && Number.isFinite(rspPosition.x) && (
-        <line
-          x1={rspPosition.x} y1={0} x2={rspPosition.x} y2={length}
-          stroke="#BFB9AE" strokeWidth={Math.max(0.015, subRadius * 0.08)}
-          strokeDasharray={`${subRadius * 0.5} ${subRadius * 0.4}`}
-        />
-      )}
-      {(Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => {
-        const x = Number(seat?.x);
-        const y = Number(seat?.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-        const isPrimary = seat?.isPrimary || seat?.priority === "primary";
-        return (
-          <circle key={seat?.id} cx={x} cy={y} r={seatRadius}
-            fill={isPrimary ? "#D6D0C4" : "#E8E5DF"} stroke="#BFB9AE"
-            strokeWidth={Math.max(0.012, seatRadius * 0.12)} />
-        );
-      })}
-      {(layoutSources || []).map((source, index) => {
-        const x = Number(source?.x);
-        const y = Number(source?.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-        return (
-          <g key={index}>
-            <circle cx={x} cy={y} r={subRadius} fill="#213428" />
-            <text x={x} y={y + subRadius * 0.34} textAnchor="middle" fontSize={subRadius} fontWeight="700" fill="white">{index + 1}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
 }
 
 function LayoutMiniSchematic({ option, roomDims }) {
@@ -281,8 +223,6 @@ export default function EvaluatedLayoutCards({
   options,
   status,
   roomDims,
-  seatingPositions,
-  rspPosition,
   subwooferInstances,
   frontSubsCfg,
   rearSubsCfg,
@@ -300,12 +240,6 @@ export default function EvaluatedLayoutCards({
     }
     return map;
   }, [options]);
-
-  const selectedOption = selectedQuantity ? optionsByQuantity[selectedQuantity] : null;
-  const previewSources = useMemo(
-    () => (selectedOption ? sourcesFromOption(selectedOption) : null),
-    [selectedOption],
-  );
 
   const isApplied = (option) => arrangementMatchesOption(subwooferInstances, option);
 
@@ -380,53 +314,27 @@ export default function EvaluatedLayoutCards({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 basis-[320px] max-w-[420px] space-y-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Room and Seating</div>
-          <RoomPlanPreview
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+        {evaluating && [1, 2, 4].map((q) => (
+          <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
+        ))}
+        {!evaluating && options.length > 0 && [1, 2, 4].map((quantity) => (
+          <EvaluatedCard
+            key={quantity}
+            option={optionsByQuantity[quantity]}
             roomDims={roomDims}
-            seatingPositions={seatingPositions}
-            layoutSources={previewSources}
-            rspPosition={rspPosition}
+            isSelected={selectedQuantity === quantity}
+            onSelect={setSelectedQuantity}
+            isApplied={optionsByQuantity[quantity] ? isApplied(optionsByQuantity[quantity]) : false}
+            onConfirmApply={() => handleConfirmApply(optionsByQuantity[quantity])}
+            canApply
           />
-          {selectedOption && (
-            <div className="text-[11px] text-[#625143]">
-              <span className="font-semibold">Current Selection:</span> {LAYOUT_TITLES[selectedOption.quantity]}
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1 basis-[320px] max-w-[420px] space-y-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Evaluated Layouts</div>
-          {evaluating && (
-            <div className="space-y-2">
-              {[1, 2, 4].map((q) => (
-                <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
-              ))}
-            </div>
-          )}
-          {!evaluating && options.length > 0 && (
-            <div className="space-y-2">
-              {[1, 2, 4].map((quantity) => (
-                <EvaluatedCard
-                  key={quantity}
-                  option={optionsByQuantity[quantity]}
-                  roomDims={roomDims}
-                  isSelected={selectedQuantity === quantity}
-                  onSelect={setSelectedQuantity}
-                  isApplied={optionsByQuantity[quantity] ? isApplied(optionsByQuantity[quantity]) : false}
-                  onConfirmApply={() => handleConfirmApply(optionsByQuantity[quantity])}
-                  canApply
-                />
-              ))}
-            </div>
-          )}
-          {!evaluating && options.length === 0 && !waiting && (
-            <p className="text-[11px] text-[#625143]">No evaluated layouts available. Manual placement remains available.</p>
-          )}
-          {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}
-        </div>
+        ))}
       </div>
+      {!evaluating && options.length === 0 && !waiting && (
+        <p className="text-[11px] text-[#625143]">No evaluated layouts available. Manual placement remains available.</p>
+      )}
+      {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}
     </div>
   );
 }

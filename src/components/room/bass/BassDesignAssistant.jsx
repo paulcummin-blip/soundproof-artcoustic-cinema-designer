@@ -294,8 +294,6 @@ export default function BassDesignAssistant({
           options={evaluatedRecommendations.options}
           status={evaluatedRecommendations.status}
           roomDims={roomDims}
-          seatingPositions={seatingPositions}
-          rspPosition={rspPosition}
           subwooferInstances={subwooferInstances}
           frontSubsCfg={frontSubsCfg}
           rearSubsCfg={rearSubsCfg}
@@ -321,8 +319,6 @@ export default function BassDesignAssistant({
           options={[]}
           status="evaluating"
           roomDims={roomDims}
-          seatingPositions={seatingPositions}
-          rspPosition={rspPosition}
           subwooferInstances={subwooferInstances}
           frontSubsCfg={frontSubsCfg}
           rearSubsCfg={rearSubsCfg}
