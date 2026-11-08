@@ -368,7 +368,8 @@ export default function RoomDesignerControlsPanel({
         <CollapsiblePanel
           title="Subwoofer Design"
           icon={<Waves className="w-5 h-5" />}
-          defaultOpen={false}>
+          defaultOpen={false}
+          keepMounted>
           {isFrozen('bass') &&
             <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
               This tab is frozen. Unlock to make changes.
