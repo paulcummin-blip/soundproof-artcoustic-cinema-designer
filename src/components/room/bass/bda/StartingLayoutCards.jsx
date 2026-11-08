@@ -2,10 +2,9 @@
 // ---------------------------------------------------------------------------
 // Sprint 1 — Stage 1: Choose Layout
 //
-// Two-column decision area:
-//   Left:  Room & Seating plan (updates to show selected layout's sub positions)
-//   Right:  Decision header, instruction, recommendation, three selectable
-//          cards, single action button.
+// Compact decision area: header, three selectable layout cards (1, 2, 4
+// subs) each carrying its own mini schematic, and a single action button.
+// Full-width grid — same presentation principle as EvaluatedLayoutCards.
 //
 // No RP22. No performance. No engineering. No predictions.
 // No advantages. No limitations. No "recommended for..."
@@ -61,108 +60,6 @@ function currentSourcesFrom(subs) {
       };
     })
     .filter((source) => Number.isFinite(source.x) && Number.isFinite(source.y));
-}
-
-// ── Room plan preview ──
-function RoomPlanPreview({ roomDims, seatingPositions, layoutSources, rspPosition }) {
-  const width = Number(roomDims?.widthM) || 1;
-  const length = Number(roomDims?.lengthM) || 1;
-  const pad = Math.max(width, length) * 0.08;
-  const seatRadius = Math.max(0.08, Math.min(width, length) * 0.035);
-  const subRadius = Math.max(0.1, Math.min(width, length) * 0.05);
-
-  return (
-    <svg
-      viewBox={`${-pad} ${-pad} ${width + pad * 2} ${length + pad * 2}`}
-      className="w-full rounded-md border border-[#D9D5CE] bg-[#F8F7F4]"
-      style={{ minHeight: 180 }}
-      role="img"
-      aria-label="Room plan showing seating and subwoofer positions"
-    >
-      <text x={width / 2} y={-pad * 0.25} textAnchor="middle" fontSize={Math.max(0.12, pad * 0.45)} fill="#8A7B6A">FRONT</text>
-      {/* Room outline */}
-      <rect x="0" y="0" width={width} height={length} fill="white" stroke="#BFB9AE" strokeWidth={Math.max(0.02, subRadius * 0.1)} />
-      {/* Front wall — thicker */}
-      <line x1={0} y1={0} x2={width} y2={0} stroke="#1B1A1A" strokeWidth={Math.max(0.04, subRadius * 0.22)} />
-      {/* Centerline (RSP) */}
-      {rspPosition && Number.isFinite(rspPosition.x) && (
-        <line
-          x1={rspPosition.x}
-          y1={0}
-          x2={rspPosition.x}
-          y2={length}
-          stroke="#BFB9AE"
-          strokeWidth={Math.max(0.015, subRadius * 0.08)}
-          strokeDasharray={`${subRadius * 0.5} ${subRadius * 0.4}`}
-        />
-      )}
-      {/* Seats */}
-      {(Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => {
-        const x = Number(seat?.x);
-        const y = Number(seat?.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-        const isPrimary = seat?.isPrimary || seat?.priority === "primary";
-        return (
-          <circle
-            key={seat?.id}
-            cx={x}
-            cy={y}
-            r={seatRadius}
-            fill={isPrimary ? "#D6D0C4" : "#E8E5DF"}
-            stroke="#BFB9AE"
-            strokeWidth={Math.max(0.012, seatRadius * 0.12)}
-          />
-        );
-      })}
-      {/* Sub positions for selected layout */}
-      {(layoutSources || []).map((source, index) => {
-        const x = Number(source?.x);
-        const y = Number(source?.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-        return (
-          <g key={source?.id || index}>
-            <circle cx={x} cy={y} r={subRadius} fill="#213428" />
-            <text x={x} y={y + subRadius * 0.34} textAnchor="middle" fontSize={subRadius} fontWeight="700" fill="white">{index + 1}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-// ── Seating badges ──
-function SeatingBadges({ seatingPositions, rspPosition, roomDims }) {
-  const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
-  const rowNumbers = [...new Set(seats.map((s) => s?.rowNumber).filter(Number.isFinite))].sort((a, b) => a - b);
-  const primaryRow = rowNumbers[0];
-  const secondaryRow = rowNumbers[1];
-  const primaryCount = seats.filter((s) => s?.rowNumber === primaryRow).length;
-  const secondaryCount = secondaryRow != null ? seats.filter((s) => s?.rowNumber === secondaryRow).length : 0;
-
-  const isCentred = rspPosition && roomDims
-    && Number.isFinite(rspPosition.x)
-    && Number.isFinite(roomDims.widthM)
-    && Math.abs(rspPosition.x - roomDims.widthM / 2) < 0.15;
-
-  const badges = [];
-  if (isCentred) badges.push("Centred RSP");
-  if (primaryCount > 0) badges.push(`Primary row: ${primaryCount}`);
-  if (secondaryCount > 0) badges.push(`Secondary row: ${secondaryCount}`);
-
-  if (badges.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {badges.map((badge) => (
-        <span
-          key={badge}
-          className="rounded-full border border-[#D9D5CE] bg-white px-2.5 py-1 text-[10px] font-medium text-[#625143]"
-        >
-          {badge}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 // ── Mini schematic for each card ──
@@ -307,11 +204,6 @@ export default function StartingLayoutCards({
     });
   };
 
-  const roomLabel = roomDims?.widthM && roomDims?.lengthM
-    ? `${Number(roomDims.widthM).toFixed(1)} × ${Number(roomDims.lengthM).toFixed(1)} m`
-    : "";
-  const seatCount = Array.isArray(seatingPositions) ? seatingPositions.length : 0;
-
   return (
     <div className="space-y-3" data-bda-stage="choose-layout" data-advisor-status={advisor.status}>
       {/* Workspace header */}
@@ -327,95 +219,53 @@ export default function StartingLayoutCards({
         </p>
       </div>
 
-      {/* Two-column: room plan (40%) + gutter (20%) + decision cards (40%) */}
-      {/* Container-driven two-column: each panel asks for 320px of real space,
-          so the cards stack whenever the hosting panel is actually narrow — a
-          viewport media query cannot know how wide this panel is. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {/* Left: Room & Seating — 40% width when the panel has room for it */}
-        <div className="min-w-0 flex-1 basis-[320px] max-w-[420px] space-y-2">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Room and Seating</div>
-            <div className="text-[11px] text-[#8A7B6A]">
-              {roomLabel}
-              {seatCount > 0 && ` · ${seatCount} seat${seatCount > 1 ? "s" : ""}`}
-            </div>
-          </div>
-          <RoomPlanPreview
-            roomDims={roomDims}
-            seatingPositions={seatingPositions}
-            layoutSources={selectedLayout?.sources}
-            rspPosition={rspPosition}
-          />
-          {/* Current Selection — tiny, calm, reinforces the plan */}
-          {selectedLayout && (
-            <div className="text-[11px] text-[#625143]">
-              <span className="font-semibold">Current Selection:</span>{" "}
-              {LAYOUT_TITLES[selectedQuantity]}
-            </div>
-          )}
-          <SeatingBadges
-            seatingPositions={seatingPositions}
-            rspPosition={rspPosition}
-            roomDims={roomDims}
-          />
+      {/* Error state — advisor failed, but fallback cards still show */}
+      {advisorError && (
+        <p className="text-[11px] text-[#4A230F]">Optimised placement unavailable — showing standard layouts. Manual placement remains available.</p>
+      )}
+
+      {/* Loading state — only when no fallback available (invalid room) */}
+      {advisorLoading && (
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          {[1, 2, 4].map((q) => (
+            <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
+          ))}
         </div>
+      )}
 
-        {/* Right: Decision cards — 40% width when the panel has room for it */}
-        <div className="min-w-0 flex-1 basis-[320px] max-w-[420px] space-y-2">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">Starting Layouts</div>
-            <div className="text-[11px] text-[#8A7B6A]">Choose a physical arrangement</div>
-          </div>
-
-          {/* Loading state — only when no fallback available (invalid room) */}
-          {advisorLoading && (
-            <div className="space-y-2">
-              {[1, 2, 4].map((q) => (
-                <div key={q} className="h-20 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
-              ))}
-            </div>
-          )}
-
-          {/* Error state — advisor failed, but fallback cards still show */}
-          {advisorError && (
-            <p className="text-[11px] text-[#4A230F]">Optimised placement unavailable — showing standard layouts. Manual placement remains available.</p>
-          )}
-
-          {/* Cards — always render when recommendations exist (advisor or fallback) */}
-          {recommendations[2] && (
-            <div className="space-y-2">
-              {[1, 2, 4].map((quantity) => (
-                <LayoutCard
-                  key={quantity}
-                  quantity={quantity}
-                  layout={recommendations[quantity]}
-                  roomDims={roomDims}
-                  isSelected={selectedQuantity === quantity}
-                  onSelect={setSelectedQuantity}
-                  isApplied={recommendations[quantity] ? isApplied(recommendations[quantity]) : false}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Action button — enabled whenever a layout is selected and
-              commitInstances is available. Not gated by hasCanonicalInstances
-              because buildAppliedInstances creates instances from scratch. */}
-          {selectedLayout && (
-            <button
-              type="button"
-              onClick={apply}
-              className="w-full rounded-lg bg-[#213428] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
-            >
-              Use {selectedQuantity}-sub layout
-            </button>
-          )}
-
-          {applyError && <p className="text-xs text-red-700">{applyError}</p>}
+      {/* Cards — always render when recommendations exist (advisor or fallback).
+          Full-width grid matches the evaluated-layout presentation so the
+          cards are the primary content in every state. */}
+      {recommendations[2] && (
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          {[1, 2, 4].map((quantity) => (
+            <LayoutCard
+              key={quantity}
+              quantity={quantity}
+              layout={recommendations[quantity]}
+              roomDims={roomDims}
+              isSelected={selectedQuantity === quantity}
+              onSelect={setSelectedQuantity}
+              isApplied={recommendations[quantity] ? isApplied(recommendations[quantity]) : false}
+            />
+          ))}
         </div>
-      </div>
+      )}
 
+      {/* Action button — enabled whenever a layout is selected and
+          commitInstances is available. Not gated by hasCanonicalInstances
+          because buildAppliedInstances creates instances from scratch. */}
+      {selectedLayout && (
+        <button
+          type="button"
+          onClick={apply}
+          className="w-full rounded-lg bg-[#213428] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
+        >
+          Use {selectedQuantity}-sub layout
+        </button>
+      )}
+
+      {applyError && <p className="text-xs text-red-700">{applyError}</p>}
     </div>
   );
 }
