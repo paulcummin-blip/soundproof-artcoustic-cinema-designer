@@ -84,11 +84,15 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
   // persisted snapshot and restore as soon as the final fingerprint is known.
   // Validate against the scoped `fingerprint` so a saved recommendation-scope
   // cache (`|rec:1,2,4`) hydrates its own request without requiring a
-  // three-sub result. Publish keeps the base fingerprint so the shared
-  // controller's multi-consumer coordination is unchanged.
+  // three-sub result. Publish the scoped execution `fingerprint` — the same
+  // identity a fresh completed search writes via publishStage1Complete — so
+  // Stage 2 receives an identical Stage 1 identity whether Stage 1 ran live or
+  // hydrated from cache. baseFingerprint is retained for the completeness
+  // compatibility check below (a full unscoped result still satisfies a scoped
+  // request) and for the dependency array, but is NOT the published identity.
   useEffect(() => {
     if (!hydrationDone || !isStage1CacheValid(hydratedCache, fingerprint)) return;
-    publishHydratedStage1(projectId, versionId, baseFingerprint, {
+    publishHydratedStage1(projectId, versionId, fingerprint, {
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
       three_sub_result: hydratedCache.three_sub_result,
@@ -156,8 +160,11 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     // Restore synchronously here as well so scheduling cannot race the restore
     // effect during the same commit. Validate against the scoped fingerprint
     // so a saved recommendation-scope cache hydrates without a re-search.
+    // Publish the scoped execution `fingerprint` so the hydrated live state
+    // carries the same Stage 1 identity a fresh completed search would, and
+    // Stage 2 derives an identical downstream fingerprint from either path.
     if (isStage1CacheValid(hydratedCache, fingerprint)) {
-      publishHydratedStage1(projectId, versionId, baseFingerprint, {
+      publishHydratedStage1(projectId, versionId, fingerprint, {
         one_sub_result: hydratedCache.one_sub_result,
         two_sub_result: hydratedCache.two_sub_result,
         three_sub_result: hydratedCache.three_sub_result,
