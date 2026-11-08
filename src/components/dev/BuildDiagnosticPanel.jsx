@@ -8,22 +8,22 @@ const REPORT_GATE_VERSION = "engineering-report-completeness-v1";
 
 // Floating verification aid for the build id, checkpoint versions, the report
 // gate and the restore checklist. It is OFF on every normal load — dealer,
-// client, partner and admin alike — and appears only when somebody asks for it
-// explicitly:
+// client, partner and admin alike, in preview and in production — and appears
+// only when a developer asks for it explicitly:
 //
 //   · ?debugBuild=1                             (URL query parameter)
 //   · soundproof:debug:buildDiagnostic = "true"  (localStorage)
-//   · the local development server               (import.meta.env.DEV)
 //   · SHOW_DEBUG_PANEL in components/utils/diagnostics.js
 //
-// Closing it hides it for the rest of the browser session, so whoever has
-// finished looking at it is not followed by it from page to page.
+// It is never auto-enabled by the dev server, so preview and production stay
+// clean. Closing it hides it for the rest of the browser session, so whoever
+// has finished looking at it is not followed by it from page to page.
 const QUERY_FLAG = "debugBuild";
 const STORAGE_FLAG = "soundproof:debug:buildDiagnostic";
 const DISMISSED_KEY = "soundproof:debug:buildDiagnostic:dismissed";
 
 function isExplicitlyRequested() {
-  if (SHOW_DEBUG_PANEL || import.meta.env.DEV) return true;
+  if (SHOW_DEBUG_PANEL) return true;
   if (typeof window === "undefined") return false;
   try {
     if (new URLSearchParams(window.location.search).get(QUERY_FLAG) === "1") return true;
