@@ -362,11 +362,14 @@ function buildCanonicalQuantitySnapshot(evaluated, quantity, opts = {}) {
   const ranked = [...eligible].sort(compareStage2Results);
 
   let best;
-  if (preserveBest && isCandidateEligibleForRecommendation(preserveBest)) {
-    // Hydration: keep a still-eligible historical bestFinalist (by finalistId)
-    // so a valid saved recommendation — including a side/mixed candidate chosen
-    // via the shared-null exception — is preserved verbatim. The preserved
-    // candidate must be a member of the eligible ranked pool.
+  if (preserveBest && isCandidateEligibleForRecommendation(preserveBest)
+      && !isSideOrMixedWallFamily(preserveBest?.familyId)) {
+    // Hydration: keep a still-eligible historical CONVENTIONAL bestFinalist
+    // (by finalistId) so a valid saved front/rear recommendation is preserved
+    // verbatim. A side/mixed historical bestFinalist (from the former
+    // displacement behaviour) is NOT preserved — under the new contract the
+    // practical front/rear is always the normal recommendation and the
+    // side/mixed candidate is surfaced as an alternative when it qualifies.
     const preserved = ranked.find((r) => r?.finalistId && r.finalistId === preserveBest.finalistId);
     if (preserved) {
       best = preserved;
@@ -374,8 +377,9 @@ function buildCanonicalQuantitySnapshot(evaluated, quantity, opts = {}) {
       best = selectPracticalBest(ranked, { getRawTransfer });
     }
   } else {
-    // Fresh construction (or a stale/unmatched historical best): apply the
-    // practical front/rear preference to the eligible ranked pool.
+    // Fresh construction (or a side/mixed / stale / unmatched historical
+    // best): apply the practical front/rear preference to the eligible
+    // ranked pool.
     best = selectPracticalBest(ranked, { getRawTransfer });
   }
 

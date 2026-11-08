@@ -1,47 +1,39 @@
 // stage2PracticalPlacementPreference.js
 // ---------------------------------------------------------------------------
-// Practical placement preference at the FINAL recommendation selection
-// boundary, applied AFTER canonical engineering evaluation.
+// Practical placement preference + exceptional side/mixed-wall alternatives at
+// the FINAL recommendation selection boundary, applied AFTER canonical
+// engineering evaluation.
 //
-// Product policy: the default recommended arrangement for each quantity is the
-// best physically feasible FRONT/REAR-wall arrangement. A side-wall or
-// mixed-wall arrangement must not displace a conventional front/rear candidate
-// solely because it ranks slightly better numerically (e.g. a within-Level
-// floored-dB difference). It may displace it only when EXISTING authoritative
-// engineering evidence establishes a compelling benefit that justifies the
-// installation compromise.
+// Product policy:
+//   - The normal recommendation for each quantity is the best physically
+//     feasible FRONT/REAR-wall arrangement. A side/mixed-wall arrangement NEVER
+//     displaces it as the recommendation, regardless of any raw numerical
+//     advantage. The practical front/rear option is always visible.
+//   - A side/mixed-wall arrangement may be presented as an ADDITIONAL
+//     "Alternative placement" card only when EXISTING authoritative engineering
+//     evidence establishes an actual improvement in a displayed Sound Proof
+//     P19 RSP or Primary P20 Performance Level, with no regression in the
+//     other relevant Level. An improvement affecting only Secondary seating
+//     never qualifies on its own.
 //
 // This module changes NO acoustic physics, NO RP22 scoring, NO Stage 1/2
 // candidate generation, NO tuning and NO ranking maths. It only chooses which
-// already-ranked finalist becomes the recommendation. The canonical acoustic
-// ranking (compareStage2Results) is reused unchanged; the evaluated-finalist
-// list and every candidate's P19/P20 evidence are preserved verbatim.
+// already-ranked finalists become the normal recommendation and the optional
+// alternatives. The canonical acoustic ranking (compareStage2Results) is reused
+// unchanged; the evaluated-finalist list and every candidate's P19/P20
+// evidence are preserved verbatim.
 //
-// Compelling benefit (existing evidence only — no new grade, no fixed dB
-// threshold, no weighted score):
-//   (a) A whole Primary P20 Performance Level improvement over the best
-//       front/rear candidate, with no P19 RSP Level regression; OR
-//   (b) A whole P19 RSP Performance Level improvement, with no Primary P20
-//       Level regression; OR
-//   (c) The conventional candidate carries a CONFIRMED shared destructive
-//       null (existing sharedNullSafeguard severity "confirmed") and the
-//       side/mixed candidate does NOT — the side/mixed resolves a serious
-//       shared-null problem. Best-effort: only when raw transfers are
-//       available from the caller.
-//
-// If no viable front/rear candidate exists, the existing acoustic winner
-// stands (the fallback may consider side walls).
+// Uses the existing Sound Proof whole-number, round-down grading convention —
+// the Levels already stamped on each Stage 2 result. No new grade, no fixed dB
+// threshold, no weighted score.
 // ---------------------------------------------------------------------------
 
 import { FAMILY_IDS } from "../stage1/stage1FamilyRegistry.js";
-import { compareStage2Results } from "./stage2Ranking.js";
-import { assessSharedNullSafeguard } from "./sharedNullSafeguard.js";
 
 // Families whose canonical seed places one or more sources on a SIDE wall
 // (xNorm ∈ {0,1}, yNorm strictly between 0 and 1) or mixes side-wall sources
-// with front/rear-wall sources. These are the only families the practical
-// preference ever defers; every other family (front/rear wall, corners,
-// three-sub front/rear topologies, custom boundary) is conventional.
+// with front/rear-wall sources. These are the only families ever considered as
+// exceptional alternatives; every other family is conventional.
 const SIDE_OR_MIXED_FAMILY_IDS = new Set([
   FAMILY_IDS.ONE_SIDE_QUARTER,
   FAMILY_IDS.RP22_G,            // left/right wall midpoints
@@ -84,21 +76,33 @@ function rspP19Level(result) {
 }
 
 /**
- * Decide whether a side/mixed candidate has a compelling engineering benefit
- * over the best conventional (front/rear) candidate, using ONLY existing
- * authoritative P19/P20 Levels and the existing shared-null safeguard.
+ * Decide whether a side/mixed candidate has a whole-Level improvement over
+ * the practical (front/rear) candidate, with no regression in the other
+ * relevant Level. Primary-weighted: a Secondary-only improvement never
+ * qualifies.
+ *
+ * Qualifying improvements (existing stamped Levels only):
+ *   (a) A whole Primary P20 Performance Level improvement, with no P19 RSP
+ *       Level regression; OR
+ *   (b) A whole P19 RSP Performance Level improvement, with no Primary P20
+ *       Level regression.
  *
  * @private
  * @param {object} sideMixed — side/mixed-wall candidate result
- * @param {object} conventional — front/rear candidate result
- * @param {function|null} getRawTransfer — (result) => rawTransfer | null
+ * @param {object} practical — practical front/rear candidate result
  * @returns {boolean}
  */
-function hasCompellingBenefit(sideMixed, conventional, getRawTransfer) {
+function hasWholeLevelImprovement(sideMixed, practical) {
   const sP19 = rspP19Level(sideMixed);
-  const cP19 = rspP19Level(conventional);
+  const cP19 = rspP19Level(practical);
   const sPrimP20 = worstPrimaryP20Level(sideMixed);
-  const cPrimP20 = worstPrimaryP20Level(conventional);
+  const cPrimP20 = worstPrimaryP20Level(practical);
+
+  // Need at least one Level pair to compare; if both are missing, no
+  // evidence-based improvement can be established.
+  if ((sP19 == null || cP19 == null) && (sPrimP20 == null || cPrimP20 == null)) {
+    return false;
+  }
 
   // (a) Whole Primary P20 Level improvement, no P19 RSP regression.
   if (sPrimP20 != null && cPrimP20 != null && sPrimP20 > cPrimP20) {
@@ -108,23 +112,6 @@ function hasCompellingBenefit(sideMixed, conventional, getRawTransfer) {
   if (sP19 != null && cP19 != null && sP19 > cP19) {
     if (sPrimP20 == null || cPrimP20 == null || sPrimP20 >= cPrimP20) return true;
   }
-  // (c) Confirmed shared-null resolution (best-effort, existing safeguard).
-  if (getRawTransfer) {
-    try {
-      const convRaw = getRawTransfer(conventional);
-      const sideRaw = getRawTransfer(sideMixed);
-      if (convRaw && sideRaw) {
-        const convNull = assessSharedNullSafeguard(convRaw, conventional);
-        const sideNull = assessSharedNullSafeguard(sideRaw, sideMixed);
-        if (convNull?.severity === "confirmed" && sideNull?.severity !== "confirmed") {
-          return true;
-        }
-      }
-    } catch {
-      // Shared-null assessment is best-effort: unavailable evidence never
-      // blocks the default front/rear preference.
-    }
-  }
   return false;
 }
 
@@ -132,9 +119,10 @@ function hasCompellingBenefit(sideMixed, conventional, getRawTransfer) {
  * Practical placement preference at the final recommendation selection
  * boundary, applied AFTER canonical ranking.
  *
- * Default: select the best physically feasible front/rear-wall arrangement.
- * A side/mixed-wall arrangement may displace it only when existing
- * engineering evidence establishes a compelling benefit.
+ * Always returns the best physically feasible front/rear-wall arrangement.
+ * A side/mixed-wall arrangement never displaces it. When no conventional
+ * candidate exists, the existing acoustic winner stands (the fallback may be
+ * a side-wall arrangement, with no invented compliance claim).
  *
  * The canonical acoustic ranking is reused unchanged: `ranked` is already
  * sorted by compareStage2Results. The returned candidate is always a member
@@ -142,33 +130,48 @@ function hasCompellingBenefit(sideMixed, conventional, getRawTransfer) {
  * are preserved.
  *
  * @param {Array} ranked — results already sorted by compareStage2Results
- * @param {object} [opts]
- * @param {function} [opts.getRawTransfer] — (result) => rawTransfer | null
- *   Best-effort accessor for the cached placement raw transfer, used only for
- *   the shared-null exception. Null/omitted = shared-null evidence unavailable.
- * @returns {object|null} the policy-selected best finalist
+ * @param {object} [_opts] — reserved (ignored); kept for call-site stability
+ * @returns {object|null} the practical best finalist
  */
-export function selectPracticalBest(ranked, opts = {}) {
+export function selectPracticalBest(ranked, _opts = {}) {
   if (!Array.isArray(ranked) || !ranked.length) return null;
-  const getRawTransfer = typeof opts.getRawTransfer === "function" ? opts.getRawTransfer : null;
-
   const bestConventional = ranked.find((r) => !isSideOrMixedWallFamily(r?.familyId)) || null;
-  const bestSideMixed = ranked.find((r) => isSideOrMixedWallFamily(r?.familyId)) || null;
+  if (bestConventional) return bestConventional;
+  // No conventional front/rear candidate — keep the existing acoustic winner.
+  return ranked[0];
+}
 
-  // No conventional front/rear candidate — keep the existing acoustic winner
-  // (the fallback may consider side walls, with no invented compliance claim).
-  if (!bestConventional) return ranked[0];
-  // No side/mixed candidate — conventional wins by default.
-  if (!bestSideMixed) return bestConventional;
-
-  // If the conventional candidate already ranks higher or ties acoustically,
-  // keep it — no within-Level numerical edge can displace it.
-  if (compareStage2Results(bestSideMixed, bestConventional) >= 0) return bestConventional;
-
-  // The side/mixed candidate ranks higher acoustically. Apply the
-  // compelling-benefit exception before letting it displace the front/rear.
-  if (hasCompellingBenefit(bestSideMixed, bestConventional, getRawTransfer)) {
-    return bestSideMixed;
+/**
+ * Select qualifying exceptional side/mixed-wall alternatives for a quantity,
+ * relative to the practical best. An alternative qualifies only when it
+ * delivers an actual whole-Level improvement in P19 RSP or Primary P20, with
+ * no regression in the other relevant Level. Secondary-only improvements do
+ * not qualify.
+ *
+ * `ranked` is the eligible, ranked evaluated-finalist set for the quantity
+ * (already filtered and sorted by the shared Stage 2 authority). The
+ * practical best is excluded. Results are returned in ranked order (best
+ * first), deduplicated by finalistId so no duplicate or near-identical
+ * alternative is surfaced. No new acoustic work, no new grade — only the
+ * existing stamped Levels are compared.
+ *
+ * @param {Array} ranked — eligible ranked finalists for the quantity
+ * @param {object} practicalBest — the practical best finalist
+ * @returns {Array} qualifying side/mixed alternatives (Stage 2 results)
+ */
+export function selectQualifyingAlternatives(ranked, practicalBest) {
+  if (!Array.isArray(ranked) || !ranked.length) return [];
+  const practicalId = practicalBest?.finalistId || null;
+  const seen = new Set();
+  const out = [];
+  for (const result of ranked) {
+    if (!result) continue;
+    if (practicalId && result.finalistId === practicalId) continue;
+    if (!isSideOrMixedWallFamily(result.familyId)) continue;
+    if (seen.has(result.finalistId)) continue;
+    if (!hasWholeLevelImprovement(result, practicalBest)) continue;
+    seen.add(result.finalistId);
+    out.push(result);
   }
-  return bestConventional;
+  return out;
 }

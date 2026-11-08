@@ -14,10 +14,20 @@
 // so a Stage 1 proxy, an invented curve or a failed operating point is never
 // shown as a predicted RP22 result. When the evidence is not valid the field
 // is null and the card renders "—".
+//
+// Each quantity surfaces ONE practical front/rear-wall option (the normal
+// recommendation) plus zero or more exceptional side/mixed-wall ALTERNATIVES
+// that deliver an actual whole-Level improvement. The practical option is
+// always visible; alternatives are labelled `placementKind: "alternative"` and
+// carry an `improvement` summary describing the specific RP22 Level gain.
 // ---------------------------------------------------------------------------
 
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { resultEvidenceIsValid } from "../stage2/stage2CandidateEligibility.js";
+import {
+  selectQualifyingAlternatives,
+  isSideOrMixedWallFamily,
+} from "../stage2/stage2PracticalPlacementPreference.js";
 
 const ROTATION_FRONT = 0;
 const ROTATION_REAR = 180;
@@ -93,7 +103,7 @@ export { resultEvidenceIsValid };
  *
  * @param {object} result — Stage 2 canonical finalist result (bestFinalist)
  * @param {Map} seatPriorityMap — seatId → "primary" | "secondary"
- * @param {object} context — { roomDims, selectedSubModel, subwooferBottomHeightM }
+ * @param {object} context — { roomDims, selectedSubModel, subwooferBottomHeightM, placementKind }
  * @returns {object|null} option shape, or null when the result is not a real
  *   evaluated candidate (no coordinates, no quantity)
  */
@@ -145,39 +155,83 @@ export function buildEvaluatedOption(result, seatPriorityMap, context) {
     fingerprint: result.fingerprint || null,
     terminal: result.terminal === true,
     physicalRejection: Boolean(result.physicalRejection),
+    placementKind: context?.placementKind === "alternative" ? "alternative" : "practical",
+    isSideOrMixed: isSideOrMixedWallFamily(result.familyId),
+    improvement: null,
   };
 }
 
 /**
- * Select the best evaluated option per quantity (1, 2, 4) from a Stage 2
- * complete state snapshot. Returns an array ordered by quantity, with null
- * entries omitted. Only quantities whose bestFinalist carries valid evidence
- * (or an explicit terminal/physical rejection that should be shown as "not
- * verified") are included.
+ * Compare an alternative option against the practical option and describe the
+ * specific whole-Level improvement that qualifies it. Uses only the Levels
+ * already stamped on the options — no new grade, no dB threshold.
+ * @private
+ */
+function buildImprovementDescription(altOption, practicalOption) {
+  const p19 = Number.isFinite(altOption?.p19?.level)
+    && Number.isFinite(practicalOption?.p19?.level)
+    && altOption.p19.level > practicalOption.p19.level;
+  const primaryP20 = Number.isFinite(altOption?.p20Primary?.level)
+    && Number.isFinite(practicalOption?.p20Primary?.level)
+    && altOption.p20Primary.level > practicalOption.p20Primary.level;
+  return { p19, primaryP20 };
+}
+
+/**
+ * Select the evaluated options for a Stage 2 complete state snapshot.
+ *
+ * For each quantity (1, 2, 4) the practical front/rear best finalist becomes
+ * the normal recommendation, followed by zero or more exceptional
+ * side/mixed-wall alternatives that deliver an actual whole-Level improvement
+ * over the practical best. Alternatives are drawn from the quantity's eligible
+ * ranked `evaluatedFinalists` (already persisted and hydrated), so no new
+ * acoustic work is triggered and historical caches are surfaced as-is.
+ *
+ * Returns a flat array ordered by quantity (1 practical + alternatives, then
+ * 2 practical + alternatives, then 4). Only quantities whose bestFinalist
+ * carries valid evidence (or an explicit terminal/physical rejection that
+ * should be shown as "not verified") are included.
  *
  * @param {object} stage2State — Stage 2 store state
  * @param {Map} seatPriorityMap
  * @param {object} context
- * @returns {object[]} evaluated options (1–3 entries)
+ * @returns {object[]} evaluated options (practical + qualifying alternatives)
  */
 export function selectEvaluatedOptions(stage2State, seatPriorityMap, context) {
   if (!stage2State || stage2State.status !== "complete") return [];
   const runFingerprint = stage2State.fingerprint || null;
   const buckets = [
-    { quantity: 1, result: stage2State.one_sub_result?.bestFinalist },
-    { quantity: 2, result: stage2State.two_sub_result?.bestFinalist },
-    { quantity: 4, result: stage2State.four_sub_result?.bestFinalist },
+    { result: stage2State.one_sub_result },
+    { result: stage2State.two_sub_result },
+    { result: stage2State.four_sub_result },
   ];
   const options = [];
   for (const bucket of buckets) {
-    if (!bucket.result) continue;
-    const option = buildEvaluatedOption(bucket.result, seatPriorityMap, context);
-    if (option) {
-      // Stamp the Stage 2 run fingerprint so the quantity-aware Apply stale
-      // guard can reject an option whose evaluation no longer matches the
-      // current design.
-      option.fingerprint = runFingerprint;
-      options.push(option);
+    if (!bucket.result?.bestFinalist) continue;
+    const practicalOption = buildEvaluatedOption(bucket.result.bestFinalist, seatPriorityMap, {
+      ...context,
+      placementKind: "practical",
+    });
+    if (!practicalOption) continue;
+    practicalOption.fingerprint = runFingerprint;
+    options.push(practicalOption);
+
+    // Exceptional side/mixed-wall alternatives: drawn from the quantity's
+    // eligible ranked evaluated-finalist set. No new acoustic work, no new
+    // grade — only existing stamped Levels are compared.
+    const evaluatedFinalists = Array.isArray(bucket.result.evaluatedFinalists)
+      ? bucket.result.evaluatedFinalists
+      : [];
+    const alternatives = selectQualifyingAlternatives(evaluatedFinalists, bucket.result.bestFinalist);
+    for (const alt of alternatives) {
+      const altOption = buildEvaluatedOption(alt, seatPriorityMap, {
+        ...context,
+        placementKind: "alternative",
+      });
+      if (!altOption) continue;
+      altOption.fingerprint = runFingerprint;
+      altOption.improvement = buildImprovementDescription(altOption, practicalOption);
+      options.push(altOption);
     }
   }
   return options;

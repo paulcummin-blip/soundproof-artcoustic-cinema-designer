@@ -2,16 +2,23 @@
 // ---------------------------------------------------------------------------
 // The evaluated-recommendation presentation for the Subwoofer Design Starting
 // Layout cards. Rendered IN PLACE of the geometric card column when the
-// cross-quantity Stage 1/2 evaluation has produced current, evaluated options
-// for 1, 2 and 4 subwoofers.
+// cross-quantity Stage 1/2 evaluation has produced current, evaluated options.
+//
+// Each quantity surfaces ONE practical front/rear-wall arrangement (the normal
+// recommendation) plus zero or more exceptional side/mixed-wall ALTERNATIVES
+// that deliver an actual whole-Level improvement. The practical option is
+// always visible; alternatives are labelled "Alternative placement" and carry
+// a short evidence-based note describing the specific RP22 Level gain and the
+// installation compromise. The designer decides whether the acoustic benefit
+// justifies the less convenient installation.
 //
 // Each card shows the option's subwoofer quantity, its exact proposed layout
-// (mini schematic + room plan), and the Stage 2 canonical evaluation's
-// predicted P19, P20 Primary and P20 Secondary where that evidence is valid.
-// It never shows invented or Stage 1 proxy-derived RP22 results — when the
-// evaluation did not produce valid P19/P20 for an option the fields render "—".
+// (mini schematic), and the Stage 2 canonical evaluation's predicted P19,
+// P20 Primary and P20 Secondary where that evidence is valid. It never shows
+// invented or Stage 1 proxy-derived RP22 results — when the evaluation did not
+// produce valid P19/P20 for an option the fields render "—".
 //
-// Selecting an option is a two-step approval: click to select, then click
+// Selecting any option is a two-step approval: click to select, then click
 // "Apply" to confirm. Apply uses the existing quantity-aware Apply authority
 // (quantityPlacementApplyAuthority) so 1→2, 2→4 and 4→1 transitions preserve
 // models, coordinates, orientations and heights, and are fingerprint-protected
@@ -169,7 +176,16 @@ function MetricRow({ label, value, muted }) {
   );
 }
 
-function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onConfirmApply, canApply, blockReason }) {
+function improvementText(option) {
+  if (!option?.improvement) return null;
+  const parts = [];
+  if (option.improvement.p19) parts.push("P19 level improved");
+  if (option.improvement.primaryP20) parts.push("Primary P20 level improved");
+  if (!parts.length) return null;
+  return `${parts.join(" · ")} · side/mixed-wall placement`;
+}
+
+function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onConfirmApply, canApply, blockReason, optionKey }) {
   if (!option) {
     return (
       <div className="rounded-lg border border-dashed border-[#C9C2B8] bg-white/60 p-2.5">
@@ -178,17 +194,25 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
       </div>
     );
   }
+  const isAlternative = option.placementKind === "alternative";
   return (
     <div className={`rounded-lg border p-3 transition-all ${
       isSelected || isApplied
         ? "border-2 border-[#213428] bg-[#F3F1EC]"
-        : "border border-[#D9D5CE] bg-white hover:border-[#BFB9AE]"
+        : isAlternative
+          ? "border border-[#B9AEC1] bg-[#F6F2F8] hover:border-[#9A8AB0]"
+          : "border border-[#D9D5CE] bg-white hover:border-[#BFB9AE]"
     }`}>
       <div className="flex items-center justify-between gap-2">
         <div className="text-[13px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[option.quantity]}</div>
-        {isApplied && (
-          <span className="rounded-full bg-[#213428] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Applied</span>
-        )}
+        <div className="flex items-center gap-1">
+          {isAlternative && (
+            <span className="rounded-full bg-[#625143] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Alternative placement</span>
+          )}
+          {isApplied && (
+            <span className="rounded-full bg-[#213428] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Applied</span>
+          )}
+        </div>
       </div>
       <div className="mt-1.5">
         <LayoutMiniSchematic option={option} roomDims={roomDims} />
@@ -198,6 +222,9 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
         <MetricRow label="P20 Primary" value={option.valid ? p20Phrase(option.p20Primary) : "—"} muted={!option.valid} />
         <MetricRow label="P20 Secondary" value={option.valid ? p20Phrase(option.p20Secondary) : "—"} muted={!option.valid} />
       </div>
+      {isAlternative && option.valid && improvementText(option) && (
+        <div className="mt-1.5 text-[9px] text-[#625143]">{improvementText(option)}</div>
+      )}
       {!option.valid && option.terminal && (
         <div className="mt-1.5 text-[9px] text-[#8A7B6A]">Placement could not be evaluated for this room.</div>
       )}
@@ -214,7 +241,7 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
             </button>
           </>
         ) : (
-          <button type="button" onClick={() => onSelect(option.quantity)} disabled={isApplied}
+          <button type="button" onClick={() => onSelect(optionKey)} disabled={isApplied}
             className="w-full rounded-md border border-[#D9D5CE] px-3 py-1.5 text-[11px] font-medium text-[#1B1A1A] hover:bg-[#F3F1EC] disabled:opacity-50">
             {isApplied ? "Current layout" : "Select"}
           </button>
@@ -225,6 +252,10 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
       )}
     </div>
   );
+}
+
+function optionKeyFor(option) {
+  return `${option.quantity}::${option.finalistId || JSON.stringify(option.coordinates)}`;
 }
 
 export default function EvaluatedLayoutCards({
@@ -238,16 +269,8 @@ export default function EvaluatedLayoutCards({
   currentDesignFingerprint,
   onApplied,
 }) {
-  const [selectedQuantity, setSelectedQuantity] = useState(null);
+  const [selectedKey, setSelectedKey] = useState(null);
   const [applyError, setApplyError] = useState(null);
-
-  const optionsByQuantity = useMemo(() => {
-    const map = {};
-    for (const option of (Array.isArray(options) ? options : [])) {
-      map[option.quantity] = option;
-    }
-    return map;
-  }, [options]);
 
   const isApplied = (option) => arrangementMatchesOption(subwooferInstances, option);
 
@@ -314,7 +337,7 @@ export default function EvaluatedLayoutCards({
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },
     });
-    setSelectedQuantity(null);
+    setSelectedKey(null);
     // Trigger the existing authoritative bass recalculation after the new
     // arrangement has committed. The caller arms a fingerprint-aware effect
     // that runs once the live bass fingerprint reflects the applied design,
@@ -327,6 +350,14 @@ export default function EvaluatedLayoutCards({
   const evaluating = status === "evaluating";
   const waiting = status === "waiting";
 
+  // Render the flat options array (practical first per quantity, then its
+  // alternatives). This keeps the practical option and its exceptional
+  // alternatives visually adjacent without a hard card-count cap.
+  const orderedOptions = useMemo(
+    () => (Array.isArray(options) ? options : []),
+    [options],
+  );
+
   return (
     <div className="space-y-3" data-bda-stage="choose-layout" data-evaluated-status={status}>
       <div>
@@ -338,7 +369,7 @@ export default function EvaluatedLayoutCards({
             ? "Select a subwoofer model and design target to evaluate layouts."
             : evaluating
               ? "Evaluating front and rear wall arrangements for this room…"
-              : "Evaluated layouts for the current room, seating and reference position."}
+              : "Evaluated layouts for the current room, seating and reference position. Practical front/rear-wall placements are shown first; exceptional side/mixed-wall alternatives are labelled."}
         </p>
       </div>
 
@@ -346,20 +377,24 @@ export default function EvaluatedLayoutCards({
         {evaluating && [1, 2, 4].map((q) => (
           <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
         ))}
-        {!evaluating && options.length > 0 && [1, 2, 4].map((quantity) => (
-          <EvaluatedCard
-            key={quantity}
-            option={optionsByQuantity[quantity]}
-            roomDims={roomDims}
-            isSelected={selectedQuantity === quantity}
-            onSelect={setSelectedQuantity}
-            isApplied={optionsByQuantity[quantity] ? isApplied(optionsByQuantity[quantity]) : false}
-            onConfirmApply={() => handleConfirmApply(optionsByQuantity[quantity])}
-            canApply={optionsByQuantity[quantity] ? canApplyOption(optionsByQuantity[quantity]) : false}
-          />
-        ))}
+        {!evaluating && orderedOptions.map((option) => {
+          const key = optionKeyFor(option);
+          return (
+            <EvaluatedCard
+              key={key}
+              option={option}
+              optionKey={key}
+              roomDims={roomDims}
+              isSelected={selectedKey === key}
+              onSelect={setSelectedKey}
+              isApplied={isApplied(option)}
+              onConfirmApply={() => handleConfirmApply(option)}
+              canApply={canApplyOption(option)}
+            />
+          );
+        })}
       </div>
-      {!evaluating && options.length === 0 && !waiting && (
+      {!evaluating && orderedOptions.length === 0 && !waiting && (
         <p className="text-[11px] text-[#625143]">No evaluated layouts available. Manual placement remains available.</p>
       )}
       {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}

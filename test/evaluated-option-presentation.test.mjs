@@ -6,6 +6,10 @@
 // Stage 2 canonical evaluation genuinely carried them, and the option's
 // fingerprint is stamped from the Stage 2 run for the Apply stale guard.
 //
+// Also locks in that each quantity surfaces ONE practical front/rear option
+// plus zero or more exceptional side/mixed-wall alternatives that deliver an
+// actual whole-Level improvement.
+//
 // Run: node --import ./test/_alias-register.mjs --test test/evaluated-option-presentation.test.mjs
 
 import assert from 'node:assert/strict';
@@ -17,6 +21,7 @@ import {
   wallPlacementForCoordinate,
   orientationForCoordinate,
 } from '../src/components/room/bass/bda/evaluatedOptionPresentation.js';
+import { FAMILY_IDS } from '../src/components/room/bass/stage1/stage1FamilyRegistry.js';
 
 const seatPriorityMap = new Map([
   ['seat-1', 'primary'],
@@ -79,6 +84,8 @@ function makeValidResult(overrides = {}) {
   assert.equal(option.p20Primary.level, 2, 'worst primary P20 level is the min across primary seats');
   assert.ok(option.p20Secondary, 'P20 Secondary present');
   assert.equal(option.p20Secondary.level, 1, 'worst secondary P20 level');
+  assert.equal(option.placementKind, 'practical', 'default placementKind is practical');
+  assert.equal(option.improvement, null, 'improvement null for practical option');
 }
 
 // ── 3. P19/P20 withheld when P14 failed (no invented RP22) ──────────────
@@ -106,20 +113,30 @@ function makeValidResult(overrides = {}) {
   assert.equal(buildEvaluatedOption({ ...makeValidResult(), quantity: 3 }, seatPriorityMap, context), null);
 }
 
-// ── 6. selectEvaluatedOptions only when complete; stamps fingerprint ───
+// ── 6. selectEvaluatedOptions: practical only when no alternatives qualify
 {
   const completeState = {
     status: 'complete',
     fingerprint: 'stage2-rec-fp-123',
-    one_sub_result: { bestFinalist: makeValidResult({ finalistId: 'f1', quantity: 1, coordinates: [{ x: 2.5, y: 0.3 }] }) },
-    two_sub_result: { bestFinalist: makeValidResult({ finalistId: 'f2', quantity: 2 }) },
-    four_sub_result: { bestFinalist: makeValidResult({ finalistId: 'f4', quantity: 4, coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }] }) },
+    one_sub_result: {
+      bestFinalist: makeValidResult({ finalistId: 'f1', quantity: 1, coordinates: [{ x: 2.5, y: 0.3 }] }),
+      evaluatedFinalists: [makeValidResult({ finalistId: 'f1', quantity: 1, coordinates: [{ x: 2.5, y: 0.3 }] })],
+    },
+    two_sub_result: {
+      bestFinalist: makeValidResult({ finalistId: 'f2', quantity: 2 }),
+      evaluatedFinalists: [makeValidResult({ finalistId: 'f2', quantity: 2 })],
+    },
+    four_sub_result: {
+      bestFinalist: makeValidResult({ finalistId: 'f4', quantity: 4, coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }] }),
+      evaluatedFinalists: [makeValidResult({ finalistId: 'f4', quantity: 4, coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }] })],
+    },
   };
   const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
-  assert.equal(options.length, 3, 'three evaluated options for a complete 1/2/4 run');
+  assert.equal(options.length, 3, 'three practical options, no qualifying alternatives');
   assert.deepEqual(options.map((o) => o.quantity).sort(), [1, 2, 4]);
   for (const o of options) {
     assert.equal(o.fingerprint, 'stage2-rec-fp-123', 'run fingerprint stamped on every option');
+    assert.equal(o.placementKind, 'practical', 'all practical when no side/mixed qualifies');
   }
 
   // Non-complete state → no options (no proxy-derived cards)
@@ -128,7 +145,109 @@ function makeValidResult(overrides = {}) {
   assert.equal(selectEvaluatedOptions(null, seatPriorityMap, context).length, 0);
 }
 
-// ── 7. wall placement / orientation derivation ─────────────────────────
+// Helper: build rankingData.primarySummary.seats from perSeatP20 + the seat
+// priority map, mirroring buildStage2RankingTuple so the qualifier can read
+// Primary P20 levels.
+function withRankingData(result) {
+  const primarySeats = (result.perSeatP20 || [])
+    .filter((row) => seatPriorityMap.get(row.seatId) === 'primary')
+    .map((row) => ({ seatId: row.seatId, isPrimary: true, p20Level: row.level }));
+  const secondarySeats = (result.perSeatP20 || [])
+    .filter((row) => seatPriorityMap.get(row.seatId) === 'secondary')
+    .map((row) => ({ seatId: row.seatId, isPrimary: false, p20Level: row.level }));
+  return {
+    ...result,
+    rankingData: { primarySummary: { seats: primarySeats }, secondarySummary: { seats: secondarySeats } },
+  };
+}
+
+// ── 7. selectEvaluatedOptions surfaces a qualifying side/mixed alternative
+{
+  const frontRear = withRankingData(makeValidResult({
+    finalistId: 'ftp',
+    familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+    quantity: 4,
+    coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 7.5 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 7.2 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 9.0 },
+    ],
+  }));
+  const sideMixed = withRankingData(makeValidResult({
+    finalistId: 'd',
+    familyId: FAMILY_IDS.RP22_D,
+    quantity: 4,
+    coordinates: [{ x: 0, y: 2.0 }, { x: 0, y: 4.0 }, { x: 5, y: 2.0 }, { x: 5, y: 4.0 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 2, variationDbRaw: 3.5 },
+      { seatId: 'seat-2', level: 2, variationDbRaw: 3.2 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 8.0 },
+    ],
+  }));
+  const completeState = {
+    status: 'complete',
+    fingerprint: 'stage2-rec-fp-alt',
+    one_sub_result: null,
+    two_sub_result: null,
+    four_sub_result: {
+      bestFinalist: frontRear,
+      evaluatedFinalists: [frontRear, sideMixed],
+    },
+  };
+  const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
+  assert.equal(options.length, 2, 'practical + one qualifying alternative');
+  assert.equal(options[0].placementKind, 'practical');
+  assert.equal(options[0].familyId, FAMILY_IDS.FOUR_THIRD_PAIRS);
+  assert.equal(options[1].placementKind, 'alternative');
+  assert.equal(options[1].familyId, FAMILY_IDS.RP22_D);
+  assert.ok(options[1].isSideOrMixed, 'alternative flagged as side/mixed');
+  assert.ok(options[1].improvement, 'alternative carries improvement summary');
+  assert.equal(options[1].improvement.primaryP20, true, 'Primary P20 L1->L2 improvement detected');
+  assert.equal(options[1].improvement.p19, false, 'no P19 improvement in this fixture');
+}
+
+// ── 8. selectEvaluatedOptions omits a non-qualifying side/mixed (same Level)
+{
+  const frontRear = withRankingData(makeValidResult({
+    finalistId: 'ftp',
+    familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+    quantity: 4,
+    coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 7.5 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 7.2 },
+    ],
+  }));
+  const sideMixed = withRankingData(makeValidResult({
+    finalistId: 'b',
+    familyId: FAMILY_IDS.RP22_B_LAST_RESORT,
+    quantity: 4,
+    coordinates: [{ x: 0, y: 2.0 }, { x: 0, y: 4.0 }, { x: 5, y: 2.0 }, { x: 5, y: 4.0 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 6.7 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 6.5 },
+      { seatId: 'seat-3', level: 2, variationDbRaw: 4.5 },
+    ],
+  }));
+  const completeState = {
+    status: 'complete',
+    fingerprint: 'stage2-rec-fp-noalt',
+    four_sub_result: {
+      bestFinalist: frontRear,
+      evaluatedFinalists: [frontRear, sideMixed],
+    },
+  };
+  const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
+  assert.equal(options.length, 1, 'no qualifying alternative (same Primary P20 L1, P19 L4) → practical only');
+  assert.equal(options[0].placementKind, 'practical');
+}
+
+// ── 9. wall placement / orientation derivation ─────────────────────────
 {
   const room = { widthM: 5, lengthM: 6 };
   assert.equal(wallPlacementForCoordinate({ x: 2.5, y: 0.3 }, room), 'front');
