@@ -232,10 +232,14 @@ test("A2. Diagnostic metadata is coalesced into the next legitimate evidence wri
   const storedBank = typeof dbRecord.target_cache === 'string'
     ? JSON.parse(dbRecord.target_cache)
     : dbRecord.target_cache;
+  // The production contract wraps each digest as { values, storedAtMs }.
+  // getFingerprintInputDigest unwraps it; the persisted bank keeps the wrapper.
+  const persistedDigest = storedBank.fingerprintDigests?.['fp-cal-C'];
+  assert.ok(persistedDigest, "diagnostic digest entry must be persisted with the next legitimate evidence write");
   assert.deepEqual(
-    storedBank.fingerprintDigests?.['fp-cal-C'],
+    persistedDigest.values,
     { layout: '4-sub', rsp: 'mid' },
-    "diagnostic digest must be persisted with the next legitimate evidence write",
+    "diagnostic digest values must be persisted with the next legitimate evidence write",
   );
   assert.ok(storedBank.targets['minimum-L3'], "first target still present");
   assert.ok(storedBank.targets['minimum-L4'], "second target present");
