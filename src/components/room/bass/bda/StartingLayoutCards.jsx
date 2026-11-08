@@ -198,10 +198,14 @@ export default function StartingLayoutCards({
     // product default already presented by the subwoofer workflow.
     const appliedModel = frontSubsCfg?.model || rearSubsCfg?.model || "SUB2-12";
     const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, appliedModel);
-    commitInstances(next, {
-      front: { placementMode: "manual", isManual: true },
-      rear: { placementMode: "manual", isManual: true },
-    });
+    try {
+      commitInstances(next, {
+        front: { placementMode: "manual", isManual: true },
+        rear: { placementMode: "manual", isManual: true },
+      });
+    } catch (err) {
+      setApplyError(err?.message || "Could not save a restore point. The layout was not applied.");
+    }
   };
 
   return (

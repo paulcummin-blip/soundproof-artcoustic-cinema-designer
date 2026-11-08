@@ -28,6 +28,7 @@ import {
   captureCheckpoint,
   markCheckpointIncludesSeating,
   getCheckpoint,
+  hasCheckpoint,
   clearCheckpoint,
 } from "./previousDesignCheckpoint";
 import {
@@ -183,53 +184,79 @@ export function captureBeforeApply(projectId, versionId, {
     return false;
   }
 
-  // Coherence check — only capture a known-good state.
-  // FIX 1: When the authority is STALE but captureEligible is true (cold-open
-  // with a valid cached target bank and matching baseDesign), allow the
-  // capture. The stale currentFingerprint is from a previous session's move
-  // that was returned; the contract is for the current physical design.
-  const isCaptureEligible = !!completedBassAuthority?.captureEligible;
-  if (!completedBassAuthority?.authoritative && !isCaptureEligible) {
-    _diag.reason = '!authoritative && !captureEligible';
-    _diag.failedGuard = 'captureEligible';
-    if (_eligibilityDebug) {
-      const failedConditions = [];
-      if (!_eligibilityDebug.visibleCachedContractExists) failedConditions.push('visibleCachedContractExists');
-      if (!_eligibilityDebug.visibleCachedContractAuthoritative) failedConditions.push('visibleCachedContractAuthoritative');
-      if (!_eligibilityDebug.resultFingerprintMatchesCacheKey) failedConditions.push('resultFingerprintMatchesCacheKey');
-      if (!_eligibilityDebug.baseDesignMatches) failedConditions.push('baseDesignMatches');
-      if (_eligibilityDebug.calculationInProgress) failedConditions.push('calculationInProgress');
-      if (_eligibilityDebug.manualAnalysisRequest) failedConditions.push('manualAnalysisRequest');
-      if (_eligibilityDebug.placementPreviewActive) failedConditions.push('placementPreviewActive');
-      _diag.failedConditions = failedConditions;
-    }
-    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
-    return false;
-  }
-  if (!completedBassAuthority?.contract?.job?.resultFingerprint) {
-    _diag.reason = 'no contract.job.resultFingerprint';
-    _diag.failedGuard = 'contract.resultFingerprint';
-    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
-    return false;
-  }
-  const bassFp = completedBassAuthority.contract.job.resultFingerprint;
-  // For an AUTHORITATIVE authority, the currentFingerprint must match the
-  // contract fingerprint (the authority is for the current physical design).
-  // For a captureEligible STALE authority, the currentFingerprint is expected
-  // to differ (that's what makes it STALE) — skip this check since the
-  // captureEligible flag already verified the contract's baseDesign matches.
-  if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) {
-    _diag.reason = 'authoritative && currentFingerprint !== contractResultFingerprint';
-    _diag.failedGuard = 'authoritative.currentFingerprintMatch';
-    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
-    return false;
-  }
+  // A physically valid design is one with subwoofer instances. An uncalculated
+  // baseline (no authoritative bass result) is still a physically valid design
+  // that must be restorable. The engineering fingerprint — the design identity
+  // — is always available from the design state and is required so restore can
+  // reject cross-project/version recovery.
+  const physicalInstances = Array.isArray(appState.subwooferInstances)
+    ? appState.subwooferInstances
+    : null;
+  const hasPhysicalDesign = !!(physicalInstances && physicalInstances.length > 0);
+  _diag.hasPhysicalDesign = hasPhysicalDesign;
 
   const engineeringFingerprint = computeEngFingerprint(appState);
   _diag.hasEngineeringFingerprint = !!engineeringFingerprint;
   if (!engineeringFingerprint) {
     _diag.reason = 'no engineeringFingerprint';
     _diag.failedGuard = 'engineeringFingerprint';
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+    return false;
+  }
+
+  // Coherence check — only capture a known-good engineering state.
+  // FIX 1: When the authority is STALE but captureEligible is true (cold-open
+  // with a valid cached target bank and matching baseDesign), allow the
+  // capture. The stale currentFingerprint is from a previous session's move
+  // that was returned; the contract is for the current physical design.
+  const isCaptureEligible = !!completedBassAuthority?.captureEligible;
+  const isEngineeringCoherent = (!!completedBassAuthority?.authoritative || isCaptureEligible)
+    && !!completedBassAuthority?.contract?.job?.resultFingerprint;
+  if (!isEngineeringCoherent) {
+    // PHYSICAL-ONLY CAPTURE PATH — uncalculated or incoherent baseline.
+    // A physically valid design must be checkpointed before an ADI
+    // recommendation changes its subwoofer configuration, even when no
+    // matching engineering contract exists. Do NOT, however, overwrite an
+    // existing checkpoint: a failed experiment cannot destroy the last
+    // known-good restore point. The physical-only capture is only taken when
+    // no checkpoint exists for this project/version.
+    if (!hasPhysicalDesign) {
+      _diag.reason = 'physical-only: no physical design';
+      _diag.failedGuard = 'physicalDesign';
+      if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
+      return false;
+    }
+    if (hasCheckpoint(projectId, versionId)) {
+      _diag.reason = 'physical-only: existing checkpoint preserved';
+      _diag.preservedExisting = true;
+      if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] preserve existing', _diag);
+      return true;
+    }
+    const _capturedPhysical = captureCheckpoint(projectId, versionId, {
+      subwooferInstances: physicalInstances,
+      seatingPositions: appState.seatingPositions,
+      bassFingerprint: null,
+      engineeringFingerprint,
+      allowUncalculated: true,
+      includesSeating,
+      baseDesignFingerprint: fallbackBaseDesignFingerprint || null,
+      targetBankSnapshot: null,
+      targetBankCount: 0,
+    });
+    _diag.captureMode = 'physical-only';
+    _diag.uncalculated = true;
+    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] physical-only', { ..._diag, captured: !!_capturedPhysical });
+    return _capturedPhysical;
+  }
+  // For an AUTHORITATIVE authority, the currentFingerprint must match the
+  // contract fingerprint (the authority is for the current physical design).
+  // For a captureEligible STALE authority, the currentFingerprint is expected
+  // to differ (that's what makes it STALE) — skip this check since the
+  // captureEligible flag already verified the contract's baseDesign matches.
+  const bassFp = completedBassAuthority.contract.job.resultFingerprint;
+  if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) {
+    _diag.reason = 'authoritative && currentFingerprint !== contractResultFingerprint';
+    _diag.failedGuard = 'authoritative.currentFingerprintMatch';
     if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
     return false;
   }
@@ -413,6 +440,30 @@ export async function restorePreviousDesign(projectId, versionId, {
   // Fix 5: clear stale draft/preview positions so the plan redraws from the
   // restored canonical positions immediately.
   fireSubwooferDraftReset(projectId, versionId);
+
+  // ── Uncalculated baseline restore ──────────────────────────────────────
+  // The checkpointed baseline had no authoritative bass result
+  // (checkpoint.uncalculated / bassFingerprint === null). Restore the exact
+  // physical configuration only. Do NOT reuse the newer arrangement's
+  // engineering results, do NOT invent a historical P19/P20 result, and do
+  // NOT launch a calculation automatically merely to make Restore possible.
+  // The existing stale-result protections keep the newer result from showing
+  // as current: after the physical commit, the live fingerprint reflects the
+  // restored design while the cached contract still belongs to the newer
+  // arrangement, so the authority is STALE until the designer recalculates.
+  if (checkpoint.uncalculated || !checkpoint.bassFingerprint) {
+    try {
+      await hydrateTargetCache(projectId, versionId);
+    } catch { /* non-fatal — bank hydrate best-effort for uncalculated restore */ }
+    clearCheckpoint(projectId, versionId);
+    return {
+      ok: true,
+      bankRestored: false,
+      uncalculated: true,
+      physicalRestored: true,
+      reason: "uncalculated-baseline-restored",
+    };
+  }
 
   // STEP B — Wait for the live bass fingerprint to match the checkpoint.
   // Fix 4: the checkpoint is KEPT during this wait so a re-render or retry
@@ -612,10 +663,14 @@ export function useCheckpointedCommits({
   const authorityRef = useRef(completedBassAuthority);
   authorityRef.current = completedBassAuthority;
 
+  // Returns true when a checkpoint exists for this project/version after the
+  // capture attempt (either freshly written or preserved from a prior call).
+  // The transaction-safety guard below uses this to block an Apply that would
+  // leave the designer without a restore point.
   const captureNow = useCallback((includesSeating, invocationSource = null) => {
     if (captureLockRef.current) {
       if (includesSeating) markCheckpointIncludesSeating(projectId, versionId);
-      return;
+      return hasCheckpoint(projectId, versionId);
     }
     captureLockRef.current = true;
     captureBeforeApply(projectId, versionId, {
@@ -625,21 +680,38 @@ export function useCheckpointedCommits({
       invocationSource,
       baseDesignFingerprint,
     });
+    const checkpointReady = hasCheckpoint(projectId, versionId);
     // Release the lock at the end of the current microtask so a subsequent
     // commitSeating call in the same synchronous batch is recognised as part
     // of the same apply action.
     Promise.resolve().then(() => { captureLockRef.current = false; });
+    return checkpointReady;
   }, [projectId, versionId, baseDesignFingerprint]);
 
+  // Transaction safety: checkpoint capture must occur before committing the
+  // new arrangement. If the current design has a physical subwoofer
+  // configuration but no checkpoint could be captured (genuine failure —
+  // missing design identity), block Apply rather than leaving the designer
+  // without Restore. When there is no physical design to checkpoint (e.g.
+  // applying the first layout to an empty project), proceed without a
+  // checkpoint — there is no previous design to restore.
   const checkpointedCommitInstances = useCallback((nextInstances, ...rest) => {
-    captureNow(false, "commit");
+    const hadPhysicalDesign = !!(appStateRef.current?.subwooferInstances?.length > 0);
+    const checkpointReady = captureNow(false, "commit");
+    if (hadPhysicalDesign && !checkpointReady) {
+      throw new Error("Could not save a restore point for the previous design. The layout was not applied.");
+    }
     if (typeof commitInstances === "function") {
       return commitInstances(nextInstances, ...rest);
     }
   }, [captureNow, commitInstances]);
 
   const checkpointedCommitSeating = useCallback((nextSeating, ...rest) => {
-    captureNow(true, "commit-seating");
+    const hadPhysicalDesign = !!(appStateRef.current?.subwooferInstances?.length > 0);
+    const checkpointReady = captureNow(true, "commit-seating");
+    if (hadPhysicalDesign && !checkpointReady) {
+      throw new Error("Could not save a restore point for the previous design. The seating was not applied.");
+    }
     if (typeof commitSeating === "function") {
       return commitSeating(nextSeating, ...rest);
     }

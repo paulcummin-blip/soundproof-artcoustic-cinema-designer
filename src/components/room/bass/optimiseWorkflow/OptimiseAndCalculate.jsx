@@ -889,8 +889,14 @@ export default function OptimiseAndCalculate({
               subInstancesRef.current,
               recommendationValues,
             );
-            commitInstances(newInstances);
-            calibrationApplied = true;
+            try {
+              commitInstances(newInstances);
+              calibrationApplied = true;
+            } catch {
+              // Pre-apply checkpoint could not be captured — block the auto-apply
+              // so the designer is not left without Restore. Nothing is committed.
+              calibrationApplied = false;
+            }
           } else {
             // Not applied — a trade-off, an immaterial or ambiguous result, or a
             // hand-set calibration. The recommendation is ready for the designer

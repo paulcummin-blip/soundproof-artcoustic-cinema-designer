@@ -11,8 +11,12 @@
 //   - projectId, versionId
 //   - subwooferInstances (deep clone)
 //   - seatingPositions (deep clone, only if the apply action changes seating)
-//   - bassFingerprint  (the bass result fingerprint of the coherent design)
-//   - engineeringFingerprint (the full engineering fingerprint of the coherent design)
+//   - bassFingerprint  (the bass result fingerprint of the coherent design,
+//                      or null when the baseline was uncalculated)
+//   - uncalculated     (true when the baseline had no authoritative bass result)
+//   - engineeringFingerprint (the full engineering fingerprint of the design —
+//                      always present; the design identity used to reject
+//                      cross-project/version recovery)
 //   - includesSeating (whether restore should also restore seating)
 //   - baseDesignFingerprint / targetBankSnapshot / targetBankCount (bank carry)
 //
@@ -148,7 +152,14 @@ function hydrateFromDurable(projectId, versionId) {
  */
 export function captureCheckpoint(projectId, versionId, payload) {
   if (!projectId || !versionId) return false;
-  if (!payload?.bassFingerprint || !payload?.engineeringFingerprint) return false;
+  // An uncalculated baseline has no bass result fingerprint yet, but it is
+  // still a physically valid design that must be restorable. The engineering
+  // fingerprint (the design identity) is always required so restore can reject
+  // cross-project/version recovery. bassFingerprint may be null ONLY for a
+  // physical-only checkpoint (uncalculated baseline).
+  if (!payload?.engineeringFingerprint) return false;
+  const hasBassFingerprint = !!payload?.bassFingerprint;
+  if (!hasBassFingerprint && !payload?.allowUncalculated) return false;
   const key = checkpointKey(projectId, versionId);
   // Fix 2: capture the target bank snapshot so restore can recover 8/8 targets
   // without a full background recalculation. Deep-clone the targets object so
@@ -161,8 +172,9 @@ export function captureCheckpoint(projectId, versionId, payload) {
     versionId,
     subwooferInstances: cloneInstances(payload.subwooferInstances),
     seatingPositions: cloneSeats(payload.seatingPositions),
-    bassFingerprint: payload.bassFingerprint,
+    bassFingerprint: payload.bassFingerprint || null,
     engineeringFingerprint: payload.engineeringFingerprint,
+    uncalculated: !hasBassFingerprint,
     includesSeating: !!payload.includesSeating,
     baseDesignFingerprint: payload.baseDesignFingerprint || null,
     targetBankSnapshot,

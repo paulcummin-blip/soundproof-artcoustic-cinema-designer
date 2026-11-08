@@ -333,10 +333,18 @@ export default function EvaluatedLayoutCards({
     // checkpointedCommitInstances (passed in as commitInstances), so the
     // existing RestorePreviousDesignBar owns exact Undo for the 1→2, 2→4 and
     // 4→1 quantity transitions. This card holds no second, temporary snapshot.
-    commitInstances(result.instances, {
-      front: { placementMode: "manual", isManual: true },
-      rear: { placementMode: "manual", isManual: true },
-    });
+    // Transaction safety: if the checkpoint cannot be captured for a design
+    // that has a physical subwoofer configuration, the wrapper throws and the
+    // layout is not applied — the designer is not left without Restore.
+    try {
+      commitInstances(result.instances, {
+        front: { placementMode: "manual", isManual: true },
+        rear: { placementMode: "manual", isManual: true },
+      });
+    } catch (err) {
+      setApplyError(err?.message || "Could not save a restore point. The layout was not applied.");
+      return;
+    }
     setSelectedKey(null);
     // Trigger the existing authoritative bass recalculation after the new
     // arrangement has committed. The caller arms a fingerprint-aware effect

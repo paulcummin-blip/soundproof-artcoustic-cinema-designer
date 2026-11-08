@@ -264,7 +264,13 @@ export default function AdiRecommendation({
       });
       if (!rspUpdate.ok || (rspUpdate.manualRspY_m !== null && typeof appState?.setManualRspY_m !== "function")) return;
       // Capture the previous design before updating either seats or manual RSP.
-      commitSeating(result.seatingPositions);
+      // Transaction safety: block the seating lever if the pre-apply checkpoint
+      // cannot be captured for a design with a physical configuration.
+      try {
+        commitSeating(result.seatingPositions);
+      } catch {
+        return;
+      }
       if (rspUpdate.manualRspY_m !== null) appState.setManualRspY_m(rspUpdate.manualRspY_m);
       setLeverOutcome({
         leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key, direction,
@@ -280,12 +286,19 @@ export default function AdiRecommendation({
       ? buildLeverUndoInstances({ leverKey: lever.key, lever, instances: currentInstances })
       : buildLeverApplyInstances({ leverKey: lever.key, lever, instances: currentInstances });
     if (!result.ok) return;
-    commitInstances(
-      result.instances,
-      lever.key === OPTIMISER_LEVER.PLACEMENT
-        ? { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } }
-        : undefined,
-    );
+    // Transaction safety: if the pre-apply checkpoint cannot be captured for a
+    // design with a physical subwoofer configuration, the wrapper throws and
+    // the lever change is blocked so the designer is not left without Restore.
+    try {
+      commitInstances(
+        result.instances,
+        lever.key === OPTIMISER_LEVER.PLACEMENT
+          ? { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } }
+          : undefined,
+      );
+    } catch {
+      return;
+    }
     setLeverOutcome({
       leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key, direction,
     });
