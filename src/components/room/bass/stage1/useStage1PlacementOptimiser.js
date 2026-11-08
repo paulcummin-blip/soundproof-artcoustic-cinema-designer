@@ -82,15 +82,19 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
 
   // Project geometry can hydrate after the cache query completes. Retain the
   // persisted snapshot and restore as soon as the final fingerprint is known.
+  // Validate against the scoped `fingerprint` so a saved recommendation-scope
+  // cache (`|rec:1,2,4`) hydrates its own request without requiring a
+  // three-sub result. Publish keeps the base fingerprint so the shared
+  // controller's multi-consumer coordination is unchanged.
   useEffect(() => {
-    if (!hydrationDone || !isStage1CacheValid(hydratedCache, baseFingerprint)) return;
+    if (!hydrationDone || !isStage1CacheValid(hydratedCache, fingerprint)) return;
     publishHydratedStage1(projectId, versionId, baseFingerprint, {
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
       three_sub_result: hydratedCache.three_sub_result,
       four_sub_result: hydratedCache.four_sub_result,
     });
-  }, [hydrationDone, hydratedCache, baseFingerprint, projectId]);
+  }, [hydrationDone, hydratedCache, fingerprint, baseFingerprint, projectId, versionId]);
 
   // ── Schedule / cancel search on fingerprint change ───────────────────
   useEffect(() => {
@@ -150,8 +154,9 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
 
     // A valid persisted snapshot is authoritative for this fingerprint.
     // Restore synchronously here as well so scheduling cannot race the restore
-    // effect during the same commit.
-    if (isStage1CacheValid(hydratedCache, baseFingerprint)) {
+    // effect during the same commit. Validate against the scoped fingerprint
+    // so a saved recommendation-scope cache hydrates without a re-search.
+    if (isStage1CacheValid(hydratedCache, fingerprint)) {
       publishHydratedStage1(projectId, versionId, baseFingerprint, {
         one_sub_result: hydratedCache.one_sub_result,
         two_sub_result: hydratedCache.two_sub_result,

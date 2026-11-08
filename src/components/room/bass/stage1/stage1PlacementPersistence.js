@@ -9,10 +9,34 @@ import {
   STAGE1_PLACEMENT_ALGORITHM_VERSION,
   STAGE1_FAMILY_POLICY_VERSION,
 } from "./stage1Constants";
+import { parseStage1FingerprintScope } from "./stage1RecommendationScope";
 
 const BASS_PHYSICS_VERSION = "normalized-physics-v1";
 
+// Per-quantity result slots, in quantity order.
+const STAGE1_RESULT_FIELDS = Object.freeze({
+  1: "one_sub_result",
+  2: "two_sub_result",
+  3: "three_sub_result",
+  4: "four_sub_result",
+});
+
 function buildPersistedCache(existing, fingerprint, results, status) {
+  // The A-prohibition aggregate is computed only over the quantities the run
+  // actually searched. A recommendation-scope `[1,2,4]` run has no
+  // three_sub_result; the old logic AND-ed the (absent) three-sub check and
+  // stamped a perfectly valid 1/2/4 run as "FAIL". Aggregate over present
+  // results only, so a scoped run records the prohibition status of the
+  // quantities it actually evaluated. The validator re-derives per quantity
+  // from each result's own aProhibitionValidation, so historical records
+  // stamped by the old logic are not misread either.
+  const prohibitionResults = results
+    ? [results.one_sub_result, results.two_sub_result, results.three_sub_result, results.four_sub_result]
+        .filter((r) => r && typeof r.aProhibitionValidation === "string")
+    : [];
+  const allPass = prohibitionResults.length > 0
+    && prohibitionResults.every((r) => r.aProhibitionValidation === "PASS");
+
   return {
     stage1_cache_version: STAGE1_CACHE_VERSION,
     placement_algorithm_version: STAGE1_PLACEMENT_ALGORITHM_VERSION,
@@ -27,12 +51,7 @@ function buildPersistedCache(existing, fingerprint, results, status) {
     two_sub_result: results?.two_sub_result || null,
     three_sub_result: results?.three_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
-    a_prohibition_validation: results
-      ? (results.one_sub_result?.aProhibitionValidation === "PASS" &&
-         results.two_sub_result?.aProhibitionValidation === "PASS" &&
-         results.three_sub_result?.aProhibitionValidation === "PASS" &&
-         results.four_sub_result?.aProhibitionValidation === "PASS" ? "PASS" : "FAIL")
-      : "PASS",
+    a_prohibition_validation: results ? (allPass ? "PASS" : "FAIL") : "PASS",
     b_evaluated: false,
   };
 }
@@ -70,9 +89,27 @@ export async function hydrateStage1PlacementCache(projectId, versionId) {
 }
 
 /**
- * Check whether a hydrated cache is valid for the current fingerprint and versions.
+ * Check whether a hydrated cache is valid for the current run.
+ *
+ * Scope-aware: the `fingerprint` argument is the CURRENT run's fingerprint
+ * (which may carry a `|rec:1,2,4` or `|sel:N` suffix). The validator compares
+ * the base identity (room, RSP, seating, modal physics, algorithm, family
+ * policy) and then checks that the saved cache SEARCHED every quantity the
+ * current run requests — so a valid `[1,2,4]` cache hydrates a `[1,2,4]`
+ * request without requiring a three-subwoofer result that was never searched.
+ *
+ * Per-quantity A-prohibition is read from each requested result's own
+ * `aProhibitionValidation`, so an irrelevant three-sub prohibition result
+ * (or a stale aggregate stamped by an older writer) cannot invalidate a
+ * 1/2/4 recommendation cache. A full `[1,2,3,4]` request still validates
+ * quantity 3, preserving the legitimate three-sub check where it is required.
+ *
+ * Partial or incompatible caches (wrong base, or missing a requested
+ * quantity's evidence) are rejected, so a stale or narrower cache is never
+ * accepted as complete.
+ *
  * @param {object} hydrated — from hydrateStage1PlacementCache
- * @param {string} fingerprint — current required fingerprint
+ * @param {string} fingerprint — current run's (possibly scoped) fingerprint
  * @returns {boolean}
  */
 export function isStage1CacheValid(hydrated, fingerprint) {
@@ -80,21 +117,29 @@ export function isStage1CacheValid(hydrated, fingerprint) {
   if (hydrated.stage1_cache_version !== STAGE1_CACHE_VERSION) return false;
   if (hydrated.placement_algorithm_version !== STAGE1_PLACEMENT_ALGORITHM_VERSION) return false;
   if (hydrated.family_policy_version !== STAGE1_FAMILY_POLICY_VERSION) return false;
-  if (hydrated.current_fingerprint !== fingerprint) return false;
   if (hydrated.status !== "complete") return false;
 
-  const requiredResults = [
-    hydrated.one_sub_result,
-    hydrated.two_sub_result,
-    hydrated.three_sub_result,
-    hydrated.four_sub_result,
-  ];
-  if (requiredResults.some((result) =>
-    !result ||
-    result.status !== "complete" ||
-    !Array.isArray(result.finalists)
-  )) return false;
-  if (hydrated.a_prohibition_validation !== "PASS") return false;
+  const requested = parseStage1FingerprintScope(fingerprint);
+  const saved = parseStage1FingerprintScope(hydrated.current_fingerprint);
+  // Base identity protects room dimensions, RSP, seating, modal physics,
+  // algorithm and family policy. A mismatch means the design moved on.
+  if (!requested.base || requested.base !== saved.base) return false;
+  // The saved cache must have searched every quantity the current run needs.
+  const requestedQuantities = requested.quantities;
+  if (!Array.isArray(requestedQuantities) || requestedQuantities.length === 0) return false;
+  const savedSet = new Set(Array.isArray(saved.quantities) ? saved.quantities : []);
+  if (!requestedQuantities.every((q) => savedSet.has(q))) return false;
+
+  for (const q of requestedQuantities) {
+    const result = hydrated[STAGE1_RESULT_FIELDS[q]];
+    if (!result || result.status !== "complete" || !Array.isArray(result.finalists)) return false;
+    // Per-quantity A-prohibition for the requested quantities only. A missing
+    // field (legacy result without it) does not fail validation here — the
+    // version checks above already guard incompatible old records.
+    if (typeof result.aProhibitionValidation === "string" && result.aProhibitionValidation !== "PASS") {
+      return false;
+    }
+  }
 
   return true;
 }
