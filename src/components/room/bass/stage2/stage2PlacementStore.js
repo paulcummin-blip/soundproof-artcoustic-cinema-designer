@@ -19,7 +19,7 @@ import { shouldEvaluateThirdFinalist } from "./stage2FinalistPromotion.js";
 import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort.js";
 import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry.js";
 import { buildPlacementRankingTuple, comparePlacementResults, isPlacementTied } from "./stage2PlacementRanking.js";
-import { selectPracticalBest } from "./stage2PracticalPlacementPreference.js";
+import { selectPracticalBest, isSideOrMixedWallFamily } from "./stage2PracticalPlacementPreference.js";
 import { candidateRecommendationEligibility, isCandidateEligibleForRecommendation } from "./stage2CandidateEligibility.js";
 import {
   getCachedRawTransfer,
@@ -615,67 +615,50 @@ export class Stage2PlacementController {
     // to re-sum and run the canonical chain — no search in the worker.
     // Current is supplied by the adapter's buildCurrentCanonicalLayout.
     const confirmationJobs = [];
-    const hasPerSourceTransfers = !!(best.rawTransfer?.perSourcePerSeatComplexTransfers?.length);
 
-    // 1. Placement-only (always)
-    confirmationJobs.push({
-      finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
-      quantity: qty,
-      phase: "confirmation",
-      rawTransfer: best.rawTransfer,
-    });
-    this.confirmationJobsPlanned++;
-    this.totalJobsPlanned++;
+    // Best raw candidate: full tuning confirmation (placement-only +
+    // delay-only + level-delay), reusing its cached raw transfer.
+    confirmationJobs.push(...this._buildConfirmationJobsForPlacement(best, qty, W, L));
 
-    // 2 + 3. Independent per-source tuning search (only if per-source
-    // per-seat transfers are available). Run the search in the main thread
-    // and queue one confirmation job per tuning finalist.
-    if (hasPerSourceTransfers) {
-      const rspTransfers = best.rawTransfer.perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
-      const searchSources = best.rawTransfer.sources?.map((s) => ({ yNorm: s.yNorm ?? 0 })) || [];
-
-      // Delay-only finalists (up to 2)
-      const delayResult = searchDelayOnly(rspTransfers, searchSources);
-      for (const finalist of (delayResult.finalists || [])) {
-        confirmationJobs.push({
-          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
-          quantity: qty,
-          phase: "confirmation",
-          tuningVariant: "delay-only",
-          tuning: finalist.tuning,
-          rawTransfer: best.rawTransfer,
-        });
-        this.confirmationJobsPlanned++;
-        this.totalJobsPlanned++;
-      }
-
-      // Level+delay finalists (up to 2)
-      const levelDelayResult = searchLevelAndDelay(rspTransfers, searchSources);
-      for (const finalist of (levelDelayResult.finalists || [])) {
-        confirmationJobs.push({
-          finalist: { id: best.finalistId, familyId: best.rawTransfer.familyId, sources: best.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
-          quantity: qty,
-          phase: "confirmation",
-          tuningVariant: "level-delay",
-          tuning: finalist.tuning,
-          rawTransfer: best.rawTransfer,
-        });
-        this.confirmationJobsPlanned++;
-        this.totalJobsPlanned++;
+    // Front/rear coverage safeguard: when the leading raw candidate uses a
+    // side/mixed-wall arrangement, the best already-evaluated, physically
+    // feasible front/rear-wall candidate also receives canonical confirmation
+    // — even when its raw ranking is not tied with the leader. Both
+    // candidates receive the SAME processing opportunities (placement-only +
+    // delay-only + level-delay), limits and RP22 calculations, reusing the
+    // existing Stage 2 per-source transfers (no Stage 1 / physical rerun).
+    // Only placements present in `ranked` are eligible — physically rejected
+    // or incomplete candidates never enter the promotion set. If no feasible
+    // front/rear candidate exists, the existing fallback behaviour stands.
+    const bestIsSideMixed = isSideOrMixedWallFamily(best.rawTransfer?.familyId);
+    let frontRearSafeguardPlacement = null;
+    if (bestIsSideMixed) {
+      frontRearSafeguardPlacement = ranked.find((p) =>
+        p !== best && !isSideOrMixedWallFamily(p.rawTransfer?.familyId)) || null;
+      if (frontRearSafeguardPlacement) {
+        confirmationJobs.push(...this._buildConfirmationJobsForPlacement(frontRearSafeguardPlacement, qty, W, L));
       }
     }
 
-    // If there's a tie, queue an alternate confirmation (placement-only)
+    // If there's a tie, queue an alternate confirmation (placement-only).
+    // Skip the duplicate placement-only job when the tie alternate is the
+    // same placement as the front/rear safeguard — its full tuning search
+    // already includes placement-only, so a second placement-only job would
+    // process the same candidate twice.
     if (ranked.length > 1 && isPlacementTied(best, ranked[1])) {
       const alternate = ranked[1];
-      confirmationJobs.push({
-        finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
-        quantity: qty,
-        phase: "confirmation",
-        rawTransfer: alternate.rawTransfer,
-      });
-      this.confirmationJobsPlanned++;
-      this.totalJobsPlanned++;
+      if (frontRearSafeguardPlacement === alternate) {
+        // already covered by the full tuning search above — no duplicate
+      } else {
+        confirmationJobs.push({
+          finalist: { id: alternate.finalistId, familyId: alternate.rawTransfer.familyId, sources: alternate.rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" })) },
+          quantity: qty,
+          phase: "confirmation",
+          rawTransfer: alternate.rawTransfer,
+        });
+        this.confirmationJobsPlanned++;
+        this.totalJobsPlanned++;
+      }
     }
 
     // unshift inserts at front — confirmation jobs are dispatched before
@@ -688,6 +671,81 @@ export class Stage2PlacementController {
     if (this.controllerPhase === "placement") {
       this.controllerPhase = "confirmation";
     }
+  }
+
+  /**
+   * Build the full confirmation job set (placement-only + delay-only +
+   * level-delay variants) for a single placement, reusing its cached raw
+   * transfer. The same processing opportunities, limits and RP22 canonical
+   * chain are applied to every candidate — no Stage 1 / physical placement
+   * rerun, no new tuning search algorithm, no new grade or threshold. Each
+   * job carries the placement's own finalistId, familyId, geometry and raw
+   * transfer so candidate-specific P19/P20 evidence and processing identity
+   * are preserved verbatim.
+   *
+   * @private
+   * @param {object} placement - { finalistId, rawTransfer, placementRanking }
+   * @param {number} qty
+   * @param {number} W - room width (m) for source normalisation
+   * @param {number} L - room length (m) for source normalisation
+   * @returns {Array} confirmation jobs for the worker queue
+   */
+  _buildConfirmationJobsForPlacement(placement, qty, W, L) {
+    const rawTransfer = placement.rawTransfer;
+    const finalistId = placement.finalistId;
+    const familyId = rawTransfer.familyId;
+    const sources = rawTransfer.sources?.map((s) => ({ xNorm: s.x / W, yNorm: s.y / L, coordinateSpace: "cabinet_centre" }));
+    const jobs = [];
+
+    // 1. Placement-only (always)
+    jobs.push({
+      finalist: { id: finalistId, familyId, sources },
+      quantity: qty,
+      phase: "confirmation",
+      rawTransfer,
+    });
+    this.confirmationJobsPlanned++;
+    this.totalJobsPlanned++;
+
+    // 2 + 3. Independent per-source tuning search (only if per-source
+    // per-seat transfers are available). Run the search in the main thread
+    // and queue one confirmation job per tuning finalist.
+    const hasPerSourceTransfers = !!(rawTransfer.perSourcePerSeatComplexTransfers?.length);
+    if (hasPerSourceTransfers) {
+      const rspTransfers = rawTransfer.perSourcePerSeatComplexTransfers.filter((t) => t.seatId === "rsp");
+      const searchSources = rawTransfer.sources?.map((s) => ({ yNorm: s.yNorm ?? 0 })) || [];
+
+      // Delay-only finalists (up to 2)
+      const delayResult = searchDelayOnly(rspTransfers, searchSources);
+      for (const finalist of (delayResult.finalists || [])) {
+        jobs.push({
+          finalist: { id: finalistId, familyId, sources },
+          quantity: qty,
+          phase: "confirmation",
+          tuningVariant: "delay-only",
+          tuning: finalist.tuning,
+          rawTransfer,
+        });
+        this.confirmationJobsPlanned++;
+        this.totalJobsPlanned++;
+      }
+
+      // Level+delay finalists (up to 2)
+      const levelDelayResult = searchLevelAndDelay(rspTransfers, searchSources);
+      for (const finalist of (levelDelayResult.finalists || [])) {
+        jobs.push({
+          finalist: { id: finalistId, familyId, sources },
+          quantity: qty,
+          phase: "confirmation",
+          tuningVariant: "level-delay",
+          tuning: finalist.tuning,
+          rawTransfer,
+        });
+        this.confirmationJobsPlanned++;
+        this.totalJobsPlanned++;
+      }
+    }
+    return jobs;
   }
 
   startWorker(workerIndex) {
