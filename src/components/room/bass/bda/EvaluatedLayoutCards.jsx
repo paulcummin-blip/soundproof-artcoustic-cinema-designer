@@ -286,6 +286,13 @@ export default function EvaluatedLayoutCards({
       frontCoords: front,
       rearCoords: rear,
     });
+    // Safety: if the built arrangement does not exactly match the evaluated
+    // candidate, reject Apply. Commit nothing, calculate nothing and publish
+    // nothing for a partial or mismatched recommendation.
+    if (!result.valid) {
+      setApplyError(STALE_OR_BLOCKED[result.error] || "This layout could not be applied exactly. No changes were made.");
+      return;
+    }
     // The pre-apply checkpoint is captured by the caller's
     // checkpointedCommitInstances (passed in as commitInstances), so the
     // existing RestorePreviousDesignBar owns exact Undo for the 1→2, 2→4 and
@@ -351,6 +358,7 @@ const STALE_OR_BLOCKED = {
   "stale-candidate-room-or-seating-changed": "The room or seating has changed since this layout was evaluated. Re-evaluate before applying.",
   "no-coordinates": "This layout has no subwoofer positions.",
   "unsupported-quantity": "This layout uses an unsupported subwoofer quantity.",
+  "arrangement-mismatch": "This layout could not be applied exactly. No changes were made.",
 };
 
 function splitCoordsByPlacement(coords) {

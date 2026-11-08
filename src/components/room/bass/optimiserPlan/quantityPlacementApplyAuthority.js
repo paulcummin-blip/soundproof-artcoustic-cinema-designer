@@ -35,6 +35,7 @@
 // ---------------------------------------------------------------------------
 
 import { generateStableId } from "@/components/utils/stableIdGenerator";
+import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecommendationUtils";
 
 const POSITION_TOLERANCE_M = 0.01;
 
@@ -121,24 +122,42 @@ export function isCandidateStale(candidateFingerprint, currentFingerprint) {
  * Build the next subwooferInstances array for an evaluated candidate option,
  * preserving models, orientations, heights and unrelated design settings.
  *
- * Strategy:
+ * Strategy (explicit one-to-one assignment):
  *   - The candidate specifies the exact cabinet positions and quantity.
- *   - Existing instances that match a candidate coordinate are REUSED (their
- *     IDs, models, orientation, height and calibration are preserved; only
- *     their position is updated).
- *   - Additional instances beyond the current count are CREATED from the
- *     current global subwoofer model/height/orientation defaults.
- *   - Excess instances are DISABLED (not deleted) so Undo can restore them
- *     exactly. Disabled instances are excluded from the bass engine.
+ *   - Each candidate coordinate is assigned to exactly ONE existing
+ *     compatible instance by proximity (one-to-one; an existing instance is
+ *     never reused for two candidate positions). The matched instance keeps
+ *     its ID, model, orientation, height and calibration; only its position,
+ *     enabled state and wall-group rotation are updated.
+ *   - A candidate coordinate with NO matching existing instance gets a NEW
+ *     instance created for IT — regardless of that coordinate's index. The
+ *     created instance is built from the candidate's evaluated model, height
+ *     and per-group orientation (passed via defaults).
+ *   - Existing instances that were neither matched nor created are DISABLED
+ *     (not deleted) so Undo can restore them exactly. Disabled instances are
+ *     excluded from the bass engine.
+ *   - The complete proposed arrangement is validated against the candidate
+ *     using the existing authoritative unordered per-group position matcher
+ *     (coordinatesMatch). If the built enabled instances do not exactly match
+ *     the evaluated candidate, Apply is rejected: the original instances are
+ *     returned unchanged and `valid` is false so the caller commits nothing.
+ *
+ * This corrects the previous defect where the creation loop started at
+ * `next.length` and indexed into `targetCoords` from there, treating the
+ * number of matched instances as the index of the next unmatched coordinate.
+ * When matches were partial and not at the beginning (e.g. candidate
+ * positions 2–4 matched, position 1 missing) that loop re-created an already
+ * matched coordinate and never created the missing one — producing a
+ * partial, duplicated arrangement that was still committed.
  *
  * @param {object} params
- * @param {Array} params.coordinates — exact evaluated cabinet positions [{ x, y }]
+ * @param {Array} params.coordinates — exact evaluated cabinet positions [{ x, y, placement }]
  * @param {number} params.quantity — target subwoofer quantity
  * @param {Array} params.instances — current subwooferInstances
- * @param {object} [params.defaults] — { model, bottomHeightM, orientation } for new instances
+ * @param {object} [params.defaults] — { model, bottomHeightM, frontOrientation, rearOrientation, orientation } for new/matched instances
  * @param {Array} [params.frontCoords] — coordinates belonging to the front group (for legacyGroup)
  * @param {Array} [params.rearCoords] — coordinates belonging to the rear group
- * @returns {object} { instances, appliedCount, createdCount, disabledCount }
+ * @returns {object} { instances, appliedCount, createdCount, disabledCount, valid, error }
  */
 export function buildQuantityApplyInstances({
   coordinates,
@@ -151,17 +170,18 @@ export function buildQuantityApplyInstances({
   const current = Array.isArray(instances) ? instances : [];
   const targetCoords = (Array.isArray(coordinates) ? coordinates : []).slice(0, Math.max(0, Number(quantity) || 0));
   if (targetCoords.length === 0) {
-    return { instances: current, appliedCount: 0, createdCount: 0, disabledCount: 0 };
+    return { instances: current, appliedCount: 0, createdCount: 0, disabledCount: 0, valid: true, error: null };
   }
 
+  // ---- First pass: explicit one-to-one assignment.
+  // For each candidate coordinate, find a single compatible existing instance
+  // at that position. usedInstanceIds guarantees no existing instance is ever
+  // assigned to two candidate positions. Unmatched coordinates are recorded
+  // explicitly so they are created for themselves, not for an index inferred
+  // from the match count.
   const usedInstanceIds = new Set();
-  const next = [];
-
-  // Match candidate coordinates to existing instances by proximity. A
-  // coordinate that matches an existing instance reuses that instance's ID,
-  // model, orientation, height and calibration — only its position is updated.
-  const matchInstance = (coord, candidates) => {
-    for (const instance of candidates) {
+  const assignments = targetCoords.map((coord) => {
+    for (const instance of current) {
       if (usedInstanceIds.has(instance.id)) continue;
       const ix = Number(instance?.position?.x);
       const iy = Number(instance?.position?.y);
@@ -169,63 +189,58 @@ export function buildQuantityApplyInstances({
       if (Math.abs(ix - Number(coord.x)) <= POSITION_TOLERANCE_M
         && Math.abs(iy - Number(coord.y)) <= POSITION_TOLERANCE_M) {
         usedInstanceIds.add(instance.id);
-        return instance;
+        return { kind: "match", instance };
       }
     }
-    return null;
-  };
+    return { kind: "create" };
+  });
 
-  // First pass: match each candidate coordinate to an existing instance.
-  // The matched instance keeps its ID, model, calibration and height, but its
-  // cabinet rotation is set from the candidate coordinate's wall group so the
-  // applied geometry is physically identical to the evaluated P19/P20 (a
-  // rear-wall coordinate always faces 180°, a front-wall coordinate 0°).
-  for (const coord of targetCoords) {
-    const matched = matchInstance(coord, current);
-    if (matched) {
-      const coordGroup = groupForCoord(coord, frontCoords, rearCoords);
+  // ---- Second pass: build the enabled arrangement in candidate order.
+  // Matched coordinates reuse their instance (ID, model, calibration, height
+  // preserved; position, enabled, wall-group rotation and orientation updated
+  // from the candidate). Unmatched coordinates get a new instance created for
+  // that exact coordinate.
+  const existingIds = new Set(current.map((i) => i.id));
+  let createdCount = 0;
+  const next = [];
+
+  for (let i = 0; i < targetCoords.length; i += 1) {
+    const coord = targetCoords[i];
+    const group = groupForCoord(coord, frontCoords, rearCoords);
+    const assignment = assignments[i];
+    if (assignment.kind === "match") {
+      const matched = assignment.instance;
       next.push({
         ...matched,
         position: { x: Number(coord.x), y: Number(coord.y) },
         enabled: true,
-        rotationDeg: rotationForGroup(coordGroup),
-        orientation: groupOrientationForGroup(coordGroup, defaults) ?? matched.orientation ?? null,
+        rotationDeg: rotationForGroup(group),
+        orientation: groupOrientationForGroup(group, defaults) ?? matched.orientation ?? null,
       });
+    } else {
+      const id = generateStableId(existingIds, group);
+      existingIds.add(id);
+      next.push({
+        id,
+        model: defaults.model || null,
+        enabled: true,
+        position: { x: Number(coord.x), y: Number(coord.y) },
+        bottomHeightM: Number.isFinite(Number(defaults.bottomHeightM)) ? Number(defaults.bottomHeightM) : 0,
+        rotationDeg: rotationForGroup(group),
+        orientation: groupOrientationForGroup(group, defaults),
+        positionSource: "recommendation",
+        legacyGroup: group,
+        symmetryLinkId: null,
+        gainDb: 0,
+        delayMs: 0,
+        polarity: 1,
+      });
+      createdCount += 1;
     }
   }
 
-  // Second pass: for unmatched coordinates, create new instances from the
-  // defaults. Preserve the model/orientation/height the candidate was
-  // evaluated with (from the canonical result's sources, passed via defaults).
-  const existingIds = new Set(current.map((i) => i.id));
-  let createdCount = 0;
-  for (let i = next.length; i < targetCoords.length; i += 1) {
-    const coord = targetCoords[i];
-    const group = rearCoords && rearCoords.some((c) => Math.abs(c.x - coord.x) < 0.01 && Math.abs(c.y - coord.y) < 0.01)
-      ? "rear"
-      : (frontCoords && frontCoords.some((c) => Math.abs(c.x - coord.x) < 0.01 && Math.abs(c.y - coord.y) < 0.01) ? "front" : null);
-    const id = generateStableId(existingIds, group);
-    existingIds.add(id);
-    next.push({
-      id,
-      model: defaults.model || null,
-      enabled: true,
-      position: { x: Number(coord.x), y: Number(coord.y) },
-      bottomHeightM: Number.isFinite(Number(defaults.bottomHeightM)) ? Number(defaults.bottomHeightM) : 0,
-      rotationDeg: rotationForGroup(group),
-      orientation: groupOrientationForGroup(group, defaults),
-      positionSource: "recommendation",
-      legacyGroup: group,
-      symmetryLinkId: null,
-      gainDb: 0,
-      delayMs: 0,
-      polarity: 1,
-    });
-    createdCount += 1;
-  }
-
-  // Third pass: disable any existing instances that were not matched or
-  // created. They are kept (disabled) so Undo can restore them exactly.
+  // ---- Third pass: disable any existing instances that were neither matched
+  // nor created. They are kept (disabled) so Undo can restore them exactly.
   const nextIds = new Set(next.map((i) => i.id));
   const disabled = [];
   for (const instance of current) {
@@ -234,12 +249,42 @@ export function buildQuantityApplyInstances({
     }
   }
 
+  // ---- Validation: the built enabled arrangement must exactly match the
+  // evaluated candidate (one-to-one, per wall group). Reuse the existing
+  // authoritative unordered per-group position matcher — never a second,
+  // inconsistent definition of arrangement identity. On mismatch, reject
+  // Apply: return the original instances unchanged so the caller commits
+  // nothing, calculates nothing and publishes nothing for a partial result.
+  const builtSources = next.map((inst) => ({
+    x: Number(inst.position.x),
+    y: Number(inst.position.y),
+    placement: inst.legacyGroup === "rear" ? "rear" : "front",
+  }));
+  const candidateSources = targetCoords.map((c) => ({
+    x: Number(c.x),
+    y: Number(c.y),
+    placement: (groupForCoord(c, frontCoords, rearCoords) === "rear") ? "rear" : "front",
+  }));
+
+  if (!coordinatesMatch(builtSources, candidateSources, POSITION_TOLERANCE_M)) {
+    return {
+      instances: current,
+      appliedCount: 0,
+      createdCount: 0,
+      disabledCount: 0,
+      valid: false,
+      error: "arrangement-mismatch",
+    };
+  }
+
   const result = [...next, ...disabled];
   return {
     instances: result,
     appliedCount: next.length - createdCount,
     createdCount,
     disabledCount: disabled.length,
+    valid: true,
+    error: null,
   };
 }
 
