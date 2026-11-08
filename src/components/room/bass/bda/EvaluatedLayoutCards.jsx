@@ -51,6 +51,14 @@ function p19Phrase(p19) {
   return variation ? `${level} · ${variation}` : level;
 }
 
+function sourcesFromOption(option) {
+  return (option?.coordinates || []).map((coord) => ({
+    x: Number(coord.x),
+    y: Number(coord.y),
+    placement: coord.placement,
+  }));
+}
+
 // Expected cabinet rotation for a wall placement. The recommendation surfaces
 // only front/rear-wall arrangements, so orientation is a deterministic read of
 // the wall the active cabinet sits at.
