@@ -377,7 +377,15 @@ export function setFingerprintInputDigest(projectId, versionId, fingerprint, dig
   }
   cache.fingerprintDigests = next;
   notify();
-  scheduleSync(projectId, versionId, {});
+  // Diagnostic-only: fingerprint digests are never an authority and never used
+  // for matching (see comment above). A standalone full target-bank write for a
+  // ~1.8 KB diagnostic change re-sends the entire completed-contract map (~1 MB)
+  // and trips the platform's write-volume limit (HTTP 429). The digest stays in
+  // memory and is coalesced into the next genuinely necessary target-bank
+  // persistence operation (setTargetCacheEntry, setLimitedTargetCacheEntry,
+  // restoreTargetBankSnapshot), whose flush already serialises the whole cache
+  // — digests included. No dirty marker is set, so flushTargetCachePersistence
+  // returns early when nothing else has changed.
   return true;
 }
 
