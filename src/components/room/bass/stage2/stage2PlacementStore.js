@@ -20,6 +20,7 @@ import { evaluateBEligibility, generateBFinalist } from "./stage2BLastResort.js"
 import { isBFamily, isProhibitedFamily } from "../stage1/stage1FamilyRegistry.js";
 import { buildPlacementRankingTuple, comparePlacementResults, isPlacementTied } from "./stage2PlacementRanking.js";
 import { selectPracticalBest } from "./stage2PracticalPlacementPreference.js";
+import { candidateRecommendationEligibility, isCandidateEligibleForRecommendation } from "./stage2CandidateEligibility.js";
 import {
   getCachedRawTransfer,
   setCachedRawTransfer,
@@ -1026,16 +1027,35 @@ export class Stage2PlacementController {
         snapshot[quantityMap[qty]] = null;
         continue;
       }
-      // Only results carrying a valid ranking tuple are eligible for the
-      // ranked set / winner selection. Incomplete, malformed, or failed
-      // results (no rankingData.rankingTuple) are excluded — they must never
-      // become bestFinalist or overall_best. They remain in this.completedResults
-      // for lifecycle/progress tracking but are not promoted into the snapshot.
-      const rankable = evaluated.filter((r) => Array.isArray(r?.rankingData?.rankingTuple));
-      if (!rankable.length) {
+      // ELIGIBILITY GATE: a candidate is eligible for actionable recommendation
+      // selection only when its physical geometry is valid (no physical
+      // rejection, physicalValidation passed), its canonical evaluation
+      // completed successfully, and its candidate-specific P19/P20 evidence is
+      // valid. A physically rejected candidate still receives a degenerate
+      // ranking tuple (no per-seat evidence → zero failing seats), so the
+      // ranking-tuple filter alone is NOT a sufficient eligibility test — it
+      // must never become bestFinalist or overall_best regardless of its
+      // tuple. The practical front/rear preference is applied ONLY to the
+      // eligible pool, so a conventional family can never win merely because
+      // of its family once it has failed physical validation.
+      //
+      // Rejected candidates are preserved in `rejectedCandidates` (diagnostic
+      // evidence) carrying their original rejection reasons — never erased,
+      // never falsely described as unevaluated. `evaluatedFinalists` stays the
+      // ranked ELIGIBLE set so downstream Pareto/family consumers only ever see
+      // candidates that are physically and evidentially valid.
+      const eligible = evaluated.filter((r) => isCandidateEligibleForRecommendation(r));
+      const rejected = evaluated
+        .filter((r) => !isCandidateEligibleForRecommendation(r))
+        .map((r) => {
+          const verdict = candidateRecommendationEligibility(r);
+          return { ...r, eligibilityReason: verdict.reason };
+        });
+      if (!eligible.length) {
         snapshot[quantityMap[qty]] = {
           quantity: qty,
           evaluatedFinalists: [],
+          rejectedCandidates: rejected,
           bestFinalist: null,
           finalistCount: 0,
         };
@@ -1044,7 +1064,7 @@ export class Stage2PlacementController {
       // B is ranked identically to every other candidate through the normal
       // lexicographic ranking. Family preference (tuple position 12) ensures a
       // practical candidate wins any acoustic tie against B.
-      const ranked = [...rankable].sort(compareStage2Results);
+      const ranked = [...eligible].sort(compareStage2Results);
       // PRACTICAL PLACEMENT PREFERENCE: default to the best conventional
       // front/rear-wall arrangement. A side/mixed-wall arrangement (RP22 D,
       // RP22 G, ONE_SIDE_QUARTER, RP22 B_LAST_RESORT) may displace it only
@@ -1062,6 +1082,7 @@ export class Stage2PlacementController {
       snapshot[quantityMap[qty]] = {
         quantity: qty,
         evaluatedFinalists: ranked,
+        rejectedCandidates: rejected,
         bestFinalist: best,
         finalistCount: ranked.length,
       };

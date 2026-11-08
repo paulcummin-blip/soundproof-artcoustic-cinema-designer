@@ -251,6 +251,16 @@ export default function EvaluatedLayoutCards({
 
   const isApplied = (option) => arrangementMatchesOption(subwooferInstances, option);
 
+  // An option is actionable only when its own evaluated evidence is physically
+  // and evidentially valid. A terminal or physically rejected option must never
+  // offer Apply, regardless of how it reached the card. This is the card-level
+  // mirror of the Stage 2 eligibility gate — defense in depth, not the sole
+  // authority (the store already excludes rejected candidates from
+  // bestFinalist, and the Apply authority re-verifies independently).
+  const canApplyOption = (option) => Boolean(
+    option && option.valid && !option.terminal && !option.physicalRejection,
+  );
+
   const handleConfirmApply = (option) => {
     setApplyError(null);
     if (!option) return;
@@ -265,6 +275,9 @@ export default function EvaluatedLayoutCards({
       currentFingerprint: currentDesignFingerprint,
       coordinates: coords,
       quantity: option.quantity,
+      option,
+      roomDims,
+      model: option.model || frontSubsCfg?.model || rearSubsCfg?.model || null,
     });
     if (!applyState.canApply) {
       setApplyError(STALE_OR_BLOCKED[applyState.blockReason] || "This layout can no longer be applied.");
@@ -342,7 +355,7 @@ export default function EvaluatedLayoutCards({
             onSelect={setSelectedQuantity}
             isApplied={optionsByQuantity[quantity] ? isApplied(optionsByQuantity[quantity]) : false}
             onConfirmApply={() => handleConfirmApply(optionsByQuantity[quantity])}
-            canApply
+            canApply={optionsByQuantity[quantity] ? canApplyOption(optionsByQuantity[quantity]) : false}
           />
         ))}
       </div>
@@ -359,6 +372,11 @@ const STALE_OR_BLOCKED = {
   "no-coordinates": "This layout has no subwoofer positions.",
   "unsupported-quantity": "This layout uses an unsupported subwoofer quantity.",
   "arrangement-mismatch": "This layout could not be applied exactly. No changes were made.",
+  "terminal-candidate": "This layout could not be physically evaluated for this room. No changes were made.",
+  "physical-rejection": "This layout is physically invalid for this room. No changes were made.",
+  "missing-p19-p20-evidence": "This layout has no valid evaluated performance evidence. No changes were made.",
+  "cabinet-boundary-violation": "A cabinet in this layout sits outside the room. No changes were made.",
+  "invalid-room": "The room dimensions are not valid. No changes were made.",
 };
 
 function splitCoordsByPlacement(coords) {

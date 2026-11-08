@@ -36,6 +36,8 @@
 
 import { generateStableId } from "@/components/utils/stableIdGenerator";
 import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { validateCabinetBoundary } from "@/components/room/bass/stage2/installableWallCentreAuthority";
+import { getCabinetWidthM, getCabinetDepthM } from "@/components/utils/subwooferInstanceMigration";
 
 const POSITION_TOLERANCE_M = 0.01;
 
@@ -318,13 +320,65 @@ export function buildQuantityApplyProvenance({
 }
 
 /**
+ * Independently re-verify that every option coordinate keeps the full cabinet
+ * volume inside the room, reusing the existing boundary authority. This is the
+ * Apply-time out-of-bounds safety net: it does not trust the card's `canApply`
+ * flag, and it catches a stale option whose room changed without the
+ * fingerprint guard noticing. Overlap is covered by the evaluated
+ * `physicalRejection`/`physicalValidation` the option already carries (the
+ * option does not carry per-source z/height, so overlap is not re-run here —
+ * that would require fabricating geometry and would create a competing rule).
+ *
+ * @private
+ * @param {Array} coordinates — option coordinates [{ x, y }]
+ * @param {object} roomDims — { widthM, lengthM }
+ * @param {string} model — canonical subwoofer model key
+ * @returns {{ valid: boolean, reason: string|null }}
+ */
+function recheckOptionBoundary(coordinates, roomDims, model) {
+  const W = Number(roomDims?.widthM);
+  const L = Number(roomDims?.lengthM);
+  if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
+    return { valid: false, reason: "invalid-room" };
+  }
+  const cabinetWidthM = getCabinetWidthM(model);
+  const cabinetDepthM = getCabinetDepthM(model);
+  for (const coord of (Array.isArray(coordinates) ? coordinates : [])) {
+    const result = validateCabinetBoundary({
+      centre: { x: Number(coord?.x), y: Number(coord?.y) },
+      roomDims,
+      cabinetWidthM,
+      cabinetDepthM,
+    });
+    if (!result.valid) {
+      return { valid: false, reason: "cabinet-boundary-violation" };
+    }
+  }
+  return { valid: true, reason: null };
+}
+
+/**
  * Resolve whether a quantity-aware Apply can proceed, and why not if not.
+ *
+ * Independently verifies physical and evidence eligibility immediately before
+ * Apply, using the existing physical-validation and evidence authorities. A
+ * rejected Apply must not alter subwoofer instances, initiate authoritative
+ * calculation or publish engineering results — the caller commits nothing when
+ * `canApply` is false.
  *
  * @param {object} params
  * @param {string} params.candidateFingerprint
  * @param {string} params.currentFingerprint
  * @param {Array} params.coordinates
  * @param {number} params.quantity
+ * @param {object} [params.option] — the evaluated option carrying `valid`,
+ *   `terminal`, `physicalRejection` flags from the Stage 2 eligibility
+ *   authority. When omitted, the evidence/physical flag checks are skipped
+ *   (backward compatibility for callers that pre-verify eligibility).
+ * @param {object} [params.roomDims] — current room dimensions, for the
+ *   independent out-of-bounds boundary re-check.
+ * @param {string} [params.model] — canonical subwoofer model key, for cabinet
+ *   dimension resolution during the boundary re-check.
  * @returns {object} { canApply, blockReason }
  */
 export function resolveQuantityApplyState({
@@ -332,6 +386,9 @@ export function resolveQuantityApplyState({
   currentFingerprint,
   coordinates,
   quantity,
+  option = null,
+  roomDims = null,
+  model = null,
 }) {
   if (isCandidateStale(candidateFingerprint, currentFingerprint)) {
     return { canApply: false, blockReason: "stale-candidate-room-or-seating-changed" };
@@ -341,6 +398,30 @@ export function resolveQuantityApplyState({
   }
   if (![1, 2, 4].includes(Number(quantity))) {
     return { canApply: false, blockReason: "unsupported-quantity" };
+  }
+  // Evidence + physical eligibility from the evaluated option (the existing
+  // Stage 2 eligibility authority's output). This independently blocks Apply
+  // for a terminal, physically rejected, or evidence-missing candidate even if
+  // the card somehow enabled it.
+  if (option) {
+    if (option.terminal === true) {
+      return { canApply: false, blockReason: "terminal-candidate" };
+    }
+    if (option.physicalRejection) {
+      return { canApply: false, blockReason: "physical-rejection" };
+    }
+    if (option.valid === false) {
+      return { canApply: false, blockReason: "missing-p19-p20-evidence" };
+    }
+  }
+  // Independent out-of-bounds boundary re-check using the current room and the
+  // cabinet dimensions resolved from the model. Reuses the existing authority —
+  // no competing geometry rule.
+  if (roomDims && model) {
+    const boundary = recheckOptionBoundary(coordinates, roomDims, model);
+    if (!boundary.valid) {
+      return { canApply: false, blockReason: boundary.reason || "cabinet-boundary-violation" };
+    }
   }
   return { canApply: true, blockReason: null };
 }

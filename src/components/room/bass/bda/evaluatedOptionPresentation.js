@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { resultEvidenceIsValid } from "../stage2/stage2CandidateEligibility.js";
 
 const ROTATION_FRONT = 0;
 const ROTATION_REAR = 180;
@@ -83,21 +84,9 @@ function worstP20ForPriority(perSeatP20, seatPriorityMap, priority) {
   };
 }
 
-/**
- * Is the Stage 2 result's P19/P20 evidence valid to display?
- * A result that failed the requested P14 operating point, that carried a
- * physical rejection, or that terminated without canonical assessment never
- * carries valid P19/P20 — so it is never shown as a predicted RP22 result.
- */
-export function resultEvidenceIsValid(result) {
-  if (!result || result.terminal === true || result.physicalRejection) return false;
-  if (result.requestedP14Pass === false) return false;
-  // Explicit null guard: Number(null) === 0, which Number.isFinite accepts.
-  // A null/undefined P19 level must never be treated as a valid Level 0.
-  const p19Level = result.achievedP19Level;
-  if (p19Level == null || !Number.isFinite(Number(p19Level)) || Number(p19Level) < 0) return false;
-  return true;
-}
+// Re-export the single evidence-validity authority so the display path and
+// the Stage 2 eligibility path share one definition.
+export { resultEvidenceIsValid };
 
 /**
  * Build the compact evaluated-option shape for a Stage 2 best-finalist result.
