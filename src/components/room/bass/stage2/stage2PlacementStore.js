@@ -98,15 +98,79 @@ export function setStage2StateForTest(projectId, versionId, patch) {
 }
 
 export function publishHydratedStage2(projectId, versionId, fingerprint, results) {
+  // Re-apply the SAME canonical eligibility and practical-selection authority
+  // used by fresh Stage 2 construction (buildResultsSnapshot), so a saved
+  // invalid bestFinalist — e.g. a physically rejected RP22_E four-sub
+  // arrangement (cabinet-boundary-violation / left-wall-intersection) that
+  // pre-dates the eligibility gate — is not restored as the actionable
+  // recommendation merely because it was copied verbatim from the cache.
+  //
+  // Hydration re-derives bestFinalist from the retained canonical evidence and
+  // physical-validity records: it runs NO acoustic simulation, mutates no
+  // candidate metric / ranking / curve / evidence, and invents no P19/P20
+  // values. A still-eligible historical bestFinalist (by finalistId) is
+  // preserved verbatim — including a side/mixed candidate chosen via the
+  // shared-null exception — so valid historical recommendations are unchanged.
+  // A historical bestFinalist that is no longer eligible is replaced by the
+  // practical front/rear preference over the eligible ranked pool, or null
+  // when no eligible candidate exists. Rejected candidates and their original
+  // rejection reasons are retained for diagnostics.
+  const placementFingerprint = results?.placement_fingerprint || null;
+  const quantityKeys = [
+    ["one_sub_result", 1],
+    ["two_sub_result", 2],
+    ["three_sub_result", 3],
+    ["four_sub_result", 4],
+  ];
+  const rehydrated = {};
+  let overallBest = null;
+  for (const [key, qty] of quantityKeys) {
+    const saved = results?.[key] || null;
+    if (!saved) {
+      rehydrated[key] = null;
+      continue;
+    }
+    // The saved evidence may be in either shape: pre-fix (evaluatedFinalists
+    // holds ALL evaluated candidates, eligible and rejected together) or
+    // post-fix (evaluatedFinalists holds only the eligible ranked set and
+    // rejectedCandidates holds the rejected ones). Reconstruct the full
+    // evaluated list from both, then let the shared authority re-split it.
+    const evaluated = [
+      ...(Array.isArray(saved.evaluatedFinalists) ? saved.evaluatedFinalists : []),
+      ...(Array.isArray(saved.rejectedCandidates) ? saved.rejectedCandidates : []),
+    ];
+    const qtySnapshot = buildCanonicalQuantitySnapshot(evaluated, qty, {
+      // Best-effort raw-transfer accessor: the shared-null compelling-benefit
+      // exception is best-effort and only fires when raw transfers are already
+      // restored to the in-memory cache. The default front/rear preference and
+      // the P19/P20 Level comparisons need no raw transfer, so hydration is
+      // deterministic and idempotent regardless of restore timing. A
+      // still-eligible historical bestFinalist is preserved (above), so the
+      // shared-null selection made at construction time is never reverted
+      // merely because raw transfers are absent on cold reopen.
+      getRawTransfer: (result) => {
+        if (!result?.finalistId || !placementFingerprint) return null;
+        try {
+          return getCachedRawTransfer(projectId, versionId, placementFingerprint, result.finalistId) || null;
+        } catch { return null; }
+      },
+      preserveBest: saved.bestFinalist || null,
+    });
+    rehydrated[key] = qtySnapshot;
+    if (qtySnapshot.bestFinalist) {
+      overallBest = betterOverallBest(overallBest, { quantity: qty, ...qtySnapshot.bestFinalist });
+    }
+  }
+
   return setMemory(projectId, versionId, {
     status: "complete",
     fingerprint,
-    placementFingerprint: results?.placement_fingerprint || null,
-    one_sub_result: results?.one_sub_result || null,
-    two_sub_result: results?.two_sub_result || null,
-    three_sub_result: results?.three_sub_result || null,
-    four_sub_result: results?.four_sub_result || null,
-    overall_best: results?.overall_best || null,
+    placementFingerprint,
+    one_sub_result: rehydrated.one_sub_result || null,
+    two_sub_result: rehydrated.two_sub_result || null,
+    three_sub_result: rehydrated.three_sub_result || null,
+    four_sub_result: rehydrated.four_sub_result || null,
+    overall_best: overallBest,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
     runtimeDiagnostics: results?.runtime_diagnostics || null,
     completedJobs: results?.canonical_jobs_run || 0,
@@ -216,6 +280,112 @@ function publishStage2Complete(projectId, versionId, fingerprint, results, place
     hydratedFromCache: false,
     scopeQuantity: results?.scope_quantity ?? null,
   });
+}
+
+/**
+ * Build the canonical per-quantity Stage 2 snapshot from a list of evaluated
+ * finalist results, applying the SAME eligibility gate and practical
+ * front/rear selection authority used by fresh Stage 2 construction.
+ *
+ * This is the single authority shared by:
+ *  - `Stage2PlacementController.buildResultsSnapshot()` (fresh construction),
+ *  - `publishHydratedStage2()` (rehydration of a saved Stage 2 cache).
+ *
+ * A candidate is eligible for actionable recommendation only when its physical
+ * geometry is valid (no physical rejection, physicalValidation passed), its
+ * canonical evaluation completed, and its candidate-specific P19/P20 evidence
+ * is valid. A physically rejected candidate still receives a degenerate ranking
+ * tuple (no per-seat evidence → zero failing seats), so ranking alone is NOT a
+ * sufficient eligibility test and a rejected candidate must never become
+ * bestFinalist regardless of its tuple.
+ *
+ * Rejected candidates are preserved in `rejectedCandidates` carrying their
+ * original rejection reasons — never erased, never falsely described as
+ * unevaluated. `evaluatedFinalists` is the ranked ELIGIBLE set so downstream
+ * Pareto/family consumers only ever see physically and evidentially valid
+ * candidates. No acoustic simulation is run, no candidate metric, ranking,
+ * curve or evidence is mutated — only the selected bestFinalist may differ.
+ *
+ * @param {Array} evaluated — evaluated finalist results for one quantity
+ * @param {number} quantity — 1 | 2 | 3 | 4
+ * @param {object} [opts]
+ * @param {function|null} [opts.getRawTransfer] — (result) => rawTransfer|null,
+ *   best-effort accessor for the cached placement raw transfer, used only by
+ *   the shared-null compelling-benefit exception. Null = evidence unavailable.
+ * @param {object|null} [opts.preserveBest] — a previously-selected bestFinalist
+ *   to KEEP when it is still eligible (by finalistId). Used by hydration so a
+ *   valid historical recommendation — including a side/mixed candidate chosen
+ *   via the shared-null exception — is not reverted to the default front/rear
+ *   preference merely because raw transfers are not yet restored. Null
+ *   (fresh construction) always re-selects via the practical preference.
+ * @returns {object} per-quantity snapshot
+ *   { quantity, evaluatedFinalists, rejectedCandidates, bestFinalist, finalistCount }
+ */
+function buildCanonicalQuantitySnapshot(evaluated, quantity, opts = {}) {
+  const getRawTransfer = typeof opts.getRawTransfer === "function" ? opts.getRawTransfer : null;
+  const preserveBest = opts.preserveBest || null;
+
+  if (!Array.isArray(evaluated) || !evaluated.length) {
+    return {
+      quantity,
+      evaluatedFinalists: [],
+      rejectedCandidates: [],
+      bestFinalist: null,
+      finalistCount: 0,
+    };
+  }
+
+  const eligible = evaluated.filter((r) => isCandidateEligibleForRecommendation(r));
+  const rejected = evaluated
+    .filter((r) => !isCandidateEligibleForRecommendation(r))
+    .map((r) => {
+      // Preserve an existing stamped reason (e.g. from a saved
+      // rejectedCandidates entry) and only derive one when absent.
+      if (r && typeof r.eligibilityReason === "string" && r.eligibilityReason) return r;
+      const verdict = candidateRecommendationEligibility(r);
+      return { ...r, eligibilityReason: verdict.reason };
+    });
+
+  if (!eligible.length) {
+    return {
+      quantity,
+      evaluatedFinalists: [],
+      rejectedCandidates: rejected,
+      bestFinalist: null,
+      finalistCount: 0,
+    };
+  }
+
+  // B is ranked identically to every other candidate through the normal
+  // lexicographic ranking. Family preference (tuple position 12) ensures a
+  // practical candidate wins any acoustic tie against B.
+  const ranked = [...eligible].sort(compareStage2Results);
+
+  let best;
+  if (preserveBest && isCandidateEligibleForRecommendation(preserveBest)) {
+    // Hydration: keep a still-eligible historical bestFinalist (by finalistId)
+    // so a valid saved recommendation — including a side/mixed candidate chosen
+    // via the shared-null exception — is preserved verbatim. The preserved
+    // candidate must be a member of the eligible ranked pool.
+    const preserved = ranked.find((r) => r?.finalistId && r.finalistId === preserveBest.finalistId);
+    if (preserved) {
+      best = preserved;
+    } else {
+      best = selectPracticalBest(ranked, { getRawTransfer });
+    }
+  } else {
+    // Fresh construction (or a stale/unmatched historical best): apply the
+    // practical front/rear preference to the eligible ranked pool.
+    best = selectPracticalBest(ranked, { getRawTransfer });
+  }
+
+  return {
+    quantity,
+    evaluatedFinalists: ranked,
+    rejectedCandidates: rejected,
+    bestFinalist: best,
+    finalistCount: ranked.length,
+  };
 }
 
 // ── Worker pool controller ───────────────────────────────────────────────
@@ -1027,70 +1197,32 @@ export class Stage2PlacementController {
         snapshot[quantityMap[qty]] = null;
         continue;
       }
-      // ELIGIBILITY GATE: a candidate is eligible for actionable recommendation
-      // selection only when its physical geometry is valid (no physical
-      // rejection, physicalValidation passed), its canonical evaluation
-      // completed successfully, and its candidate-specific P19/P20 evidence is
-      // valid. A physically rejected candidate still receives a degenerate
-      // ranking tuple (no per-seat evidence → zero failing seats), so the
-      // ranking-tuple filter alone is NOT a sufficient eligibility test — it
-      // must never become bestFinalist or overall_best regardless of its
-      // tuple. The practical front/rear preference is applied ONLY to the
-      // eligible pool, so a conventional family can never win merely because
-      // of its family once it has failed physical validation.
-      //
-      // Rejected candidates are preserved in `rejectedCandidates` (diagnostic
-      // evidence) carrying their original rejection reasons — never erased,
-      // never falsely described as unevaluated. `evaluatedFinalists` stays the
-      // ranked ELIGIBLE set so downstream Pareto/family consumers only ever see
-      // candidates that are physically and evidentially valid.
-      const eligible = evaluated.filter((r) => isCandidateEligibleForRecommendation(r));
-      const rejected = evaluated
-        .filter((r) => !isCandidateEligibleForRecommendation(r))
-        .map((r) => {
-          const verdict = candidateRecommendationEligibility(r);
-          return { ...r, eligibilityReason: verdict.reason };
-        });
-      if (!eligible.length) {
-        snapshot[quantityMap[qty]] = {
-          quantity: qty,
-          evaluatedFinalists: [],
-          rejectedCandidates: rejected,
-          bestFinalist: null,
-          finalistCount: 0,
-        };
-        continue;
-      }
-      // B is ranked identically to every other candidate through the normal
-      // lexicographic ranking. Family preference (tuple position 12) ensures a
-      // practical candidate wins any acoustic tie against B.
-      const ranked = [...eligible].sort(compareStage2Results);
-      // PRACTICAL PLACEMENT PREFERENCE: default to the best conventional
-      // front/rear-wall arrangement. A side/mixed-wall arrangement (RP22 D,
-      // RP22 G, ONE_SIDE_QUARTER, RP22 B_LAST_RESORT) may displace it only
-      // with a compelling whole-Level engineering benefit or a confirmed
-      // shared-null resolution. The acoustic ranking and every candidate's
-      // P19/P20 evidence are unchanged — only the selected bestFinalist may
-      // differ from ranked[0].
+      // PRACTICAL PLACEMENT PREFERENCE raw-transfer accessor (best-effort,
+      // existing evidence only): used solely by the shared-null
+      // compelling-benefit exception. The default front/rear preference and
+      // the P19/P20 Level comparisons need no raw transfer.
       const practicalGetRawTransfer = (result) => {
         if (!result?.finalistId || !this.placementFingerprint) return null;
         try {
           return getCachedRawTransfer(this.projectId, this.versionId, this.placementFingerprint, result.finalistId) || null;
         } catch { return null; }
       };
-      const best = selectPracticalBest(ranked, { getRawTransfer: practicalGetRawTransfer });
-      snapshot[quantityMap[qty]] = {
-        quantity: qty,
-        evaluatedFinalists: ranked,
-        rejectedCandidates: rejected,
-        bestFinalist: best,
-        finalistCount: ranked.length,
-      };
+      // Fresh construction: no historical bestFinalist to preserve — always
+      // re-select via the practical front/rear preference over the eligible
+      // ranked pool. The eligibility gate, rejected-candidate preservation and
+      // overall_best selection all live in the shared authority.
+      const qtySnapshot = buildCanonicalQuantitySnapshot(evaluated, qty, {
+        getRawTransfer: practicalGetRawTransfer,
+        preserveBest: null,
+      });
+      snapshot[quantityMap[qty]] = qtySnapshot;
       // overall_best is the best-RANKED candidate across ALL quantities (the
       // documented rule lives in stage2OverallBestSelection.js). It is never
       // "the first quantity that happened to be processed": a one-sub candidate
       // must not be labelled overall best merely because it was ranked first.
-      overallBest = betterOverallBest(overallBest, { quantity: qty, ...best });
+      if (qtySnapshot.bestFinalist) {
+        overallBest = betterOverallBest(overallBest, { quantity: qty, ...qtySnapshot.bestFinalist });
+      }
     }
 
     snapshot.overall_best = overallBest;
