@@ -10,6 +10,7 @@ import {
   STAGE2_RANKING_VERSION,
   STAGE2_CANONICAL_VERSION,
 } from "./stage2Constants";
+import { hasStage2ConfirmationCoverage } from "./stage2ConfirmationCoverage";
 
 /**
  * Hydrate the Stage 2 placement cache from the database.
@@ -60,6 +61,15 @@ export function isStage2CacheValid(hydrated, fingerprint) {
   if (hydrated.stage2_canonical_version !== STAGE2_CANONICAL_VERSION) return false;
   if (hydrated.current_fingerprint !== fingerprint) return false;
   if (hydrated.status !== "complete") return false;
+  // Confirmation coverage safeguard: a saved result produced before the
+  // front/rear coverage safeguard may have a side/mixed raw winner with no
+  // front/rear canonical receipt (Room B: RP22_G winner, five G
+  // confirmations, no RP22_F confirmation). Do not hydrate it as a fully
+  // current recommendation. The hook falls through to a fresh schedule() that
+  // reuses the cached raw transfers (no Stage 1 / physical placement rerun)
+  // and re-runs the safeguard's confirmation set. See
+  // stage2ConfirmationCoverage.js for the targeted-continuation limitation.
+  if (!hasStage2ConfirmationCoverage(hydrated)) return false;
   return true;
 }
 
