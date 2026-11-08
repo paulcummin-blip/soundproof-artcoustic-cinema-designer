@@ -43,6 +43,7 @@ import {
   RESTORE_BANK_MISMATCH_REASON,
 } from "@/components/room/bass/bankIdentityCoherence";
 import { fireSubwooferDraftReset } from "./subwooferDraftResetStore";
+import { resolveCaptureCoherence } from "./captureCoherenceAuthority";
 import {
   publishCachedCompactBassContract,
   isAuthoritativeBassContract,
@@ -204,14 +205,20 @@ export function captureBeforeApply(projectId, versionId, {
     return false;
   }
 
-  // Coherence check — only capture a known-good engineering state.
-  // FIX 1: When the authority is STALE but captureEligible is true (cold-open
-  // with a valid cached target bank and matching baseDesign), allow the
-  // capture. The stale currentFingerprint is from a previous session's move
-  // that was returned; the contract is for the current physical design.
-  const isCaptureEligible = !!completedBassAuthority?.captureEligible;
-  const isEngineeringCoherent = (!!completedBassAuthority?.authoritative || isCaptureEligible)
-    && !!completedBassAuthority?.contract?.job?.resultFingerprint;
+  // Coherence check — determine whether the retained engineering contract
+  // describes the CURRENT physical design BEFORE selecting the capture path.
+  // See captureCoherenceAuthority.js for the full rule. A matching
+  // authoritative contract is captured with the physical design; a missing,
+  // stale, non-authoritative or fingerprint-mismatched contract routes to the
+  // physical-only (uncalculated) capture path so a valid baseline is never
+  // blocked by a stale retained engineering result. The strict fingerprint
+  // protection for engineering recovery is preserved by the helper: a
+  // mismatched contract is never reported as coherent.
+  const coherence = resolveCaptureCoherence(completedBassAuthority);
+  const isEngineeringCoherent = coherence.isEngineeringCoherent;
+  _diag.isEngineeringCoherent = isEngineeringCoherent;
+  _diag.coherenceMode = coherence.coherenceMode;
+  _diag.fingerprintMatchesContract = coherence.fingerprintMatchesContract;
   if (!isEngineeringCoherent) {
     // PHYSICAL-ONLY CAPTURE PATH — uncalculated or incoherent baseline.
     // A physically valid design must be checkpointed before an ADI
@@ -248,18 +255,14 @@ export function captureBeforeApply(projectId, versionId, {
     if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] physical-only', { ..._diag, captured: !!_capturedPhysical });
     return _capturedPhysical;
   }
-  // For an AUTHORITATIVE authority, the currentFingerprint must match the
-  // contract fingerprint (the authority is for the current physical design).
-  // For a captureEligible STALE authority, the currentFingerprint is expected
-  // to differ (that's what makes it STALE) — skip this check since the
-  // captureEligible flag already verified the contract's baseDesign matches.
+  // The fingerprint-match protection for the coherent path is enforced by the
+  // coherence check above: isAuthoritativeCoherent requires
+  // fingerprintMatchesContract, and isStaleCaptureEligibleCoherent requires
+  // !authoritative (so the authoritative-mismatch guard cannot fire). A
+  // mismatched authoritative contract already fell through to the
+  // physical-only path. bassFp is the coherent contract's result fingerprint,
+  // safe to use because isEngineeringCoherent guaranteed hasContract.
   const bassFp = completedBassAuthority.contract.job.resultFingerprint;
-  if (completedBassAuthority.authoritative && completedBassAuthority.currentFingerprint !== bassFp) {
-    _diag.reason = 'authoritative && currentFingerprint !== contractResultFingerprint';
-    _diag.failedGuard = 'authoritative.currentFingerprintMatch';
-    if (typeof console !== 'undefined' && console.log) console.log('[CAPTURE-DIAG] return false', _diag);
-    return false;
-  }
 
   // FIX 1 — the checkpoint's DESIGN identity must come from the physical
   // design's authority: the coherent contract's baseDesign fingerprint (the
