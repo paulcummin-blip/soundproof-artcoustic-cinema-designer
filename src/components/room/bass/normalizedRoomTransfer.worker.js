@@ -33,7 +33,13 @@ self.onmessage = (e) => {
   try {
     const result = computeNormalizedRoomTransfer({
       ...(payload || {}),
-      useExactPreviewBatch: quality === "preview" && payload?.listenerSelection?.mode === "all",
+      // Enable the existing exact batch evaluator for All Seats and RSP preview.
+      // Both paths reuse the same factored modal evaluator — no new engine. All
+      // Seats uses the summed fast path (identical tuning, no RSP); RSP uses
+      // the per-source path which preserves perSourceRspComplexTransfers.
+      useExactPreviewBatch: quality === "preview" &&
+        (payload?.listenerSelection?.mode === "all" ||
+         payload?.listenerSelection?.mode === "rsp"),
     });
 
     if (result && result.status === "error") {
