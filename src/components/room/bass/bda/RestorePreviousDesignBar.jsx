@@ -181,7 +181,7 @@ export default function RestorePreviousDesignBar({
   // When the restored authority is already current, the family is rebuilt
   // automatically (Path C), so the card reports "Preparing target results…"
   // rather than implying action is required.
-  if (!checkpoint && restoreResult && !restoreResult.ok) {
+  if (restoreResult && !restoreResult.ok && restoreResult.physicalRestored !== false) {
     const progress = shared?.p14FamilyProgress || {};
     const familyTotal = Number(progress.total) || 0;
     const familyResolved = Number(progress.resolved) || 0;
@@ -210,6 +210,7 @@ export default function RestorePreviousDesignBar({
             type="button"
             onClick={() => {
               setRestoreResult(null);
+              clearCheckpoint(projectId, versionId);
               onUpdateBass();
             }}
             className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349]"

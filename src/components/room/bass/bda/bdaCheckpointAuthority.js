@@ -21,6 +21,8 @@
 import { useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
+import { parseTargetCacheBank } from "@/components/room/bass/bassIdentityReconciliation";
+import { findRestoredContract } from "./findRestoredContract";
 import { fetchDurablePublication } from "@/components/engineering/versionedEngineeringAuthority";
 import {
   captureCheckpoint,
@@ -419,16 +421,39 @@ export async function restorePreviousDesign(projectId, versionId, {
   // checkpoint that points to the now-current design).
   const fingerprintReady = await waitForBassFingerprint(sharedRef, checkpoint.bassFingerprint);
   if (!fingerprintReady) {
-    clearCheckpoint(projectId, versionId);
+    // Physical restore may not have propagated within the timeout. Keep the
+    // checkpoint so the designer can retry.
     return { ok: false, reason: "fingerprint-not-ready", physicalRestored: true };
   }
 
-  // STEP C — Find + promote cached bass result
-  let cachedContract = await fetchCachedCompactContract(projectId, versionId, checkpoint.bassFingerprint);
+  // STEP C — Find + promote the matching engineering contract.
+  // Search the established recovery paths in a controlled order:
+  //   1. Exact-fingerprint completed-contract cache (completed_by_fingerprint).
+  //   2. P14 target bank — the existing exact-fingerprint reconciliation helper
+  //      finds a contract the capped completed map has evicted.
+  //   3. Checkpoint target-bank snapshot, if it carries a valid matching entry.
+  //   4. Already-completed in-memory authority for this exact fingerprint.
+  // A contract is promoted only when it passes the existing authoritative
+  // validation and matches the exact restored fingerprint and the restored
+  // design's requested P14 target identity.
+  let cachedContract = null;
+  try {
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
+    const bank = parseTargetCacheBank(record?.target_cache);
+    const found = findRestoredContract({
+      completedByFingerprint: record?.completed_by_fingerprint || {},
+      bankTargets: bank.targets,
+      checkpointSnapshot: checkpoint.targetBankSnapshot,
+      fingerprint: checkpoint.bassFingerprint,
+    });
+    cachedContract = found.contract;
+  } catch {
+    // Cache read failure — fall through to the in-memory fallback.
+  }
+
+  // (4) In-memory authority fallback — an already-completed authority for this
+  // exact restored fingerprint before treating the restore as a cache miss.
   if (!cachedContract || !isAuthoritativeBassContract(cachedContract)) {
-    // The persistent cache can briefly miss while its write is still queued.
-    // Prefer an already-completed in-memory authority for this exact restored
-    // fingerprint before treating the restore as a cache miss.
     const inMemoryAuthority = getCompletedBassAuthority(projectId, versionId);
     const inMemoryContract = inMemoryAuthority?.contract || null;
     const inMemoryMatchesCheckpoint = !!inMemoryAuthority?.authoritative
@@ -437,12 +462,14 @@ export async function restorePreviousDesign(projectId, versionId, {
       && isAuthoritativeBassContract(inMemoryContract);
     if (inMemoryMatchesCheckpoint) cachedContract = inMemoryContract;
   }
+
   if (!cachedContract || !isAuthoritativeBassContract(cachedContract)) {
-    // CACHE MISS — physical restored, bass authority is STALE. Hydrate the
-    // target cache before returning so the restored design can reuse any
-    // durable target bank even though bass promotion was unavailable.
+    // GENUINE CACHE MISS — physical restored, no valid matching engineering
+    // contract in any recovery source. Keep the restored physical design;
+    // the bass authority remains stale and the normal Calculate workflow
+    // produces new authoritative evidence. Do NOT silently discard the
+    // checkpoint before this outcome is acknowledged.
     await hydrateTargetCache(projectId, versionId);
-    clearCheckpoint(projectId, versionId);
     return {
       ok: false,
       reason: "cache-miss",
@@ -451,11 +478,13 @@ export async function restorePreviousDesign(projectId, versionId, {
     };
   }
 
+  const requestedP14Identity = sharedRef?.current?.authoritative?.requested || null;
   const promoted = publishCachedCompactBassContract(
-    projectId, versionId, cachedContract, checkpoint.bassFingerprint,
+    projectId, versionId, cachedContract, checkpoint.bassFingerprint, requestedP14Identity,
   );
   if (!promoted) {
-    clearCheckpoint(projectId, versionId);
+    // Promotion rejected the recovered contract (fingerprint / P14 identity /
+    // schema mismatch). Keep the checkpoint so the designer can recalculate.
     return { ok: false, reason: "promotion-failed", physicalRestored: true };
   }
 

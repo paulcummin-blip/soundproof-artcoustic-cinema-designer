@@ -16,6 +16,7 @@ import { useBassAuthorityReconciliation } from "./useBassAuthorityReconciliation
 import { useTargetCacheEntry, useTargetCacheProgress, useTargetBankIdentity, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock, getTargetBankSnapshot } from "./p14TargetCache";
 import { resolveBankIdentityCoherence, resolveLifecycleWithBankIdentity, shouldProtectBankFromSeed } from "./bankIdentityCoherence";
 import { resolveRestoredAuthorityRebuild } from "./bda/restoreRecoveryAuthority";
+import { hasCurrentBassResult } from "./bda/hasCurrentBassResult";
 import { useIsRestoring, setRestoring } from "./bda/restoreStateStore";
 import { beginP14AnalysisJob, publishP14AnalysisProgress, getP14AnalysisProgress } from "./p14AnalysisProgressStore";
 import { getP14TargetBackgroundScheduler } from "./p14TargetBackgroundScheduler";
@@ -2249,8 +2250,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       timingTraceRef.current = null;
     }
   }, [manualAnalysisRequest]);
-  const hasCurrentResult = completedBassAuthority?.authoritative === true
-    && !!completedBassAuthority?.contract;
+  const hasCurrentResult = hasCurrentBassResult(completedBassAuthority, cacheKey);
   const hasPublishedCurrentDesign = completedBassAuthority?.authorityStatus === BASS_AUTHORITY_STATUS.AUTHORITATIVE
     && completedBassAuthority?.contract?.job?.resultFingerprint === cacheKey;
 
