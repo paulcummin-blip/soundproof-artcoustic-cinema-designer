@@ -27,6 +27,7 @@ import { buildComparisonRow, resolvePowerAuthority } from "./model-first/rp22Com
 import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization.js";
 import { applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption.js";
 import { installedSpaceAssumptionForSpecification } from "@/components/utils/spl/installedSpaceAssumption.js";
+import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification.js";
 
 const present = (value) =>
   value !== null && value !== undefined && value !== "" && value !== "unknown" && value !== "unspecified";
@@ -93,20 +94,6 @@ export const COMPARISON_FIELDS = [
   { key: "max_continuous_spl_db", label: "Max continuous SPL", critical: false, resolve: (s) => present(s.max_continuous_spl_db) },
   { key: "max_peak_spl_db", label: "Max peak SPL", critical: false, resolve: (s) => present(s.max_peak_spl_db) },
   { key: "max_spl_basis", label: "Max SPL / power basis", critical: false, resolve: (s) => present(s.max_spl_basis) },
-  {
-    key: "dispersion",
-    label: "Dispersion",
-    critical: false,
-    resolve: (s) => present(s.horizontal_dispersion_deg) || present(s.vertical_dispersion_deg),
-  },
-  { key: "thx_certification", label: "THX / certification", critical: false, resolve: (s) => present(s.thx_certification) },
-  {
-    key: "driver_configuration",
-    label: "Driver configuration",
-    critical: false,
-    resolve: (s) => present(s.woofer_count) || present(s.woofer_size) || present(s.tweeter_description),
-  },
-  { key: "cabinet_type", label: "Cabinet type", critical: false, resolve: (s) => present(s.cabinet_type) },
 ];
 
 /**
@@ -137,9 +124,13 @@ export function comparisonReadiness({ product, specification }) {
   const { row: comparisonRow, assumed: sensitivityBasisAssumed } = applySensitivityBasisAssumption(mapped);
   const normalized = normalizeCompetitor(comparisonRow);
   const level = READINESS_LEVELS[normalized.data_confidence] || READINESS_LEVELS.INSUFFICIENT;
+  // The admin-facing FULL/GOOD/INCOMPLETE label, classified from the same
+  // normalized record so it can never disagree with the grade above.
+  const adequacy = classifyDataAdequacy(normalized);
 
   return {
     level,
+    adequacy,
     confidence: level.confidence,
     label: level.label,
     tone: level.tone,

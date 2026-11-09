@@ -23,32 +23,21 @@ import { findRp22Gaps, publishSpecificationToRp22 } from "@/components/admin/spe
 import { approveSpecification, saveSpecEdits } from "@/components/admin/speaker-db/add-speaker/addSpeakerPersistence";
 import { createModelFirstDraft, ensureManufacturer, persistModelFirstWarnings } from "@/components/admin/speaker-db/model-first/modelFirstPersistence";
 import { publishIncompleteManualCompetitor } from "./publishIncompleteCompetitor";
+import {
+  SENSITIVITY_REFERENCES as _SENSITIVITY_REFERENCES,
+  POWER_BASES as _POWER_BASES,
+  MEASUREMENT_SPACES as _MEASUREMENT_SPACES,
+  SPL_BASES as _SPL_BASES,
+} from "@/components/spl/comparisonFieldOptions";
 
-export const SENSITIVITY_REFERENCES = [
-  { value: "2.83V/1m", label: "2.83 V / 1 m" },
-  { value: "1W/1m", label: "1 W / 1 m" },
-  { value: "unknown", label: "Not stated" },
-];
-
-export const POWER_BASES = [
-  { value: "amplifier", label: "Recommended amplifier maximum" },
-  { value: "continuous", label: "Continuous speaker rating" },
-];
-
-export const MEASUREMENT_SPACES = [
-  { value: "unspecified", label: "Unspecified" },
-  { value: "half-space", label: "Half Space" },
-  { value: "free-space", label: "Full Space" },
-];
-
-// How the manufacturer states a published maximum SPL. The stored values are the
-// existing basis vocabulary, so the RP22 evidence authority classifies them
-// exactly as it classifies every other model.
-export const SPL_BASES = [
-  { value: "continuous", label: "Measured / rated figure" },
-  { value: "calculated", label: "Calculated figure" },
-  { value: "manufacturer unspecified", label: "Not stated" },
-];
+// Re-export the shared, dependency-free option lists so existing imports keep
+// working. The single source of definition lives in comparisonFieldOptions so
+// the pure parity-mapping module and its tests can use them without the base44
+// chain.
+export const SENSITIVITY_REFERENCES = _SENSITIVITY_REFERENCES;
+export const POWER_BASES = _POWER_BASES;
+export const MEASUREMENT_SPACES = _MEASUREMENT_SPACES;
+export const SPL_BASES = _SPL_BASES;
 
 const REFERENCE_VALUES = new Set(SENSITIVITY_REFERENCES.map((option) => option.value));
 const SPL_BASIS_VALUES = new Set(SPL_BASES.map((option) => option.value));

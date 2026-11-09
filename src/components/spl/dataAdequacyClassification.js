@@ -20,9 +20,27 @@
 // ---------------------------------------------------------------------------
 
 export const DATA_ADEQUACY = Object.freeze({
-  FULL: { key: "FULL", label: "FULL DATA", short: "FULL", tone: "#213428" },
-  GOOD: { key: "GOOD", label: "GOOD DATA", short: "GOOD", tone: "#9A6E00" },
-  INCOMPLETE: { key: "INCOMPLETE", label: "INCOMPLETE DATA", short: "INCOMPLETE", tone: "#B23A3A" },
+  FULL: {
+    key: "FULL",
+    label: "FULL DATA",
+    short: "FULL",
+    tone: "#213428",
+    meaning: "Manufacturer publishes sufficient transparent information to calculate P12/P13 on substantially the same evidence basis used for Artcoustic. No material additional assumptions are required.",
+  },
+  GOOD: {
+    key: "GOOD",
+    label: "GOOD DATA",
+    short: "GOOD",
+    tone: "#9A6E00",
+    meaning: "Sufficient manufacturer information for a useful, defensible P12/P13 calculation, but some ambiguity or controlled assumption remains (e.g. measurement space not stated, sensitivity normalised, power terminology less rigorously defined, or manufacturer-calculated capability).",
+  },
+  INCOMPLETE: {
+    key: "INCOMPLETE",
+    label: "INCOMPLETE DATA",
+    short: "INCOMPLETE",
+    tone: "#B23A3A",
+    meaning: "Incomplete data — fair P12/P13 comparison not available. Insufficient manufacturer-published information to calculate a fair P12/P13 result.",
+  },
 });
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== "";

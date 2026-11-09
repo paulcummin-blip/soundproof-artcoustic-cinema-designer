@@ -17,26 +17,29 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildExtractionRules, coerceSpecValue, readSource } from '../../shared/speakerSourceReading.js';
 
+// P12/P13 parity fields only. The job is NOT to catalogue the speaker — it is to
+// find the manufacturer-published evidence required to calculate this speaker's
+// P12/P13 SPL capability on the same basis used for Artcoustic. Driver
+// descriptions, crossover, dimensions, weight, dispersion, finishes,
+// construction and certification are intentionally NOT extracted: they are not
+// part of the P12/P13 comparison dataset.
 const ALLOWED_FIELDS = [
-  'cabinet_type', 'mounting_type', 'woofer_count', 'woofer_size', 'midrange_count', 'midrange_size',
-  'tweeter_description', 'compression_driver', 'coaxial', 'height_mm', 'width_mm', 'depth_mm', 'weight_kg',
   'sensitivity_db', 'sensitivity_basis', 'nominal_impedance_ohm', 'minimum_impedance_ohm',
   'recommended_amp_min_w', 'recommended_amp_max_w', 'long_term_iec_power_w', 'rated_iec_power_w',
   'aes_power_w', 'peak_power_w', 'power_handling_continuous_w', 'power_handling_peak_w',
   'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance',
   'frequency_response_tolerance_db', 'max_continuous_spl_db', 'max_peak_spl_db', 'max_spl_basis',
-  'measurement_space', 'horizontal_dispersion_deg', 'vertical_dispersion_deg', 'thx_certification',
+  'measurement_space',
 ];
 
 // Only these fields are numbers. Everything else is copied verbatim as text,
 // so a driver description like 3 x 1" is never turned into a number.
 const NUMERIC_FIELDS = new Set([
-  'woofer_count', 'midrange_count', 'height_mm', 'width_mm', 'depth_mm', 'weight_kg',
   'sensitivity_db', 'nominal_impedance_ohm', 'minimum_impedance_ohm',
   'recommended_amp_min_w', 'recommended_amp_max_w', 'long_term_iec_power_w', 'rated_iec_power_w',
   'aes_power_w', 'peak_power_w', 'power_handling_continuous_w', 'power_handling_peak_w',
   'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance_db',
-  'max_continuous_spl_db', 'max_peak_spl_db', 'horizontal_dispersion_deg', 'vertical_dispersion_deg',
+  'max_continuous_spl_db', 'max_peak_spl_db',
 ]);
 
 const ENUMS = {
@@ -87,10 +90,17 @@ function rulesFor(manufacturerName, model) {
       `Never convert or normalise. Copy the published figure as stated, e.g. "92 dB", "4 Ω", "200 W". Text fields such as tweeter_description must be copied word for word from the source.`,
       `Answer sensitivity_basis, max_spl_basis and measurement_space only when the source states the basis/space; otherwise "unknown" or "unspecified" respectively. When the source states the sensitivity reference — "2.83V1m", "2.83 V / 1 m", "2.83V @ 1m", "1W/1m" — answer sensitivity_basis with the recognised equivalent "2.83V/1m" or "1W/1m".`,
       `Use only these exact field names: ${ALLOWED_FIELDS.join(', ')}.`,
-      `Give the exact sentence or table cell the value came from in raw_text.`,
+      `Give the exact sentence or table cell the value came from in raw_text — this is the manufacturer's label and it is kept as evidence.`,
       `model_confirmed must be true only if the source names this exact model.`,
-      `Look specifically for a technical specifications table, spec sheet, or "Specifications" section — that is where sensitivity, impedance, power handling, max SPL and dispersion normally appear.`,
-      `cabinet_type is the enclosure (sealed, ported, passive radiator) and mounting_type is how it is installed (on-wall, in-wall, in-ceiling, freestanding). A phrase like "On-Wall Speaker" describes mounting_type only, so leave cabinet_type not_found unless the enclosure itself is described.`,
+      `Look specifically for a technical specifications table, spec sheet, or "Specifications" section — that is where sensitivity, impedance, power handling and max SPL normally appear.`,
+      `POWER CLASSIFICATION IS CRITICAL. Distinguish the manufacturer's power terminology literally and never convert one category into another merely because a value is in watts. Use the field that matches what the source actually says:`,
+      `  - power_handling_continuous_w = a genuine continuous speaker power rating labelled "continuous", "RMS power handling" or "long-term power handling".`,
+      `  - long_term_iec_power_w / rated_iec_power_w = an IEC long-term or rated continuous figure labelled "IEC".`,
+      `  - aes_power_w = an AES continuous figure labelled "AES".`,
+      `  - recommended_amp_max_w = the MAXIMUM of a stated RECOMMENDED AMPLIFIER RANGE only — e.g. "Recommended amplifier: 25-150 W".`,
+      `  - peak_power_w / power_handling_peak_w = a peak / short-term / maximum figure explicitly labelled "peak".`,
+      `For example, "Power Handling (RMS): 5 watts minimum; 150 watts maximum" is RMS power handling — put 150 in power_handling_continuous_w, NOT in recommended_amp_max_w. A "Recommended amplifier power" range is recommended_amp_max_w, never a continuous rating.`,
+      `For max SPL, distinguish the basis the manufacturer states. "Max SPL" or "Peak SPL" is NOT "continuous" — when the source labels a figure peak or maximum short-term, record max_peak_spl_db and set max_spl_basis to "peak". Only use max_continuous_spl_db when the source genuinely establishes a continuous/rated basis.`,
     ],
   });
 }

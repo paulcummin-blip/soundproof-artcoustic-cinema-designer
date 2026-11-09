@@ -24,7 +24,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Sparkles, ExternalLink } from "lucide-react";
-import { saveSpeakerComparison } from "@/components/admin/speaker-library/saveSpeakerComparison";
+import { saveSpeakerComparison, assessSpeakerForm } from "@/components/admin/speaker-library/saveSpeakerComparison";
 import {
   FIELD_LABEL,
   PROPOSAL_FIELDS,
@@ -38,6 +38,7 @@ import {
   readSourceExtraction,
   sourceUrlOf,
 } from "@/components/spl/adiSourceExtraction";
+import { DATA_ADEQUACY } from "@/components/spl/dataAdequacyClassification";
 
 const BRAND = {
   text: "#1B1A1A", subtext: "#3E4349", hint: "#625143",
@@ -93,6 +94,29 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
       }
     })();
   }, [open, candidate]);
+
+  // The form values that would be saved if the admin applied the current
+  // decisions — current values with accepted source values merged in. Used only
+  // to preview the resulting FULL/GOOD/INCOMPLETE status; nothing is written.
+  const mergedForm = useMemo(() => {
+    const overrides = {};
+    for (const key of Object.keys(decisions)) {
+      if (!decisions[key]) continue;
+      overrides[key] = info[key]?.value;
+      if (key === "power_w" && info[key]?.basis) overrides.power_basis = info[key].basis;
+    }
+    return { ...currentForm, ...overrides };
+  }, [currentForm, decisions, info]);
+
+  const proposedAdequacy = useMemo(() => {
+    if (!raw || proposalFields.length === 0) return null;
+    try {
+      const { readiness } = assessSpeakerForm(mergedForm, candidate?.specification || null);
+      return readiness?.adequacy || null;
+    } catch {
+      return null;
+    }
+  }, [raw, proposalFields, mergedForm, candidate]);
 
   const toggle = (key) => setDecisions((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -189,7 +213,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead style={{ background: BRAND.soft }}>
                     <tr>
-                      {["Field", "Current", "Found in source", "Use"].map((h) => (
+                      {["P12/P13 input", "Current", "Manufacturer source", "Use"].map((h) => (
                         <th key={h} style={{ textAlign: h === "Use" ? "center" : "left", padding: "8px 10px", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: BRAND.hint, fontWeight: 600 }}>{h}</th>
                       ))}
                     </tr>
@@ -207,7 +231,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                             {FIELD_LABEL[key]}
                             {key === "power_w" && f.basis && (
                               <div style={{ fontSize: 10, color: BRAND.hint, fontWeight: 400, marginTop: 2 }}>
-                                {f.basis === "continuous" ? "Continuous rating" : "Recommended amp max"}
+                                {f.category || (f.basis === "continuous" ? "Continuous rating" : "Recommended amp max")}
                               </div>
                             )}
                           </td>
@@ -252,6 +276,19 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
             {raw.not_found && raw.not_found.length > 0 && (
               <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 8 }}>
                 Not stated in source: {raw.not_found.slice(0, 12).join(", ")}{raw.not_found.length > 12 ? "…" : ""}. These stay blank.
+              </div>
+            )}
+
+            {proposedAdequacy && (
+              <div style={{ marginTop: 10, padding: "10px 12px", border: `1px solid ${proposedAdequacy.tone}33`, borderRadius: 10, background: `${proposedAdequacy.tone}08` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: proposedAdequacy.tone }}>
+                  Proposed comparison status · {proposedAdequacy.label}
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 4 }}>
+                  {proposedAdequacy.key === DATA_ADEQUACY.INCOMPLETE.key
+                    ? "Incomplete data — fair P12/P13 comparison not available with the accepted values."
+                    : proposedAdequacy.meaning}
+                </div>
               </div>
             )}
           </>

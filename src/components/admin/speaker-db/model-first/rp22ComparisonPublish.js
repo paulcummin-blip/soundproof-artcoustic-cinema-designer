@@ -23,14 +23,14 @@ export const RP22_CRITICAL_FIELDS = [
   { key: "measurement_space", label: "Measurement space" },
 ];
 
-// Published values that improve the comparison but never block it.
+// Published values that improve the P12/P13 comparison but never block it.
+// Only parity-relevant fields — dispersion is intentionally absent: it is not
+// part of the P12/P13 comparison dataset.
 const ADVISORY_FIELD_KEYS = [
   "minimum_impedance_ohm",
   "recommended_amp_min_w",
   "recommended_amp_max_w",
   "max_peak_spl_db",
-  "horizontal_dispersion_deg",
-  "vertical_dispersion_deg",
   "frequency_response_low_hz",
   "frequency_response_high_hz",
 ];
