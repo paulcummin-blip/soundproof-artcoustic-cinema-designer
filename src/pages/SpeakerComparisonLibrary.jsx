@@ -165,13 +165,21 @@ export default function SpeakerComparisonLibrary() {
             manufacturer publishes and its retail price, and it is available in the comparison immediately.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openAdd}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: 10, padding: "11px 18px", background: BRAND.green, color: "#FFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
-        >
-          <Plus size={16} /> Add Speaker
-        </button>
+        <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap" }}>
+          <a
+            href="/admin/speaker-library-update"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "11px 16px", background: "#FFF", color: BRAND.text, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", textDecoration: "none" }}
+          >
+            Update from workbook
+          </a>
+          <button
+            type="button"
+            onClick={openAdd}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: 10, padding: "11px 18px", background: BRAND.green, color: "#FFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+          >
+            <Plus size={16} /> Add Speaker
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", margin: "18px 0 12px" }}>
