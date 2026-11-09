@@ -93,6 +93,32 @@ export function diagnoseSharedCancellations(confirmation, options = {}) {
 
   const seatFreqMap = buildSeatFrequencyMap(perSeatP20, confirmation);
 
+  // Per-seat reference level. For a genuine post-EQ curve (many points) the
+  // reference is the seat's mean SPL over the assessment band; a deficit is a
+  // dip relative to that mean. For the single-point fallback the stored value
+  // IS the signed deficit, so the reference is 0 and the absolute threshold
+  // applies directly. Without this, genuine curves (absolute SPL ~100 dB)
+  // never fall below a fixed −6 dB threshold and the diagnostic is silent.
+  const seatReference = new Map();
+  const seatIsCurve = new Map();
+  for (const seat of primarySeats) {
+    const seatId = String(seat.seatId);
+    const freqMap = seatFreqMap.get(seatId);
+    if (!freqMap) continue;
+    if (freqMap.size > 1) {
+      const spls = [];
+      for (const [freq, spl] of freqMap.entries()) {
+        const inBand = assessmentStartHz == null || assessmentEndHz == null
+          || (freq >= assessmentStartHz && freq <= assessmentEndHz);
+        if (inBand) spls.push(spl);
+      }
+      seatReference.set(seatId, spls.length ? spls.reduce((a, b) => a + b, 0) / spls.length : null);
+      seatIsCurve.set(seatId, true);
+    } else {
+      seatIsCurve.set(seatId, false);
+    }
+  }
+
   // Collect all frequencies where at least 2 priority seats have a deficit
   // at the same frequency (within a small frequency tolerance).
   const sharedDeficits = [];
@@ -113,11 +139,20 @@ export function diagnoseSharedCancellations(confirmation, options = {}) {
         // Find the SPL at this frequency (exact match or nearest within 1 Hz)
         const spl = freqMap.get(freq) ?? findNearest(freqMap, freq, 1);
         if (spl == null) continue;
-        // A deficit is a negative SPL value (from the fallback) or a dip
-        // relative to the seat's mean. For full curves, compare against the
-        // seat's mean SPL; for the fallback, the stored value IS the deficit.
-        if (spl <= deficitThresholdDb) {
-          seatsWithDeficit.push({ seatId, splDb: spl });
+        const isCurve = seatIsCurve.get(seatId);
+        const ref = seatReference.get(seatId);
+        // Full curve: dip relative to the seat's mean SPL. Fallback: the
+        // stored value IS the signed deficit, so compare against 0.
+        const isDeficit = isCurve
+          ? (ref != null && spl <= ref + deficitThresholdDb)
+          : (spl <= deficitThresholdDb);
+        if (isDeficit) {
+          seatsWithDeficit.push({
+            seatId,
+            splDb: spl,
+            referenceDb: isCurve ? ref : null,
+            deficitDb: isCurve && ref != null ? spl - ref : spl,
+          });
         }
       }
 

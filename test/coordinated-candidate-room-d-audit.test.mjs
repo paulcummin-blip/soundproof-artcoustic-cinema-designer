@@ -134,10 +134,15 @@ test("Room D coordinated candidate — saved-seating audit", async () => {
     "Pre-transfer gate",
   );
 
-  // 3. Run the developer evaluator exactly once. Sub-only here (no live LCR
-  //    integration context available in the standalone harness); the 95 Hz
-  //    crossover is still applied by the canonical confirmation. The response
-  //    basis difference vs the combined reference is reported explicitly.
+  // 3. Run the developer evaluator exactly once. SOURCE EXECUTION: no live LCR
+  //    integration context is available in the standalone harness, so this run
+  //    is sub-only (requireCombined omitted → false). The 95 Hz crossover is
+  //    still carried by the bundle and applied by the canonical confirmation.
+  //    The response-basis difference vs the combined reference is reported
+  //    explicitly. The BROWSER ACCEPTANCE path (the developer panel) passes
+  //    requireCombined: true with a live LCR context derived from the placed
+  //    screen channels, so it evaluates combined and rejects explicitly if the
+  //    live LCR context is unavailable — it never falls back to sub-only.
   clearCoordinatedDeveloperRun();
   const result = await runCoordinatedCandidateDeveloper({
     integrationContext: null,
@@ -185,10 +190,12 @@ test("Room D coordinated candidate — saved-seating audit", async () => {
 
   // 5. Evidence: response basis, crossover, processing.
   row(
-    "Response basis",
+    "Response basis (source execution vs browser acceptance)",
     REF.responseBasis,
     ev.responseBasis || "—",
-    (ev.responseBasis || "—") === REF.responseBasis ? "none" : "sub-only in harness vs combined reference",
+    (ev.responseBasis || "—") === REF.responseBasis
+      ? "none"
+      : "sub-only in source execution vs combined reference — browser acceptance (panel) evaluates combined with live LCR",
     "minor",
     "Crossover",
   );
@@ -276,7 +283,19 @@ test("Room D coordinated candidate — saved-seating audit", async () => {
     "Shared cancellation diagnostic",
     "reported",
     ev.sharedCancellations ? (ev.sharedCancellations.hasSharedCancellations ? "detected" : "none") : "—",
-    "n/a",
+    "n/a (diagnostic only — never a grade or EQ permission)",
+    "info",
+    "Shared deficit frequencies",
+  );
+  const deficits = Array.isArray(ev.sharedCancellations?.sharedDeficits) ? ev.sharedCancellations.sharedDeficits : [];
+  const deficitFreqs = deficits.map((d) => `${(d.frequencyHz || 0).toFixed(1)} Hz (${d.seatCount} seats${d.inAssessmentBand ? "" : ", out of band"})`).join(", ") || "—";
+  const near62 = deficits.some((d) => Math.abs((d.frequencyHz || 0) - 62) <= 3);
+  const near95 = deficits.some((d) => Math.abs((d.frequencyHz || 0) - 95) <= 3);
+  row(
+    "Shared deficit frequencies (near 62 / 94–95 Hz)",
+    "residuals near 62 Hz and 94–95 Hz reported",
+    `${deficitFreqs} · near 62 Hz: ${near62 ? "yes" : "no"} · near 95 Hz: ${near95 ? "yes" : "no"}`,
+    "n/a (diagnostic only)",
     "info",
     "Canonical receipt",
   );

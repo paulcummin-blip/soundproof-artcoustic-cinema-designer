@@ -601,6 +601,15 @@ export function evaluateStage2Confirmation(rawTransfer, {
       poolId: pool.poolId,
       productEngineeringVersion: STAGE2_PRODUCT_ENGINEERING_VERSION,
     },
+    // Genuine post-EQ curves from the canonical result's
+    // finalOptimisedBassResponse. Retained on the confirmation so downstream
+    // consumers (coordinated-candidate evidence summariser, shared-cancellation
+    // diagnostic) read the actual processed responses instead of reconstructing
+    // from headline metrics or falling back to single-point worst frequencies.
+    finalOptimisedBassResponse: canonicalResult ? {
+      postEqRspCurve: Array.isArray(canonicalResult.postEqRspCurve) ? canonicalResult.postEqRspCurve : [],
+      postEqPerSeatCurves: Array.isArray(canonicalResult.postEqPerSeatCurves) ? canonicalResult.postEqPerSeatCurves : [],
+    } : null,
     runtimeMs: Math.max(0, endedAt - startedAt),
     algorithmVersion: "stage2-canonical-v2",
   };

@@ -62,8 +62,12 @@ export function clearCoordinatedDeveloperRun() {
  * @param {object} [options]
  * @param {object} [options.integrationContext] — live LCR/sub integration context
  *   ({ roomDims, seatingPositions, rspPosition, speakerSources, crossover, physics })
- *   When null, the run falls back to sub-only response basis.
+ *   When null and requireCombined is false, the run falls back to sub-only.
  * @param {number} [options.amplifierPowerPerSubW] — amplifier power per sub
+ * @param {boolean} [options.requireCombined] — when true (acceptance mode), a
+ *   null integration context is an explicit rejection, never a silent sub-only
+ *   fallback. Used by the developer panel so the browser acceptance test cannot
+ *   pass as sub-only.
  * @returns {Promise<object>} { status, evidence, issues, boundaries }
  *   status: "evaluated" | "rejected" | "error"
  */
@@ -72,7 +76,24 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
     integrationContext = null,
     amplifierPowerPerSubW = 0,
     savedSeating = null,
+    requireCombined = false,
   } = options;
+
+  // 0a. Acceptance mode: a combined LCR/sub evaluation is required. If the
+  //     live LCR integration context is unavailable, reject the candidate
+  //     explicitly — never fall back silently to sub-only for the acceptance
+  //     test. Source-execution harnesses pass requireCombined=false so they
+  //     can still exercise the sub-only path.
+  if (requireCombined && !integrationContext) {
+    lastResult = {
+      status: "rejected",
+      evidence: null,
+      issues: ["Live LCR integration context unavailable — combined LCR/sub evaluation required for acceptance test"],
+      boundaries: { preTransfer: null, preConfirm: null, postConfirm: null },
+    };
+    publish();
+    return lastResult;
+  }
 
   // 0. When live saved seating is supplied (the acceptance bridge), validate it
   //    strictly against the accepted Room D reference before building anything.

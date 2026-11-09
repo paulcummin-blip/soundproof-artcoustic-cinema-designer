@@ -31,6 +31,7 @@ import {
   ROOM_D_EXPECTED_FRONT_EAR_HEIGHT_M,
   ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M,
 } from "./coordinatedCandidateFixture";
+import { buildLcrIntegrationSources } from "../lcrIntegrationSources";
 
 const MUTED = "text-[10px] text-[#8A7B6A] leading-relaxed";
 const LINE = "text-[11px] text-[#3E4349] leading-relaxed";
@@ -180,7 +181,9 @@ function PreRunInspection({ refCheck, integrationContext }) {
         OFF
       </CheckRow>
       <CheckRow label="95 Hz integration" ok={crossoverActive}>
-        {crossoverActive ? "live LCR + 95 Hz crossover" : "sub-only (no live LCR context)"}
+        {crossoverActive
+          ? `live LCR (${integrationContext?.speakerSources?.length || 0} sources) + 95 Hz crossover`
+          : "no live LCR context — run will reject (acceptance mode)"}
       </CheckRow>
 
       {!ok && (
@@ -222,22 +225,25 @@ export default function CoordinatedCandidateDeveloperPanel() {
     [savedSeating],
   );
 
-  // Derive a live integration context from the shared bass results so the
-  // coordinated candidate is evaluated with the same LCR sources and crossover
-  // the live design carries. Falls back to sub-only when unavailable.
+  // Trace the SAME live LCR source path the normal calculation uses
+  // (buildLcrIntegrationSources from placedSpeakers), so the coordinated
+  // candidate is evaluated with the same screen-channel transfers the live
+  // design carries — not a derived flag that may be stale or null before the
+  // authoritative hook has populated. When no LCR speakers are placed the
+  // context is null and the run rejects explicitly (acceptance mode), never a
+  // silent sub-only fallback.
   const integrationContext = useMemo(() => {
-    const auth = shared?.authoritative;
-    if (!auth?.combinedAuthorityEnabled) return null;
-    if (!auth.lcrSources?.length) return null;
+    const lcrSources = buildLcrIntegrationSources(appState?.speakerSystem?.placedSpeakers);
+    if (!lcrSources.length) return null;
     return {
       roomDims: { widthM: 3.5, lengthM: 8.0, heightM: 3.0 },
       seatingPositions: [], // filled by the bundle's proposed seating
       rspPosition: { x: 1.75, y: 3.4, z: 1.2 },
-      speakerSources: auth.lcrSources,
-      crossover: { type: "lowpass", frequencyHz: 95, order: 4, enabled: true },
-      physics: auth.physics || null,
+      speakerSources: lcrSources,
+      crossover: ROOM_D_CROSSOVER,
+      physics: shared?.authoritative?.physics || null,
     };
-  }, [shared?.authoritative]);
+  }, [appState?.speakerSystem?.placedSpeakers, shared?.authoritative?.physics]);
 
   const handleRun = useCallback(async () => {
     if (running) return;
@@ -249,6 +255,7 @@ export default function CoordinatedCandidateDeveloperPanel() {
         integrationContext,
         amplifierPowerPerSubW: shared?.authoritative?.amplifierPowerPerSubW || 0,
         savedSeating,
+        requireCombined: true,
       });
     } catch (err) {
       setError(err?.message || "Run failed");
