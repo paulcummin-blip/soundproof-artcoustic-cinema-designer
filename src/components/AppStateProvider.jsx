@@ -1047,6 +1047,11 @@ function useDesignerState() {
         lcrLRHeightM: autosaveConfig.lcrLRHeightM,
         lcrHeightManual: autosaveConfig.lcrHeightManual,
         lcrLRHeightManual: autosaveConfig.lcrLRHeightManual,
+        // Auto time-alignment — version-scoped bass electronic setting. Defaults
+        // to enabled (true) for legacy designs without an explicit saved value.
+        autoAlignEnabled: autosaveConfig.autoAlignEnabled !== undefined
+          ? autosaveConfig.autoAlignEnabled === true
+          : true,
       };
     });
 
@@ -1681,6 +1686,11 @@ function useDesignerState() {
           selectedP18TargetBasis: p.splConfig.selectedP18TargetBasis || p.splConfig.p18Mode || 'minimum',
           // FIX 1: Preserve null P14 level through autosave restore.
           selectedP14Level: normaliseP14Level(p.splConfig.selectedP14Level),
+          // Auto time-alignment: preserve explicit saved value, default to
+          // enabled (true) for legacy autosave payloads without the field.
+          autoAlignEnabled: p.splConfig.autoAlignEnabled !== undefined
+            ? p.splConfig.autoAlignEnabled === true
+            : (previous?.autoAlignEnabled !== undefined ? previous.autoAlignEnabled === true : true),
         }));
       }
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
@@ -1939,7 +1949,8 @@ function useDesignerState() {
       p13Mode: 'minimum',
       p14Mode: 'minimum', bassTargetLevel: 1, selectedP14TargetBasis: null, selectedP14Level: null,
       p18Mode: 'minimum', selectedP18TargetBasis: 'minimum',
-      perRole: {}
+      perRole: {},
+      autoAlignEnabled: true,
     });
 
     // P12 target basis defaults to Minimum

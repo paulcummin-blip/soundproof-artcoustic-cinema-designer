@@ -242,7 +242,19 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     [lcrSources],
   );
 
-  const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
+  // Auto time-alignment is a version-scoped design setting, not local UI
+  // state. It lives in appState.splConfig.autoAlignEnabled so the calculation,
+  // background reconciliation, fingerprint, serialization and hydration all
+  // read and restore the same value. Legacy designs without an explicit value
+  // default to enabled (true).
+  const autoAlignEnabled = splConfig?.autoAlignEnabled !== undefined
+    ? splConfig.autoAlignEnabled === true
+    : true;
+  const setAutoAlignEnabled = useCallback((value) => {
+    if (typeof updateGlobalSpl === "function") {
+      updateGlobalSpl({ autoAlignEnabled: value === true });
+    }
+  }, [updateGlobalSpl]);
   const [roomDamping, setRoomDamping] = useState(DEFAULTS.roomDamping);
   const [surfaceAbsorptionInputs, setSurfaceAbsorptionInputs] = useState(DEFAULTS.surfaceAbsorption);
   const [enableRewCoreReflections, setEnableRewCoreReflections] = useState(DEFAULTS.enableRewCoreReflections);
