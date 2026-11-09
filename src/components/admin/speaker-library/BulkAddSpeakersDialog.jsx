@@ -12,6 +12,7 @@ import { Loader2, Upload, FileSpreadsheet } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { parsePasted, bulkAddSpeakers } from "./bulkAddSpeakers";
+import { parseWorkbookFile } from "./workbookParser";
 
 const BRAND = {
   text: "#1B1A1A", subtext: "#3E4349", hint: "#625143",
@@ -20,29 +21,78 @@ const BRAND = {
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== "";
 
-/** A short data summary for the preview: what the row carries, or "INCOMPLETE". */
-function dataSummary(row) {
-  const parts = [];
-  if (hasValue(row.sensitivity_db)) parts.push("sensitivity");
-  if (hasValue(row.impedance_ohm)) parts.push("impedance");
-  if (hasValue(row.power_w)) parts.push("power");
-  if (hasValue(row.max_spl_db)) parts.push("max SPL");
-  return parts.length > 0 ? parts.join(", ") : "INCOMPLETE";
-}
-
 function pricePreview(row) {
   return hasValue(row.price) ? `£${String(row.price).replace(/[^0-9.]/g, "")}` : "—";
 }
 
+const TECH_FIELDS = ["source_url", "sensitivity_db", "sensitivity_reference", "impedance_ohm", "power_w", "max_spl_db", "price"];
+
+const OUTCOME_META = {
+  new: { label: "New", color: "#213428" },
+  incomplete: { label: "Incomplete", color: "#9A6E00" },
+  existing: { label: "Existing", color: "#3E4349" },
+  duplicate: { label: "Duplicate exact match", color: "#625143" },
+  "brand-only": { label: "Manufacturer only", color: "#625143" },
+  invalid: { label: "—", color: "#7A1E19" },
+};
+
+/**
+ * Build the preview from raw rows (paste + workbook combined). Each row gets an
+ * outcome; within-workbook duplicates merge their non-conflicting fields into the
+ * first new/incomplete occurrence. Returns the items to render, the actionable
+ * product rows to create, the brand-only rows (manufacturers to preserve), and the
+ * count for the Add all button.
+ */
+function buildPreview(rawRows, existingKeys, keyFor) {
+  const seen = new Map();
+  const items = [];
+  const actionableMap = new Map();
+  const brandOnlyRows = [];
+  for (let i = 0; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    const key = keyFor(row);
+    const hasBrand = hasValue(row.manufacturer);
+    const hasProduct = hasValue(row.model);
+    let outcome;
+    if (!hasProduct && hasBrand) {
+      outcome = "brand-only";
+      brandOnlyRows.push(row);
+    } else if (!hasProduct) {
+      outcome = "invalid";
+    } else if (existingKeys.has(key)) {
+      outcome = "existing";
+    } else if (seen.has(key)) {
+      outcome = "duplicate";
+    } else {
+      seen.set(key, i);
+      const hasTech = hasValue(row.sensitivity_db) || hasValue(row.impedance_ohm)
+        || hasValue(row.power_w) || hasValue(row.max_spl_db);
+      outcome = hasTech ? "new" : "incomplete";
+      actionableMap.set(key, { ...row });
+    }
+    items.push({ row, outcome, key, index: i });
+  }
+  for (const it of items) {
+    if (it.outcome === "duplicate") {
+      const target = actionableMap.get(it.key);
+      if (target) for (const f of TECH_FIELDS) if (!hasValue(target[f]) && hasValue(it.row[f])) target[f] = it.row[f];
+    }
+  }
+  const actionable = Array.from(actionableMap.values());
+  return { items, actionable, brandOnlyRows, toAdd: [...actionable, ...brandOnlyRows], actionableCount: actionable.length };
+}
+
 export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone }) {
   const [text, setText] = useState("");
+  const [workbookRows, setWorkbookRows] = useState([]);
   const [working, setWorking] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [existingKeys, setExistingKeys] = useState(() => new Set());
 
-  const rows = useMemo(() => (open ? parsePasted(text) : []), [text, open]);
+  const pasteRows = useMemo(() => (open ? parsePasted(text) : []), [text, open]);
+  const rows = useMemo(() => [...pasteRows, ...workbookRows], [pasteRows, workbookRows]);
 
   // Load existing product identities once per open so the preview can flag
   // Existing vs New without a per-row API call.
@@ -68,75 +118,23 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
 
   const keyFor = (row) => competitorIdentityKey({ manufacturer: row.manufacturer, model: row.model });
 
-  // Convert extracted workbook rows into the CSV dialect parsePasted already
-  // understands, so the existing preview/apply path handles them unchanged.
-  // Manufacturer names are filled down where blank cells belong to the preceding
-  // brand; non-breaking spaces and trailing spaces are trimmed; fully blank
-  // rows are dropped so notes and separators never become dummy products.
-  const csvCell = (v) => {
-    const s = String(v ?? "").replace(/\u00a0/g, " ").trim();
-    if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
-    return s;
-  };
+  const preview = useMemo(() => buildPreview(rows, existingKeys, keyFor), [rows, existingKeys]);
 
+  // Read the workbook directly in the browser (SheetJS): inspect every
+  // populated cell in Sheet1, fill down blank manufacturer cells, skip headers,
+  // notes and brand-only rows. No upload, no LLM extraction — the previous path
+  // lost every row and turned the header into a "Brand / Product" speaker.
   const onWorkbook = async (file) => {
     if (!file) return;
     setUploading(true);
     setError("");
     try {
-      const up = await base44.integrations.Core.UploadPrivateFile({ file });
-      const file_uri = up?.file_uri || up?.data?.file_uri || up?.uri;
-      if (!file_uri) throw new Error("The workbook could not be uploaded.");
-      // ExtractDataFromUploadedFile needs a fetchable URL; sign the private file
-      // for long enough to run the one-time extraction.
-      const signed = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 600 });
-      const file_url = signed?.signed_url || signed?.data?.signed_url;
-      if (!file_url) throw new Error("The workbook could not be read.");
-      const res = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: "object",
-          properties: {
-            rows: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  manufacturer: { type: "string" },
-                  model: { type: "string" },
-                  source_url: { type: "string" },
-                  sensitivity: { type: "string" },
-                  impedance: { type: "string" },
-                  power: { type: "string" },
-                  max_spl: { type: "string" },
-                  price: { type: "string" },
-                },
-              },
-            },
-          },
-        },
-      });
-      const data = res?.data ?? res;
-      const extracted = Array.isArray(data?.output?.rows) ? data.output.rows : (Array.isArray(data?.output) ? data.output : []);
-      const header = "Brand,Product,Sensitivity,Impedance,Power,Max SPL,Price,URL";
-      let lastMfr = "";
-      const lines = [header];
-      for (const r of extracted) {
-        let mfr = String(r.manufacturer || "").replace(/\u00a0/g, " ").trim();
-        const model = String(r.model || "").replace(/\u00a0/g, " ").trim();
-        if (mfr) lastMfr = mfr;
-        else mfr = lastMfr;
-        if (!mfr && !model) continue;
-        lines.push([
-          mfr, model,
-          r.sensitivity, r.impedance, r.power, r.max_spl, r.price, r.source_url,
-        ].map(csvCell).join(","));
+      const { rows: parsed } = await parseWorkbookFile(file);
+      if (parsed.length === 0) {
+        setError("No product rows were found in the workbook.");
+        return;
       }
-      const csv = lines.join("\n");
-      setText((prev) => {
-        const prevTrim = String(prev || "").replace(/\s+$/, "");
-        return prevTrim ? prevTrim + "\n" + csv : csv;
-      });
+      setWorkbookRows((prev) => [...prev, ...parsed]);
     } catch (e) {
       setError(e?.message || "The workbook could not be read.");
     } finally {
@@ -145,11 +143,11 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
   };
 
   const addAll = async () => {
-    if (rows.length === 0) return;
+    if (preview.actionableCount === 0) return;
     setWorking(true);
     setError("");
     try {
-      const outcome = await bulkAddSpeakers({ rows, actorName });
+      const outcome = await bulkAddSpeakers({ rows: preview.toAdd, actorName });
       setResult(outcome);
       onDone?.(outcome);
     } catch (e) {
@@ -162,6 +160,7 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
   const close = () => {
     if (working) return;
     setText("");
+    setWorkbookRows([]);
     setError("");
     setResult(null);
     onClose();
@@ -173,8 +172,8 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
         <DialogHeader>
           <DialogTitle style={{ color: BRAND.text }}>Add multiple speakers</DialogTitle>
           <DialogDescription style={{ color: BRAND.subtext }}>
-            Paste CSV or JSON prepared by ChatGPT. Brand and product are the minimum; everything else can be blank.
-            Existing speakers are never overwritten — duplicates are shown as a warning only.
+            Paste CSV/JSON or upload an XLSX workbook. Brand and product are the minimum; everything else can be blank.
+            Existing speakers are never overwritten — exact matches are skipped, within-workbook duplicates are merged.
           </DialogDescription>
         </DialogHeader>
 
@@ -209,7 +208,7 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
                 <FileSpreadsheet size={15} /> {uploading ? "Reading workbook…" : "Upload workbook"}
                 <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} disabled={uploading} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; onWorkbook(f); }} />
               </label>
-              <span style={{ fontSize: 11, color: BRAND.hint }}>(stored privately — read once for this import)</span>
+              <span style={{ fontSize: 11, color: BRAND.hint }}>reads Sheet1 in your browser</span>
             </div>
 
             <textarea
@@ -226,45 +225,43 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
             {rows.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: BRAND.text, marginBottom: 6 }}>
-                  Preview — {rows.length} row{rows.length === 1 ? "" : "s"}
+                  Preview — {rows.length} row{rows.length === 1 ? "" : "s"} · {preview.actionableCount} to add
                 </div>
-                <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 9, overflowX: "auto", maxHeight: 280, overflowY: "auto" }}>
-                  <table style={{ width: "100%", minWidth: 540, borderCollapse: "collapse" }}>
+                <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 9, overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
+                  <table style={{ width: "100%", minWidth: 780, borderCollapse: "collapse" }}>
                     <thead style={{ background: BRAND.soft }}>
                       <tr>
-                        {["Brand", "Product", "Status", "Data", "Price"].map((label) => (
+                        {["Manufacturer", "Product", "Sensitivity", "Power", "Max SPL", "Price", "Source", "Outcome"].map((label) => (
                           <th key={label} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: BRAND.hint, fontWeight: 600 }}>{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((row, i) => {
-                        const hasBrand = hasValue(row.manufacturer);
-                        const hasProduct = hasValue(row.model);
-                        const isBrandOnly = hasBrand && !hasProduct;
-                        const isExisting = hasProduct && existingKeys.has(keyFor(row));
-                        const isIncomplete = hasProduct && !isExisting && dataSummary(row) === "INCOMPLETE";
-                        const priceFound = hasValue(row.price);
+                      {preview.items.map((it, i) => {
+                        const meta = OUTCOME_META[it.outcome] || OUTCOME_META.invalid;
+                        const row = it.row;
+                        const isBrandOnly = it.outcome === "brand-only";
+                        const url = String(row.source_url || "");
+                        const shortUrl = url ? url.replace(/^https?:\/\//, "").slice(0, 28) : "";
                         return (
                           <tr key={i} style={{ borderTop: `1px solid ${BRAND.soft}` }}>
-                            <td style={{ padding: "7px 10px", fontSize: 13, color: hasBrand ? BRAND.text : BRAND.red }}>{row.manufacturer || "—"}</td>
-                            <td style={{ padding: "7px 10px", fontSize: 13, color: hasProduct ? BRAND.text : (isBrandOnly ? BRAND.hint : BRAND.red) }}>{row.model || (isBrandOnly ? "(brand only)" : "—")}</td>
-                            <td style={{ padding: "7px 10px", fontSize: 11, color: BRAND.hint }}>
-                              {isBrandOnly ? <span style={{ color: BRAND.subtext }}>Manufacturer</span>
-                                : isExisting ? <span style={{ color: BRAND.green, fontWeight: 600 }}>Existing</span>
-                                : isIncomplete ? <span style={{ color: BRAND.amber }}>New · Incomplete</span>
-                                : <span style={{ color: BRAND.text }}>New</span>}
-                              {priceFound && <span style={{ color: BRAND.green }}> · £</span>}
+                            <td style={{ padding: "7px 10px", fontSize: 13, color: hasValue(row.manufacturer) ? BRAND.text : BRAND.red }}>{row.manufacturer || "—"}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 13, color: hasValue(row.model) ? BRAND.text : (isBrandOnly ? BRAND.hint : BRAND.red) }}>{row.model || (isBrandOnly ? "(brand only)" : "—")}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 12, color: BRAND.subtext }}>{isBrandOnly ? "—" : (hasValue(row.sensitivity_db) ? `${row.sensitivity_db}` : "—")}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 12, color: BRAND.subtext }}>{isBrandOnly ? "—" : (hasValue(row.power_w) ? `${row.power_w}` : "—")}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 12, color: BRAND.subtext }}>{isBrandOnly ? "—" : (hasValue(row.max_spl_db) ? `${row.max_spl_db}` : "—")}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 12, color: BRAND.text }}>{isBrandOnly ? "—" : pricePreview(row)}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 11, color: BRAND.hint, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={url}>
+                              {url ? shortUrl : "—"}
                             </td>
-                            <td style={{ padding: "7px 10px", fontSize: 12, color: BRAND.hint }}>{isBrandOnly ? "—" : dataSummary(row)}</td>
-                            <td style={{ padding: "7px 10px", fontSize: 13, color: BRAND.text }}>{isBrandOnly ? "—" : pricePreview(row)}</td>
+                            <td style={{ padding: "7px 10px", fontSize: 11, color: meta.color, fontWeight: 600, whiteSpace: "nowrap" }}>{meta.label}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-                {(rows.some((r) => !hasValue(r.manufacturer) && hasValue(r.model))) && (
+                {preview.items.some((it) => it.outcome === "invalid") && (
                   <div style={{ fontSize: 12, color: BRAND.amber, marginTop: 6 }}>
                     Rows with a product but no brand will be skipped.
                   </div>
@@ -289,10 +286,10 @@ export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone
               <button
                 type="button"
                 onClick={addAll}
-                disabled={working || rows.length === 0}
-                style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: 9, padding: "9px 18px", background: rows.length === 0 ? "#9CA3A0" : BRAND.green, color: "#FFF", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: rows.length === 0 ? "not-allowed" : "pointer" }}
+                disabled={working || preview.actionableCount === 0}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: 9, padding: "9px 18px", background: preview.actionableCount === 0 ? "#9CA3A0" : BRAND.green, color: "#FFF", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: preview.actionableCount === 0 ? "not-allowed" : "pointer" }}
               >
-                {working ? <><Loader2 size={15} className="animate-spin" /> Adding…</> : <><Upload size={15} /> Add all ({rows.length})</>}
+                {working ? <><Loader2 size={15} className="animate-spin" /> Adding…</> : <><Upload size={15} /> Add all ({preview.actionableCount})</>}
               </button>
             </>
           )}
