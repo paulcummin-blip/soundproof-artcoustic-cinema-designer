@@ -135,31 +135,37 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
   const [rowError, setRowError] = useState(null);
   const [error, setError] = useState("");
 
+  const { user } = useAuth();
+  const actorName = user?.full_name || user?.email || "Administrator";
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [removal, setRemoval] = useState(null);
+  const [removing, setRemoving] = useState(false);
+  const [notice, setNotice] = useState("");
+
   // The list is the RP22 selection list itself — the same candidate builder the
   // comparison dropdown uses, including the database products a master admin can
   // select before they are published — so no selectable speaker can be missing.
-  useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
+  const reload = useCallback(async () => {
     setLoading(true);
     setError("");
-    (async () => {
-      try {
-        const list = await loadComparisonCandidates({ includeUnpublished: true });
-        if (cancelled) return;
-        setCandidates(list);
-        setDrafts({});
-        setRowError(null);
-      } catch (e) {
-        if (cancelled) return;
-        setCandidates([]);
-        setError(e?.message || "Could not load the comparison speakers.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open]);
+    setRowError(null);
+    try {
+      const list = await loadComparisonCandidates({ includeUnpublished: true });
+      setCandidates(list);
+      setDrafts({});
+    } catch (e) {
+      setCandidates([]);
+      setError(e?.message || "Could not load the comparison speakers.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (open) reload(); }, [open, reload]);
 
   // Manufacturer names come from the list itself, so they are the comparison's
   // own names rather than whatever a raw record happens to spell.
@@ -225,6 +231,76 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
     }
   };
 
+  // ---- Admin management actions (add / edit / bulk / delete) ----------------
+  // These reach the same CompetitorSpeaker records the list is built from, so a
+  // saved speaker appears in the RP22 dropdown on the next reload without any
+  // separate publication step. Only an admin can reach this panel and only an
+  // admin can write to CompetitorSpeaker (RLS), so no extra guard is needed here.
+  const openAdd = () => { setEditingRow(null); setFormOpen(true); };
+  const openEdit = (candidate) => { setEditingRow(candidateToFormRow(candidate)); setFormOpen(true); };
+  const openBulk = () => setBulkOpen(true);
+
+  const handleSaved = async () => {
+    setFormOpen(false);
+    setEditingRow(null);
+    setNotice("Speaker saved.");
+    await reload();
+    setTimeout(() => setNotice(""), 3500);
+  };
+
+  const handleBulkDone = async (summary) => {
+    setBulkOpen(false);
+    const added = summary?.created || 0;
+    setNotice(added ? `Added ${added} speaker${added === 1 ? "" : "s"}.` : "No speakers added.");
+    await reload();
+    setTimeout(() => setNotice(""), 3500);
+  };
+
+  const askDelete = async (candidate) => {
+    setPendingDelete(candidate);
+    setRemoval(null);
+    setRemoving(true);
+    try {
+      const probe = {
+        productId: candidate.productId || null,
+        product: candidate.productId ? { id: candidate.productId } : null,
+        rowId: candidate.priceRecordId || null,
+        manufacturer: candidate.manufacturer || "",
+        model: candidate.model || "",
+      };
+      const described = await describeRemoval(probe);
+      setRemoval(described);
+    } catch (e) {
+      setRemoval({ error: e?.message || "Could not assess this speaker." });
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setRemoving(true);
+    try {
+      const probe = {
+        productId: pendingDelete.productId || null,
+        product: pendingDelete.productId ? { id: pendingDelete.productId } : null,
+        rowId: pendingDelete.priceRecordId || null,
+        manufacturer: pendingDelete.manufacturer || "",
+        model: pendingDelete.model || "",
+      };
+      await removeSpeakerFromLibrary({ row: probe, actorName });
+      setNotice(`Removed ${pendingDelete.manufacturer || ""} ${pendingDelete.model || ""}.`.trim());
+      setPendingDelete(null);
+      setRemoval(null);
+      await reload();
+      setTimeout(() => setNotice(""), 3500);
+    } catch (e) {
+      setRemoval({ error: e?.message || "Could not remove this speaker." });
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const inputStyle = {
     width: "100%",
     border: `1px solid ${BRAND.border}`,
@@ -236,6 +312,18 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
     fontFamily: "inherit",
   };
 
+  const iconBtn = {
+    border: `1px solid ${BRAND.border}`,
+    borderRadius: 8,
+    padding: 6,
+    background: "#FFF",
+    color: BRAND.subtext,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
   return (
     <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14 }}>
       <button
@@ -243,13 +331,23 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
         onClick={() => setOpen((v) => !v)}
         style={{ width: "100%", border: 0, background: "transparent", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: BRAND.text }}
       >
-        <span style={{ fontWeight: 700 }}>Admin · Manage Prices</span>
+        <span style={{ fontWeight: 700 }}>Admin · Manage Competitor Speakers</span>
         {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
       </button>
 
       {open && (
         <div style={{ borderTop: `1px solid ${BRAND.border}`, padding: 18 }}>
           <div style={{ fontSize: 12, color: BRAND.hint, marginBottom: 12 }}>{PRICE_BASIS_LABEL}</div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+            <button type="button" onClick={openAdd} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 9, border: `1px solid ${BRAND.text}`, background: BRAND.text, color: "#FFF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+              <Plus size={15} /> Add speaker
+            </button>
+            <button type="button" onClick={openBulk} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 9, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+              <Upload size={15} /> Add multiple
+            </button>
+            {notice && <div style={{ fontSize: 12, color: "#213428" }}>{notice}</div>}
+          </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "8px 11px", background: "#FFF", flex: "1 1 260px" }}>
@@ -274,8 +372,12 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
           <div style={{ display: "grid", gridTemplateColumns: TABLE_GRID, gap: 8, padding: "0 4px 8px", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
             <div>Manufacturer</div>
             <div>Speaker model</div>
-            <div>Retail price (inc VAT)</div>
-            <div />
+            <div>Sens.</div>
+            <div>Power</div>
+            <div>Max SPL</div>
+            <div>Data</div>
+            <div>Retail (inc VAT)</div>
+            <div style={{ textAlign: "right" }}>Actions</div>
           </div>
 
           <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, overflow: "hidden" }}>
@@ -307,6 +409,17 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                   >
                     <div style={{ fontSize: 14, color: BRAND.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{candidate.manufacturer || "—"}</div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, minWidth: 0 }}>{candidate.model || "—"}</div>
+                    <div style={{ fontSize: 13, color: BRAND.subtext }}>{sensitivityText(candidate.record)}</div>
+                    <div style={{ fontSize: 13, color: BRAND.subtext }}>{powerText(candidate.record)}</div>
+                    <div style={{ fontSize: 13, color: BRAND.subtext }}>{splText(candidate.record)}</div>
+                    <div>
+                      {(() => {
+                        const s = dataStatus(candidate.classKey);
+                        return (
+                          <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", padding: "2px 7px", borderRadius: 999, background: `${s.tone}14`, color: s.tone, whiteSpace: "nowrap" }}>{s.label}</span>
+                        );
+                      })()}
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ color: BRAND.hint, fontSize: 14 }}>£</span>
                       <input
@@ -319,11 +432,11 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                         style={inputStyle}
                       />
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+                      <button type="button" title="Edit speaker" onClick={() => openEdit(candidate)} style={iconBtn}><Pencil size={14} /></button>
+                      <button type="button" title="Remove speaker" onClick={() => askDelete(candidate)} style={iconBtn}><Trash2 size={14} /></button>
                       {savedId === candidate.id && (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "#213428" }}>
-                          <Check size={14} /> Saved
-                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "#213428" }}><Check size={13} /></span>
                       )}
                       <button
                         type="button"
@@ -331,8 +444,8 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                         disabled={savingId === candidate.id || !isDirty(candidate)}
                         style={{
                           border: 0,
-                          borderRadius: 9,
-                          padding: "8px 14px",
+                          borderRadius: 8,
+                          padding: "7px 12px",
                           fontSize: 13,
                           fontFamily: "inherit",
                           cursor: isDirty(candidate) ? "pointer" : "default",
@@ -344,7 +457,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                       </button>
                     </div>
                     {rowError?.id === candidate.id && (
-                      <div style={{ gridColumn: "3 / 5", fontSize: 12, color: "#7A1E19" }}>{rowError.message}</div>
+                      <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "#7A1E19" }}>{rowError.message}</div>
                     )}
                   </div>
                 ))}
@@ -359,6 +472,51 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
           </div>
         </div>
       )}
+
+      <SpeakerFormDialog
+        open={formOpen}
+        onClose={() => { setFormOpen(false); setEditingRow(null); }}
+        row={editingRow}
+        actorName={actorName}
+        onSaved={handleSaved}
+      />
+      <BulkAddSpeakersDialog
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        actorName={actorName}
+        onDone={handleBulkDone}
+      />
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(v) => { if (!v) { setPendingDelete(null); setRemoval(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove speaker</DialogTitle>
+            <DialogDescription>
+              {pendingDelete ? `${pendingDelete.manufacturer || ""} ${pendingDelete.model || ""}`.trim() : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {removing && !removal ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: BRAND.subtext }}><Loader2 size={15} className="animate-spin" /> Checking references…</div>
+          ) : removal?.error ? (
+            <div style={{ fontSize: 13, color: "#7A1E19" }}>{removal.error}</div>
+          ) : removal ? (
+            <div style={{ fontSize: 13, color: BRAND.subtext }}>
+              <div style={{ fontWeight: 600, color: BRAND.text, marginBottom: 6 }}>{removal.headline}</div>
+              <div>{removal.detail}</div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <button type="button" onClick={() => { setPendingDelete(null); setRemoval(null); }} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 8, padding: "8px 14px", background: "#FFF", color: BRAND.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
+            <button
+              type="button"
+              onClick={confirmDelete}
+              disabled={removing || !removal || Boolean(removal?.error)}
+              style={{ border: 0, borderRadius: 8, padding: "8px 14px", background: "#7A1E19", color: "#FFF", cursor: "pointer", fontSize: 13, fontFamily: "inherit", opacity: removing || !removal || removal?.error ? 0.5 : 1 }}
+            >
+              {removing ? "Removing…" : (removal?.actionLabel || "Remove")}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
