@@ -164,7 +164,12 @@ export function buildStage2Sources(finalist, roomDims, selectedSubModel, amplifi
     const autoDelay = autoAlignDelays[canonicalId] ?? 0;
     const descriptor = sourceDescriptors[i];
     return {
-      id: `stage2-src-${i + 1}`,
+      // Preserve an explicitly supplied sourceId (coordinated candidate
+      // identity contract). Ordinary Stage 2 finalists without a sourceId
+      // fall back to the existing generated identity. This is the identity
+      // layer only — positions, orientations and acoustic calculations are
+      // unchanged.
+      id: s?.sourceId || `stage2-src-${i + 1}`,
       modelKey: descriptor.modelKey,
       bassCapability: resolveSubwooferBassCapability(descriptor.modelKey),
       subwooferAmplifierPowerW: amplifierPowerPerSubW,

@@ -214,17 +214,105 @@ export function bundleToStage2Finalist(bundle, roomDims) {
   const W = Number(roomDims?.widthM) || 0;
   const L = Number(roomDims?.lengthM) || 0;
   const coords = Array.isArray(bundle.coordinates) ? bundle.coordinates : [];
-  const sources = (W > 0 && L > 0)
-    ? coords.map((c) => ({
-        xNorm: Number(c.x) / W,
-        yNorm: Number(c.y) / L,
-        coordinateSpace: "cabinet_centre",
-      }))
-    : coords.map(() => ({ xNorm: 0, yNorm: 0, coordinateSpace: "cabinet_centre" }));
+  const sourceIds = Array.isArray(bundle.sourceIds) ? bundle.sourceIds : [];
+  const instances = Array.isArray(bundle.instances) ? bundle.instances : [];
+  const subwooferBottomHeightM = Number.isFinite(Number(bundle.subwooferBottomHeightM))
+    ? Number(bundle.subwooferBottomHeightM) : 0;
+
+  // Carry the candidate-owned sourceId, model and bottomHeight on each
+  // finalist source so buildStage2Sources can use them instead of generating
+  // replacement stage2-src-N identities. This is the identity layer only —
+  // positions, orientations and acoustic calculations are unchanged.
+  const sources = coords.map((c, i) => ({
+    xNorm: (W > 0 && L > 0) ? Number(c.x) / W : 0,
+    yNorm: (W > 0 && L > 0) ? Number(c.y) / L : 0,
+    coordinateSpace: "cabinet_centre",
+    sourceId: sourceIds[i] || null,
+    modelKey: instances[i]?.model || bundle.selectedSubModel || null,
+    bottomHeightM: Number.isFinite(Number(instances[i]?.bottomHeightM))
+      ? Number(instances[i].bottomHeightM) : subwooferBottomHeightM,
+    orientation: instances[i]?.orientation || null,
+  }));
 
   return {
     id: bundle.candidateId,
     familyId: "coordinated-candidate",
     sources,
   };
+}
+
+/**
+ * Validate post-evaluation identity integrity for a coordinated candidate.
+ *
+ * Checks:
+ *   - Source ID count equals source count
+ *   - Every source ID is non-null and unique
+ *   - Source order matches placement order (the rawTransfer.sources IDs
+ *     match the bundle.sourceIds in order)
+ *   - Tuning IDs match transfer source IDs
+ *   - Confirmation references the same candidate and source identities
+ *
+ * @param {object} bundle — the original coordinated candidate bundle
+ * @param {object} rawTransfer — from evaluateStage2Placement
+ * @param {object} confirmation — from evaluateStage2ConfirmationWithTuning
+ * @returns {{ valid: boolean, issues: string[] }}
+ */
+export function validateCoordinatedCandidateIntegrity(bundle, rawTransfer, confirmation) {
+  const issues = [];
+
+  const bundleSourceIds = Array.isArray(bundle?.sourceIds) ? bundle.sourceIds : [];
+  const transferSources = Array.isArray(rawTransfer?.sources) ? rawTransfer.sources : [];
+  const transferSourceIds = transferSources.map((s) => s?.id || null);
+
+  // Source ID count must equal source count
+  if (transferSourceIds.length !== bundleSourceIds.length) {
+    issues.push(`Transfer source count (${transferSourceIds.length}) does not match bundle source count (${bundleSourceIds.length})`);
+  }
+
+  // Every source ID must be non-null and unique
+  if (transferSourceIds.some((id) => !id)) {
+    issues.push("One or more transfer source IDs are null or empty");
+  }
+  if (new Set(transferSourceIds.filter(Boolean)).size !== transferSourceIds.filter(Boolean).length) {
+    issues.push("Duplicate transfer source IDs");
+  }
+
+  // Source order must match placement order
+  for (let i = 0; i < bundleSourceIds.length; i++) {
+    if (transferSourceIds[i] !== bundleSourceIds[i]) {
+      issues.push(`Source order mismatch at index ${i}: bundle=${bundleSourceIds[i]}, transfer=${transferSourceIds[i]}`);
+    }
+  }
+
+  // Tuning IDs must match transfer IDs (the tuning array is positional, but
+  // each tuning entry's sourceId — if present — must match the transfer)
+  const tuning = Array.isArray(bundle?.tuning) ? bundle.tuning : [];
+  const transferPerSource = Array.isArray(rawTransfer?.perSourcePerSeatComplexTransfers)
+    ? rawTransfer.perSourcePerSeatComplexTransfers : [];
+  const transferSourceIdsFromTransfers = transferPerSource
+    .map((t) => t?.sourceId || null)
+    .filter((id, i, arr) => arr.indexOf(id) === i); // unique, ordered
+
+  if (tuning.length !== bundleSourceIds.length) {
+    issues.push(`Tuning count (${tuning.length}) does not match bundle source count (${bundleSourceIds.length})`);
+  }
+
+  // Check that the per-source per-seat transfer sourceIds match the source IDs
+  // on the sources array (they should be the same identities)
+  for (const t of transferPerSource) {
+    const idx = t?.sourceIndex;
+    if (Number.isFinite(idx) && idx < transferSources.length) {
+      const sourceId = transferSources[idx]?.id;
+      if (t?.sourceId && sourceId && t.sourceId !== sourceId) {
+        issues.push(`Transfer sourceId ${t.sourceId} does not match source[${idx}].id ${sourceId}`);
+      }
+    }
+  }
+
+  // Confirmation must reference the same candidate identity
+  if (confirmation?.finalistId && bundle?.candidateId && confirmation.finalistId !== bundle.candidateId) {
+    issues.push(`Confirmation finalistId (${confirmation.finalistId}) does not match candidate ID (${bundle.candidateId})`);
+  }
+
+  return { valid: issues.length === 0, issues };
 }

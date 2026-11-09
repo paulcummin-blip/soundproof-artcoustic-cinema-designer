@@ -16,7 +16,7 @@
 import { evaluateStage2Placement, evaluateStage2ConfirmationWithTuning } from "../stage2/stage2CanonicalEvaluation";
 import { captureCombinedIntegrationTransfers } from "../combinedIntegrationEngine";
 import { simulateAuthoritativeBassResponse } from "../authoritativeBassResponseEngine";
-import { buildCoordinatedCandidateBundle, validateCoordinatedCandidateBundle, bundleToStage2Finalist } from "./coordinatedCandidateBundle";
+import { buildCoordinatedCandidateBundle, validateCoordinatedCandidateBundle, bundleToStage2Finalist, validateCoordinatedCandidateIntegrity } from "./coordinatedCandidateBundle";
 import { summariseCoordinatedEvidence } from "./coordinatedCandidateEvidence";
 import { diagnoseSharedCancellations } from "./sharedCancellationDiagnostic";
 
@@ -151,6 +151,15 @@ export async function evaluateCoordinatedCandidate({
 
     if (!confirmation) {
       return { status: "error", evidence: null, issues: ["Canonical confirmation returned no result"] };
+    }
+
+    // 5b. Validate post-evaluation identity integrity: the candidate-owned
+    //     source IDs must survive through the transfer and confirmation
+    //     without regeneration or substitution. Reject inconsistent candidates
+    //     explicitly rather than silently regenerating IDs.
+    const integrity = validateCoordinatedCandidateIntegrity(bundle, evalTransfer, confirmation);
+    if (!integrity.valid) {
+      return { status: "rejected", evidence: null, issues: integrity.issues };
     }
 
     // 6. Retain the genuine post-EQ evidence
