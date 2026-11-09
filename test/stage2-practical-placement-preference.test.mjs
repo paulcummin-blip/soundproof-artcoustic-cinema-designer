@@ -399,4 +399,54 @@ describe("Practical Placement Preference — selectQualifyingAlternatives", () =
   it("returns an empty array for an empty ranked list", () => {
     assert.deepEqual(selectQualifyingAlternatives([], null), []);
   });
+
+  // ── Screenshot acceptance cases ───────────────────────────────────────
+  it("SCREENSHOT CASE 1: mixed-wall alt with Primary P20 L1→L2 (P19 L4=L4, Secondary L1=L1) qualifies", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7.5, familyRank: 3 }),
+    });
+    const mixedAlt = makeResult({
+      familyId: FAMILY_IDS.RP22_B_LAST_RESORT,
+      finalistId: "b",
+      p19Level: 4,
+      primaryP20Levels: [2, 2],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 2, p20Dev: 3.5, familyRank: 99 }),
+    });
+    const ranked = [mixedAlt, frontRear];
+    const practical = selectPracticalBest(ranked);
+    assert.equal(practical.familyId, FAMILY_IDS.FOUR_THIRD_PAIRS, "front/rear remains the recommendation");
+    const alts = selectQualifyingAlternatives(ranked, practical);
+    assert.equal(alts.length, 1, "mixed-wall alternative remains visible — Primary P20 improved by one Level");
+    assert.equal(alts[0].familyId, FAMILY_IDS.RP22_B_LAST_RESORT);
+  });
+
+  it("SCREENSHOT CASE 2: both P20 L1 despite a large numerical deviation reduction → alternative must NOT appear", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7.5, familyRank: 3 }),
+    });
+    const mixedAlt = makeResult({
+      familyId: FAMILY_IDS.RP22_D,
+      finalistId: "d",
+      p19Level: 4,
+      primaryP20Levels: [1, 1], // same Level L1 despite a large numerical reduction
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 0.5, familyRank: 4 }),
+    });
+    const ranked = [mixedAlt, frontRear];
+    const practical = selectPracticalBest(ranked);
+    assert.equal(practical.familyId, FAMILY_IDS.FOUR_THIRD_PAIRS);
+    const alts = selectQualifyingAlternatives(ranked, practical);
+    assert.equal(alts.length, 0, "numerical-only gain at the same Level must not surface an alternative");
+  });
 });

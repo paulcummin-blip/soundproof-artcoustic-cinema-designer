@@ -185,6 +185,24 @@ function improvementText(option) {
   return `${parts.join(" · ")} · side/mixed-wall placement`;
 }
 
+// Surface the actual compromises a qualifying alternative carries — a Level
+// regression in a non-gating parameter (Secondary P20). The alternative still
+// qualifies (P19 or Primary P20 improved by a whole Level), but the designer
+// must see the trade-off before accepting the less convenient installation.
+// Uses the existing stamped Levels only; no new grade or threshold.
+const COMPROMISE_LABEL = { secondaryP20: "Secondary P20" };
+
+function compromiseText(option) {
+  if (!Array.isArray(option?.compromises) || !option.compromises.length) return null;
+  const parts = option.compromises.map((c) => {
+    const label = COMPROMISE_LABEL[c.parameter] || c.parameter;
+    const from = normalizeLevelForDisplay(c.fromLevel);
+    const to = normalizeLevelForDisplay(c.toLevel);
+    return `${label} drops ${from} → ${to}`;
+  });
+  return `Compromise: ${parts.join(" · ")}`;
+}
+
 function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onConfirmApply, canApply, blockReason, optionKey }) {
   if (!option) {
     return (
@@ -224,6 +242,9 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
       </div>
       {isAlternative && option.valid && improvementText(option) && (
         <div className="mt-1.5 text-[9px] text-[#625143]">{improvementText(option)}</div>
+      )}
+      {isAlternative && option.valid && compromiseText(option) && (
+        <div className="mt-1 text-[9px] text-[#9A4A2B]">{compromiseText(option)}</div>
       )}
       {!option.valid && option.terminal && (
         <div className="mt-1.5 text-[9px] text-[#8A7B6A]">Placement could not be evaluated for this room.</div>

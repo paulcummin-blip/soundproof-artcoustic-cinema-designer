@@ -178,6 +178,31 @@ function buildImprovementDescription(altOption, practicalOption) {
 }
 
 /**
+ * Detect regressions in the NON-gating parameters so the alternative card can
+ * show the actual compromises. The qualification gate is P19 RSP or Primary P20
+ * Level improvement with no regression in the other of that pair; a Secondary
+ * P20 Level regression does not block qualification (it is not a gate) but is a
+ * real compromise the designer must see before accepting a less convenient
+ * side/mixed-wall installation. Uses only the Levels already stamped on the
+ * options — no new grade, no dB threshold.
+ *
+ * @private
+ * @param {object} altOption — built alternative option
+ * @param {object} practicalOption — built practical option
+ * @returns {Array<{parameter: string, fromLevel: number, toLevel: number}>}
+ *   compromise descriptors (empty when the alternative has no regression)
+ */
+function buildCompromiseDescription(altOption, practicalOption) {
+  const out = [];
+  const altLvl = Number(altOption?.p20Secondary?.level);
+  const pracLvl = Number(practicalOption?.p20Secondary?.level);
+  if (Number.isFinite(altLvl) && Number.isFinite(pracLvl) && altLvl < pracLvl) {
+    out.push({ parameter: "secondaryP20", fromLevel: pracLvl, toLevel: altLvl });
+  }
+  return out;
+}
+
+/**
  * Select the evaluated options for a Stage 2 complete state snapshot.
  *
  * For each quantity (1, 2, 4) the practical front/rear best finalist becomes
@@ -231,6 +256,7 @@ export function selectEvaluatedOptions(stage2State, seatPriorityMap, context) {
       if (!altOption) continue;
       altOption.fingerprint = runFingerprint;
       altOption.improvement = buildImprovementDescription(altOption, practicalOption);
+      altOption.compromises = buildCompromiseDescription(altOption, practicalOption);
       options.push(altOption);
     }
   }

@@ -247,6 +247,127 @@ function withRankingData(result) {
   assert.equal(options[0].placementKind, 'practical');
 }
 
+// ── 8b. Screenshot acceptance case 1: Primary P20 L1→L2 qualifies (P19 L4=L4)
+//   Practical four-sub: P19 L4, P20 Primary L1, P20 Secondary L1
+//   Mixed-wall alt:      P19 L4, P20 Primary L2, P20 Secondary L1
+//   The alternative remains visible because Primary P20 improves by one Level.
+{
+  const frontRear = withRankingData(makeValidResult({
+    finalistId: 'ftp',
+    familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+    quantity: 4,
+    coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 7.5 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 7.2 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 9.0 },
+    ],
+  }));
+  const mixedAlt = withRankingData(makeValidResult({
+    finalistId: 'b',
+    familyId: FAMILY_IDS.RP22_B_LAST_RESORT,
+    quantity: 4,
+    coordinates: [{ x: 0, y: 2.0 }, { x: 0, y: 4.0 }, { x: 5, y: 2.0 }, { x: 5, y: 4.0 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 2, variationDbRaw: 3.5 },
+      { seatId: 'seat-2', level: 2, variationDbRaw: 3.2 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 8.0 },
+    ],
+  }));
+  const completeState = {
+    status: 'complete',
+    fingerprint: 'stage2-rec-fp-screenshot1',
+    four_sub_result: { bestFinalist: frontRear, evaluatedFinalists: [frontRear, mixedAlt] },
+  };
+  const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
+  assert.equal(options.length, 2, 'practical + qualifying mixed-wall alternative');
+  assert.equal(options[1].placementKind, 'alternative');
+  assert.equal(options[1].improvement.primaryP20, true, 'Primary P20 L1->L2 improvement');
+  assert.equal(options[1].improvement.p19, false, 'P19 unchanged (L4=L4)');
+  assert.deepEqual(options[1].compromises, [], 'no compromise: Secondary P20 L1=L1');
+}
+
+// ── 8c. Screenshot acceptance case 2: both P20 L1 despite a large numerical
+//   reduction in deviation — the alternative must NOT appear for that gain.
+{
+  const frontRear = withRankingData(makeValidResult({
+    finalistId: 'ftp',
+    familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+    quantity: 4,
+    coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 7.5 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 7.2 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 9.0 },
+    ],
+  }));
+  const mixedAlt = withRankingData(makeValidResult({
+    finalistId: 'd',
+    familyId: FAMILY_IDS.RP22_D,
+    quantity: 4,
+    coordinates: [{ x: 0, y: 2.0 }, { x: 0, y: 4.0 }, { x: 5, y: 2.0 }, { x: 5, y: 4.0 }],
+    achievedP19Level: 4,
+    // Large numerical reduction (7.5 → 0.5 dB) but SAME Level (L1) everywhere.
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 0.5 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 0.6 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 1.0 },
+    ],
+  }));
+  const completeState = {
+    status: 'complete',
+    fingerprint: 'stage2-rec-fp-screenshot2',
+    four_sub_result: { bestFinalist: frontRear, evaluatedFinalists: [frontRear, mixedAlt] },
+  };
+  const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
+  assert.equal(options.length, 1, 'numerical-only gain at the same Level must NOT surface an alternative');
+  assert.equal(options[0].placementKind, 'practical');
+}
+
+// ── 8d. Compromise surfacing: a qualifying alternative (Primary P20 L1→L2)
+//   that regresses Secondary P20 (L2→L1) carries the compromise descriptor.
+{
+  const frontRear = withRankingData(makeValidResult({
+    finalistId: 'ftp',
+    familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+    quantity: 4,
+    coordinates: [{ x: 1.25, y: 0.3 }, { x: 3.75, y: 0.3 }, { x: 1.25, y: 5.7 }, { x: 3.75, y: 5.7 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 1, variationDbRaw: 7.5 },
+      { seatId: 'seat-2', level: 1, variationDbRaw: 7.2 },
+      { seatId: 'seat-3', level: 2, variationDbRaw: 4.0 },
+    ],
+  }));
+  const mixedAlt = withRankingData(makeValidResult({
+    finalistId: 'b',
+    familyId: FAMILY_IDS.RP22_B_LAST_RESORT,
+    quantity: 4,
+    coordinates: [{ x: 0, y: 2.0 }, { x: 0, y: 4.0 }, { x: 5, y: 2.0 }, { x: 5, y: 4.0 }],
+    achievedP19Level: 4,
+    perSeatP20: [
+      { seatId: 'seat-1', level: 2, variationDbRaw: 3.5 },
+      { seatId: 'seat-2', level: 2, variationDbRaw: 3.2 },
+      { seatId: 'seat-3', level: 1, variationDbRaw: 8.0 },
+    ],
+  }));
+  const completeState = {
+    status: 'complete',
+    fingerprint: 'stage2-rec-fp-compromise',
+    four_sub_result: { bestFinalist: frontRear, evaluatedFinalists: [frontRear, mixedAlt] },
+  };
+  const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
+  assert.equal(options.length, 2, 'practical + qualifying alternative (Primary P20 improved)');
+  assert.equal(options[1].improvement.primaryP20, true, 'Primary P20 L1->L2 qualifies despite Secondary regression');
+  assert.ok(Array.isArray(options[1].compromises) && options[1].compromises.length === 1, 'one compromise surfaced');
+  assert.equal(options[1].compromises[0].parameter, 'secondaryP20');
+  assert.equal(options[1].compromises[0].fromLevel, 2);
+  assert.equal(options[1].compromises[0].toLevel, 1);
+}
+
 // ── 9. wall placement / orientation derivation ─────────────────────────
 {
   const room = { widthM: 5, lengthM: 6 };
@@ -256,4 +377,4 @@ function withRankingData(result) {
   assert.equal(orientationForCoordinate({ x: 2.5, y: 5.7 }, room), 180);
 }
 
-console.log('evaluated-option-presentation: all checks passed');
+console.log('evaluated-option-presentation: all checks passed (incl. screenshot + compromise cases)');
