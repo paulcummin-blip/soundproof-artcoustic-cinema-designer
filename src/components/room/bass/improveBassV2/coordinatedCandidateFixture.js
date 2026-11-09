@@ -229,17 +229,12 @@ function buildRoomDSeating(savedSeating = null) {
         + `Refusing to construct different seating from a non-matching saved layout.`,
       );
     }
-    // Preserve every saved field; only y will be shifted below.
-    originSeats = savedSeating.map((seat) => ({
-      id: seat.id,
-      rowNumber: seat.rowNumber,
-      priority: seat.priority,
-      x: Number(seat.x),
-      y: Number(seat.y),
-      z: Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2,
-      earHeight: seat.earHeight,
-      platformHeight: seat.platformHeight,
-    }));
+    // Preserve every saved seat property verbatim — ID, X, Z / ear height, row
+    // identity, priority, riser/platform metadata (platformHeightM) and any
+    // acoustic-listener metadata the saved layout carries. Only y is shifted
+    // below. No field is dropped or renamed, so the proposed listener geometry
+    // is the actual saved geometry translated by −0.6 m, never a reconstruction.
+    originSeats = savedSeating.map((seat) => ({ ...seat }));
   } else {
     // Canonical original Room D rows: front row 3 seats, rear row 3 seats,
     // laterally symmetric about the 1.75 m centreline.
