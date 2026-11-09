@@ -196,6 +196,11 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
             <Field label="Power rating (W)">
               <input style={inputStyle} value={values.power_w} onChange={set("power_w")} inputMode="decimal" placeholder="e.g. 400" />
             </Field>
+            {values.power_basis === "amplifier" && hasValue(values.power_w_min) && (
+              <Field label="Recommended amplifier minimum (W)" hint="The low end of the stated recommended amplifier range. The maximum above is what the calculation uses.">
+                <input style={inputStyle} value={values.power_w_min} onChange={set("power_w_min")} inputMode="decimal" placeholder="e.g. 25" />
+              </Field>
+            )}
             <Field label="Power figure is" hint="A recommended amplifier maximum is never treated as a continuous speaker rating.">
               <select style={inputStyle} value={values.power_basis} onChange={set("power_basis")}>
                 {POWER_BASES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

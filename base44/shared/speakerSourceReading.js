@@ -100,10 +100,170 @@ export function matchEnumValue(field, raw, enums) {
 }
 
 /**
+ * Normalise a manufacturer-formatted numeric literal into a Number, correctly
+ * handling thousands separators (comma, space, dot) and decimal separators
+ * (dot, comma), so "1,000" is 1000, never 1.
+ *
+ * Heuristics (English speaker-spec domain):
+ *  - Both "," and "." present → the LAST separator is the decimal; the other is
+ *    thousands. "1,234.56" → 1234.56 ; "1.234,56" → 1234.56.
+ *  - Only "," present:
+ *      - comma group of exactly 3 digits with ≥1 digit before → thousands:
+ *        "1,000"→1000, "10,000"→10000, "1,234,567"→1234567.
+ *      - otherwise (1-2 digits after the comma) → decimal: "7,9"→7.9, "93,5"→93.5.
+ *  - Only "." present:
+ *      - dot group of exactly 3 digits with ≥2 digits before, or multiple dots
+ *        → European thousands: "10.000"→10000, "1.234.567"→1234567.
+ *      - otherwise → decimal: "2.83"→2.83, "8.0"→8, "1.000"→1 (default decimal;
+ *        the plausibility guard rejects an implausible 1 W).
+ *  - Space between digit groups → thousands: "1 000"→1000.
+ *  - Plain digits → as-is.
+ *
+ * Returns null when no number can be read.
+ */
+export function normaliseNumber(literal) {
+  if (literal === null || literal === undefined) return null;
+  let s = String(literal).trim();
+  if (!s) return null;
+  // Strip leading currency symbols and spaces.
+  s = s.replace(/^[\s£$€]+/, '');
+  // Extract the numeric core: digits, comma, dot and space (thousands) only.
+  // A line such as "303 x 266 x 142 mm" yields 303, not a concatenation.
+  const coreMatch = s.match(/-?\d[\d.,\s]*\d|-?\d/);
+  if (!coreMatch) return null;
+  let core = coreMatch[0].replace(/\s+/g, '');
+  if (!core || !/\d/.test(core)) return null;
+
+  const hasComma = core.includes(',');
+  const hasDot = core.includes('.');
+
+  if (hasComma && hasDot) {
+    // The LAST separator is the decimal; the other is thousands.
+    const lastComma = core.lastIndexOf(',');
+    const lastDot = core.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      core = core.replace(/\./g, '').replace(',', '.');
+    } else {
+      core = core.replace(/,/g, '');
+    }
+  } else if (hasComma) {
+    const parts = core.split(',');
+    const last = parts[parts.length - 1];
+    if (parts.length > 2 || (parts.length === 2 && last.length === 3 && parts[0].length >= 1)) {
+      // Thousands separator: "1,000", "10,000", "1,234,567".
+      core = parts.join('');
+    } else {
+      // Decimal separator: "7,9", "93,5".
+      core = parts.join('.');
+    }
+  } else if (hasDot) {
+    const parts = core.split('.');
+    const last = parts[parts.length - 1];
+    if (parts.length > 2 || (parts.length === 2 && last.length === 3 && parts[0].length >= 2)) {
+      // European thousands: "10.000", "1.234.567".
+      core = parts.join('');
+    }
+    // otherwise keep the dot as a decimal: "2.83", "8.0".
+  }
+
+  const numeric = Number(core);
+  if (!Number.isFinite(numeric)) return null;
+  return numeric;
+}
+
+/** Extract every numeric token from a text using normaliseNumber. */
+export function extractAllNumbers(text) {
+  if (!text) return [];
+  const tokens = String(text).match(/-?\d[\d.,\s]*\d|-?\d/g) || [];
+  const out = [];
+  for (const token of tokens) {
+    const n = normaliseNumber(token);
+    if (n !== null) out.push(n);
+  }
+  return out;
+}
+
+/**
+ * Parse a manufacturer range literal ("500W – 1,000W", "500-1000 W",
+ * "500 to 1000 watts") into { min, max }, or null when it is not a range.
+ * A leading minus sign is never read as a separator.
+ */
+export function parseRangeEndpoints(literal) {
+  const s = String(literal ?? '').trim();
+  if (!s) return null;
+  // Normalise en/em dashes to a hyphen.
+  const norm = s.replace(/[–—]/g, '-');
+  // Capture the NUMBER immediately before and after the separator, not the
+  // whole prefix — an unrelated figure earlier in the sentence (e.g. "8Ω" in
+  // "...into 8Ω ... 500W – 1,000W") must not become the range minimum. Unit
+  // letters / spaces between a number and the separator are tolerated.
+  const dashMatch = norm.match(/(-?\d[\d.,\s]*\d|-?\d)[^\d-]*\s*-\s*[^\d]*(-?\d[\d.,\s]*\d|-?\d)/);
+  if (dashMatch) {
+    const lo = normaliseNumber(dashMatch[1]);
+    const hi = normaliseNumber(dashMatch[2]);
+    if (lo !== null && hi !== null) return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
+  }
+  const toMatch = s.match(/(-?\d[\d.,\s]*\d|-?\d)[^\d]*\s+to\s+[^\d]*(-?\d[\d.,\s]*\d|-?\d)/i);
+  if (toMatch) {
+    const lo = normaliseNumber(toMatch[1]);
+    const hi = normaliseNumber(toMatch[2]);
+    if (lo !== null && hi !== null) return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
+  }
+  return null;
+}
+
+// Plausibility floors for extraction validation only. This is NOT an acoustic
+// engine rule — it is a backstop so a mis-parsed thousands figure (e.g. "1,000"
+// read as 1 W) is never saved. Only power fields carry a floor, per the
+// request: cinema speakers in this library do not publish < 5 W.
+const PLAUSIBILITY_FLOOR_W = 5;
+const PLAUSIBILITY_FLOORS = {
+  recommended_amp_min_w: PLAUSIBILITY_FLOOR_W,
+  recommended_amp_max_w: PLAUSIBILITY_FLOOR_W,
+  long_term_iec_power_w: PLAUSIBILITY_FLOOR_W,
+  rated_iec_power_w: PLAUSIBILITY_FLOOR_W,
+  aes_power_w: PLAUSIBILITY_FLOOR_W,
+  peak_power_w: PLAUSIBILITY_FLOOR_W,
+  power_handling_continuous_w: PLAUSIBILITY_FLOOR_W,
+  power_handling_peak_w: PLAUSIBILITY_FLOOR_W,
+};
+
+/**
+ * Extraction-validation guard: reject a parsed value that is below its field's
+ * plausibility floor, and confirm the value can be reconstructed from its
+ * quoted evidence. When the parsed value fails, recover the plausible figure
+ * from the quotation; when none exists, return null so the field stays blank
+ * rather than saving an obviously wrong number. Never invoked for fields
+ * without a floor (frequencies, SPL, etc. use the corrected parser directly).
+ */
+function applyNumericGuard(field, numeric, rawText) {
+  if (!Number.isFinite(numeric)) return null;
+  const floor = PLAUSIBILITY_FLOORS[field];
+  if (floor === undefined) return numeric;
+  const quoteNums = extractAllNumbers(rawText);
+  const close = (a, b) => Math.abs(a - b) <= Math.max(1, Math.abs(a) * 0.001);
+  if (numeric >= floor) {
+    if (quoteNums.length > 0 && !quoteNums.some((n) => close(n, numeric))) {
+      // Parsed value is not reconstructable from the quote — the comma bug.
+      const plausible = quoteNums.filter((n) => n >= floor);
+      if (plausible.length > 0) return Math.max(...plausible);
+      return null;
+    }
+    return numeric;
+  }
+  // Below floor: recover from the quote, else reject.
+  const plausible = quoteNums.filter((n) => n >= floor);
+  if (plausible.length > 0) return Math.max(...plausible);
+  return null;
+}
+
+/**
  * Decode one reported field into the shape the guards expect: the field's own
- * figure for a numeric field ("93dB" → 93, "24kHz" → 24000), a canonical option
- * for an enum, otherwise the text as published. Each caller supplies the field
- * sets it allows, so a secondary read and an official read decode identically.
+ * figure for a numeric field ("93dB" → 93, "1,000W" → 1000, "24kHz" → 24000),
+ * a canonical option for an enum, otherwise the text as published. Each caller
+ * supplies the field sets it allows, so a secondary read and an official read
+ * decode identically. Recommended-amplifier ranges are split into their min and
+ * max endpoints so both are preserved.
  */
 export function coerceSpecValue(field, value, rawText, { numericFields, enums }) {
   const raw = value === null || value === undefined ? '' : String(value).trim();
@@ -111,23 +271,38 @@ export function coerceSpecValue(field, value, rawText, { numericFields, enums })
   if (enums?.[field]) return matchEnumValue(field, raw, enums);
   if (!numericFields?.has(field)) return raw;
 
-  // Decode this field's own figure: comma decimals are read as published
-  // (7,9 → 7.9) and a line such as "303 x 266 x 142 mm" yields 303, not a
-  // concatenation of every number in the sentence.
-  const context = `${raw} ${rawText || ''}`.toLowerCase();
-  const normalised = raw.replace(/(\d),(\d)/g, '$1.$2');
-  const firstNumber = normalised.match(/-?\d+(?:\.\d+)?/);
-  if (!firstNumber) return '';
-  const numeric = Number(firstNumber[0]);
-  if (!Number.isFinite(numeric)) return '';
-  if (/_hz$/.test(field) && numeric < 1000) {
-    // kHz only applies to this field's own figure, never to a neighbour in the
-    // same sentence (77 Hz–20 kHz must not turn 77 into 77,000).
-    const khz = [...context.matchAll(/(\d+(?:[.,]\d+)?)\s*k\s*hz/gi)]
-      .map((match) => Number(match[1].replace(',', '.')));
-    if (khz.some((value) => value === numeric)) return Math.round(numeric * 1000);
+  const isMinField = /_min_w$/.test(field);
+  const isMaxField = /_max_w$/.test(field);
+  // A stated range is split into its endpoints: the min field takes the low end,
+  // the max field takes the high end.
+  const range = parseRangeEndpoints(raw) || parseRangeEndpoints(rawText);
+  if (range) {
+    if (isMinField) {
+      const guarded = applyNumericGuard(field, range.min, rawText);
+      if (guarded !== null) return guarded;
+    }
+    if (isMaxField) {
+      const guarded = applyNumericGuard(field, range.max, rawText);
+      if (guarded !== null) return guarded;
+    }
   }
-  return numeric;
+
+  const numeric = normaliseNumber(raw);
+  if (numeric === null) return '';
+
+  // kHz applies only to THIS field's own figure, never to a neighbour in the
+  // same sentence (the low end "20 Hz" must not become 20000 because "20 kHz"
+  // appears elsewhere in a "20 Hz – 20 kHz" range). Check the field's own value
+  // text only.
+  if (/_hz$/.test(field) && numeric < 1000) {
+    const own = raw.toLowerCase();
+    const khz = [...own.matchAll(/(\d+(?:[.,]\d+)?)\s*k\s*hz/gi)]
+      .map((match) => Number(match[1].replace(',', '.')));
+    if (khz.some((v) => v === numeric)) return Math.round(numeric * 1000);
+  }
+
+  const guarded = applyNumericGuard(field, numeric, rawText);
+  return guarded === null ? '' : guarded;
 }
 export function buildExtractionRules({ manufacturerName, model, rules, contextLines = [] }) {
   return [

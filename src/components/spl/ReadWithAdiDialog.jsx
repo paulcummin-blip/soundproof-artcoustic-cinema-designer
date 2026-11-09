@@ -229,9 +229,9 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                         <tr key={key} style={{ borderTop: `1px solid ${BRAND.soft}` }}>
                           <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: BRAND.text, verticalAlign: "top" }}>
                             {FIELD_LABEL[key]}
-                            {key === "power_w" && f.basis && (
+                            {(key === "power_w" || key === "power_w_min") && f.basis && (
                               <div style={{ fontSize: 10, color: BRAND.hint, fontWeight: 400, marginTop: 2 }}>
-                                {f.category || (f.basis === "continuous" ? "Continuous rating" : "Recommended amp max")}
+                                {f.category || (f.basis === "continuous" ? "Continuous rating" : "Recommended amplifier")}
                               </div>
                             )}
                           </td>

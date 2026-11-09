@@ -97,7 +97,7 @@ function rulesFor(manufacturerName, model) {
       `  - power_handling_continuous_w = a genuine continuous speaker power rating labelled "continuous", "RMS power handling" or "long-term power handling".`,
       `  - long_term_iec_power_w / rated_iec_power_w = an IEC long-term or rated continuous figure labelled "IEC".`,
       `  - aes_power_w = an AES continuous figure labelled "AES".`,
-      `  - recommended_amp_max_w = the MAXIMUM of a stated RECOMMENDED AMPLIFIER RANGE only — e.g. "Recommended amplifier: 25-150 W".`,
+      `  - recommended_amp_min_w and recommended_amp_max_w = the MINIMUM and MAXIMUM of a stated RECOMMENDED AMPLIFIER RANGE — e.g. "Recommended amplifier: 25-150 W" → recommended_amp_min_w 25, recommended_amp_max_w 150. When only one amplifier figure is stated, use it for recommended_amp_max_w and leave recommended_amp_min_w blank. Preserve BOTH endpoints of the range, copied exactly as stated (e.g. "500W – 1,000W" → recommended_amp_min_w 500, recommended_amp_max_w 1000).`,
       `  - peak_power_w / power_handling_peak_w = a peak / short-term / maximum figure explicitly labelled "peak".`,
       `For example, "Power Handling (RMS): 5 watts minimum; 150 watts maximum" is RMS power handling — put 150 in power_handling_continuous_w, NOT in recommended_amp_max_w. A "Recommended amplifier power" range is recommended_amp_max_w, never a continuous rating.`,
       `For max SPL, distinguish the basis the manufacturer states. "Max SPL" or "Peak SPL" is NOT "continuous" — when the source labels a figure peak or maximum short-term, record max_peak_spl_db and set max_spl_basis to "peak". Only use max_continuous_spl_db when the source genuinely establishes a continuous/rated basis.`,

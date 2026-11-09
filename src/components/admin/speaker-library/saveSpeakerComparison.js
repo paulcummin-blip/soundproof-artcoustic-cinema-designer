@@ -58,6 +58,7 @@ export function emptySpeakerForm() {
     sensitivity_reference: "2.83V/1m",
     impedance_ohm: "",
     power_w: "",
+    power_w_min: "",
     power_basis: "amplifier",
     max_spl_db: "",
     max_spl_basis: "manufacturer unspecified",
@@ -73,6 +74,7 @@ export function formFromRow(row) {
   const record = row.record || {};
   const continuous = spec.power_handling_continuous_w ?? null;
   const ampMax = spec.recommended_amp_max_w ?? record.recommended_amp_max_w ?? null;
+  const ampMin = spec.recommended_amp_min_w ?? record.recommended_amp_min_w ?? null;
   const reference = REFERENCE_VALUES.has(spec.sensitivity_basis)
     ? spec.sensitivity_basis
     : (REFERENCE_VALUES.has(record.sensitivity_reference) ? record.sensitivity_reference : "unknown");
@@ -85,6 +87,7 @@ export function formFromRow(row) {
     sensitivity_reference: reference,
     impedance_ohm: spec.nominal_impedance_ohm ?? record.rated_impedance_ohm ?? "",
     power_w: hasValue(continuous) ? continuous : (hasValue(ampMax) ? ampMax : (record.continuous_power_w ?? "")),
+    power_w_min: hasValue(ampMin) ? ampMin : "",
     power_basis: hasValue(continuous) ? "continuous" : (hasValue(ampMax) || hasValue(record.continuous_power_w) ? "amplifier" : "amplifier"),
     max_spl_db: spec.max_continuous_spl_db ?? record.published_max_continuous_spl_db_1m ?? "",
     max_spl_basis: SPL_BASIS_VALUES.has(spec.max_spl_basis) ? spec.max_spl_basis : "manufacturer unspecified",
@@ -143,6 +146,14 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
     } else {
       patch.recommended_amp_max_w = power;
       authority.recommended_amp_max_w = "Official Product Page";
+      // Preserve the recommended amplifier range minimum when the manufacturer
+      // states a range. The maximum is what the P12/P13 calculation uses; the
+      // minimum is kept so both endpoints survive.
+      const powerMin = numberOrNull(values.power_w_min);
+      if (powerMin !== null) {
+        patch.recommended_amp_min_w = powerMin;
+        authority.recommended_amp_min_w = "Official Product Page";
+      }
     }
   }
 

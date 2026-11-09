@@ -24,7 +24,8 @@ export const FIELD_LABEL = {
   sensitivity_db: "Sensitivity (dB)",
   sensitivity_reference: "Sensitivity reference",
   impedance_ohm: "Nominal impedance (Ω)",
-  power_w: "Power (W)",
+  power_w: "Recommended amplifier max (W)",
+  power_w_min: "Recommended amplifier min (W)",
   max_spl_db: "Max continuous SPL (dB)",
   max_spl_basis: "Max SPL basis",
   measurement_space: "Measurement space",
@@ -35,6 +36,7 @@ export const PROPOSAL_FIELDS = [
   "sensitivity_reference",
   "impedance_ohm",
   "power_w",
+  "power_w_min",
   "max_spl_db",
   "max_spl_basis",
   "measurement_space",
@@ -142,6 +144,19 @@ export function extractionToFound(raw) {
       basis: "amplifier",
       category: "Recommended amplifier max",
     };
+    // Preserve the recommended amplifier range minimum when the source states
+    // it, so both endpoints of a range like "500W – 1,000W" are proposed.
+    if (byField.recommended_amp_min_w) {
+      found.power_w_min = byField.recommended_amp_min_w.value;
+      info.power_w_min = {
+        value: byField.recommended_amp_min_w.value,
+        rawValue: byField.recommended_amp_min_w.value,
+        status: byField.recommended_amp_min_w.status,
+        quote: byField.recommended_amp_min_w.quote,
+        basis: "amplifier",
+        category: "Recommended amplifier min",
+      };
+    }
   }
   return { found, info };
 }
