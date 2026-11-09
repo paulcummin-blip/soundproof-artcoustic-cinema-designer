@@ -88,6 +88,11 @@ export function serializeOptimiserPlan(plan) {
     // those are never reinterpreted.
     runtimeBreakdown: plan.runtimeBreakdown || null,
     notes: Array.isArray(plan.notes) ? plan.notes : [],
+    // The run's compact cross-quantity audit trail. Retained with the plan so a
+    // completed run can be diagnosed after cold reopen from saved evidence
+    // instead of console logs. Identity + outcome labels only — no response
+    // arrays, curves or tuning payloads.
+    crossQuantityAudit: plan.crossQuantityAudit || null,
   };
 }
 

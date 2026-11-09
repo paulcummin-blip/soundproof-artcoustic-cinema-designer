@@ -855,6 +855,14 @@ export default function AdiOptimisationJourney({
     // is terminal from its saved plan, so this only states what happened to the
     // recommendation publication afterwards — developer diagnostics only.
     recommendationPublication: planView?.recommendationPublication || null,
+    // The run's compact cross-quantity audit trail — retained with the saved
+    // plan (planView) and also available live on the run's winner state
+    // (liveState.winner). The plan copy survives cold reopen; the live copy
+    // carries the run's retained confirmed results for receipt resolution.
+    crossQuantityAudit: planView?.crossQuantityAudit
+      || liveState?.winner?.crossQuantityAudit
+      || null,
+    confirmedResults: liveState?.winner?.confirmedResults || null,
   };
 
   // The joint option has its own canonical verification and persisted receipt.

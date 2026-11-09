@@ -40,6 +40,7 @@ import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.j
 import AdiJourneyRunWorkloadBlock from "./AdiJourneyRunWorkloadBlock.jsx";
 import AdiJourneyRuntimeCostBlock from "./AdiJourneyRuntimeCostBlock.jsx";
 import AdiRecommendationPublicationStatus from "./AdiRecommendationPublicationStatus.jsx";
+import AdiCrossQuantityAuditBlock from "./AdiCrossQuantityAuditBlock.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { OPTIMISER_TESTED_PLACEMENT_LABEL } from "./optimiserResultViewModel.js";
@@ -99,6 +100,13 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     // describes the result is read from it, so this evidence cannot state a
     // different decision, winner or current value than the card does.
     resultModel = null,
+    // The run's compact cross-quantity audit trail, retained with the saved
+    // plan. Developer diagnostics only.
+    crossQuantityAudit = null,
+    // The run's retained confirmed results, available live after a V2 run so a
+    // receipt reference can be resolved to its canonical P19/P20 evidence.
+    // Absent on cold reopen — the resolver then returns an explicit unavailable.
+    confirmedResults = null,
   } = view;
 
   // The labelled CURRENT and PROPOSED values. They are two different things and
@@ -359,6 +367,15 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
           is the AFTERMATH of that save: it is recorded for diagnosis, and it is
           never stated as the run's result or its failure. */}
       <AdiRecommendationPublicationStatus publication={recommendationPublication} />
+
+      {/* THE CROSS-QUANTITY AUDIT TRAIL — DEVELOPER DIAGNOSTICS ONLY. The retained
+          compact audit (run id, admitted scope, one receipt per cross-quantity
+          finalist) and each receipt's canonical evidence resolved against the
+          run's retained confirmed results. No response arrays, no Overall P20. */}
+      <AdiCrossQuantityAuditBlock
+        audit={crossQuantityAudit}
+        confirmedResults={confirmedResults}
+      />
     </>
   );
 }

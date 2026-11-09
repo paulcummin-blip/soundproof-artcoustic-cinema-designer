@@ -602,6 +602,13 @@ export function buildOptimiserPlan({
     leverDecisions: normaliseDecisions(leverDecisions),
     applied: resolveAppliedMap(levers, instances, seatingPositions),
     notes: planNotes,
+    // The run's compact cross-quantity audit trail (run id, admitted scope, and
+    // one lightweight receipt per cross-quantity finalist: admission, transfer,
+    // proxy, confirmation outcome and final disposition). Retained with the plan
+    // so a completed run can be diagnosed from saved evidence instead of console
+    // logs. No response arrays, curves or tuning payloads — identity + outcome
+    // labels only.
+    crossQuantityAudit: selection?.crossQuantityAudit || null,
   };
 }
 

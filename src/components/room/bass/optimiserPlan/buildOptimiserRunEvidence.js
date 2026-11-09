@@ -465,5 +465,10 @@ export function buildOptimiserRunEvidence({
     leverDecisions: {},
     applied: {},
     notes: Array.isArray(notes) ? notes : [],
+    // The run's compact cross-quantity audit trail, retained with the terminal
+    // evidence so a completed run that produced no actionable plan can still be
+    // diagnosed from saved evidence. Identity + outcome labels only — no
+    // response arrays, curves or tuning payloads.
+    crossQuantityAudit: selection?.crossQuantityAudit || null,
   };
 }
