@@ -185,6 +185,12 @@ function extractProductRows(matrix) {
         kefColumnMap = map;
         blockManufacturer = findBlockBrand(cells, prevRows.slice(0, -1));
         lastManufacturer = blockManufacturer;
+        // The lone brand-label row above this header was just collected as a
+        // brand-only entry; it is this block's manufacturer, not a brand with
+        // no products, so remove it.
+        if (blockManufacturer && brandOnly.length && brandOnly[brandOnly.length - 1] === blockManufacturer) {
+          brandOnly.pop();
+        }
       } else {
         // A:C block. Persist the column map so a later A:C block that does not
         // repeat its header still parses with the correct columns.
