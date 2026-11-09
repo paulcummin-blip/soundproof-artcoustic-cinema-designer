@@ -54,7 +54,7 @@ function Field({ label, hint, children, wide = false }) {
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== "";
 
-export default function SpeakerFormDialog({ open, onClose, row, actorName, onSaved }) {
+export default function SpeakerFormDialog({ open, onClose, row, actorName, onSaved, onReadWithAdi }) {
   const isEdit = Boolean(row);
   const [values, setValues] = useState(emptySpeakerForm());
   const [saving, setSaving] = useState(false);
@@ -81,19 +81,25 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
   const requiresImpedance = values.sensitivity_reference === "2.83V/1m";
   const showsSplBasis = hasValue(values.max_spl_db);
 
-  const submit = async () => {
+  const submit = async (thenRead = false) => {
     setSaving(true);
     setError("");
     try {
       const saved = await saveSpeakerComparison({ values, row, actorName });
-      setResult(saved);
       onSaved?.(saved);
+      if (thenRead) {
+        onReadWithAdi?.({ manufacturer: values.manufacturer, model: values.model, source_url: values.source_url });
+      } else {
+        setResult(saved);
+      }
     } catch (e) {
       setError(e?.message || "This speaker could not be saved.");
     } finally {
       setSaving(false);
     }
   };
+
+  const canReadWithAdi = hasValue(values.source_url) && Boolean(onReadWithAdi);
 
   const preview = useMemo(() => {
     if (!open || result) return null;
@@ -226,7 +232,12 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
               <button type="button" onClick={onClose} disabled={saving} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "9px 16px", background: "#FFF", color: BRAND.text, fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
                 Cancel
               </button>
-              <button type="button" onClick={submit} disabled={saving} style={{ border: 0, borderRadius: 9, padding: "9px 18px", background: BRAND.green, color: "#FFF", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer" }}>
+              {canReadWithAdi && (
+                <button type="button" onClick={() => submit(true)} disabled={saving} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${BRAND.green}`, borderRadius: 9, padding: "9px 16px", background: "#FFF", color: BRAND.green, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer" }}>
+                  {saving ? "Saving…" : "Save & Read with ADI"}
+                </button>
+              )}
+              <button type="button" onClick={() => submit(false)} disabled={saving} style={{ border: 0, borderRadius: 9, padding: "9px 18px", background: BRAND.green, color: "#FFF", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer" }}>
                 {saving ? "Saving…" : "Save & Compare"}
               </button>
             </>

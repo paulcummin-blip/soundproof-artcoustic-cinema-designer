@@ -103,12 +103,27 @@ export async function bulkAddSpeakers({ rows, actorName }) {
   const skipped = [];
   const errors = [];
   const duplicates = [];
+  const manufacturers = [];
+
+  const cleanStr = (s) => String(s || "").replace(/\u00a0/g, " ").trim();
 
   for (const entry of rows) {
-    const manufacturerName = String(entry.manufacturer || "").trim();
-    const model = String(entry.model || "").trim();
-    if (!manufacturerName || !model) {
-      errors.push({ manufacturer: manufacturerName, model, reason: "Brand and product are required." });
+    const manufacturerName = cleanStr(entry.manufacturer);
+    const model = cleanStr(entry.model);
+    // Blank rows (notes, separators) are skipped silently.
+    if (!manufacturerName && !model) continue;
+    if (!manufacturerName) {
+      errors.push({ manufacturer: "", model, reason: "Brand is required." });
+      continue;
+    }
+    // Brand-only rows create or preserve the manufacturer but never a dummy product.
+    if (!model) {
+      try {
+        await ensureManufacturer({ name: manufacturerName, website: "" });
+        manufacturers.push({ manufacturer: manufacturerName });
+      } catch (e) {
+        errors.push({ manufacturer: manufacturerName, model: "", reason: e?.message || "Could not add manufacturer." });
+      }
       continue;
     }
 
@@ -193,5 +208,5 @@ export async function bulkAddSpeakers({ rows, actorName }) {
     }
   }
 
-  return { created: created.length, skipped: skipped.length, errors, duplicates };
+  return { created: created.length, skipped: skipped.length, manufacturers: manufacturers.length, errors, duplicates };
 }

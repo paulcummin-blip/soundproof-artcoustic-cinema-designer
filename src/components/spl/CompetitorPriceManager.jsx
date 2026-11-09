@@ -37,9 +37,11 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Search, Plus, Upload, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Search, Plus, Upload, Pencil, Trash2, Loader2, Sparkles, ExternalLink } from "lucide-react";
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 import { saveCandidatePrice } from "@/components/spl/comparisonPriceRecord";
+import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification";
+import ReadWithAdiDialog from "@/components/spl/ReadWithAdiDialog";
 import { useAuth } from "@/lib/AuthContext";
 import SpeakerFormDialog from "@/components/admin/speaker-library/SpeakerFormDialog";
 import BulkAddSpeakersDialog from "@/components/admin/speaker-library/BulkAddSpeakersDialog";
@@ -55,17 +57,28 @@ const BRAND = {
   soft: "#F1F0EE",
 };
 
-const TABLE_GRID = "minmax(110px, 1fr) minmax(130px, 1.2fr) 80px 70px 65px 65px 100px 96px";
+// Columns: Manufacturer, Model, Sens, Power, Max SPL, Data, Retail, Source, Actions
+const TABLE_GRID = "minmax(100px, 1fr) minmax(120px, 1.2fr) 64px 60px 60px 68px 92px 116px 168px";
 
 const DASH = "—";
 const hasVal = (value) => value !== null && value !== undefined && String(value).trim() !== "";
 
-/** Data status from the comparison class: A=FULL, B=GOOD, C/D=INCOMPLETE. */
-function dataStatus(classKey) {
-  if (classKey === "A") return { label: "FULL", tone: "#213428" };
-  if (classKey === "B") return { label: "GOOD", tone: "#9A6E00" };
-  return { label: "INCOMPLETE", tone: "#B23A3A" };
-}
+/** The source URL a row carries, preferring source_url then datasheet_url. */
+const sourceUrlOf = (candidate) =>
+  candidate?.record?.source_url
+  || candidate?.sourceUrl
+  || candidate?.record?.datasheet_url
+  || candidate?.datasheetUrl
+  || "";
+
+/** Whether the row already carries any P12/P13 technical value. */
+const hasTechnicalValues = (record) => {
+  const r = record || {};
+  return hasVal(r.sensitivity_value_db)
+    || hasVal(r.power_authority_w)
+    || hasVal(r.published_max_continuous_spl_db_1m)
+    || hasVal(r.halfspace_published_max_continuous_spl_db_1m);
+};
 
 function sensitivityText(record) {
   const v = record?.sensitivity_value_db;
@@ -145,6 +158,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
   const [removal, setRemoval] = useState(null);
   const [removing, setRemoving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [adiCandidate, setAdiCandidate] = useState(null);
 
   // The list is the RP22 selection list itself — the same candidate builder the
   // comparison dropdown uses, including the database products a master admin can
@@ -157,6 +171,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
       const list = await loadComparisonCandidates({ includeUnpublished: true });
       setCandidates(list);
       setDrafts({});
+      return list;
     } catch (e) {
       setCandidates([]);
       setError(e?.message || "Could not load the comparison speakers.");
@@ -239,6 +254,16 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
   const openAdd = () => { setEditingRow(null); setFormOpen(true); };
   const openEdit = (candidate) => { setEditingRow(candidateToFormRow(candidate)); setFormOpen(true); };
   const openBulk = () => setBulkOpen(true);
+  const openReadWithAdi = (candidate) => setAdiCandidate(candidate);
+
+  // After "Save & Read with ADI" from the add form: the new product is on disk,
+  // reload the candidate list, then open the proposal dialog for that row.
+  const handleReadWithAdiAfterSave = async ({ manufacturer, model }) => {
+    const list = await reload();
+    const found = (list || []).find((c) => String(c.manufacturer || "") === String(manufacturer)
+      && String(c.model || "") === String(model));
+    if (found) setAdiCandidate(found);
+  };
 
   const handleSaved = async () => {
     setFormOpen(false);
@@ -377,6 +402,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
             <div>Max SPL</div>
             <div>Data</div>
             <div>Retail (inc VAT)</div>
+            <div>Source</div>
             <div style={{ textAlign: "right" }}>Actions</div>
           </div>
 
@@ -414,9 +440,9 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                     <div style={{ fontSize: 13, color: BRAND.subtext }}>{splText(candidate.record)}</div>
                     <div>
                       {(() => {
-                        const s = dataStatus(candidate.classKey);
+                        const s = classifyDataAdequacy(candidate.record);
                         return (
-                          <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", padding: "2px 7px", borderRadius: 999, background: `${s.tone}14`, color: s.tone, whiteSpace: "nowrap" }}>{s.label}</span>
+                          <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", padding: "2px 7px", borderRadius: 999, background: `${s.tone}14`, color: s.tone, whiteSpace: "nowrap" }} title={s.label}>{s.short}</span>
                         );
                       })()}
                     </div>
@@ -432,7 +458,31 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                         style={inputStyle}
                       />
                     </div>
+                    <div style={{ fontSize: 12, minWidth: 0, display: "flex", alignItems: "center" }}>
+                      {(() => {
+                        const url = sourceUrlOf(candidate);
+                        if (!url) return (
+                          <button type="button" onClick={() => openEdit(candidate)} title="Add source URL" style={{ ...iconBtn, fontSize: 11, padding: "4px 8px", color: BRAND.hint }}>Add source</button>
+                        );
+                        const short = url.replace(/^https?:\/\//, "");
+                        return (
+                          <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{ display: "inline-flex", alignItems: "center", gap: 3, color: BRAND.subtext, textDecoration: "none", fontSize: 11, maxWidth: "100%", overflow: "hidden" }}>
+                            <ExternalLink size={11} style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short.length > 26 ? short.slice(0, 24) + "…" : short}</span>
+                          </a>
+                        );
+                      })()}
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+                      {sourceUrlOf(candidate) && (
+                        <button
+                          type="button"
+                          title={hasTechnicalValues(candidate.record) ? "Refresh with ADI" : "Read with ADI"}
+                          onClick={() => openReadWithAdi(candidate)}
+                          style={iconBtn}
+                          aria-label={hasTechnicalValues(candidate.record) ? "Refresh with ADI" : "Read with ADI"}
+                        ><Sparkles size={14} /></button>
+                      )}
                       <button type="button" title="Edit speaker" onClick={() => openEdit(candidate)} style={iconBtn}><Pencil size={14} /></button>
                       <button type="button" title="Remove speaker" onClick={() => askDelete(candidate)} style={iconBtn}><Trash2 size={14} /></button>
                       {savedId === candidate.id && (
@@ -479,12 +529,20 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
         row={editingRow}
         actorName={actorName}
         onSaved={handleSaved}
+        onReadWithAdi={handleReadWithAdiAfterSave}
       />
       <BulkAddSpeakersDialog
         open={bulkOpen}
         onClose={() => setBulkOpen(false)}
         actorName={actorName}
         onDone={handleBulkDone}
+      />
+      <ReadWithAdiDialog
+        open={Boolean(adiCandidate)}
+        onClose={() => setAdiCandidate(null)}
+        candidate={adiCandidate}
+        actorName={actorName}
+        onSaved={reload}
       />
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(v) => { if (!v) { setPendingDelete(null); setRemoval(null); } }}>
         <DialogContent>
