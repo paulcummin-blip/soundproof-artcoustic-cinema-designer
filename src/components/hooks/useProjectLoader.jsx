@@ -833,11 +833,27 @@ appState, // Pass appState directly for setters
           setProjectIdState(effectiveProjectId);
         }
 
+        // Acknowledgement: identify the exact payload that was saved and
+        // compare it against the LATEST queued design signature. A newer edit
+        // made while this save was in flight must NOT be silently cleared.
+        // Only clear dirty when the acknowledged payload matches the latest
+        // design state; otherwise keep the project dirty and re-schedule the
+        // latest payload so it receives its own save.
         r.lastSavedSig = sig;
-        r.lastQueuedSig = sig;
         r.lastSaveAt = Date.now();
-        r.dirty = false;
-        setAutosaveStatus("saved");
+        if (r.lastQueuedSig === sig) {
+          r.dirty = false;
+          setAutosaveStatus("saved");
+        } else {
+          // A newer edit is queued. Keep the queue dirty and re-schedule the
+          // latest payload after the current in-flight save settles. This
+          // preserves the one-in-flight-save-per-project queue while ensuring
+          // the newer value is never lost.
+          r.dirty = true;
+          setAutosaveStatus("dirty");
+          if (r.debounceId) clearTimeout(r.debounceId);
+          r.debounceId = setTimeout(runLatestSave, AUTOSAVE_DEBOUNCE_MS);
+        }
         logSaveEvent({
           projectId: effectiveProjectId,
           source: "autosave",
@@ -1185,11 +1201,23 @@ appState, // Pass appState directly for setters
         // will see r.saveToken !== myToken after its own await and abort its stamp.
         rMS.saveToken = (rMS.saveToken || 0) + 1;
         rMS.lastSavedSig = savedSig;
-        rMS.lastQueuedSig = savedSig;
         rMS.lastSaveAt = Date.now();
-        rMS.dirty = false;
-
-        setAutosaveStatus("saved");
+        // Same acknowledgement guard as autosave: only clear dirty when the
+        // acknowledged manual-save payload matches the latest queued design
+        // signature. A newer edit made while this manual save was in flight
+        // must remain dirty so it receives its own save.
+        if (rMS.lastQueuedSig === savedSig) {
+          rMS.dirty = false;
+          setAutosaveStatus("saved");
+        } else {
+          rMS.dirty = true;
+          setAutosaveStatus("dirty");
+          if (rMS.debounceId) clearTimeout(rMS.debounceId);
+          rMS.debounceId = setTimeout(() => {
+            const current = autosaveAttemptRef.current;
+            if (current?.projectId === effectiveProjectId) void current.run();
+          }, 1000);
+        }
         logSaveEvent({
           projectId: effectiveProjectId,
           source: "manual",
