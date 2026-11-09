@@ -70,6 +70,7 @@ import {
   validationContextForCandidate,
   MAX_CROSS_QUANTITY_CANDIDATES_PER_QUANTITY,
 } from "./candidateDesignContext.js";
+import { createCrossQuantityAuditTrail } from "./crossQuantityAuditTrail.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -539,6 +540,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   const metrics = new V2RuntimeMetrics(projectId, { runId: params.runId || null, versionId });
   metrics.recordCounts({ roomSimulationCalls: 0, batchedReceiverEvaluations: 0 });
   worker.onRuntimeDiagnostics = counts => metrics.recordCounts(counts);
+  // Run-scoped audit trail for cross-quantity candidates. Lightweight identity
+  // and outcome receipts so a completed run can be diagnosed from retained
+  // evidence. Not a result authority; no response arrays are retained.
+  const crossQtyAudit = createCrossQuantityAuditTrail(params.runId || null);
+  crossQtyAudit.recordScope(params.crossQuantityQuantities || []);
   // The wait BEFORE this engine began (acquiring or waiting for Stage 2). It is
   // measured by the orchestrator on the same run identity, so the interval
   // between the run's verdict and its evaluation figure is never unaccounted.
@@ -586,11 +592,38 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
   // Completed untuned acoustics only. Every consumer still runs its existing
   // proxy/tuning/promotion/canonical checks using this request's targets.
   const transferRunId = {};
-  async function prepareFullTransfer(finalist, candidateId, consumer) {
+  // Cross-quantity candidates carry their own source identities, geometry and
+  // per-source model/height/orientation in a candidate-owned design context.
+  // The installed subwoofer instances MUST NOT be used to fill source
+  // identities for a different-quantity candidate: that would assign installed
+  // IDs to the first sources and leave the rest null, breaking the
+  // candidate-owned authority the confirmation and audit trail rely on. The
+  // worker's source builder (buildStage2Sources) does not propagate sourceId
+  // today, so this is the identity authority layer, not an acoustic change.
+  async function prepareFullTransfer(finalist, candidateId, consumer, candidateDesignContext = null) {
     const activeInstances = (subwooferInstances || []).filter((instance) => instance.enabled !== false);
+    const contextSourceIds = candidateDesignContext?.sourceIds || null;
+    const contextInstances = candidateDesignContext?.instances || null;
+    const isCrossQuantity = candidateDesignContext?.isCrossQuantity === true;
     const authoritativeFinalist = {
       ...finalist,
       sources: (finalist?.sources || []).map((source, index) => {
+        if (isCrossQuantity && contextSourceIds && contextInstances) {
+          // Candidate-owned identity authority for a cross-quantity candidate.
+          const ctxInst = contextInstances[index] || null;
+          return {
+            ...source,
+            sourceId: contextSourceIds[index] || null,
+            modelKey: ctxInst?.model || source.modelKey || selectedSubModel,
+            bottomHeightM: Number.isFinite(Number(source.bottomHeightM))
+              ? Number(source.bottomHeightM)
+              : Number.isFinite(Number(ctxInst?.bottomHeightM))
+                ? Number(ctxInst.bottomHeightM)
+                : subwooferBottomHeightM,
+            orientation: source.orientation || ctxInst?.orientation || null,
+          };
+        }
+        // Same-quantity: installed instances supply identity (existing behaviour).
         const instance = activeInstances[index] || null;
         return {
           ...source,
@@ -605,6 +638,16 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         };
       }),
     };
+    // Identity integrity guard for cross-quantity candidates: reject
+    // incomplete, null or duplicate source identities rather than silently
+    // falling back to installed IDs. One unique source identity per source.
+    if (isCrossQuantity) {
+      const ids = authoritativeFinalist.sources.map((s) => s?.sourceId);
+      const expected = contextSourceIds?.length || 0;
+      if (ids.length !== expected || ids.some((id) => !id) || new Set(ids).size !== ids.length) {
+        throw new Error(`Cross-quantity candidate ${candidateId} has inconsistent source identities`);
+      }
+    }
     // TRANSFER ACQUISITION: the cache lookup and, on a miss, the modal simulation.
     // Measured around the single authority every caller goes through, so the
     // figure covers exactly the work this run did to obtain its transfers.
@@ -1223,23 +1266,37 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         autoAlignEnabled: true,
       })
     );
+    // Record admission for every cross-quantity candidate (candidate-owned
+    // identity, quantity, source count). Same-quantity candidates are covered
+    // by the existing engine diagnostics and are not duplicated here.
+    for (const c of allCandidates) {
+      const ctx = c?.designContext;
+      if (ctx?.isCrossQuantity) {
+        crossQtyAudit.recordAdmission(c.id, ctx.quantity, ctx.sourceIds?.length || null,
+          ctx.sourceIds || [], "admitted");
+      }
+    }
 
     // Compute raw transfers for global candidates (cached or worker)
     for (let i = 0; i < allCandidates.length; i++) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
       onProgress("testing_positions", `Testing recommended positions (${i + 1}/${allCandidates.length})`, i, allCandidates.length);
+      const isCrossQty = !!allCandidates[i].designContext?.isCrossQuantity;
       if (!allCandidates[i].rawTransfer) {
         try {
-          allCandidates[i].rawTransfer = await prepareFullTransfer(allCandidates[i].finalist, allCandidates[i].id, "global proxy and promotion");
+          allCandidates[i].rawTransfer = await prepareFullTransfer(allCandidates[i].finalist, allCandidates[i].id, "global proxy and promotion", allCandidates[i].designContext);
+          if (isCrossQty) crossQtyAudit.recordTransfer(allCandidates[i].id, "prepared");
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
           allCandidates[i].rawTransfer = null;
           allCandidates[i].error = err.message;
           evaluationIssues.push({stage:"global",candidateId:allCandidates[i].id,error:err.message});
+          if (isCrossQty) crossQtyAudit.recordTransfer(allCandidates[i].id, "failed", err.message);
         }
       } else {
         metrics.recordStage2TransferReused();
+        if (isCrossQty) crossQtyAudit.recordTransfer(allCandidates[i].id, "reused");
       }
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
       await yieldToUI();
@@ -1254,6 +1311,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       allCandidates[i].proxyResult = runProxySearch(allCandidates[i]);
       metrics.recordProxySearch(allCandidates[i].id,
         (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyT0);
+      if (allCandidates[i].designContext?.isCrossQuantity) {
+        crossQtyAudit.recordProxy(allCandidates[i].id,
+          allCandidates[i].proxyResult ? "proxy-computed" : "no-proxy");
+      }
       onProgress("testing_positions", `Optimising timing (${i + 1}/${allCandidates.length})`, i + 1, allCandidates.length);
       await yieldToUI();
     }
@@ -1559,10 +1620,24 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             if(check.nonAssessable){recordNonAssessable(escPhase.name,bound,check);}
             else if(check.valid){confirmedResults.push(check.result);funnelCandidates.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});}
             else evaluationIssues.push({stage:escPhase.name,candidateId:candidate.id,issues:check.issues});
-          } else evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,issues:["Missing confirmation"]});
+            if (candidate.designContext?.isCrossQuantity && optionIndex === 0) {
+              const outcome = check.nonAssessable ? "non-assessable"
+                : check.valid ? "success" : "invalid";
+              crossQtyAudit.recordConfirmation(candidate.id, outcome,
+                check.result?.canonicalAuthorityReceipt?.selectedCandidateId || null);
+            }
+          } else {
+            evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,issues:["Missing confirmation"]});
+            if (newPromoted[i].designContext?.isCrossQuantity && optionIndex === 0) {
+              crossQtyAudit.recordConfirmation(newPromoted[i].id, "failed", null);
+            }
+          }
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
           evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,error:err.message});
+          if (newPromoted[i].designContext?.isCrossQuantity && optionIndex === 0) {
+            crossQtyAudit.recordConfirmation(newPromoted[i].id, "failed", null);
+          }
         }
       }
       // Progress + yield after the batch completes (order preserved)
@@ -1980,6 +2055,23 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     });
     metrics.addStage("final-selection", performance.now() - selectionStarted);
     setStageVerdict(projectId, versionId, "preparing", "done");
+    // Finalise cross-quantity audit dispositions: any candidate never
+    // confirmed is not-promoted; a confirmed candidate is either selected or
+    // evaluated-outranked. The snapshot attaches to the selection so a
+    // completed run can be diagnosed from retained evidence.
+    for (const c of allCandidates) {
+      if (c?.designContext?.isCrossQuantity) crossQtyAudit.recordNotPromoted(c.id);
+    }
+    if (selection.winner?.isCrossQuantity) {
+      crossQtyAudit.recordDisposition(selection.winner.candidateId, "selected");
+    }
+    const winnerId = selection.winner?.candidateId || null;
+    for (const r of confirmedResults) {
+      if (r?.isCrossQuantity && r.candidateId !== winnerId) {
+        crossQtyAudit.recordDisposition(r.candidateId, "evaluated-outranked");
+      }
+    }
+    selection.crossQuantityAudit = crossQtyAudit.snapshot();
     await yieldToUI();
 
     // BLOCKER 4: If selection is null/undefined, return NO_WINNER explicitly
