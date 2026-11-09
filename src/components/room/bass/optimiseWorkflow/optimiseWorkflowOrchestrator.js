@@ -41,6 +41,7 @@ import { generateRecommendation } from "@/components/recommendationEngine";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { identifyProblem } from "@/components/recommendationEngine/recommendationProblem";
 import { classifyCorrectability } from "../improveBassV2/correctabilityClassifier";
+import { extractEligibleCrossQuantityScope } from "./crossQuantityScope";
 
 /**
  * Run the V2 optimisation engine and return the selection result.
@@ -204,6 +205,16 @@ export async function runOptimisation(opts) {
   // consumes. Measured on its own so it can never be mistaken for search time.
   const stage2WaitMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - stage2StartedAt;
 
+  // ── Cross-quantity scope ─────────────────────────────────────────────
+  // The eligible 1/2/4 quantities whose Stage 2 canonical evaluation produced
+  // at least one physically valid, non-terminal, evidence-complete finalist.
+  // These let V2 evaluate a different-quantity candidate (e.g. a 4-sub
+  // finalist from a 2-sub installed baseline) WITHOUT modifying the installed
+  // instances. Each candidate carries its own design context (synthetic source
+  // IDs, geometry, tuning) so the confirmed result belongs to the candidate,
+  // never to the installed design. Read-only: no Stage 1/2 search is triggered.
+  const crossQuantityQuantities = extractEligibleCrossQuantityScope(stage2Result, selectedQuantity);
+
   // ── Compute correctability BEFORE the optimisation ──
   // The Physical Recoverability Assessment is the authoritative input to the
   // EQ optimisation. It determines whether EQ is physically appropriate before
@@ -254,6 +265,7 @@ export async function runOptimisation(opts) {
     placementFingerprint,
     correctabilityAssessment,
     integrationContext,
+    crossQuantityQuantities,
   };
 
   let runtimeMetrics = null;
