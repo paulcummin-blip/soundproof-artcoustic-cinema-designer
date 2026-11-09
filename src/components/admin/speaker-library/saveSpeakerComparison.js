@@ -22,6 +22,7 @@ import { comparisonReadiness } from "@/components/admin/speaker-db/comparisonRea
 import { findRp22Gaps, publishSpecificationToRp22 } from "@/components/admin/speaker-db/model-first/rp22ComparisonPublish";
 import { approveSpecification, saveSpecEdits } from "@/components/admin/speaker-db/add-speaker/addSpeakerPersistence";
 import { createModelFirstDraft, ensureManufacturer, persistModelFirstWarnings } from "@/components/admin/speaker-db/model-first/modelFirstPersistence";
+import { publishIncompleteManualCompetitor } from "./publishIncompleteCompetitor";
 
 export const SENSITIVITY_REFERENCES = [
   { value: "2.83V/1m", label: "2.83 V / 1 m" },
@@ -294,6 +295,21 @@ export async function saveSpeakerComparison({ values, row = null, actorName }) {
     });
     comparisonRecordId = result.competitorId || comparisonRecordId;
     published = true;
+  } else {
+    // Manual INCOMPLETE path: persist a shared competitor identity row so the
+    // speaker is selectable in the comparison library while remaining
+    // non-gradeable. The specification is NOT approved and no P12/P13
+    // capability is produced; normalizeCompetitor() yields p12_p13_eligible
+    // === false because no technical acoustic fields are written.
+    const result = await publishIncompleteManualCompetitor({
+      product: readyProduct,
+      specification: { ...mergedSpecification, id: specification.id },
+      manufacturerName: manufacturer.name || manufacturerName,
+      sourceUrl: hasValue(values.source_url) ? values.source_url : "",
+      datasheetUrl: "",
+      actorName,
+    });
+    comparisonRecordId = result.competitorId || comparisonRecordId;
   }
 
   // The retail price lives on the comparison record. A price the administrator
@@ -324,6 +340,9 @@ export async function saveSpeakerComparison({ values, row = null, actorName }) {
     published,
     created,
     readiness,
+    // The canonical missing-fields list the form renders. Always an array so
+    // the post-save result never throws on .length for an ineligible record.
+    missing: readiness.missingCriticalLabels || [],
     gaps: findRp22Gaps(mergedSpecification),
     price,
   };

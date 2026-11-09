@@ -199,7 +199,7 @@ export function buildComparisonRow({ product, specification, manufacturerName })
  * "MP150" / "MP-150" as the same model. The model is queried first (the common
  * case) and the comparison library is scanned when the stored spelling differs.
  */
-async function findIdentityMatches({ manufacturer, model }) {
+export async function findIdentityMatches({ manufacturer, model }) {
   const matches = (rows) => (Array.isArray(rows) ? rows : [])
     .filter((row) => sameCompetitorIdentity(row, { manufacturer, model }));
 
