@@ -43,6 +43,7 @@ import { saveCandidatePrice } from "@/components/spl/comparisonPriceRecord";
 import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification";
 import ReadWithAdiDialog from "@/components/spl/ReadWithAdiDialog";
 import BatchReadSourcesDialog from "@/components/spl/BatchReadSourcesDialog";
+import BulkDeleteCompetitorDialog from "@/components/spl/BulkDeleteCompetitorDialog";
 import { useAuth } from "@/lib/AuthContext";
 import SpeakerFormDialog from "@/components/admin/speaker-library/SpeakerFormDialog";
 import BulkAddSpeakersDialog from "@/components/admin/speaker-library/BulkAddSpeakersDialog";
@@ -58,8 +59,8 @@ const BRAND = {
   soft: "#F1F0EE",
 };
 
-// Columns: Manufacturer, Model, Sens, Power, Max SPL, Data, Retail, Source, Actions
-const TABLE_GRID = "minmax(100px, 1fr) minmax(120px, 1.2fr) 64px 60px 60px 68px 92px 116px 168px";
+// Columns: Checkbox, Manufacturer, Model, Sens, Power, Max SPL, Data, Retail, Source, Actions
+const TABLE_GRID = "34px minmax(100px, 1fr) minmax(120px, 1.2fr) 64px 60px 60px 68px 92px 116px 168px";
 
 const DASH = "—";
 const hasVal = (value) => value !== null && value !== undefined && String(value).trim() !== "";
@@ -161,6 +162,8 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
   const [notice, setNotice] = useState("");
   const [adiCandidate, setAdiCandidate] = useState(null);
   const [batchReadOpen, setBatchReadOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // The list is the RP22 selection list itself — the same candidate builder the
   // comparison dropdown uses, including the database products a master admin can
@@ -208,6 +211,57 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
   }, [candidates, search, manufacturerFilter]);
 
   const shownCount = groups.reduce((total, group) => total + group.rows.length, 0);
+
+  // The set of candidate ids currently visible after search/manufacturer
+  // filtering. "Select all visible" toggles exactly these, so a filtered view
+  // (e.g. a bad-import manufacturer) selects only the filtered rows.
+  const visibleIds = useMemo(() => {
+    const ids = new Set();
+    for (const group of groups) for (const row of group.rows) ids.add(row.id);
+    return ids;
+  }, [groups]);
+
+  const allVisibleSelected = visibleIds.size > 0 && [...visibleIds].every((id) => selectedIds.has(id));
+  const someVisibleSelected = selectedIds.size > 0 && [...visibleIds].some((id) => selectedIds.has(id));
+
+  const toggleRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const selectedCandidates = useMemo(
+    () => candidates.filter((c) => selectedIds.has(c.id)),
+    [candidates, selectedIds],
+  );
+
+  const handleBulkDeleteDone = async ({ removedCount, skippedCount, failedCount }) => {
+    setBulkDeleteOpen(false);
+    const parts = [];
+    if (removedCount) parts.push(`Removed ${removedCount}`);
+    if (skippedCount) parts.push(`skipped ${skippedCount} referenced`);
+    if (failedCount) parts.push(`${failedCount} failed`);
+    setNotice(parts.length ? parts.join(" · ") + "." : "No speakers removed.");
+    clearSelection();
+    await reload();
+    setTimeout(() => setNotice(""), 4500);
+  };
 
   const priceOf = (candidate) => (candidate.record?.retail_price_inc_vat ?? "");
   const valueFor = (candidate) => (candidate.id in drafts ? drafts[candidate.id] : priceOf(candidate));
@@ -316,6 +370,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
         model: pendingDelete.model || "",
       };
       await removeSpeakerFromLibrary({ row: probe, actorName });
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(pendingDelete.id); return next; });
       setNotice(`Removed ${pendingDelete.manufacturer || ""} ${pendingDelete.model || ""}.`.trim());
       setPendingDelete(null);
       setRemoval(null);
@@ -399,7 +454,40 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
             </select>
           </div>
 
+          {selectedIds.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", marginBottom: 10, border: `1px solid ${BRAND.text}`, borderRadius: 10, background: BRAND.soft }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setBulkDeleteOpen(true)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: 0, background: "#7A1E19", color: "#FFF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}
+              >
+                <Trash2 size={14} /> Delete selected
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: TABLE_GRID, gap: 8, padding: "0 4px 8px", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
+            <div>
+              <input
+                type="checkbox"
+                aria-label="Select all visible speakers"
+                checked={allVisibleSelected}
+                ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected; }}
+                onChange={toggleAllVisible}
+                disabled={visibleIds.size === 0}
+                style={{ cursor: "pointer" }}
+              />
+            </div>
             <div>Manufacturer</div>
             <div>Speaker model</div>
             <div>Sens.</div>
@@ -435,9 +523,18 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                       alignItems: "center",
                       padding: "10px 12px",
                       borderTop: index === 0 ? 0 : `1px solid ${BRAND.soft}`,
-                      background: savedId === candidate.id ? "#F4F8F3" : "#FFF",
+                      background: selectedIds.has(candidate.id) ? "#F4F8F3" : (savedId === candidate.id ? "#F4F8F3" : "#FFF"),
                     }}
                   >
+                    <div>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${candidate.manufacturer || ""} ${candidate.model || ""}`.trim()}
+                        checked={selectedIds.has(candidate.id)}
+                        onChange={() => toggleRow(candidate.id)}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </div>
                     <div style={{ fontSize: 14, color: BRAND.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{candidate.manufacturer || "—"}</div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.text, minWidth: 0 }}>{candidate.model || "—"}</div>
                     <div style={{ fontSize: 13, color: BRAND.subtext }}>{sensitivityText(candidate.record)}</div>
@@ -555,6 +652,13 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
         candidates={candidates}
         actorName={actorName}
         onApplied={async () => { const list = await reload(); return list; }}
+      />
+      <BulkDeleteCompetitorDialog
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        selectedCandidates={selectedCandidates}
+        actorName={actorName}
+        onDone={handleBulkDeleteDone}
       />
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(v) => { if (!v) { setPendingDelete(null); setRemoval(null); } }}>
         <DialogContent>
