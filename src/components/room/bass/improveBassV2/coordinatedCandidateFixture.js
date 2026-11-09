@@ -35,6 +35,153 @@ export const ROOM_D_SELECTED_SUB_MODEL = "SUB3-12";
 export const ROOM_D_ORIGINAL_ROW_Y = Object.freeze([4.0, 5.8]);
 export const ROOM_D_SHIFT_M = 0.6;
 
+// The accepted Room D saved seating reference. The developer acceptance bridge
+// validates the live saved seating against this exact reference before the
+// coordinated candidate is built, so the fixture can never silently fall back
+// to synthetic listeners for the acceptance test.
+export const ROOM_D_EXPECTED_SEAT_IDS = Object.freeze([
+  "seat-r1-c1", "seat-r1-c2", "seat-r1-c3",
+  "seat-r2-c1", "seat-r2-c2", "seat-r2-c3",
+]);
+export const ROOM_D_EXPECTED_X_POSITIONS = Object.freeze([1.15, 1.75, 2.35]);
+export const ROOM_D_EXPECTED_FRONT_EAR_HEIGHT_M = 1.2;
+export const ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M = 1.7;
+const ROOM_D_REF_TOLERANCE_M = 1e-3; // 1 mm
+
+const round3 = (v) => Math.round(v * 1000) / 1000;
+
+// Resolve the front-row centre seat identity from a saved seating array. The
+// designated RSP seat is the front-row (rowNumber === 1) seat closest to the
+// room centreline. For the Room D reference this is `seat-r1-c2` at X = 1.75 m.
+export function resolveRoomDDesignatedSeatId(savedSeating, roomWidthM = ROOM_D_DIMS.widthM) {
+  const seats = Array.isArray(savedSeating) ? savedSeating : [];
+  const centreX = Number.isFinite(Number(roomWidthM)) ? Number(roomWidthM) / 2 : 1.75;
+  let best = null;
+  let bestDist = Infinity;
+  for (const seat of seats) {
+    const row = Number(seat?.rowNumber);
+    const x = Number(seat?.x);
+    if (!Number.isFinite(row) || !Number.isFinite(x)) continue;
+    if (row !== 1) continue;
+    const dist = Math.abs(x - centreX);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = seat;
+    }
+  }
+  return best?.id || null;
+}
+
+/**
+ * Strictly validate a live saved seating array against the accepted Room D
+ * reference. Returns { valid, issues, summary }. When invalid the caller must
+ * stop with an explicit input-mismatch error and never fall back to synthetic
+ * seating for the acceptance bridge.
+ *
+ * Checks: exactly six seats; expected seat IDs; original row centres 4.0/5.8 m;
+ * X positions 1.15/1.75/2.35 m per row; front-row ear height 1.2 m; rear-row
+ * ear height 1.7 m.
+ */
+export function validateRoomDSavedSeatingReference(savedSeating) {
+  const seats = Array.isArray(savedSeating) ? savedSeating : [];
+  const issues = [];
+
+  if (seats.length === 0) {
+    return { valid: false, issues: ["No saved seating supplied"], summary: null };
+  }
+  if (seats.length !== 6) {
+    issues.push(`Expected 6 saved seats, got ${seats.length}`);
+  }
+
+  const seatIds = seats.map((s) => String(s?.id || ""));
+  for (const expected of ROOM_D_EXPECTED_SEAT_IDS) {
+    if (!seatIds.includes(expected)) {
+      issues.push(`Missing expected seat ID ${expected}`);
+    }
+  }
+
+  const centres = rowCentresFromSavedSeating(seats);
+  const expectedCentres = ROOM_D_ORIGINAL_ROW_Y;
+  if (
+    centres.length !== expectedCentres.length ||
+    centres.some((c, i) => Math.abs(c - expectedCentres[i]) > ROOM_D_REF_TOLERANCE_M)
+  ) {
+    issues.push(
+      `Row centres [${centres.join(", ")}] m do not match expected original Room D rows [${expectedCentres.join(", ")}] m`,
+    );
+  }
+
+  const byRow = new Map();
+  for (const seat of seats) {
+    const row = Number(seat?.rowNumber);
+    if (!Number.isFinite(row)) continue;
+    if (!byRow.has(row)) byRow.set(row, []);
+    byRow.get(row).push(Number(seat?.x));
+  }
+  const sortedRows = [...byRow.keys()].sort((a, b) => a - b);
+  for (const row of sortedRows) {
+    const xs = byRow.get(row).sort((a, b) => a - b);
+    if (
+      xs.length !== ROOM_D_EXPECTED_X_POSITIONS.length ||
+      xs.some((x, i) => Math.abs(x - ROOM_D_EXPECTED_X_POSITIONS[i]) > ROOM_D_REF_TOLERANCE_M)
+    ) {
+      issues.push(
+        `Row ${row} X positions [${xs.join(", ")}] m do not match expected [${ROOM_D_EXPECTED_X_POSITIONS.join(", ")}] m`,
+      );
+    }
+  }
+
+  const frontHeights = seats
+    .filter((s) => Number(s?.rowNumber) === 1)
+    .map((s) => Number(s?.z))
+    .filter((v) => Number.isFinite(v));
+  const rearHeights = seats
+    .filter((s) => Number(s?.rowNumber) === 2)
+    .map((s) => Number(s?.z))
+    .filter((v) => Number.isFinite(v));
+  const frontHeight = frontHeights.length
+    ? frontHeights.reduce((a, b) => a + b, 0) / frontHeights.length
+    : null;
+  const rearHeight = rearHeights.length
+    ? rearHeights.reduce((a, b) => a + b, 0) / rearHeights.length
+    : null;
+  if (frontHeight == null || Math.abs(frontHeight - ROOM_D_EXPECTED_FRONT_EAR_HEIGHT_M) > ROOM_D_REF_TOLERANCE_M) {
+    issues.push(
+      `Front-row ear height ${frontHeight} m does not match expected ${ROOM_D_EXPECTED_FRONT_EAR_HEIGHT_M} m`,
+    );
+  }
+  if (rearHeight == null || Math.abs(rearHeight - ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M) > ROOM_D_REF_TOLERANCE_M) {
+    issues.push(
+      `Rear-row ear height ${rearHeight} m does not match expected ${ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M} m`,
+    );
+  }
+
+  const designatedSeatId = resolveRoomDDesignatedSeatId(seats);
+  const designatedSeat = seats.find((s) => String(s?.id) === designatedSeatId);
+  const proposedRowCentres = centres.map((c) => round3(c - ROOM_D_SHIFT_M));
+  const proposedRsp = designatedSeat
+    ? {
+        x: Number(designatedSeat.x),
+        y: round3(Number(designatedSeat.y) - ROOM_D_SHIFT_M),
+        z: Number.isFinite(Number(designatedSeat.z)) ? Number(designatedSeat.z) : 1.2,
+      }
+    : null;
+
+  const summary = {
+    seatCount: seats.length,
+    seatIds,
+    rowCentres: centres.map(round3),
+    xPositions: sortedRows.length ? byRow.get(sortedRows[0]).sort((a, b) => a - b) : [],
+    frontEarHeight: frontHeight,
+    rearEarHeight: rearHeight,
+    proposedRowCentres,
+    proposedRsp,
+    designatedSeatId,
+  };
+
+  return { valid: issues.length === 0, issues, summary };
+}
+
 // Compute the per-row mean Y from a saved seating array, ordered by rowNumber.
 // Used to verify a caller-supplied saved layout matches the expected original
 // Room D rows before the shift is applied.
@@ -152,7 +299,14 @@ export const ROOM_D_P14_TARGET = Object.freeze({
  * @returns {object} coordinated candidate bundle (validated by the caller)
  */
 export function buildRoomDBundle(overrides = {}) {
-  const seatingPositions = buildRoomDSeating(overrides.savedSeating || null);
+  const savedSeating = overrides.savedSeating || null;
+  // When live saved seating is supplied, the designated RSP seat is the
+  // front-row centre seat of the saved layout (e.g. seat-r1-c2), not the
+  // synthetic room-d-seat-2 identity. This keeps the RSP bound to the actual
+  // saved seat so it follows the moved seat exactly.
+  const designatedSeatId = overrides.designatedSeatId
+    || (savedSeating ? resolveRoomDDesignatedSeatId(savedSeating) : ROOM_DESIGNATED_SEAT_ID);
+  const seatingPositions = buildRoomDSeating(savedSeating);
   return buildCoordinatedCandidateBundle({
     candidateId: overrides.candidateId || "room-d-4sub-600mm",
     quantity: 4,
@@ -160,7 +314,7 @@ export function buildRoomDBundle(overrides = {}) {
     selectedSubModel: ROOM_D_SELECTED_SUB_MODEL,
     subwooferBottomHeightM: ROOM_D_SUBWOOFER_BOTTOM_HEIGHT_M,
     seatingPositions,
-    designatedSeatId: ROOM_DESIGNATED_SEAT_ID,
+    designatedSeatId,
     fallbackRsp: ROOM_D_RSP_POSITION,
     roomWidthM: ROOM_D_DIMS.widthM,
     tuning: ROOM_D_COORDINATES.map(() => ({

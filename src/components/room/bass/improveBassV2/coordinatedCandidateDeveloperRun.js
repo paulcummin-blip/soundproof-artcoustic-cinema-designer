@@ -17,7 +17,11 @@
 // it is not written into the saved optimiser plan or any persistent authority.
 
 import { evaluateCoordinatedCandidate } from "./coordinatedCandidateEvaluation";
-import { buildRoomDBundle, ROOM_D_DIMS } from "./coordinatedCandidateFixture";
+import {
+  buildRoomDBundle,
+  ROOM_D_DIMS,
+  validateRoomDSavedSeatingReference,
+} from "./coordinatedCandidateFixture";
 import {
   checkPreTransferIntegrity,
   checkPreConfirmIntegrity,
@@ -67,7 +71,26 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
   const {
     integrationContext = null,
     amplifierPowerPerSubW = 0,
+    savedSeating = null,
   } = options;
+
+  // 0. When live saved seating is supplied (the acceptance bridge), validate it
+  //    strictly against the accepted Room D reference before building anything.
+  //    A mismatch stops here with an explicit input-mismatch error — the bridge
+  //    never silently falls back to synthetic listeners.
+  if (savedSeating) {
+    const ref = validateRoomDSavedSeatingReference(savedSeating);
+    if (!ref.valid) {
+      lastResult = {
+        status: "error",
+        evidence: null,
+        issues: ["Room D saved seating reference mismatch:", ...ref.issues],
+        boundaries: { preTransfer: null, preConfirm: null, postConfirm: null },
+      };
+      publish();
+      return lastResult;
+    }
+  }
 
   // 1. Build the Room D bundle from real candidate inputs.
   let bundle;
@@ -75,6 +98,7 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
     bundle = buildRoomDBundle({
       integrationContext,
       responseBasis: integrationContext ? "combined-lcr-sub" : "sub-only",
+      savedSeating,
     });
   } catch (err) {
     lastResult = {

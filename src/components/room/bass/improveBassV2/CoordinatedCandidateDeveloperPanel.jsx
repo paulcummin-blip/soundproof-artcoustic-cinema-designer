@@ -9,9 +9,9 @@
 // never publishes engineering results. The single allowed calculation is the
 // proposed candidate.
 
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useSyncExternalStore } from "react";
-import { Loader2, FlaskConical, X } from "lucide-react";
+import { Loader2, FlaskConical, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import {
   subscribeCoordinatedDeveloperRun,
   getCoordinatedDeveloperRunResult,
@@ -19,6 +19,18 @@ import {
   clearCoordinatedDeveloperRun,
 } from "./coordinatedCandidateDeveloperRun";
 import { useSharedBassResults } from "../bassResultsStore";
+import { useAppState } from "@/components/AppStateProvider";
+import {
+  validateRoomDSavedSeatingReference,
+  ROOM_D_COORDINATES,
+  ROOM_D_SUBWOOFER_BOTTOM_HEIGHT_M,
+  ROOM_D_SELECTED_SUB_MODEL,
+  ROOM_D_CROSSOVER,
+  ROOM_D_EXPECTED_SEAT_IDS,
+  ROOM_D_EXPECTED_X_POSITIONS,
+  ROOM_D_EXPECTED_FRONT_EAR_HEIGHT_M,
+  ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M,
+} from "./coordinatedCandidateFixture";
 
 const MUTED = "text-[10px] text-[#8A7B6A] leading-relaxed";
 const LINE = "text-[11px] text-[#3E4349] leading-relaxed";
@@ -101,6 +113,90 @@ function EvidenceView({ evidence }) {
   );
 }
 
+function CheckRow({ label, ok, children }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className={ok ? "text-[#213428]" : "text-[#A33]"}>
+        {ok ? <CheckCircle2 className="h-3 w-3 mt-0.5" /> : <AlertTriangle className="h-3 w-3 mt-0.5" />}
+      </span>
+      <div className="text-[10px] text-[#3E4349] leading-relaxed">
+        <span className="font-medium">{label}:</span> {children}
+      </div>
+    </div>
+  );
+}
+
+function PreRunInspection({ refCheck, integrationContext }) {
+  const s = refCheck?.summary;
+  const ok = refCheck?.valid === true;
+  const crossoverActive = integrationContext?.crossover?.frequencyHz === 95;
+  return (
+    <div
+      className="rounded-md border border-[#E7E5E0] bg-white px-2.5 py-2 space-y-1.5"
+      data-coordinated-pre-run-inspection="true"
+    >
+      <div className={LABEL}>Pre-run input inspection</div>
+
+      <CheckRow label="Saved seats" ok={s?.seatCount === 6}>
+        {s ? `${s.seatCount} (expected 6)` : "none — live saved seating required"}
+      </CheckRow>
+      <CheckRow
+        label="Seat IDs"
+        ok={ok && s?.seatIds?.join(",") === ROOM_D_EXPECTED_SEAT_IDS.join(",")}
+      >
+        {s ? s.seatIds.join(", ") : "—"}
+      </CheckRow>
+      <CheckRow
+        label="X positions"
+        ok={ok && s?.xPositions?.join(",") === ROOM_D_EXPECTED_X_POSITIONS.join(",")}
+      >
+        {s ? s.xPositions.join(", ") : "—"} m (expected {ROOM_D_EXPECTED_X_POSITIONS.join(", ")} m)
+      </CheckRow>
+      <CheckRow label="Original row centres" ok={ok && s?.rowCentres?.length === 2}>
+        {s ? `${s.rowCentres.join(", ")} m (expected 4, 5.8 m)` : "—"}
+      </CheckRow>
+      <CheckRow
+        label="Ear heights"
+        ok={ok && s?.frontEarHeight === ROOM_D_EXPECTED_FRONT_EAR_HEIGHT_M && s?.rearEarHeight === ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M}
+      >
+        {s ? `front ${s.frontEarHeight} m · rear ${s.rearEarHeight} m (expected 1.2 / 1.7 m)` : "—"}
+      </CheckRow>
+      <CheckRow label="Proposed row centres" ok={ok && s?.proposedRowCentres?.length === 2}>
+        {s ? `${s.proposedRowCentres.join(", ")} m (expected 3.4, 5.2 m)` : "—"}
+      </CheckRow>
+      <CheckRow
+        label="Proposed RSP"
+        ok={ok && s?.proposedRsp && s.proposedRsp.x === 1.75 && s.proposedRsp.y === 3.4 && s.proposedRsp.z === 1.2}
+      >
+        {s?.proposedRsp ? `(${s.proposedRsp.x}, ${s.proposedRsp.y}, ${s.proposedRsp.z})` : "—"} (expected 1.75, 3.4, 1.2)
+      </CheckRow>
+      <CheckRow label="Designated seat" ok={ok && !!s?.designatedSeatId}>
+        {s?.designatedSeatId || "—"}
+      </CheckRow>
+      <CheckRow label="Four-sub geometry" ok={ROOM_D_COORDINATES.length === 4}>
+        {ROOM_D_SELECTED_SUB_MODEL} · {ROOM_D_COORDINATES.length} cabinets · bottom {ROOM_D_SUBWOOFER_BOTTOM_HEIGHT_M} m
+      </CheckRow>
+      <CheckRow label="Auto alignment" ok={true}>
+        OFF
+      </CheckRow>
+      <CheckRow label="95 Hz integration" ok={crossoverActive}>
+        {crossoverActive ? "live LCR + 95 Hz crossover" : "sub-only (no live LCR context)"}
+      </CheckRow>
+
+      {!ok && (
+        <div className="space-y-1 pt-1 border-t border-[#E7E5E0]">
+          <div className="text-[10px] font-semibold text-[#A33]">Input mismatch — Run once is blocked</div>
+          <ul className="ml-3 list-disc text-[10px] text-[#A33]">
+            {refCheck?.issues?.map((issue, i) => (
+              <li key={i}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CoordinatedCandidateDeveloperPanel() {
   const result = useSyncExternalStore(
     subscribeCoordinatedDeveloperRun,
@@ -108,13 +204,28 @@ export default function CoordinatedCandidateDeveloperPanel() {
     getCoordinatedDeveloperRunResult,
   );
   const shared = useSharedBassResults();
+  const appState = useAppState();
   const [running, setRunning] = React.useState(false);
   const [error, setError] = React.useState(null);
+
+  // The live saved seating from the currently open project. The acceptance
+  // bridge must use the actual listener geometry, not the synthetic fallback.
+  const savedSeating = useMemo(() => {
+    const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
+    return seats.length ? seats : null;
+  }, [appState?.seatingPositions]);
+
+  // Strictly validate the live saved seating against the accepted Room D
+  // reference. The Run-once button is only enabled when every check passes.
+  const refCheck = useMemo(
+    () => validateRoomDSavedSeatingReference(savedSeating),
+    [savedSeating],
+  );
 
   // Derive a live integration context from the shared bass results so the
   // coordinated candidate is evaluated with the same LCR sources and crossover
   // the live design carries. Falls back to sub-only when unavailable.
-  const integrationContext = React.useMemo(() => {
+  const integrationContext = useMemo(() => {
     const auth = shared?.authoritative;
     if (!auth?.combinedAuthorityEnabled) return null;
     if (!auth.lcrSources?.length) return null;
@@ -130,19 +241,21 @@ export default function CoordinatedCandidateDeveloperPanel() {
 
   const handleRun = useCallback(async () => {
     if (running) return;
+    if (!refCheck?.valid) return;
     setRunning(true);
     setError(null);
     try {
       await runCoordinatedCandidateDeveloper({
         integrationContext,
         amplifierPowerPerSubW: shared?.authoritative?.amplifierPowerPerSubW || 0,
+        savedSeating,
       });
     } catch (err) {
       setError(err?.message || "Run failed");
     } finally {
       setRunning(false);
     }
-  }, [running, integrationContext, shared]);
+  }, [running, integrationContext, shared, refCheck, savedSeating]);
 
   const handleClear = useCallback(() => {
     clearCoordinatedDeveloperRun();
@@ -175,16 +288,22 @@ export default function CoordinatedCandidateDeveloperPanel() {
         through the canonical pipeline. No Apply, no autosave, no publication.
       </div>
 
+      <PreRunInspection refCheck={refCheck} integrationContext={integrationContext} />
+
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={handleRun}
-          disabled={running}
+          disabled={running || !refCheck?.valid}
           className="rounded-md bg-[#213428] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-45"
+          data-coord-run-disabled={!refCheck?.valid}
         >
           {running ? "Evaluating…" : "Run once"}
         </button>
         {running && <Loader2 className="h-3 w-3 animate-spin text-[#213428]" />}
+        {!refCheck?.valid && (
+          <span className="text-[10px] text-[#A33]">Inputs must match before running</span>
+        )}
       </div>
 
       {error && <div className="text-[10px] text-[#A33]">{error}</div>}
