@@ -578,10 +578,11 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setSplConfig({
       ...mergedSplCfg,
       selectedP14Level: normaliseP14Level(mergedSplCfg?.selectedP14Level),
-      // Auto time-alignment: preserve explicit saved value (including false),
-      // default to enabled (true) for legacy designs without the field.
-      autoAlignEnabled: mergedSplCfg?.autoAlignEnabled !== undefined
-        ? mergedSplCfg.autoAlignEnabled === true
+      // Auto time-alignment: preserve an explicit boolean saved value (including
+      // false), default to enabled (true) for legacy designs without the field
+      // or with a non-boolean value (null/undefined).
+      autoAlignEnabled: typeof mergedSplCfg?.autoAlignEnabled === "boolean"
+        ? mergedSplCfg.autoAlignEnabled
         : true,
     });
   }

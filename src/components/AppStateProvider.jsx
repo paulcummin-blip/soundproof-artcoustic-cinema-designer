@@ -1686,11 +1686,12 @@ function useDesignerState() {
           selectedP18TargetBasis: p.splConfig.selectedP18TargetBasis || p.splConfig.p18Mode || 'minimum',
           // FIX 1: Preserve null P14 level through autosave restore.
           selectedP14Level: normaliseP14Level(p.splConfig.selectedP14Level),
-          // Auto time-alignment: preserve explicit saved value, default to
-          // enabled (true) for legacy autosave payloads without the field.
-          autoAlignEnabled: p.splConfig.autoAlignEnabled !== undefined
-            ? p.splConfig.autoAlignEnabled === true
-            : (previous?.autoAlignEnabled !== undefined ? previous.autoAlignEnabled === true : true),
+          // Auto time-alignment: preserve an explicit boolean saved value
+          // (including false), default to enabled (true) for legacy autosave
+          // payloads without the field or with a non-boolean value.
+          autoAlignEnabled: typeof p.splConfig.autoAlignEnabled === "boolean"
+            ? p.splConfig.autoAlignEnabled
+            : (typeof previous?.autoAlignEnabled === "boolean" ? previous.autoAlignEnabled : true),
         }));
       }
       if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);

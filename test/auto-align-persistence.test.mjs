@@ -21,7 +21,9 @@ import { computeCalibrationFingerprint } from "@/components/room/bass/bassAnalys
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 const BASE_ROOM = { widthM: 4.5, lengthM: 6.0, heightM: 2.4 };
-const RSP = { x: 2.25, y: 3.0, z: 1.2 };
+// RSP positioned so front and rear subs are at different distances — this is
+// what makes auto-align produce a non-zero delay when enabled.
+const RSP = { x: 2.25, y: 2.5, z: 1.2 };
 
 const FRONT_SUB_LIVE = [
   { id: "front-sub-left", model: "SUB2-12", position: { x: 0.5, y: 0.5, z: 0.35 }, delay: 0 },
@@ -55,7 +57,7 @@ function buildFingerprintInputs({ autoAlignEnabled }) {
     roomDims: BASE_ROOM,
     sources,
     rspPosition: RSP,
-    seatingPositions: [{ id: "seat-1", x: 2.25, y: 3.0, z: 1.2 }],
+    seatingPositions: [{ id: "seat-1", x: 2.25, y: 2.5, z: 1.2 }],
     splConfig: { radiationMode: "half_space" },
     optimisationTransitionHz: 200,
     assessmentStartHz: 20,
@@ -199,8 +201,8 @@ describe("autoAlignEnabled hydration default guard", () => {
   // we replicate its exact decision logic here to lock the contract.
 
   function hydrationGuard(mergedSplCfg) {
-    return mergedSplCfg?.autoAlignEnabled !== undefined
-      ? mergedSplCfg.autoAlignEnabled === true
+    return typeof mergedSplCfg?.autoAlignEnabled === "boolean"
+      ? mergedSplCfg.autoAlignEnabled
       : true;
   }
 
@@ -218,6 +220,10 @@ describe("autoAlignEnabled hydration default guard", () => {
 
   it("null is treated as legacy (true)", () => {
     assert.equal(hydrationGuard({ autoAlignEnabled: null }), true);
+  });
+
+  it("undefined is treated as legacy (true)", () => {
+    assert.equal(hydrationGuard({ autoAlignEnabled: undefined }), true);
   });
 });
 
