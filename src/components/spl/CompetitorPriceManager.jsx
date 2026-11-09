@@ -36,10 +36,15 @@
  * comparison shows and cannot change them.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Search } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, ChevronDown, ChevronUp, Search, Plus, Upload, Pencil, Trash2, Loader2 } from "lucide-react";
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 import { saveCandidatePrice } from "@/components/spl/comparisonPriceRecord";
+import { useAuth } from "@/lib/AuthContext";
+import SpeakerFormDialog from "@/components/admin/speaker-library/SpeakerFormDialog";
+import BulkAddSpeakersDialog from "@/components/admin/speaker-library/BulkAddSpeakersDialog";
+import { describeRemoval, removeSpeakerFromLibrary } from "@/components/admin/speaker-library/removeSpeakerFromLibrary";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const BRAND = {
   panel: "#FFFFFF",
@@ -50,7 +55,51 @@ const BRAND = {
   soft: "#F1F0EE",
 };
 
-const TABLE_GRID = "minmax(150px, 1fr) minmax(220px, 1.6fr) 150px 96px";
+const TABLE_GRID = "minmax(110px, 1fr) minmax(130px, 1.2fr) 80px 70px 65px 65px 100px 96px";
+
+const DASH = "—";
+const hasVal = (value) => value !== null && value !== undefined && String(value).trim() !== "";
+
+/** Data status from the comparison class: A=FULL, B=GOOD, C/D=INCOMPLETE. */
+function dataStatus(classKey) {
+  if (classKey === "A") return { label: "FULL", tone: "#213428" };
+  if (classKey === "B") return { label: "GOOD", tone: "#9A6E00" };
+  return { label: "INCOMPLETE", tone: "#B23A3A" };
+}
+
+function sensitivityText(record) {
+  const v = record?.sensitivity_value_db;
+  if (!hasVal(v)) return DASH;
+  const ref = hasVal(record?.sensitivity_reference) ? record.sensitivity_reference : "";
+  return ref ? `${v} dB` : `${v} dB`;
+}
+
+function powerText(record) {
+  const v = record?.power_authority_w;
+  if (!hasVal(v)) return DASH;
+  return `${v} W`;
+}
+
+function splText(record) {
+  const v = record?.published_max_continuous_spl_db_1m ?? record?.halfspace_published_max_continuous_spl_db_1m;
+  return hasVal(v) ? `${v} dB` : DASH;
+}
+
+/** Build a row object the SpeakerFormDialog expects from a comparison candidate. */
+function candidateToFormRow(candidate) {
+  return {
+    key: candidate.id,
+    rowId: candidate.priceRecordId || null,
+    productId: candidate.productId || null,
+    specificationId: candidate.specificationId || null,
+    manufacturer: candidate.manufacturer || "",
+    model: candidate.model || "",
+    price: candidate.record?.retail_price_inc_vat ?? null,
+    record: candidate.record || null,
+    specification: null,
+    product: null,
+  };
+}
 
 export const PRICE_BASIS_LABEL = "Retail price including VAT, per speaker · GBP (£)";
 

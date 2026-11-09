@@ -94,6 +94,31 @@ export function priceText(row) {
   return formatRetailPrice(row.price);
 }
 
+/**
+ * The administrator's three simple statuses, mapped from the same readiness
+ * authority the RP22 comparison uses. FULL = published measured data; GOOD =
+ * calculated from published data; INCOMPLETE = not enough for a numerical
+ * P12/P13 result yet.
+ */
+export function dataStatus(row) {
+  if (!row || (!row.readiness && !row.record)) return { label: "INCOMPLETE", tone: "#B23A3A" };
+  if (row.readiness) {
+    const confidence = String(row.readiness.confidence || "").toUpperCase();
+    if (confidence === "A") return { label: "FULL", tone: "#213428" };
+    if (confidence === "B") return { label: "GOOD", tone: "#9A6E00" };
+    return { label: "INCOMPLETE", tone: "#B23A3A" };
+  }
+  const stored = String(row.record?.data_confidence || "").toUpperCase();
+  if (stored === "A") return { label: "FULL", tone: "#213428" };
+  if (stored === "B") return { label: "GOOD", tone: "#9A6E00" };
+  return { label: "INCOMPLETE", tone: "#B23A3A" };
+}
+
+/** The source URL for this row — the official product page or the stored source. */
+export function sourceUrl(row) {
+  return row.product?.official_product_url || row.record?.source_url || "";
+}
+
 /** What the comparison will actually use as the power authority for this model. */
 export function powerAuthorityText(row) {
   if (!row.specification) return "";

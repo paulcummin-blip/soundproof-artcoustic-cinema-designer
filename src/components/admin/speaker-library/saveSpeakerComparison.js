@@ -226,9 +226,6 @@ export async function saveSpeakerComparison({ values, row = null, actorName }) {
   const typedManufacturer = String(values.manufacturer || "").trim();
   const model = String(values.model || "").trim();
   if (!typedManufacturer || !model) throw new Error("Manufacturer and speaker model are required.");
-  if (!hasValue(values.sensitivity_db) && !hasValue(values.max_spl_db)) {
-    throw new Error("Enter the manufacturer's sensitivity or their published maximum continuous SPL.");
-  }
 
   const today = todayIso();
   const { patch, authority } = buildSpecPatch(values, today);

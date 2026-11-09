@@ -48,11 +48,11 @@ const CORE_CARDS = [
     href: "/PriceList",
   },
   {
-    title: "Speaker Comparison Library",
-    description: "The competitor loudspeaker list behind RP22 P12/P13 comparison: add a speaker with the manufacturer's published data, set the retail price and compare it immediately.",
+    title: "Competitor Speaker Library",
+    description: "The competitor loudspeaker list behind RP22 P12/P13 comparison: add, edit, price and delete competitor speakers directly on the RP22 Speaker Capability page.",
     status: "Ready",
     count: "Speakers, specifications and prices",
-    href: "/admin/speaker-database",
+    href: "/SPLCalculator",
   },
   {
     title: "Content Management",

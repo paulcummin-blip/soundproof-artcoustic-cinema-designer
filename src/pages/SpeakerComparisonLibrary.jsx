@@ -12,11 +12,12 @@
 // reachable as advanced tooling, and is off the normal path.
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/AuthContext";
 import SpeakerLibraryTable from "@/components/admin/speaker-library/SpeakerLibraryTable";
 import SpeakerFormDialog from "@/components/admin/speaker-library/SpeakerFormDialog";
+import BulkAddSpeakersDialog from "@/components/admin/speaker-library/BulkAddSpeakersDialog";
 import { loadLibraryManufacturers, loadSpeakerLibrary } from "@/components/admin/speaker-library/speakerLibraryRows";
 import { describeRemoval, removeSpeakerFromLibrary } from "@/components/admin/speaker-library/removeSpeakerFromLibrary";
 
@@ -48,6 +49,7 @@ export default function SpeakerComparisonLibrary() {
   const [notice, setNotice] = useState("");
 
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [removal, setRemoval] = useState(null);
@@ -102,12 +104,19 @@ export default function SpeakerComparisonLibrary() {
   }, [cursor, loadingMore, search, manufacturer]);
 
   const openAdd = () => { setEditingRow(null); setNotice(""); setFormOpen(true); };
+  const openBulk = () => { setNotice(""); setBulkOpen(true); };
   const openEdit = (row) => { setEditingRow(row); setNotice(""); setFormOpen(true); };
 
   const handleSaved = (saved) => {
     setNotice(saved.published
       ? "Saved and published to RP22 Comparison."
       : "Saved. Not published yet — the manufacturer data is not enough for a defensible comparison.");
+    setReloadToken((token) => token + 1);
+  };
+
+  const handleBulkDone = (outcome) => {
+    const msg = `Added ${outcome.created}. ${outcome.skipped} already existed (not overwritten).`;
+    setNotice(msg);
     setReloadToken((token) => token + 1);
   };
 
@@ -159,19 +168,21 @@ export default function SpeakerComparisonLibrary() {
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div style={{ flex: "1 1 420px", minWidth: 260 }}>
-          <h1 style={{ margin: 0, fontSize: 26 }}>Speaker Comparison Library</h1>
+          <h1 style={{ margin: 0, fontSize: 26 }}>Competitor Speaker Library</h1>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4, maxWidth: 720 }}>
             The competitor loudspeakers compared against Artcoustic on RP22 P12/P13. Add a speaker with what the
-            manufacturer publishes and its retail price, and it is available in the comparison immediately.
+            manufacturer publishes and its retail price. Incomplete speakers stay in the library until you
+            research the missing data.
           </div>
         </div>
         <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap" }}>
-          <a
-            href="/admin/speaker-library-update"
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "11px 16px", background: "#FFF", color: BRAND.text, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", textDecoration: "none" }}
+          <button
+            type="button"
+            onClick={openBulk}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "11px 16px", background: "#FFF", color: BRAND.text, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
           >
-            Update from workbook
-          </a>
+            <Upload size={16} /> Add Multiple
+          </button>
           <button
             type="button"
             onClick={openAdd}
@@ -232,11 +243,6 @@ export default function SpeakerComparisonLibrary() {
         )}
       </div>
 
-      <div style={{ marginTop: 22, fontSize: 12, color: BRAND.hint }}>
-        Specifications, sources, approval history and data-quality notes are retained behind these records ·{" "}
-        <a href="/admin/speaker-database/advanced" style={{ color: BRAND.hint }}>Advanced tools</a>
-      </div>
-
       <datalist id="speaker-library-manufacturers">
         {manufacturers.map((name) => <option key={name} value={name} />)}
       </datalist>
@@ -247,6 +253,13 @@ export default function SpeakerComparisonLibrary() {
         actorName={actorName}
         onClose={() => setFormOpen(false)}
         onSaved={handleSaved}
+      />
+
+      <BulkAddSpeakersDialog
+        open={bulkOpen}
+        actorName={actorName}
+        onClose={() => setBulkOpen(false)}
+        onDone={handleBulkDone}
       />
 
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(next) => { if (!next && !removing) { setPendingDelete(null); setRemoval(null); } }}>

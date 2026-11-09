@@ -158,12 +158,12 @@ const AuthenticatedApp = () => {
         <Route path="/admin/proposal-diagnostics" element={<AccessGate masterAdmin><AdminProposalDiagnostics /></AccessGate>} />
         <Route path="/admin/adi-design-knowledge" element={<AccessGate masterAdmin><AdminAdiDesignKnowledge /></AccessGate>} />
         <Route path="/admin/design-intent-preview" element={<AccessGate masterAdmin><AdminDesignIntentPreview /></AccessGate>} />
-        <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><SpeakerComparisonLibrary /></AccessGate>} />
+        <Route path="/admin/speaker-database" element={<AccessGate masterAdmin><Navigate to="/SPLCalculator" replace /></AccessGate>} />
         <Route path="/admin/speaker-database/advanced" element={<AccessGate masterAdmin><AdminSpeakerDatabase /></AccessGate>} />
         <Route path="/admin/speaker-database/product/:productId" element={<AccessGate masterAdmin><AdminSpeakerProductDetail /></AccessGate>} />
         <Route path="/admin/speaker-database/add-speaker" element={<AccessGate masterAdmin><AdminAddSpeaker /></AccessGate>} />
         <Route path="/admin/speaker-database/model-first" element={<AccessGate masterAdmin><AdminModelFirstSpeaker /></AccessGate>} />
-        <Route path="/admin/speaker-library-update" element={<AccessGate masterAdmin><AdminSpeakerLibraryUpdate /></AccessGate>} />
+        <Route path="/admin/speaker-library-update" element={<AccessGate masterAdmin><Navigate to="/SPLCalculator" replace /></AccessGate>} />
         <Route path="/admin/audit-log" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></AccessGate>} />
         <Route path="/admin/billing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></AccessGate>} />
         <Route path="*" element={<PageNotFound />} />

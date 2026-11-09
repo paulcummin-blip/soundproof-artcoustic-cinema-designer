@@ -8,11 +8,13 @@
 import React from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import {
+  dataStatus,
   evidenceCell,
   maxSplCell,
   powerCell,
   priceText,
   sensitivityCell,
+  sourceUrl,
   statusText,
 } from "./speakerLibraryDisplay";
 
@@ -26,13 +28,14 @@ const BRAND = {
 };
 
 const COLUMNS = [
-  "Manufacturer",
-  "Model",
+  "Brand",
+  "Product",
   "Sensitivity",
   "Power / amplifier",
-  "Max SPL (published)",
-  "Retail inc VAT",
-  "Evidence",
+  "Max SPL",
+  "Price inc VAT",
+  "Data status",
+  "Source",
   "",
 ];
 
@@ -82,7 +85,8 @@ export default function SpeakerLibraryTable({ rows, loading, error, onEdit, onDe
         <tbody>
           {rows.map((row) => {
             const maxSpl = maxSplCell(row);
-            const evidence = evidenceCell(row);
+            const status = dataStatus(row);
+            const url = sourceUrl(row);
             return (
               <tr key={row.key} style={{ borderTop: `1px solid ${BRAND.soft}` }}>
                 <Cell>{row.manufacturer || "—"}</Cell>
@@ -98,8 +102,12 @@ export default function SpeakerLibraryTable({ rows, loading, error, onEdit, onDe
                 </Cell>
                 <Cell>{priceText(row)}</Cell>
                 <Cell>
-                  <div style={{ color: evidence.tone, fontWeight: 600 }}>{evidence.label}</div>
-                  <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 2 }}>{evidence.text}</div>
+                  <span style={{ fontWeight: 600, color: status.tone }}>{status.label}</span>
+                </Cell>
+                <Cell>
+                  {url
+                    ? <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#2C5AA0", textDecoration: "none" }}>link</a>
+                    : <span style={{ color: BRAND.hint }}>—</span>}
                 </Cell>
                 <Cell>
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>

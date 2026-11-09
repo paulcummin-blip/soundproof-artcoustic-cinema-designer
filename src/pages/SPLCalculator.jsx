@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Upload, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { Plus, Trash2, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
@@ -8,7 +8,7 @@ import { PRODUCT_ROLES } from "@/components/products/productMaster";
 import { getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeSpeakerCapabilityAtDistance } from "@/components/utils/spl/centralSplEngine";
 import { resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
-import { normalizeCompetitor, competitorMetaForComparison, parseRecommendedAmpRange } from "@/components/utils/spl/competitorNormalization";
+import { competitorMetaForComparison } from "@/components/utils/spl/competitorNormalization";
 import { getLevelColors } from "@/components/utils/rp22Colors";
 import { resolveSpeakerSplMeta } from "@/components/utils/spl/speakerSplMeta";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
@@ -17,7 +17,7 @@ import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
 import ComparisonDataQualitySection from "@/components/spl/ComparisonDataQualitySection";
 import CompetitorPriceManager from "@/components/spl/CompetitorPriceManager";
-import { planCompetitorImport, applyCompetitorImport } from "@/components/utils/spl/competitorSpreadsheetImport";
+
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 
 const BRAND = {
@@ -307,98 +307,6 @@ function SpeakerInfo({ rows, sourceUrl = null, datasheetUrl = null, dataQuality 
   );
 }
 
-function loadSheetJs() {
-  if (typeof window === "undefined") return Promise.reject(new Error("Browser only"));
-  if (window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-soundproof-xlsx="true"]');
-    if (existing) {
-      existing.addEventListener("load", () => resolve(window.XLSX), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Could not load Excel reader")), { once: true });
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
-    script.async = true;
-    script.dataset.soundproofXlsx = "true";
-    script.onload = () => resolve(window.XLSX);
-    script.onerror = () => reject(new Error("Could not load Excel reader"));
-    document.head.appendChild(script);
-  });
-}
-
-function firstValue(row, keys) {
-  for (const key of keys) {
-    if (row[key] !== undefined && row[key] !== null && row[key] !== "") return row[key];
-  }
-  return null;
-}
-
-function normalizeImportedRow(row, index) {
-  const manufacturer = String(firstValue(row, ["Manufacturer", "manufacturer", "Brand", "brand"]) || "").trim();
-  const model = String(firstValue(row, ["Model", "model"]) || "").trim();
-  const ratedImpedance = numeric(firstValue(row, ["Rated Impedance Ω", "Rated Impedance Ohm", "rated_impedance_ohm", "Nominal Impedance Ω"]));
-  const sensitivityValue = numeric(firstValue(row, ["Sensitivity Value dB", "sensitivity_value_db", "Sensitivity (dB)"]));
-  const sensitivityReference = String(firstValue(row, ["Sensitivity Reference", "sensitivity_reference", "Sensitivity Spec"]) || "").trim();
-  const sensitivityImpedance = numeric(firstValue(row, ["Sensitivity Impedance Used Ω", "sensitivity_impedance_used_ohm"])) || ratedImpedance;
-  const continuousPower = numeric(firstValue(row, ["Continuous / RMS / AES Power W", "Continuous Power W", "continuous_power_w", "Max Power (W)"]));
-  const publishedContinuous = numeric(firstValue(row, ["Published Max Continuous SPL dB @1m", "published_max_continuous_spl_db_1m"]));
-
-  const sensitivityBasis = String(firstValue(row, ["Sensitivity Measurement Basis", "sensitivity_measurement_basis", "Sensitivity Space Basis", "Sensitivity Full/Half Space", "Sensitivity Full Space", "Sensitivity Space", "Sensitivity Basis"]) ?? "").trim();
-  const maxSplBasis = String(firstValue(row, ["Max SPL Measurement Basis", "max_spl_measurement_basis", "Max SPL Space Basis", "SPL Measurement Basis", "SPL Full/Half Space", "SPL Full Space", "Max SPL Space", "SPL Basis", "Max SPL Basis"]) ?? "").trim();
-  const legacyMeasurementSpace = String(firstValue(row, ["Measurement Space Basis", "Measurement Basis", "Measurement Space", "Full Space / Half Space", "measurement_space_basis"]) ?? "").trim();
-  const recAmpRange = parseRecommendedAmpRange(firstValue(row, ["Recommended Amplifier Power W", "recommended_amplifier_power_w", "Recommended Amplifier Range", "Recommended Amp Power", "Recommended Amplifier"]));
-  const checkedDate = firstValue(row, ["Date Checked", "date_checked"]);
-  const dateChecked = typeof checkedDate === "number" && checkedDate > 0 && checkedDate < 100000
-    ? new Date(Date.UTC(1899, 11, 30) + checkedDate * 86400000).toISOString().slice(0, 10)
-    : String(checkedDate || "").trim();
-  const normalized = normalizeCompetitor({
-      manufacturer,
-      model,
-      product_type: String(firstValue(row, ["Product Type", "product_type"]) || "").trim(),
-      open_back: String(firstValue(row, ["Open Back", "open_back", "Open-Back", "OpenBack"]) || "").trim(),
-      retail_price_inc_vat: numeric(firstValue(row, ["Retail Price inc VAT", "retail_price_inc_vat"])),
-      currency: String(firstValue(row, ["Currency", "currency"]) || "GBP").trim() || "GBP",
-      rated_impedance_ohm: ratedImpedance,
-      minimum_impedance_ohm: numeric(firstValue(row, ["Minimum Impedance Ω", "minimum_impedance_ohm"])),
-      sensitivity_value_db: sensitivityValue,
-      sensitivity_reference: sensitivityReference,
-      sensitivity_impedance_used_ohm: sensitivityImpedance,
-      sensitivity_band_conditions: String(firstValue(row, ["Sensitivity Band / Conditions", "sensitivity_band_conditions"]) || "").trim(),
-      continuous_power_w: continuousPower,
-      power_rating_type: String(firstValue(row, ["Power Rating Type / Standard", "power_rating_type"]) || "").trim(),
-      program_power_w: numeric(firstValue(row, ["Program Power W", "program_power_w"])),
-      peak_power_w: numeric(firstValue(row, ["Peak Power W", "peak_power_w"])),
-      published_max_continuous_spl_db_1m: publishedContinuous,
-      published_max_peak_spl_db_1m: numeric(firstValue(row, ["Published Max Peak SPL dB @1m", "published_max_peak_spl_db_1m"])),
-      max_spl_test_conditions: String(firstValue(row, ["Max SPL Test Standard / Conditions", "max_spl_test_conditions"]) || "").trim(),
-      frequency_range: String(firstValue(row, ["Frequency Range", "frequency_range"]) || "").trim(),
-      usable_lf_minus6db_hz: numeric(firstValue(row, ["Usable LF / -6 dB Point", "usable_lf_minus6db_hz"])),
-      horizontal_coverage_deg: numeric(firstValue(row, ["Horizontal Coverage °", "horizontal_coverage_deg"])),
-      vertical_coverage_deg: numeric(firstValue(row, ["Vertical Coverage °", "vertical_coverage_deg"])),
-      recommended_amplifier_power_w: recAmpRange.max,
-      recommended_amp_min_w: recAmpRange.min,
-      recommended_amp_max_w: recAmpRange.max,
-      source_url: String(firstValue(row, ["Source URL", "source_url"]) || "").trim(),
-      datasheet_url: String(firstValue(row, ["Datasheet URL", "datasheet_url"]) || "").trim(),
-      date_checked: dateChecked,
-      notes: String(firstValue(row, ["Notes", "notes"]) || "").trim(),
-      measurement_space_basis: legacyMeasurementSpace,
-      sensitivity_measurement_basis: sensitivityBasis,
-      max_spl_measurement_basis: maxSplBasis,
-      active: true,
-  });
-  return {
-    rowNumber: index + 2,
-    record: normalized,
-    warnings: [
-      !manufacturer ? "Missing manufacturer" : null,
-      !model ? "Missing model" : null,
-      ...normalized.normalization_warnings,
-    ].filter(Boolean),
-  };
-}
-
 function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null, dataNoteRecord = null, onRemove = null, infoRows = null, sourceUrl = null, datasheetUrl = null }) {
   const showDataNote = dataNoteRecord && (shouldShowDataWarning(dataNoteRecord) || shouldShowOpenBackWarning(dataNoteRecord));
   return (
@@ -450,11 +358,6 @@ export default function SPLCalculatorPage() {
   const [artId, setArtId] = useState("");
   const [competitorRows, setCompetitorRows] = useState([]);
   const [selectedCompetitorIds, setSelectedCompetitorIds] = useState([]);
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [importPreview, setImportPreview] = useState([]);
-  const [importFileName, setImportFileName] = useState("");
-  const [importStatus, setImportStatus] = useState("");
-  const [importing, setImporting] = useState(false);
   const [loadingCompetitors, setLoadingCompetitors] = useState(true);
 
   useEffect(() => {
@@ -662,34 +565,6 @@ export default function SPLCalculatorPage() {
     });
   };
 
-  const handleImportFile = async (file) => {
-    if (!file) return;
-    setImportStatus("Reading spreadsheet…");
-    setImportFileName(file.name);
-    try {
-      const XLSX = await loadSheetJs();
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const headers = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] || [];
-      if (!headers.some(h => ["Manufacturer", "manufacturer", "Brand", "brand"].includes(h)) || !headers.some(h => ["Model", "model"].includes(h))) {
-        throw new Error("First row must contain Manufacturer and Model headers. Upload the prepared specifications sheet, not the link collection list.");
-      }
-      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      const normalized = rawRows.map(normalizeImportedRow).filter((r) => r.record.manufacturer || r.record.model);
-      if (!normalized.length) throw new Error("No speaker rows found.");
-      const existing = await base44.entities.CompetitorSpeaker.list("-created_date", 500);
-      if (existing.length >= 500) throw new Error("Library has reached 500 records. Import needs pagination before continuing.");
-      const plan = planCompetitorImport(normalized, existing);
-      setImportPreview(plan);
-      const warningCount = normalized.reduce((sum, r) => sum + r.warnings.length, 0);
-      setImportStatus(`${plan.filter(r => r.action === "Add").length} to add · ${plan.filter(r => r.action === "Update").length} to update · ${warningCount} data notes`);
-    } catch (error) {
-      setImportPreview([]);
-      setImportStatus(error?.message || "Could not read spreadsheet");
-    }
-  };
-
   // A price saved in Manage Prices shows in the comparison above immediately,
   // without reloading the candidate set or disturbing the selection.
   const handlePriceSaved = useCallback((recordId, price) => {
@@ -699,25 +574,6 @@ export default function SPLCalculatorPage() {
         : row
     )));
   }, []);
-
-  const applyImport = async () => {
-    if (importing || !importPreview.length) return;
-    setImporting(true);
-    setImportStatus("Applying import…");
-    try {
-      const existing = await base44.entities.CompetitorSpeaker.list("-created_date", 500);
-      if (existing.length >= 500) throw new Error("Library has reached 500 records. Import needs pagination before continuing.");
-      const plan = planCompetitorImport(importPreview, existing);
-      const result = await applyCompetitorImport(plan, base44.entities.CompetitorSpeaker, new Date().toISOString());
-      setImportStatus(`Added ${result.added} · updated ${result.updated} · other models kept`);
-      setImportPreview([]);
-      await loadCompetitors();
-    } catch (error) {
-      setImportStatus(`${error?.message || "Import failed"}. Some rows may have saved; retrying updates those models without duplicating them.`);
-    } finally {
-      setImporting(false);
-    }
-  };
 
   return (
     <div style={{ minHeight: "100vh", background: BRAND.bg, color: BRAND.text, padding: 24, fontFamily: '"Didact Gothic", "Century Gothic", sans-serif' }}>
@@ -900,41 +756,6 @@ export default function SPLCalculatorPage() {
             Sound Pressure Level at the Reference Seating Position is the recommended minimum long-term SPL according to AES75-2022 or ANSI-CTA-2034-A, Section 8. Additional speaker SPL capability should be considered at bass frequencies for bass contours and for positive EQ.
           </div>
         </div>
-
-        {canManageCompetitors && (
-        <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14 }}>
-          <button type="button" onClick={() => setAdminOpen((v) => !v)} style={{ width: "100%", border: 0, background: "transparent", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: BRAND.text }}>
-            <span style={{ fontWeight: 700 }}>Admin · Competitor comparison data (legacy direct comparison import)</span>
-            {adminOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-          </button>
-          {adminOpen && (
-            <div style={{ borderTop: `1px solid ${BRAND.border}`, padding: 18 }}>
-              <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "9px 12px", cursor: "pointer", background: "#FFF", fontSize: 13 }}>
-                  <Upload size={15} /> Upload Excel / CSV
-                  <input type="file" disabled={importing} accept=".xlsx,.xls,.csv" onChange={(e) => handleImportFile(e.target.files?.[0])} style={{ display: "none" }} />
-                </label>
-                {importPreview.length > 0 && <button type="button" disabled={importing} onClick={applyImport} style={{ border: 0, borderRadius: 9, padding: "10px 14px", background: BRAND.text, color: "#FFF", cursor: "pointer", fontSize: 13 }}>Apply import</button>}
-                <span style={{ color: BRAND.subtext, fontSize: 12 }}>{importStatus}</span>
-              </div>
-
-              {importPreview.length > 0 && (
-                <div style={{ marginTop: 14, maxHeight: 280, overflow: "auto", border: `1px solid ${BRAND.border}`, borderRadius: 10 }}>
-                  {importPreview.map((row) => (
-                    <div key={row.rowNumber} style={{ display: "grid", gridTemplateColumns: "60px 1fr 1fr 1fr", gap: 8, padding: "9px 11px", borderBottom: `1px solid ${BRAND.soft}`, fontSize: 12 }}>
-                      <div style={{ color: BRAND.hint }}>Row {row.rowNumber}</div>
-                      <div>{row.record.manufacturer || "—"}</div>
-                      <div>{row.record.model || "—"}</div>
-                      <div style={{ color: row.warnings?.length ? "#7A1E19" : BRAND.subtext }}>{row.action} · {row.warnings?.length ? row.warnings.join(" · ") : row.record.spl_authority}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>Legacy direct comparison import: this writes the published comparison library only, not the Speaker Database, and it replaces the comparison values for a matching model. Maintain canonical speaker data through Speaker Database → Export / Import instead. Upload the prepared specifications sheet. Matching manufacturer/model records are updated; other models are kept. Blank cells clear that field. Prices are per speaker, including VAT. Website links are stored as sources, not automatically read.</div>
-            </div>
-          )}
-        </div>
-        )}
 
         {canManageCompetitors && <CompetitorPriceManager onPriceSaved={handlePriceSaved} />}
       </div>
