@@ -1468,31 +1468,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
         </div>
       </CollapsiblePanel>
 
-      {/* Advanced Subwoofer Tuning — expert/calibration only, hidden from the normal designer view */}
+      {/* Automatic Subwoofer Time Alignment — visible whenever Expert View is
+          enabled. The switch is the single version-scoped authority
+          (splConfig.autoAlignEnabled) shared by calculation, reconciliation,
+          fingerprint and publication; no hidden diagnostic flag is required. */}
+      {engineeringMode && totalSubCount > 0 && <CollapsiblePanel title="Automatic Subwoofer Time Alignment" defaultOpen={true}>
+        <div className="pt-3">
+          <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="auto-align-toggle" className="text-xs text-[#3E4349]">Automatic Subwoofer Time Alignment</Label>
+                <Switch id="auto-align-toggle" checked={autoAlignEnabled} onCheckedChange={setAutoAlignEnabled} />
+              </div>
+              {autoAlignEnabled && (
+                <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+                  Auto alignment active.
+                </div>
+              )}
+              {!autoAlignEnabled && (
+                <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+                  Manual delay controls are currently hidden.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </CollapsiblePanel>}
+
+      {/* Advanced Subwoofer Tuning — manual calibration controls, expert/diagnostic only */}
       {engineeringMode && includeDiagnostics && <CollapsiblePanel title="Advanced Subwoofer Tuning" defaultOpen={false}>
         <div className="pt-3 space-y-4">
           <p className="text-[11px] text-[#625143]">For calibration review only. Sound Proof automatically time-aligns subwoofers for the design simulation.</p>
-          {totalSubCount > 0 && (
-            <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-              <div className="text-sm font-medium text-[#1B1A1A] mb-3">Time Alignment</div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="auto-align-toggle" className="text-xs text-[#3E4349]">Auto time-align to MLP</Label>
-                  <Switch id="auto-align-toggle" checked={autoAlignEnabled} onCheckedChange={setAutoAlignEnabled} />
-                </div>
-                {autoAlignEnabled && (
-                  <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-                    Auto alignment active.
-                  </div>
-                )}
-                {!autoAlignEnabled && (
-                  <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-                    Manual delay controls are currently hidden.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {frontTuningInstances.length > 0 && (
             <div>
