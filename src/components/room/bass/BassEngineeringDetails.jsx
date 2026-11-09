@@ -14,8 +14,18 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
   if (!enabled) return null;
   const signature = designEqEnabled && result?.selectedCandidate ? buildCandidateSignature({ result, rspRawCurve }) : null;
   const baseCurve = rspRawCurve.length ? rspRawCurve : (multiSeries[0]?.data || []);
-  const correction = result ? baseCurve.map((point) => {
-    const finalPoint = result.finalPostEqCurve.find((candidate) => candidate.frequency === point.frequency);
+  // finalPostEqCurve is optional on the optimisation result: the canonical
+  // curve lives on selectedCandidate.finalPostEqCurve, and the top-level
+  // result.finalPostEqCurve is a legacy denormalised alias that is not always
+  // present (see candidateConsistency / finalOptimisedBassResponse). Read it
+  // safely and never invent a curve when the evidence is unavailable.
+  const finalPostEqCurve = Array.isArray(result?.finalPostEqCurve)
+    ? result.finalPostEqCurve
+    : (Array.isArray(result?.selectedCandidate?.finalPostEqCurve)
+        ? result.selectedCandidate.finalPostEqCurve
+        : []);
+  const correction = result && finalPostEqCurve.length ? baseCurve.map((point) => {
+    const finalPoint = finalPostEqCurve.find((candidate) => candidate.frequency === point.frequency);
     return { frequency: point.frequency, spl: (finalPoint?.spl ?? point.spl) - point.spl };
   }) : [];
   return <>
@@ -40,7 +50,7 @@ export default function BassEngineeringDetails({ enabled, designEqEnabled, resul
       />
       <DesignEqLifecycleDiagnostic result={result} rspRawCurve={rspRawCurve} graphCandidateId={graphCandidateId} graphFilterBankSignature={graphFilterBankSignature} />
       {/* Stage B: DesignEqDiagnosticTrace quarantined until Stages C and D complete. */}
-      <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={result.finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
+      <SourceDomainCapabilityDiagnostic activeSubs={systemLimits.activeSubs} rawCurve={baseCurve} postEqCurve={finalPostEqCurve} usableLfHz={systemLimits.usableLfHz} optimisationResult={result} />
     </>}
     <ProductionVectorCaptureTest10 capture={runtimeCapture} designEqEnabled={designEqEnabled} smoothingMode={smoothingMode} />
   </>;
