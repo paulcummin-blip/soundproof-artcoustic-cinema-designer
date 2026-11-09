@@ -100,5 +100,25 @@ export function summariseCoordinatedEvidence(confirmation, meta = {}) {
     responseBasis: meta.responseBasis || confirmation?.responseBasis || "sub-only",
     receipt: confirmation?.canonicalAuthorityReceipt || null,
     sharedCancellations: null, // filled by the caller after this summary
+    // Genuine post-EQ curves from the canonical result's
+    // finalOptimisedBassResponse. Empty arrays when unavailable — never
+    // invented from headline metrics.
+    postEqRspCurve: extractCurve(confirmation?.finalOptimisedBassResponse?.postEqRspCurve),
+    postEqPerSeatCurves: extractPerSeatCurves(confirmation?.finalOptimisedBassResponse?.postEqPerSeatCurves),
   };
+}
+
+function extractCurve(curve) {
+  if (!Array.isArray(curve)) return [];
+  return curve.map((p) => ({ ...p }));
+}
+
+function extractPerSeatCurves(curves) {
+  if (!Array.isArray(curves)) return [];
+  return curves.map((seat) => ({
+    seatId: seat?.seatId ?? null,
+    responseData: Array.isArray(seat?.responseData)
+      ? seat.responseData.map((p) => ({ ...p }))
+      : [],
+  }));
 }
