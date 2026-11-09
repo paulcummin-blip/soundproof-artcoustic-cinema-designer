@@ -9,7 +9,7 @@
 // never publishes engineering results. The single allowed calculation is the
 // proposed candidate.
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useSyncExternalStore } from "react";
 import { Loader2, FlaskConical, X } from "lucide-react";
 import {

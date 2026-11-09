@@ -108,7 +108,8 @@ export function buildRoomDBundle(overrides = {}) {
     crossover: overrides.crossover || ROOM_D_CROSSOVER,
     autoAlignEnabled: false,
     integrationContext: overrides.integrationContext || null,
-    responseBasis: overrides.responseBasis || "combined-lcr-sub",
+    responseBasis: overrides.responseBasis
+      || (overrides.integrationContext ? "combined-lcr-sub" : "sub-only"),
     p14Target: overrides.p14Target || ROOM_D_P14_TARGET,
   });
 }

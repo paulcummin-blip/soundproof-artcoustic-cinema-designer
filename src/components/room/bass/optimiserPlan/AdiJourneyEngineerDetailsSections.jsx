@@ -41,6 +41,7 @@ import AdiJourneyRunWorkloadBlock from "./AdiJourneyRunWorkloadBlock.jsx";
 import AdiJourneyRuntimeCostBlock from "./AdiJourneyRuntimeCostBlock.jsx";
 import AdiRecommendationPublicationStatus from "./AdiRecommendationPublicationStatus.jsx";
 import AdiCrossQuantityAuditBlock from "./AdiCrossQuantityAuditBlock.jsx";
+import CoordinatedCandidateDeveloperPanel from "../improveBassV2/CoordinatedCandidateDeveloperPanel.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { OPTIMISER_TESTED_PLACEMENT_LABEL } from "./optimiserResultViewModel.js";
@@ -376,6 +377,12 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
         audit={crossQuantityAudit}
         confirmedResults={confirmedResults}
       />
+
+      {/* THE COORDINATED CANDIDATE DEVELOPER BRIDGE — acceptance-test only.
+          Invokes the coordinated evaluator once for the Room D reference and
+          exposes its actual result, evidence and failure reason. Never runs
+          the full V2 optimisation, never applies geometry, never publishes. */}
+      <CoordinatedCandidateDeveloperPanel />
     </>
   );
 }
