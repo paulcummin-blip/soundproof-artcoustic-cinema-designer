@@ -345,6 +345,13 @@ export async function runOptimisation(opts) {
       } else {
         setWinner(projectId, versionId, {
           ...selection,
+          // The cross-quantity audit resolver searches EVERY confirmed candidate
+          // (including evaluated-outranked ones the ranking subset drops).
+          // selection.confirmedResults is the ranking-filtered subset used by
+          // rankRecommendations; the engine's top-level result.confirmedResults
+          // is the full set. Carry the full set on the winner so a receipt
+          // reference resolves to its canonical P19/P20 evidence.
+          confirmedResults: result.confirmedResults || selection.confirmedResults || [],
           applyFingerprint: startFingerprint,
           applyCandidateId: selection.winner?.candidateId ?? null,
           applyCalibrationId: selection.calibrationResult?.candidateId ?? null,

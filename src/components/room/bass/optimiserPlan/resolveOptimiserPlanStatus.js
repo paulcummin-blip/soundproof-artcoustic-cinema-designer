@@ -127,6 +127,10 @@ export function resolveOptimiserPlanStatus({
       projectId: plan.projectId || null,
       versionId: plan.versionId || null,
       target: plan.target || null,
+      // The run's compact cross-quantity audit trail, retained with the saved
+      // plan. Developer diagnostics only; absent on a plan saved before the
+      // trail existed.
+      crossQuantityAudit: plan.crossQuantityAudit || null,
       staleReason: null,
       // The evidence is kept even when the payload version cannot be read: the
       // panel still reports what that run retained.
@@ -186,6 +190,9 @@ export function resolveOptimiserPlanStatus({
       evidenceMessage: null,
       recordKind: plan.recordKind || null,
       terminalOutcome,
+      // The run's compact cross-quantity audit trail, retained with the saved
+      // plan. Developer diagnostics only.
+      crossQuantityAudit: plan.crossQuantityAudit || null,
       // Why the run ended, when it ended in a failure that must be stated:
       // { status, category, message, publicationError, at }. Null for a run that
       // finished and saved.
@@ -355,6 +362,9 @@ export function resolveOptimiserPlanStatus({
     evidenceMessage: null,
     recordKind: plan.recordKind || OPTIMISER_RECORD_KIND.PLAN,
     terminalOutcome: null,
+    // The run's compact cross-quantity audit trail, retained with the saved
+    // plan. Developer diagnostics only; null when this run recorded none.
+    crossQuantityAudit: plan.crossQuantityAudit || null,
     // A publication the run could not complete travels with the record it belongs
     // to, so the panel states the failure rather than a silent success.
     failure: plan.failure || plan.run?.failure || null,
