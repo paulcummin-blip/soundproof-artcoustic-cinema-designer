@@ -13,6 +13,7 @@ import { base44 } from "@/api/base44Client";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { parsePasted, bulkAddSpeakers } from "./bulkAddSpeakers";
 import { parseWorkbookFile } from "./workbookParser";
+import { buildPreview, OUTCOME_META } from "./bulkAddPreview";
 
 const BRAND = {
   text: "#1B1A1A", subtext: "#3E4349", hint: "#625143",
@@ -25,62 +26,7 @@ function pricePreview(row) {
   return hasValue(row.price) ? `£${String(row.price).replace(/[^0-9.]/g, "")}` : "—";
 }
 
-const TECH_FIELDS = ["source_url", "sensitivity_db", "sensitivity_reference", "impedance_ohm", "power_w", "max_spl_db", "price"];
 
-const OUTCOME_META = {
-  new: { label: "New", color: "#213428" },
-  incomplete: { label: "Incomplete", color: "#9A6E00" },
-  existing: { label: "Existing", color: "#3E4349" },
-  duplicate: { label: "Duplicate exact match", color: "#625143" },
-  "brand-only": { label: "Manufacturer only", color: "#625143" },
-  invalid: { label: "—", color: "#7A1E19" },
-};
-
-/**
- * Build the preview from raw rows (paste + workbook combined). Each row gets an
- * outcome; within-workbook duplicates merge their non-conflicting fields into the
- * first new/incomplete occurrence. Returns the items to render, the actionable
- * product rows to create, the brand-only rows (manufacturers to preserve), and the
- * count for the Add all button.
- */
-function buildPreview(rawRows, existingKeys, keyFor) {
-  const seen = new Map();
-  const items = [];
-  const actionableMap = new Map();
-  const brandOnlyRows = [];
-  for (let i = 0; i < rawRows.length; i++) {
-    const row = rawRows[i];
-    const key = keyFor(row);
-    const hasBrand = hasValue(row.manufacturer);
-    const hasProduct = hasValue(row.model);
-    let outcome;
-    if (!hasProduct && hasBrand) {
-      outcome = "brand-only";
-      brandOnlyRows.push(row);
-    } else if (!hasProduct) {
-      outcome = "invalid";
-    } else if (existingKeys.has(key)) {
-      outcome = "existing";
-    } else if (seen.has(key)) {
-      outcome = "duplicate";
-    } else {
-      seen.set(key, i);
-      const hasTech = hasValue(row.sensitivity_db) || hasValue(row.impedance_ohm)
-        || hasValue(row.power_w) || hasValue(row.max_spl_db);
-      outcome = hasTech ? "new" : "incomplete";
-      actionableMap.set(key, { ...row });
-    }
-    items.push({ row, outcome, key, index: i });
-  }
-  for (const it of items) {
-    if (it.outcome === "duplicate") {
-      const target = actionableMap.get(it.key);
-      if (target) for (const f of TECH_FIELDS) if (!hasValue(target[f]) && hasValue(it.row[f])) target[f] = it.row[f];
-    }
-  }
-  const actionable = Array.from(actionableMap.values());
-  return { items, actionable, brandOnlyRows, toAdd: [...actionable, ...brandOnlyRows], actionableCount: actionable.length };
-}
 
 export default function BulkAddSpeakersDialog({ open, onClose, actorName, onDone }) {
   const [text, setText] = useState("");
