@@ -20,7 +20,7 @@
 // ---------------------------------------------------------------------------
 
 export const INSTALLED_SPACE_ASSUMPTION =
-  "Measurement space not explicitly stated — Sound Proof standard installed / half-space normalisation applied as an ADI assumption";
+  "Measurement space not stated by the manufacturer — Sound Proof assumes Half Space (no +6 dB correction) as a controlled assumption";
 
 // The evidence basis and confidence this assumption carries. A treated basis is
 // an estimate: it can never be reported as published measured capability.
@@ -36,7 +36,7 @@ export const INSTALLED_SPACE_ASSUMPTION_NOTE =
 // The same statement in the space a narrow table cell has. Both wordings live
 // here so the short label and the full sentence can never drift apart.
 export const INSTALLED_SPACE_ASSUMPTION_SHORT =
-  "ADI assumption · half-space installed normalisation applied";
+  "Half Space — assumed by Sound Proof";
 
 // Only a stated space declaration is a confirmed basis. "in room", "unspecified"
 // and a blank field are all unconfirmed — in room is a real published statement,
@@ -49,10 +49,10 @@ export function spaceBasisConfirmed(measurementSpace) {
 /** How the published space reads in the review UI. */
 export function spaceSourceLabel(measurementSpace) {
   const space = String(measurementSpace ?? "").trim().toLowerCase();
-  if (space === "half-space") return "Half space — stated by the manufacturer";
-  if (space === "free-space") return "Full space — stated, converted once to half space";
+  if (space === "half-space") return "Half Space — reported by the manufacturer";
+  if (space === "free-space") return "Full Space — reported by the manufacturer, converted once to half space";
   if (space === "in-room") return "In room — published, but not a confirmed comparison basis";
-  return "Not stated by the manufacturer";
+  return "Half Space — assumed by Sound Proof";
 }
 
 const result = (applied) => ({

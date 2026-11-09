@@ -112,7 +112,12 @@ export function findRp22Gaps(specification) {
       continue;
     }
     if (field.key === "measurement_space") {
-      if (!present(spec.measurement_space)) critical.push(field);
+      // "unspecified" is a deliberate "Half Space — assumed" choice, not a missing
+      // field: it downgrades the data status to GOOD (via the normalisation's
+      // half_space_assumed provenance) but never blocks the comparison. Only a
+      // truly empty value counts as missing.
+      const space = spec.measurement_space;
+      if (space === null || space === undefined || String(space).trim() === "") critical.push(field);
       continue;
     }
     if (!present(spec[field.key])) critical.push(field);

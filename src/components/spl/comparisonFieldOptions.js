@@ -17,10 +17,16 @@ export const POWER_BASES = [
   { value: "continuous", label: "Continuous speaker rating" },
 ];
 
+// The measurement-space basis the comparison is graded on.
+//   half-space   → Half Space — reported (manufacturer stated 2π)
+//   free-space   → Full Space — reported (manufacturer stated 4π, converted once)
+//   unspecified  → Half Space — assumed (manufacturer stated nothing; a controlled
+//                  Sound Proof assumption, no +6 dB correction, never labelled
+//                  as manufacturer-reported)
 export const MEASUREMENT_SPACES = [
-  { value: "unspecified", label: "Unspecified" },
-  { value: "half-space", label: "Half Space" },
-  { value: "free-space", label: "Full Space" },
+  { value: "half-space", label: "Half Space — reported" },
+  { value: "free-space", label: "Full Space — reported" },
+  { value: "unspecified", label: "Half Space — assumed" },
 ];
 
 // How the manufacturer states a published maximum SPL. The stored values are the

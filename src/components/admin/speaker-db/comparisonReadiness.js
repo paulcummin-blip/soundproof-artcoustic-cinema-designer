@@ -77,7 +77,16 @@ export const COMPARISON_FIELDS = [
     critical: true,
     resolve: (s) => present(s.frequency_response_low_hz) || present(s.frequency_response_high_hz),
   },
-  { key: "measurement_space", label: "Measurement space", critical: true, resolve: (s) => present(s.measurement_space) },
+  {
+    key: "measurement_space",
+    label: "Measurement space",
+    critical: true,
+    // "unspecified" is a deliberate "Half Space — assumed" choice, not a missing
+    // field: it downgrades the data status to GOOD (handled by the normalisation's
+    // half_space_assumed provenance) but never blocks the comparison. Only a truly
+    // empty value counts as missing.
+    resolve: (s) => s.measurement_space !== null && s.measurement_space !== undefined && String(s.measurement_space).trim() !== "",
+  },
   {
     key: "source_url",
     label: "Source URL",

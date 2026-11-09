@@ -75,10 +75,12 @@ test('B. MP150-style record is an ADI estimate, never published-grade evidence',
   assert.equal(r.evidenceQuality, 'Manufacturer Calculated');
   assert.equal(evidenceText(r), 'C · ADI estimate');
   assert.equal(powerBasisText(MP150_SPEC), '400 W · recommended amplifier max');
-  // The two gaps that keep it out of Comparable are named, not implied.
-  assert.deepEqual(r.missingCriticalLabels, ['Measurement space', 'Evidence quality']);
+  // "Measurement space" is no longer a critical gap when the space is unstated:
+  // "Half Space — assumed" is a valid controlled assumption (GOOD, not FULL), so
+  // only the evidence-quality gap remains.
+  assert.deepEqual(r.missingCriticalLabels, ['Evidence quality']);
   assert.equal(r.totalCount, 16); // the RP22 comparison field definition
-  assert.equal(r.presentCount, 7);
+  assert.equal(r.presentCount, 8);
 });
 
 test('D. published capability reaches Comparable and is marked as published evidence', () => {

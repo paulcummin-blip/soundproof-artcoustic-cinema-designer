@@ -218,7 +218,16 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
               </Field>
             )}
 
-            <Field label="Measurement basis">
+            <Field
+              label="Measurement space"
+              hint={
+                values.measurement_space === "unspecified"
+                  ? "Half Space — assumed by Sound Proof. Used when the manufacturer does not state a measurement space; no +6 dB correction is applied, and it is never labelled as manufacturer-reported."
+                  : values.measurement_space === "free-space"
+                    ? "Full Space — reported by the manufacturer; converted once to half space for comparison."
+                    : "Half Space — reported by the manufacturer; used as published."
+              }
+            >
               <select style={inputStyle} value={values.measurement_space} onChange={set("measurement_space")}>
                 {MEASUREMENT_SPACES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>

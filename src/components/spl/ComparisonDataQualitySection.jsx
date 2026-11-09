@@ -24,7 +24,7 @@ const BRAND = {
 
 const LIMITED_DATA = "Limited Data";
 const NOT_PUBLISHED = "Not published";
-const UNSTATED_BASIS = "Unstated — half-space assumed";
+const UNSTATED_BASIS = "Half Space — assumed by Sound Proof";
 
 const EXPLANATION =
   "Sound Proof has calculated the comparison capability from the available manufacturer data. " +
