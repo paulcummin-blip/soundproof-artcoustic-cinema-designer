@@ -18,7 +18,12 @@
 // Returns ONE best candidate (the single best by P19 > P20 > P18 > P14).
 // Does NOT independently scatter seats — the entire layout moves together.
 
-const OFFSETS_MM = [-500, -400, -300, -200, -100, 0, 100, 200, 300, 400, 500];
+// Extended to ±600 mm to admit the known Room D 600 mm forward movement.
+// The existing ±500 mm range remains the default bounded search; the ±600 mm
+// entries extend the physically eligible range without removing the existing
+// step granularity. Validation rejects any offset that violates room, screen
+// or clearance constraints, so the wider range never produces an unsafe move.
+const OFFSETS_MM = [-600, -500, -400, -300, -200, -100, 0, 100, 200, 300, 400, 500, 600];
 const BOUNDARY_MARGIN_M = 0.3; // minimum distance from walls
 const SCREEN_CLEARANCE_M = 1.0; // minimum distance from screen wall
 
