@@ -65,6 +65,11 @@ import { setCombinedResult } from "./improveBassV2Store.js";
 import { computeProxyCandidateMetrics, promoteProxyChallengers } from "./proxyCandidateMetrics.js";
 import { selectCanonicalObjectives, explainFinalSelection, dedupeCandidates } from "./canonicalObjectiveSelection.js";
 import { buildCandidateLedger, buildProxyIndex } from "./candidateLedger.js";
+import {
+  buildCandidateDesignContext,
+  validationContextForCandidate,
+  MAX_CROSS_QUANTITY_CANDIDATES_PER_QUANTITY,
+} from "./candidateDesignContext.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -217,6 +222,15 @@ export function gatherCandidates({
   roomDims,
   stage2Result,
   placementFingerprint,
+  crossQuantityQuantities = [],
+  selectedSubModel,
+  subwooferBottomHeightM,
+  frontOrientation,
+  rearOrientation,
+  seatingPositions,
+  rspPosition,
+  crossover,
+  autoAlignEnabled,
 }) {
   const candidates = [];
   const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
@@ -255,6 +269,41 @@ export function gatherCandidates({
       rawTransfer: cached || null,
       practicality: PLACEMENT_PRACTICALITY.PRACTICAL,
     });
+  }
+
+  // ── Cross-quantity candidates ────────────────────────────────────────
+  // Physically valid Stage 2 finalists whose subwoofer quantity differs from
+  // the installed design. Each carries its own design context so the V2
+  // evaluation binds tuning and evidence to the candidate's own source
+  // identities, never to the installed instances. The Stage 2 worker already
+  // evaluates any source count; this is the identity layer that lets the
+  // main-thread binding and validation work with a different quantity.
+  for (const crossQty of crossQuantityQuantities) {
+    if (!Number.isFinite(Number(crossQty)) || crossQty <= 0 || crossQty === quantity) continue;
+    const crossFinalists = extractStage2Finalists(stage2Result, crossQty, roomDims);
+    const bounded = crossFinalists.slice(0, MAX_CROSS_QUANTITY_CANDIDATES_PER_QUANTITY);
+    for (const finalist of bounded) {
+      const designContext = buildCandidateDesignContext({
+        finalistId: finalist.id,
+        quantity: crossQty,
+        coordinates: finalist.coordinates,
+        selectedSubModel,
+        subwooferBottomHeightM,
+        seatingPositions,
+        rspPosition,
+        crossover,
+        autoAlignEnabled,
+      });
+      const cached = cachedTransfers.get(finalist.id);
+      candidates.push({
+        id: finalist.id,
+        finalist,
+        isCurrent: false,
+        rawTransfer: cached || null,
+        practicality: PLACEMENT_PRACTICALITY.PRACTICAL,
+        designContext,
+      });
+    }
   }
 
   return candidates;
@@ -465,6 +514,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
     currentAuthority, currentCanonicalResult, currentSources, liveCacheKey, stage2Result, placementFingerprint,
     correctabilityAssessment, integrationContext,
+    crossQuantityQuantities = [],
   } = params;
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
@@ -748,16 +798,23 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       return ranked.length ? ranked[0].pair : null;
     }
     function bindConfirmation(result, tuning, candidate, kind) {
-      const appliedTuning=bindTuningToSourceIds(tuning,snapshot.instanceIds);
+      const designContext=candidate?.designContext || null;
+      const bindingSourceIds=designContext?.sourceIds || snapshot.instanceIds;
+      const appliedTuning=bindTuningToSourceIds(tuning,bindingSourceIds);
       const positions=candidate.coordinates || result.coordinates || snapshot.positions;
-      const instances=snapshot.allInstances.filter(s=>s.enabled!==false).map((s,i)=>({...s,position:{...s.position,...positions[i]}}));
+      const baseInstances=designContext
+        ? designContext.instances
+        : snapshot.allInstances.filter(s=>s.enabled!==false);
+      const instances=baseInstances.map((s,i)=>({...s,position:{...s.position,...(positions[i]||{})}}));
       const configurationKey=effectiveConfigurationKey(instances,appliedTuning) + (result.crossover ? "|xo:"+JSON.stringify(result.crossover) : "");
       let hash=2166136261;for(const ch of configurationKey)hash=Math.imul(hash^ch.charCodeAt(0),16777619);
-      return {...result,baselineCacheKey:liveCacheKey,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
+      const bound={...result,baselineCacheKey:liveCacheKey,appliedTuning,configurationKey,inputIdentity:startFingerprint,candidateKind:kind,
         candidateId:kind==="current"?"current":kind==="phase"?(candidate.groupedPhase?.id || "phase:"+(hash>>>0).toString(16)):kind==="calibration"?(candidate.groupedDelay?.id || "calibration:"+(hash>>>0).toString(16)):candidate.id,
         groupedDelay:candidate.groupedDelay || null,
         groupedPhase:candidate.groupedPhase || null,
         isCurrent:kind==="current",candidateOrigin:kind==="phase"?"phase-only":kind==="calibration"?"calibration-only":candidate.candidateOrigin};
+      if(designContext){bound.designContext=designContext;bound.isCrossQuantity=true;}
+      return bound;
     }
 
     try {
@@ -1157,7 +1214,14 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       ...collectExcludedTheoreticalCandidates({ subwooferInstances, roomDims, stage2Result }),
     ];
     let allCandidates = tagGlobalCandidates(
-      gatherCandidates({ projectId, versionId, subwooferInstances, roomDims, stage2Result, placementFingerprint })
+      gatherCandidates({
+        projectId, versionId, subwooferInstances, roomDims, stage2Result, placementFingerprint,
+        crossQuantityQuantities,
+        selectedSubModel, subwooferBottomHeightM, frontOrientation, rearOrientation,
+        seatingPositions, rspPosition,
+        crossover: integrationContext?.crossover || null,
+        autoAlignEnabled: true,
+      })
     );
 
     // Compute raw transfers for global candidates (cached or worker)
@@ -1491,7 +1555,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               movementDescription:candidate.movement,positionCoordinates:candidate.coordinates || result.coordinates,
               candidateOrigin:candidate.candidateOrigin || "global-placement"});
             if (optionIndex > 0) bound.candidateId = String(candidate.id || "position") + "::alt" + optionIndex;
-            const check=validateCandidateForRun(bound,validationContext);
+            const check=validateCandidateForRun(bound,validationContextForCandidate(candidate,validationContext));
             if(check.nonAssessable){recordNonAssessable(escPhase.name,bound,check);}
             else if(check.valid){confirmedResults.push(check.result);funnelCandidates.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});}
             else evaluationIssues.push({stage:escPhase.name,candidateId:candidate.id,issues:check.issues});

@@ -410,6 +410,11 @@ export function extractCalibrationTuning(selection) {
   if (!selection) return null;
   const winner = selection.winner;
   if (!winner) return null;
+  // A cross-quantity candidate owns its own source identities (it evaluated a
+  // different subwoofer count). Its tuning is bound to those candidate-owned
+  // IDs, not the installed instances, so it must NOT be auto-applied to the
+  // installed design. Evaluation is temporary; Apply is a separate action.
+  if (winner.isCrossQuantity) return null;
   const tuning = winner.appliedTuning || winner.tuning || [];
   return Array.isArray(tuning) && tuning.length > 0 ? tuning : null;
 }
