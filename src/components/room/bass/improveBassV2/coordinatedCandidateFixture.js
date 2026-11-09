@@ -27,41 +27,105 @@ export const ROOM_D_COORDINATES = Object.freeze([
 export const ROOM_D_SUBWOOFER_BOTTOM_HEIGHT_M = 0.05;
 export const ROOM_D_SELECTED_SUB_MODEL = "SUB3-12";
 
-// Both seating rows moved 600 mm toward the screen (front screen at y=0).
-// Seat identities and priorities are preserved; only y is shifted by -0.6 m.
-// The two-row arrangement mirrors the known Room D layout: front row 3 seats,
-// rear row 3 seats. Lateral positions are symmetric about the 1.75 m centreline.
-function buildRoomDSeating() {
-  const rowY = [3.4, 5.2]; // pre-move row centres (front, rear)
-  const seats = [];
-  let seatIndex = 0;
-  for (let row = 0; row < rowY.length; row++) {
-    const seatCount = 3;
-    const lateralOffsets = seatCount === 3 ? [-0.8, 0, 0.8] : [0];
-    for (const offset of lateralOffsets) {
-      seatIndex += 1;
-      const id = `room-d-seat-${seatIndex}`;
-      seats.push({
-        id,
-        rowNumber: row + 1,
-        priority: row === 0 ? "primary" : "secondary",
-        x: 1.75 + offset,
-        y: rowY[row],
-        z: 1.2,
-        earHeight: 1.2,
-        platformHeight: 0.4,
-      });
-    }
+// The accepted Room D proposal starts from the ORIGINAL saved seating and
+// applies the −600 mm forward move exactly once. The original Room D rows are
+// the primary row at Y = 4.0 m and the secondary row at Y = 5.8 m. After the
+// single shift they become 3.4 m and 5.2 m. The fixture never starts from an
+// already-shifted layout — doing so would apply the offset a second time.
+export const ROOM_D_ORIGINAL_ROW_Y = Object.freeze([4.0, 5.8]);
+export const ROOM_D_SHIFT_M = 0.6;
+
+// Compute the per-row mean Y from a saved seating array, ordered by rowNumber.
+// Used to verify a caller-supplied saved layout matches the expected original
+// Room D rows before the shift is applied.
+function rowCentresFromSavedSeating(savedSeating) {
+  const byRow = new Map();
+  for (const seat of savedSeating) {
+    const row = Number(seat?.rowNumber);
+    const y = Number(seat?.y);
+    if (!Number.isFinite(row) || !Number.isFinite(y)) continue;
+    if (!byRow.has(row)) byRow.set(row, []);
+    byRow.get(row).push(y);
   }
-  // Apply the 600 mm forward move to every seat.
-  return seats.map((seat) => ({ ...seat, y: Number(seat.y) - 0.6 }));
+  return [...byRow.keys()]
+    .sort((a, b) => a - b)
+    .map((row) => {
+      const ys = byRow.get(row);
+      return ys.reduce((sum, y) => sum + y, 0) / ys.length;
+    });
 }
 
-// The proposed RSP follows the designated primary seat. After the move, the
-// front-row centre seat sits at (1.75, 2.8, 1.2). The fixture passes the seat
-// identity and the resolved RSP so the bundle's RSP authority can bind it.
+// Build the proposed (moved) Room D seating from the original saved rows.
+//
+// When `savedSeating` is supplied (the actual saved seating from the open
+// project), it is validated against the expected original Room D row centres.
+// A mismatch rejects the fixture with an explicit input-mismatch error rather
+// than silently constructing different seating — and an already-shifted layout
+// (3.4 / 5.2 m) is rejected here, so it is never shifted a second time.
+//
+// Seat IDs, row membership, priority, height and platform metadata are
+// preserved verbatim from the saved seating; only y is shifted by −0.6 m.
+function buildRoomDSeating(savedSeating = null) {
+  let originSeats;
+
+  if (savedSeating) {
+    const centres = rowCentresFromSavedSeating(savedSeating);
+    const expected = ROOM_D_ORIGINAL_ROW_Y;
+    const tolerance = 1e-3; // 1 mm
+    const mismatch =
+      centres.length !== expected.length ||
+      centres.some((c, i) => Math.abs(c - expected[i]) > tolerance);
+    if (mismatch) {
+      throw new Error(
+        `Room D fixture input mismatch: saved seating row centres [${centres.join(", ")}] m `
+        + `do not match the expected original Room D rows [${expected.join(", ")}] m. `
+        + `Refusing to construct different seating from a non-matching saved layout.`,
+      );
+    }
+    // Preserve every saved field; only y will be shifted below.
+    originSeats = savedSeating.map((seat) => ({
+      id: seat.id,
+      rowNumber: seat.rowNumber,
+      priority: seat.priority,
+      x: Number(seat.x),
+      y: Number(seat.y),
+      z: Number.isFinite(Number(seat.z)) ? Number(seat.z) : 1.2,
+      earHeight: seat.earHeight,
+      platformHeight: seat.platformHeight,
+    }));
+  } else {
+    // Canonical original Room D rows: front row 3 seats, rear row 3 seats,
+    // laterally symmetric about the 1.75 m centreline.
+    originSeats = [];
+    let seatIndex = 0;
+    for (let row = 0; row < ROOM_D_ORIGINAL_ROW_Y.length; row++) {
+      const lateralOffsets = [-0.8, 0, 0.8];
+      for (const offset of lateralOffsets) {
+        seatIndex += 1;
+        originSeats.push({
+          id: `room-d-seat-${seatIndex}`,
+          rowNumber: row + 1,
+          priority: row === 0 ? "primary" : "secondary",
+          x: 1.75 + offset,
+          y: ROOM_D_ORIGINAL_ROW_Y[row],
+          z: 1.2,
+          earHeight: 1.2,
+          platformHeight: 0.4,
+        });
+      }
+    }
+  }
+
+  // Apply the −600 mm forward move exactly once.
+  return originSeats.map((seat) => ({ ...seat, y: Number(seat.y) - ROOM_D_SHIFT_M }));
+}
+
+// The proposed RSP follows the designated primary seat. After the single
+// −600 mm move the front-row centre seat sits at (1.75, 3.4, 1.2). The fixture
+// passes the seat identity and the resolved RSP so the bundle's RSP authority
+// can bind it.
 export const ROOM_DESIGNATED_SEAT_ID = "room-d-seat-2"; // front-row centre
-export const ROOM_D_RSP_POSITION = Object.freeze({ x: 1.75, y: 2.8, z: 1.2 });
+export const ROOM_D_RSP_POSITION = Object.freeze({ x: 1.75, y: 3.4, z: 1.2 });
 
 // Combined LCR/sub crossover (95 Hz). The integration context is supplied by
 // the caller at run time from the live LCR sources — the fixture only carries
@@ -88,7 +152,7 @@ export const ROOM_D_P14_TARGET = Object.freeze({
  * @returns {object} coordinated candidate bundle (validated by the caller)
  */
 export function buildRoomDBundle(overrides = {}) {
-  const seatingPositions = buildRoomDSeating();
+  const seatingPositions = buildRoomDSeating(overrides.savedSeating || null);
   return buildCoordinatedCandidateBundle({
     candidateId: overrides.candidateId || "room-d-4sub-600mm",
     quantity: 4,

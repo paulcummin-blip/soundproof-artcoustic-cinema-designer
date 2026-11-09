@@ -121,7 +121,7 @@ export default function CoordinatedCandidateDeveloperPanel() {
     return {
       roomDims: { widthM: 3.5, lengthM: 8.0, heightM: 3.0 },
       seatingPositions: [], // filled by the bundle's proposed seating
-      rspPosition: { x: 1.75, y: 2.8, z: 1.2 },
+      rspPosition: { x: 1.75, y: 3.4, z: 1.2 },
       speakerSources: auth.lcrSources,
       crossover: { type: "lowpass", frequencyHz: 95, order: 4, enabled: true },
       physics: auth.physics || null,

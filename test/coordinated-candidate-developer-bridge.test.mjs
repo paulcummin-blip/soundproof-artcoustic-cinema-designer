@@ -33,16 +33,21 @@ test("Room D fixture builds a structurally valid bundle from real inputs", () =>
   assert.ok(structural.valid, `Bundle should be valid: ${JSON.stringify(structural.issues)}`);
 });
 
-test("Room D seating is moved 600 mm toward the screen", () => {
+test("Room D seating starts from the original saved rows and shifts once", () => {
   const bundle = buildRoomDBundle({});
-  // Front-row centre seat (room-d-seat-2) pre-move y = 3.4, after -0.6 = 2.8
+  // Original primary row Y = 4.0 m, after a single −0.6 m shift = 3.4 m.
+  // The secondary row Y = 5.8 m shifts once to 5.2 m.
   const frontCentre = bundle.seatingPositions.find((s) => s.id === "room-d-seat-2");
   assert.ok(frontCentre, "Front-row centre seat must exist");
-  assert.equal(Math.round(frontCentre.y * 1000) / 1000, 2.8);
-  // RSP resolved from the designated seat
+  assert.equal(Math.round(frontCentre.y * 1000) / 1000, 3.4);
+  const rearCentre = bundle.seatingPositions.find((s) => s.id === "room-d-seat-5");
+  assert.ok(rearCentre, "Rear-row centre seat must exist");
+  assert.equal(Math.round(rearCentre.y * 1000) / 1000, 5.2);
+  // RSP resolved from the designated primary seat at (1.75, 3.4, 1.2)
   assert.ok(bundle.rspResolvedFromSeat);
-  assert.equal(bundle.rspPosition.y, 2.8);
+  assert.equal(bundle.rspPosition.y, 3.4);
   assert.equal(bundle.rspPosition.x, 1.75);
+  assert.equal(bundle.rspPosition.z, 1.2);
 });
 
 test("pre-transfer integrity gate passes for the Room D bundle", () => {
