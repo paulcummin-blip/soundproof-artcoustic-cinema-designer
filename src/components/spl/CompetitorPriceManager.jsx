@@ -42,6 +42,7 @@ import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbCompar
 import { saveCandidatePrice } from "@/components/spl/comparisonPriceRecord";
 import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification";
 import ReadWithAdiDialog from "@/components/spl/ReadWithAdiDialog";
+import BatchReadSourcesDialog from "@/components/spl/BatchReadSourcesDialog";
 import { useAuth } from "@/lib/AuthContext";
 import SpeakerFormDialog from "@/components/admin/speaker-library/SpeakerFormDialog";
 import BulkAddSpeakersDialog from "@/components/admin/speaker-library/BulkAddSpeakersDialog";
@@ -159,6 +160,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
   const [removing, setRemoving] = useState(false);
   const [notice, setNotice] = useState("");
   const [adiCandidate, setAdiCandidate] = useState(null);
+  const [batchReadOpen, setBatchReadOpen] = useState(false);
 
   // The list is the RP22 selection list itself — the same candidate builder the
   // comparison dropdown uses, including the database products a master admin can
@@ -371,6 +373,9 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
             <button type="button" onClick={openBulk} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 9, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
               <Upload size={15} /> Add multiple
             </button>
+            <button type="button" onClick={() => setBatchReadOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 9, border: `1px solid ${BRAND.text}`, background: BRAND.text, color: "#FFF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+              <Sparkles size={15} /> Read all incomplete
+            </button>
             {notice && <div style={{ fontSize: 12, color: "#213428" }}>{notice}</div>}
           </div>
 
@@ -477,10 +482,10 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                       {sourceUrlOf(candidate) && (
                         <button
                           type="button"
-                          title={hasTechnicalValues(candidate.record) ? "Refresh with ADI" : "Read with ADI"}
+                          title={hasTechnicalValues(candidate.record) ? "Refresh from source" : "Read source"}
                           onClick={() => openReadWithAdi(candidate)}
                           style={iconBtn}
-                          aria-label={hasTechnicalValues(candidate.record) ? "Refresh with ADI" : "Read with ADI"}
+                          aria-label={hasTechnicalValues(candidate.record) ? "Refresh from source" : "Read source"}
                         ><Sparkles size={14} /></button>
                       )}
                       <button type="button" title="Edit speaker" onClick={() => openEdit(candidate)} style={iconBtn}><Pencil size={14} /></button>
@@ -543,6 +548,13 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
         candidate={adiCandidate}
         actorName={actorName}
         onSaved={reload}
+      />
+      <BatchReadSourcesDialog
+        open={batchReadOpen}
+        onClose={() => setBatchReadOpen(false)}
+        candidates={candidates}
+        actorName={actorName}
+        onApplied={async () => { const list = await reload(); return list; }}
       />
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(v) => { if (!v) { setPendingDelete(null); setRemoval(null); } }}>
         <DialogContent>

@@ -111,7 +111,7 @@ export function formFromRow(row) {
  * is written — a blank field is left as it is, never overwritten, and no
  * unrelated specification field is touched.
  */
-export function buildSpecPatch(values, today) {
+export function buildSpecPatch(values, today, adiEvidence = null) {
   const patch = {
     source_date: today,
     last_verified: today,
@@ -120,6 +120,11 @@ export function buildSpecPatch(values, today) {
     confidence: "A",
     measurement_space: values.measurement_space || "unspecified",
   };
+  // Audit trail of the last ADI source read the administrator accepted values
+  // from. Carries no engineering value; never feeds the RP22 engine.
+  if (adiEvidence && typeof adiEvidence === "object") {
+    patch.adi_source_evidence = adiEvidence;
+  }
   const authority = {};
 
   const sensitivity = numberOrNull(values.sensitivity_db);
@@ -223,13 +228,13 @@ async function currentSpecification(productId) {
  * @returns {object} { productId, specificationId, comparisonRecordId, published,
  *   readiness, missing, price, created }
  */
-export async function saveSpeakerComparison({ values, row = null, actorName }) {
+export async function saveSpeakerComparison({ values, row = null, actorName, adiEvidence = null }) {
   const typedManufacturer = String(values.manufacturer || "").trim();
   const model = String(values.model || "").trim();
   if (!typedManufacturer || !model) throw new Error("Manufacturer and speaker model are required.");
 
   const today = todayIso();
-  const { patch, authority } = buildSpecPatch(values, today);
+  const { patch, authority } = buildSpecPatch(values, today, adiEvidence);
 
   const manufacturerName = await resolveManufacturerName(typedManufacturer);
   const manufacturer = await ensureManufacturer({ name: manufacturerName, website: "" });

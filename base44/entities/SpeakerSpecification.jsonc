@@ -360,6 +360,24 @@
           "description": "Per-field source sentence each accepted value was read from, keyed by field name."
         }
       }
+    },
+    "adi_source_evidence": {
+      "type": "object",
+      "nullable": true,
+      "description": "Audit trail of the last ADI source read the administrator accepted values from: the source URL, the date checked, and the short quotation behind each accepted field. Written only when values are accepted from a 'Read source' / 'Read all incomplete' pass; never inferred. Displayed read-only inside Edit Speaker so an auditor can see exactly what ADI extracted and from where. Carries no engineering value and never feeds the RP22 engine.",
+      "properties": {
+        "source_url": {
+          "type": "string"
+        },
+        "source_date": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "object",
+          "description": "Per accepted form-field key: { quote, status, basis }.",
+          "properties": {}
+        }
+      }
     }
   },
   "required": [

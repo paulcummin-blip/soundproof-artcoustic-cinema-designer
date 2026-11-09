@@ -8,6 +8,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { base44 } from "@/api/base44Client";
 import { findRp22Gaps } from "@/components/admin/speaker-db/model-first/rp22ComparisonPublish";
 import {
   MEASUREMENT_SPACES,
@@ -60,12 +61,22 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [specEvidence, setSpecEvidence] = useState(null);
 
   useEffect(() => {
     if (!open) return;
     setValues(formFromRow(row));
     setResult(null);
     setError("");
+    // Best-effort: load the current spec to surface the ADI source-evidence
+    // audit trail (source URL, date checked, per-field quotations) for the row
+    // being edited. Never blocks the form; never changes anything.
+    setSpecEvidence(null);
+    if (row?.specificationId) {
+      base44.entities.SpeakerSpecification.get(row.specificationId)
+        .then((spec) => setSpecEvidence(spec?.adi_source_evidence || null))
+        .catch(() => setSpecEvidence(null));
+    }
   }, [open, row]);
 
   const set = (key) => (event) => setValues((prev) => ({ ...prev, [key]: event.target.value }));
@@ -217,6 +228,31 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
                 : "The comparison needs a power authority or a published maximum SPL."}
               {missing.length > 0 && <> Still needed: {missing.join(", ")}.</>}
             </div>
+          </div>
+        )}
+
+        {specEvidence && !result && (
+          <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: "10px 12px", background: BRAND.soft, fontSize: 12, color: BRAND.subtext }}>
+            <div style={{ fontWeight: 700, color: BRAND.text, marginBottom: 4, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase" }}>ADI source evidence</div>
+            {specEvidence.source_url && (
+              <div style={{ marginBottom: 4, wordBreak: "break-all" }}>
+                <a href={specEvidence.source_url} target="_blank" rel="noopener noreferrer" style={{ color: BRAND.subtext }}>{specEvidence.source_url}</a>
+                {specEvidence.source_date ? ` · checked ${specEvidence.source_date}` : ""}
+              </div>
+            )}
+            {specEvidence.fields && Object.keys(specEvidence.fields).length > 0 ? (
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                {Object.entries(specEvidence.fields).map(([key, f]) => (
+                  <li key={key} style={{ marginBottom: 3 }}>
+                    <span style={{ fontWeight: 600, color: BRAND.text }}>{key}</span>
+                    {f.status ? <span style={{ color: BRAND.hint }}> · {f.status}</span> : null}
+                    {f.quote ? <div style={{ color: BRAND.hint, fontStyle: "italic" }}>“{f.quote}”</div> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div style={{ color: BRAND.hint }}>No per-field quotations recorded.</div>
+            )}
           </div>
         )}
 
