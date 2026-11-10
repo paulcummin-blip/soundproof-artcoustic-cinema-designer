@@ -61,6 +61,7 @@ export function emptySpeakerForm() {
     power_w_min: "",
     power_basis: "amplifier",
     max_spl_db: "",
+    max_peak_spl_db: "",
     max_spl_basis: "manufacturer unspecified",
     measurement_space: "unspecified",
     price: "",
@@ -90,6 +91,7 @@ export function formFromRow(row) {
     power_w_min: hasValue(ampMin) ? ampMin : "",
     power_basis: hasValue(continuous) ? "continuous" : (hasValue(ampMax) || hasValue(record.continuous_power_w) ? "amplifier" : "amplifier"),
     max_spl_db: spec.max_continuous_spl_db ?? record.published_max_continuous_spl_db_1m ?? "",
+    max_peak_spl_db: spec.max_peak_spl_db ?? record.published_max_peak_spl_db_1m ?? "",
     max_spl_basis: SPL_BASIS_VALUES.has(spec.max_spl_basis) ? spec.max_spl_basis : "manufacturer unspecified",
     measurement_space: ["half-space", "free-space", "unspecified"].includes(spec.measurement_space)
       ? spec.measurement_space
@@ -163,6 +165,15 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
     patch.max_spl_basis = SPL_BASIS_VALUES.has(values.max_spl_basis) ? values.max_spl_basis : "manufacturer unspecified";
     authority.max_continuous_spl_db = "Official Product Page";
     authority.max_spl_basis = "Official Product Page";
+  }
+
+  // Peak SPL is kept separate from continuous — it is advisory evidence that
+  // travels with the comparison row (published_max_peak_spl_db_1m) and never
+  // drives the P12/P13 calculation.
+  const peakSpl = numberOrNull(values.max_peak_spl_db);
+  if (peakSpl !== null) {
+    patch.max_peak_spl_db = peakSpl;
+    authority.max_peak_spl_db = "Official Product Page";
   }
 
   return { patch, authority };

@@ -279,6 +279,25 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               </div>
             )}
 
+            {info.power_handling_note && (
+              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.soft }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
+                  Power handling — basis not stated
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
+                  {info.power_handling_note.value} W — {info.power_handling_note.category}
+                </div>
+                {info.power_handling_note.quote && (
+                  <div style={{ fontSize: 10, color: BRAND.hint, marginTop: 4, fontStyle: "italic" }}>
+                    “{info.power_handling_note.quote.slice(0, 160)}{info.power_handling_note.quote.length > 160 ? "…" : ""}”
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 4 }}>
+                  The source did not state the standard (continuous / RMS / IEC / AES / peak / recommended amplifier). The manufacturer wording is preserved and no basis is invented — classify it in Edit speaker if needed. A published continuous SPL remains the comparison authority.
+                </div>
+              </div>
+            )}
+
             {proposedAdequacy && (
               <div style={{ marginTop: 10, padding: "10px 12px", border: `1px solid ${proposedAdequacy.tone}33`, borderRadius: 10, background: `${proposedAdequacy.tone}08` }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: proposedAdequacy.tone }}>

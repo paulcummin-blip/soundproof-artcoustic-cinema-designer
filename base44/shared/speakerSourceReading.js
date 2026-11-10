@@ -60,6 +60,7 @@ export function compactEnumValue(value) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '')
+    .replace(/π/g, 'pi')
     .replace(/@/g, '/')
     .replace(/per/g, '/')
     .replace(/volts?/g, 'v')
@@ -80,6 +81,12 @@ export function matchEnumValue(field, raw, enums) {
     return '';
   }
   if (field === 'measurement_space') {
+    // Half Space is 2π and Full Space is 4π. Manufacturers state the solid
+    // angle directly ("2 pi", "2π", "4π") as often as they state the name, so
+    // both forms are recognised. A stated 2π must never fall through to the
+    // "assumed half space" path — it is a reported half space.
+    if (/2pi/.test(compact)) return 'half-space';
+    if (/4pi/.test(compact)) return 'free-space';
     if (/half/.test(compact)) return 'half-space';
     if (/free|full|anechoic/.test(compact)) return 'free-space';
     if (/inroom/.test(compact)) return 'in-room';

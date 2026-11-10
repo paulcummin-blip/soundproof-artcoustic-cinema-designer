@@ -27,6 +27,7 @@ export const FIELD_LABEL = {
   power_w: "Recommended amplifier max (W)",
   power_w_min: "Recommended amplifier min (W)",
   max_spl_db: "Max continuous SPL (dB)",
+  max_peak_spl_db: "Max peak SPL (dB)",
   max_spl_basis: "Max SPL basis",
   measurement_space: "Measurement space",
 };
@@ -38,6 +39,7 @@ export const PROPOSAL_FIELDS = [
   "power_w",
   "power_w_min",
   "max_spl_db",
+  "max_peak_spl_db",
   "max_spl_basis",
   "measurement_space",
 ];
@@ -47,6 +49,7 @@ const SPEC_TO_FORM = {
   sensitivity_basis: "sensitivity_reference",
   nominal_impedance_ohm: "impedance_ohm",
   max_continuous_spl_db: "max_spl_db",
+  max_peak_spl_db: "max_peak_spl_db",
   max_spl_basis: "max_spl_basis",
   measurement_space: "measurement_space",
 };
@@ -120,7 +123,13 @@ export function extractionToFound(raw) {
     { field: "rated_iec_power_w", label: "Rated IEC" },
     { field: "aes_power_w", label: "AES" },
   ];
-  const continuous = CONTINUOUS_SOURCES.find((src) => byField[src.field]);
+  // Only a REPORTED continuous-source rating is classified as continuous power.
+  // An ambiguous "Power handling" figure is surfaced separately as an advisory
+  // (info.power_handling_note) preserving the manufacturer wording — it is NOT
+  // proposed as continuous or amplifier power, so no basis is invented.
+  const continuous = CONTINUOUS_SOURCES.find(
+    (src) => byField[src.field] && byField[src.field].status === "reported",
+  );
   if (continuous) {
     const entry = byField[continuous.field];
     found.power_w = entry.value;
@@ -133,7 +142,7 @@ export function extractionToFound(raw) {
       basis: "continuous",
       category: continuous.label,
     };
-  } else if (byField.recommended_amp_max_w) {
+  } else if (byField.recommended_amp_max_w && byField.recommended_amp_max_w.status === "reported") {
     found.power_w = byField.recommended_amp_max_w.value;
     found.power_basis = "amplifier";
     info.power_w = {
@@ -158,6 +167,22 @@ export function extractionToFound(raw) {
       };
     }
   }
+  // Advisory: a "Power handling" figure the manufacturer stated without a
+  // continuous/RMS/IEC/AES/peak/recommended-amplifier qualifier. The wording is
+  // preserved but NO basis is invented — it is not proposed as continuous or
+  // amplifier power. The direct published-continuous-SPL route remains the
+  // authority when a continuous SPL exists.
+  const ambiguousPower = CONTINUOUS_SOURCES.find(
+    (src) => byField[src.field] && byField[src.field].status === "ambiguous",
+  );
+  if (ambiguousPower && !found.power_w) {
+    const entry = byField[ambiguousPower.field];
+    info.power_handling_note = {
+      value: entry.value,
+      quote: entry.quote,
+      category: "Power handling (basis not stated)",
+    };
+  }
   return { found, info };
 }
 
@@ -166,7 +191,7 @@ export function displayValue(formKey, value) {
   if (formKey === "sensitivity_reference") return labelOf(SENSITIVITY_REFERENCES, value);
   if (formKey === "measurement_space") return labelOf(MEASUREMENT_SPACES, value);
   if (formKey === "max_spl_basis") return labelOf(SPL_BASES, value);
-  if (formKey === "power_w") return `${value}`;
+  if (formKey === "power_w" || formKey === "max_peak_spl_db") return `${value}`;
   return String(value);
 }
 

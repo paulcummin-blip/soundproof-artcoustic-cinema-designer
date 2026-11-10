@@ -94,6 +94,11 @@ export function findRp22Gaps(specification) {
 
   for (const field of RP22_CRITICAL_FIELDS) {
     if (field.key === "power") {
+      // The direct published-continuous-SPL route and the sensitivity+power
+      // calculation route are independent. Power is only required for the
+      // calculation route — when a published continuous SPL exists, an
+      // undefined power standard must not block the direct-SPL comparison path.
+      if (present(spec.max_continuous_spl_db)) continue;
       if (resolvePowerAuthority(spec).value === null) critical.push(field);
       continue;
     }
