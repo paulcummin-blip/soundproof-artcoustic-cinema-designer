@@ -1912,11 +1912,36 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // seating-batch worker, placement generator/screener, electronic retune
     // and canonical confirmation. Defensively guarded: any internal failure
     // records an issue and continues — it never destabilises the run.
-    let coordinatedDiagnostics = { status: "skipped" };
+    //
+    // CROSS-QUANTITY: extracts practical Stage 1/2 finalists for 1, 2 and 4
+    // subwoofers and passes them to the coordinated search so it can discover
+    // improvements from a different subwoofer count (e.g. Room D's two-to-
+    // four-subwoofer improvement). Missing quantity finalists are reported,
+    // not invented. Each cross-quantity finalist carries its own candidate-
+    // owned design context so tuning and evidence bind to the candidate.
+    let coordinatedDiagnostics = { status: "skipped", eligible: false, skipReason: null };
     const coordinatedStarted = performance.now();
     try {
       setStageVerdict(projectId, versionId, "coordinated_physical", "skipped");
-      if (existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
+      const coordinatedEligible = !!(existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length);
+      coordinatedDiagnostics.eligible = coordinatedEligible;
+      coordinatedDiagnostics.skipReason = coordinatedEligible
+        ? null
+        : !existingAuthority ? "no_existing_authority" : "no_current_transfer";
+      if (coordinatedEligible) {
+        // ── Extract cross-quantity Stage 2 finalists (1, 2, 4 subs) ──────
+        // Only quantities that differ from the installed count and have
+        // available practical finalists are included. Missing quantities
+        // are reported in diagnostics, not invented.
+        const installedQty = (subwooferInstances || []).filter((i) => i?.enabled !== false).length;
+        const coordinatedCrossQtyFinalists = {};
+        for (const qty of [1, 2, 4]) {
+          if (qty === installedQty) continue;
+          const finalists = extractStage2Finalists(stage2Result, qty, roomDims);
+          if (finalists.length > 0) {
+            coordinatedCrossQtyFinalists[qty] = finalists.slice(0, MAX_CROSS_QUANTITY_CANDIDATES_PER_QUANTITY);
+          }
+        }
         const coordinatedCtx = {
           worker, controller, isCancelled: () => isCancelled(), isStale, metrics,
           bindConfirmation, validationContext,
@@ -1927,6 +1952,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           existingAuthority, effectiveBaseline: savedEffectiveBaseline,
           currentFinalist: buildCurrentFinalist(subwooferInstances, roomDims),
           onProgress,
+          crossQuantityFinalists: coordinatedCrossQtyFinalists,
+          installedQuantity: installedQty,
         };
         const { coordinatedCandidates, diagnostics: coordDiag } = await runCoordinatedPhysicalSearch(coordinatedCtx);
         coordinatedDiagnostics = coordDiag;
@@ -2134,6 +2161,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           phaseResult, phaseMaterial, phaseDiagnostics,
           gainResult, gainMaterial, gainDiagnostics,
           seatingResult, seatingMaterial, seatingDiagnostics,
+          coordinatedDiagnostics,
         },
         snapshot,
         confirmedResults,

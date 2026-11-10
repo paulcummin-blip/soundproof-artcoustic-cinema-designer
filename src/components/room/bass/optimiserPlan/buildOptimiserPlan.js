@@ -32,6 +32,7 @@ import {
 import { describePlacementMove } from "./placementMoveAuthority.js";
 import { subwooferGroupCounts } from "./placementPlausibilityAuthority.js";
 import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
+import { buildCoordinatedSummary } from "./coordinatedSummary.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -609,6 +610,9 @@ export function buildOptimiserPlan({
     // logs. No response arrays, curves or tuning payloads — identity + outcome
     // labels only.
     crossQuantityAudit: selection?.crossQuantityAudit || null,
+    // Phase 9B coordinated physical search summary — always present so a
+    // completed plan states what happened to Phase 9B explicitly.
+    coordinatedSummary: buildCoordinatedSummary(selection?.coordinatedDiagnostics),
   };
 }
 

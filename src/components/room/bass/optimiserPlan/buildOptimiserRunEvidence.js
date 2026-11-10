@@ -37,6 +37,7 @@ import {
   buildFamilyLedger,
 } from "./optimiserRunFamilies.js";
 import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
+import { buildCoordinatedSummary } from "./coordinatedSummary.js";
 
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -175,6 +176,9 @@ export function buildActionableOptimiserRunSummary({
     // Running the plan evaluates evidence only. Applying a lever is a separate,
     // explicit designer action.
     designUnchanged: true,
+    // Phase 9B coordinated physical search summary — always present so a
+    // completed run states what happened to Phase 9B explicitly.
+    coordinatedSummary: buildCoordinatedSummary(selection?.coordinatedDiagnostics),
   };
 }
 
@@ -470,5 +474,9 @@ export function buildOptimiserRunEvidence({
     // diagnosed from saved evidence. Identity + outcome labels only — no
     // response arrays, curves or tuning payloads.
     crossQuantityAudit: selection?.crossQuantityAudit || null,
+    // Phase 9B coordinated physical search summary — always present so a
+    // completed run states what happened to Phase 9B explicitly, whether it
+    // produced an actionable plan or not.
+    coordinatedSummary: buildCoordinatedSummary(selection?.coordinatedDiagnostics),
   };
 }
