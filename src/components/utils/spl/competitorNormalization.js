@@ -15,6 +15,10 @@ import {
   capEvidenceConfidence,
   resolveSplEvidenceSource,
 } from './splEvidenceSourceAuthority.js';
+import {
+  AMBIGUOUS_MAX_SPL_ASSUMPTION,
+  resolveMaxSplDuration,
+} from './maxSplBasisAuthority.js';
 
 export const FULL_TO_HALF_SPACE_DB = 6;
 
@@ -110,8 +114,31 @@ export function normalizeCompetitor(record) {
   // Half-space sensitivity: apply sensitivity space correction once
   const halfSensitivity = oneW !== null ? oneW + sensitivityBasis.correctionDb : null;
 
+  // --- max SPL duration authority (conservative) -------------------------
+  // The manufacturer's stated basis decides whether a published "Max SPL"
+  // figure is continuous capability or a peak / short-term figure. When the
+  // duration is not explicitly stated — and no separate peak figure
+  // distinguishes it — the figure is NEVER promoted to continuous: it is held
+  // as peak / short-term and the continuous capability falls back to the
+  // calculated value, capped at the reclassified peak (continuous can never
+  // exceed peak), so an ambiguous "Max SPL" can never increase capability.
+  const maxSplDuration = resolveMaxSplDuration(record.max_spl_test_conditions);
+  const basisIsContinuous = maxSplDuration.isContinuous;
+
   const rawContinuous = num(record.published_max_continuous_spl_db_1m);
   const rawPeak = num(record.published_max_peak_spl_db_1m);
+  const hasExplicitPeak = rawPeak !== null;
+
+  // A continuous-field figure is only continuous when the basis explicitly
+  // says so, OR the manufacturer also published a separate peak figure (so the
+  // two values were distinguished). A single ambiguous "Max SPL" with no
+  // stated duration is reclassified as peak / short-term.
+  const continuousIsGenuine = basisIsContinuous || hasExplicitPeak;
+  const continuousSourceValue = continuousIsGenuine ? rawContinuous : null;
+  const reclassifiedAsPeak = !continuousIsGenuine && rawContinuous !== null ? rawContinuous : null;
+  // The peak figure: an explicit peak field wins; otherwise the reclassified
+  // ambiguous figure is the peak authority.
+  const peakSourceValue = rawPeak !== null ? rawPeak : reclassifiedAsPeak;
 
   // Recommended amplifier range — prefer dedicated min/max fields, fall back to legacy single value
   const recAmpMin = num(record.recommended_amp_min_w);
@@ -132,12 +159,20 @@ export function normalizeCompetitor(record) {
     : powerFromAmpRecommendation !== null ? 'Manufacturer recommended amplifier maximum' : null;
 
   // Published SPL values get the max-SPL space correction applied once (independently)
-  const continuous = rawContinuous !== null ? rawContinuous + maxSplBasis.correctionDb : null;
-  const peak = rawPeak !== null ? rawPeak + maxSplBasis.correctionDb : null;
+  const continuous = continuousSourceValue !== null ? continuousSourceValue + maxSplBasis.correctionDb : null;
+  const peak = peakSourceValue !== null ? peakSourceValue + maxSplBasis.correctionDb : null;
 
   // Calculated capability uses the sensitivity space correction (already in halfSensitivity)
   const rawCalculated = oneW !== null && power !== null ? oneW + 10 * Math.log10(power) : null;
   const calculated = halfSensitivity !== null && power !== null ? halfSensitivity + 10 * Math.log10(power) : null;
+
+  // Effective continuous capability consumed by the engine. When the published
+  // figure was reclassified as peak, the continuous capability is the calculated
+  // value capped at the reclassified peak (continuous ≤ peak), so an ambiguous
+  // "Max SPL" figure can never increase capability beyond what is justified.
+  const effectiveContinuous = continuous !== null
+    ? continuous
+    : (calculated !== null && peak !== null ? Math.min(calculated, peak) : calculated);
 
   // Gradeable when either a published continuous SPL exists, or the capability can
   // be calculated from sensitivity plus a stated power authority. A row with
@@ -248,6 +283,13 @@ export function normalizeCompetitor(record) {
     halfspace_published_max_continuous_spl_db_1m: continuous,
     halfspace_published_max_peak_spl_db_1m: peak,
     halfspace_calculated_max_continuous_spl_db_1m: calculated,
+    halfspace_effective_max_continuous_spl_db_1m: effectiveContinuous,
+    max_spl_duration_key: maxSplDuration.key,
+    max_spl_duration_label: maxSplDuration.label,
+    max_spl_duration_is_continuous: maxSplDuration.isContinuous,
+    max_spl_duration_assumed: maxSplDuration.assumed,
+    max_spl_reclassified_as_peak: reclassifiedAsPeak !== null,
+    max_spl_duration_assumption: maxSplDuration.assumed ? AMBIGUOUS_MAX_SPL_ASSUMPTION : '',
     spl_authority: !eligible
       ? 'Incomplete'
       : continuous !== null ? evidenceSource.authority : 'Calculated from sensitivity + power',
@@ -286,7 +328,11 @@ export function competitorMetaForComparison(record) {
     // The stated power authority — published rating preferred, recommended
     // amplifier maximum otherwise. Never an inferred figure.
     power_handling_w: n.power_authority_w,
-    max_spl_cont_db_1m_halfspace: n.halfspace_published_max_continuous_spl_db_1m ?? n.halfspace_calculated_max_continuous_spl_db_1m,
+    // The conservative continuous authority: the published continuous figure
+    // when genuine, otherwise the calculated value capped at the reclassified
+    // peak (continuous ≤ peak), so an ambiguous "Max SPL" never increases
+    // capability beyond what is justified.
+    max_spl_cont_db_1m_halfspace: n.halfspace_effective_max_continuous_spl_db_1m,
     recommended_amp_max_w: n.recommended_amp_max_w,
     isLineSource: false,
   };

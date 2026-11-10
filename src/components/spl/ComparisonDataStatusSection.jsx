@@ -70,6 +70,19 @@ function continuousSplRow(record) {
   return textOrNull(record.published_max_continuous_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
 
+function maxSplBasisRow(record) {
+  // The conservative duration interpretation of the published max SPL figure.
+  // When the manufacturer did not state a duration, the figure is held as
+  // peak / short-term — never promoted to continuous.
+  const reclassified = record.max_spl_reclassified_as_peak === true;
+  const label = String(record.max_spl_duration_label || "").trim();
+  if (!label) return "Not stated";
+  if (reclassified || record.max_spl_duration_assumed === true) {
+    return `${label} — assumed because manufacturer did not state duration`;
+  }
+  return label;
+}
+
 function measurementBasisRow(record) {
   const basis = String(record.sensitivity_measurement_basis || record.max_spl_measurement_basis || "").trim();
   return basis || "Half Space — assumed by Sound Proof";
@@ -137,6 +150,7 @@ export default function ComparisonDataStatusSection({
     ["Nominal impedance", impedanceRow(record)],
     ["Power authority", powerAuthorityRow(record)],
     ["Continuous SPL (if published)", continuousSplRow(record)],
+    ["Max SPL basis", maxSplBasisRow(record)],
     ["Measurement basis", measurementBasisRow(record)],
   ];
 

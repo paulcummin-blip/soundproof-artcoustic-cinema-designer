@@ -143,7 +143,12 @@ test('4. Sound Proof-calculated capability is named as such and keeps the existi
 });
 
 test('5. a manufacturer figure with no stated basis is published-but-unverified, never measured', () => {
-  const row = { ...toRow(MEASURED_SPEC), max_spl_test_conditions: '', source_evidence_quality: '' };
+  // A continuous figure published ALONGSIDE a stated peak figure, but with no
+  // stated measurement standard: provenance is unverified (never measured), and
+  // the continuous figure is preserved as continuous because the manufacturer
+  // distinguished it from the stated peak. (A single ambiguous "Max SPL" with no
+  // duration is reclassified as peak / short-term — see max-spl-basis-authority.)
+  const row = { ...toRow(MEASURED_SPEC), published_max_peak_spl_db_1m: 124, max_spl_test_conditions: '', source_evidence_quality: '' };
   const n = normalizeCompetitor(row);
   assert.equal(n.spl_evidence_source, 'manufacturer_unverified');
   assert.equal(n.spl_evidence_label, 'Manufacturer Published (unstated)');

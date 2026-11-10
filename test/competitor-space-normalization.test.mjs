@@ -60,8 +60,11 @@ test('5. published Full Space max SPL → +6 dB once', () => {
 });
 
 test('6. blank/Unknown max SPL basis → assumed Half Space, 0 dB', () => {
+  // The duration basis is stated continuous so 103 is a genuine continuous
+  // figure; this test exercises the SPACE-basis assumption, not the duration
+  // reclassification (covered in max-spl-basis-authority.test.mjs).
   for (const space of [undefined, '', 'Unknown', 'Anechoic']) {
-    const n = normalizeCompetitor({ ...base, measurement_space_basis: undefined, published_max_continuous_spl_db_1m: 103, max_spl_measurement_basis: space });
+    const n = normalizeCompetitor({ ...base, measurement_space_basis: undefined, published_max_continuous_spl_db_1m: 103, max_spl_test_conditions: 'continuous', max_spl_measurement_basis: space });
     near(n.max_spl_space_correction_db, 0);
     assert.equal(n.max_spl_space_provenance, 'half_space_assumed');
     near(n.halfspace_published_max_continuous_spl_db_1m, 103);
@@ -78,14 +81,16 @@ test('7. 2.83 V / 4 Ω and Full Space conversion occur independently', () => {
 });
 
 test('8. no double +6 dB correction — idempotent on re-normalisation', () => {
-  const full = normalizeCompetitor({ ...base, sensitivity_measurement_basis: 'Full Space', max_spl_measurement_basis: 'Full Space', published_max_continuous_spl_db_1m: 103 });
+  // Duration stated continuous so the published figure is genuine continuous;
+  // this test exercises the SPACE +6 dB correction, not the duration rule.
+  const full = normalizeCompetitor({ ...base, sensitivity_measurement_basis: 'Full Space', max_spl_measurement_basis: 'Full Space', published_max_continuous_spl_db_1m: 103, max_spl_test_conditions: 'continuous' });
   const reNorm = normalizeCompetitor(full);
   near(reNorm.sensitivity_space_correction_db, 6);
   near(reNorm.max_spl_space_correction_db, 6);
   near(reNorm.halfspace_sensitivity_db_1w_1m, 96);
   near(reNorm.halfspace_published_max_continuous_spl_db_1m, 109);
   // Also check sensitivity and max-SPL are independent: Full sensitivity + Half max-SPL
-  const mixed = normalizeCompetitor({ ...base, sensitivity_measurement_basis: 'Full Space', max_spl_measurement_basis: 'Half Space', published_max_continuous_spl_db_1m: 103 });
+  const mixed = normalizeCompetitor({ ...base, sensitivity_measurement_basis: 'Full Space', max_spl_measurement_basis: 'Half Space', published_max_continuous_spl_db_1m: 103, max_spl_test_conditions: 'continuous' });
   near(mixed.sensitivity_space_correction_db, 6);
   near(mixed.max_spl_space_correction_db, 0);
   near(mixed.halfspace_sensitivity_db_1w_1m, 96);

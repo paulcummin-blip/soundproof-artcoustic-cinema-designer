@@ -99,6 +99,7 @@ test('an eligible speaker_database row is unchanged and still selected', () => {
     sensitivity_impedance_used_ohm: 8,
     continuous_power_w: 200,
     published_max_continuous_spl_db_1m: 112,
+    max_spl_test_conditions: 'continuous',
     measurement_space_basis: 'Half Space',
     sensitivity_measurement_basis: 'Half Space',
     max_spl_measurement_basis: 'Half Space',

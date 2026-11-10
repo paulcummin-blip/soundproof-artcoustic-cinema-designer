@@ -32,7 +32,7 @@ export const DATA_ADEQUACY = Object.freeze({
     label: "GOOD DATA",
     short: "GOOD",
     tone: "#9A6E00",
-    meaning: "Sufficient manufacturer information for a useful, defensible P12/P13 calculation, but some ambiguity or controlled assumption remains (e.g. measurement space not stated, sensitivity normalised, power terminology less rigorously defined, or manufacturer-calculated capability).",
+    meaning: "Sufficient manufacturer information for a useful, defensible P12/P13 calculation, but some ambiguity or controlled assumption remains (e.g. max SPL duration not stated so the figure is held as peak / short-term, measurement space not stated, sensitivity normalised, power terminology less rigorously defined, or manufacturer-calculated capability).",
   },
   INCOMPLETE: {
     key: "INCOMPLETE",
@@ -60,6 +60,14 @@ export function classifyDataAdequacy(record) {
     && record.max_spl_space_provenance !== "half_space_assumed";
   const basisConfirmed = record.sensitivity_reference === "1W/1m"
     || record.sensitivity_reference === "2.83V/1m";
+
+  // Transparency rule: a manufacturer that did not state the duration of its
+  // published "Max SPL" has not published enough transparent information to be
+  // compared on the same basis as Artcoustic. The figure is held as
+  // peak / short-term (never promoted to continuous), so the row can never
+  // qualify as FULL DATA. (A reclassified record arrives here with its
+  // published continuous already nulled, so this guard is belt-and-braces.)
+  if (record.max_spl_duration_assumed === true) return DATA_ADEQUACY.GOOD;
 
   // FULL requires published measured capability AND no controlled assumptions
   // behind the space or the sensitivity basis.

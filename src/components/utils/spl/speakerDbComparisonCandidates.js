@@ -35,6 +35,7 @@ import { installedSpaceAssumptionForRow } from "@/components/utils/spl/installed
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { selectComparisonLibraryRows } from "./competitorSpreadsheetImport.js";
 import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification.js";
+import { AMBIGUOUS_MAX_SPL_ASSUMPTION } from "@/components/utils/spl/maxSplBasisAuthority.js";
 import {
   documentTypeLabel,
   evidenceBadgeLabel,
@@ -112,6 +113,10 @@ export function classifyComparisonRow(row) {
   if (assumedSensitivityBasis) assumptions.push(ASSUMED_SENSITIVITY_BASIS);
   const spaceAssumption = installedSpaceAssumptionForRow(record);
   if (spaceAssumption.applied) assumptions.push(spaceAssumption.note);
+  // Conservative max-SPL basis: when the manufacturer did not state a duration,
+  // the published "Max SPL" is held as peak / short-term and never promoted to
+  // continuous. The assumption is stated wherever the comparison is shown.
+  if (record.max_spl_duration_assumed) assumptions.push(AMBIGUOUS_MAX_SPL_ASSUMPTION);
 
   const eligible = record.p12_p13_eligible === true;
   const gradedFromPublished = record.halfspace_published_max_continuous_spl_db_1m != null;
