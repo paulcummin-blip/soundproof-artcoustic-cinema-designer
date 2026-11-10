@@ -57,6 +57,7 @@ import { computeProxyCandidateMetrics } from "./proxyCandidateMetrics.js";
 import { isSamePlacement } from "./improveBassV2Engine.js";
 import { retuneFullCalibration, confirmCombinedCandidate } from "./combinedOptimisationSearch.js";
 import { selectDiverseSeatingStates } from "./coordinatedDiversityPolicy.js";
+import { selectQuantityAwarePlacements } from "./coordinatedPlacementSelection.js";
 import { buildCandidateDesignContext, validationContextForCandidate } from "./candidateDesignContext.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
@@ -93,10 +94,17 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     installedQuantity: null,
     quantityCoverage: {},
     missingQuantities: [],
+    quantityAvailableCounts: {},
+    quantityEligibleCounts: {},
+    quantityRetainedCounts: {},
+    quantityExcludedByCap: {},
+    placementsAvailable: {},
+    placementsEligible: {},
+    placementsRetained: [],
+    placementsExcludedByCap: [],
     seatingOffsetsConsidered: 0,
     seatingStatesRetained: [],
     placementsGenerated: 0,
-    placementsRetained: [],
     combosEvaluated: 0,
     proxyScreened: [],
     survivors: [],
@@ -183,10 +191,21 @@ export async function runCoordinatedPhysicalSearch(ctx) {
   });
   diagnostics.placementsGenerated = placements.generated;
   diagnostics.placementsRetained = placements.retained.map((p) => ({
-    id: p.id, phase: p.phase, quantity: p.quantity, coordinates: p.coordinates,
+    id: p.id, phase: p.phase, quantity: p.quantity,
+    familyId: p.familyId || null, coordinates: p.coordinates,
   }));
   diagnostics.quantityCoverage = placements.quantityCoverage;
   diagnostics.missingQuantities = placements.missingQuantities;
+  diagnostics.quantityAvailableCounts = placements.availableCounts || {};
+  diagnostics.quantityEligibleCounts = placements.eligibleCounts || {};
+  diagnostics.quantityRetainedCounts = placements.quantityCoverage || {};
+  diagnostics.quantityExcludedByCap = placements.excludedByCap || [];
+  diagnostics.placementsAvailable = placements.availableCounts || {};
+  diagnostics.placementsEligible = placements.eligibleCounts || {};
+  diagnostics.placementsExcludedByCap = (placements.excludedByCap || []).map((p) => ({
+    id: p.id, quantity: p.quantity, familyId: p.familyId || null,
+    coordinates: p.coordinates, exclusionReason: p.exclusionReason || "cap_exceeded",
+  }));
 
   if (placements.retained.length === 0) {
     diagnostics.status = "no_legal_placements";
@@ -434,12 +453,23 @@ function injectCandidateSourceIds(finalist, designContext) {
 /**
  * Gather topology-diverse, practical sub placements from BOTH the installed
  * quantity (via existing placement screening) and cross-quantity Stage 1/2
- * finalists (where available). Dedupes against the installed layout and
- * against itself, bounds to COORDINATED_MAX_PLACEMENTS.
+ * finalists (where available). Builds per-quantity buckets of ALL eligible
+ * placements first, then delegates the shared cap to the quantity-aware
+ * selection policy (coordinatedPlacementSelection.js) so the installed
+ * quantity does not exhaust the cap before cross-quantity finalists are
+ * considered.
  *
- * Returns { generated, retained, quantityCoverage, missingQuantities }.
- * quantityCoverage: { 1: count, 2: count, 4: count } — placements retained per quantity.
- * missingQuantities: quantities in supportedQuantities that had no finalists available.
+ * Returns {
+ *   generated, retained, quantityCoverage, missingQuantities,
+ *   availableCounts, eligibleCounts, excludedByCap,
+ * }.
+ *
+ * Diagnostics contract:
+ *   availableCounts  — finalists available per quantity (before eligibility/dedup).
+ *   eligibleCounts   — placements that passed physical eligibility + dedup.
+ *   quantityCoverage — placements RETAINED per quantity (after the cap).
+ *   missingQuantities — supported quantities with no available finalists.
+ *   excludedByCap    — eligible placements cut by the cap, with reason.
  */
 function gatherDiversePlacements({
   subwooferInstances, roomDims, selectedSubModel,
@@ -468,14 +498,20 @@ function gatherDiversePlacements({
     };
   } catch { /* registry lookup failed — use defaults */ }
 
-  const byCoord = new Map();
-  const quantityCoverage = {};
-  const missingQuantities = [];
-
-  // ── Installed-quantity placements via existing screening ──────────────
   const installedQty = Number.isFinite(Number(installedQuantity))
     ? Number(installedQuantity)
     : activeInstances.length;
+
+  // Per-quantity buckets of eligible placements. Each entry is a descriptor
+  // carrying the identity the selection policy needs (quantity, family,
+  // coordinates) plus the finalist + designContext the engine consumes later.
+  const buckets = {};
+  for (const q of supportedQuantities) buckets[q] = [];
+
+  // ── Installed-quantity placements via existing screening ──────────────
+  // Collected WITHOUT applying the cap — the cap is applied across all
+  // quantities by the selection policy.
+  let generated = 0;
   if (installedQty > 0) {
     const phases = ["symmetric", "asymmetric-pair", "individual"];
     for (const phase of phases) {
@@ -488,45 +524,40 @@ function gatherDiversePlacements({
       } catch {
         continue;
       }
+      generated += phaseResult?.funnel?.generated || 0;
       for (const c of phaseResult?.promoted || []) {
         if (!c?.finalist?.sources?.length) continue;
         if (isSamePlacement(c.finalist, currentFinalist, roomDims)) continue;
         const key = coordKey(c.finalist, roomDims);
-        if (byCoord.has(key)) continue;
-        byCoord.set(key, {
+        const existing = buckets[installedQty].find((p) => p._coordKey === key);
+        if (existing) continue;
+        buckets[installedQty].push({
           id: c.id,
           phase,
           quantity: installedQty,
+          familyId: c.finalist.familyId || phase,
           finalist: { id: c.id, familyId: c.finalist.familyId, sources: c.finalist.sources },
           coordinates: c.coordinates,
           designContext: null,
+          _coordKey: key,
         });
-        if (byCoord.size >= COORDINATED_MAX_PLACEMENTS) break;
       }
-      if (byCoord.size >= COORDINATED_MAX_PLACEMENTS) break;
     }
-    quantityCoverage[installedQty] = byCoord.size;
   }
 
   // ── Cross-quantity placements from existing Stage 1/2 finalists ───────
-  // Use only quantities that differ from the installed count and that have
-  // available finalists. Each finalist gets a candidate-owned design context.
+  // Collected WITHOUT applying the cap. Each finalist gets a candidate-owned
+  // design context.
   for (const qty of supportedQuantities) {
     if (qty === installedQty) continue;
     const finalists = Array.isArray(crossQuantityFinalists?.[qty])
       ? crossQuantityFinalists[qty]
       : [];
-    if (finalists.length === 0) {
-      missingQuantities.push(qty);
-      continue;
-    }
-    let added = 0;
     for (const finalist of finalists) {
       if (!finalist?.sources?.length) continue;
-      if (byCoord.size >= COORDINATED_MAX_PLACEMENTS) break;
       const key = coordKey(finalist, roomDims);
-      if (byCoord.has(key)) continue;
-      // Build candidate-owned design context for this finalist.
+      // Dedup within this bucket and against the installed bucket.
+      if (buckets[qty].some((p) => p._coordKey === key)) continue;
       const designContext = buildCandidateDesignContext({
         finalistId: finalist.id,
         quantity: qty,
@@ -538,47 +569,48 @@ function gatherDiversePlacements({
         crossover: null,
         autoAlignEnabled: true,
       });
-      byCoord.set(key, {
+      buckets[qty].push({
         id: finalist.id,
         phase: "cross-quantity",
         quantity: qty,
+        familyId: finalist.familyId || "cross-quantity",
         finalist: { id: finalist.id, familyId: finalist.familyId || "cross-quantity", sources: finalist.sources },
         coordinates: finalist.coordinates || [],
         designContext,
+        _coordKey: key,
       });
-      added++;
     }
-    quantityCoverage[qty] = (quantityCoverage[qty] || 0) + added;
-    if (byCoord.size >= COORDINATED_MAX_PLACEMENTS) break;
   }
 
-  // generated counts all screened candidates from the installed-quantity
-  // phases (the cross-quantity finalists are pre-screened by Stage 1/2).
-  let generated = 0;
-  // Re-run the phases just to count generated (cheap — no transfer work).
-  // This is a diagnostic counter only; it does not affect the search.
-  if (installedQty > 0) {
-    for (const phase of ["symmetric", "asymmetric-pair", "individual"]) {
-      try {
-        const pr = runPositionScreenPhase(
-          phase, currentPositions, roomDims, cabinetDims,
-          seatingPositions, rspPosition, subwooferBottomHeightM, groups,
-        );
-        generated += pr?.funnel?.generated || 0;
-      } catch { /* skip */ }
-    }
-  }
   // Add cross-quantity finalist count to generated.
   for (const qty of supportedQuantities) {
     if (qty === installedQty) continue;
     generated += (crossQuantityFinalists?.[qty] || []).length;
   }
 
+  // ── Quantity-aware cap across ALL buckets ────────────────────────────
+  // The selection policy interleaves one placement per quantity per round,
+  // preferring family diversity within each quantity, so the installed
+  // quantity is represented but does not occupy every slot.
+  const selection = selectQuantityAwarePlacements({
+    buckets,
+    installedQuantity: installedQty,
+    max: COORDINATED_MAX_PLACEMENTS,
+    supportedQuantities,
+  });
+
+  // Strip the internal _coordKey before returning.
+  const retained = selection.retained.map(({ _coordKey, ...rest }) => rest);
+  const excludedByCap = selection.excludedByCap.map(({ _coordKey, ...rest }) => rest);
+
   return {
     generated,
-    retained: Array.from(byCoord.values()),
-    quantityCoverage,
-    missingQuantities,
+    retained,
+    quantityCoverage: selection.quantityCoverage,
+    missingQuantities: selection.missingQuantities,
+    availableCounts: selection.availableCounts,
+    eligibleCounts: selection.eligibleCounts,
+    excludedByCap,
   };
 }
 

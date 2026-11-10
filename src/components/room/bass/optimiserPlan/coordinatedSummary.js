@@ -53,6 +53,16 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
     missingQuantities: Array.isArray(coordinatedDiagnostics.missingQuantities)
       ? coordinatedDiagnostics.missingQuantities
       : [],
+    // Explicit quantity coverage — distinguishes available (existed
+    // upstream), eligible (passed physical eligibility + dedup), retained
+    // (survived the cap) and excluded (cut by the cap). A quantity is NOT
+    // reported as covered merely because finalists existed upstream.
+    quantityAvailableCounts: coordinatedDiagnostics.quantityAvailableCounts || {},
+    quantityEligibleCounts: coordinatedDiagnostics.quantityEligibleCounts || {},
+    quantityRetainedCounts: coordinatedDiagnostics.quantityRetainedCounts || {},
+    placementsExcludedByCap: Array.isArray(coordinatedDiagnostics.placementsExcludedByCap)
+      ? coordinatedDiagnostics.placementsExcludedByCap
+      : [],
     // Search funnel — counts only, never summed.
     seatingOffsetsConsidered: Number(coordinatedDiagnostics.seatingOffsetsConsidered) || 0,
     seatingStatesRetained: Array.isArray(coordinatedDiagnostics.seatingStatesRetained)
