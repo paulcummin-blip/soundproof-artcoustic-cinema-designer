@@ -144,7 +144,7 @@ describe("coordinated candidate pre-confirm handoff — evaluator reuse", () => 
       };
       return ctx;
     })();
-    const bundle = buildRoomDBundle({ integrationContext, responseBasis: "combined-lcr-sub" });
+    const bundle = buildRoomDBundle({ integrationContext, responseBasis: "combined-lcr-sub", p14Target: ROOM_D_P14_TARGET });
     const built = buildCandidateTransfer({ bundle, roomDims: ROOM_D_DIMS, amplifierPowerPerSubW: 500 });
     assert.equal(built.status, "built");
     const gate = checkPreConfirmIntegrity(bundle, built.transfer);
@@ -209,6 +209,7 @@ describe("coordinated candidate pre-confirm handoff — end-to-end acceptance", 
       amplifierPowerPerSubW: 500,
       savedSeating,
       requireCombined: true,
+      p14Target: ROOM_D_P14_TARGET,
     });
 
     // The acceptance boundary: pre-transfer PASS, pre-confirmation PASS,
