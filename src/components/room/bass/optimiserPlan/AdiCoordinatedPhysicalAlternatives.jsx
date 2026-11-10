@@ -272,10 +272,13 @@ function AlternativeCard({ alt, index }) {
 
 export default function AdiCoordinatedPhysicalAlternatives({
   coordinatedSummary = null,
-  currentPerSeatP20 = [],
   className = "",
 }) {
-  const alternatives = selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary, currentPerSeatP20);
+  // Uses only the candidate-owned saved evidence — no current live seating
+  // values. The staleness gate (shouldShowCoordinatedAlternatives) is
+  // checked by the parent before rendering this component, so historical
+  // evidence from a stale plan never reaches here.
+  const alternatives = selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary);
   if (alternatives.length === 0) return null;
 
   return (

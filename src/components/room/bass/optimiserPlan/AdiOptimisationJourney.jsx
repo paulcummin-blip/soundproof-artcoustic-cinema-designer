@@ -96,6 +96,7 @@ import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 import ReoptimiseCalibrationAction from "./ReoptimiseCalibrationAction.jsx";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
+import { shouldShowCoordinatedAlternatives } from "./coordinatedPhysicalAlternativePresentation.js";
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
 import {
@@ -121,7 +122,6 @@ import { buildElectronicTimingRows } from "@/components/room/bass/electronicSafe
 import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiCoordinatedPhysicalAlternatives from "./AdiCoordinatedPhysicalAlternatives.jsx";
-import { readAuthoritativeP20Seats } from "./optimiserPlanMetrics.js";
 import { buildOptimiserPanelHierarchy } from "./optimiserPanelHierarchy.js";
 import { useOptimiserDeveloperDiagnostics } from "./useOptimiserDeveloperDiagnostics.js";
 import { presentationThemeState, resolveAdiJourneyTheme } from "./adiJourneyTheme.js";
@@ -1209,11 +1209,15 @@ export default function AdiOptimisationJourney({
           winner: they appear whether or not a calibration improvement was found,
           and nothing here is auto-applied. The designer reviews each option and
           acts manually in the Room Designer. Suppressed while a fresh run is in
-          flight and when the saved plan is stale. */}
-      {!freshRunActive && !isRunning && planView?.coordinatedSummary && (
+          flight and when the saved plan is stale — the plan-freshness authority
+          (resolveOptimiserPlanStatus) gates this, so a physical recommendation
+          calculated for an earlier room configuration never remains visible
+          after the designer changes seating, subwoofer positions, quantity or
+          RSP authority. The card uses only candidate-owned saved evidence — no
+          current live seating values are mixed in. */}
+      {!freshRunActive && !isRunning && shouldShowCoordinatedAlternatives(planView) && (
         <AdiCoordinatedPhysicalAlternatives
           coordinatedSummary={planView.coordinatedSummary}
-          currentPerSeatP20={readAuthoritativeP20Seats(completedBassAuthority)}
         />
       )}
 

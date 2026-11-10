@@ -240,7 +240,10 @@ test("selectEligiblePhysicalAlternativesFromSummary surfaces only eligible candi
   const primary = presentations[0].perSeatP20Comparisons[0];
   assert.equal(primary.seatId, "seat-r1-c2");
   assert.equal(primary.isPrimary, true);
-  assert.equal(primary.beforeVariationDb, 4.8);
+  // Before values are null — only candidate-owned evidence is used, not
+  // current live seating values.
+  assert.equal(primary.beforeVariationDb, null);
+  assert.equal(primary.beforeLevel, null);
   assert.equal(primary.afterVariationDb, 2.5);
   assert.equal(primary.afterLevel, 3);
 });

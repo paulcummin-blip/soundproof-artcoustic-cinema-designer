@@ -12,8 +12,43 @@
 // Those checks run in selectConfirmedRecommendations; this module reads their
 // outcome from the selection.evaluations array and the coordinated summary.
 //
+// FRESHNESS: coordinated alternatives are only presented when the saved
+// optimiser plan is confirmed current for the active design. The plan-freshness
+// authority is resolveOptimiserPlanStatus — this module reads its `status`
+// field and never computes a second fingerprint. A stale, absent, unsupported,
+// failed or incomplete plan never surfaces physical recommendations, even when
+// historical coordinatedSummary evidence is present.
+//
 // This module is a pure reader: it reformats persisted evidence, it evaluates
 // nothing, and it changes no bass maths, ranking or grading.
+
+import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
+
+/**
+ * The plan statuses that confirm the saved evaluation belongs to the active
+ * design and completed successfully. Only these may surface coordinated
+ * physical alternatives. Terminal failure/incomplete states and stale/absent/
+ * unsupported states are excluded — a failed or stale run's historical evidence
+ * is never presented as current advice.
+ */
+const CURRENT_PLAN_STATUSES = new Set([
+  OPTIMISER_PLAN_STATUS.CURRENT,
+  OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT,
+  OPTIMISER_PLAN_STATUS.NON_ACTIONABLE_WINNER,
+]);
+
+/**
+ * Decide whether coordinated physical alternatives should be presented for the
+ * given resolved plan view. Reuses the existing plan-freshness authority
+ * (resolveOptimiserPlanStatus) — never computes a second fingerprint.
+ *
+ * @param {object|null} planView - resolved plan view from useOptimiserPlanView
+ * @returns {boolean}
+ */
+export function shouldShowCoordinatedAlternatives(planView) {
+  if (!planView?.coordinatedSummary) return false;
+  return CURRENT_PLAN_STATUSES.has(planView?.status);
+}
 
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -229,24 +264,27 @@ function assessReproducibility(confirmed) {
  * @param {Array} [currentPerSeatP20] — current published per-seat P20 rows
  * @returns {Array} presentation data for eligible, reproducible alternatives
  */
-export function selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary, currentPerSeatP20 = []) {
+export function selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary, currentPerSeatP20) {
+  // currentPerSeatP20 (live values) is no longer used: the per-seat P20
+  // comparison uses only the candidate's own saved evidence. Live values
+  // from the current bass authority can diverge from the evaluation
+  // baseline after the design changes, so mixing them with historical
+  // candidate results is unsafe. The "before" column is left null — the
+  // card states only what the candidate-owned evidence carries.
+  void currentPerSeatP20;
   if (!coordinatedSummary || !Array.isArray(coordinatedSummary.confirmedCandidates)) return [];
-  const currentBySeat = new Map(
-    (Array.isArray(currentPerSeatP20) ? currentPerSeatP20 : [])
-      .map((s) => [String(s?.seatId ?? ""), s]),
-  );
   const presentations = [];
   for (const confirmed of coordinatedSummary.confirmedCandidates) {
     if (confirmed?.physicalAlternativeEligible !== true) continue;
     const reproducibility = assessReproducibility(confirmed);
     if (!reproducibility.reproducible) continue;
-    const presentation = buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySeat);
+    const presentation = buildPhysicalAlternativePresentationFromSummary(confirmed);
     if (presentation) presentations.push(presentation);
   }
   return presentations;
 }
 
-function buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySeat) {
+function buildPhysicalAlternativePresentationFromSummary(confirmed) {
   if (!confirmed) return null;
   const candidateId = confirmed.candidateId || null;
   const placementId = confirmed.placementId || null;
@@ -259,13 +297,17 @@ function buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySea
   const p19VariationDb = num(confirmed.p19VariationDb);
   const perSeatP20 = Array.isArray(confirmed.perSeatP20) ? confirmed.perSeatP20 : [];
 
+  // Per-seat P20 comparison using ONLY the candidate's own saved evidence.
+  // The "before" (baseline) column is null — we do not mix in current live
+  // seating values, which may not match the evaluation baseline after the
+  // design changes. The card states only what the candidate-owned evidence
+  // carries.
   const seatComparisons = perSeatP20.map((seat) => {
-    const before = currentBySeat.get(String(seat.seatId));
     return {
       seatId: seat.seatId,
       isPrimary: Boolean(seat.isPrimary),
-      beforeLevel: before?.level ?? null,
-      beforeVariationDb: num(before?.variationDbRaw ?? before?.wholeDbDeviation),
+      beforeLevel: null,
+      beforeVariationDb: null,
       afterLevel: seat.level ?? null,
       afterVariationDb: num(seat.variationDbRaw),
       worstFrequencyHz: num(seat.worstFrequencyHz),
