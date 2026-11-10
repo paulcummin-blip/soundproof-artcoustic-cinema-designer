@@ -544,7 +544,7 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                       {(() => {
                         const s = classifyDataAdequacy(candidate.record);
                         return (
-                          <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", padding: "2px 7px", borderRadius: 999, background: `${s.tone}14`, color: s.tone, whiteSpace: "nowrap" }} title={s.meaning || s.label}>{s.short}</span>
+                          <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", padding: "2px 7px", borderRadius: 999, background: `${s.tone}14`, color: s.tone, whiteSpace: "nowrap" }} title={s.meaning || s.label}>{s.label}</span>
                         );
                       })()}
                     </div>

@@ -101,17 +101,14 @@ export function priceText(row) {
  * P12/P13 result yet.
  */
 export function dataStatus(row) {
-  if (!row || (!row.readiness && !row.record)) return { label: "INCOMPLETE", tone: "#B23A3A" };
-  if (row.readiness) {
-    const confidence = String(row.readiness.confidence || "").toUpperCase();
-    if (confidence === "A") return { label: "FULL", tone: "#213428" };
-    if (confidence === "B") return { label: "GOOD", tone: "#9A6E00" };
-    return { label: "INCOMPLETE", tone: "#B23A3A" };
+  if (!row || (!row.readiness && !row.record)) return { label: "INCOMPLETE DATA", tone: "#B23A3A" };
+  // ONE authority: the adequacy classification the RP22 comparison row and the
+  // admin Manage Competitor Speakers table already use. The library table can
+  // never show a different word from the comparison.
+  if (row.readiness?.adequacy) {
+    return { label: row.readiness.adequacy.label, tone: row.readiness.adequacy.tone };
   }
-  const stored = String(row.record?.data_confidence || "").toUpperCase();
-  if (stored === "A") return { label: "FULL", tone: "#213428" };
-  if (stored === "B") return { label: "GOOD", tone: "#9A6E00" };
-  return { label: "INCOMPLETE", tone: "#B23A3A" };
+  return { label: "INCOMPLETE DATA", tone: "#B23A3A" };
 }
 
 /** The source URL for this row — the official product page or the stored source. */

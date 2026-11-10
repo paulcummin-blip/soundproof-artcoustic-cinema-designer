@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Info } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
@@ -15,7 +15,8 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
-import ComparisonDataQualitySection from "@/components/spl/ComparisonDataQualitySection";
+import SpeakerInfo from "@/components/spl/SpeakerInfo";
+import ComparisonDataStatusSection from "@/components/spl/ComparisonDataStatusSection";
 import CompetitorPriceManager from "@/components/spl/CompetitorPriceManager";
 
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
@@ -185,126 +186,6 @@ function artcousticInfoRows(speaker, price, result = null) {
     ["Graded from", "Calculated SPL at RSP, whole dB"],
     ["Source", "Canonical Sound Proof speaker registry"],
   ];
-}
-
-function competitorInfoRows(record, result = null, candidate = null) {
-  if (!record) return [];
-  const debug = result?.debug || null;
-  const recAmpRange = (record.recommended_amp_min_w != null || record.recommended_amp_max_w != null)
-    ? `${record.recommended_amp_min_w != null ? `${record.recommended_amp_min_w}–` : ""}${record.recommended_amp_max_w ?? ""} W`
-    : infoValue(record.recommended_amplifier_power_w, " W");
-  const limitingFactor = debug
-    ? (debug.spl1mCappedDb != null && debug.maxContinuousSplCapDb != null && debug.spl1mCappedDb === debug.maxContinuousSplCapDb
-      ? "Published continuous SPL"
-      : debug.availablePowerW != null && debug.ampPowerW != null && debug.availablePowerW < debug.ampPowerW
-        ? "Power limited (continuous/rec amp)"
-        : "Amplifier power")
-    : "—";
-  // What this comparison is still missing, stated rather than implied.
-  const missingFields = [
-    ...(record.normalization_warnings || []),
-    !numeric(record.continuous_power_w) ? "Published power rating" : null,
-    !numeric(record.published_max_continuous_spl_db_1m) ? "Published max SPL" : null,
-    !String(record.sensitivity_measurement_basis || "").trim() ? "Sensitivity measurement basis" : null,
-    !String(record.max_spl_measurement_basis || "").trim() ? "Max SPL measurement basis" : null,
-  ].filter(Boolean);
-  const secondary = candidate?.secondaryEvidence || record.secondary_evidence || null;
-  return [
-    ...(secondary ? [
-      ["Official source status", secondary.is_official ? "Official manufacturer host" : "Not on the official manufacturer domain"],
-      ["Secondary evidence URL", secondary.url || "—"],
-      ["Secondary evidence host", secondary.host || "—"],
-      ["Secondary document type", secondary.document_type_label || secondary.document_type || "—"],
-      ["Accepted by", `${secondary.accepted_by || "—"}${secondary.accepted_date ? ` · ${new Date(secondary.accepted_date).toLocaleDateString("en-GB")}` : ""}`],
-      ["Confidence cap reason", secondary.confidence_cap_reason || "—"],
-    ] : []),
-    ["Manufacturer", record.manufacturer],
-    ["Model", record.model],
-    ["Product type", record.product_type],
-    ["Retail inc VAT", formatPrice(numeric(record.retail_price_inc_vat))],
-    ["Sensitivity source", `${infoValue(record.sensitivity_value_db, " dB")} @ ${record.sensitivity_reference || "—"}`],
-    ["Sensitivity source basis", record.sensitivity_measurement_basis || "Unstated → assumed Half Space"],
-    ["Normalised sensitivity (1W/1m, half-space)", infoValue(record.halfspace_sensitivity_db_1w_1m, " dB")],
-    ["Continuous power", infoValue(record.continuous_power_w, " W")],
-    ["Recommended amp range", recAmpRange],
-    ["Published continuous SPL", infoValue(record.published_max_continuous_spl_db_1m, " dB")],
-    ["Published SPL source basis", record.max_spl_measurement_basis || "Unstated → assumed Half Space"],
-    ["Normalised continuous SPL (half-space)", infoValue(record.halfspace_published_max_continuous_spl_db_1m ?? record.halfspace_calculated_max_continuous_spl_db_1m, " dB")],
-    ["Power authority", record.power_authority || "—"],
-    ["Power authority figure", infoValue(record.power_authority_w, " W")],
-    ["Capability basis", record.capability_basis || "—"],
-    ["Capability source", record.spl_evidence_label || "—"],
-    ["Evidence quality", record.source_evidence_quality || record.evidence_quality || "—"],
-    ["Evidence standing", evidenceStanding(record)],
-    ["Confidence class", candidate ? `${candidate.confidence} · ${candidate.label}` : "—"],
-    ["Basis", candidate ? candidate.basisLabel : "—"],
-    ["Approval status", candidate?.statusLabel || record.approval_status || "—"],
-    ["Values used", candidate?.valuesUsed || "—"],
-    ["Values assumed", candidate && candidate.assumptions.length > 0 ? candidate.assumptions.join(" · ") : "None — published values only"],
-    ["Comparable to Artcoustic", candidate?.comparable
-      ? `Yes — ${candidate.parityNote}`
-      : "No — insufficient published data for a P12/P13 estimate"],
-    ["Source URL", record.source_url || "—"],
-    ["Fields used", record.data_confidence === "A"
-      ? "Published max SPL, power authority, sensitivity, impedance, measurement space"
-      : record.data_confidence === "C"
-        ? "Published sensitivity and stated power authority only — partial manufacturer data"
-        : "Published sensitivity, impedance and power authority"],
-    ["Fields missing", missingFields.join(" · ") || "None recorded"],
-    ["Calculated SPL at RSP", infoValue(result?.designSpl ?? result?.rawSpl, " dB")],
-    ["Graded from", "Calculated SPL at RSP, whole dB"],
-    ["User amplifier", debug ? `${Math.round(debug.ampPowerW)} W` : "—"],
-    ["Effective amplifier used", debug ? `${Math.round(debug.availablePowerW)} W` : "—"],
-    ["Final limiting factor", limitingFactor],
-    ["SPL authority", record.spl_authority || "—"],
-    ["Data confidence", record.data_confidence || "—"],
-    ["Verification status", record.approval_status || "Spreadsheet import"],
-    ["Date checked", record.date_checked || "—"],
-    ["Notes", record.notes || "—"],
-  ];
-}
-
-function SpeakerInfo({ rows, sourceUrl = null, datasheetUrl = null, dataQuality = null }) {
-  const [open, setOpen] = useState(false);
-  if (!Array.isArray(rows) || rows.length === 0) return <div />;
-  return (
-    <div
-      style={{ position: "relative", display: "inline-flex", justifyContent: "center" }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <button
-        type="button"
-        aria-label="Show source speaker data"
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={() => setOpen((v) => !v)}
-        style={{ width: 26, height: 26, borderRadius: 999, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.hint, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
-      >
-        <Info size={14} />
-      </button>
-      {open && (
-        <div style={{ position: "absolute", zIndex: 100, right: 0, top: 32, width: 390, maxHeight: 500, overflowY: "auto", background: "#FFF", border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: 14, boxShadow: "0 12px 30px rgba(0,0,0,0.14)", color: BRAND.text }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Published / comparison data</div>
-          {dataQuality}
-          <div style={{ display: "grid", gap: 0 }}>
-            {rows.map(([label, value], idx) => (
-              <div key={`${label}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 10, padding: "6px 0", borderTop: idx === 0 ? 0 : `1px solid ${BRAND.soft}`, fontSize: 11, lineHeight: 1.35 }}>
-                <div style={{ color: BRAND.subtext }}>{label}</div>
-                <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{value || "—"}</div>
-              </div>
-            ))}
-          </div>
-          {(sourceUrl || datasheetUrl) && (
-            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BRAND.border}`, display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11 }}>
-              {sourceUrl && <a href={sourceUrl} target="_blank" rel="noreferrer" style={{ color: BRAND.hint, textDecoration: "underline" }}>Manufacturer source</a>}
-              {datasheetUrl && <a href={datasheetUrl} target="_blank" rel="noreferrer" style={{ color: BRAND.hint, textDecoration: "underline" }}>Datasheet</a>}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function SpeakerRow({ eyebrow, name, price, result, accent = false, note = null, dataNoteRecord = null, onRemove = null, infoRows = null, sourceUrl = null, datasheetUrl = null }) {
@@ -679,7 +560,7 @@ export default function SPLCalculatorPage() {
                         </select>
                         {candidate && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                            <span title="Open source data for the figures and assumptions used" style={{ fontSize: 11, fontWeight: 700, color: candidate.badgeLabel === "Good Data" ? "#213428" : "#9A6E00" }}>{candidate.badgeLabel}</span>
+                            <span title="Open source data for the figures and assumptions used" style={{ fontSize: 11, fontWeight: 700, color: candidate.adequacy?.tone || "#9A6E00" }}>{candidate.badgeLabel}</span>
                           </div>
                         )}
                       </div>
@@ -690,10 +571,15 @@ export default function SPLCalculatorPage() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
                         {record && (
                           <SpeakerInfo
-                            rows={competitorInfoRows(record, item?.result, candidate)}
-                            sourceUrl={candidate?.sourceUrl || record.source_url}
-                            datasheetUrl={candidate?.datasheetUrl || record.datasheet_url}
-                            dataQuality={<ComparisonDataQualitySection record={record} badgeLabel={candidate?.badgeLabel} />}
+                            dataQuality={
+                              <ComparisonDataStatusSection
+                                record={record}
+                                candidate={candidate}
+                                price={formatPrice(numeric(record?.retail_price_inc_vat))}
+                                sourceUrl={candidate?.sourceUrl || record.source_url}
+                                datasheetUrl={candidate?.datasheetUrl || record.datasheet_url}
+                              />
+                            }
                           />
                         )}
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>

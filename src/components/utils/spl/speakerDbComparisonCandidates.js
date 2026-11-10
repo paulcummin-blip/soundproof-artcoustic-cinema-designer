@@ -33,7 +33,8 @@ import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalizat
 import { ASSUMED_SENSITIVITY_BASIS, applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption";
 import { installedSpaceAssumptionForRow } from "@/components/utils/spl/installedSpaceAssumption";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
-import { selectComparisonLibraryRows, comparisonDataQuality } from "./competitorSpreadsheetImport.js";
+import { selectComparisonLibraryRows } from "./competitorSpreadsheetImport.js";
+import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification.js";
 import {
   documentTypeLabel,
   evidenceBadgeLabel,
@@ -170,7 +171,12 @@ export function buildCandidate({
     : null;
   const secondaryCapped = Boolean(secondary) && secondary.is_official !== true;
   const trustedSecondary = secondaryCapped && isTrustedEvidence(secondary);
-  const badgeLabel = comparisonDataQuality(record, assumptions);
+  // ONE data-adequacy vocabulary everywhere: FULL DATA / GOOD DATA / INCOMPLETE
+  // DATA, classified by the same authority the admin Manage Competitor
+  // Speakers table and the readiness list use. The badge can never disagree
+  // with the admin table again.
+  const adequacy = classifyDataAdequacy(record);
+  const badgeLabel = adequacy.label;
   // The basis label states where the graded SPL figure came from. An approved
   // secondary document keeps its own wording; otherwise the row carries the
   // provenance the normalizer resolved for the figure.
@@ -195,6 +201,8 @@ export function buildCandidate({
     confidence: klass.confidence,
     label: klass.label,
     badgeLabel,
+    adequacy,
+    adequacyKey: adequacy.key,
     basisLabel,
     splEvidenceSource: record.spl_evidence_source || "",
     splEvidenceLabel: record.spl_evidence_label || "",
