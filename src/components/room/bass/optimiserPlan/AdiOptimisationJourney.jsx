@@ -120,6 +120,8 @@ import AdiJourneyEngineerDetailsSections from "./AdiJourneyEngineerDetailsSectio
 import { buildElectronicTimingRows } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
+import AdiCoordinatedPhysicalAlternatives from "./AdiCoordinatedPhysicalAlternatives.jsx";
+import { readAuthoritativeP20Seats } from "./optimiserPlanMetrics.js";
 import { buildOptimiserPanelHierarchy } from "./optimiserPanelHierarchy.js";
 import { useOptimiserDeveloperDiagnostics } from "./useOptimiserDeveloperDiagnostics.js";
 import { presentationThemeState, resolveAdiJourneyTheme } from "./adiJourneyTheme.js";
@@ -1201,6 +1203,19 @@ export default function AdiOptimisationJourney({
           alternatives beside the ONE decision. Each is reviewed on its own, no
           Apply is offered per candidate, and the option that is already the
           decision is never repeated here. */}
+
+      {/* ── COORDINATED PHYSICAL ALTERNATIVES ── Phase 9B candidates that move
+          BOTH seating and subwoofers. Rendered independently of the calibration
+          winner: they appear whether or not a calibration improvement was found,
+          and nothing here is auto-applied. The designer reviews each option and
+          acts manually in the Room Designer. Suppressed while a fresh run is in
+          flight and when the saved plan is stale. */}
+      {!freshRunActive && !isRunning && planView?.coordinatedSummary && (
+        <AdiCoordinatedPhysicalAlternatives
+          coordinatedSummary={planView.coordinatedSummary}
+          currentPerSeatP20={readAuthoritativeP20Seats(completedBassAuthority)}
+        />
+      )}
 
       {/* ── LEVEL 2 — TECHNICAL DETAILS ── collapsed, and below the primary
           action. The concise professional summary: what ADI checked, the

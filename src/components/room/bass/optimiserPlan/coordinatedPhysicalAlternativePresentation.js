@@ -176,3 +176,100 @@ export function selectEligiblePhysicalAlternatives(coordinatedSummary, evaluatio
   }
   return presentations;
 }
+
+/**
+ * Build presentation data for eligible coordinated physical alternatives
+ * directly from the PERSISTED coordinated summary — no live selection
+ * evaluations required. Eligibility is read from the per-candidate
+ * `physicalAlternativeEligible` flag the enrichment step wrote when the run
+ * completed, so this works after a cold reopen where the in-memory
+ * selection.evaluations are gone.
+ *
+ * @param {object|null} coordinatedSummary — from planView.coordinatedSummary
+ * @param {Array} [currentPerSeatP20] — current published per-seat P20 rows
+ * @returns {Array} presentation data for eligible alternatives
+ */
+export function selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary, currentPerSeatP20 = []) {
+  if (!coordinatedSummary || !Array.isArray(coordinatedSummary.confirmedCandidates)) return [];
+  const currentBySeat = new Map(
+    (Array.isArray(currentPerSeatP20) ? currentPerSeatP20 : [])
+      .map((s) => [String(s?.seatId ?? ""), s]),
+  );
+  const presentations = [];
+  for (const confirmed of coordinatedSummary.confirmedCandidates) {
+    if (confirmed?.physicalAlternativeEligible !== true) continue;
+    const presentation = buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySeat);
+    if (presentation) presentations.push(presentation);
+  }
+  return presentations;
+}
+
+function buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySeat) {
+  if (!confirmed) return null;
+  const candidateId = confirmed.candidateId || null;
+  const placementId = confirmed.placementId || null;
+  const quantity = num(confirmed.quantity);
+  const offsetMm = num(confirmed.offsetMm);
+  const rspAuthority = confirmed.rspAuthority || null;
+
+  const p14Db = num(confirmed.p14Db);
+  const p19Level = confirmed.p19Level || null;
+  const p19VariationDb = num(confirmed.p19VariationDb);
+  const perSeatP20 = Array.isArray(confirmed.perSeatP20) ? confirmed.perSeatP20 : [];
+
+  const seatComparisons = perSeatP20.map((seat) => {
+    const before = currentBySeat.get(String(seat.seatId));
+    return {
+      seatId: seat.seatId,
+      isPrimary: Boolean(seat.isPrimary),
+      beforeLevel: before?.level ?? null,
+      beforeVariationDb: num(before?.variationDbRaw ?? before?.wholeDbDeviation),
+      afterLevel: seat.level ?? null,
+      afterVariationDb: num(seat.variationDbRaw),
+      worstFrequencyHz: num(seat.worstFrequencyHz),
+    };
+  });
+
+  const primarySeats = perSeatP20.filter((s) => s.isPrimary);
+  const secondarySeats = perSeatP20.filter((s) => !s.isPrimary);
+  const materialityOutcome = confirmed.materialityOutcome || null;
+  const materialImprovement = materialityOutcome?.material === true
+    ? (materialityOutcome?.reason || "Material improvement")
+    : null;
+
+  const remainingCompromises = perSeatP20
+    .filter((s) => num(s.level) != null && num(s.level) <= 2)
+    .map((s) => ({
+      seatId: s.seatId,
+      isPrimary: Boolean(s.isPrimary),
+      level: s.level,
+      variationDb: num(s.variationDbRaw),
+    }));
+
+  const installedQuantity = num(confirmed.installedQuantity);
+  const quantityChange = (installedQuantity != null && quantity != null)
+    ? quantity - installedQuantity
+    : null;
+
+  return {
+    candidateId,
+    placementId,
+    quantity,
+    offsetMm,
+    rspAuthority,
+    p14: { achievedDb: p14Db },
+    p19: { level: p19Level, variationDb: p19VariationDb },
+    perSeatP20Comparisons: seatComparisons,
+    primaryP20Summary: summarizeWorst(primarySeats),
+    secondaryP20Summary: summarizeWorst(secondarySeats),
+    materialImprovement,
+    materialityRule: materialityOutcome?.rule || null,
+    remainingCompromises,
+    installationComplexity: {
+      quantityChange,
+      seatingOffsetMm: offsetMm,
+      isCrossQuantity: confirmed.isCrossQuantity === true,
+    },
+    displayed: false,
+  };
+}
