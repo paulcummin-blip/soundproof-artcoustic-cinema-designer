@@ -39,6 +39,7 @@ import {
   sourceUrlOf,
 } from "@/components/spl/adiSourceExtraction";
 import { DATA_ADEQUACY } from "@/components/spl/dataAdequacyClassification";
+import { base44 } from "@/api/base44Client";
 
 const BRAND = {
   text: "#1B1A1A", subtext: "#3E4349", hint: "#625143",
@@ -48,6 +49,37 @@ const BRAND = {
 
 const hasValue = (v) => v !== null && v !== undefined && String(v).trim() !== "";
 
+/**
+ * Load the candidate's current stored specification so the proposed-status
+ * assessment starts from the existing record (frequency response, power
+ * rating, source date, evidence quality …) — the same base the real save
+ * merges its patch into. Comparison candidates only carry a normalised
+ * `record`, not the raw specification, so without this the proposed status
+ * is assessed from the patch alone and reads INCOMPLETE even when the
+ * stored record already supplies every field the form does not capture.
+ */
+async function fetchExistingSpecification(candidate) {
+  try {
+    const specId = candidate?.specificationId || candidate?.record?.source_specification_id || null;
+    if (specId) {
+      try {
+        const spec = await base44.entities.SpeakerSpecification.get(specId);
+        if (spec) return spec;
+      } catch { /* fall through to the product filter */ }
+    }
+    const productId = candidate?.productId || candidate?.record?.source_product_id || null;
+    if (productId) {
+      const result = await base44.entities.SpeakerSpecification.filter({ product_id: productId });
+      const items = Array.isArray(result) ? result : result?.items || [];
+      return items.find((s) => s.id && s.is_current !== false) || items[0] || null;
+    }
+  } catch {
+    // Best-effort: the proposed status simply falls back to the form-only
+    // assessment if the existing specification cannot be loaded.
+  }
+  return null;
+}
+
 export default function ReadWithAdiDialog({ open, onClose, candidate, actorName, onSaved }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -55,6 +87,10 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
   const [decisions, setDecisions] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  // The candidate's current stored specification — the base the proposed
+  // status is assessed against. Fetched once per open so the merged
+  // assessment sees every stored field the form does not capture.
+  const [existingSpec, setExistingSpec] = useState(null);
 
   const sourceUrl = sourceUrlOf(candidate);
 
@@ -74,7 +110,10 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     [proposalFields, currentForm, info],
   );
 
-  // Fetch the extraction when a candidate is opened.
+  // Fetch the extraction and the current stored specification in parallel
+  // when a candidate is opened. The specification is the base the proposed
+  // status is assessed against — it must be the real stored record, not a
+  // null base that discards every field the form does not capture.
   useEffect(() => {
     if (!open || !candidate) return;
     setLoading(true);
@@ -82,10 +121,15 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     setRaw(null);
     setDecisions({});
     setSaveError("");
+    setExistingSpec(null);
     (async () => {
       try {
-        const data = await readSourceExtraction(candidate);
+        const [data, spec] = await Promise.all([
+          readSourceExtraction(candidate),
+          fetchExistingSpecification(candidate),
+        ]);
         setRaw(data);
+        setExistingSpec(spec);
         setDecisions(decideDefaults(currentFormFor(candidate), extractionToFound(data).info));
       } catch (e) {
         setError(e?.message || "ADI could not read this source.");
@@ -108,15 +152,20 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     return { ...currentForm, ...overrides };
   }, [currentForm, decisions, info]);
 
+  // Proposed comparison status, assessed from the stored specification +
+  // every currently checked proposed source value + the form's controlled
+  // defaults. Recomputes live as the admin checks or unchecks fields, so the
+  // modal shows what the status WILL become if the checked values are
+  // accepted — never only what the saved record already is.
   const proposedAdequacy = useMemo(() => {
     if (!raw || proposalFields.length === 0) return null;
     try {
-      const { readiness } = assessSpeakerForm(mergedForm, candidate?.specification || null);
+      const { readiness } = assessSpeakerForm(mergedForm, existingSpec);
       return readiness?.adequacy || null;
     } catch {
       return null;
     }
-  }, [raw, proposalFields, mergedForm, candidate]);
+  }, [raw, proposalFields, mergedForm, existingSpec]);
 
   const toggle = (key) => setDecisions((prev) => ({ ...prev, [key]: !prev[key] }));
 
