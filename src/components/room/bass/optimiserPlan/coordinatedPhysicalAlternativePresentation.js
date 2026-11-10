@@ -178,6 +178,40 @@ export function selectEligiblePhysicalAlternatives(coordinatedSummary, evaluatio
 }
 
 /**
+ * Assess whether the persisted confirmed evidence carries enough information
+ * for a designer to recreate the evaluated alternative. Returns the missing
+ * field names so a card can state what it lacks instead of presenting itself
+ * as ready to reproduce.
+ *
+ * @param {object} confirmed — one entry from coordinatedSummary.confirmedCandidates
+ * @returns {{ reproducible: boolean, missing: string[] }}
+ */
+function assessReproducibility(confirmed) {
+  const missing = [];
+  if (!confirmed?.selectedSubModel) missing.push("subwooferModel");
+  if (!Array.isArray(confirmed?.subwooferInstances) || confirmed.subwooferInstances.length === 0) {
+    missing.push("subwooferPositions");
+  } else {
+    for (const inst of confirmed.subwooferInstances) {
+      if (!inst?.position || !Number.isFinite(Number(inst.position.x)) || !Number.isFinite(Number(inst.position.y))) {
+        missing.push("subwooferPositions");
+        break;
+      }
+    }
+  }
+  if (!Array.isArray(confirmed?.seatingPositions) || confirmed.seatingPositions.length === 0) {
+    missing.push("seatingPositions");
+  }
+  if (!Array.isArray(confirmed?.tuning) || confirmed.tuning.length === 0) {
+    missing.push("tuning");
+  }
+  if (!confirmed?.rspAuthority?.rspPosition) {
+    missing.push("rspPosition");
+  }
+  return { reproducible: missing.length === 0, missing };
+}
+
+/**
  * Build presentation data for eligible coordinated physical alternatives
  * directly from the PERSISTED coordinated summary — no live selection
  * evaluations required. Eligibility is read from the per-candidate
@@ -185,9 +219,15 @@ export function selectEligiblePhysicalAlternatives(coordinatedSummary, evaluatio
  * completed, so this works after a cold reopen where the in-memory
  * selection.evaluations are gone.
  *
+ * P0-2: a candidate whose persisted evidence is missing essential
+ * reproducibility information (subwoofer model, positions, seating, tuning or
+ * RSP) is NOT presented as ready to reproduce. The card is suppressed so the
+ * designer is never shown an alternative they cannot recreate from the saved
+ * advice.
+ *
  * @param {object|null} coordinatedSummary — from planView.coordinatedSummary
  * @param {Array} [currentPerSeatP20] — current published per-seat P20 rows
- * @returns {Array} presentation data for eligible alternatives
+ * @returns {Array} presentation data for eligible, reproducible alternatives
  */
 export function selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary, currentPerSeatP20 = []) {
   if (!coordinatedSummary || !Array.isArray(coordinatedSummary.confirmedCandidates)) return [];
@@ -198,6 +238,8 @@ export function selectEligiblePhysicalAlternativesFromSummary(coordinatedSummary
   const presentations = [];
   for (const confirmed of coordinatedSummary.confirmedCandidates) {
     if (confirmed?.physicalAlternativeEligible !== true) continue;
+    const reproducibility = assessReproducibility(confirmed);
+    if (!reproducibility.reproducible) continue;
     const presentation = buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySeat);
     if (presentation) presentations.push(presentation);
   }
@@ -251,6 +293,45 @@ function buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySea
     ? quantity - installedQuantity
     : null;
 
+  // P0-2: the exact evaluated configuration, read from the same confirmed
+  // candidate. Nothing invented — if a field is absent it stays absent and
+  // the reproducibility assessment in selectEligiblePhysicalAlternativesFromSummary
+  // suppresses the card.
+  const subwooferInstances = Array.isArray(confirmed.subwooferInstances)
+    ? confirmed.subwooferInstances.map((inst) => ({
+        id: inst?.id || null,
+        model: inst?.model || null,
+        position: {
+          x: num(inst?.position?.x),
+          y: num(inst?.position?.y),
+          z: num(inst?.position?.z),
+        },
+        bottomHeightM: num(inst?.bottomHeightM),
+        rotationDeg: num(inst?.rotationDeg),
+        orientation: inst?.orientation ?? null,
+      }))
+    : [];
+  const seatingPositions = Array.isArray(confirmed.seatingPositions)
+    ? confirmed.seatingPositions.map((seat) => ({
+        id: seat?.id || null,
+        x: num(seat?.x),
+        y: num(seat?.y),
+        z: num(seat?.z),
+        priority: seat?.priority ?? null,
+        rowNumber: seat?.rowNumber ?? null,
+      }))
+    : [];
+  const tuning = Array.isArray(confirmed.tuning)
+    ? confirmed.tuning.map((t) => ({
+        sourceId: t?.sourceId || null,
+        delayMs: num(t?.delayMs),
+        gainDb: num(t?.gainDb),
+        polarity: t?.polarity ?? null,
+        phaseControlDeg: num(t?.phaseControlDeg ?? t?.phaseAdjust),
+      }))
+    : [];
+  const crossover = confirmed.crossover || null;
+
   return {
     candidateId,
     placementId,
@@ -270,6 +351,14 @@ function buildPhysicalAlternativePresentationFromSummary(confirmed, currentBySea
       seatingOffsetMm: offsetMm,
       isCrossQuantity: confirmed.isCrossQuantity === true,
     },
+    // Reproducibility: the exact evaluated configuration.
+    selectedSubModel: confirmed.selectedSubModel || null,
+    subwooferInstances,
+    seatingPositions,
+    tuning,
+    crossover,
+    frontOrientation: confirmed.frontOrientation ?? null,
+    rearOrientation: confirmed.rearOrientation ?? null,
     displayed: false,
   };
 }

@@ -37,6 +37,7 @@ import {
   describeCalibrationNotApplied,
   resolveCalibrationAutoApply,
 } from "./adiCalibrationAutoApplyAuthority.js";
+import { isCalibrationOnlyResult } from "./calibrationIdentityGuard.js";
 
 /** The calibration levers, in the fixed least-intrusive order. */
 export const CALIBRATION_CANDIDATE_ORDER = Object.freeze(["delay", "gain", "polarity", "phase"]);
@@ -103,6 +104,12 @@ export function confirmedCalibrationCandidates({ selection = null } = {}) {
   const seen = new Set();
   const push = (candidate) => {
     if (!candidate || !candidate.tuning.length || candidate.result?.integrationVerified) return;
+    // P0-1 GUARD: a candidate whose tuning was derived from a different
+    // physical configuration (moved seating, moved subwoofers, different
+    // subwoofer quantity, or a coordinated combination) must never be
+    // auto-applied as calibration. Its tuning was optimised for a geometry
+    // the installed design does not share.
+    if (!isCalibrationOnlyResult(candidate.result)) return;
     const key = `${candidate.lever}:${candidate.candidateId}`;
     if (seen.has(key)) return;
     seen.add(key);

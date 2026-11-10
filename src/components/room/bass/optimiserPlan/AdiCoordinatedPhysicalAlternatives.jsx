@@ -57,6 +57,131 @@ function SeatRow({ row }) {
   );
 }
 
+function fmtMm(m) {
+  if (m == null || !Number.isFinite(Number(m))) return "—";
+  return `${Math.round(Number(m) * 1000)} mm`;
+}
+
+function fmtOrient(orientation) {
+  if (orientation == null) return "—";
+  const s = String(orientation);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function SubPositionsBlock({ alt }) {
+  const subs = Array.isArray(alt.subwooferInstances) ? alt.subwooferInstances : [];
+  if (subs.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+        Subwoofers{alt.selectedSubModel ? ` · ${alt.selectedSubModel}` : ""}
+        {alt.frontOrientation || alt.rearOrientation
+          ? ` · ${[alt.frontOrientation, alt.rearOrientation].filter(Boolean).map(fmtOrient).join(" / ")}`
+          : ""}
+      </div>
+      <div className="overflow-hidden rounded border border-[#E5E5E5]">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="text-[9.5px] font-semibold uppercase tracking-wide text-[#8A7B6A] bg-[#F7F6F3]">
+              <th className="px-2 py-1">#</th>
+              <th className="px-2 py-1">X</th>
+              <th className="px-2 py-1">Y</th>
+              <th className="px-2 py-1">Height</th>
+              <th className="px-2 py-1">Orient.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subs.map((inst, i) => (
+              <tr key={inst.id || i} className="border-t border-[#EFEDE8] text-[10.5px] text-[#3E4349]">
+                <td className="px-2 py-1 font-medium text-[#1B1A1A]">{i + 1}</td>
+                <td className="px-2 py-1">{fmtMm(inst.position?.x)}</td>
+                <td className="px-2 py-1">{fmtMm(inst.position?.y)}</td>
+                <td className="px-2 py-1">{fmtMm(inst.bottomHeightM)}</td>
+                <td className="px-2 py-1">{inst.orientation ? fmtOrient(inst.orientation) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SeatingBlock({ alt }) {
+  const seats = Array.isArray(alt.seatingPositions) ? alt.seatingPositions : [];
+  if (seats.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+        Seating{alt.offsetMm != null ? ` · ${alt.offsetMm > 0 ? "+" : ""}${alt.offsetMm} mm` : ""}
+      </div>
+      <div className="overflow-hidden rounded border border-[#E5E5E5]">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="text-[9.5px] font-semibold uppercase tracking-wide text-[#8A7B6A] bg-[#F7F6F3]">
+              <th className="px-2 py-1">Seat</th>
+              <th className="px-2 py-1">X</th>
+              <th className="px-2 py-1">Y</th>
+              <th className="px-2 py-1">Priority</th>
+            </tr>
+          </thead>
+          <tbody>
+            {seats.slice(0, 6).map((seat) => (
+              <tr key={seat.id || seat.seatId} className="border-t border-[#EFEDE8] text-[10.5px] text-[#3E4349]">
+                <td className="px-2 py-1 font-medium text-[#1B1A1A]">{seat.id || "—"}</td>
+                <td className="px-2 py-1">{fmtMm(seat.x)}</td>
+                <td className="px-2 py-1">{fmtMm(seat.y)}</td>
+                <td className="px-2 py-1">{seat.priority || "—"}</td>
+              </tr>
+            ))}
+            {seats.length > 6 && (
+              <tr className="border-t border-[#EFEDE8] text-[10px] text-[#8A7B6A]">
+                <td className="px-2 py-1" colSpan={4}>+{seats.length - 6} more seats</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TuningBlock({ alt }) {
+  const tuning = Array.isArray(alt.tuning) ? alt.tuning : [];
+  if (tuning.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+        Tuning{alt.crossover ? ` · crossover ${alt.crossover}` : ""}
+      </div>
+      <div className="overflow-hidden rounded border border-[#E5E5E5]">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="text-[9.5px] font-semibold uppercase tracking-wide text-[#8A7B6A] bg-[#F7F6F3]">
+              <th className="px-2 py-1">Sub</th>
+              <th className="px-2 py-1">Delay</th>
+              <th className="px-2 py-1">Gain</th>
+              <th className="px-2 py-1">Polarity</th>
+              <th className="px-2 py-1">Phase</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tuning.map((t, i) => (
+              <tr key={t.sourceId || i} className="border-t border-[#EFEDE8] text-[10.5px] text-[#3E4349]">
+                <td className="px-2 py-1 font-medium text-[#1B1A1A]">{i + 1}</td>
+                <td className="px-2 py-1">{t.delayMs != null ? `${t.delayMs.toFixed(1)} ms` : "—"}</td>
+                <td className="px-2 py-1">{t.gainDb != null ? `${t.gainDb > 0 ? "+" : ""}${t.gainDb.toFixed(1)} dB` : "—"}</td>
+                <td className="px-2 py-1">{t.polarity != null ? (Number(t.polarity) < 0 || Number(t.polarity) === 180 ? "Inverted" : "Normal") : "—"}</td>
+                <td className="px-2 py-1">{t.phaseControlDeg != null ? `${Math.round(t.phaseControlDeg)}°` : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function AlternativeCard({ alt, index }) {
   const seats = Array.isArray(alt.perSeatP20Comparisons) ? alt.perSeatP20Comparisons : [];
   const qty = alt.installationComplexity;
@@ -121,6 +246,11 @@ function AlternativeCard({ alt, index }) {
         </div>
       )}
 
+      {/* Reproducible configuration: sub positions, seating, tuning */}
+      <SubPositionsBlock alt={alt} />
+      <SeatingBlock alt={alt} />
+      <TuningBlock alt={alt} />
+
       {/* Remaining compromises */}
       {remaining.length > 0 && (
         <div className="text-[10.5px] text-[#8A7B6A] leading-relaxed">
@@ -133,6 +263,7 @@ function AlternativeCard({ alt, index }) {
         <div className="text-[10px] text-[#9A8E80] leading-relaxed">
           RSP: {alt.rspAuthority.rspMode}
           {alt.rspAuthority.designatedRspSeatId ? ` · seat ${alt.rspAuthority.designatedRspSeatId}` : ""}
+          {alt.rspAuthority.evaluatedRspPosition ? ` · (${fmtMm(alt.rspAuthority.evaluatedRspPosition.x)}, ${fmtMm(alt.rspAuthority.evaluatedRspPosition.y)})` : ""}
         </div>
       )}
     </div>

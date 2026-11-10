@@ -108,6 +108,14 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
       // audited without re-running the search.
       rspAuthority: c?.rspAuthority ?? null,
       installedQuantity: c?.installedQuantity ?? null,
+      // P0-2 Reproducibility: the exact evaluated physical configuration so a
+      // designer can recreate the alternative from the saved advice. All
+      // read from the same confirmed candidate — nothing invented.
+      selectedSubModel: c?.selectedSubModel ?? null,
+      subwooferInstances: Array.isArray(c?.subwooferInstances) ? c.subwooferInstances : [],
+      seatingPositions: Array.isArray(c?.seatingPositions) ? c.seatingPositions : [],
+      frontOrientation: c?.frontOrientation ?? null,
+      rearOrientation: c?.rearOrientation ?? null,
       // Selection evaluation outcomes — cross-referenced from selection.evaluations
       // after selectConfirmedRecommendations runs. These survive plan save,
       // serialization, hydration and readback.

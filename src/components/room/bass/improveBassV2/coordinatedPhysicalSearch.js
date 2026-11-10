@@ -431,6 +431,41 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     // designated seat ID and actual XYZ used for canonical evaluation.
     attachRspAuthority(result, rspAuthority, combo.offsetMm);
     coordinatedCandidates.push(result);
+    // ── P0-2: Reproducibility evidence ────────────────────────────────────
+    // The exact physical configuration the candidate was confirmed under, so a
+    // designer can recreate it: subwoofer model, per-sub XYZ coordinates,
+    // height, rotation and orientation; the moved seating positions; the RSP
+    // authority; and the candidate-specific tuning. All read from the same
+    // confirmed candidate — nothing invented.
+    const candidateInstanceSource = combo.designContext?.instances || subwooferInstances || [];
+    const activeCandidateInstances = candidateInstanceSource.filter((i) => i?.enabled !== false);
+    const subwooferInstancesCompact = (combo.placementCoordinates || []).map((coord, i) => {
+      const inst = activeCandidateInstances[i] || {};
+      return {
+        id: inst.id || null,
+        model: inst.model || selectedSubModel || null,
+        position: {
+          x: Number(coord?.x) || 0,
+          y: Number(coord?.y) || 0,
+          z: Number(inst.position?.z) || 0,
+        },
+        bottomHeightM: Number.isFinite(Number(inst.bottomHeightM))
+          ? Number(inst.bottomHeightM)
+          : (Number.isFinite(Number(subwooferBottomHeightM)) ? Number(subwooferBottomHeightM) : 0),
+        rotationDeg: Number(inst.rotationDeg) || 0,
+        orientation: inst.orientation ?? null,
+      };
+    });
+    const seatingPositionsCompact = (combo.seatingPositions || []).map((seat) => ({
+      id: seat?.id ?? null,
+      x: Number(seat?.x ?? seat?.x_m) || 0,
+      y: Number(seat?.y ?? seat?.y_m) || 0,
+      z: Number(seat?.z ?? seat?.z_m) || 0,
+      priority: seat?.priority ?? null,
+      rowNumber: seat?.rowNumber ?? null,
+      earHeight: Number.isFinite(Number(seat?.earHeight)) ? Number(seat.earHeight) : null,
+      platformHeight: Number.isFinite(Number(seat?.platformHeight)) ? Number(seat.platformHeight) : null,
+    }));
     diagnostics.confirmed.push({
       candidateId: result.candidateId, placementId: combo.placementId,
       quantity: combo.placementQuantity, offsetMm: combo.offsetMm,
@@ -448,6 +483,12 @@ export async function runCoordinatedPhysicalSearch(ctx) {
       isCrossQuantity: !!combo.designContext,
       rspAuthority: result.rspAuthority,
       installedQuantity: diagnostics.installedQuantity,
+      // Reproducibility: the exact evaluated physical configuration.
+      selectedSubModel: selectedSubModel || null,
+      subwooferInstances: subwooferInstancesCompact,
+      seatingPositions: seatingPositionsCompact,
+      frontOrientation: frontOrientation ?? null,
+      rearOrientation: rearOrientation ?? null,
     });
   }
 
