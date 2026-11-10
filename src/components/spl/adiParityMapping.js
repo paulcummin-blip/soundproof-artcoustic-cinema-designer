@@ -118,7 +118,7 @@ export function extractionToFound(raw) {
     };
   }
   const CONTINUOUS_SOURCES = [
-    { field: "power_handling_continuous_w", label: "Continuous" },
+    { field: "power_handling_continuous_w", label: "Manufacturer Power Handling" },
     { field: "long_term_iec_power_w", label: "Long-term IEC" },
     { field: "rated_iec_power_w", label: "Rated IEC" },
     { field: "aes_power_w", label: "AES" },
@@ -182,6 +182,16 @@ export function extractionToFound(raw) {
       quote: entry.quote,
       category: "Power handling (basis not stated)",
     };
+  }
+  // Surface any P12/P13 concepts the LLM noticed in the source but could not
+  // map to a field, so the admin sees "Potential field not mapped" warnings
+  // rather than a silently dropped specification row.
+  const unmapped = Array.isArray(raw?.potential_unmapped) ? raw.potential_unmapped : [];
+  if (unmapped.length > 0) {
+    info.potential_unmapped = unmapped.map((u) => ({
+      concept: String(u?.concept || "").trim(),
+      quote: String(u?.raw_text || "").trim(),
+    })).filter((u) => u.concept || u.quote);
   }
   return { found, info };
 }

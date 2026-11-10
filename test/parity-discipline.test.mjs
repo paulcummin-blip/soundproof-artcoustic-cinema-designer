@@ -38,7 +38,7 @@ test("continuous power rating is retained with its category, not converted to am
   assert.equal(found.power_w, "150");
   assert.equal(found.power_basis, "continuous");
   assert.equal(info.power_w.basis, "continuous");
-  assert.equal(info.power_w.category, "Continuous");
+  assert.equal(info.power_w.category, "Manufacturer Power Handling");
   assert.notEqual(found.power_basis, "amplifier", "RMS power handling must NOT be classified as recommended amplifier maximum");
 });
 

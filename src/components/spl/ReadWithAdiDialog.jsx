@@ -347,6 +347,27 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               </div>
             )}
 
+            {info.potential_unmapped && info.potential_unmapped.length > 0 && (
+              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.amber}55`, borderRadius: 10, background: `${BRAND.amber}0a` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.amber }}>
+                  Potential field not mapped
+                </div>
+                {info.potential_unmapped.map((u, i) => (
+                  <div key={i} style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
+                    <strong>{u.concept || "Unnamed concept"}</strong>
+                    {u.quote && (
+                      <div style={{ fontSize: 10, color: BRAND.hint, marginTop: 2, fontStyle: "italic" }}>
+                        “{u.quote.slice(0, 180)}{u.quote.length > 180 ? "…" : ""}”
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 4 }}>
+                  ADI noticed this P12/P13-relevant specification in the source but could not map it to a field. Review the source and enter the value manually if needed.
+                </div>
+              </div>
+            )}
+
             {proposedAdequacy && (
               <div style={{ marginTop: 10, padding: "10px 12px", border: `1px solid ${proposedAdequacy.tone}33`, borderRadius: 10, background: `${proposedAdequacy.tone}08` }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: proposedAdequacy.tone }}>

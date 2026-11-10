@@ -64,6 +64,16 @@ const EXTRACTION_SCHEMA = {
         },
       },
     },
+    potential_unmapped: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          concept: { type: 'string' },
+          raw_text: { type: 'string' },
+        },
+      },
+    },
   },
 };
 
@@ -84,6 +94,13 @@ function rulesFor(manufacturerName, model) {
     manufacturerName,
     model,
     rules: [
+      `P12/P13 FIELD CHECKLIST. Search the source explicitly for each of these concepts and their common aliases. Do not rely on a single pass noticing whichever fields happen to be prominent — look for every concept listed, then return what you found:
+  1. SENSITIVITY — aliases: "Sensitivity", "Efficiency", "SPL @ 1W/1m", "SPL @ 2.83V/1m", "dB / 1W / 1m", "dB / 2.83V / 1m"
+  2. IMPEDANCE — aliases: "Nominal impedance", "Impedance", "Minimum impedance"
+  3. POWER HANDLING — aliases: "Power Handling", "Continuous Power", "RMS Power", "AES Power", "IEC Power", "Long Term Power", "Rated Power", "Recommended Amplifier Power", "Amplifier Power"
+  4. SPL — aliases: "Continuous SPL", "RMS SPL", "Maximum SPL", "Max SPL", "Peak SPL", "Peak Output"
+  5. MEASUREMENT BASIS — aliases: "Half Space", "Full Space", "2π / 2pi", "4π / 4pi", "1 metre / 1 meter", measurement or test standard
+Process the COMPLETE specification table before returning. Do not stop after the first few matched values — read every row of a spec table.`,
       `Report a value only if the source explicitly states it for "${model}".`,
       `Mark a field "ambiguous" only when the source genuinely leaves it unclear for this model — for example the figure is given for a range of models, or the sentence is contradictory. When the source states the value plainly for this model, mark it "reported".`,
       `If the source does not state the field, return status "not_found" with an EMPTY value. Never infer, never estimate, never borrow a value from a sibling model, another series, a predecessor, or your own general knowledge.`,
@@ -94,17 +111,18 @@ function rulesFor(manufacturerName, model) {
       `model_confirmed must be true only if the source names this exact model.`,
       `Look specifically for a technical specifications table, spec sheet, or "Specifications" section — that is where sensitivity, impedance, power handling and max SPL normally appear.`,
       `POWER CLASSIFICATION IS CRITICAL. Distinguish the manufacturer's power terminology literally and never convert one category into another merely because a value is in watts. Use the field that matches what the source actually says:`,
-      `  - power_handling_continuous_w = a genuine continuous speaker power rating labelled "continuous", "RMS power handling" or "long-term power handling".`,
+      `  - power_handling_continuous_w = the manufacturer's stated power handling figure. This includes "Power Handling: X Watts minimum; Y Watts maximum" — report the MAXIMUM (Y) here with status "reported". The minimum (X) is advisory; include the full range in raw_text. Also includes "Continuous Power", "RMS Power Handling", "Long-term Power Handling" — all reported, status "reported".`,
       `  - long_term_iec_power_w / rated_iec_power_w = an IEC long-term or rated continuous figure labelled "IEC".`,
       `  - aes_power_w = an AES continuous figure labelled "AES".`,
       `  - recommended_amp_min_w and recommended_amp_max_w = the MINIMUM and MAXIMUM of a stated RECOMMENDED AMPLIFIER RANGE — e.g. "Recommended amplifier: 25-150 W" → recommended_amp_min_w 25, recommended_amp_max_w 150. When only one amplifier figure is stated, use it for recommended_amp_max_w and leave recommended_amp_min_w blank. Preserve BOTH endpoints of the range, copied exactly as stated (e.g. "500W – 1,000W" → recommended_amp_min_w 500, recommended_amp_max_w 1000).`,
       `  - peak_power_w / power_handling_peak_w = a peak / short-term / maximum figure explicitly labelled "peak".`,
-      `For example, "Power Handling (RMS): 5 watts minimum; 150 watts maximum" is RMS power handling — put 150 in power_handling_continuous_w, NOT in recommended_amp_max_w. A "Recommended amplifier power" range is recommended_amp_max_w, never a continuous rating.`,
+      `POWER HANDLING IS NEVER RECOMMENDED AMPLIFIER. A line labelled "Power Handling" is the speaker's own power rating — never a recommended amplifier range, even when it states a minimum and maximum. Only "Recommended amplifier" or "Amplifier power" wording maps to recommended_amp_min_w / recommended_amp_max_w. "Power Handling: 5 Watts minimum; 150 Watts maximum" → power_handling_continuous_w = 150, status "reported", raw_text preserves the full range. "Power Handling (RMS): 5 watts minimum; 150 watts maximum" → same: power_handling_continuous_w = 150, status "reported". A "Recommended amplifier power" range is recommended_amp_max_w, never a continuous rating.`,
       `For max SPL, distinguish the basis the manufacturer states. "Max SPL" or "Peak SPL" is NOT "continuous" — when the source labels a figure peak or maximum short-term, record max_peak_spl_db and set max_spl_basis to "peak". Only use max_continuous_spl_db when the source genuinely establishes a continuous/rated basis.`,
       `SPL CONTINUOUS vs PEAK MUST BE SPLIT. Manufacturers often state one combined figure such as "123 dB (Cont.) / 135 dB (Peak)", "Max SPL: 123 dB continuous / 135 dB peak" or "Measured Data 123 dB (Cont.) / 135 dB (Peak)". When the source states BOTH a continuous and a peak SPL, record BOTH fields: max_continuous_spl_db = the continuous figure (123) and max_peak_spl_db = the peak figure (135), and set max_spl_basis to "continuous" (the continuous figure is the graded capability). Never collapse the two into one field, and never drop the continuous figure because a peak figure also appears.`,
       `Recognise continuous qualifiers: "Cont.", "Continuous", "RMS", "long-term", "rated". Recognise peak qualifiers: "Peak", "Max SPL", "Maximum SPL", "short-term". A figure labelled only "Max SPL" or "Maximum SPL" with NO continuous qualifier is NOT continuous — record it in max_peak_spl_db and set max_spl_basis to "peak". Only a figure explicitly labelled continuous / Cont. / RMS / long-term / rated / AES / IEC enters max_continuous_spl_db. "Measured Data" before an SPL figure means the manufacturer measured it — record it in max_continuous_spl_db when a continuous qualifier is present, otherwise in max_peak_spl_db.`,
       `MEASUREMENT SPACE. "Half Space", "2π", "2 pi" mean half-space → measurement_space "half-space". "Full Space", "4π", "4 pi", "anechoic" mean free-space → measurement_space "free-space". When the source states the space (for sensitivity or for max SPL), answer measurement_space with the recognised value. Never leave it "unspecified" when the source explicitly states 2π / 4π / half space / full space.`,
-      `POWER HANDLING AMBIGUITY. "Power Handling N W" (or "Power handling: N W") with NO further qualifier — no "continuous", "RMS", "long-term", "IEC", "rated", "AES", "peak", and no "recommended amplifier" wording — is genuinely ambiguous: the manufacturer stated a figure but not the standard. Report it as power_handling_continuous_w with status "ambiguous". Do NOT report it as recommended_amp_max_w (it is not a recommended amplifier range). Do NOT invent a continuous basis. When the source ALSO states a continuous/RMS/IEC/AES figure or a recommended amplifier range, report those in their own fields with status "reported".`,
+      `POWER HANDLING AMBIGUITY. "Power Handling: N W" (a SINGLE value with no min/max range and no continuous/RMS/IEC/AES/peak qualifier and no "recommended amplifier" wording) is genuinely ambiguous: the manufacturer stated a figure but not the standard. Report it as power_handling_continuous_w with status "ambiguous". Do NOT report it as recommended_amp_max_w. Do NOT invent a continuous basis. NOTE: "Power Handling: X Watts minimum; Y Watts maximum" is NOT ambiguous — the manufacturer stated the power handling limits plainly. Report the maximum (Y) as power_handling_continuous_w with status "reported". Only a bare single-figure "Power Handling: N W" with no range and no qualifier is "ambiguous". When the source ALSO states a continuous/RMS/IEC/AES figure or a recommended amplifier range, report those in their own fields with status "reported".`,
+      `UNMAPPED CONCEPTS. If you notice a P12/P13-relevant specification concept from the checklist above in the source that you cannot map to any allowed field — for example a "Power Handling" row you are unsure how to classify, or a sensitivity figure with an unfamiliar basis — add it to the potential_unmapped array with the concept name and the exact raw text. This flags it for human review rather than silently dropping it. An empty potential_unmapped array is correct when every concept you found was mapped.`,
     ],
   });
 }
@@ -199,6 +217,7 @@ export default async function (req) {
       reported,
       ambiguous,
       not_found: notFound,
+      potential_unmapped: Array.isArray(raw?.potential_unmapped) ? raw.potential_unmapped : [],
       extraction_source: 'Official source, human review required before approval',
     });
   } catch (error) {

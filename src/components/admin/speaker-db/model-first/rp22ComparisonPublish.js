@@ -47,7 +47,7 @@ function present(value) {
 // The continuous power figure the comparison uses, and where it came from.
 export function resolveContinuousPower(spec) {
   if (!spec) return { value: null, label: "" };
-  if (present(spec.power_handling_continuous_w)) return { value: spec.power_handling_continuous_w, label: "Continuous" };
+  if (present(spec.power_handling_continuous_w)) return { value: spec.power_handling_continuous_w, label: "Manufacturer Power Handling" };
   if (present(spec.long_term_iec_power_w)) return { value: spec.long_term_iec_power_w, label: "Long term IEC" };
   if (present(spec.rated_iec_power_w)) return { value: spec.rated_iec_power_w, label: "Rated IEC" };
   if (present(spec.aes_power_w)) return { value: spec.aes_power_w, label: "AES" };

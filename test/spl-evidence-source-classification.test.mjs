@@ -139,7 +139,7 @@ test('4. Sound Proof-calculated capability is named as such and keeps the existi
     competitorMetaForComparison(toRow(ESTIMATE_SPEC)).max_spl_cont_db_1m_halfspace,
     n.halfspace_calculated_max_continuous_spl_db_1m,
   );
-  assert.equal(n.power_authority, 'Continuous');
+  assert.equal(n.power_authority, 'Manufacturer Power Handling');
 });
 
 test('5. a manufacturer figure with no stated basis is published-but-unverified, never measured', () => {
