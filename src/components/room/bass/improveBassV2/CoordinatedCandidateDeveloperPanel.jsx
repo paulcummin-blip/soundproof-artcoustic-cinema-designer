@@ -32,6 +32,7 @@ import {
   ROOM_D_EXPECTED_REAR_EAR_HEIGHT_M,
 } from "./coordinatedCandidateFixture";
 import { buildLcrIntegrationSources } from "../lcrIntegrationSources";
+import { resolveAuthoritativeP14Target } from "./coordinatedCandidateTargetAuthority";
 
 const MUTED = "text-[10px] text-[#8A7B6A] leading-relaxed";
 const LINE = "text-[11px] text-[#3E4349] leading-relaxed";
@@ -64,6 +65,11 @@ function BoundaryGate({ name, gate }) {
 
 function EvidenceView({ evidence }) {
   if (!evidence) return null;
+  const perSeatP20 = Array.isArray(evidence.perSeatP20) ? evidence.perSeatP20 : [];
+  const tuning = Array.isArray(evidence.tuning) ? evidence.tuning : [];
+  const appliedEq = Array.isArray(evidence.appliedEq) ? evidence.appliedEq : [];
+  const sharedDeficits = Array.isArray(evidence.sharedCancellations?.sharedDeficits)
+    ? evidence.sharedCancellations.sharedDeficits : [];
   return (
     <div className="space-y-2">
       <div className={LINE}>
@@ -92,23 +98,76 @@ function EvidenceView({ evidence }) {
         worst {fmt(evidence.p20Secondary?.variationDb, " dB")} · {fmt(evidence.p20Secondary?.level)} ·{" "}
         {evidence.p20Secondary?.seatId || "—"}
       </div>
-      <div className={LINE}>
-        <span className="font-medium">Tuning:</span>{" "}
-        {Array.isArray(evidence.tuning) ? `${evidence.tuning.length} sources` : "—"}
+
+      <div className="pt-1">
+        <div className={LABEL}>Individual-seat P20 ({perSeatP20.length})</div>
+        <div className="mt-1 space-y-0.5">
+          {perSeatP20.length === 0 && <div className={MUTED}>none</div>}
+          {perSeatP20.map((seat) => (
+            <div key={seat.seatId} className="flex justify-between text-[10px] text-[#3E4349]">
+              <span>{seat.seatId} {seat.isPrimary ? "· primary" : "· secondary"}</span>
+              <span>
+                {fmt(seat.variationDb, " dB")} · L{fmt(seat.level)}
+                {seat.worstFrequencyHz != null ? ` @ ${seat.worstFrequencyHz} Hz` : ""}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
+
+      <div className="pt-1">
+        <div className={LABEL}>Per-source tuning ({tuning.length})</div>
+        <div className="mt-1 space-y-0.5">
+          {tuning.length === 0 && <div className={MUTED}>none</div>}
+          {tuning.map((t, i) => (
+            <div key={i} className="flex justify-between text-[10px] text-[#3E4349]">
+              <span>src {i + 1}</span>
+              <span>
+                gain {fmt(t.gainDb, " dB")} · delay {fmt(t.delayMs, " ms")} · phase {fmt(t.phaseControlDeg, "°")} · pol {fmt(t.polarity)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-1">
+        <div className={LABEL}>Applied EQ filters ({appliedEq.length})</div>
+        <div className="mt-1 space-y-0.5">
+          {appliedEq.length === 0 && <div className={MUTED}>none</div>}
+          {appliedEq.map((f, i) => (
+            <div key={i} className="flex justify-between text-[10px] text-[#3E4349]">
+              <span>{f.type || "filter"}</span>
+              <span>
+                {fmt(f.frequencyHz, " Hz")}{f.gainDb != null ? ` · ${fmt(f.gainDb, " dB")}` : ""}{f.q != null ? ` · Q ${f.q}` : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className={LINE}>
         <span className="font-medium">Receipt:</span>{" "}
         {evidence.receipt?.selectedCandidateId || "—"}
       </div>
       <div className={MUTED}>
-        {evidence.perSeatP20?.length || 0} individual-seat P20 rows ·{" "}
+        {perSeatP20.length} individual-seat P20 rows ·{" "}
         {evidence.postEqRspCurve?.length || 0} RSP curve points ·{" "}
         {evidence.postEqPerSeatCurves?.length || 0} per-seat curves
       </div>
-      <div className={LINE}>
-        <span className="font-medium">Shared cancellations:</span>{" "}
-        {evidence.sharedCancellations?.hasSharedCancellations ? "detected" : "none"}
-        {evidence.sharedCancellations?.hasSeriousSharedCancellations ? " (serious)" : ""}
+      <div className="pt-1">
+        <div className={LABEL}>Shared cancellations</div>
+        {sharedDeficits.length === 0 ? (
+          <div className={MUTED}>none detected</div>
+        ) : (
+          <div className="mt-1 space-y-0.5">
+            {sharedDeficits.map((d, i) => (
+              <div key={i} className="flex justify-between text-[10px] text-[#3E4349]">
+                <span>{fmt(d.frequencyHz, " Hz")} {d.inAssessmentBand ? "(in band)" : ""}</span>
+                <span>{d.seatCount} seats{d.seats?.length ? `: ${d.seats.map((s) => s.seatId).join(", ")}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -127,7 +186,7 @@ function CheckRow({ label, ok, children }) {
   );
 }
 
-function PreRunInspection({ refCheck, integrationContext }) {
+function PreRunInspection({ refCheck, integrationContext, p14Target }) {
   const s = refCheck?.summary;
   const ok = refCheck?.valid === true;
   const crossoverActive = integrationContext?.crossover?.frequencyHz === 95;
@@ -184,6 +243,14 @@ function PreRunInspection({ refCheck, integrationContext }) {
         {crossoverActive
           ? `live LCR (${integrationContext?.speakerSources?.length || 0} sources) + 95 Hz crossover`
           : "no live LCR context — run will reject (acceptance mode)"}
+      </CheckRow>
+      <CheckRow
+        label="P14 target authority"
+        ok={!!p14Target}
+      >
+        {p14Target
+          ? `${p14Target.p14TargetBasis} L${p14Target.p14TargetLevel} · ${p14Target.p14TargetDb} dB (inherited from project)`
+          : "unresolved — run will reject (acceptance mode, no fixture default)"}
       </CheckRow>
 
       {!ok && (
@@ -245,6 +312,18 @@ export default function CoordinatedCandidateDeveloperPanel() {
     };
   }, [appState?.speakerSystem?.placedSpeakers, shared?.authoritative?.physics]);
 
+  // Inherit the project's authoritative P14 operating target — the SAME source
+  // the optimiser orchestrator uses (shared.authoritative.requested /
+  // shared.completedBassAuthority). The fixture never decides the target; an
+  // unresolved target rejects explicitly in acceptance mode.
+  const p14Target = useMemo(() => {
+    const resolved = resolveAuthoritativeP14Target({
+      requested: shared?.authoritative?.requested,
+      completedBassAuthority: shared?.completedBassAuthority,
+    });
+    return resolved.resolved ? resolved : null;
+  }, [shared?.authoritative?.requested, shared?.completedBassAuthority]);
+
   const handleRun = useCallback(async () => {
     if (running) return;
     if (!refCheck?.valid) return;
@@ -256,13 +335,14 @@ export default function CoordinatedCandidateDeveloperPanel() {
         amplifierPowerPerSubW: shared?.authoritative?.amplifierPowerPerSubW || 0,
         savedSeating,
         requireCombined: true,
+        p14Target,
       });
     } catch (err) {
       setError(err?.message || "Run failed");
     } finally {
       setRunning(false);
     }
-  }, [running, integrationContext, shared, refCheck, savedSeating]);
+  }, [running, integrationContext, shared, refCheck, savedSeating, p14Target]);
 
   const handleClear = useCallback(() => {
     clearCoordinatedDeveloperRun();
@@ -295,7 +375,7 @@ export default function CoordinatedCandidateDeveloperPanel() {
         through the canonical pipeline. No Apply, no autosave, no publication.
       </div>
 
-      <PreRunInspection refCheck={refCheck} integrationContext={integrationContext} />
+      <PreRunInspection refCheck={refCheck} integrationContext={integrationContext} p14Target={p14Target} />
 
       <div className="flex items-center gap-2">
         <button

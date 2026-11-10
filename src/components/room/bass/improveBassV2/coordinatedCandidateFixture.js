@@ -279,7 +279,11 @@ export const ROOM_D_CROSSOVER = Object.freeze({
   enabled: true,
 });
 
-// P14 target. Level 2 / minimum basis, 117 dB — the standard operating target.
+// P14 target reference values for source-execution harnesses that are not the
+// acceptance bridge (the acceptance path must inherit the project's
+// authoritative target via resolveAuthoritativeP14Target). This constant is NOT
+// applied as a default by buildRoomDBundle — it is exported only so non-acceptance
+// tests can construct a complete bundle without a live project.
 export const ROOM_D_P14_TARGET = Object.freeze({
   p14TargetBasis: "minimum",
   p14TargetLevel: 2,
@@ -323,7 +327,11 @@ export function buildRoomDBundle(overrides = {}) {
     integrationContext: overrides.integrationContext || null,
     responseBasis: overrides.responseBasis
       || (overrides.integrationContext ? "combined-lcr-sub" : "sub-only"),
-    p14Target: overrides.p14Target || ROOM_D_P14_TARGET,
+    // The fixture no longer owns a P14 target. The caller supplies the
+    // authoritative operating target (resolved from the open project); a
+    // missing target is left null so the bundle/validation rejects it rather
+    // than silently grading against a fixture constant.
+    p14Target: overrides.p14Target || null,
   });
 }
 

@@ -20,6 +20,7 @@ import { evaluateCoordinatedCandidate, buildCandidateTransfer } from "./coordina
 import {
   buildRoomDBundle,
   ROOM_D_DIMS,
+  ROOM_D_P14_TARGET,
   validateRoomDSavedSeatingReference,
 } from "./coordinatedCandidateFixture";
 import {
@@ -73,6 +74,7 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
     amplifierPowerPerSubW = 0,
     savedSeating = null,
     requireCombined = false,
+    p14Target = null,
   } = options;
 
   // 0a. Acceptance mode: a combined LCR/sub evaluation is required. If the
@@ -85,6 +87,25 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
       status: "rejected",
       evidence: null,
       issues: ["Live LCR integration context unavailable — combined LCR/sub evaluation required for acceptance test"],
+      boundaries: { preTransfer: null, preConfirm: null, postConfirm: null },
+    };
+    publish();
+    return lastResult;
+  }
+
+  // 0b. P14 target authority. The candidate must inherit the project's
+  //     authoritative operating target — the fixture never decides it. In
+  //     acceptance mode a missing/unresolved target is an explicit rejection,
+  //     never a 117 dB fixture default. Source-execution harnesses
+  //     (requireCombined=false) fall back to the reference target so they can
+  //     still exercise the pipeline without a live project.
+  const resolvedP14Target = p14Target
+    || (requireCombined ? null : ROOM_D_P14_TARGET);
+  if (requireCombined && (!resolvedP14Target || !Number.isFinite(Number(resolvedP14Target.p14TargetDb)))) {
+    lastResult = {
+      status: "rejected",
+      evidence: null,
+      issues: ["Authoritative P14 operating target unavailable — cannot resolve the project's P14 target dB for the acceptance test. The fixture does not substitute a default."],
       boundaries: { preTransfer: null, preConfirm: null, postConfirm: null },
     };
     publish();
@@ -116,6 +137,7 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
       integrationContext,
       responseBasis: integrationContext ? "combined-lcr-sub" : "sub-only",
       savedSeating,
+      p14Target: resolvedP14Target,
     });
   } catch (err) {
     lastResult = {

@@ -609,6 +609,7 @@ export function evaluateStage2Confirmation(rawTransfer, {
     finalOptimisedBassResponse: canonicalResult ? {
       postEqRspCurve: Array.isArray(canonicalResult.postEqRspCurve) ? canonicalResult.postEqRspCurve : [],
       postEqPerSeatCurves: Array.isArray(canonicalResult.postEqPerSeatCurves) ? canonicalResult.postEqPerSeatCurves : [],
+      eqFilterBank: Array.isArray(canonicalResult.eqFilterBank) ? canonicalResult.eqFilterBank : [],
     } : null,
     runtimeMs: Math.max(0, endedAt - startedAt),
     algorithmVersion: "stage2-canonical-v2",

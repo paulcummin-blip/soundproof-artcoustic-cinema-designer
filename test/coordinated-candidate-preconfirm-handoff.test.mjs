@@ -7,7 +7,7 @@
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildRoomDBundle, ROOM_D_DIMS, ROOM_D_CROSSOVER } from "../src/components/room/bass/improveBassV2/coordinatedCandidateFixture.js";
+import { buildRoomDBundle, ROOM_D_DIMS, ROOM_D_CROSSOVER, ROOM_D_P14_TARGET } from "../src/components/room/bass/improveBassV2/coordinatedCandidateFixture.js";
 import { buildCandidateTransfer, evaluateCoordinatedCandidate } from "../src/components/room/bass/improveBassV2/coordinatedCandidateEvaluation.js";
 import { checkPreConfirmIntegrity } from "../src/components/room/bass/improveBassV2/coordinatedCandidateIntegrityChecks.js";
 import {
@@ -68,7 +68,7 @@ describe("coordinated candidate pre-confirmation integration handoff", () => {
 
   before(() => {
     const integrationContext = makeRoomDIntegrationContext();
-    bundle = buildRoomDBundle({ integrationContext, responseBasis: "combined-lcr-sub" });
+    bundle = buildRoomDBundle({ integrationContext, responseBasis: "combined-lcr-sub", p14Target: ROOM_D_P14_TARGET });
     const built = buildCandidateTransfer({
       bundle,
       roomDims: ROOM_D_DIMS,

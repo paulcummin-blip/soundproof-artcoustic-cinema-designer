@@ -99,6 +99,10 @@ export function summariseCoordinatedEvidence(confirmation, meta = {}) {
     crossover: meta.crossover || confirmation?.crossover || null,
     responseBasis: meta.responseBasis || confirmation?.responseBasis || "sub-only",
     receipt: confirmation?.canonicalAuthorityReceipt || null,
+    // Applied EQ filter bank (the bass correction filters the canonical pipeline
+    // selected). Compact per-filter descriptors only — never the full coefficient
+    // arrays. Empty when unavailable.
+    appliedEq: extractEqFilters(confirmation?.finalOptimisedBassResponse?.eqFilterBank),
     sharedCancellations: null, // filled by the caller after this summary
     // Genuine post-EQ curves from the canonical result's
     // finalOptimisedBassResponse. Empty arrays when unavailable — never
@@ -111,6 +115,22 @@ export function summariseCoordinatedEvidence(confirmation, meta = {}) {
 function extractCurve(curve) {
   if (!Array.isArray(curve)) return [];
   return curve.map((p) => ({ ...p }));
+}
+
+/**
+ * Extract a compact descriptor of each applied EQ filter from the canonical
+ * filter bank. Carries the filter type, frequency, gain and Q (where present)
+ * so the developer evidence can show what the pipeline applied without
+ * duplicating the full coefficient arrays.
+ */
+function extractEqFilters(filterBank) {
+  if (!Array.isArray(filterBank)) return [];
+  return filterBank.map((f) => ({
+    type: f?.type ?? f?.filterType ?? null,
+    frequencyHz: num(f?.frequency ?? f?.frequencyHz ?? f?.fc),
+    gainDb: num(f?.gain ?? f?.gainDb),
+    q: num(f?.q ?? f?.quality),
+  }));
 }
 
 function extractPerSeatCurves(curves) {

@@ -179,15 +179,25 @@ export async function evaluateCoordinatedCandidate({
       responseBasis = built.responseBasis;
     }
 
-    // 3. Canonically confirm with the candidate's known tuning and crossover
+    // 3. Canonically confirm with the candidate's known tuning and crossover.
+    //    The P14 target must be supplied by the caller (the authoritative
+    //    project target). A missing dB is an explicit rejection — never a
+    //    silent 117 dB fixture default.
     const p14 = bundle.p14Target || {};
+    if (!Number.isFinite(Number(p14.p14TargetDb))) {
+      return {
+        status: "rejected",
+        evidence: null,
+        issues: ["P14 operating target dB is missing — the candidate must inherit the project's authoritative target, not a fixture default"],
+      };
+    }
     const confirmation = evaluateStage2ConfirmationWithTuning(evalTransfer, {
       tuning: bundle.tuning,
       tuningVariant: "delay-polarity-trim",
       crossover: bundle.crossover,
       p14TargetBasis: p14.p14TargetBasis || "minimum",
       p14TargetLevel: p14.p14TargetLevel || 2,
-      p14TargetDb: p14.p14TargetDb || 117,
+      p14TargetDb: p14.p14TargetDb,
       p18TargetBasis: p14.p18TargetBasis || "minimum",
     });
 
