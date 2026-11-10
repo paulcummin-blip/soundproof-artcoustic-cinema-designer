@@ -106,6 +106,19 @@ function whyText(adequacy, record) {
     return "Insufficient transparent information for a defensible numerical P12/P13 result.";
   }
   // GOOD — tailor the sentence to what is actually published.
+  const peakCeilingDb = record.halfspace_published_max_peak_spl_db_1m;
+  const hasPeakCeiling = hasValue(peakCeilingDb);
+  const hasPower = hasValue(record.power_authority_w);
+  const hasSensitivity = hasValue(record.halfspace_sensitivity_db_1w_1m);
+  if (!hasPower && hasPeakCeiling && hasSensitivity) {
+    const peakAssumed = record.max_spl_duration_assumed === true;
+    const spaceAssumed = record.max_spl_space_provenance === 'half_space_assumed'
+      || record.sensitivity_space_provenance === 'half_space_assumed';
+    const parts = [`Manufacturer publishes usable sensitivity, nominal impedance and maximum SPL at 1 m. Sound Proof calculates variable-power capability from sensitivity and impedance, capped at the manufacturer's ${Math.round(Number(peakCeilingDb))} dB maximum.`];
+    if (peakAssumed) parts.push('SPL duration is not stated, so the cap is held as peak / short-term.');
+    if (spaceAssumed) parts.push('Measurement space is not stated, so the result remains an informed estimate rather than FULL DATA.');
+    return parts.join(' ');
+  }
   const publishedSpl = hasValue(record.published_max_continuous_spl_db_1m);
   const lead = "A defensible comparison is possible using manufacturer-published sensitivity and amplifier guidance.";
   if (!publishedSpl) return `${lead} No published continuous SPL figure, so capability is calculated from sensitivity and amplifier power.`;

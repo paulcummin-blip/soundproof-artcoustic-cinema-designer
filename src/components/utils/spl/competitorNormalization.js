@@ -166,23 +166,40 @@ export function normalizeCompetitor(record) {
   const rawCalculated = oneW !== null && power !== null ? oneW + 10 * Math.log10(power) : null;
   const calculated = halfSensitivity !== null && power !== null ? halfSensitivity + 10 * Math.log10(power) : null;
 
+  // A published "Max SPL" ceiling — an explicit peak figure, or an ambiguous
+  // "Max SPL" reclassified as peak / short-term — is a defensible conservative
+  // upper bound on capability even when no continuous/AES power rating is
+  // published. With a usable sensitivity the engine's variable-power calculation
+  // (sensitivity + the system amplifier power) can still run, capped at the
+  // manufacturer's own maximum, so the row is gradeable. (Wisdom P2i route:
+  // 86 dB @ 2.83 V / 1 m into 4 Ω → ~83 dB @ 1 W / 1 m, capped at 107 dB.)
+  const hasPeakCeiling = peak !== null;
+  const peakCeilingRoute = hasPeakCeiling && oneW !== null;
+
   // Effective continuous capability consumed by the engine. When the published
   // figure was reclassified as peak, the continuous capability is the calculated
   // value capped at the reclassified peak (continuous ≤ peak), so an ambiguous
-  // "Max SPL" figure can never increase capability beyond what is justified.
+  // "Max SPL" figure can never increase capability beyond what is justified. When
+  // no power authority is published at all, the reclassified peak is the
+  // conservative ceiling: the engine's variable-power calc (sensitivity + system
+  // amp) is capped at it, so the manufacturer's own maximum is never exceeded and
+  // the figure is never used as proof of continuous capability.
   const effectiveContinuous = continuous !== null
     ? continuous
-    : (calculated !== null && peak !== null ? Math.min(calculated, peak) : calculated);
+    : (calculated !== null && peak !== null
+        ? Math.min(calculated, peak)
+        : (peakCeilingRoute ? peak : calculated));
 
-  // Gradeable when either a published continuous SPL exists, or the capability can
-  // be calculated from sensitivity plus a stated power authority. A row with
-  // neither a power rating nor a recommended amplifier maximum — and no published
-  // SPL — stays ungradeable rather than being estimated.
+  // Gradeable when a defensible numerical result is possible: a published
+  // continuous SPL, a calculated capability (sensitivity + power), or a usable
+  // sensitivity capped at a published max SPL ceiling. A row with no sensitivity,
+  // no power authority and no max SPL ceiling stays ungradeable rather than being
+  // estimated.
   const warnings = [
-    sensitivity === null && continuous === null ? 'Missing sensitivity' : null,
-    voltageDb === null && continuous === null ? 'Sensitivity reference or impedance needs confirmation' : null,
-    power === null && continuous === null
-      ? 'Missing continuous/AES power and recommended amplifier maximum'
+    sensitivity === null && continuous === null && !peakCeilingRoute ? 'Missing sensitivity' : null,
+    voltageDb === null && continuous === null && !peakCeilingRoute ? 'Sensitivity reference or impedance needs confirmation' : null,
+    power === null && continuous === null && !hasPeakCeiling
+      ? 'Missing continuous/AES power, recommended amplifier maximum and max SPL ceiling'
       : null,
   ].filter(Boolean);
 
@@ -292,7 +309,11 @@ export function normalizeCompetitor(record) {
     max_spl_duration_assumption: maxSplDuration.assumed ? AMBIGUOUS_MAX_SPL_ASSUMPTION : '',
     spl_authority: !eligible
       ? 'Incomplete'
-      : continuous !== null ? evidenceSource.authority : 'Calculated from sensitivity + power',
+      : continuous !== null
+        ? evidenceSource.authority
+        : (power !== null
+          ? 'Calculated from sensitivity + power'
+          : 'Calculated from sensitivity, capped at max SPL ceiling'),
     // Evidence provenance of the graded SPL figure, so every surface that describes
     // the evidence states where the figure came from rather than implying measurement.
     spl_evidence_source: evidenceSource.key,
