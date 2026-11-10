@@ -31,6 +31,8 @@ let roomSimulationObserver = null;
 export function setRoomSimulationObserver(observer) { roomSimulationObserver = observer; }
 export function recordRoomSimulationInvocation(kind = "roomSimulationCalls") { roomSimulationObserver?.(kind); }
 
+import { V2_ENGINE_REVISION } from "./v2EngineRevision.js";
+
 const now = () =>
   typeof performance !== "undefined" ? performance.now() : Date.now();
 
@@ -255,6 +257,7 @@ export class V2RuntimeMetrics {
       runId: this.runId,
       projectId: this.projectId,
       versionId: this.versionId,
+      engineRevision: V2_ENGINE_REVISION,
       totalWallClockMs: Math.round(total),
       stages,
       stageTotalMs: stages.reduce((sum, stage) => sum + stage.durationMs, 0),
@@ -270,6 +273,7 @@ export class V2RuntimeMetrics {
       runId: this.runId,
       projectId: this.projectId,
       versionId: this.versionId,
+      engineRevision: V2_ENGINE_REVISION,
       totalWallClockMs: Math.round(this.totalWallClockMs || 0),
       currentReused: this.currentReused,
       currentRecalculations: this.currentRecalculations,

@@ -391,6 +391,7 @@ export default function OptimiseAndCalculate({
           runId: activeRun.runId,
           timings: buildPersistedRunTimings(timings),
         },
+        engineRevision: measuredRuntime?.engineRevision || null,
       });
     };
     const saveRunFailure = (reason, extra = {}) => {
@@ -630,6 +631,7 @@ export default function OptimiseAndCalculate({
               targetKey: null,
             },
             engineVersion: result.selection?.winner?.algorithmVersion || null,
+            engineRevision: result.engineRevision || measuredRuntime?.engineRevision || null,
           },
           instances: subInstancesRef.current || [],
           seatingPositions,
@@ -651,6 +653,7 @@ export default function OptimiseAndCalculate({
             cacheKey: currentShared?.cacheKey || null,
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
             engineVersion: result.selection?.winner?.algorithmVersion || null,
+            engineRevision: result.engineRevision || measuredRuntime?.engineRevision || null,
           },
           calibrationDecision: calibrationApplication,
           decisionApplied: calibrationApplied,

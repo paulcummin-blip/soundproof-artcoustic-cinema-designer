@@ -390,6 +390,8 @@ export function resolveOptimiserPlanStatus({
     // Measurement only: it is read inside the developer diagnostics level and no
     // value in it decides anything.
     runtimeBreakdown: plan.runtimeBreakdown || null,
+    // The V2 engine revision that executed the run. Diagnostic only.
+    engineRevision: plan.engineRevision || null,
     // What ADI did with the calibration levers, and why: the decision saved with
     // the run, so the panel states it after a refresh instead of guessing.
     calibrationDecision: plan.calibrationDecision || null,

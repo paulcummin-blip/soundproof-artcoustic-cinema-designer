@@ -87,6 +87,10 @@ export function serializeOptimiserPlan(plan) {
     // level, and it decides nothing. Absent on records saved before this existed;
     // those are never reinterpreted.
     runtimeBreakdown: plan.runtimeBreakdown || null,
+    // The V2 engine revision that executed the run. Surfaces in the persisted
+    // plan so a saved record can be compared against the source it claims to
+    // have executed. Absent on records saved before this existed.
+    engineRevision: plan.engineRevision || null,
     notes: Array.isArray(plan.notes) ? plan.notes : [],
     // The run's compact cross-quantity audit trail. Retained with the plan so a
     // completed run can be diagnosed after cold reopen from saved evidence

@@ -72,6 +72,7 @@ import {
   MAX_CROSS_QUANTITY_CANDIDATES_PER_QUANTITY,
 } from "./candidateDesignContext.js";
 import { createCrossQuantityAuditTrail } from "./crossQuantityAuditTrail.js";
+import { V2_ENGINE_REVISION } from "./v2EngineRevision.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -1919,7 +1920,17 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // four-subwoofer improvement). Missing quantity finalists are reported,
     // not invented. Each cross-quantity finalist carries its own candidate-
     // owned design context so tuning and evidence bind to the candidate.
-    let coordinatedDiagnostics = { status: "skipped", eligible: false, skipReason: null };
+    let coordinatedDiagnostics = {
+      status: "skipped",
+      eligible: false,
+      skipReason: null,
+      gateInputs: {
+        hasExistingAuthority: !!existingAuthority,
+        hasCurrentFinalist: !!buildCurrentFinalist(subwooferInstances, roomDims),
+        hasEffectiveBaseline: !!(savedEffectiveBaseline?.length),
+        hasCurrentTransfer: !!(savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length),
+      },
+    };
     const coordinatedStarted = performance.now();
     try {
       setStageVerdict(projectId, versionId, "coordinated_physical", "skipped");
@@ -1956,8 +1967,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           installedQuantity: installedQty,
         };
         const { coordinatedCandidates, diagnostics: coordDiag } = await runCoordinatedPhysicalSearch(coordinatedCtx);
-        coordinatedDiagnostics = coordDiag;
-        metrics.addStage("coordinated-search", performance.now() - coordinatedStarted);
+        coordinatedDiagnostics = { ...coordinatedDiagnostics, ...coordDiag,
+          gateInputs: coordinatedDiagnostics.gateInputs };
         metrics.recordCounts({ coordinatedCombos: coordDiag.combosEvaluated || 0, coordinatedConfirmed: (coordDiag.confirmed || []).length });
         for (const cc of coordinatedCandidates) {
           confirmedResults.push(cc);
@@ -1973,7 +1984,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       setStageVerdict(projectId, versionId, "coordinated_physical", "incomplete");
       coordinatedDiagnostics = { ...coordinatedDiagnostics, status: "incomplete", error: err.message };
     }
+    // COORDINATED-SEARCH TIMING: always recorded — completed, skipped, or
+    // recoverable failure — so the stage is present in run-history metrics
+    // for every normal completed run, including when the search was skipped.
     coordinatedDiagnostics.elapsedMs ??= performance.now() - coordinatedStarted;
+    metrics.addStage("coordinated-search", coordinatedDiagnostics.elapsedMs || 0);
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
@@ -2192,6 +2207,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       selection,
       snapshot,
       confirmedResults,
+      engineRevision: V2_ENGINE_REVISION,
       // The parity record travels WITH the result: the plan stores it so a
       // future mismatch is diagnosable and so Apply can be refused when parity
       // was never established.

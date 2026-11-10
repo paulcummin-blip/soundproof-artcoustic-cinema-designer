@@ -411,6 +411,7 @@ export function buildOptimiserRunEvidence({
     resultFingerprint: identity.resultFingerprint || null,
     cacheKey: identity.cacheKey || identity.designFingerprint || null,
     engineVersion: identity.engineVersion || null,
+    engineRevision: identity.engineRevision || null,
     // --- terminal outcome ---
     terminalOutcome: outcome,
     // --- terminal failure, when the run ended in one ---

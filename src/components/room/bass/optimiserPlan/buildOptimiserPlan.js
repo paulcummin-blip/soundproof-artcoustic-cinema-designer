@@ -549,6 +549,8 @@ export function buildOptimiserPlan({
     // --- 1. source identity ---
     projectId: identity.projectId || null,
     versionId: identity.versionId || null,
+    // The V2 engine revision that executed the run. Diagnostic only.
+    engineRevision: identity.engineRevision || null,
     baseDesignFingerprint: identity.baseDesignFingerprint || null,
     designFingerprint: identity.designFingerprint || null,
     resultFingerprint: identity.resultFingerprint || null,

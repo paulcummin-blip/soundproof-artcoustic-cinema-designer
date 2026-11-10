@@ -36,6 +36,15 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
       ? Math.round(Number(coordinatedDiagnostics.elapsedMs))
       : null,
     error: coordinatedDiagnostics.error || null,
+    // Gate-outcome inputs — what the eligibility gate checked before
+    // branching. Captured before the search so a skipped run states WHY
+    // it was skipped (which input was absent), not merely that it was.
+    gateInputs: {
+      hasExistingAuthority: coordinatedDiagnostics.gateInputs?.hasExistingAuthority ?? null,
+      hasCurrentFinalist: coordinatedDiagnostics.gateInputs?.hasCurrentFinalist ?? null,
+      hasEffectiveBaseline: coordinatedDiagnostics.gateInputs?.hasEffectiveBaseline ?? null,
+      hasCurrentTransfer: coordinatedDiagnostics.gateInputs?.hasCurrentTransfer ?? null,
+    },
     // Quantity coverage — which subwoofer counts were searched.
     installedQuantity: Number.isFinite(Number(coordinatedDiagnostics.installedQuantity))
       ? Number(coordinatedDiagnostics.installedQuantity)

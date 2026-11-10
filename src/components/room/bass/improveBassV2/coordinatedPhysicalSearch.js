@@ -84,6 +84,12 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     skipReason: null,
     startedAt: null,
     elapsedMs: 0,
+    gateInputs: {
+      hasExistingAuthority: null,
+      hasCurrentFinalist: null,
+      hasEffectiveBaseline: null,
+      hasCurrentTransfer: null,
+    },
     installedQuantity: null,
     quantityCoverage: {},
     missingQuantities: [],
@@ -120,6 +126,18 @@ export async function runCoordinatedPhysicalSearch(ctx) {
   // The gate is the same as the existing seating/combined phases: a
   // published baseline is required to compare against. Without it, the
   // final ranking has nothing to compare to.
+  // GATE OUTCOME: capture each input the gate checked, BEFORE branching,
+  // so a skipped run states which input was absent — not merely that it
+  // was skipped. These are boolean presence flags, never raw transfers or
+  // internal data.
+  const hasCurrentTransfer = !!(currentFinalist?.sources?.length
+    && effectiveBaseline?.length);
+  diagnostics.gateInputs = {
+    hasExistingAuthority: !!existingAuthority,
+    hasCurrentFinalist: !!currentFinalist,
+    hasEffectiveBaseline: !!(effectiveBaseline?.length),
+    hasCurrentTransfer,
+  };
   if (!existingAuthority || !currentFinalist || !effectiveBaseline?.length) {
     diagnostics.status = "skipped";
     diagnostics.eligible = false;

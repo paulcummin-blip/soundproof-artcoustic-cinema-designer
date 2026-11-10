@@ -156,6 +156,7 @@ export default function useRunOptimisationPlan({
           timings: buildPersistedRunTimings(timings),
           publication: publicationDiagnostics,
         },
+        engineRevision: measuredRuntime?.engineRevision || null,
       });
     };
 
@@ -337,6 +338,7 @@ export default function useRunOptimisationPlan({
           targetKey: null,
         },
         engineVersion: result.selection?.winner?.algorithmVersion || null,
+        engineRevision: result.engineRevision || measuredRuntime?.engineRevision || null,
       };
 
       // The calibration decision for this evaluation: what ADI would apply, and
