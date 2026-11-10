@@ -61,6 +61,7 @@ import {
 } from "../optimiserPlan/optimiserBaselineAuthority.js";
 import { buildOptimisationDiagnosticsReport, logOptimisationDiagnosticsReport } from "./optimisationDiagnosticsReport.js";
 import { runCombinedOptimisation, identifyBestPositionCandidate } from "./combinedOptimisationSearch.js";
+import { runCoordinatedPhysicalSearch } from "./coordinatedPhysicalSearch.js";
 import { setCombinedResult } from "./improveBassV2Store.js";
 import { computeProxyCandidateMetrics, promoteProxyChallengers } from "./proxyCandidateMetrics.js";
 import { selectCanonicalObjectives, explainFinalSelection, dedupeCandidates } from "./canonicalObjectiveSelection.js";
@@ -1904,6 +1905,51 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     metrics.addStage("seating-search", performance.now() - seatingSearchStarted);
     metrics.recordCounts({ seatingProbes: seatingDiagnostics.confirmed || 0 });
 
+    // ── Phase 9B: Coordinated seating + subwoofer placement discovery ────
+    // Searches COMBINATIONS of moved seating and freshly reconsidered sub
+    // positions — the interaction the separate seating (Phase 9) and
+    // position (Phases A/B/C) searches cannot reach. Reuses the existing
+    // seating-batch worker, placement generator/screener, electronic retune
+    // and canonical confirmation. Defensively guarded: any internal failure
+    // records an issue and continues — it never destabilises the run.
+    let coordinatedDiagnostics = { status: "skipped" };
+    const coordinatedStarted = performance.now();
+    try {
+      setStageVerdict(projectId, versionId, "coordinated_physical", "skipped");
+      if (existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
+        const coordinatedCtx = {
+          worker, controller, isCancelled: () => isCancelled(), isStale, metrics,
+          bindConfirmation, validationContext,
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
+          roomDims, subwooferInstances, seatingPositions, rspPosition,
+          selectedSubModel, amplifierPowerPerSubW, subwooferBottomHeightM,
+          frontOrientation, rearOrientation,
+          existingAuthority, effectiveBaseline: savedEffectiveBaseline,
+          currentFinalist: buildCurrentFinalist(subwooferInstances, roomDims),
+          onProgress,
+        };
+        const { coordinatedCandidates, diagnostics: coordDiag } = await runCoordinatedPhysicalSearch(coordinatedCtx);
+        coordinatedDiagnostics = coordDiag;
+        metrics.addStage("coordinated-search", performance.now() - coordinatedStarted);
+        metrics.recordCounts({ coordinatedCombos: coordDiag.combosEvaluated || 0, coordinatedConfirmed: (coordDiag.confirmed || []).length });
+        for (const cc of coordinatedCandidates) {
+          confirmedResults.push(cc);
+          funnelCandidates.push(cc);
+          metrics.recordChallengerConfirmed();
+        }
+        setStageVerdict(projectId, versionId, "coordinated_physical",
+          coordinatedCandidates.length > 0 ? "improvement" : coordDiag.status === "skipped" ? "skipped" : "no_improvement");
+      }
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+      evaluationIssues.push({ stage: "coordinated", error: err.message });
+      setStageVerdict(projectId, versionId, "coordinated_physical", "incomplete");
+      coordinatedDiagnostics = { ...coordinatedDiagnostics, status: "incomplete", error: err.message };
+    }
+    await yieldToUI();
+    if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
     // ── Phase 10: Combined optimisation ────────────────────────────────
     // Build combined candidates by retuning FULL calibration (phase → delay →
     // gain chained) on Current, seating, and position rawTransfers. Reuses
@@ -2029,6 +2075,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.combinedResult=combinedResult;
     selection.combinedMaterial=combinedMaterial;
     selection.combinedDiagnostics=combinedDiagnostics;
+    selection.coordinatedDiagnostics=coordinatedDiagnostics;
     selection.integrationRecommendation=combinedResult?.integrationVerified ? combinedResult : null;
     // ── Canonical objective winners + diagnostic ledger ─────────────────
     // Built from canonically CONFIRMED results only. This never changes the
