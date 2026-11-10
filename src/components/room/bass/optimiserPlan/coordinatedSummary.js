@@ -45,6 +45,9 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
       hasEffectiveBaseline: coordinatedDiagnostics.gateInputs?.hasEffectiveBaseline ?? null,
       hasCurrentTransfer: coordinatedDiagnostics.gateInputs?.hasCurrentTransfer ?? null,
     },
+    // RSP authority validation — whether the RSP mode and designated seat
+    // were consistent before the search ran. A skipped run states WHY.
+    rspAuthority: coordinatedDiagnostics.rspAuthority ?? null,
     // Quantity coverage — which subwoofer counts were searched.
     installedQuantity: Number.isFinite(Number(coordinatedDiagnostics.installedQuantity))
       ? Number(coordinatedDiagnostics.installedQuantity)
@@ -100,6 +103,19 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
       receipt: c?.receipt ?? null,
       perSeatP20: c?.perSeatP20 ?? [],
       isCrossQuantity: !!c?.isCrossQuantity,
+      // RSP authority: the mode, designated seat ID and actual XYZ used for
+      // canonical evaluation. Carried so a saved candidate's RSP can be
+      // audited without re-running the search.
+      rspAuthority: c?.rspAuthority ?? null,
+      installedQuantity: c?.installedQuantity ?? null,
+      // Selection evaluation outcomes — cross-referenced from selection.evaluations
+      // after selectConfirmedRecommendations runs. These survive plan save,
+      // serialization, hydration and readback.
+      validationOutcome: c?.validationOutcome ?? null,
+      protectedPrimarySafety: c?.protectedPrimarySafety ?? null,
+      materialityOutcome: c?.materialityOutcome ?? null,
+      physicalAlternativeEligible: c?.physicalAlternativeEligible === true,
+      physicalAlternativeDisplayed: c?.physicalAlternativeDisplayed === true,
     })),
     // Rejection reasons — compact, no raw issues arrays.
     rejectedCount: Number(coordinatedDiagnostics.rejected?.length) || 0,

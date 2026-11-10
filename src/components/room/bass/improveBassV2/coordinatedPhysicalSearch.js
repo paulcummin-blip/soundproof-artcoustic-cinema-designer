@@ -60,6 +60,7 @@ import { selectDiverseSeatingStates } from "./coordinatedDiversityPolicy.js";
 import { selectQuantityAwarePlacements } from "./coordinatedPlacementSelection.js";
 import { buildCandidateDesignContext, validationContextForCandidate } from "./candidateDesignContext.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { validateCoordinatedRspAuthority, attachRspAuthority } from "./coordinatedRspAuthority.js";
 
 // Bounded search contract — a small, topology-diverse set so the search
 // stays fast and the shortlist is cheap to confirm canonically.
@@ -124,6 +125,8 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     onProgress,
     crossQuantityFinalists = {},
     installedQuantity = null,
+    rspMode = null,
+    designatedRspSeatId = null,
   } = ctx;
 
   diagnostics.installedQuantity = Number.isFinite(Number(installedQuantity))
@@ -160,6 +163,30 @@ export async function runCoordinatedPhysicalSearch(ctx) {
 
   diagnostics.eligible = true;
   diagnostics.startedAt = new Date().toISOString();
+
+  // ── 0a. Validate the RSP authority BEFORE searching ────────────────────
+  // The coordinated search moves ALL seats. The RSP must follow the SAME
+  // authority the project uses. A seat_bound RSP with a missing or invalid
+  // designated seat ID is rejected explicitly — it never silently resolves
+  // to an unrelated position.
+  const rspAuthority = validateCoordinatedRspAuthority({
+    rspMode,
+    designatedRspSeatId,
+    seatingPositions,
+    rspPosition,
+  });
+  diagnostics.rspAuthority = {
+    valid: rspAuthority.valid,
+    rspMode: rspAuthority.rspMode,
+    designatedRspSeatId: rspAuthority.designatedRspSeatId,
+    issues: rspAuthority.issues,
+  };
+  if (!rspAuthority.valid) {
+    diagnostics.status = "skipped";
+    diagnostics.skipReason = "invalid_rsp_authority";
+    diagnostics.elapsedMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
+    return { coordinatedCandidates: [], diagnostics };
+  }
 
   // ── 1. Diverse legal seating states (NOT pruned by installed-sub proxy) ──
   const screenWall = "front";
@@ -390,6 +417,7 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     result.candidateId = `coordinated:${combo.placementId}:${combo.offsetMm}`;
     result.candidateOrigin = "coordinated";
     result.isCoordinatedCandidate = true;
+    result.isPhysicalAlternative = true;
     result.seatingOffsetMm = combo.offsetMm;
     result.seatingPositions = combo.seatingPositions;
     result.coordinatedPlacementId = combo.placementId;
@@ -399,6 +427,9 @@ export async function runCoordinatedPhysicalSearch(ctx) {
       result.designContext = combo.designContext;
       result.isCrossQuantity = true;
     }
+    // Attach the RSP authority so each candidate records the RSP mode,
+    // designated seat ID and actual XYZ used for canonical evaluation.
+    attachRspAuthority(result, rspAuthority, combo.offsetMm);
     coordinatedCandidates.push(result);
     diagnostics.confirmed.push({
       candidateId: result.candidateId, placementId: combo.placementId,
@@ -415,6 +446,8 @@ export async function runCoordinatedPhysicalSearch(ctx) {
         seatId, isPrimary, level, variationDbRaw, worstFrequencyHz,
       })),
       isCrossQuantity: !!combo.designContext,
+      rspAuthority: result.rspAuthority,
+      installedQuantity: diagnostics.installedQuantity,
     });
   }
 

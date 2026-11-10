@@ -266,6 +266,8 @@ export async function runOptimisation(opts) {
     correctabilityAssessment,
     integrationContext,
     crossQuantityQuantities,
+    rspMode: appState?.rspMode || null,
+    designatedRspSeatId: appState?.designatedRspSeatId || null,
   };
 
   let runtimeMetrics = null;

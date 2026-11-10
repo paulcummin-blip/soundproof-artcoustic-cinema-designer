@@ -62,6 +62,7 @@ import {
 import { buildOptimisationDiagnosticsReport, logOptimisationDiagnosticsReport } from "./optimisationDiagnosticsReport.js";
 import { runCombinedOptimisation, identifyBestPositionCandidate } from "./combinedOptimisationSearch.js";
 import { runCoordinatedPhysicalSearch } from "./coordinatedPhysicalSearch.js";
+import { enrichCoordinatedDiagnosticsWithEvaluations } from "./coordinatedDiagnosticsEnrichment.js";
 import { setCombinedResult } from "./improveBassV2Store.js";
 import { computeProxyCandidateMetrics, promoteProxyChallengers } from "./proxyCandidateMetrics.js";
 import { selectCanonicalObjectives, explainFinalSelection, dedupeCandidates } from "./canonicalObjectiveSelection.js";
@@ -518,6 +519,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     currentAuthority, currentCanonicalResult, currentSources, liveCacheKey, stage2Result, placementFingerprint,
     correctabilityAssessment, integrationContext,
     crossQuantityQuantities = [],
+    rspMode = null,
+    designatedRspSeatId = null,
   } = params;
 
   const worker = new Worker(new URL("./improveBassV2.worker.js", import.meta.url), { type: "module" });
@@ -1965,6 +1968,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           onProgress,
           crossQuantityFinalists: coordinatedCrossQtyFinalists,
           installedQuantity: installedQty,
+          rspMode,
+          designatedRspSeatId,
         };
         const { coordinatedCandidates, diagnostics: coordDiag } = await runCoordinatedPhysicalSearch(coordinatedCtx);
         coordinatedDiagnostics = { ...coordinatedDiagnostics, ...coordDiag,
@@ -2119,6 +2124,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.combinedMaterial=combinedMaterial;
     selection.combinedDiagnostics=combinedDiagnostics;
     selection.coordinatedDiagnostics=coordinatedDiagnostics;
+    // Enrich the coordinated diagnostics with the selection evaluation outcomes
+    // (validation, safety, protected-primary-seat, materiality) so the
+    // persisted coordinated summary carries the full decision evidence.
+    enrichCoordinatedDiagnosticsWithEvaluations(coordinatedDiagnostics, selection.evaluations);
     selection.integrationRecommendation=combinedResult?.integrationVerified ? combinedResult : null;
     // ── Canonical objective winners + diagnostic ledger ─────────────────
     // Built from canonically CONFIRMED results only. This never changes the
