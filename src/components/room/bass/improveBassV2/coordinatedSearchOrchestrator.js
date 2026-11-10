@@ -257,6 +257,11 @@ async function evaluateBaseline({
       crossover: integrationContext?.crossover || null,
       tuning: bundle.tuning,
       designatedSeatId,
+      // P0-2: candidate-owned physical identity for the baseline too.
+      placementId: "baseline-current",
+      selectedSubModel,
+      subwooferBottomHeightM,
+      roomDims: { widthM: roomDims.widthM, lengthM: roomDims.lengthM },
     },
   };
 }
@@ -341,6 +346,12 @@ function generateSearchCandidates({
             designatedSeatId,
             finalistId: finalist.id || null,
             seatingLabel: seatingState.label,
+            // P0-2: candidate-owned physical identity for reproducible
+            // presentation. Never inferred from the installed layout.
+            placementId: finalist.id || null,
+            selectedSubModel,
+            subwooferBottomHeightM,
+            roomDims: { widthM: roomDims.widthM, lengthM: roomDims.lengthM },
           },
         });
       }

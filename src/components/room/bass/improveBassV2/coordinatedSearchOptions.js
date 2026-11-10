@@ -40,6 +40,15 @@ export function buildOption({ optionId, label, evidence, meta = {} }) {
       crossover: meta.crossover || null,
       tuning: Array.isArray(meta.tuning) ? meta.tuning : [],
       complexity: meta.complexity || "baseline",
+      // P0-2: the candidate's persisted placement identity and designated RSP
+      // seat, so the designer can reproduce the evaluated physical
+      // configuration. Candidate-owned data only — never inferred from the
+      // installed layout.
+      placementId: meta.placementId || meta.finalistId || null,
+      designatedSeatId: meta.designatedSeatId || null,
+      selectedSubModel: meta.selectedSubModel || null,
+      subwooferBottomHeightM: num(meta.subwooferBottomHeightM),
+      roomDims: meta.roomDims || null,
     },
   };
 }
@@ -171,9 +180,23 @@ function describeWhatChanges(baselineMeta, altMeta) {
   }
   if (altMeta?.coordinates && baselineMeta?.coordinates) {
     const moved = positionsChanged(baselineMeta.coordinates, altMeta.coordinates);
-    if (moved) changes.push("Subwoofer positions changed");
+    if (moved) {
+      // P0-2: show the actual evaluated coordinates so the designer can
+      // reproduce the proposed placement. Room-relative metres, one entry
+      // per source, in candidate-owned order.
+      const coordText = altMeta.coordinates
+        .map((c, i) => `Sub ${i + 1}: (${formatM(c.x)}, ${formatM(c.y)}) m`)
+        .join("; ");
+      changes.push(`Subwoofer positions: ${coordText}`);
+    }
   }
   return changes;
+}
+
+function formatM(value) {
+  const n = num(value);
+  if (n == null) return "?";
+  return n.toFixed(2);
 }
 
 function describeWhatImproves(comparison) {

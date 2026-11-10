@@ -56,6 +56,7 @@ import {
   describeTradeOffRejected,
   describeTradeOffReview,
 } from "./adiCalibrationTradeOffRule.js";
+import { candidatePhysicalGeometryMatchesInstalled } from "./candidateGeometryMatchAuthority.js";
 import {
   describeCalibrationSuggestion,
   suggestionInputsFromSettings,
@@ -92,6 +93,12 @@ export const CALIBRATION_APPLY_REASON = Object.freeze({
   ALREADY_APPLIED: "calibration-already-applied",
   HUMAN_CALIBRATION: "calibration-was-set-by-hand",
   NO_CANDIDATE: "no-confirmed-calibration-candidate",
+  // P0-1: the candidate's confirmed result depends on changed physical
+  // geometry (moved subwoofers, changed count, moved seating) or its source
+  // identities do not match the installed instances. Its tuning was computed
+  // for a different geometry, so it must not be auto-applied to the installed
+  // design regardless of its acoustic score.
+  PHYSICAL_GEOMETRY_MISMATCH: "candidate-physical-geometry-does-not-match-installed",
 });
 
 export const CALIBRATION_SETTING = Object.freeze({
@@ -151,6 +158,8 @@ export function describeCalibrationNotApplied(reason, { selectedLever = null } =
       return "Not applied because the current calibration was set by hand and is not overwritten automatically.";
     case CALIBRATION_APPLY_REASON.ALREADY_APPLIED:
       return "Not applied because this calibration is already applied to the design.";
+    case CALIBRATION_APPLY_REASON.PHYSICAL_GEOMETRY_MISMATCH:
+      return "Not applied because this candidate depends on physical changes to the layout — it requires your approval.";
     case CALIBRATION_APPLY_REASON.NOT_MATERIAL:
       // Deliberately no fixed sentence: whether this was "under 1 dB" or held by
       // the seat-level rule depends on the exact values, which only the decision
@@ -650,6 +659,21 @@ export function resolveCalibrationAutoApply({
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.ALREADY_APPLIED,
       "The applied calibration already matches the best confirmed candidate — nothing to change.",
       { candidateId, tuning });
+  }
+
+  // ── P0-1: physical-geometry guard ──────────────────────────────────
+  // A calibration-only result may be auto-applied ONLY when its source
+  // identities, quantity, positions, seating geometry and processing
+  // assumptions match the installed configuration. A candidate whose confirmed
+  // result depends on changed physical geometry (moved subwoofers, changed
+  // count, moved seating) must remain advisory — its tuning was computed for a
+  // different geometry. This guard runs before any improvement/damage
+  // assessment so a high acoustic score can never override a geometry mismatch.
+  const geometryMatch = candidatePhysicalGeometryMatchesInstalled(candidate, instances);
+  if (!geometryMatch.matches) {
+    return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.PHYSICAL_GEOMETRY_MISMATCH,
+      `This candidate depends on physical changes to the layout (${geometryMatch.reasons.join("; ")}). It has not been applied — your approval is required.`,
+      { candidateId, tuning, geometryMismatch: geometryMatch.reasons });
   }
 
   const before = canonicalCalibrationPair(baseline);
