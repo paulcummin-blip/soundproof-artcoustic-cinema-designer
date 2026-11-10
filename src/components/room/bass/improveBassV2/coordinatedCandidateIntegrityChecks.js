@@ -170,12 +170,34 @@ export function checkPreConfirmIntegrity(bundle, rawTransfer) {
 
   // Response basis and crossover correspond to the candidate
   const expectedBasis = bundle?.responseBasis || "sub-only";
-  const transferBasis = rawTransfer?.integrationTransfers ? "combined-lcr-sub" : "sub-only";
-  if (expectedBasis === "combined-lcr-sub" && transferBasis !== "combined-lcr-sub") {
-    issues.push("Expected combined LCR/sub response basis but transfer has no integration transfers");
-  }
-  if (expectedBasis === "combined-lcr-sub" && bundle?.crossover && !rawTransfer?.crossover) {
-    issues.push("Bundle crossover not carried into transfer");
+  const integration = rawTransfer?.integrationTransfers;
+  const transferBasis = (integration && integration.available) ? "combined-lcr-sub" : "sub-only";
+  if (expectedBasis === "combined-lcr-sub") {
+    if (transferBasis !== "combined-lcr-sub") {
+      issues.push("Expected combined LCR/sub response basis but transfer has no integration transfers");
+    } else {
+      // Integration evidence must be present and available — no silent sub-only fallback
+      if (!integration?.available) {
+        issues.push("Combined transfer integration evidence is not available");
+      }
+      // Live LCR source count must match the integration context (e.g. 3 for Room D)
+      const expectedLcrCount = Array.isArray(bundle?.integrationContext?.speakerSources)
+        ? bundle.integrationContext.speakerSources.length : null;
+      const transferLcrCount = Number.isFinite(Number(integration?.speakerCount))
+        ? Number(integration.speakerCount) : null;
+      if (expectedLcrCount != null && transferLcrCount != null && expectedLcrCount !== transferLcrCount) {
+        issues.push(`Live LCR source count mismatch: integration context has ${expectedLcrCount}, transfer has ${transferLcrCount}`);
+      }
+      // Crossover frequency must survive the handoff (e.g. 95 Hz)
+      const bundleFreq = Number(bundle?.crossover?.frequencyHz);
+      const transferFreq = Number(rawTransfer?.crossover?.frequencyHz);
+      if (Number.isFinite(bundleFreq) && Number.isFinite(transferFreq) && bundleFreq !== transferFreq) {
+        issues.push(`Crossover frequency mismatch: bundle ${bundleFreq} Hz, transfer ${transferFreq} Hz`);
+      }
+      if (bundle?.crossover && !rawTransfer?.crossover) {
+        issues.push("Bundle crossover not carried into transfer");
+      }
+    }
   }
 
   return { valid: issues.length === 0, issues };

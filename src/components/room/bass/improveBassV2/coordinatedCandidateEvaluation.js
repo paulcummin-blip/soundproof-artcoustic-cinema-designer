@@ -69,6 +69,63 @@ function attachCombinedIntegration(rawTransfer, integrationContext) {
 }
 
 /**
+ * Build the candidate transfer (placement → combined LCR/sub integration when
+ * the bundle requires it). This is the single transfer-building authority shared
+ * by the evaluator and the developer pre-confirmation gate, so the gate validates
+ * the exact transfer object canonical confirmation will consume — never a second
+ * independently reconstructed transfer.
+ *
+ * @param {object} params
+ * @param {object} params.bundle — from buildCoordinatedCandidateBundle
+ * @param {object} params.roomDims — { widthM, lengthM, heightM }
+ * @param {number} [params.amplifierPowerPerSubW]
+ * @param {string} [params.frontOrientation]
+ * @param {string} [params.rearOrientation]
+ * @returns {{ status: "built"|"rejected"|"error", transfer: object|null, responseBasis: string|null, issues: string[] }}
+ */
+export function buildCandidateTransfer({ bundle, roomDims, amplifierPowerPerSubW = 0, frontOrientation = null, rearOrientation = null }) {
+  const validation = validateCoordinatedCandidateBundle(bundle);
+  if (!validation.valid) {
+    return { status: "rejected", transfer: null, responseBasis: null, issues: validation.issues };
+  }
+
+  const finalist = bundleToStage2Finalist(bundle, roomDims);
+  const rawTransfer = evaluateStage2Placement({
+    finalist,
+    roomDims,
+    rspPosition: bundle.rspPosition,
+    seatingPositions: bundle.seatingPositions,
+    selectedSubModel: bundle.selectedSubModel,
+    amplifierPowerPerSubW,
+    subwooferBottomHeightM: bundle.subwooferBottomHeightM,
+    frontOrientation,
+    rearOrientation,
+  });
+
+  if (!rawTransfer) {
+    return { status: "error", transfer: null, responseBasis: null, issues: ["Placement evaluation returned no raw transfer"] };
+  }
+
+  // A terminal physical rejection is a completed outcome, not missing evidence
+  if (rawTransfer.physicalRejection) {
+    return { status: "rejected", transfer: null, responseBasis: null, issues: [`Physical rejection: ${rawTransfer.physicalRejection.reason}`] };
+  }
+
+  let evalTransfer = rawTransfer;
+  let responseBasis = "sub-only";
+  if (bundle.responseBasis === "combined-lcr-sub" && bundle.integrationContext) {
+    const combined = attachCombinedIntegration(rawTransfer, bundle.integrationContext);
+    if (!combined) {
+      return { status: "error", transfer: null, responseBasis: null, issues: ["Combined LCR/sub integration capture failed"] };
+    }
+    evalTransfer = combined;
+    responseBasis = "combined-lcr-sub";
+  }
+
+  return { status: "built", transfer: evalTransfer, responseBasis, issues: [] };
+}
+
+/**
  * Evaluate a coordinated candidate bundle through the existing canonical engine.
  *
  * @param {object} params
@@ -77,6 +134,12 @@ function attachCombinedIntegration(rawTransfer, integrationContext) {
  * @param {number} [params.amplifierPowerPerSubW] — amplifier power per sub
  * @param {string} [params.frontOrientation] — front subwoofer orientation
  * @param {string} [params.rearOrientation] — rear subwoofer orientation
+ * @param {object} [params.preBuiltTransfer] — a transfer already built by
+ *   buildCandidateTransfer (the developer pre-confirmation gate path). When
+ *   supplied, the evaluator reuses this exact object for canonical confirmation
+ *   so the gate validates the same transfer confirmation consumes.
+ * @param {string} [params.preBuiltResponseBasis] — response basis of the
+ *   pre-built transfer ("sub-only" | "combined-lcr-sub").
  * @returns {Promise<object>} { status, evidence, issues }
  *   status: "evaluated" | "rejected" | "error"
  *   evidence: { p19, perSeatP20, primarySummary, secondarySummary, postEqCurves, receipt, crossover, responseBasis, sharedCancellations }
@@ -87,6 +150,8 @@ export async function evaluateCoordinatedCandidate({
   amplifierPowerPerSubW = 0,
   frontOrientation = null,
   rearOrientation = null,
+  preBuiltTransfer = null,
+  preBuiltResponseBasis = null,
 }) {
   // 1. Validate the bundle before any evaluation
   const validation = validateCoordinatedCandidateBundle(bundle);
@@ -95,49 +160,26 @@ export async function evaluateCoordinatedCandidate({
   }
 
   try {
-    // 2. Build a Stage 2 finalist from the bundle's coordinates
-    const finalist = bundleToStage2Finalist(bundle, roomDims);
-
-    // 3. Evaluate the placement (modal simulation → raw transfer)
-    //    Uses the candidate's proposed seating and proposed RSP.
-    const rawTransfer = evaluateStage2Placement({
-      finalist,
-      roomDims,
-      rspPosition: bundle.rspPosition,
-      seatingPositions: bundle.seatingPositions,
-      selectedSubModel: bundle.selectedSubModel,
-      amplifierPowerPerSubW,
-      subwooferBottomHeightM: bundle.subwooferBottomHeightM,
-      frontOrientation,
-      rearOrientation,
-    });
-
-    if (!rawTransfer) {
-      return { status: "error", evidence: null, issues: ["Placement evaluation returned no raw transfer"] };
-    }
-
-    // A terminal physical rejection is a completed outcome, not missing evidence
-    if (rawTransfer.physicalRejection) {
-      return {
-        status: "rejected",
-        evidence: null,
-        issues: [`Physical rejection: ${rawTransfer.physicalRejection.reason}`],
-      };
-    }
-
-    // 4. Attach combined LCR/sub integration if an integration context is provided
-    let evalTransfer = rawTransfer;
-    let responseBasis = "sub-only";
-    if (bundle.responseBasis === "combined-lcr-sub" && bundle.integrationContext) {
-      const combined = attachCombinedIntegration(rawTransfer, bundle.integrationContext);
-      if (!combined) {
-        return { status: "error", evidence: null, issues: ["Combined LCR/sub integration capture failed"] };
+    // 2. Obtain the transfer. When a pre-built transfer is supplied (the
+    //    developer pre-confirmation gate path), reuse that exact object so the
+    //    gate validates the same transfer canonical confirmation consumes —
+    //    never a second independently reconstructed one. Otherwise build it
+    //    here through the shared transfer-building authority.
+    let evalTransfer;
+    let responseBasis;
+    if (preBuiltTransfer) {
+      evalTransfer = preBuiltTransfer;
+      responseBasis = preBuiltResponseBasis || bundle.responseBasis || "sub-only";
+    } else {
+      const built = buildCandidateTransfer({ bundle, roomDims, amplifierPowerPerSubW, frontOrientation, rearOrientation });
+      if (built.status !== "built") {
+        return { status: built.status, evidence: null, issues: built.issues };
       }
-      evalTransfer = combined;
-      responseBasis = "combined-lcr-sub";
+      evalTransfer = built.transfer;
+      responseBasis = built.responseBasis;
     }
 
-    // 5. Canonically confirm with the candidate's known tuning and crossover
+    // 3. Canonically confirm with the candidate's known tuning and crossover
     const p14 = bundle.p14Target || {};
     const confirmation = evaluateStage2ConfirmationWithTuning(evalTransfer, {
       tuning: bundle.tuning,
@@ -153,7 +195,7 @@ export async function evaluateCoordinatedCandidate({
       return { status: "error", evidence: null, issues: ["Canonical confirmation returned no result"] };
     }
 
-    // 5b. Validate post-evaluation identity integrity: the candidate-owned
+    // 3b. Validate post-evaluation identity integrity: the candidate-owned
     //     source IDs must survive through the transfer and confirmation
     //     without regeneration or substitution. Reject inconsistent candidates
     //     explicitly rather than silently regenerating IDs.
@@ -162,7 +204,7 @@ export async function evaluateCoordinatedCandidate({
       return { status: "rejected", evidence: null, issues: integrity.issues };
     }
 
-    // 6. Retain the genuine post-EQ evidence
+    // 4. Retain the genuine post-EQ evidence
     const evidence = summariseCoordinatedEvidence(confirmation, {
       candidateId: bundle.candidateId,
       responseBasis,
@@ -170,7 +212,7 @@ export async function evaluateCoordinatedCandidate({
       tuning: bundle.tuning,
     });
 
-    // 7. Inspect processed seat curves for shared cancellations
+    // 5. Inspect processed seat curves for shared cancellations
     evidence.sharedCancellations = diagnoseSharedCancellations(confirmation, {
       assessmentStartHz: confirmation.assessmentStartHz,
       assessmentEndHz: confirmation.assessmentEndHz,

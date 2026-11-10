@@ -16,7 +16,7 @@
 // The result is a temporary developer object held in a module-scoped store —
 // it is not written into the saved optimiser plan or any persistent authority.
 
-import { evaluateCoordinatedCandidate } from "./coordinatedCandidateEvaluation";
+import { evaluateCoordinatedCandidate, buildCandidateTransfer } from "./coordinatedCandidateEvaluation";
 import {
   buildRoomDBundle,
   ROOM_D_DIMS,
@@ -28,10 +28,6 @@ import {
   checkPostConfirmIntegrity,
 } from "./coordinatedCandidateIntegrityChecks";
 import { validateCoordinatedCandidateBundle } from "./coordinatedCandidateBundle";
-import {
-  evaluateStage2Placement,
-  evaluateStage2ConfirmationWithTuning,
-} from "../stage2/stage2CanonicalEvaluation";
 
 let listeners = new Set();
 let lastResult = null;
@@ -161,50 +157,46 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
     return lastResult;
   }
 
-  // 3. To run the pre-confirm gate we need the raw transfer. The evaluator
-  //    performs placement internally; to get the transfer for our independent
-  //    gate we call evaluateStage2Placement directly (the same function the
-  //    evaluator uses). This is a second placement call, but it is the ONLY
-  //    acoustic calculation outside the evaluator, and it is the same
-  //    deterministic placement the evaluator runs. We do NOT re-confirm here.
-  let rawTransfer = null;
+  // 3. Build the candidate transfer ONCE through the shared transfer-building
+  //    authority (placement → combined LCR/sub integration when the bundle
+  //    requires it). The pre-confirmation gate validates this exact transfer
+  //    object, and the same object is handed into canonical confirmation —
+  //    never a second independently reconstructed transfer.
+  let built;
   try {
-    const { bundleToStage2Finalist } = await import("./coordinatedCandidateBundle");
-    const finalist = bundleToStage2Finalist(bundle, ROOM_D_DIMS);
-    rawTransfer = evaluateStage2Placement({
-      finalist,
+    built = buildCandidateTransfer({
+      bundle,
       roomDims: ROOM_D_DIMS,
-      rspPosition: bundle.rspPosition,
-      seatingPositions: bundle.seatingPositions,
-      selectedSubModel: bundle.selectedSubModel,
       amplifierPowerPerSubW,
-      subwooferBottomHeightM: bundle.subwooferBottomHeightM,
     });
   } catch (err) {
     lastResult = {
       status: "error",
       evidence: null,
-      issues: [`Placement for pre-confirm gate failed: ${err?.message || err}`],
+      issues: [`Transfer build for pre-confirm gate failed: ${err?.message || err}`],
       boundaries,
     };
     publish();
     return lastResult;
   }
 
-  // A terminal physical rejection is a completed outcome — report it.
-  if (rawTransfer?.physicalRejection) {
+  // A terminal physical rejection or failed integration capture is a completed
+  // outcome — report it without running the gate.
+  if (built.status !== "built") {
     lastResult = {
-      status: "rejected",
+      status: built.status,
       evidence: null,
-      issues: [`Physical rejection: ${rawTransfer.physicalRejection.reason}`],
+      issues: built.issues,
       boundaries,
     };
     publish();
     return lastResult;
   }
+  const candidateTransfer = built.transfer;
 
-  // 3b. Pre-confirm integrity gate.
-  const preConfirm = checkPreConfirmIntegrity(bundle, rawTransfer);
+  // 3b. Pre-confirm integrity gate — validates the combined transfer that
+  //     canonical confirmation will consume.
+  const preConfirm = checkPreConfirmIntegrity(bundle, candidateTransfer);
   boundaries.preConfirm = preConfirm;
   if (!preConfirm.valid) {
     lastResult = {
@@ -217,14 +209,16 @@ export async function runCoordinatedCandidateDeveloper(options = {}) {
     return lastResult;
   }
 
-  // 4. Invoke the coordinated evaluator once. It performs placement →
-  //    (combined integration if context) → canonical confirmation → evidence
-  //    summary. Its internal post-confirmation identity check
+  // 4. Invoke the coordinated evaluator once, handing it the exact pre-built
+  //    transfer so canonical confirmation consumes the same object the gate
+  //    validated. The evaluator's internal post-confirmation identity check
   //    (validateCoordinatedCandidateIntegrity) guards source-ID continuity.
   const evalResult = await evaluateCoordinatedCandidate({
     bundle,
     roomDims: ROOM_D_DIMS,
     amplifierPowerPerSubW,
+    preBuiltTransfer: candidateTransfer,
+    preBuiltResponseBasis: built.responseBasis,
   });
 
   // 5. Post-confirm gate. We reconstruct a confirmation-shaped object from the
