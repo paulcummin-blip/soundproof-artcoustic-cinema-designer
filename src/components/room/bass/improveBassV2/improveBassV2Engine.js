@@ -1973,6 +1973,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       setStageVerdict(projectId, versionId, "coordinated_physical", "incomplete");
       coordinatedDiagnostics = { ...coordinatedDiagnostics, status: "incomplete", error: err.message };
     }
+    coordinatedDiagnostics.elapsedMs ??= performance.now() - coordinatedStarted;
     await yieldToUI();
     if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };

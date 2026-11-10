@@ -235,7 +235,12 @@ export async function runCoordinatedPhysicalSearch(ctx) {
         diagnostics.rejected.push({ stage: "proxy", placementId: placement.id, quantity: placement.quantity, offsetMm, reason: "no transfer" });
         continue;
       }
-      const proxy = computeProxyCandidateMetrics(rawTransfer, effectiveBaseline);
+      const candidateBaseline = placement.designContext
+        ? rawTransfer.sources.map(({ id }) => ({
+            sourceId: id, delayMs: 0, gainDb: 0, polarity: 0, phaseControlDeg: 0,
+          }))
+        : effectiveBaseline;
+      const proxy = computeProxyCandidateMetrics(rawTransfer, candidateBaseline);
       combos.push({
         placementId: placement.id,
         placementCoordinates: placement.coordinates,
@@ -244,6 +249,7 @@ export async function runCoordinatedPhysicalSearch(ctx) {
         offsetMm,
         seatingPositions: movedSeats,
         rawTransfer,
+        candidateBaseline,
         proxyRspRange: proxy.proxyRspRange,
         proxyWorstSeatRange: proxy.proxyWorstSeatRange,
         proxyAllSeatRange: proxy.proxyAllSeatRange,
@@ -293,7 +299,7 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     const retuneCtx = { worker, controller, isStale, metrics, subwooferInstances: candidateInstances, roomDims };
     let tuning = null;
     try {
-      tuning = await retuneFullCalibration(retuneCtx, combo.rawTransfer, effectiveBaseline);
+      tuning = await retuneFullCalibration(retuneCtx, combo.rawTransfer, combo.candidateBaseline);
     } catch (err) {
       diagnostics.rejected.push({ stage: "retune", placementId: combo.placementId, quantity: combo.placementQuantity, offsetMm: combo.offsetMm, error: err?.message || "retune failed" });
       continue;
@@ -363,6 +369,14 @@ export async function runCoordinatedPhysicalSearch(ctx) {
       p19Level: result.achievedP19Level, p19VariationDb: result.achievedP19VariationDb,
       p20Level: result.achievedP20Level, p20VariationDb: result.achievedP20VariationDb,
       p14Db: result.p14AchievedDb, p18Hz: result.achievedP18Hz,
+      responseBasis: result.responseBasis ?? null,
+      crossover: result.crossover ?? combo.rawTransfer.crossover ?? null,
+      crossoverSearched: false,
+      tuning: result.appliedTuning ?? tuning,
+      receipt: result.canonicalAuthorityReceipt ?? null,
+      perSeatP20: (result.perSeatP20 || []).map(({ seatId, isPrimary, level, variationDbRaw, worstFrequencyHz }) => ({
+        seatId, isPrimary, level, variationDbRaw, worstFrequencyHz,
+      })),
       isCrossQuantity: !!combo.designContext,
     });
   }

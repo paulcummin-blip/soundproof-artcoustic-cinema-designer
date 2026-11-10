@@ -74,6 +74,12 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
         ? Number(c.p20VariationDb) : null,
       p14Db: c?.p14Db != null && Number.isFinite(Number(c.p14Db)) ? Number(c.p14Db) : null,
       p18Hz: c?.p18Hz != null && Number.isFinite(Number(c.p18Hz)) ? Number(c.p18Hz) : null,
+      responseBasis: c?.responseBasis ?? null,
+      crossover: c?.crossover ?? null,
+      crossoverSearched: c?.crossoverSearched === true,
+      tuning: c?.tuning ?? null,
+      receipt: c?.receipt ?? null,
+      perSeatP20: c?.perSeatP20 ?? [],
       isCrossQuantity: !!c?.isCrossQuantity,
     })),
     // Rejection reasons — compact, no raw issues arrays.
