@@ -93,6 +93,7 @@ export function serializeOptimiserPlan(plan) {
     // instead of console logs. Identity + outcome labels only — no response
     // arrays, curves or tuning payloads.
     crossQuantityAudit: plan.crossQuantityAudit || null,
+    coordinatedSummary: plan.coordinatedSummary || null,
   };
 }
 

@@ -52,6 +52,12 @@ export function buildCoordinatedSummary(coordinatedDiagnostics) {
     placementsGenerated: Number(coordinatedDiagnostics.placementsGenerated) || 0,
     placementsRetained: Number(coordinatedDiagnostics.placementsRetained?.length) || 0,
     combosEvaluated: Number(coordinatedDiagnostics.combosEvaluated) || 0,
+    placementFinalists: (coordinatedDiagnostics.placementsRetained || []).map(({ id, phase, quantity, coordinates }) => ({
+      id, phase, quantity, coordinates,
+    })),
+    screenedCandidates: (coordinatedDiagnostics.survivors || []).map(({ placementId, quantity, offsetMm }) => ({
+      placementId, quantity, offsetMm,
+    })),
     shortlistSize: Number(coordinatedDiagnostics.survivors?.length) || 0,
     // Confirmation outcomes — identity + outcome labels only.
     confirmedCount: confirmed.length,
