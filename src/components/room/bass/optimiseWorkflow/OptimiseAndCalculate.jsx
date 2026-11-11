@@ -482,7 +482,21 @@ export default function OptimiseAndCalculate({
 
       measuredRuntime = result.runtimeMetrics || measuredRuntime;
       if (result.status === "cancelled") {
-        logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" }).catch(() => null);
+        // Only an explicit user Cancel is a user cancellation. Other stop
+        // reasons (inputs-incomplete, user-interaction, superseded, etc.) are
+        // preserved as evaluation_incomplete with the actual reason.
+        const userCancel = result.reason === "user-cancel";
+        const stopReason = result.reason || result.error || null;
+        const reason = userCancel
+          ? "Optimisation cancelled by the user before completion."
+          : (stopReason
+            ? `The optimisation stopped before it could complete (${stopReason}). Re-run the Optimisation Plan.`
+            : "The optimisation stopped before it could complete. Re-run the Optimisation Plan.");
+        logRunHistory({
+          terminalStatus: userCancel ? "cancelled" : "evaluation_incomplete",
+          publicationStatus: "not_attempted",
+          publicationError: userCancel ? null : reason,
+        }).catch(() => null);
         setCancelled(projectId, versionId);
         return;
       }

@@ -187,7 +187,7 @@ export async function runOptimisation(opts) {
     opts.onRuntimeMetrics?.(waitedMetrics);
     if (waitResult.status === "cancelled") {
       setCancelled(projectId, versionId);
-      return { status: "cancelled", runtimeMetrics: waitedMetrics };
+      return { status: "cancelled", reason: waitResult.reason || null, error: waitResult.error || null, runtimeMetrics: waitedMetrics };
     }
     if (waitResult.status === "stale") {
       setStale(projectId, versionId, waitResult.message);
@@ -301,6 +301,8 @@ export async function runOptimisation(opts) {
     result.runtimeMetrics = runtimeMetrics || result.runtimeMetrics;
 
     if (result.status === "cancelled") {
+      // V2 engine cancelled is always user-initiated (AbortError from cancelRequested).
+      result.reason = result.reason || "user-cancel";
       setCancelled(projectId, versionId);
     } else if (result.status === "blocked") {
       // No completed production baseline for the live design: the run stopped
