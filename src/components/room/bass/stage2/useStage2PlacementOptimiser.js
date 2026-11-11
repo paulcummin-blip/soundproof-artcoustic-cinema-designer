@@ -87,6 +87,7 @@ export function useStage2PlacementOptimiser({
   requestId = null,
   selectedQuantityOnly = false,
   recommendationQuantities = null,
+  expectedStage1Fingerprint = null,
 }) {
   const scopeQuantity = selectedQuantityOnly && [1, 2, 3, 4].includes(currentQuantity) ? currentQuantity : null;
   // A cross-quantity recommendation run evaluates 1, 2 and 4 together. It is
@@ -148,6 +149,19 @@ export function useStage2PlacementOptimiser({
   }, [stage1State?.status, stage1State?.one_sub_result, stage1State?.two_sub_result, stage1State?.three_sub_result, stage1State?.four_sub_result]);
 
   const stage1Fingerprint = stage1State?.fingerprint || null;
+
+  // ── Stage 1 evidence matching ──────────────────────────────────────
+  // Stage 2 must NOT capture a fingerprint or schedule work from a stale
+  // Stage 1 snapshot left over from a previous geometry. The Stage 1 store
+  // matches the current request only when it is complete AND its fingerprint
+  // equals the Stage 1 fingerprint the current geometry + recommendation
+  // scope would produce. While a new Stage 1 result is pending (or a stale
+  // snapshot is still present), Stage 2 must WAIT rather than consume old
+  // finalists — otherwise it captures a fingerprint that becomes stale the
+  // moment the matching Stage 1 result arrives, permanently idling Stage 2.
+  const stage1EvidenceMatches = !!expectedStage1Fingerprint
+    && stage1State?.status === "complete"
+    && stage1State?.fingerprint === expectedStage1Fingerprint;
 
   // Resolved effective amplifier power — the same value the engine receives
   // after defaults are applied. Used in both placement and legacy fingerprints
@@ -290,17 +304,40 @@ export function useStage2PlacementOptimiser({
     if (explicitRequestRef.current.requestId !== requestToken) {
       explicitRequestRef.current = { requestId: requestToken, fingerprint: null };
     }
-    // Stage 2's fingerprint only exists after Stage 1 finalists are ready.
-    // Capture it once for this explicit request, then refuse to follow later
-    // geometry/model/target changes automatically.
-    if (fingerprint && !explicitRequestRef.current.fingerprint) {
-      explicitRequestRef.current.fingerprint = fingerprint;
-    } else if (fingerprint
-      && explicitRequestRef.current.fingerprint
-      && explicitRequestRef.current.fingerprint !== fingerprint) {
-      stage2PlacementController.cancelAll("request-fingerprint-stale");
-      markStage2Idle(projectId, versionId);
+
+    // ── Stage 1 evidence guard ────────────────────────────────────────
+    // Before capturing a fingerprint or scheduling, require the Stage 1
+    // store to hold a COMPLETED result whose fingerprint matches the Stage 1
+    // fingerprint the current geometry + recommendation scope would produce.
+    // A stale Stage 1 snapshot (left over from a previous geometry under a
+    // new request) must NOT feed Stage 2 — it would capture a fingerprint
+    // that becomes stale the moment the matching Stage 1 result arrives,
+    // permanently idling Stage 2 (the original ordering defect).
+    if (!stage1EvidenceMatches) {
+      // Clear any captured fingerprint so the matching Stage 1 result can
+      // re-capture cleanly when it arrives.
+      explicitRequestRef.current.fingerprint = null;
+      const cur = getStage2State(projectId, versionId);
+      const alreadyWaiting = cur.status === "updating" && cur.phase === "waiting_for_stage1";
+      if (!alreadyWaiting) {
+        stage2PlacementController.cancelAll("awaiting-matching-stage1");
+        // Mark WAITING (status "updating" with a distinct phase), NOT idle.
+        // Idle is a terminal state the UI would display as "Evaluating"
+        // indefinitely. The UI masks this phase as "discovering" because
+        // Stage 1 evidence does not match (the UI checks stage1EvidenceMatches).
+        markStage2Waiting(projectId, versionId, null, "waiting_for_stage1");
+      }
       return;
+    }
+
+    // Stage 1 has matching evidence. Capture the fingerprint for this
+    // request. If the fingerprint changed since the last capture (because
+    // Stage 1 produced NEW matching finalists under the same request — the
+    // transition from a stale capture to the matching capture), UPDATE the
+    // captured fingerprint and re-schedule. Do NOT cancel and idle: that
+    // left Stage 2 permanently stuck after a geometry change.
+    if (fingerprint && explicitRequestRef.current.fingerprint !== fingerprint) {
+      explicitRequestRef.current.fingerprint = fingerprint;
     }
 
     // FIX 5: Interaction gate — cancel speculative Stage 2 work during any
@@ -315,23 +352,11 @@ export function useStage2PlacementOptimiser({
       return;
     }
 
-    // When Stage 1 is actively recomputing the matching scope (e.g. sel:2),
-    // its finalists are temporarily unavailable and the Stage 2 fingerprint is
-    // null. Stage 2 must WAIT for the matching Stage 1 result rather than
-    // cancelling as inputs-incomplete — the existing stale-result, supersession
-    // and safety-timeout protections in waitForStage2Terminal remain in force.
-    // A rec:1,2,4 result can never satisfy a sel:2 request: the ownerRequestId
-    // check ties this wait to the EXACT ADI request that owns the selected
-    // scope, so a different consumer's recommendation run does not gate it.
-    const stage1UpdatingForThisRequest = stage1State?.status === "updating"
-      && !!stage1State?.ownerRequestId
-      && !!requestId
-      && stage1State.ownerRequestId === requestId;
-
     if (!fingerprint) {
-      if (stage1UpdatingForThisRequest) {
-        return;
-      }
+      // Stage 1 matches but Stage 2's own fingerprint is null (model, P14
+      // target or bottom height not resolved). This is a genuine
+      // prerequisites-missing state, not a stuck state — cancel stale work
+      // and mark idle. The UI shows "awaiting-prerequisites".
       stage2PlacementController.cancelAll("inputs-incomplete");
       markStage2Idle(projectId, versionId);
       return;
@@ -388,7 +413,7 @@ export function useStage2PlacementOptimiser({
       delay: STAGE2_START_DELAY_MS,
       ownerRequestId: requestId,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope, stage1State?.status, stage1State?.ownerRequestId]);
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope, stage1State?.status, stage1State?.ownerRequestId, stage1State?.fingerprint, expectedStage1Fingerprint, stage1EvidenceMatches]);
 
   // Expose the COMPUTED fingerprint (derived from current inputs via useMemo
   // above) alongside the STORED store state. The stored `state.fingerprint` is

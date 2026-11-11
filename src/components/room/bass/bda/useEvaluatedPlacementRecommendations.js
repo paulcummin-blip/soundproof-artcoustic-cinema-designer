@@ -54,7 +54,7 @@ import { selectBestSubLayoutPhysics } from "../best-layout/bestSubLayoutPhysicsS
 import { useBestSubLayoutLiveInputs } from "../best-layout/bestSubLayoutLiveInputs";
 import { resolveBestSubLayoutContextId } from "../best-layout/bestSubLayoutContext";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { RECOMMENDATION_QUANTITIES } from "../stage1/stage1RecommendationScope";
+import { RECOMMENDATION_QUANTITIES, normaliseRecommendationScope } from "../stage1/stage1RecommendationScope";
 import { buildAdiShortlist } from "./adiShortlistSelection";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
@@ -178,6 +178,18 @@ export function useEvaluatedPlacementRecommendations({
     [roomDims, rspPosition, seatingPositions, physicsOptions],
   );
 
+  // The Stage 1 fingerprint the current geometry + recommendation scope
+  // WOULD produce (the scoped execution identity, e.g. `<base>|rec:1,2,4`).
+  // Stage 2 uses this to verify its Stage 1 snapshot matches the current
+  // geometry BEFORE capturing a fingerprint or scheduling — so a stale
+  // Stage 1 snapshot (left over from a previous geometry under a new
+  // request) can never feed Stage 2 and permanently idle it.
+  const recScope = normaliseRecommendationScope(RECOMMENDATION_QUANTITIES);
+  const expectedStage1Fingerprint = useMemo(() => {
+    if (!geometryFingerprint) return null;
+    return recScope ? `${geometryFingerprint}|rec:${recScope.join(",")}` : geometryFingerprint;
+  }, [geometryFingerprint, recScope]);
+
   // A fresh request identity is minted for each genuinely new settled
   // evaluation context (geometry + model + P14 target + height + orientation +
   // amplifier). When any input changes, the requestId changes, so the shared
@@ -240,6 +252,7 @@ export function useEvaluatedPlacementRecommendations({
     enabled: stage2Enabled,
     requestId: stage2Enabled ? requestId : null,
     recommendationQuantities: RECOMMENDATION_QUANTITIES,
+    expectedStage1Fingerprint: stage2Enabled ? expectedStage1Fingerprint : null,
   });
 
   // stage2Result is the store state + computedFingerprint (the EXPECTED
@@ -269,22 +282,41 @@ export function useEvaluatedPlacementRecommendations({
     [stage2State, seatPriorityMap, roomDims, inputs.selectedSubModel, inputs.subwooferBottomHeightM],
   );
 
+  // Stage 1 evidence matches when the store holds a COMPLETED result whose
+  // fingerprint equals the Stage 1 fingerprint the current geometry + scope
+  // would produce. A "complete" store status alone is NOT sufficient: after a
+  // geometry change the store briefly retains the previous geometry's
+  // completed snapshot, and treating that as "matched" would let Stage 2
+  // capture a stale fingerprint and then idle permanently when the matching
+  // Stage 1 result arrives. When evidence does NOT match, discovery is
+  // running or about to restart — the UI must show "discovering", never
+  // "evaluating".
+  const stage1EvidenceMatches = !!expectedStage1Fingerprint
+    && stage1State?.status === "complete"
+    && stage1State?.fingerprint === expectedStage1Fingerprint;
+
   const status = (() => {
     if (!inputs.geometryReady) return "waiting";
     // Stage 1 error is a terminal state — surface it, don't mask as discovery.
     if (stage1State?.status === "error") return "error";
-    // Stage 1 not yet complete (idle, updating, stale, cancelled) — discovery
-    // is running or about to restart. Stale/cancelled are transient: the
-    // requestId change triggers an immediate reschedule on the next effect
-    // tick, so "discovering" is the honest label for that brief window.
-    if (stage1State?.status !== "complete") return "discovering";
-    // Stage 1 complete — Stage 2 needs model + P14 target.
+    // Stage 1 must hold matching evidence before Stage 2 can evaluate. While
+    // Stage 1 is updating, idle, stale, cancelled, OR complete-but-stale-
+    // fingerprint, discovery is running or about to restart.
+    if (!stage1EvidenceMatches) return "discovering";
+    // Stage 1 has matching evidence — Stage 2 needs model + P14 target.
     if (!inputs.canEvaluate) return "awaiting-prerequisites";
     if (stage2State?.status === "error") return "error";
     if (stage2State?.status === "complete") return "complete";
-    // Stage 2 is updating, or idle/stale/cancelled but ready to evaluate
-    // (the requestId change triggers an immediate reschedule). Either way
-    // the cards are not yet ready — show "evaluating".
+    // Stage 1 matches and Stage 2 is genuinely queued or running (status
+    // "updating"), or about to schedule (the effect schedules immediately
+    // when Stage 1 evidence matches). Only "updating" is genuine active
+    // work; idle/stale/cancelled are transient (Stage 2 reschedules on the
+    // next effect tick) and never displayed indefinitely as "evaluating"
+    // because the Stage 1 evidence guard prevents the permanent-idle trap.
+    if (stage2State?.status === "updating") return "evaluating";
+    // Matching Stage 1 but Stage 2 is idle/stale/cancelled — about to
+    // reschedule (transient). Show "evaluating" only when genuinely running;
+    // otherwise surface the actual state concisely.
     return "evaluating";
   })();
 
