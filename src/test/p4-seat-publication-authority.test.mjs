@@ -11,8 +11,9 @@
 //   TEST 3  Calculated but unsaved → ONE "Saving" status, no repeated
 //           developer wording.
 //   TEST 4  Publication blocked by P4 only → the bass band stays in the bass
-//           domain: the completed bass result is current, no bass action is
-//           offered, and overall readiness remains in Project Report.
+//           domain: P4 is never named. A FAILED attempt is a publication
+//           failure (save_failed), not Performance Current. Overall readiness
+//           remains in Project Report.
 //   TEST 5  Saved and acknowledged → "Performance Current" (the state a refresh
 //           restores from the durable publication).
 //
@@ -134,16 +135,19 @@ test('TEST 4 — a P4-only blocker is never named inside the bass band', () => {
     },
   });
 
-  // P4 is not a bass parameter, so the completed bass result stays current and no
-  // bass action is offered. Overall readiness belongs in Project Report.
-  expect(state.code).toBe('current');
-  expect(state.label).toBe('Performance Current');
-  expect(state.attention).not.toBe(true);
-  expect(state.message).toBe('Calculated and saved.');
-  expect(state.actionLabel).toBeNull();
+  // P4 is not a bass parameter, so the bass band never names it. A FAILED
+  // publication attempt is a publication failure, not Performance Current: the
+  // completed bass result is never presented as current while the full
+  // engineering design is not publishable. Overall readiness belongs in
+  // Project Report.
+  expect(state.code).toBe('save_failed');
+  expect(state.label).toBe('Bass result could not be saved');
+  expect(state.attention).toBe(true);
+  expect(state.message).toBe('The bass result could not be saved, so reports and proposals cannot use it yet.');
+  expect(state.actionLabel).toBe('Retry save');
   expect(state.note).toBeUndefined();
   expect(state.waitingItems).toBeUndefined();
-  expect(JSON.stringify(state)).not.toMatch(/assessment needs updating/i);
+  expect(JSON.stringify(state)).not.toMatch(/P4|assessment needs updating/i);
 });
 
 test('TEST 5 — a saved and acknowledged assessment restores Performance Current', () => {

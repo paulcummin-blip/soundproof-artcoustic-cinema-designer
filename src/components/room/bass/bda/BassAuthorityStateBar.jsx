@@ -17,6 +17,7 @@ const TONES = {
   [BASS_AUTHORITY_STATE.NEEDS_CALCULATION]: { color: "#625143", background: "#F1F0EE", border: "#C1B6AD" },
   [BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED]: { color: "#3E4349", background: "#F8F8F7", border: "#DCDBD6" },
   [BASS_AUTHORITY_STATE.CALCULATING]: { color: "#3E4349", background: "#F8F8F7", border: "#DCDBD6" },
+  [BASS_AUTHORITY_STATE.BASS_CALCULATED]: { color: "#3E4349", background: "#F8F8F7", border: "#DCDBD6" },
 };
 
 // The one attention tone: used only for the single status when something needs
