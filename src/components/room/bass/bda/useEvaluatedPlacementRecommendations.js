@@ -36,7 +36,7 @@ import { useBestSubLayoutLiveInputs } from "../best-layout/bestSubLayoutLiveInpu
 import { resolveBestSubLayoutContextId } from "../best-layout/bestSubLayoutContext";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { RECOMMENDATION_QUANTITIES } from "../stage1/stage1RecommendationScope";
-import { selectEvaluatedOptions } from "./evaluatedOptionPresentation";
+import { buildAdiShortlist } from "./adiShortlistSelection";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 import {
@@ -188,7 +188,7 @@ export function useEvaluatedPlacementRecommendations({
   );
 
   const options = useMemo(
-    () => selectEvaluatedOptions(stage2State, seatPriorityMap, {
+    () => buildAdiShortlist(stage2State, seatPriorityMap, {
       roomDims,
       selectedSubModel: inputs.selectedSubModel,
       subwooferBottomHeightM: inputs.subwooferBottomHeightM,

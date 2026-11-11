@@ -32,7 +32,6 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
-import StartingLayoutCards from "@/components/room/bass/bda/StartingLayoutCards";
 import EvaluatedLayoutCards from "@/components/room/bass/bda/EvaluatedLayoutCards";
 import { useEvaluatedRecommendations } from "@/components/room/bass/bda/evaluatedRecommendationsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -278,73 +277,29 @@ export default function BassDesignAssistant({
         />
       )}
 
-      {/* ── Choose Layout (Starting Layout area) ── */}
-      {/* The evaluated 1/2/4 recommendations live here permanently. They are
-          computed in the background by an always-mounted runner, so they are
-          ready when the designer opens the section and remain visible after a
-          recommendation is applied. The generic starting-layout cards remain
-          only as the first-step picker before a sub model and design target
-          exist (status "waiting"). While evaluating, a loading state is
-          shown — generic layouts are never presented as evaluated
-          recommendations. Cards persist after Apply; switching options and
-          manual positioning stay available alongside them. */}
-      {evaluatedRecommendations.status === "complete"
-        && evaluatedRecommendations.options.length > 0 && (
-        <EvaluatedLayoutCards
-          options={evaluatedRecommendations.options}
-          status={evaluatedRecommendations.status}
-          roomDims={roomDims}
-          subwooferInstances={subwooferInstances}
-          frontSubsCfg={frontSubsCfg}
-          rearSubsCfg={rearSubsCfg}
-          commitInstances={wrappedCommitInstances}
-          currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
-          hasSubwoofers={hasSubwoofers}
-          onApplied={handleEvaluatedApplied}
-        />
-      )}
-      {evaluatedRecommendations.status === "complete"
-        && evaluatedRecommendations.options.length === 0 && (
-        <div className="rounded-lg border border-[#E7E4DF] bg-[#F8F7F4] p-4">
-          <h4 className="text-[15px] font-semibold text-[#1B1A1A]" style={{ fontFamily: "Didact Gothic, sans-serif" }}>
-            Choose Subwoofer Layout
-          </h4>
-          <p className="mt-1 text-[12px] text-[#625143]">
-            ADI could not find a credible front or rear wall arrangement for this room. Adjust the room dimensions or seating, or place subwoofers manually.
-          </p>
-        </div>
-      )}
-      {evaluatedRecommendations.status === "evaluating" && (
-        <EvaluatedLayoutCards
-          options={[]}
-          status="evaluating"
-          roomDims={roomDims}
-          subwooferInstances={subwooferInstances}
-          frontSubsCfg={frontSubsCfg}
-          rearSubsCfg={rearSubsCfg}
-          commitInstances={wrappedCommitInstances}
-          currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
-          hasSubwoofers={hasSubwoofers}
-          onApplied={handleEvaluatedApplied}
-        />
-      )}
-      {(evaluatedRecommendations.status === "waiting"
-        || evaluatedRecommendations.status === "idle"
-        || evaluatedRecommendations.status === "error") && (
-        <StartingLayoutCards
-          roomDims={roomDims}
-          seatingPositions={seatingPositions}
-          rspPosition={rspPosition}
-          sourceHeights={sourceHeights}
-          roomElements={appState?.roomElements}
-          currentSubs={subwooferInstances}
-          frontSubsCfg={frontSubsCfg}
-          rearSubsCfg={rearSubsCfg}
-          subwooferInstances={subwooferInstances}
-          commitInstances={wrappedCommitInstances}
-          hasCanonicalInstances={compat.hasCanonicalInstances}
-        />
-      )}
+      {/* ── Choose Layout (ADI Starting Layout shortlist) ── */}
+      {/* The always-mounted background runner evaluates Stage 1/2 for the
+          current room, seating, RSP and selected subwoofer. This surface shows
+          the global shortlist: up to three credible, materially distinct,
+          canonically evaluated layouts — practical front/rear placements first,
+          exceptional side-wall layouts only when they deliver a whole-Level
+          improvement over the best practical candidate. No geometric
+          fallbacks: when no current evaluation exists, a compact waiting
+          state is shown. Every P19/P20 value comes from the candidate's own
+          canonical evaluation. Apply uses the existing quantity-aware,
+          fingerprint-protected authority. */}
+      <EvaluatedLayoutCards
+        options={evaluatedRecommendations.options}
+        status={evaluatedRecommendations.status}
+        roomDims={roomDims}
+        subwooferInstances={subwooferInstances}
+        frontSubsCfg={frontSubsCfg}
+        rearSubsCfg={rearSubsCfg}
+        commitInstances={wrappedCommitInstances}
+        currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
+        hasSubwoofers={hasSubwoofers}
+        onApplied={handleEvaluatedApplied}
+      />
 
       {/* ── Zone 2: Design Target ── */}
       {layoutChosen && (

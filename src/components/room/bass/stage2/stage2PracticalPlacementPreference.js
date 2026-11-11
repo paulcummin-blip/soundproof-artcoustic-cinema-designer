@@ -92,7 +92,7 @@ function rspP19Level(result) {
  * @param {object} practical — practical front/rear candidate result
  * @returns {boolean}
  */
-function hasWholeLevelImprovement(sideMixed, practical) {
+export function hasWholeLevelImprovement(sideMixed, practical) {
   const sP19 = rspP19Level(sideMixed);
   const cP19 = rspP19Level(practical);
   const sPrimP20 = worstPrimaryP20Level(sideMixed);

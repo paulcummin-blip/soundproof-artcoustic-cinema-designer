@@ -41,6 +41,7 @@ import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecomm
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { normalizeLevelForDisplay } from "@/components/utils/rp22LevelDisplay";
 import { formatDb } from "@/components/utils/formatDb";
+import { subwooferDisplayLabel } from "@/components/utils/subwooferDisplayLabel";
 
 const LAYOUT_TITLES = { 1: "1 Subwoofer", 2: "2 Subwoofers", 4: "4 Subwoofers" };
 
@@ -222,10 +223,13 @@ function EvaluatedCard({ option, roomDims, isSelected, onSelect, isApplied, onCo
           : "border border-[#D9D5CE] bg-white hover:border-[#BFB9AE]"
     }`}>
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[13px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[option.quantity]}</div>
+        <div className="min-w-0">
+          <div className="text-[13px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[option.quantity]}</div>
+          <div className="text-[10px] text-[#8A7B6A] truncate">{subwooferDisplayLabel(option.model)}</div>
+        </div>
         <div className="flex items-center gap-1">
           {isAlternative && (
-            <span className="rounded-full bg-[#625143] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Alternative placement</span>
+            <span className="rounded-full bg-[#625143] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Side wall</span>
           )}
           {isApplied && (
             <span className="rounded-full bg-[#213428] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">Applied</span>
@@ -397,13 +401,13 @@ export default function EvaluatedLayoutCards({
           {waiting
             ? "Select a subwoofer model and design target to evaluate layouts."
             : evaluating
-              ? "Evaluating front and rear wall arrangements for this room…"
-              : "Evaluated layouts for the current room, seating and reference position. Practical front/rear-wall placements are shown first; exceptional side/mixed-wall alternatives are labelled."}
+              ? "Evaluating layouts for this room…"
+              : "Recommended layouts for this room."}
         </p>
       </div>
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-        {evaluating && [1, 2, 4].map((q) => (
+        {evaluating && [0, 1, 2].map((q) => (
           <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
         ))}
         {!evaluating && orderedOptions.map((option) => {
@@ -424,7 +428,7 @@ export default function EvaluatedLayoutCards({
         })}
       </div>
       {!evaluating && orderedOptions.length === 0 && !waiting && (
-        <p className="text-[11px] text-[#625143]">No evaluated layouts available. Manual placement remains available.</p>
+        <p className="text-[11px] text-[#625143]">No credible layouts found for this room. Manual placement remains available.</p>
       )}
       {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}
     </div>

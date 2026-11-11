@@ -167,7 +167,7 @@ export function buildEvaluatedOption(result, seatPriorityMap, context) {
  * already stamped on the options — no new grade, no dB threshold.
  * @private
  */
-function buildImprovementDescription(altOption, practicalOption) {
+export function buildImprovementDescription(altOption, practicalOption) {
   const p19 = Number.isFinite(altOption?.p19?.level)
     && Number.isFinite(practicalOption?.p19?.level)
     && altOption.p19.level > practicalOption.p19.level;
@@ -192,7 +192,7 @@ function buildImprovementDescription(altOption, practicalOption) {
  * @returns {Array<{parameter: string, fromLevel: number, toLevel: number}>}
  *   compromise descriptors (empty when the alternative has no regression)
  */
-function buildCompromiseDescription(altOption, practicalOption) {
+export function buildCompromiseDescription(altOption, practicalOption) {
   const out = [];
   const altLvl = Number(altOption?.p20Secondary?.level);
   const pracLvl = Number(practicalOption?.p20Secondary?.level);
