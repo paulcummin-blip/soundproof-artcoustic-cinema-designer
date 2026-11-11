@@ -61,6 +61,7 @@ import { selectQuantityAwarePlacements } from "./coordinatedPlacementSelection.j
 import { buildCandidateDesignContext, validationContextForCandidate } from "./candidateDesignContext.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { validateCoordinatedRspAuthority, attachRspAuthority } from "./coordinatedRspAuthority.js";
+import { validateCandidateCabinets } from "../stage2/physicalCandidateGeometry.js";
 
 // Bounded search contract — a small, topology-diverse set so the search
 // stays fast and the shortlist is cheap to confirm canonically.
@@ -262,6 +263,35 @@ export async function runCoordinatedPhysicalSearch(ctx) {
     }
     const placement = placements.retained[pi];
     onProgress?.("coordinating", `Coordinated search: placement ${pi + 1}/${placements.retained.length}`, pi, placements.retained.length);
+
+    // ── 3a. PHYSICAL VALIDATION GATE ──────────────────────────────────────
+    // Every retained placement is physically validated through the existing
+    // cabinet-boundary + cabinet-overlap authorities BEFORE it enters the
+    // seating-batch worker. A placement whose cabinets cross a wall or
+    // intersect is rejected with a stable reason (cabinet-boundary /
+    // cabinet-overlap) recorded in diagnostics — it can never reach
+    // electronic optimisation, canonical confirmation, confirmedCandidates
+    // or physicalAlternativeEligible. The canonical P14/P19/P20 authorities
+    // are preserved: this gate only prevents physically impossible geometry
+    // from being acoustically evaluated.
+    const physicalCheck = validateCandidateCabinets({
+      coordinates: placement.coordinates || [],
+      model: selectedSubModel,
+      roomDims,
+      bottomHeightM: subwooferBottomHeightM,
+    });
+    if (!physicalCheck.valid) {
+      diagnostics.rejected.push({
+        stage: "physical-validation",
+        placementId: placement.id,
+        quantity: placement.quantity,
+        coordinates: placement.coordinates,
+        reason: physicalCheck.reason,
+        violations: physicalCheck.violations,
+      });
+      continue;
+    }
+
     const batchT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     let batchResult = null;
     try {

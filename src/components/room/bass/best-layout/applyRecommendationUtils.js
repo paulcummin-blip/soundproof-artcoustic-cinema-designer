@@ -5,6 +5,7 @@
 import { generateStableId, getCabinetWidthM, getCabinetDepthM } from "@/components/utils/subwooferInstanceMigration";
 import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
 import { validateCabinetBoundary } from "@/components/room/bass/stage2/installableWallCentreAuthority";
+import { validateCandidateCabinets } from "@/components/room/bass/stage2/physicalCandidateGeometry";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
 export const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
@@ -192,6 +193,34 @@ export function validateRecommendationLayout(layout, roomDims, model = null) {
         violations: result.violations,
       };
     }
+  }
+  // Pairwise cabinet-volume overlap through the existing authority. Every
+  // cabinet pair is checked in all three dimensions (X/Y/Z) using the same
+  // orientation-adjusted extents the boundary check used. A recommendation
+  // whose cabinets intersect is rejected before buildAppliedInstances can
+  // save it — the centre check and boundary check alone are not sufficient.
+  const overlapCoordinates = layout.sources.map((source) => ({
+    x: Number(source.x),
+    y: Number(source.y),
+    rotationDeg: effectiveRotationDeg(source),
+  }));
+  const overlap = validateCandidateCabinets({
+    coordinates: overlapCoordinates,
+    model,
+    roomDims: { widthM: width, lengthM: length },
+    bottomHeightM: 0,
+  });
+  if (!overlap.valid) {
+    return {
+      valid: false,
+      reason: overlap.reason === "cabinet-boundary"
+        ? "A cabinet crosses a room wall."
+        : overlap.reason === "cabinet-overlap"
+          ? "Two subwoofers would physically overlap."
+          : "Cabinet geometry is missing or invalid.",
+      violations: overlap.violations,
+      invalidIndex: overlap.invalidIndex,
+    };
   }
   return { valid: true, reason: null };
 }
