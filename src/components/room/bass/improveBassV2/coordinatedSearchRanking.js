@@ -32,10 +32,15 @@ import { isMaterialImprovement } from "./materialityGate";
  */
 function evidenceToResult(evidence) {
   if (!evidence) return null;
+  // MISSING-EVIDENCE POLICY: never substitute zero for a missing per-seat P20
+  // or P20 variation. A missing measurement is NOT excellent performance — it
+  // is absent evidence. The value is preserved as null/undefined so the
+  // materiality gate and qualifyCandidate see a non-finite value and reject
+  // the candidate, instead of scoring a phantom 0 dB variation as "perfect".
   const perSeatP20 = Array.isArray(evidence.perSeatP20)
     ? evidence.perSeatP20.map((seat) => ({
         ...seat,
-        variationDbRaw: seat.variationDbRaw ?? seat.variationDb ?? 0,
+        variationDbRaw: seat.variationDbRaw ?? seat.variationDb ?? null,
       }))
     : [];
   return {
@@ -44,12 +49,12 @@ function evidenceToResult(evidence) {
     perSeatP19: Array.isArray(evidence.perSeatP19)
       ? evidence.perSeatP19.map((seat) => ({
           ...seat,
-          variationDbRaw: seat.deviationDb ?? seat.variationDbRaw ?? 0,
+          variationDbRaw: seat.deviationDb ?? seat.variationDbRaw ?? null,
         }))
       : [],
     achievedP19Level: evidence.p19?.level,
     achievedP19VariationDb: evidence.p19?.variationDb,
-    achievedP20VariationDb: evidence.p20Primary?.variationDb ?? evidence.achievedP20VariationDb,
+    achievedP20VariationDb: evidence.p20Primary?.variationDb ?? evidence.achievedP20VariationDb ?? null,
     achievedP20Level: evidence.p20Primary?.level,
   };
 }
@@ -99,10 +104,26 @@ export function qualifyCandidate(evidence, options = {}) {
 
   if (!evidence.perSeatP20 || evidence.perSeatP20.length === 0) {
     issues.push("No individual-seat P20 results");
+  } else {
+    // Every seat must carry a finite P20 variation. A missing or non-finite
+    // per-seat measurement is absent evidence, not a perfect 0 dB result —
+    // a candidate with any incomplete seat measurement is ineligible.
+    for (const seat of evidence.perSeatP20) {
+      const v = seat?.variationDbRaw ?? seat?.variationDb;
+      if (!Number.isFinite(Number(v))) {
+        issues.push(`Non-finite P20 variation for seat ${seat?.seatId ?? seat?.id ?? "?"}`);
+        break;
+      }
+    }
   }
 
   if (evidence.p19?.level == null && evidence.p19?.variationDb == null) {
     issues.push("No P19 evidence");
+  } else if (!Number.isFinite(Number(evidence.p19?.variationDb))) {
+    // A P19 level without a finite variation is incomplete evidence: the
+    // materiality gate needs the variation to decide improvement, so a
+    // non-finite value disqualifies rather than being read as 0 dB.
+    issues.push("Non-finite P19 variation");
   }
 
   if (!evidence.receipt?.selectedCandidateId) {

@@ -125,6 +125,7 @@ export function buildOptimiserRunHistoryRecord({
   fingerprintsPublished = [],
   workerCalls = null,
   runtimeBreakdown = [],
+  engineRevision = null,
 } = {}) {
   const run = text(runId);
   const project = text(projectId);
@@ -153,6 +154,7 @@ export function buildOptimiserRunHistoryRecord({
       : [],
     worker_calls: compactWorkerCalls(workerCalls),
     runtime_breakdown: compactRuntimeBreakdown(runtimeBreakdown),
+    engine_revision: text(engineRevision),
   };
 }
 

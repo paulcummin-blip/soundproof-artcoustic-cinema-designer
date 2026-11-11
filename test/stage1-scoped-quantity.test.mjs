@@ -12,12 +12,12 @@ const input = {
 };
 
 describe("Stage 1 selected-quantity scope", () => {
-  it("cold one-sub scoped run matches the full study's one-sub result", () => {
+  it("cold one-sub scoped run matches the full study's one-sub result", async () => {
     const t0 = performance.now();
-    const full = runFullStage1Search(input);
+    const full = await runFullStage1Search(input);
     const fullMs = performance.now() - t0;
     const t1 = performance.now();
-    const scoped = runFullStage1Search({ ...input, scopeQuantity: 1 });
+    const scoped = await runFullStage1Search({ ...input, scopeQuantity: 1 });
     const scopedMs = performance.now() - t1;
     console.log(`STAGE1_TIMING full=${fullMs.toFixed(0)}ms scoped1=${scopedMs.toFixed(0)}ms keys=${Object.keys(scoped.results)}`);
     expect(Object.keys(scoped.results)).toEqual(["one_sub_result"]);
@@ -27,8 +27,8 @@ describe("Stage 1 selected-quantity scope", () => {
     expect(b.fineCandidateCount).toBe(a.fineCandidateCount);
     expect(b.finalists).toEqual(a.finalists);
   }, 120000);
-  it("no scope still searches all four quantities", () => {
-    const full = runFullStage1Search(input);
+  it("no scope still searches all four quantities", async () => {
+    const full = await runFullStage1Search(input);
     expect(Object.keys(full.results).sort()).toEqual(["four_sub_result", "one_sub_result", "three_sub_result", "two_sub_result"]);
   }, 120000);
 });

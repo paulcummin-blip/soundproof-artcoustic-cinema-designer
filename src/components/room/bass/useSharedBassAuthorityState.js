@@ -40,6 +40,10 @@ export default function useSharedBassAuthorityState() {
       lifecycleState: effectiveLifecycle,
       calculationInProgress: shared?.calculationInProgress,
       placementPreviewActive: shared?.placementPreviewActive,
+      // Reuse the existing engineering preflight verdict so a saved bass result
+      // whose full design is not eligible is shown as "Bass calculated" rather
+      // than an indefinitely active save.
+      preflightReady: publication?.preflight?.ready,
     }),
   };
 }

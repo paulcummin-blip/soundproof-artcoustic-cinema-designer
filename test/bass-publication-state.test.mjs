@@ -111,6 +111,92 @@ test('a completed result whose write has landed is Current, not Saving', () => {
   });
   assert.equal(state.code, 'current');
 });
+// ── Bass calculated: incomplete design, saved bass, not_ready preflight ──────
+// The bass-only cinema: canonical bass results are saved and current, but the
+// full engineering design is not eligible (no 5.1-equivalent system). The
+// engineering preflight correctly reports not_ready, so the band must show
+// "Bass calculated" — never Saving, never Performance Current.
+const notReadyNonBassGates = {
+  status: 'not_ready', fingerprint: 'eng:a', message: 'Not ready: hydration; design_rating',
+  gates: [
+    { key: 'hydration', label: 'Version loaded and minimum system selected', ok: false, detail: 'no 5.1 system' },
+    { key: 'design_rating', label: 'Publishable settled design rating', ok: false },
+    { key: 'bass_current', label: 'Current verified bass / P19', ok: true },
+  ],
+  missing: [
+    { key: 'hydration', label: 'Version loaded and minimum system selected' },
+    { key: 'design_rating', label: 'Publishable settled design rating' },
+  ],
+};
+
+test('bass-only design with not_ready preflight is Bass calculated, not Saving or Current', () => {
+  const state = resolve({ ...current, publicationAttempt: notReadyNonBassGates });
+  assert.equal(state.code, 'bass_calculated');
+  assert.equal(state.label, 'Bass calculated');
+  assert.equal(state.message, 'Bass calculated. Complete the speaker layout and engineering assessment to enable reports.');
+  assert.equal(state.actionLabel, null, 'no manual save step and no retry for an ineligible design');
+  assert.notEqual(state.code, 'calculated_not_published', 'never presented as an active save');
+  assert.notEqual(state.code, 'current', 'never presented as Performance Current');
+});
+
+test('cold reopening an incomplete but calculated bass design is Bass calculated', () => {
+  // No publication attempt recorded yet, but the engineering preflight is
+  // not_ready (no 5.1 system). Bass is saved and current.
+  const state = resolve({ ...current, preflightReady: false });
+  assert.equal(state.code, 'bass_calculated');
+  assert.equal(state.label, 'Bass calculated');
+});
+
+test('complete project with a genuinely queued publication is Saving', () => {
+  const state = resolve({ ...current, publicationAttempt: { status: 'queued', fingerprint: 'eng:a' }, preflightReady: true });
+  assert.equal(state.code, 'calculated_not_published');
+  assert.equal(state.label, 'Saving');
+});
+
+test('complete project with acknowledged publication is Performance Current', () => {
+  const state = resolve({ ...current, publicationAttempt: acknowledged, preflightReady: true });
+  assert.equal(state.code, 'current');
+  assert.equal(state.label, 'Performance Current');
+});
+
+test('failed publication with a recorded error is a save failure with its reason', () => {
+  const failedNonBassGates = {
+    status: 'failed', fingerprint: 'eng:a',
+    message: 'The saved assessment is incomplete (Publishable settled design rating).',
+    gates: [
+      { key: 'design_rating', label: 'Publishable settled design rating', ok: false },
+      { key: 'bass_current', label: 'Current verified bass / P19', ok: true },
+    ],
+  };
+  const state = resolve({ ...current, publicationAttempt: failedNonBassGates });
+  assert.equal(state.code, 'save_failed');
+  assert.equal(state.label, 'Bass result could not be saved');
+  // The bass band speaks only in the bass domain: the non-bass reason is kept
+  // in the publication attempt record (diagnostics), not named here. The
+  // attempt's message is available on the record for the diagnostics surface.
+  assert.equal(state.message, 'The bass result could not be saved, so reports and proposals cannot use it yet.');
+  assert.equal(state.attention, true);
+  assert.equal(failedNonBassGates.message, 'The saved assessment is incomplete (Publishable settled design rating).', 'reason remains available on the attempt record');
+});
+
+test('stale design fingerprint needs calculation', () => {
+  const stale = { ...current.completedBassAuthority, authorityStatus: 'STALE', currentFingerprint: 'cal:b' };
+  const state = resolve({ ...current, completedBassAuthority: stale, preflightReady: false });
+  assert.equal(state.code, 'needs_calculation');
+});
+
+test('bass calculation still in progress is Calculating', () => {
+  const state = resolve({ ...current, publicationAttempt: notReadyNonBassGates, calculationInProgress: true, preflightReady: false });
+  assert.equal(state.code, 'calculating');
+});
+
+test('a not_ready attempt with no preflight wired stays Saving (backwards compatible)', () => {
+  // No preflightReady passed: the resolver cannot conclude the design is
+  // ineligible, so it keeps the existing Saving default for a pending save.
+  const state = resolve({ ...current });
+  assert.equal(state.code, 'calculated_not_published');
+});
+
 test('publication refuses an earlier target while selected-target presentation advances', () => {
   const authority={currentFingerprint:'cal:a',contract:{job:{resultFingerprint:'cal:a'},requestedP14TargetDb:118,requestedP14Basis:'minimum',requestedP14Level:4}};
   const input={completedBassAuthority:authority,bassFingerprint:'cal:a',designState:{splConfig:{selectedP14TargetBasis:'minimum',selectedP14Level:4}}};

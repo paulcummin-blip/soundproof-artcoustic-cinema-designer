@@ -79,6 +79,7 @@ export function recordPublicationAttempt(projectId, versionId, attempt) {
     gates: Array.isArray(attempt?.gates) ? attempt.gates : [],
     httpStatus: attempt?.httpStatus || null,
     assessmentComplete: attempt?.assessmentComplete === true,
+    publisherRegistered: attempt?.publisherRegistered === true,
     at: new Date().toISOString(),
   };
   attempts.set(key, record);
@@ -86,6 +87,77 @@ export function recordPublicationAttempt(projectId, versionId, attempt) {
   (listeners.get(key) || []).forEach((listener) => {
     try { listener(record); } catch { /* a listener error never breaks publishing */ }
   });
+}
+
+// Terminal statuses that represent a settled publication outcome.
+const TERMINAL_STATUSES = new Set([
+  PUBLICATION_ATTEMPT.ACKNOWLEDGED,
+  PUBLICATION_ATTEMPT.FAILED,
+  PUBLICATION_ATTEMPT.CANCELLED,
+]);
+
+// A more-informative terminal must not be overwritten by a less-informative
+// one for the same fingerprint. ACKNOWLEDGED (success) > FAILED (reason) >
+// CANCELLED (no detail). This prevents a stale cleanup CANCELLED from
+// erasing a genuine FAILED that the async path recorded a moment earlier.
+const TERMINAL_PRIORITY = {
+  [PUBLICATION_ATTEMPT.ACKNOWLEDGED]: 3,
+  [PUBLICATION_ATTEMPT.FAILED]: 2,
+  [PUBLICATION_ATTEMPT.CANCELLED]: 1,
+};
+
+function isTerminalStatus(status) {
+  return TERMINAL_STATUSES.has(status);
+}
+
+/**
+ * Record a publication attempt only when it is not a stale record that would
+ * overwrite a newer attempt for the current fingerprint.
+ *
+ * Rules:
+ *   - A terminal record (FAILED/CANCELLED/ACKNOWLEDGED) for an OLD fingerprint
+ *     must never overwrite a newer attempt (terminal or not) for the current
+ *     fingerprint. This is the key guard: a cancelled async publication from
+ *     a previous design cannot erase the current design's attempt.
+ *   - A less-informative terminal must not overwrite a more-informative
+ *     terminal for the SAME fingerprint (ACKNOWLEDGED > FAILED > CANCELLED).
+ *   - Non-terminal records (QUEUED/PUBLISHING/NOT_READY) always overwrite,
+ *     so the latest effect run controls the visible state.
+ *
+ * Used by the publication effect's async paths and cleanup so a stale
+ * catch or cancelled-debounce cannot strand the UI in Saving or erase a
+ * genuine success.
+ */
+export function recordPublicationAttemptGuarded(projectId, versionId, attempt) {
+  const key = keyOf(projectId, versionId);
+  if (!key) return;
+  const current = attempts.get(key);
+  const incomingFingerprint = attempt?.fingerprint || null;
+  const incomingStatus = attempt?.status || PUBLICATION_ATTEMPT.FAILED;
+
+  if (current) {
+    // Different fingerprint: a stale terminal record must not overwrite a
+    // newer attempt for the current fingerprint.
+    if (current.fingerprint && current.fingerprint !== incomingFingerprint
+      && isTerminalStatus(incomingStatus)) {
+      return;
+    }
+    // Same fingerprint: a less-informative terminal must not overwrite a
+    // more-informative terminal (ACKNOWLEDGED > FAILED > CANCELLED).
+    if (current.fingerprint === incomingFingerprint
+      && isTerminalStatus(current.status)
+      && isTerminalStatus(incomingStatus)
+      && (TERMINAL_PRIORITY[current.status] || 0) > (TERMINAL_PRIORITY[incomingStatus] || 0)) {
+      return;
+    }
+  }
+
+  recordPublicationAttempt(projectId, versionId, attempt);
+}
+
+/** Is this attempt status terminal (no further state transition expected)? */
+export function isPublicationAttemptTerminal(status) {
+  return isTerminalStatus(status);
 }
 
 export function readPublicationAttempt(projectId, versionId) {

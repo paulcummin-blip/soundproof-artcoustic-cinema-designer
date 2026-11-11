@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import {
   buildAppliedInstances,
   coordinatesMatch,
-  validateRecommendationLayout,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { validateAppliedInstances } from "@/components/room/bass/best-layout/validateAppliedInstances";
 import { useFastBassPlacementAdvisor } from "@/components/room/bass/best-layout/useFastBassPlacementAdvisor";
 import { useBestSubLayoutLiveInputs } from "@/components/room/bass/best-layout/bestSubLayoutLiveInputs";
 import { selectBestSubLayoutPhysics } from "@/components/room/bass/best-layout/bestSubLayoutPhysicsSnapshot";
@@ -150,20 +150,22 @@ export default function BestSubLayoutGuide({
       setApplyError("Subwoofer instances are not ready.");
       return;
     }
-    const validation = validateRecommendationLayout(layout, roomDims);
-    if (!validation.valid) {
-      setApplyError(validation.reason);
-      return;
-    }
-    setPreviousInstances(
-      (Array.isArray(subwooferInstances) ? subwooferInstances : []).map((instance) => ({ ...instance })),
-    );
+    // Build the EXACT instances that will be saved, then validate them through
+    // the existing physical authorities. The same validated array is committed.
     const next = buildAppliedInstances(
       layout,
       subwooferInstances,
       frontSubsCfg,
       rearSubsCfg,
       modelOverride,
+    );
+    const validation = validateAppliedInstances(next, roomDims);
+    if (!validation.valid) {
+      setApplyError(validation.reason);
+      return;
+    }
+    setPreviousInstances(
+      (Array.isArray(subwooferInstances) ? subwooferInstances : []).map((instance) => ({ ...instance })),
     );
     commitInstances(next, {
       front: { placementMode: "manual", isManual: true },

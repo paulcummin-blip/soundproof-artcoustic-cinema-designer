@@ -24,6 +24,7 @@ import {
   INSTALLED_DEPTH_TOLERANCE_M,
   PLACEMENT_PRACTICALITY,
 } from "../best-layout/practicalPlacementAuthority.js";
+import { validateCabinetOverlap } from "../stage2/installableWallCentreAuthority.js";
 
 const GRID_M = 0.1; // 100 mm
 const SYM_MAX_M = 0.3; // ±300 mm for symmetric
@@ -66,7 +67,55 @@ export function attachPhysicalSourceIdentity(coordinates, currentPositions) {
 }
 
 /**
+ * Build the resolved-source records the cabinet-overlap authority consumes
+ * for one candidate set. Each source carries its X/Y centre,
+ * orientation-adjusted cabinet width/depth (wall-aware rotation), a uniform
+ * cabinet-centre Z and cabinet height. The Z is uniform because every source
+ * in a V2 placement candidate shares the same installation height, so the
+ * overlap check reduces to the X/Y footprint — but the full 3D authority is
+ * still used so a future per-source height is honoured without rewrite.
+ *
+ * @param {Array<{x:number,y:number}>} positions
+ * @param {{widthM:number,lengthM:number}} roomDims
+ * @param {number} subWidthM
+ * @param {number} subDepthM
+ * @param {number} cabinetHeightM
+ * @param {number} bottomHeightM
+ * @returns {Array}
+ */
+function buildOverlapSources(positions, roomDims, subWidthM, subDepthM, cabinetHeightM, bottomHeightM) {
+  const W = Number(roomDims?.widthM);
+  const L = Number(roomDims?.lengthM);
+  const height = Number.isFinite(Number(cabinetHeightM)) && cabinetHeightM > 0
+    ? Number(cabinetHeightM) : 0.5;
+  const bottom = Number.isFinite(Number(bottomHeightM)) ? Math.max(0, Number(bottomHeightM)) : 0;
+  const centreZ = bottom + height / 2;
+  return (positions || []).map((pos) => {
+    const { rotationDeg } = deriveSubWallOrientation({
+      x: pos.x, y: pos.y, widthM: W, lengthM: L, subWidthM, subDepthM,
+    });
+    const { halfX, halfY } = subHalfExtents(subWidthM, subDepthM, rotationDeg);
+    return {
+      x: Number(pos.x),
+      y: Number(pos.y),
+      z: centreZ,
+      cabinetWidthM: halfX * 2,
+      cabinetDepthM: halfY * 2,
+      cabinetHeightM: height,
+    };
+  });
+}
+
+/**
  * Validate a complete candidate set against the room and the cabinet.
+ *
+ * The fixed 150 mm centre-distance rule is retained as a CHEAP preliminary
+ * filter only. The physical ELIGIBILITY authority is the existing
+ * dimension-aware cabinet-overlap authority (validateCabinetOverlap): two
+ * cabinets overlap only when their full volumes intersect in X, Y and Z,
+ * using each source's orientation-adjusted cabinet dimensions. A candidate
+ * that passes 150 mm Euclidean but whose cabinets intersect (e.g. 430 mm X
+ * separation with 500 mm cabinets) is rejected by the overlap authority.
  *
  * @param {Array<{x:number,y:number}>} positions — one coordinate per source
  * @param {object} [options]
@@ -75,8 +124,13 @@ export function attachPhysicalSourceIdentity(coordinates, currentPositions) {
  *   depth) keeps that installed depth and is not re-judged for wall clearance;
  *   its lateral position is still validated. Omitted → every position is judged
  *   against the wall, exactly as before.
+ * @param {number} [options.cabinetHeightM] — cabinet height for the overlap
+ *   check. When omitted a conservative default is used; Z is uniform so the
+ *   check reduces to the X/Y footprint.
+ * @param {number} [options.bottomHeightM] — cabinet bottom height for the
+ *   overlap check. When omitted Z is uniform.
  */
-export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM, { baselinePositions = null } = {}) {
+export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM, { baselinePositions = null, cabinetHeightM = null, bottomHeightM = null } = {}) {
   if (!Array.isArray(positions) || positions.length === 0) return false;
   for (let index = 0; index < positions.length; index += 1) {
     const pos = positions[index];
@@ -87,12 +141,24 @@ export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM, 
       && Math.abs(Number(pos.y) - Number(baseline.y)) <= INSTALLED_DEPTH_TOLERANCE_M;
     if (!pos || !isPhysicallyValid(pos.x, pos.y, roomDims, subWidthM, subDepthM, { installedDepth })) return false;
   }
+  // Cheap preliminary filter: reject obviously too-close pairs before the
+  // dimension-aware authority. This cannot establish physical validity on
+  // its own — it only prunes the search cheaply.
   for (let i = 0; i < positions.length; i++) {
     for (let j = i + 1; j < positions.length; j++) {
       const dist = Math.hypot(positions[i].x - positions[j].x, positions[i].y - positions[j].y);
       if (dist < MIN_SUB_SEPARATION_M) return false;
     }
   }
+  // PHYSICAL ELIGIBILITY AUTHORITY: dimension-aware cabinet-overlap check.
+  // Reuses the existing validateCabinetOverlap authority with each source's
+  // orientation-adjusted cabinet dimensions. Overlapping candidates are
+  // rejected before acoustic screening or recommendation selection.
+  const overlapSources = buildOverlapSources(
+    positions, roomDims, subWidthM, subDepthM, cabinetHeightM, bottomHeightM,
+  );
+  const overlap = validateCabinetOverlap({ sources: overlapSources });
+  if (!overlap.valid) return false;
   return true;
 }
 

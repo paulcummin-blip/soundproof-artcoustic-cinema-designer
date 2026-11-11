@@ -58,7 +58,7 @@ export function identifyBestCalibrationCandidate(confirmedResults, existingAutho
  *
  * Returns the final combined tuning (or the baseline if no improvement found).
  */
-async function retuneFullCalibration(ctx, rawTransfer, baseline) {
+export async function retuneFullCalibration(ctx, rawTransfer, baseline) {
   const { worker, controller, isStale, metrics, subwooferInstances, roomDims } = ctx;
   if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length || !baseline?.length) return null;
 
@@ -116,7 +116,7 @@ async function retuneFullCalibration(ctx, rawTransfer, baseline) {
 /**
  * Canonically confirm a combined candidate. Returns the validation check.
  */
-async function confirmCombinedCandidate(ctx, rawTransfer, tuning, candidateInfo, kind) {
+export async function confirmCombinedCandidate(ctx, rawTransfer, tuning, candidateInfo, kind) {
   const { worker, controller, isStale, bindConfirmation, validationContext,
     p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis } = ctx;
 

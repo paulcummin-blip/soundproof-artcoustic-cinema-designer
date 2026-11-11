@@ -51,6 +51,12 @@ export const BASS_AUTHORITY_STATE = Object.freeze({
   PUBLISHING: "publishing",
   CURRENT: "current",
   SAVE_FAILED: "save_failed",
+  // Bass results are saved and current, but the full engineering design is not
+  // yet eligible for publication (e.g. no 5.1-equivalent loudspeaker system, or
+  // a non-bass RP22 gate is outstanding). No publication work is active: the
+  // engineering preflight correctly reports not_ready, so this is never
+  // presented as an active save and never as Performance Current.
+  BASS_CALCULATED: "bass_calculated",
 });
 
 /** The one copy for each state. Labels are rendered uppercase by the UI. */
@@ -86,6 +92,16 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
   [BASS_AUTHORITY_STATE.CURRENT]: {
     label: "Performance Current",
     message: "Calculated and saved.",
+    actionLabel: null,
+  },
+  // Bass is saved and current, but the full engineering design is not yet
+  // eligible for publication. No save is in progress and no publication was
+  // attempted. This is never shown as Saving or as Performance Current: it is
+  // its own honest state, so an incomplete design is not presented as an
+  // indefinitely active save.
+  [BASS_AUTHORITY_STATE.BASS_CALCULATED]: {
+    label: "Bass calculated",
+    message: "Bass calculated. Complete the speaker layout and engineering assessment to enable reports.",
     actionLabel: null,
   },
 });
@@ -211,6 +227,13 @@ export function resolveBassAuthorityState({
   lifecycleState = null,
   calculationInProgress = false,
   placementPreviewActive = false,
+  // The engineering publication preflight verdict (publication.preflight.ready),
+  // reused from the existing publication authority. When bass is saved and
+  // current but preflight is not_ready, the design is not eligible for
+  // publication: this is "Bass calculated", not an active save and not Current.
+  // Undefined = unknown (no preflight wired); the resolver then falls back to
+  // the existing CALCULATED_NOT_PUBLISHED (Saving) default for a pending save.
+  preflightReady = undefined,
 } = {}) {
   const withCopy = (code) => ({ code, ...BASS_AUTHORITY_COPY[code] });
 
@@ -287,8 +310,9 @@ export function resolveBassAuthorityState({
           attention: true,
         };
       }
-      // Preserve the existing save-failure decision, but keep overall project
-      // explanations in Project Report rather than returning them to the bass UI.
+      // Preserve the existing save-failure decision for the no-gate-detail case,
+      // but keep overall project explanations in Project Report rather than
+      // returning them to the bass UI.
       const waiting = resolveOverallProjectWaiting({ attempt: matchingAttempt });
       if (waiting.complete && failedGates(matchingAttempt).length === 0) {
         return {
@@ -297,11 +321,33 @@ export function resolveBassAuthorityState({
           attention: true,
         };
       }
-      return withCopy(BASS_AUTHORITY_STATE.CURRENT);
+      // Non-bass failed gates: the engineering design is not eligible. A
+      // NOT_READY preflight blocked the publication before any write was
+      // attempted, so the bass result is saved and correct but the full
+      // engineering assessment is not publishable. An actual FAILED attempt is
+      // a genuine publication failure; NOT_READY is the design not being
+      // eligible yet. They must never be presented as Current, and NOT_READY
+      // must never be presented as an active save.
+      if (attemptStatus === ATTEMPT.NOT_READY) {
+        return withCopy(BASS_AUTHORITY_STATE.BASS_CALCULATED);
+      }
+      // FAILED with a non-bass reason: a genuine publication failure. The bass
+      // band speaks only in the bass domain, so the non-bass reason is kept in
+      // the publication diagnostics and Project Report, not named here.
+      return {
+        code: BASS_AUTHORITY_STATE.SAVE_FAILED,
+        ...BASS_AUTHORITY_SAVE_FAILED_COPY,
+        attention: true,
+      };
     }
-    // Saved and current, but the publication has not acknowledged it yet: the
-    // values are correct and saving is what is outstanding. That save is
-    // automatic, so the band reports it as in progress with no action.
+    // CANCELLED, or no matching attempt yet: the publication has not
+    // acknowledged the saved result. When the engineering preflight reports
+    // not_ready, no save is active and the design is not eligible — this is
+    // "Bass calculated", not Saving. When preflight is ready (or unknown), a
+    // genuine save is pending and the band reports it as in progress.
+    if (preflightReady === false) {
+      return withCopy(BASS_AUTHORITY_STATE.BASS_CALCULATED);
+    }
     return withCopy(BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED);
   }
 

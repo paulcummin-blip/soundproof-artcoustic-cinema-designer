@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import Rp22RecommendationCard from "@/components/room/bass/best-layout/Rp22RecommendationCard";
 import Rp22LayoutPlanDialog from "@/components/room/bass/best-layout/Rp22LayoutPlanDialog";
-import { coordinatesMatch, validateRecommendationLayout, buildAppliedInstances, currentModelFromInstances, defaultDialogModel } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { coordinatesMatch, buildAppliedInstances, currentModelFromInstances, defaultDialogModel } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { validateAppliedInstances } from "@/components/room/bass/best-layout/validateAppliedInstances";
 
 function LevelPill({ level }) {
   const n = Number(level);
@@ -94,8 +95,10 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
       setApplyError("Subwoofer instances are not valid. Cannot apply recommendation.");
       return;
     }
-    // Validate before changing any state.
-    const validation = validateRecommendationLayout(layout, roomDims);
+    // Build the EXACT instances that will be saved, then validate them through
+    // the existing physical authorities. The same validated array is committed.
+    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
+    const validation = validateAppliedInstances(nextInstances, roomDims);
     if (!validation.valid) {
       setApplyError(validation.reason);
       return;
@@ -106,10 +109,6 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
     setApplying(true);
     // Save the COMPLETE prior canonical instance array for undo (not only CFG).
     setPrevious({ instances: Array.isArray(subwooferInstances) ? subwooferInstances.map((i) => ({ ...i })) : [] });
-    // Build the next canonical instance array from the recommendation layout.
-    // Pass modelOverride so the dialog's selected model is applied to every
-    // matched instance, not only the positions.
-    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
     // One canonical-first commit: instances once, then both CFG mirrors derive
     // afterward. No direct CFG-first setters.
     commitInstances(nextInstances, {

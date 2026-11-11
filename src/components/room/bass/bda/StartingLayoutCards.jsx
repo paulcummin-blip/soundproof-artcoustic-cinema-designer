@@ -138,6 +138,10 @@ export default function StartingLayoutCards({
   const contextId = resolveBestSubLayoutContextId({ projectId: activeProjectId, roomDims });
   const liveInputs = useBestSubLayoutLiveInputs();
   const physicsOptions = selectBestSubLayoutPhysics(liveInputs, contextId);
+  // The model the Apply path will use. The advisor must evaluate with the SAME
+  // cabinet dimensions so the coordinates it recommends are the coordinates
+  // that will be saved — never a point-source approximation.
+  const applyModel = frontSubsCfg?.model || rearSubsCfg?.model || "SUB2-12";
   const advisor = useFastBassPlacementAdvisor({
     roomDims,
     seatingPositions,
@@ -145,6 +149,7 @@ export default function StartingLayoutCards({
     physicsOptions,
     sourceHeights,
     roomElements,
+    fallbackModel: applyModel,
   });
   const [applyError, setApplyError] = useState(null);
   const currentSources = useMemo(() => currentSourcesFrom(currentSubs), [currentSubs]);
@@ -188,7 +193,7 @@ export default function StartingLayoutCards({
       setApplyError("Subwoofer instances are not ready.");
       return;
     }
-    const validation = validateRecommendationLayout(layout, roomDims);
+    const validation = validateRecommendationLayout(layout, roomDims, applyModel);
     if (!validation.valid) {
       setApplyError(validation.reason);
       return;
@@ -196,8 +201,7 @@ export default function StartingLayoutCards({
     // A chosen starting layout must persist as valid canonical instances.
     // Fresh projects can hydrate with no explicit sub model, so use the
     // product default already presented by the subwoofer workflow.
-    const appliedModel = frontSubsCfg?.model || rearSubsCfg?.model || "SUB2-12";
-    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, appliedModel);
+    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, applyModel);
     try {
       commitInstances(next, {
         front: { placementMode: "manual", isManual: true },
