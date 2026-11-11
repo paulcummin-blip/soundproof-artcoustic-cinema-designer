@@ -71,6 +71,9 @@ export function useSeatingRebuild({
   const prevVisibleWidthMRef = useRef(null);
   // Tracks the last seatingBlockOffset to detect Front Row Distance changes independently
   const prevSeatingBlockOffsetRef = useRef(null);
+  // Tracks the last room width/length so a room-dimension change triggers a
+  // rebuild of generated (auto) seats, while user-placed seats are preserved.
+  const prevRoomDimsRef = useRef(null);
   // Helper: get ear height for a 1-based row index, falling back to step pattern
   const getRowZ = (rowIndex) => {
     const h = _rowEarHeights?.[rowIndex];
@@ -179,6 +182,7 @@ export function useSeatingRebuild({
             y,
             z: getRowZ(rowIndex),
             rowNumber: rowIndex + 1,
+            positionSource: scratchPrev?.positionSource || 'auto',
             platformHeightM: Number.isFinite(scratchPrev?.platformHeightM) ? scratchPrev.platformHeightM : defaultPlatformH,
             priority: resolveSeatPriority(scratchPrev),
           });
@@ -205,20 +209,35 @@ export function useSeatingRebuild({
 
     const isLoadedProject = loadState?.phase === "loaded" && !!hasProjectId;
 
+    // Room dimension change detection: a change in width/length must trigger a
+    // rebuild of generated (auto) seats so they follow room geometry. User-placed
+    // seats (positionSource === 'user') are preserved by the rebuild below.
+    const currentRoomW = Number(stableDimensions?.width) || Number(appState?.roomDims?.widthM) || 4.5;
+    const currentRoomL = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+    const prevRoomDims = prevRoomDimsRef.current;
+    const roomDimsChanged = !!prevRoomDims && (
+      Math.abs(prevRoomDims.width - currentRoomW) > 0.001 ||
+      Math.abs(prevRoomDims.length - currentRoomL) > 0.001
+    );
+    prevRoomDimsRef.current = { width: currentRoomW, length: currentRoomL };
+
     // ── LOADED-PROJECT PRESERVATION GUARD ────────────────────────────────────
     // For any loaded project where the user has NOT yet changed seating controls
-    // or requested a reset, preserve the restored seating unconditionally.
-    // This is NOT one-shot — it continues protecting on every pass until
-    // userHasChangedSeatingSinceLoad becomes true or a reset is requested.
-    // This prevents screen geometry finalising during project load from being
-    // misinterpreted as a live seating-reference change.
+    // or requested a reset, preserve the restored seating unconditionally —
+    // UNLESS room dimensions changed, in which case generated seats must follow
+    // the new geometry. This is NOT one-shot — it continues protecting on every
+    // pass until userHasChangedSeatingSinceLoad becomes true, a reset is
+    // requested, or a room resize requires the rebuild. This prevents screen
+    // geometry finalising during project load from being misinterpreted as a
+    // live seating-reference change.
     if (
       isLoadedProject &&
       currentSeats.length > 0 &&
       !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
       !(appState?.roomResetEpoch > 0) &&
-      !(appState?.roomReflowEpoch > 0)
+      !(appState?.roomReflowEpoch > 0) &&
+      !roomDimsChanged
     ) {
       // Seed tracking refs so that when the user does make a genuine change,
       // deltas are measured correctly from the stable loaded state.
@@ -267,9 +286,10 @@ export function useSeatingRebuild({
         const MAX_Y = len;
         const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
+        // Preserve deliberately repositioned seats; shift only generated seats.
         const shiftedSeats = currentSeats.map(s => ({
           ...s,
-          y: clampY(Number(s.y) + deltaY),
+          y: s?.positionSource === 'user' ? Number(s.y) : clampY(Number(s.y) + deltaY),
         }));
 
         if (typeof appState?.setSeatingPositions === 'function') {
@@ -336,7 +356,9 @@ export function useSeatingRebuild({
           appState.setRowCentersM(clampedCenters);
         }
 
+        // Preserve deliberately repositioned seats; recompute only generated seats.
         const updatedSeats = currentSeats.map(s => {
+          if (s?.positionSource === 'user') return s;
           const rowIdx = (s.rowNumber ?? 1) - 1;
           const newY = clampedCenters[rowIdx] !== undefined ? clampedCenters[rowIdx] : Number(s.y);
           return { ...s, y: newY };
@@ -370,7 +392,8 @@ export function useSeatingRebuild({
       !didUserRequestResetRef.current &&
       !(appState?.roomResetEpoch > 0) &&
       !(appState?.roomReflowEpoch > 0) &&
-      !seatingReferenceChanged
+      !seatingReferenceChanged &&
+      !roomDimsChanged
     ) {
       return;
     }
@@ -448,6 +471,11 @@ export function useSeatingRebuild({
     // 4) Build all seats
     const prevSeatById = new Map(currentSeats.map(s => [s.id, s]));
     const seats = [];
+    // An explicit seating control change (Generate, rows, spacing, or reset)
+    // regenerates every seat as a default 'auto' seat. A geometry-only change
+    // (room dims or screen) preserves seats the designer deliberately
+    // repositioned (positionSource === 'user').
+    const regenerateAll = userHasChangedSeatingSinceLoad || !!didUserRequestResetRef.current;
 
     list.forEach((rawCount, rowIndex) => {
       const count = Math.max(1, Number(rawCount) || 1);
@@ -459,14 +487,16 @@ export function useSeatingRebuild({
       for (let i = 0; i < count; i++) {
         const seatId = `seat-r${rowIndex + 1}-c${i + 1}`;
         const prev = prevSeatById.get(seatId);
+        const isUserPlaced = !regenerateAll && prev?.positionSource === 'user';
 
         const defaultPlatformH = rowIndex === 0 ? 0 : Math.max(0, getRowZ(rowIndex) - getRowZ(0));
         seats.push({
           id: seatId,
-          x: startX + i * spacingX,
-          y,
+          x: isUserPlaced ? Number(prev.x) : startX + i * spacingX,
+          y: isUserPlaced ? Number(prev.y) : y,
           z: getRowZ(rowIndex),
           rowNumber: rowIndex + 1,
+          positionSource: regenerateAll ? 'auto' : (prev?.positionSource || 'auto'),
           isPrimary: prev?.isPrimary || false,
           isSecondary: prev?.isSecondary || false,
           platformHeightM: Number.isFinite(prev?.platformHeightM) ? prev.platformHeightM : defaultPlatformH,

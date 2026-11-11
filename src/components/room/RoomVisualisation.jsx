@@ -1476,7 +1476,11 @@ const byId = useEntitiesById({
     clearSeatDragLive();
     if (!draftSeatsRef.current || !onSetSeatingPositions) return;
     const draftSeats = draftSeatsRef.current;
-    onSetSeatingPositions(draftSeats);
+    // A drag is a deliberate repositioning: mark every committed seat as
+    // user-placed so subsequent room/screen geometry changes preserve its
+    // coordinates instead of regenerating it.
+    const committedSeats = draftSeats.map(s => ({ ...s, positionSource: 'user' }));
+    onSetSeatingPositions(committedSeats);
 
     // Sync seatingBlockOffset and rowCentersM from the committed positions
     if (appState?.setSeatingBlockOffset || appState?.setRowCentersM) {

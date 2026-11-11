@@ -6,6 +6,7 @@ import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import { buildLiveComplianceSummary } from "@/components/rp22/buildLiveComplianceSummary";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDimensionReflowBanner from "@/components/room/RoomDimensionReflowBanner";
+import SeatBoundaryWarning from "@/components/room/SeatBoundaryWarning";
 
 const RoomDimensions = React.lazy(() =>
   import("@/components/room/RoomDimensions").then((m) => ({ default: m.default ?? m.RoomDimensions }))
@@ -168,6 +169,7 @@ export default function RoomDesignerControlsPanel({
         className="space-y-3">
 
         <RoomDimensionReflowBanner />
+        <SeatBoundaryWarning />
 
         {/* Always-mounted background runner for the evaluated 1/2/4-subwoofer
             recommendations. Owns the single Stage 1/2 evaluation so the
