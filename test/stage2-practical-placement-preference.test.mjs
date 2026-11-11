@@ -450,3 +450,117 @@ describe("Practical Placement Preference — selectQualifyingAlternatives", () =
     assert.equal(alts.length, 0, "numerical-only gain at the same Level must not surface an alternative");
   });
 });
+
+describe("Practical Placement Preference — Secondary P20 regression safeguard", () => {
+  it("qualifies a side/mixed alt with a whole Primary P20 Level improvement and Secondary unchanged", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7, familyRank: 3 }),
+    });
+    const side = makeResult({
+      familyId: FAMILY_IDS.RP22_D,
+      finalistId: "d",
+      p19Level: 4,
+      primaryP20Levels: [2, 2],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 2, p20Dev: 3.5, familyRank: 4 }),
+    });
+    const ranked = [side, frontRear];
+    const alts = selectQualifyingAlternatives(ranked, frontRear);
+    assert.equal(alts.length, 1, "Primary P20 L1->L2, Secondary unchanged qualifies");
+    assert.equal(alts[0].familyId, FAMILY_IDS.RP22_D);
+  });
+
+  it("rejects a side/mixed alt that improves Primary P20 but regresses Secondary P20", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [2],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7, familyRank: 3 }),
+    });
+    const side = makeResult({
+      familyId: FAMILY_IDS.RP22_D,
+      finalistId: "d",
+      p19Level: 4,
+      primaryP20Levels: [2, 2],
+      secondaryP20Levels: [1], // Secondary P20 regressed L2->L1
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 2, p20Dev: 3.5, familyRank: 4 }),
+    });
+    const ranked = [side, frontRear];
+    const alts = selectQualifyingAlternatives(ranked, frontRear);
+    assert.equal(alts.length, 0, "Secondary P20 regression blocks the alternative");
+  });
+
+  it("qualifies a side/mixed alt with a whole P19 Level improvement; Primary and Secondary unchanged", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 3,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [2],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7, familyRank: 3 }),
+    });
+    const side = makeResult({
+      familyId: FAMILY_IDS.RP22_D,
+      finalistId: "d",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [2],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 6, familyRank: 4 }),
+    });
+    const ranked = [side, frontRear];
+    const alts = selectQualifyingAlternatives(ranked, frontRear);
+    assert.equal(alts.length, 1, "P19 L3->L4 with no regression qualifies");
+    assert.equal(alts[0].familyId, FAMILY_IDS.RP22_D);
+  });
+
+  it("rejects a side/mixed alt that improves P19 but regresses Secondary P20", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 3,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [2],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7, familyRank: 3 }),
+    });
+    const side = makeResult({
+      familyId: FAMILY_IDS.RP22_D,
+      finalistId: "d",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [1], // Secondary P20 regressed
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 6, familyRank: 4 }),
+    });
+    const ranked = [side, frontRear];
+    const alts = selectQualifyingAlternatives(ranked, frontRear);
+    assert.equal(alts.length, 0, "Secondary regression blocks despite P19 improvement");
+  });
+
+  it("rejects a within-Level numerical improvement only (no whole-Level gain)", () => {
+    const frontRear = makeResult({
+      familyId: FAMILY_IDS.FOUR_THIRD_PAIRS,
+      finalistId: "ftp",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 7, familyRank: 3 }),
+    });
+    const side = makeResult({
+      familyId: FAMILY_IDS.RP22_D,
+      finalistId: "d",
+      p19Level: 4,
+      primaryP20Levels: [1, 1],
+      secondaryP20Levels: [1],
+      rankingTuple: makeRankingTuple({ worstPrimaryCombined: 1, p20Dev: 4, familyRank: 4 }),
+    });
+    const ranked = [side, frontRear];
+    const alts = selectQualifyingAlternatives(ranked, frontRear);
+    assert.equal(alts.length, 0, "within-Level numerical-only never qualifies");
+  });
+});

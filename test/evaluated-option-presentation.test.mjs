@@ -327,8 +327,10 @@ function withRankingData(result) {
   assert.equal(options[0].placementKind, 'practical');
 }
 
-// ── 8d. Compromise surfacing: a qualifying alternative (Primary P20 L1→L2)
-//   that regresses Secondary P20 (L2→L1) carries the compromise descriptor.
+// ── 8d. Secondary P20 regression safeguard: a qualifying alternative (Primary
+//   P20 L1→L2) that regresses Secondary P20 (L2→L1) is REJECTED entirely — no
+//   RP22 Level regression is an acceptable compromise. Only the practical
+//   front/rear option appears.
 {
   const frontRear = withRankingData(makeValidResult({
     finalistId: 'ftp',
@@ -360,12 +362,8 @@ function withRankingData(result) {
     four_sub_result: { bestFinalist: frontRear, evaluatedFinalists: [frontRear, mixedAlt] },
   };
   const options = selectEvaluatedOptions(completeState, seatPriorityMap, context);
-  assert.equal(options.length, 2, 'practical + qualifying alternative (Primary P20 improved)');
-  assert.equal(options[1].improvement.primaryP20, true, 'Primary P20 L1->L2 qualifies despite Secondary regression');
-  assert.ok(Array.isArray(options[1].compromises) && options[1].compromises.length === 1, 'one compromise surfaced');
-  assert.equal(options[1].compromises[0].parameter, 'secondaryP20');
-  assert.equal(options[1].compromises[0].fromLevel, 2);
-  assert.equal(options[1].compromises[0].toLevel, 1);
+  assert.equal(options.length, 1, 'Secondary P20 regression rejects the alternative — practical only');
+  assert.equal(options[0].placementKind, 'practical');
 }
 
 // ── 9. wall placement / orientation derivation ─────────────────────────

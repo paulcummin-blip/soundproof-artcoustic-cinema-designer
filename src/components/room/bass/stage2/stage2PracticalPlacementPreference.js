@@ -69,6 +69,22 @@ function worstPrimaryP20Level(result) {
 }
 
 /**
+ * Worst (minimum) P20 Performance Level among SECONDARY seats, read from the
+ * existing ranking summary. Null when no secondary seats are present.
+ * @private
+ */
+function worstSecondaryP20Level(result) {
+  const seats = result?.rankingData?.secondarySummary?.seats;
+  if (!Array.isArray(seats) || !seats.length) return null;
+  let worst = Infinity;
+  for (const seat of seats) {
+    const level = Number(seat?.p20Level);
+    if (Number.isFinite(level) && level < worst) worst = level;
+  }
+  return Number.isFinite(worst) ? worst : null;
+}
+
+/**
  * The authoritative RSP P19 Performance Level (one aggregate result).
  * @private
  */
@@ -79,15 +95,19 @@ function rspP19Level(result) {
 
 /**
  * Decide whether a side/mixed candidate has a whole-Level improvement over
- * the practical (front/rear) candidate, with no regression in the other
- * relevant Level. Primary-weighted: a Secondary-only improvement never
- * qualifies.
+ * the practical (front/rear) candidate, with NO RP22 Level regression in
+ * P19, Primary P20 or Secondary P20.
  *
- * Qualifying improvements (existing stamped Levels only):
- *   (a) A whole Primary P20 Performance Level improvement, with no P19 RSP
- *       Level regression; OR
- *   (b) A whole P19 RSP Performance Level improvement, with no Primary P20
- *       Level regression.
+ * Policy:
+ *   - At least one whole-RP22-Level improvement in P19 or worst Primary P20
+ *     (a Secondary-only improvement never qualifies).
+ *   - No RP22 Level regression in P19, Primary P20 or Secondary P20. A
+ *     Primary P20 improvement bought by a Secondary P20 regression is not an
+ *     acceptable compromise.
+ *   - No within-Level numerical improvement alone ever qualifies.
+ *
+ * Uses only the existing stamped Levels — no new dB threshold, no new
+ * scoring, no acoustic maths.
  *
  * @private
  * @param {object} sideMixed — side/mixed-wall candidate result
@@ -99,21 +119,23 @@ export function hasWholeLevelImprovement(sideMixed, practical) {
   const cP19 = rspP19Level(practical);
   const sPrimP20 = worstPrimaryP20Level(sideMixed);
   const cPrimP20 = worstPrimaryP20Level(practical);
+  const sSecP20 = worstSecondaryP20Level(sideMixed);
+  const cSecP20 = worstSecondaryP20Level(practical);
 
-  // Need at least one Level pair to compare; if both are missing, no
-  // evidence-based improvement can be established.
-  if ((sP19 == null || cP19 == null) && (sPrimP20 == null || cPrimP20 == null)) {
-    return false;
-  }
+  // Need at least one comparable improvement pair (P19 or Primary P20);
+  // if neither is available, no evidence-based improvement can be established.
+  const p19Comparable = sP19 != null && cP19 != null;
+  const primP20Comparable = sPrimP20 != null && cPrimP20 != null;
+  if (!p19Comparable && !primP20Comparable) return false;
 
-  // (a) Whole Primary P20 Level improvement, no P19 RSP regression.
-  if (sPrimP20 != null && cPrimP20 != null && sPrimP20 > cPrimP20) {
-    if (sP19 == null || cP19 == null || sP19 >= cP19) return true;
-  }
-  // (b) Whole P19 RSP Level improvement, no Primary P20 regression.
-  if (sP19 != null && cP19 != null && sP19 > cP19) {
-    if (sPrimP20 == null || cPrimP20 == null || sPrimP20 >= cPrimP20) return true;
-  }
+  // No RP22 Level regression in P19, Primary P20 or Secondary P20.
+  if (p19Comparable && sP19 < cP19) return false;
+  if (primP20Comparable && sPrimP20 < cPrimP20) return false;
+  if (sSecP20 != null && cSecP20 != null && sSecP20 < cSecP20) return false;
+
+  // At least one whole-Level improvement in P19 or Primary P20.
+  if (p19Comparable && sP19 > cP19) return true;
+  if (primP20Comparable && sPrimP20 > cPrimP20) return true;
   return false;
 }
 
