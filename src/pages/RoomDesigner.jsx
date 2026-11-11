@@ -140,6 +140,8 @@ function RoomDesignerWithState() {
 
   // NEW: Refs for speaker rescue on room resize
   const prevRoomDimsRef = useRef(null);
+  // Previous room dims snapshot for the non-destructive seat boundary clamp.
+  const prevSeatRoomDimsRef = useRef(null);
   const isDraggingRef = useRef(false);
   const visualisationRef = React.useRef(null);
   const didUserRequestResetRef = useRef(false);
@@ -1335,6 +1337,36 @@ function RoomDesignerWithState() {
     if (anyOutOfBounds) setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
+  // Seat boundary clamp on room resize — preserve every seat's position and
+  // only clamp coordinates that fall outside the new room bounds. This is
+  // non-destructive: no seat is regenerated, no row centers are recomputed, and
+  // manually positioned seats keep their coordinates when they still fit.
+  useEffect(() => {
+    if (loadState?.phase !== 'loaded') return;
+    const W = stableDimensions.width; const L = stableDimensions.length;
+    if (!(W > 0 && L > 0)) return;
+    const prev = prevSeatRoomDimsRef.current;
+    prevSeatRoomDimsRef.current = { width: W, length: L };
+    if (!prev || (prev.width === W && prev.length === L)) return;
+    const seats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
+    if (!seats.length) return;
+    const INSET = 0.30;
+    let anyClamped = false;
+    const clamped = seats.map((seat) => {
+      if (!seat) return seat;
+      const x = Number(seat.x); const y = Number(seat.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return seat;
+      const nx = Math.max(INSET, Math.min(W - INSET, x));
+      const ny = Math.max(INSET, Math.min(L - INSET, y));
+      if (nx === x && ny === y) return seat;
+      anyClamped = true;
+      return { ...seat, x: nx, y: ny };
+    });
+    if (anyClamped && typeof appState?.setSeatingPositions === 'function') {
+      appState.setSeatingPositions(clamped);
+    }
+  }, [stableDimensions.width, stableDimensions.length, _seatingPositions, loadState?.phase, appState]);
+
   // Ref to hold the latest required screen clearance computed during a speaker drag.
   // Written on every mouse move, committed once when drag ends to avoid per-pixel jitter.
   const pendingScreenReqRef = useRef(null);
@@ -1824,6 +1856,23 @@ function RoomDesignerWithState() {
       ?? appDesignRating?.engineeringSummary
       ?? null)
     : (appDesignRating?.engineeringSummary ?? null);
+
+  // Feed the completed-assessment witness to AppStateProvider so room-dimension
+  // edits only show the recalculation warning when a durable Published
+  // Engineering assessment existed for this version. The witness is true once a
+  // publication exists for the version and stays true after a dimension change
+  // invalidates it, so subsequent changes keep warning. The dimension-change
+  // warning is cleared when a fresh complete assessment is published for the
+  // current design (reportComplete becomes true again after recalculation).
+  const hadCompletedAssessment = !!restoredEngineeringAuthority?.durable?.publication;
+  React.useEffect(() => {
+    appState?.setHadCompletedAssessment?.(hadCompletedAssessment);
+  }, [hadCompletedAssessment, appState]);
+  React.useEffect(() => {
+    if (restoredEngineeringAuthority?.reportComplete) {
+      appState?.clearLayoutRefreshPending?.();
+    }
+  }, [restoredEngineeringAuthority?.reportComplete, appState]);
 
   const [designRecommendations, setDesignRecommendations] = React.useState(null);
 

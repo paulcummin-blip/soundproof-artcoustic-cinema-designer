@@ -1,33 +1,25 @@
 import React from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useAppState } from "@/components/AppStateProvider";
 
 /**
- * Non-blocking warning banner shown when room dimensions have changed on a
- * loaded project and dependent geometry needs reflow. Renders a single
- * "Refresh Layout" action — there is no "Keep Current Positions" option.
+ * Non-blocking informational banner shown when room dimensions change after a
+ * completed engineering assessment has been published for this version.
  *
- * Reads `layoutRefreshPending` and `reflowLayout` from app state.
+ * The previous RP22 and bass results are stale and need recalculation.
+ * Geometry is NOT rebuilt automatically: manually positioned seats, speakers,
+ * subwoofers, projectors and room elements are preserved. The banner clears
+ * once a fresh complete assessment is published for the current design
+ * (RoomDesigner clears the flag via clearLayoutRefreshPending).
+ *
+ * The flag is only set when a completed assessment existed before the
+ * dimension change, so this banner never appears during initial design entry.
+ *
+ * Reads `layoutRefreshPending` from app state.
  */
 export default function RoomDimensionReflowBanner() {
-  const { layoutRefreshPending, reflowLayout } = useAppState();
-  const [isReflowing, setIsReflowing] = React.useState(false);
-
-  // Reset the reflowing flag when the pending flag clears
-  React.useEffect(() => {
-    if (!layoutRefreshPending) setIsReflowing(false);
-  }, [layoutRefreshPending]);
-
+  const { layoutRefreshPending } = useAppState();
   if (!layoutRefreshPending) return null;
-
-  const handleRefresh = () => {
-    setIsReflowing(true);
-    try {
-      reflowLayout();
-    } catch (e) {
-      setIsReflowing(false);
-    }
-  };
 
   return (
     <div
@@ -52,40 +44,12 @@ export default function RoomDimensionReflowBanner() {
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, marginBottom: 2 }}>
-          Room dimensions have changed
+          Room dimensions changed
         </div>
         <div style={{ color: "#78350F" }}>
-          Refresh layout positions for the updated room. Bass and RP22 results
-          will require recalculation after refresh.
+          Previous performance results are no longer current and need recalculation.
         </div>
       </div>
-      <button
-        onClick={handleRefresh}
-        disabled={isReflowing}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "6px 12px",
-          borderRadius: 6,
-          border: "1px solid #213428",
-          background: "#213428",
-          color: "#FFFFFF",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: isReflowing ? "wait" : "pointer",
-          opacity: isReflowing ? 0.7 : 1,
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-        }}
-      >
-        <RefreshCw
-          className="w-3.5 h-3.5"
-          style={{ animation: isReflowing ? "spin 0.8s linear infinite" : undefined }}
-        />
-        {isReflowing ? "Refreshing…" : "Refresh Layout"}
-      </button>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

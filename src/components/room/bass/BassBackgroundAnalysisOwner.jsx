@@ -539,7 +539,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // hook. The authoritative geometry fingerprint (fingerprints.geometry) is the
   // sole geometry-validity gate. The normalized hook stays idle during manual
   // Calculate (analysisRequestId: null) and is not waited on.
-  const layoutRefreshPending = !!appState?.layoutRefreshPending;
   const geometryReflowInProgress = !!appState?.geometryReflowInProgress;
   const clearGeometryReflow = appState?.clearGeometryReflow;
 
@@ -618,7 +617,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // True when no reflow is pending or in-progress. During a reflow, it stays
   // false until the fingerprint stabilises (effect above calls
   // clearGeometryReflow, which sets both flags false).
-  const geometryReadyForCalculation = !layoutRefreshPending && !geometryReflowInProgress;
+  const geometryReadyForCalculation = !geometryReflowInProgress;
 
   const canCalculate = isProjectHydrationReady
     && bassAuthorityHydrationSettled

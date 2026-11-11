@@ -610,24 +610,34 @@ function useDesignerState() {
   // dimension changes vs hydration. Updated by the dimension setters.
   const prevRoomDimsRef = useRef(null);
 
+  // Completed-assessment witness: true when a durable Published Engineering
+  // assessment has existed for this version (fed by RoomDesigner from the
+  // restored engineering authority). The room-dimension warning is only
+  // meaningful after a completed assessment; a fresh design must stay editable
+  // without warnings or a manual Refresh.
+  const hadCompletedAssessmentRef = useRef(false);
+  const setHadCompletedAssessment = useCallback((v) => {
+    hadCompletedAssessmentRef.current = !!v;
+  }, []);
+  // Clears the dimension-change warning once a fresh complete assessment is
+  // published for the current design (called by RoomDesigner).
+  const clearLayoutRefreshPending = useCallback(() => {
+    setLayoutRefreshPending(false);
+  }, []);
+
   // markLayoutRefreshPending and the dimension setters are declared HERE
-  // (after all referenced state: seatingPositions, subwooferInstances,
-  // roomElements, speakerSystem, layoutRefreshPending, prevRoomDimsRef)
-  // to avoid a temporal-dead-zone ReferenceError at boot.
+  // (after all referenced state) to avoid a temporal-dead-zone ReferenceError.
   const markLayoutRefreshPending = useCallback(() => {
-    // Only set the pending flag when there are existing layout objects that
-    // could become stale. On a fresh/scratch project with no seating, no
-    // reflow is needed.
+    // Only warn when a completed engineering assessment existed for this
+    // version before the dimension change. The layout-object presence check
+    // is deliberately removed: default seating on a fresh project must not
+    // trigger a recalculation warning, and geometry is never rebuilt
+    // automatically from a dimension edit.
     setLayoutRefreshPending((prev) => {
       if (prev) return prev; // already pending
-      const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-      const hasSubs = Array.isArray(subwooferInstances) && subwooferInstances.some(i => i?.enabled !== false);
-      const hasElements = Array.isArray(roomElements) && roomElements.length > 0;
-      const hasSpeakers = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
-      if (!hasSeats && !hasSubs && !hasElements && !hasSpeakers) return false;
-      return true;
+      return hadCompletedAssessmentRef.current ? true : false;
     });
-  }, [seatingPositions, subwooferInstances, roomElements, speakerSystem?.placedSpeakers]);
+  }, []);
 
   const setRoomWidthM = useCallback((v) => {
     const newVal = Number(v);
@@ -2189,6 +2199,8 @@ function useDesignerState() {
     roomReflowEpoch,
     geometryReflowInProgress,
     clearGeometryReflow,
+    setHadCompletedAssessment,
+    clearLayoutRefreshPending,
     assumedP15Level,
     setAssumedP15LevelSafe,
     assumedP21Level,
@@ -2320,6 +2332,8 @@ function useDesignerState() {
     roomReflowEpoch,
     geometryReflowInProgress,
     clearGeometryReflow,
+    setHadCompletedAssessment,
+    clearLayoutRefreshPending,
     assumedP15Level,
     setAssumedP15LevelSafe,
     assumedP21Level,
