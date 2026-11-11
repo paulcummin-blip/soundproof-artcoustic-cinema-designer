@@ -33,6 +33,7 @@ import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwoofe
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
 import EvaluatedLayoutCards from "@/components/room/bass/bda/EvaluatedLayoutCards";
+import SubwooferModelPicker from "@/components/room/bass/bda/SubwooferModelPicker";
 import { useEvaluatedRecommendations } from "@/components/room/bass/bda/evaluatedRecommendationsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { deriveRspPosition, deriveAmplifierPowerPerSubW } from "@/components/room/bass/bda/recommendationInputs";
@@ -277,6 +278,23 @@ export default function BassDesignAssistant({
         />
       )}
 
+      {/* ── Prerequisites: model + design target ── */}
+      {/* Shown before the evaluated shortlist so the designer can satisfy the
+          Stage 2 prerequisites (subwoofer model + P14 target) without first
+          placing 1, 2 or 4 subwoofers. The model picker reuses the existing
+          compatibility action and product master options; the Design Target
+          control reuses the existing P14/P18 selectors with their established
+          Minimum L2 default. Once a layout exists, the CurrentDesignBar owns
+          model display and the picker is hidden. */}
+      {!layoutChosen && (
+        <SubwooferModelPicker
+          model={compat.frontModelDisplay}
+          onChange={compat.setFrontSubModel}
+          disabled={disabled}
+        />
+      )}
+      <ChooseDesignTarget disabled={disabled} />
+
       {/* ── Choose Layout (ADI Starting Layout shortlist) ── */}
       {/* The always-mounted background runner evaluates Stage 1/2 for the
           current room, seating, RSP and selected subwoofer. This surface shows
@@ -291,6 +309,7 @@ export default function BassDesignAssistant({
       <EvaluatedLayoutCards
         options={evaluatedRecommendations.options}
         status={evaluatedRecommendations.status}
+        waitingReason={evaluatedRecommendations.waitingReason}
         roomDims={roomDims}
         subwooferInstances={subwooferInstances}
         frontSubsCfg={frontSubsCfg}
@@ -300,11 +319,6 @@ export default function BassDesignAssistant({
         hasSubwoofers={hasSubwoofers}
         onApplied={handleEvaluatedApplied}
       />
-
-      {/* ── Zone 2: Design Target ── */}
-      {layoutChosen && (
-        <ChooseDesignTarget disabled={disabled} />
-      )}
 
       {/* ── Zone 3: Performance ── */}
       {/* The graph is the primary workspace. P14/P18/P19/P20 are the graph

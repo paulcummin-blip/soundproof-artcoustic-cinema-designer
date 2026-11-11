@@ -17,10 +17,12 @@
 // It evaluates nothing and changes no bass maths. The options it returns are a
 // reformatted view of the Stage 2 canonical evaluation's own evidence.
 //
-// The hook is gated on having a selected subwoofer model and a derivable P14
-// target, because Stage 2 cannot evaluate without them. When those are absent
-// (a brand-new project before a model is chosen) it returns status "waiting"
-// and no options, so the cards fall back to the geometric starting layouts.
+// Stage 1 (geometry discovery) is gated ONLY on valid room dimensions, seating
+// and effective RSP — it is product- and P14-independent. Stage 2 (canonical
+// evaluation) additionally requires a selected subwoofer model and P14 target.
+// Separating the two readiness conditions lets Stage 1 run and retain its
+// finalists before a model or target is chosen, so the designer sees discovery
+// progress and the candidates are ready the instant the prerequisites are met.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
@@ -43,6 +45,10 @@ import {
   subscribeStage2,
   getStage2State,
 } from "../stage2/stage2PlacementStore";
+import {
+  subscribeStage1,
+  getStage1State,
+} from "../stage1/stage1PlacementStore";
 
 let requestCounter = 0;
 
@@ -91,7 +97,12 @@ function deriveEvaluatedInputs({
   const rspValid = Number.isFinite(Number(rspPosition?.x)) && Number.isFinite(Number(rspPosition?.y));
   const seatsValid = Array.isArray(seatingPositions) && seatingPositions.length > 0;
 
-  const canEvaluate = Boolean(selectedSubModel) && hasP14Target && roomValid && rspValid && seatsValid;
+  const geometryReady = roomValid && rspValid && seatsValid;
+  const hasModel = Boolean(selectedSubModel);
+  const hasP14 = hasP14Target;
+  // Stage 1 is product- and P14-independent: it only needs valid room geometry,
+  // seating and an effective RSP. Stage 2 adds the model and P14 target.
+  const canEvaluate = geometryReady && hasModel && hasP14;
 
   return {
     selectedSubModel,
@@ -100,6 +111,9 @@ function deriveEvaluatedInputs({
     rearOrientation,
     currentQuantity,
     amplifierPowerPerSubW,
+    geometryReady,
+    hasModel,
+    hasP14,
     canEvaluate,
   };
 }
@@ -144,7 +158,11 @@ export function useEvaluatedPlacementRecommendations({
       subwooferInstances, appState, amplifierPowerPerSubW],
   );
 
-  const stage1Enabled = recGateActive && inputs.canEvaluate;
+  // Stage 1 is geometry-only: it starts as soon as room, seating and RSP are
+  // valid — it does NOT require a subwoofer model or P14 target. Stage 2
+  // requires the model and P14 target in addition to geometry.
+  const stage1Enabled = recGateActive && inputs.geometryReady;
+  const stage2Enabled = recGateActive && inputs.canEvaluate;
 
   useStage1PlacementOptimiser({
     projectId,
@@ -171,8 +189,8 @@ export function useEvaluatedPlacementRecommendations({
     subwooferBottomHeightM: inputs.subwooferBottomHeightM,
     frontOrientation: inputs.frontOrientation,
     rearOrientation: inputs.rearOrientation,
-    enabled: stage1Enabled,
-    requestId: stage1Enabled ? requestId : null,
+    enabled: stage2Enabled,
+    requestId: stage2Enabled ? requestId : null,
     recommendationQuantities: RECOMMENDATION_QUANTITIES,
   });
 
@@ -180,6 +198,12 @@ export function useEvaluatedPlacementRecommendations({
     subscribeStage2,
     () => getStage2State(projectId, versionId),
     () => getStage2State(projectId, versionId),
+  );
+
+  const stage1State = useSyncExternalStore(
+    subscribeStage1,
+    () => getStage1State(projectId, versionId),
+    () => getStage1State(projectId, versionId),
   );
 
   const seatPriorityMap = useMemo(
@@ -197,14 +221,27 @@ export function useEvaluatedPlacementRecommendations({
   );
 
   const status = (() => {
-    if (!inputs.canEvaluate) return "waiting";
+    if (!inputs.geometryReady) return "waiting";
+    // Stage 1 geometry discovery is running or not yet complete.
+    if (stage1State?.status === "updating" || stage1State?.status === "idle") return "discovering";
+    if (stage1State?.status !== "complete") return "discovering";
+    // Stage 1 complete — Stage 2 needs model + P14 target.
+    if (!inputs.canEvaluate) return "awaiting-prerequisites";
     if (stage2State?.status === "error") return "error";
     if (stage2State?.status === "complete") return "complete";
     if (stage2State?.status === "updating") return "evaluating";
     return "idle";
   })();
 
+  const waitingReason = (() => {
+    if (status !== "awaiting-prerequisites") return null;
+    if (!inputs.hasModel && !inputs.hasP14) return "Select a subwoofer model and design target to evaluate layouts.";
+    if (!inputs.hasModel) return "Select a subwoofer model to evaluate layouts.";
+    if (!inputs.hasP14) return "Select a design target to evaluate layouts.";
+    return null;
+  })();
+
   const isCurrent = stage2State?.status === "complete";
 
-  return { options, status, isCurrent, stage2Fingerprint: stage2State?.fingerprint || null };
+  return { options, status, isCurrent, stage2Fingerprint: stage2State?.fingerprint || null, waitingReason };
 }

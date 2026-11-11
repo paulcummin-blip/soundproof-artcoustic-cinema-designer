@@ -56,8 +56,9 @@ export default function EvaluatedRecommendationBackgroundRunner({
       status: rec.status,
       options: rec.options,
       stage2Fingerprint: rec.stage2Fingerprint,
+      waitingReason: rec.waitingReason,
     });
-  }, [key, rec.status, rec.options, rec.stage2Fingerprint]);
+  }, [key, rec.status, rec.options, rec.stage2Fingerprint, rec.waitingReason]);
 
   // Clear the entry when the project/version changes or the runner unmounts,
   // so a stale set of options is never presented against a new design.

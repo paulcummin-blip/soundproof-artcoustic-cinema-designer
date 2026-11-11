@@ -18,7 +18,7 @@
 
 import { useSyncExternalStore } from "react";
 
-const EMPTY = Object.freeze({ status: "idle", options: [], stage2Fingerprint: null });
+const EMPTY = Object.freeze({ status: "idle", options: [], stage2Fingerprint: null, waitingReason: null });
 
 const cache = new Map();
 const listeners = new Set();
@@ -31,7 +31,8 @@ function samePayload(a, b) {
   if (!a || !b) return false;
   return a.status === b.status
     && a.stage2Fingerprint === b.stage2Fingerprint
-    && a.options === b.options;
+    && a.options === b.options
+    && a.waitingReason === b.waitingReason;
 }
 
 /** Publish the latest evaluated recommendations for a project/version key.

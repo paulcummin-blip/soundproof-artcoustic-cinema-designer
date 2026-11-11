@@ -293,6 +293,7 @@ export default function EvaluatedLayoutCards({
   commitInstances,
   currentDesignFingerprint,
   onApplied,
+  waitingReason,
 }) {
   const [selectedKey, setSelectedKey] = useState(null);
   const [applyError, setApplyError] = useState(null);
@@ -381,6 +382,8 @@ export default function EvaluatedLayoutCards({
   };
 
   const evaluating = status === "evaluating";
+  const discovering = status === "discovering";
+  const awaitingPrerequisites = status === "awaiting-prerequisites";
   const waiting = status === "waiting";
 
   // Render the flat options array (practical first per quantity, then its
@@ -399,18 +402,22 @@ export default function EvaluatedLayoutCards({
         </h4>
         <p className="mt-1 text-[12px] text-[#625143]">
           {waiting
-            ? "Select a subwoofer model and design target to evaluate layouts."
-            : evaluating
-              ? "Evaluating layouts for this room…"
-              : "Recommended layouts for this room."}
+            ? "Enter room dimensions and seating to discover layouts."
+            : discovering
+              ? "Discovering layouts for this room…"
+              : awaitingPrerequisites
+                ? (waitingReason || "Select a subwoofer model and design target to evaluate layouts.")
+                : evaluating
+                  ? "Evaluating layouts for this room…"
+                  : "Recommended layouts for this room."}
         </p>
       </div>
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-        {evaluating && [0, 1, 2].map((q) => (
+        {(evaluating || discovering) && [0, 1, 2].map((q) => (
           <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
         ))}
-        {!evaluating && orderedOptions.map((option) => {
+        {!(evaluating || discovering) && orderedOptions.map((option) => {
           const key = optionKeyFor(option);
           return (
             <EvaluatedCard
@@ -427,7 +434,7 @@ export default function EvaluatedLayoutCards({
           );
         })}
       </div>
-      {!evaluating && orderedOptions.length === 0 && !waiting && (
+      {!evaluating && !discovering && orderedOptions.length === 0 && !waiting && !awaitingPrerequisites && (
         <p className="text-[11px] text-[#625143]">No credible layouts found for this room. Manual placement remains available.</p>
       )}
       {applyError && <p className="text-[11px] text-red-700">{applyError}</p>}
