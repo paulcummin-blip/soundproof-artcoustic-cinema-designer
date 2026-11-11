@@ -40,7 +40,7 @@ import { subscribeRspDragLive, getRspDragLive } from "@/components/state/rspDrag
 const OPTIMISER_VERSION_SIGNATURE = bassOptimiserVersionSignature();
 import { useNormalizedPhysicsOptions } from "./useNormalizedPhysicsOptions";
 import { useNormalizedRoomTransferLive } from "./useNormalizedRoomTransferLive";
-import { buildFinalOptimisedBassResponse } from "./finalOptimisedBassResponse";
+import { buildFinalOptimisedBassResponse, applyAuthorityToCanonicalResult } from "./finalOptimisedBassResponse";
 import { buildFinishedGraphOptimisationResult, hasGraphPayload } from "./finishedGraphAdapter";
 import { evaluateCanonicalBassAuthority } from "@/components/utils/canonicalBassAuthorityEvaluation";
 import { buildCanonicalCompletedBassMetricAuthority } from "./canonicalCompletedBassMetricAuthority";
@@ -1051,7 +1051,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       resultSchemaVersion: matchingResult.resultSchemaVersion || null,
       metricSchemaVersion: matchingResult.metricSchemaVersion || null,
     } : null;
-    const finalOptimisedBassResponse = buildFinalOptimisedBassResponse({ optimisationResult: result, selectedLayout: sources, roomResponseCurve: canonicalRoomResponseCurve, perSeatRawCurves });
+    const finalOptimisedBassResponse = applyAuthorityToCanonicalResult(canonicalResult, selectedCandidate); // aligned graph/P19 authority
     // C6.1B2 Gap 1: completedContractFingerprint MUST come from the completed
     // contract/store, NOT from the current request cacheKey.
     //   activeRequestFingerprint    = cacheKey (the current request fingerprint)

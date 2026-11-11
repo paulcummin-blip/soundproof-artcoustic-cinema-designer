@@ -452,6 +452,8 @@ export function evaluateCanonicalBassAuthority({
     assessmentEndHz: p19AssessmentEndHz,
     p14HeadroomDb,
     protectedNullRegions,
+    maximumOutputCurve: Array.isArray(canonicalResult.maximumSplCurveAfterEq)
+      ? canonicalResult.maximumSplCurveAfterEq : null,
   });
 
   const recommendedGlobalBassTrimDb = globalLevelAlignment?.recommendedTrimDb ?? 0;

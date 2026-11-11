@@ -23,6 +23,7 @@
 
 import { buildCurveSignature, buildFilterBankSignature } from "./bassResultAuthority";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
+import { computeCorrectableP19Diagnostic, computeOfficialP20Assessment } from "@/components/utils/bassAuthoritativeAssessment";
 
 const EXPECTED_CURVE_LENGTH = 360;
 const LEGACY_CURVE_LENGTH = 186;
@@ -506,12 +507,31 @@ export function buildCanonicalCompletedBassMetricAuthority({
 
   diagnostics.canonicalMetricAuthorityValid = true;
 
+  // ── P19/P20 value parity ──
+  // Recompute P19/P20 from the exact final graph curves and compare to the
+  // published values. This catches handoff bugs where the graph and metric
+  // authority consume different response states (e.g. unaligned vs aligned).
+  const p19Parity = computeP19ValueParity(finalOptimisedBassResponse);
+  const p20Parity = computeP20ValueParity(finalOptimisedBassResponse);
+  diagnostics.p19ValueParityValid = p19Parity.valid;
+  diagnostics.p19ValueParityReason = p19Parity.reason;
+  diagnostics.p20ValueParityValid = p20Parity.valid;
+  diagnostics.p20ValueParityReason = p20Parity.reason;
+
   // C6.1B2 Gap 3: Graph parity gates publication. When graphMetricParityValid
   // is null (not yet checked), publication is NOT valid — the graph parity
   // check must be completed before any metric is published as authoritative.
   // When graphMetricParityValid is false, retain diagnostic data but do NOT
   // publish metric results as authoritative.
-  if (graphMetricParityValid === null) {
+  // P19/P20 value parity is checked first — it does not depend on graph
+  // rendering and can reject immediately.
+  if (!p19Parity.valid) {
+    diagnostics.canonicalMetricPublicationValid = false;
+    diagnostics.publicationRejectionReason = p19Parity.reason || "p19-value-parity-invalid";
+  } else if (!p20Parity.valid) {
+    diagnostics.canonicalMetricPublicationValid = false;
+    diagnostics.publicationRejectionReason = p20Parity.reason || "p20-value-parity-invalid";
+  } else if (graphMetricParityValid === null) {
     diagnostics.canonicalMetricPublicationValid = false;
     diagnostics.publicationRejectionReason = "graph-parity-not-yet-checked";
   } else if (!graphMetricParityValid) {
@@ -523,6 +543,49 @@ export function buildCanonicalCompletedBassMetricAuthority({
   }
 
   return { authority, diagnostics };
+}
+
+const P19_P20_PARITY_TOLERANCE_DB = 0.01;
+
+function computeP19ValueParity(finalResponse) {
+  const curve = Array.isArray(finalResponse?.canonicalPostEqRsp) ? finalResponse.canonicalPostEqRsp : null;
+  const target = Array.isArray(finalResponse?.canonicalTargetCurve) ? finalResponse.canonicalTargetCurve : null;
+  const start = isFiniteNum(finalResponse?.assessmentStartHz) ? Number(finalResponse.assessmentStartHz) : null;
+  const end = isFiniteNum(finalResponse?.assessmentEndHz) ? Number(finalResponse.assessmentEndHz) : null;
+  const protectedNulls = Array.isArray(finalResponse?.protectedNullRegions) ? finalResponse.protectedNullRegions : [];
+  const published = isFiniteNum(finalResponse?.achievedP19VariationDb) ? Number(finalResponse.achievedP19VariationDb) : null;
+  if (!curve || !target || start == null || end == null) return { valid: true, reason: null };
+  if (published == null) return { valid: true, reason: null };
+  const recomputed = computeCorrectableP19Diagnostic({
+    rspPostEqCurve: curve, canonicalTargetCurve: target,
+    assessmentStartHz: start, assessmentEndHz: end, protectedNullRegions: protectedNulls,
+  });
+  const recomputedDb = isFiniteNum(recomputed?.variationDbRaw) ? Number(recomputed.variationDbRaw) : null;
+  if (recomputedDb == null) return { valid: true, reason: null };
+  if (Math.abs(recomputedDb - published) > P19_P20_PARITY_TOLERANCE_DB) {
+    return { valid: false, reason: `p19-value-mismatch:published:${published.toFixed(4)}:recomputed:${recomputedDb.toFixed(4)}` };
+  }
+  return { valid: true, reason: null };
+}
+
+function computeP20ValueParity(finalResponse) {
+  const rsp = Array.isArray(finalResponse?.canonicalPostEqRsp) ? finalResponse.canonicalPostEqRsp : null;
+  const seats = Array.isArray(finalResponse?.canonicalPostEqSeatResponses) ? finalResponse.canonicalPostEqSeatResponses : null;
+  const start = isFiniteNum(finalResponse?.assessmentStartHz) ? Number(finalResponse.assessmentStartHz) : null;
+  const end = isFiniteNum(finalResponse?.assessmentEndHz) ? Number(finalResponse.assessmentEndHz) : null;
+  const published = isFiniteNum(finalResponse?.achievedP20VariationDb) ? Number(finalResponse.achievedP20VariationDb) : null;
+  if (!rsp || !seats || start == null || end == null) return { valid: true, reason: null };
+  if (published == null) return { valid: true, reason: null };
+  const recomputed = computeOfficialP20Assessment({
+    rspPostEqCurve: rsp, perSeatPostEqCurves: seats,
+    assessmentStartHz: start, assessmentEndHz: end,
+  });
+  const recomputedDb = isFiniteNum(recomputed?.worstSeat?.variationDbRaw) ? Number(recomputed.worstSeat.variationDbRaw) : null;
+  if (recomputedDb == null) return { valid: true, reason: null };
+  if (Math.abs(recomputedDb - published) > P19_P20_PARITY_TOLERANCE_DB) {
+    return { valid: false, reason: `p20-value-mismatch:published:${published.toFixed(4)}:recomputed:${recomputedDb.toFixed(4)}` };
+  }
+  return { valid: true, reason: null };
 }
 
 /**
@@ -549,6 +612,8 @@ export function buildCanonicalCompletedBassMetricAuthority({
 export function computeCanonicalMetricPublication({
   canonicalMetricAuthorityValid,
   graphMetricParityValid,
+  p19ValueParityValid = true,
+  p20ValueParityValid = true,
   authorityRejectionReason = null,
   graphParityReason = null,
 }) {
@@ -556,6 +621,18 @@ export function computeCanonicalMetricPublication({
     return {
       canonicalMetricPublicationValid: false,
       publicationRejectionReason: authorityRejectionReason || "metric-authority-invalid",
+    };
+  }
+  if (p19ValueParityValid === false) {
+    return {
+      canonicalMetricPublicationValid: false,
+      publicationRejectionReason: "p19-value-parity-invalid",
+    };
+  }
+  if (p20ValueParityValid === false) {
+    return {
+      canonicalMetricPublicationValid: false,
+      publicationRejectionReason: "p20-value-parity-invalid",
     };
   }
   if (!graphMetricParityValid) {

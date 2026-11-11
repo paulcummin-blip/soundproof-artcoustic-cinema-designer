@@ -34,6 +34,7 @@ export function buildFinalOptimisedBassResponse({ optimisationResult, selectedLa
     p19TargetIdentity: "house-curve-target",
     canonicalVerticalOffsetDb: candidate.canonicalVerticalOffsetDb ?? null,
     operatingLevelOffsetDb: candidate.operatingLevelOffsetDb ?? 0,
+    realisticGlobalTrimDb: Number.isFinite(candidate.realisticGlobalTrimDb) ? candidate.realisticGlobalTrimDb : null,
     requestedOperatingLevelOffsetDb: Number.isFinite(candidate.requestedOperatingLevelOffsetDb) ? candidate.requestedOperatingLevelOffsetDb : 0,
     baseRequestedSystemOutputDb: Number.isFinite(candidate.baseRequestedSystemOutputDb) ? candidate.baseRequestedSystemOutputDb : null,
     operatingSystemOutputDb: Number.isFinite(candidate.operatingSystemOutputDb) ? candidate.operatingSystemOutputDb : null,

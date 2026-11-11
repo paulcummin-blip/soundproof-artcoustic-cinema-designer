@@ -66,6 +66,8 @@ export function buildMetricPublicationReceipt(optimisationResult) {
   const publication = computeCanonicalMetricPublication({
     canonicalMetricAuthorityValid: d.canonicalMetricAuthorityValid === true,
     graphMetricParityValid,
+    p19ValueParityValid: d.p19ValueParityValid !== false,
+    p20ValueParityValid: d.p20ValueParityValid !== false,
     authorityRejectionReason: d.rejectionReason || null,
     graphParityReason,
   });
@@ -97,5 +99,7 @@ export function buildMetricPublicationReceipt(optimisationResult) {
     candidateIdParityValid: d.candidateIdParityValid === true,
     candidateFingerprintParityValid: d.candidateFingerprintParityValid === true,
     fingerprintParityValid: d.fingerprintParityValid === true,
+    p19ValueParityValid: d.p19ValueParityValid !== false,
+    p20ValueParityValid: d.p20ValueParityValid !== false,
   };
 }
