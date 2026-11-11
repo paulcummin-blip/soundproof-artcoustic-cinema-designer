@@ -64,6 +64,7 @@ import { statesBassAuthority } from '@/components/engineering/versionedEngineeri
 import {
   PUBLICATION_ATTEMPT,
   recordPublicationAttempt,
+  recordPublicationAttemptGuarded,
   usePublicationAttempt,
 } from '@/components/engineering/publicationAcknowledgementStore';
 
@@ -233,6 +234,7 @@ export function useEngineeringPublicationEffect({
     recordPublicationAttempt(projectId, versionId, {
       status: PUBLICATION_ATTEMPT.QUEUED, fingerprint: engineeringFingerprint,
       message: 'Waiting for assessment to settle before publishing.', gates: preflight.gates,
+      publisherRegistered: true,
     });
     let started = false;
     let cancelled = false;
@@ -245,10 +247,24 @@ export function useEngineeringPublicationEffect({
         // read-back identity. Never send a premature/conflicting publication.
         if (bassFingerprint) {
           const written = await settleCompletedBassPersistence(projectId, versionId);
-          if (cancelled) return;
+          if (cancelled) {
+            // The effect was superseded during the bass settle. Record a
+            // terminal CANCELLED so the attempt is never stranded in QUEUED.
+            recordPublicationAttemptGuarded(projectId, versionId, {
+              status: PUBLICATION_ATTEMPT.CANCELLED, fingerprint: engineeringFingerprint,
+              message: 'Publication cancelled during bass save: the assessment changed before the write settled.',
+            });
+            return;
+          }
           if (written === false) throw new Error(readBassReconciliationStatus(projectId, versionId)?.writeError || 'The current bass assessment could not be saved. Retry publication.');
           const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
-          if (cancelled) return;
+          if (cancelled) {
+            recordPublicationAttemptGuarded(projectId, versionId, {
+              status: PUBLICATION_ATTEMPT.CANCELLED, fingerprint: engineeringFingerprint,
+              message: 'Publication cancelled during bass verification: the assessment changed before the write settled.',
+            });
+            return;
+          }
           if (record?.current_fingerprint !== bassFingerprint
             || !isAuthoritativeBassContract(record?.completed_by_fingerprint?.[bassFingerprint])) {
             throw new Error('Saved bass verification failed: fingerprint match=' + (record?.current_fingerprint === bassFingerprint) + ', contract present=' + !!record?.completed_by_fingerprint?.[bassFingerprint] + ', authority valid=' + isAuthoritativeBassContract(record?.completed_by_fingerprint?.[bassFingerprint]) + '. Retry publication after calculation completes.');
@@ -260,6 +276,7 @@ export function useEngineeringPublicationEffect({
         recordPublicationAttempt(projectId, versionId, {
           status: PUBLICATION_ATTEMPT.PUBLISHING,
           fingerprint: engineeringFingerprint,
+          publisherRegistered: true,
         });
         const response = await base44.functions.invoke('publishEngineering', {
           project_id: projectId,
@@ -276,16 +293,18 @@ export function useEngineeringPublicationEffect({
             snapshot_version: ENGINEERING_SNAPSHOT_VERSION,
             instance_authority_version: INSTANCE_AUTHORITY_VERSION,
             summary_schema_version: ENGINEERING_SUMMARY_SCHEMA_VERSION,
-            // The publication carries the authority the report is judged
-            // against: the current authoritative bass contract's own result
-            // fingerprint when one exists, otherwise the readiness fingerprint.
-            // Publishing one identity and comparing against another a moment
-            // later is what made a fresh report read as stale.
             bass_fingerprint: bassFingerprint
               || completedBassAuthority?.contract?.job?.resultFingerprint
               || null,
           },
         });
+        // The effect may have been superseded while the backend call was in
+        // flight. Do NOT process the response — a newer effect run owns the
+        // current attempt state. The guarded recorder would block a stale
+        // terminal overwrite anyway, but returning here avoids a spurious
+        // refresh/readers notification for a fingerprint that is no longer
+        // current.
+        if (cancelled) return;
         // The acknowledgement is the server's audit of the STORED publication,
         // read back by fingerprint. Only an acknowledged write counts as
         // published — a request that returned without one does not, and the
@@ -295,16 +314,17 @@ export function useEngineeringPublicationEffect({
         if (acknowledgement?.durably_published === true) {
           refreshEngineeringPublicationReaders(projectId, versionId);
           lastPublishedFingerprintRef.current = publicationKey;
-          recordPublicationAttempt(projectId, versionId, {
+          recordPublicationAttemptGuarded(projectId, versionId, {
             status: PUBLICATION_ATTEMPT.ACKNOWLEDGED,
             fingerprint: engineeringFingerprint,
             publishedAt: body?.version?.published_at || null,
             httpStatus: response?.status || 200,
             gates: preflight.gates,
             assessmentComplete: preflight.assessmentComplete,
+            publisherRegistered: true,
           });
         } else {
-          recordPublicationAttempt(projectId, versionId, {
+          recordPublicationAttemptGuarded(projectId, versionId, {
             status: PUBLICATION_ATTEMPT.FAILED,
             fingerprint: engineeringFingerprint,
             missing: acknowledgement?.missing || [],
@@ -316,9 +336,12 @@ export function useEngineeringPublicationEffect({
           console.error('[publishEngineering] not acknowledged:', body?.message || acknowledgement?.status || 'unknown');
         }
       } catch (err) {
-        // The write did not land: record it, so report generation stays blocked
-        // with the exact reason instead of appearing ready.
-        recordPublicationAttempt(projectId, versionId, {
+        // The write did not land: record a terminal FAILED with the actual
+        // reason so report generation stays blocked with an honest explanation
+        // instead of appearing ready or stranded in Saving. The guarded
+        // recorder ensures a stale FAILED (old fingerprint) cannot overwrite a
+        // newer attempt for the current fingerprint.
+        recordPublicationAttemptGuarded(projectId, versionId, {
           status: PUBLICATION_ATTEMPT.FAILED,
           fingerprint: engineeringFingerprint,
           message: err?.response?.data?.message || err?.message || 'The engineering assessment could not be saved.',
@@ -336,11 +359,15 @@ export function useEngineeringPublicationEffect({
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
-        if (!started) recordPublicationAttempt(projectId, versionId, {
+        if (!started) recordPublicationAttemptGuarded(projectId, versionId, {
           status: PUBLICATION_ATTEMPT.CANCELLED, fingerprint: engineeringFingerprint,
           message: 'Publication cancelled before sending: assessment changed or Room Designer closed. Reopen this version and publish the settled assessment.',
         });
       }
+      // If the debounce already fired, the async path records its own terminal
+      // CANCELLED on the cancelled early-returns, or its terminal ACKNOWLEDGED
+      // / FAILED if the backend responded. Either way the attempt never stays
+      // stranded in PUBLISHING.
     };
   }, [projectId, versionId, ready, isPublishable, summaryKey, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence]);
 
