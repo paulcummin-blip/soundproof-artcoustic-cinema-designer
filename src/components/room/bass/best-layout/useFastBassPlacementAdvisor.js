@@ -14,6 +14,7 @@ export function useFastBassPlacementAdvisor({
   physicsOptions,
   sourceHeights,
   roomElements,
+  fallbackModel = null,
 }) {
   const appState = useAppState();
   const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
@@ -28,15 +29,21 @@ export function useFastBassPlacementAdvisor({
   const workerRef = useRef(null);
   const requestSequenceRef = useRef(0);
 
+  // Resolve cabinet half-extents from the first installed, modelled subwoofer.
+  // When the room has no modelled instances, fall back to the model the Apply
+  // path will use — so the advisor evaluates and recommends the same physical
+  // coordinates that will ultimately be saved, never the nominal 100 mm inset
+  // a point-source assumption produces.
   const cabinetHalfExtents = useMemo(() => {
     const instances = Array.isArray(appState?.subwooferInstances)
       ? appState.subwooferInstances
       : [];
     const first = instances.find((instance) => instance?.enabled !== false && instance?.model);
-    const meta = first?.model ? getSpeakerModelMeta(first.model) : null;
+    const modelKey = first?.model || fallbackModel;
+    const meta = modelKey ? getSpeakerModelMeta(modelKey) : null;
     if (!meta) return null;
     return subHalfExtents(Number(meta.widthM) || 0.5, Number(meta.depthM) || 0.3, 0);
-  }, [appState?.subwooferInstances]);
+  }, [appState?.subwooferInstances, fallbackModel]);
 
   const fingerprint = useMemo(() => {
     const validRoom = Number(roomDims?.widthM) > 0
