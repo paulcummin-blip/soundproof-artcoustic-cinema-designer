@@ -2,16 +2,29 @@
 // ---------------------------------------------------------------------------
 // Global ADI Starting Layout shortlist.
 //
-// Pools eligible front/rear-wall candidates across the supported 1/2/4-sub
-// quantities, ranks them GLOBALLY with the existing canonical Stage 2
-// comparator, removes materially equivalent geometry, and returns up to three
-// credible, materially distinct options — irrespective of quantity.
+// Pools eligible candidates across the supported 1/2/4-sub quantities, ranks
+// them GLOBALLY with the existing canonical Stage 2 comparator, removes
+// materially equivalent geometry, and returns up to three credible, materially
+// distinct options — irrespective of quantity.
 //
-// Side-wall layouts are exceptional: they are considered only when fewer than
-// three practical options exist AND the side/mixed candidate delivers an
-// established whole-Level improvement over the best practical candidate
-// globally, without regression in the other relevant Level. This reuses the
-// existing `hasWholeLevelImprovement` qualification — no new dB threshold.
+// PRACTICAL CLASSIFICATION is derived from each candidate's ACTUAL cabinet
+// footprint (isPracticalWallContactPlacement): a cabinet is a normal
+// front/rear-wall installation only when its near face lies against the wall
+// within the established placement tolerance. A family name alone never
+// determines practicality — an inset RP22_E arrangement whose cabinet faces
+// sit ~390 mm from the walls is NOT classified as practical, regardless of
+// its family. Its valid acoustic evidence is preserved for diagnostic
+// comparison (it may appear as an alternative when it qualifies).
+//
+// SIDE-WALL EXCEPTION ORDERING: a qualifying exceptional side/mixed/inset
+// candidate is evaluated against the best practical candidate BEFORE the
+// shortlist is filled, so it may displace a weaker practical option rather
+// than being locked out by a three-practical shortlist. The existing
+// whole-RP22-Level improvement requirement (hasWholeLevelImprovement) gates
+// qualification — no new dB threshold. The global maximum of three cards and
+// the preference for practical front/rear installations are preserved: a
+// non-practical candidate that does NOT deliver a whole-Level improvement over
+// the best practical never enters the shortlist.
 //
 // READ-ONLY: reads Stage 2 canonical results and the design context. It
 // evaluates nothing, recalculates nothing and changes no bass maths, no RP22
@@ -21,8 +34,8 @@
 
 import { compareStage2Results } from "../stage2/stage2Ranking.js";
 import {
-  isSideOrMixedWallFamily,
   hasWholeLevelImprovement,
+  isPracticalWallContactPlacement,
 } from "../stage2/stage2PracticalPlacementPreference.js";
 import { isCandidateEligibleForRecommendation } from "../stage2/stage2CandidateEligibility.js";
 import {
@@ -55,6 +68,13 @@ function geometryKey(result) {
   return coords.map((c) => `${c.x}:${c.y}`).sort().join("|");
 }
 
+// Dedup is tracked by TWO independent sets: material-equivalence geometry
+// (bucketed cabinet centres) and candidate identity (finalistId). Two
+// candidates sharing the same geometry are the same physical placement; two
+// with the same finalistId are the same candidate. Either match deduplicates
+// (the first-seen, best-ranked instance wins). Uses existing identity and
+// geometry only — no new acoustic threshold.
+
 function buildOption(result, seatPriorityMap, context, placementKind, runFingerprint) {
   const option = buildEvaluatedOption(result, seatPriorityMap, {
     ...context,
@@ -72,7 +92,7 @@ function buildOption(result, seatPriorityMap, context, placementKind, runFingerp
  * @param {Map} seatPriorityMap — seatId → "primary" | "secondary"
  * @param {object} context — { roomDims, selectedSubModel, subwooferBottomHeightM }
  * @returns {object[]} up to three evaluated options (practical first, then
- *   qualifying side/mixed exceptions)
+ *   qualifying side/mixed/inset exceptions)
  */
 export function buildAdiShortlist(stage2State, seatPriorityMap, context) {
   if (!stage2State || stage2State.status !== "complete") return [];
@@ -101,60 +121,76 @@ export function buildAdiShortlist(stage2State, seatPriorityMap, context) {
   // candidates (requestedP14Pass !== false) reached this pool.
   const globallyRanked = [...pool].sort(compareStage2Results);
 
-  const practicalRanked = globallyRanked.filter((r) => !isSideOrMixedWallFamily(r.familyId));
-  const sideMixedRanked = globallyRanked.filter((r) => isSideOrMixedWallFamily(r.familyId));
+  // Classify practicality from ACTUAL cabinet wall-contact, not family name.
+  const practicalRanked = globallyRanked.filter((r) => isPracticalWallContactPlacement(r, context));
+  const nonPracticalRanked = globallyRanked.filter((r) => !isPracticalWallContactPlacement(r, context));
+
+  // The best practical candidate is the reference for the whole-Level
+  // improvement qualification. When no practical candidate exists, the global
+  // acoustic winner stands (fallback below).
+  const bestPracticalResult = practicalRanked[0] || null;
 
   const seenGeometry = new Set();
+  const seenFinalistIds = new Set();
   const shortlist = [];
 
-  // Practical front/rear candidates first — globally ranked, deduped by
-  // materially equivalent geometry. Cabinets are physically against the
-  // front/rear walls (Stage 2 resolved cabinet centres from wall references).
-  for (const result of practicalRanked) {
+  // Walk the GLOBAL ranking (best-first). Practical candidates enter
+  // directly; non-practical candidates enter ONLY when they deliver a
+  // whole-Level improvement over the best practical candidate. This lets a
+  // qualifying exceptional candidate displace a weaker practical option
+  // (because it ranks higher globally) rather than being locked out by a
+  // three-practical shortlist. The max-3 cap and the preference for practical
+  // installations are preserved: a non-practical candidate without a
+  // whole-Level improvement never enters.
+  for (const result of globallyRanked) {
     if (shortlist.length >= SHORTLIST_MAX) break;
-    const key = geometryKey(result);
-    if (!key || seenGeometry.has(key)) continue;
-    seenGeometry.add(key);
-    const option = buildOption(result, seatPriorityMap, context, "practical", runFingerprint);
-    if (!option) continue;
-    shortlist.push(option);
-  }
+    const gKey = geometryKey(result);
+    const finalistId = result?.finalistId || null;
+    if (gKey && seenGeometry.has(gKey)) continue;
+    if (finalistId && seenFinalistIds.has(finalistId)) continue;
 
-  // Exceptional side/mixed-wall candidates: only when fewer than three
-  // practical options exist AND the candidate delivers a whole-Level
-  // improvement over the best practical candidate GLOBALLY, without regression
-  // in the other relevant Level. Reuses existing qualification — no new
-  // threshold, no marginal improvement displacing a credible front/rear
-  // solution.
-  if (shortlist.length < SHORTLIST_MAX && practicalRanked.length > 0) {
-    const bestPracticalResult = practicalRanked[0];
-    const bestPracticalOption = shortlist[0] || null;
-    for (const result of sideMixedRanked) {
-      if (shortlist.length >= SHORTLIST_MAX) break;
-      const key = geometryKey(result);
-      if (!key || seenGeometry.has(key)) continue;
+    const isPractical = isPracticalWallContactPlacement(result, context);
+    if (!isPractical) {
+      // Non-practical (side/mixed/inset): qualify against the best practical.
+      if (!bestPracticalResult) {
+        // No practical candidate exists at all — the fallback path below
+        // handles this. Skip non-practical here so the fallback owns it.
+        continue;
+      }
       if (!hasWholeLevelImprovement(result, bestPracticalResult)) continue;
-      seenGeometry.add(key);
-      const option = buildOption(result, seatPriorityMap, context, "alternative", runFingerprint);
-      if (!option) continue;
+    }
+
+    if (gKey) seenGeometry.add(gKey);
+    if (finalistId) seenFinalistIds.add(finalistId);
+    const placementKind = isPractical ? "practical" : "alternative";
+    const option = buildOption(result, seatPriorityMap, context, placementKind, runFingerprint);
+    if (!option) continue;
+
+    // For an alternative, attach the improvement/compromise description
+    // relative to the best practical option (when one exists).
+    if (!isPractical && bestPracticalResult) {
+      const bestPracticalOption = buildOption(bestPracticalResult, seatPriorityMap, context, "practical", runFingerprint);
       if (bestPracticalOption) {
         option.improvement = buildImprovementDescription(option, bestPracticalOption);
         option.compromises = buildCompromiseDescription(option, bestPracticalOption);
       }
-      shortlist.push(option);
     }
+    shortlist.push(option);
   }
 
   // No practical front/rear candidates exist at all: fall back to the global
   // acoustic winner so the designer is never left without a recommendation
-  // when eligible candidates exist. The winner may be a side/mixed
+  // when eligible candidates exist. The winner may be a side/mixed/inset
   // arrangement — shown without an invented compliance claim.
   if (shortlist.length === 0) {
     for (const result of globallyRanked) {
       if (shortlist.length >= SHORTLIST_MAX) break;
-      const key = geometryKey(result);
-      if (!key || seenGeometry.has(key)) continue;
-      seenGeometry.add(key);
+      const gKey = geometryKey(result);
+      const finalistId = result?.finalistId || null;
+      if (gKey && seenGeometry.has(gKey)) continue;
+      if (finalistId && seenFinalistIds.has(finalistId)) continue;
+      if (gKey) seenGeometry.add(gKey);
+      if (finalistId) seenFinalistIds.add(finalistId);
       const option = buildOption(result, seatPriorityMap, context, "practical", runFingerprint);
       if (!option) continue;
       shortlist.push(option);

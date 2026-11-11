@@ -390,5 +390,12 @@ export function useStage2PlacementOptimiser({
     });
   }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope, stage1State?.status, stage1State?.ownerRequestId]);
 
-  return state;
+  // Expose the COMPUTED fingerprint (derived from current inputs via useMemo
+  // above) alongside the STORED store state. The stored `state.fingerprint` is
+  // the fingerprint of the last completed/running Stage 2 run; the computed
+  // `fingerprint` is the fingerprint the current inputs WOULD produce. When the
+  // design has changed but Stage 2 has not re-evaluated yet, these differ — and
+  // the recommendation Apply authority compares them to reject a stale
+  // candidate whose stored fingerprint no longer matches the current design.
+  return { ...state, computedFingerprint: fingerprint };
 }

@@ -29,6 +29,8 @@
 // ---------------------------------------------------------------------------
 
 import { FAMILY_IDS } from "../stage1/stage1FamilyRegistry.js";
+import { buildOverlapSources } from "./physicalCandidateGeometry.js";
+import { WALL_BUFFER_M } from "@/components/utils/subwooferInstanceMigration";
 
 // Families whose canonical seed places one or more sources on a SIDE wall
 // (xNorm ∈ {0,1}, yNorm strictly between 0 and 1) or mixes side-wall sources
@@ -159,6 +161,71 @@ export function selectPracticalBest(ranked, _opts = {}) {
  * @param {object} practicalBest — the practical best finalist
  * @returns {Array} qualifying side/mixed alternatives (Stage 2 results)
  */
+/**
+ * Tolerance for how far a cabinet's near face may be from the expected wall
+ * buffer (WALL_BUFFER_M = 10 mm) and still count as wall-mounted. Generous
+ * enough to accept the placement guide's resolved wall-reference positions
+ * (whose near face sits exactly at WALL_BUFFER_M), tight enough to reject an
+ * inset cabinet whose face is hundreds of millimetres from the wall.
+ * @private
+ */
+const WALL_CONTACT_TOLERANCE_M = 0.05;
+
+/**
+ * Classify a Stage 2 candidate as a PRACTICAL front/rear-wall installation by
+ * inspecting its ACTUAL cabinet footprint — not its family name.
+ *
+ * A cabinet is wall-mounted on the front or rear wall only when its near face
+ * (centre minus the orientation-adjusted half-extent along Y) sits at
+ * approximately WALL_BUFFER_M from that wall. A cabinet whose face is inset
+ * (e.g. ~390 mm from the wall) is NOT a practical wall-contact installation,
+ * regardless of its RP22 family name or which half of the room it sits in.
+ *
+ * Every cabinet in the arrangement must be against a front or rear wall for
+ * the placement to count as practical. A side-wall or mid-room cabinet fails.
+ *
+ * This reuses the existing cabinet geometry resolution
+ * (physicalCandidateGeometry.buildOverlapSources) and the existing wall
+ * buffer constant — no new geometry calculation, no acoustic maths, no RP22
+ * scoring. It only classifies what the shortlist presents as "practical".
+ *
+ * @param {object} result — Stage 2 canonical finalist result
+ * @param {object} context — { roomDims, selectedSubModel, subwooferBottomHeightM }
+ * @returns {boolean} true when every cabinet is against a front or rear wall
+ */
+export function isPracticalWallContactPlacement(result, context) {
+  const coords = Array.isArray(result?.coordinates) ? result.coordinates : [];
+  if (!coords.length) return false;
+  const roomDims = context?.roomDims || null;
+  const W = Number(roomDims?.widthM);
+  const L = Number(roomDims?.lengthM);
+  if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) return false;
+  const model = result?.selectedProduct || context?.selectedSubModel || null;
+  if (!model) return false;
+
+  const { sources, dimensionsResolved } = buildOverlapSources({
+    coordinates: coords,
+    model,
+    roomDims,
+    bottomHeightM: Number.isFinite(Number(context?.subwooferBottomHeightM))
+      ? Number(context.subwooferBottomHeightM) : 0,
+  });
+  if (!dimensionsResolved || sources.length !== coords.length) return false;
+
+  for (const source of sources) {
+    const y = Number(source.y);
+    const halfY = Number(source.cabinetDepthM) / 2; // effective depth along Y
+    if (!Number.isFinite(y) || !Number.isFinite(halfY) || halfY <= 0) return false;
+    // Near-face distance from the front wall (y=0) and rear wall (y=L).
+    const frontFaceDist = y - halfY;
+    const rearFaceDist = L - y - halfY;
+    const onFront = Math.abs(frontFaceDist - WALL_BUFFER_M) <= WALL_CONTACT_TOLERANCE_M;
+    const onRear = Math.abs(rearFaceDist - WALL_BUFFER_M) <= WALL_CONTACT_TOLERANCE_M;
+    if (!onFront && !onRear) return false; // not against a front or rear wall
+  }
+  return true;
+}
+
 export function selectQualifyingAlternatives(ranked, practicalBest) {
   if (!Array.isArray(ranked) || !ranked.length) return [];
   const practicalId = practicalBest?.finalistId || null;

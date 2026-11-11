@@ -319,8 +319,16 @@ export default function EvaluatedLayoutCards({
     }
     const coords = sourcesFromOption(option);
     const { front, rear } = splitCoordsByPlacement(coords);
+    // FRESHNESS: compare the candidate's SAVED run fingerprint (the Stage 2
+    // evaluation identity at the time the option was built) with the CURRENT
+    // expected evaluation fingerprint (independently derived from the current
+    // room, seating, RSP, model and P14). When the design has changed but
+    // Stage 2 has not re-evaluated yet, these differ and Apply is rejected —
+    // no stale candidate geometry or tuning is silently adapted to the
+    // current design. The candidate's own fingerprint is authoritative; no
+    // fallback to the current fingerprint (that would compare it with itself).
     const applyState = resolveQuantityApplyState({
-      candidateFingerprint: option.fingerprint || currentDesignFingerprint,
+      candidateFingerprint: option.fingerprint,
       currentFingerprint: currentDesignFingerprint,
       coordinates: coords,
       quantity: option.quantity,

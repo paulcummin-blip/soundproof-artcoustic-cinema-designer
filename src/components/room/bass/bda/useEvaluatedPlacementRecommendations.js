@@ -7,7 +7,12 @@
 // interface or another competing guide. While mounted it:
 //   • opens the shared recommendation gate so Stage 1/2 speculative work is
 //     permitted (the gate is closed when no recommendation UI is mounted),
-//   • mints one stable request identity for the mount,
+//   • mints a FRESH request identity for each genuinely new settled
+//     evaluation context (geometry + model + P14 + height + orientation +
+//     amplifier), so the shared Stage 1/2 hooks reset their captured
+//     fingerprint and reschedule automatically after a geometry, model or
+//     P14 change — instead of cancelling and idling on a stale captured
+//     fingerprint,
 //   • drives useStage1PlacementOptimiser + useStage2PlacementOptimiser with
 //     recommendationQuantities [1, 2, 4], using the current room, fixed RSP and
 //     listening-position priorities,
@@ -23,9 +28,21 @@
 // Separating the two readiness conditions lets Stage 1 run and retain its
 // finalists before a model or target is chosen, so the designer sees discovery
 // progress and the candidates are ready the instant the prerequisites are met.
+//
+// REQUEST IDENTITY: the requestId is derived from the settled evaluation
+// identity (geometry fingerprint + model + P14 target + height + orientations +
+// amplifier). When any of those inputs changes, the requestId changes, so the
+// shared hooks reset their explicitRequestRef and reschedule. Old requests
+// cannot publish into newer design identities: the controller cancels the old
+// run before scheduling the new one, and the store's ownerRequestId guard
+// rejects publishes from a cancelled run. Cached matching results are reused:
+// when the identity returns to a previously-evaluated state, the hooks hydrate
+// from the persistent cache. Explicit Optimise Bass requests use a DIFFERENT
+// requestId (the heavy-action one) and retain their existing cancel-on-stale
+// identity behaviour — they do not pass through this hook.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useStage1PlacementOptimiser } from "../stage1/useStage1PlacementOptimiser";
 import { useStage2PlacementOptimiser } from "../stage2/useStage2PlacementOptimiser";
 import {
@@ -41,6 +58,8 @@ import { RECOMMENDATION_QUANTITIES } from "../stage1/stage1RecommendationScope";
 import { buildAdiShortlist } from "./adiShortlistSelection";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
+import { computeStage1Fingerprint } from "../stage1/stage1Fingerprint";
+import { DEFAULT_BEST_SUB_LAYOUT_PHYSICS } from "../best-layout/bestSubLayoutPhysicsSnapshot";
 import {
   subscribeStage2,
   getStage2State,
@@ -49,14 +68,6 @@ import {
   subscribeStage1,
   getStage1State,
 } from "../stage1/stage1PlacementStore";
-
-let requestCounter = 0;
-
-function useStableRequestId() {
-  const ref = useRef(null);
-  if (!ref.current) ref.current = `bda-rec-${++requestCounter}`;
-  return ref.current;
-}
 
 function buildSeatPriorityMap(seatingPositions) {
   const map = new Map();
@@ -115,6 +126,7 @@ function deriveEvaluatedInputs({
     hasModel,
     hasP14,
     canEvaluate,
+    p14TargetKey: p14Selection.targetKey || "none",
   };
 }
 
@@ -130,7 +142,6 @@ export function useEvaluatedPlacementRecommendations({
 }) {
   const projectId = useActiveProjectId();
   const versionId = appState?.activeVersionId || null;
-  const requestId = useStableRequestId();
   const recGateActive = useSyncExternalStore(
     subscribeRecommendationGate,
     isRecommendationGateActive,
@@ -158,12 +169,53 @@ export function useEvaluatedPlacementRecommendations({
       subwooferInstances, appState, amplifierPowerPerSubW],
   );
 
+  // Geometry fingerprint — the SAME authority Stage 1 uses (computeStage1Fingerprint),
+  // so the request identity changes exactly when Stage 1's settled geometry
+  // changes. This is the product-independent, P14-independent base identity.
+  const geometryFingerprint = useMemo(
+    () => computeStage1Fingerprint({
+      roomDims,
+      rspPosition,
+      seatingPositions,
+      physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
+    }),
+    [roomDims, rspPosition, seatingPositions, physicsOptions],
+  );
+
+  // A fresh request identity is minted for each genuinely new settled
+  // evaluation context (geometry + model + P14 target + height + orientation +
+  // amplifier). When any input changes, the requestId changes, so the shared
+  // Stage 1/2 hooks reset their explicitRequestRef and reschedule automatically
+  // — instead of cancelling and idling on a stale captured fingerprint. Old
+  // requests cannot publish into newer design identities because the
+  // controller cancels the old run before scheduling the new one.
+  const requestId = useMemo(() => {
+    if (!geometryFingerprint || !inputs.geometryReady) return null;
+    const parts = [
+      geometryFingerprint,
+      `m:${inputs.selectedSubModel || 'none'}`,
+      `p14:${inputs.p14TargetKey}`,
+      `h:${inputs.subwooferBottomHeightM}`,
+      `fo:${inputs.frontOrientation || ''}`,
+      `ro:${inputs.rearOrientation || ''}`,
+      `a:${inputs.amplifierPowerPerSubW || ''}`,
+    ];
+    return `bda-rec:${parts.join('::')}`;
+  }, [geometryFingerprint, inputs.geometryReady, inputs.selectedSubModel,
+      inputs.p14TargetKey, inputs.subwooferBottomHeightM, inputs.frontOrientation,
+      inputs.rearOrientation, inputs.amplifierPowerPerSubW]);
+
   // Stage 1 is geometry-only: it starts as soon as room, seating and RSP are
   // valid — it does NOT require a subwoofer model or P14 target. Stage 2
   // requires the model and P14 target in addition to geometry.
   const stage1Enabled = recGateActive && inputs.geometryReady;
   const stage2Enabled = recGateActive && inputs.canEvaluate;
 
+  // Pass the SAME requestId to both hooks. When geometry changes, both reset
+  // and stage2 waits for stage1 (stage1UpdatingForThisRequest matches because
+  // the requestId is shared). When only model/P14 changes, stage1's requestId
+  // also changes but stage1's fingerprint is unchanged, so stage1 skips
+  // (already complete) while stage2 resets and reschedules.
   useStage1PlacementOptimiser({
     projectId,
     versionId,
@@ -176,7 +228,7 @@ export function useEvaluatedPlacementRecommendations({
     recommendationQuantities: RECOMMENDATION_QUANTITIES,
   });
 
-  useStage2PlacementOptimiser({
+  const stage2Result = useStage2PlacementOptimiser({
     projectId,
     versionId,
     roomDims,
@@ -194,11 +246,12 @@ export function useEvaluatedPlacementRecommendations({
     recommendationQuantities: RECOMMENDATION_QUANTITIES,
   });
 
-  const stage2State = useSyncExternalStore(
-    subscribeStage2,
-    () => getStage2State(projectId, versionId),
-    () => getStage2State(projectId, versionId),
-  );
+  // stage2Result is the store state + computedFingerprint (the EXPECTED
+  // fingerprint from current inputs). The stored `fingerprint` is the run's
+  // fingerprint; `computedFingerprint` is what the current inputs WOULD
+  // produce. They differ when the design has changed but Stage 2 has not
+  // re-evaluated — and that difference is what the Apply authority checks.
+  const stage2State = stage2Result;
 
   const stage1State = useSyncExternalStore(
     subscribeStage1,
@@ -222,15 +275,21 @@ export function useEvaluatedPlacementRecommendations({
 
   const status = (() => {
     if (!inputs.geometryReady) return "waiting";
-    // Stage 1 geometry discovery is running or not yet complete.
-    if (stage1State?.status === "updating" || stage1State?.status === "idle") return "discovering";
+    // Stage 1 error is a terminal state — surface it, don't mask as discovery.
+    if (stage1State?.status === "error") return "error";
+    // Stage 1 not yet complete (idle, updating, stale, cancelled) — discovery
+    // is running or about to restart. Stale/cancelled are transient: the
+    // requestId change triggers an immediate reschedule on the next effect
+    // tick, so "discovering" is the honest label for that brief window.
     if (stage1State?.status !== "complete") return "discovering";
     // Stage 1 complete — Stage 2 needs model + P14 target.
     if (!inputs.canEvaluate) return "awaiting-prerequisites";
     if (stage2State?.status === "error") return "error";
     if (stage2State?.status === "complete") return "complete";
-    if (stage2State?.status === "updating") return "evaluating";
-    return "idle";
+    // Stage 2 is updating, or idle/stale/cancelled but ready to evaluate
+    // (the requestId change triggers an immediate reschedule). Either way
+    // the cards are not yet ready — show "evaluating".
+    return "evaluating";
   })();
 
   const waitingReason = (() => {
@@ -243,5 +302,16 @@ export function useEvaluatedPlacementRecommendations({
 
   const isCurrent = stage2State?.status === "complete";
 
-  return { options, status, isCurrent, stage2Fingerprint: stage2State?.fingerprint || null, waitingReason };
+  // The EXPECTED Stage 2 fingerprint from current inputs — the Apply authority
+  // compares this with the candidate's SAVED run fingerprint to reject a stale
+  // candidate whose evidence no longer matches the current design.
+  const currentEvaluationFingerprint = stage2Result?.computedFingerprint || null;
+
+  return {
+    options,
+    status,
+    isCurrent,
+    stage2Fingerprint: currentEvaluationFingerprint,
+    waitingReason,
+  };
 }
