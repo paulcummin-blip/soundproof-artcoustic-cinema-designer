@@ -42,6 +42,7 @@ import { publishRecommendation } from "@/components/recommendationEngine";
 import { identifyProblem } from "@/components/recommendationEngine/recommendationProblem";
 import { classifyCorrectability } from "../improveBassV2/correctabilityClassifier";
 import { extractEligibleCrossQuantityScope } from "./crossQuantityScope";
+import { isCalibrationOnlyResult } from "./calibrationIdentityGuard.js";
 
 /**
  * Run the V2 optimisation engine and return the selection result.
@@ -186,7 +187,7 @@ export async function runOptimisation(opts) {
     opts.onRuntimeMetrics?.(waitedMetrics);
     if (waitResult.status === "cancelled") {
       setCancelled(projectId, versionId);
-      return { status: "cancelled", runtimeMetrics: waitedMetrics };
+      return { status: "cancelled", reason: waitResult.reason || null, error: waitResult.error || null, runtimeMetrics: waitedMetrics };
     }
     if (waitResult.status === "stale") {
       setStale(projectId, versionId, waitResult.message);
@@ -266,6 +267,8 @@ export async function runOptimisation(opts) {
     correctabilityAssessment,
     integrationContext,
     crossQuantityQuantities,
+    rspMode: appState?.rspMode || null,
+    designatedRspSeatId: appState?.designatedRspSeatId || null,
   };
 
   let runtimeMetrics = null;
@@ -298,6 +301,8 @@ export async function runOptimisation(opts) {
     result.runtimeMetrics = runtimeMetrics || result.runtimeMetrics;
 
     if (result.status === "cancelled") {
+      // V2 engine cancelled is always user-initiated (AbortError from cancelRequested).
+      result.reason = result.reason || "user-cancel";
       setCancelled(projectId, versionId);
     } else if (result.status === "blocked") {
       // No completed production baseline for the live design: the run stopped
@@ -429,11 +434,15 @@ export function extractCalibrationTuning(selection) {
   if (!selection) return null;
   const winner = selection.winner;
   if (!winner) return null;
-  // A cross-quantity candidate owns its own source identities (it evaluated a
-  // different subwoofer count). Its tuning is bound to those candidate-owned
-  // IDs, not the installed instances, so it must NOT be auto-applied to the
-  // installed design. Evaluation is temporary; Apply is a separate action.
-  if (winner.isCrossQuantity) return null;
+  // P0-1 GUARD: any candidate whose tuning was derived from a different
+  // physical configuration — moved seating, moved subwoofers, a different
+  // subwoofer quantity, or a coordinated combination — must never have its
+  // tuning auto-applied to the installed design. The tuning was optimised for
+  // a geometry the installed design does not share, so applying it would
+  // produce a different acoustic result than the one that was canonically
+  // confirmed. Genuine calibration-only candidates (delay, gain, polarity,
+  // phase, and the calibration-only combined retune on Current geometry) pass.
+  if (!isCalibrationOnlyResult(winner)) return null;
   const tuning = winner.appliedTuning || winner.tuning || [];
   return Array.isArray(tuning) && tuning.length > 0 ? tuning : null;
 }

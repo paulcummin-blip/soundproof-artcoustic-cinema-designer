@@ -315,7 +315,23 @@ export function useStage2PlacementOptimiser({
       return;
     }
 
+    // When Stage 1 is actively recomputing the matching scope (e.g. sel:2),
+    // its finalists are temporarily unavailable and the Stage 2 fingerprint is
+    // null. Stage 2 must WAIT for the matching Stage 1 result rather than
+    // cancelling as inputs-incomplete — the existing stale-result, supersession
+    // and safety-timeout protections in waitForStage2Terminal remain in force.
+    // A rec:1,2,4 result can never satisfy a sel:2 request: the ownerRequestId
+    // check ties this wait to the EXACT ADI request that owns the selected
+    // scope, so a different consumer's recommendation run does not gate it.
+    const stage1UpdatingForThisRequest = stage1State?.status === "updating"
+      && !!stage1State?.ownerRequestId
+      && !!requestId
+      && stage1State.ownerRequestId === requestId;
+
     if (!fingerprint) {
+      if (stage1UpdatingForThisRequest) {
+        return;
+      }
       stage2PlacementController.cancelAll("inputs-incomplete");
       markStage2Idle(projectId, versionId);
       return;
@@ -372,7 +388,7 @@ export function useStage2PlacementOptimiser({
       delay: STAGE2_START_DELAY_MS,
       ownerRequestId: requestId,
     });
-  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope]);
+  }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope, stage1State?.status, stage1State?.ownerRequestId]);
 
   return state;
 }

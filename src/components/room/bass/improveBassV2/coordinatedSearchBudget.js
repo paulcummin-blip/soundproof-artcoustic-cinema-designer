@@ -57,14 +57,34 @@ export const SEARCH_BOUNDS = Object.freeze({
 /**
  * Create a budget tracker for one search run.
  *
+ * CANCELLATION: a run is cancelled by calling `cancel()`. `isExhausted()`
+ * then returns true for the lifetime of the tracker, so the orchestrator
+ * stops launching new phases. This is a COOPERATIVE, BETWEEN-PHASE signal:
+ * it is checked at phase/loop boundaries. An in-flight worker call cannot
+ * be interrupted by this budget alone — the orchestrator must thread an
+ * AbortController (or the existing worker lifecycle's signal) into any
+ * cancellable call. Where an in-flight calculation cannot be interrupted,
+ * the orchestrator reports that limitation honestly instead of claiming
+ * a hard 45 s deadline.
+ *
+ * OBSOLETE-RUN GUARD: `isCurrent()` compares this tracker's run token
+ * against the latest token known to the budget. A newer run calls
+ * `supersede()` to mark this tracker obsolete; after that, the
+ * orchestrator must not publish. The token is opaque and owned by the
+ * caller — typically a run id minted when the user started the search.
+ *
  * @param {object} [overrides] — partial overrides for SEARCH_BOUNDS
+ * @param {object} [options] — { runToken } opaque identity for obsolete-run guard
  * @returns {object} budget tracker API
  */
-export function createSearchBudget(overrides = {}) {
+export function createSearchBudget(overrides = {}, options = {}) {
   const bounds = { ...SEARCH_BOUNDS, ...overrides };
   const startTime = Date.now();
   let canonicalConfirmationsUsed = 0;
   let electronicVariantsUsed = 0;
+  let cancelled = false;
+  let obsolete = false;
+  const runToken = options?.runToken ?? null;
 
   return {
     bounds,
@@ -78,17 +98,36 @@ export function createSearchBudget(overrides = {}) {
     },
 
     isExhausted() {
-      return this.elapsedMs() >= bounds.ELAPSED_BUDGET_MS
+      return cancelled
+        || obsolete
+        || this.elapsedMs() >= bounds.ELAPSED_BUDGET_MS
         || canonicalConfirmationsUsed >= bounds.MAX_CANONICAL_CONFIRMATIONS;
     },
 
+    // Cooperative cancellation. Stops new work; does not interrupt in-flight
+    // work (the orchestrator must propagate this into worker signals).
+    cancel() { cancelled = true; },
+    isCancelled() { return cancelled; },
+
+    // Obsolete-run guard. A newer search supersedes this one; the
+    // orchestrator must not publish results from a superseded tracker.
+    supersede() { obsolete = true; },
+    isObsolete() { return obsolete; },
+    runToken() { return runToken; },
+    isCurrent(latestToken) {
+      if (latestToken == null) return true;
+      return runToken === latestToken;
+    },
+
     claimCanonicalConfirmation() {
+      if (cancelled || obsolete) return false;
       if (canonicalConfirmationsUsed >= bounds.MAX_CANONICAL_CONFIRMATIONS) return false;
       canonicalConfirmationsUsed++;
       return true;
     },
 
     claimElectronicVariant() {
+      if (cancelled || obsolete) return false;
       if (electronicVariantsUsed >= bounds.MAX_ELECTRONIC_VARIANTS_PER_CANDIDATE) return false;
       electronicVariantsUsed++;
       return true;
@@ -109,6 +148,12 @@ export function createSearchBudget(overrides = {}) {
         canonicalConfirmationsUsed,
         electronicVariantsUsed,
         exhausted: this.isExhausted(),
+        cancelled,
+        obsolete,
+        runToken,
+        // Explicit statement of the budget's nature, so any consumer that
+        // reads this snapshot cannot mistake the target for a hard deadline.
+        budgetContract: "between-phase-target-not-hard-deadline",
         bounds: { ...bounds },
       };
     },

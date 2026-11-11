@@ -156,6 +156,7 @@ export default function useRunOptimisationPlan({
           timings: buildPersistedRunTimings(timings),
           publication: publicationDiagnostics,
         },
+        engineRevision: measuredRuntime?.engineRevision || null,
       });
     };
 
@@ -262,11 +263,23 @@ export default function useRunOptimisationPlan({
 
       measuredRuntime = result.runtimeMetrics || measuredRuntime;
       if (result.status === "cancelled") {
-        // Cancellation must own a durable terminal record after cold reopen.
-        saveRunFailure("Optimisation cancelled by the user before completion.", {
-          terminalOutcome: "evaluation_incomplete",
+        // Only an explicit user Cancel produces the user-cancelled message.
+        // Other stop reasons (inputs-incomplete, user-interaction, superseded,
+        // heavy-action-cancelled, stage1/stage2-cancelled) are preserved as
+        // evaluation_incomplete with the actual reason in the saved evidence.
+        const userCancel = result.reason === "user-cancel";
+        const stopReason = result.reason || result.error || null;
+        const reason = userCancel
+          ? "Optimisation cancelled by the user before completion."
+          : (stopReason
+            ? `The optimisation stopped before it could complete (${stopReason}). Re-run the Optimisation Plan.`
+            : "The optimisation stopped before it could complete. Re-run the Optimisation Plan.");
+        saveRunFailure(reason, { terminalOutcome: "evaluation_incomplete" });
+        logRunHistory({
+          terminalStatus: userCancel ? "cancelled" : "evaluation_incomplete",
+          publicationStatus: "not_attempted",
+          publicationError: userCancel ? null : reason,
         });
-        logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" });
         setStatus("complete");
         return;
       }
@@ -337,6 +350,7 @@ export default function useRunOptimisationPlan({
           targetKey: null,
         },
         engineVersion: result.selection?.winner?.algorithmVersion || null,
+        engineRevision: result.engineRevision || measuredRuntime?.engineRevision || null,
       };
 
       // The calibration decision for this evaluation: what ADI would apply, and

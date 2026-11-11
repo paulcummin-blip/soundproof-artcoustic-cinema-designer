@@ -30,6 +30,10 @@ import {
   subscribeEngineeringPublishTrigger,
 } from "@/components/engineering/engineeringPublishTrigger";
 import { retryBassAuthorityPersistence } from "@/components/room/bass/completedBassResultStore";
+import {
+  PUBLICATION_ATTEMPT,
+  recordPublicationAttempt,
+} from "@/components/engineering/publicationAcknowledgementStore";
 
 export default function useBassAuthorityAutoPublication({
   projectId = null,
@@ -54,8 +58,18 @@ export default function useBassAuthorityAutoPublication({
       const publish = readEngineeringPublishTrigger(projectId, versionId);
       // Nothing is mounted that can publish: the publication effect is not up
       // for this version yet, so this request is not spent — the subscription
-      // fires again the moment it registers.
-      if (typeof publish !== "function") return;
+      // fires again the moment it registers. Record a lightweight NOT_READY so
+      // the diagnostic surface can distinguish "publisher not registered" from
+      // "preflight blocked" — the subscription fires again on registration.
+      if (typeof publish !== "function") {
+        recordPublicationAttempt(projectId, versionId, {
+          status: PUBLICATION_ATTEMPT.NOT_READY,
+          fingerprint: resultFingerprint || null,
+          message: 'The Room Designer publication action is not mounted for this version yet. It registers automatically when the Room Designer is open.',
+          publisherRegistered: false,
+        });
+        return;
+      }
       requestedRef.current.add(identity);
       publish();
     });

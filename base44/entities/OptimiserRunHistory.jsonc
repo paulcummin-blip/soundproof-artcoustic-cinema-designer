@@ -104,6 +104,11 @@
         "type": "object"
       },
       "default": []
+    },
+    "engine_revision": {
+      "type": "string",
+      "nullable": true,
+      "description": "The V2 engine revision identifier that executed this run, as embedded in the module bundle the browser loaded. Diagnostic only: it lets a saved run be compared against the source it claims to have executed. Absent on runs saved before this field existed."
     }
   },
   "required": [

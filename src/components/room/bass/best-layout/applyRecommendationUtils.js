@@ -2,8 +2,10 @@
 // Coordinates are in metres and represent cabinet centres, matching the saved
 // room-plan subwoofer objects.
 
-import { generateStableId } from "@/components/utils/subwooferInstanceMigration";
+import { generateStableId, getCabinetWidthM, getCabinetDepthM } from "@/components/utils/subwooferInstanceMigration";
 import { deriveSubWallOrientation, subHalfExtents } from "@/components/room/rv/utils/subWallOrientation";
+import { validateCabinetBoundary } from "@/components/room/bass/stage2/installableWallCentreAuthority";
+import { validateCandidateCabinets } from "@/components/room/bass/stage2/physicalCandidateGeometry";
 import { normaliseModelKey } from "@/components/models/speakers/registry";
 
 export const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
@@ -95,12 +97,54 @@ export function coordinatesMatch(currentSources, recommendationSources, toleranc
   );
 }
 
+const ROTATION_BY_PLACEMENT = { front: 0, rear: 180, left: 90, right: 270 };
+
+/**
+ * Resolve the effective rotation for a recommendation source. A source may
+ * carry an explicit rotationDeg; otherwise the rotation is derived from its
+ * placement group, matching the rotation buildAppliedInstances assigns to a
+ * newly created instance.
+ */
+function effectiveRotationDeg(source) {
+  const explicit = Number(source?.rotationDeg);
+  if (Number.isFinite(explicit)) return explicit;
+  const placement = String(source?.placement || "");
+  return ROTATION_BY_PLACEMENT[placement] ?? 0;
+}
+
+/**
+ * Human-readable reason for a cabinet-boundary violation, naming the wall the
+ * cabinet crosses.
+ */
+function boundaryViolationReason(index, violations) {
+  const wallMessages = {
+    "front-wall-intersection": `Sub ${index + 1} cabinet crosses the front wall.`,
+    "rear-wall-intersection": `Sub ${index + 1} cabinet crosses the rear wall.`,
+    "left-wall-intersection": `Sub ${index + 1} cabinet crosses the left wall.`,
+    "right-wall-intersection": `Sub ${index + 1} cabinet crosses the right wall.`,
+  };
+  if (Array.isArray(violations)) {
+    for (const violation of violations) {
+      if (wallMessages[violation]) return wallMessages[violation];
+    }
+  }
+  return `Sub ${index + 1} cabinet does not fit inside the room.`;
+}
+
 /**
  * Validate a recommendation layout before applying.
- * Checks: sources exist, coordinates finite, within room boundary, placements supported.
+ * Checks: sources exist, coordinates finite, within room boundary, placements
+ * supported, and — when a model is supplied — the FULL cabinet footprint stays
+ * inside the room through the existing validateCabinetBoundary authority.
+ *
+ * The cabinet footprint is resolved from the model that Apply will use, with
+ * per-source rotation. A recommendation whose centre lies inside the room but
+ * whose cabinet crosses a wall is rejected; the centre check alone is not
+ * sufficient.
+ *
  * Returns { valid: boolean, reason: string | null, invalidIndex: number | null }.
  */
-export function validateRecommendationLayout(layout, roomDims) {
+export function validateRecommendationLayout(layout, roomDims, model = null) {
   if (!layout?.sources || !Array.isArray(layout.sources) || layout.sources.length === 0) {
     return { valid: false, reason: "No recommended positions found." };
   }
@@ -120,6 +164,63 @@ export function validateRecommendationLayout(layout, roomDims) {
     if (x < margin || x > width - margin || y < margin || y > length - margin) {
       return { valid: false, reason: `Sub ${index + 1} is outside the room boundary.`, invalidIndex: index };
     }
+  }
+  // Full-cabinet footprint validation through the existing physical authority.
+  // Only runs when a model is supplied (the model Apply will use); without a
+  // model the cabinet dimensions are unknown and the centre check above remains
+  // the sole gate, preserving backward compatibility for callers without a model.
+  if (!model) return { valid: true, reason: null };
+  const cabinetWidthM = getCabinetWidthM(model);
+  const cabinetDepthM = getCabinetDepthM(model);
+  for (let index = 0; index < layout.sources.length; index += 1) {
+    const source = layout.sources[index];
+    const rotationDeg = effectiveRotationDeg(source);
+    // subHalfExtents swaps at rotation 90; treat 270 the same so a right-wall
+    // cabinet's footprint is validated with the correct axis orientation.
+    const normalisedRotation = rotationDeg === 90 || rotationDeg === 270 ? 90 : 0;
+    const { halfX, halfY } = subHalfExtents(cabinetWidthM, cabinetDepthM, normalisedRotation);
+    const result = validateCabinetBoundary({
+      centre: { x: Number(source.x), y: Number(source.y) },
+      roomDims: { widthM: width, lengthM: length },
+      cabinetWidthM: halfX * 2,
+      cabinetDepthM: halfY * 2,
+    });
+    if (!result.valid) {
+      return {
+        valid: false,
+        reason: boundaryViolationReason(index, result.violations),
+        invalidIndex: index,
+        violations: result.violations,
+      };
+    }
+  }
+  // Pairwise cabinet-volume overlap through the existing authority. Every
+  // cabinet pair is checked in all three dimensions (X/Y/Z) using the same
+  // orientation-adjusted extents the boundary check used. A recommendation
+  // whose cabinets intersect is rejected before buildAppliedInstances can
+  // save it — the centre check and boundary check alone are not sufficient.
+  const overlapCoordinates = layout.sources.map((source) => ({
+    x: Number(source.x),
+    y: Number(source.y),
+    rotationDeg: effectiveRotationDeg(source),
+  }));
+  const overlap = validateCandidateCabinets({
+    coordinates: overlapCoordinates,
+    model,
+    roomDims: { widthM: width, lengthM: length },
+    bottomHeightM: 0,
+  });
+  if (!overlap.valid) {
+    return {
+      valid: false,
+      reason: overlap.reason === "cabinet-boundary"
+        ? "A cabinet crosses a room wall."
+        : overlap.reason === "cabinet-overlap"
+          ? "Two subwoofers would physically overlap."
+          : "Cabinet geometry is missing or invalid.",
+      violations: overlap.violations,
+      invalidIndex: overlap.invalidIndex,
+    };
   }
   return { valid: true, reason: null };
 }

@@ -5,9 +5,12 @@
 // The bass band may name a blocker only inside the bass domain:
 //
 //   A / F  P4 (or any other non-bass parameter) blocking the overall
-//          engineering publication → the bass band does NOT name it. The
-//          completed bass result stays current; overall readiness belongs in
-//          Project Report.
+//          engineering publication → the bass band does NOT name it. A FAILED
+//          attempt is a publication failure (save_failed); a NOT_READY attempt
+//          is "Bass calculated" (engineering not eligible). Either way the
+//          completed bass result is never presented as Performance Current
+//          while the full engineering design is not publishable, and overall
+//          readiness belongs in Project Report.
 //   B      P14 incomplete → the bass band may name P14.
 //   C      P18 incomplete → the bass band may name P18.
 //   D      P19 incomplete → the bass band may name P19.
@@ -64,10 +67,12 @@ test('A / F — a non-bass blocker never names a parameter inside the bass band'
     gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p4, p16')],
   });
 
-  expect(p4.label).toBe('Performance Current');
-  expect(p4.message).toBe('Calculated and saved.');
-  expect(p4.attention).not.toBe(true);
-  expect(p4.actionLabel).toBeNull();
+  // A FAILED publication attempt with a non-bass reason is a publication
+  // failure: the bass band never names P4, and never claims Current.
+  expect(p4.label).toBe('Bass result could not be saved');
+  expect(p4.message).toBe('The bass result could not be saved, so reports and proposals cannot use it yet.');
+  expect(p4.attention).toBe(true);
+  expect(p4.actionLabel).toBe('Retry save');
   expect(p4.waitingHeading).toBeUndefined();
   expect(p4.waitingItems).toBeUndefined();
   expect(p4.note).toBeUndefined();
@@ -158,24 +163,33 @@ test('a not-ready attempt is filtered by the same domain rule', () => {
       gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p4')],
     },
   });
-  expect(state.label).toBe('Performance Current');
+  // NOT_READY with a non-bass blocker: the engineering design is not eligible,
+  // so the bass result is saved but not publishable. This is "Bass calculated",
+  // never Performance Current and never an active save.
+  expect(state.label).toBe('Bass calculated');
+  expect(state.code).toBe('bass_calculated');
   expect(state.note).toBeUndefined();
+  expect(JSON.stringify(state)).not.toMatch(/P4/i);
 });
 
 test('P15 and P21 are assumed design values: never named, never outstanding', () => {
   // An attempt that refused the save only because the assumed parameters were
   // present states nothing outstanding: the assumption IS the terminal value.
+  // The bass band never names P15/P21, and a FAILED attempt is a publication
+  // failure, not Performance Current.
   const state = blockedBy({
     missing: [{ key: 'engineering_summary.p15' }, { key: 'parameter_index.P21.level' }],
     gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p15, p21')],
   });
-  expect(state.label).toBe('Performance Current');
+  expect(state.label).toBe('Bass result could not be saved');
   expect(state.note).toBeUndefined();
   expect(state.waitingItems).toBeUndefined();
-  expect(state.message).toBe('Calculated and saved.');
-  expect(state.actionLabel).toBeNull();
+  expect(state.message).toBe('The bass result could not be saved, so reports and proposals cannot use it yet.');
+  expect(state.actionLabel).toBe('Retry save');
+  expect(state.attention).toBe(true);
   // There is no manual save step to offer, in any state.
   expect(JSON.stringify(state)).not.toMatch(/save assessment/i);
+  expect(JSON.stringify(state)).not.toMatch(/P15|P21/i);
 });
 
 test('the canonical completeness authority never counts an assumed P15/P21 as missing', async () => {
@@ -203,6 +217,9 @@ test('rendered bass status cannot display an old overall waiting list or non-bas
     state: { ...blockedBy({ gates: [gate('rp22_terminal', 'RP22 terminal', 'p4, p9')] }),
       note: 'Waiting for P9', waitingHeading: 'Overall project waiting for:', waitingItems: ['P4', 'P9'] },
   }));
-  expect(html).toMatch(/Calculated and saved/);
+  // A FAILED non-bass blocker renders the save-failed status, never the
+  // Performance Current copy and never the old overall waiting list.
+  expect(html).toMatch(/Bass result could not be saved/);
+  expect(html).not.toMatch(/Calculated and saved/);
   expect(html).not.toMatch(/Overall|Waiting|P4|P9|<ul/);
 });

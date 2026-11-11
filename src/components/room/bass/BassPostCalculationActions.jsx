@@ -23,10 +23,10 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import {
   buildAppliedInstances,
   coordinatesMatch,
-  validateRecommendationLayout,
   currentModelFromInstances,
   defaultDialogModel,
 } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { validateAppliedInstances } from "@/components/room/bass/best-layout/validateAppliedInstances";
 
 function floorLevel(rows) {
   const levels = (Array.isArray(rows) ? rows : [])
@@ -335,9 +335,16 @@ export default function BassPostCalculationActions({
   const comparisonReady = action?.action === "compare"
     && action.status === "complete"
     && stage2.status === "complete";
-  const applicationValid = recommendation
-    ? validateRecommendationLayout(recommendation, canonical.roomDims)
-    : { valid: false };
+  // Validate the EXACT instances Apply would commit — each cabinet against its
+  // own model — through the existing physical authorities. Mixed-model aware.
+  const proposedInstances = useMemo(() => {
+    if (!recommendation) return null;
+    return buildAppliedInstances(recommendation, subwooferInstances, frontSubsCfg, rearSubsCfg, null);
+  }, [recommendation, subwooferInstances, frontSubsCfg, rearSubsCfg]);
+  const applicationValid = useMemo(() => {
+    if (!proposedInstances) return { valid: false };
+    return validateAppliedInstances(proposedInstances, canonical.roomDims);
+  }, [proposedInstances, canonical.roomDims]);
   const applied = recommendation
     ? coordinatesMatch(currentSources, recommendation.sources)
     : false;
@@ -354,16 +361,19 @@ export default function BassPostCalculationActions({
 
   const apply = (layout, modelOverride = null) => {
     setApplyError(null);
-    const validation = validateRecommendationLayout(layout, canonical.roomDims);
-    if (!validation.valid) {
-      setApplyError("Could not apply this layout. Please check the room dimensions.");
-      return;
-    }
     if (!hasCanonicalInstances || typeof commitInstances !== "function") {
       setApplyError("Subwoofer instances are not ready.");
       return;
     }
+    // Build the EXACT instances that will be saved, then validate them through
+    // the existing physical authorities. The same validated array is committed —
+    // no reconstruction after validation.
     const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
+    const validation = validateAppliedInstances(next, canonical.roomDims);
+    if (!validation.valid) {
+      setApplyError(validation.reason || "Could not apply this layout. Please check the room dimensions.");
+      return;
+    }
     commitInstances(next, {
       front: { placementMode: "manual", isManual: true },
       rear: { placementMode: "manual", isManual: true },

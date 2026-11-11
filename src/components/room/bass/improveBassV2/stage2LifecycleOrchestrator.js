@@ -133,7 +133,8 @@ export function waitForStage2Terminal(projectId, versionId, {
       if (requestId && heavy?.requestId !== requestId) {
         settle({ status: "stale", message: "Stage 2 request was superseded" }); return;
       }
-      if (isCancelled?.()) { settle({ status: "cancelled" }); return; }
+      // Explicit user cancellation — the only path that may report "user-cancel".
+      if (isCancelled?.()) { settle({ status: "cancelled", reason: "user-cancel" }); return; }
       if (startFingerprint && getCurrentFingerprint) {
         try {
           const currentFp = getCurrentFingerprint();
@@ -147,16 +148,18 @@ export function waitForStage2Terminal(projectId, versionId, {
       if ((!requestId || stage1.ownerRequestId === requestId)
           && ["error", "cancelled", "stale"].includes(stage1.status)) {
         settle({ status: stage1.status, error: stage1.errorMessage || "Stage 1 placement search stopped",
-          message: stage1.status === "stale" ? "Design changed during placement search" : undefined }); return;
+          message: stage1.status === "stale" ? "Design changed during placement search" : undefined,
+          reason: stage1.errorMessage || (stage1.status === "stale" ? "design-changed" : "stage1-cancelled") }); return;
       }
       if (heavy?.status === "error") {
-        settle({ status: "error", error: heavy.error || "Placement analysis failed" }); return;
+        settle({ status: "error", error: heavy.error || "Placement analysis failed", reason: heavy.error || "heavy-action-error" }); return;
       }
-      if (heavy?.status === "cancelled") { settle({ status: "cancelled" }); return; }
+      if (heavy?.status === "cancelled") { settle({ status: "cancelled", reason: heavy?.errorMessage || "heavy-action-cancelled", error: heavy?.error || null }); return; }
       if (!requestId || stage2.ownerRequestId === requestId) {
         if (stage2.status === "complete") { settle({ status: "complete", stage2 }); return; }
         if (["error", "cancelled", "stale"].includes(stage2.status)) {
-          settle({ status: stage2.status, error: stage2.errorMessage || "Stage 2 evaluation stopped" }); return;
+          settle({ status: stage2.status, error: stage2.errorMessage || "Stage 2 evaluation stopped",
+            reason: stage2.errorMessage || (stage2.status === "stale" ? "design-changed" : "stage2-cancelled") }); return;
         }
       }
     };

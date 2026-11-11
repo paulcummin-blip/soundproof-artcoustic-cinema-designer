@@ -55,6 +55,10 @@ export const ELECTRONIC_TIMING_STAGE = Object.freeze({
   // belongs inside Calculate Bass can be read on its own.
   PHYSICAL_PLACEMENT: "physical-placement",
   SEATING_ADVISORY: "seating-advisory",
+  // Phase 9B: coordinated seating + subwoofer placement discovery. Always
+  // recorded — completed, skipped, or recoverable failure — so the stage
+  // appears in run-history metrics for every normal completed run.
+  COORDINATED_SEARCH: "coordinated-search",
   // The wait BEFORE the optimiser: acquiring or waiting for the Stage 2
   // placement result the run consumes. Measured so the interval between the
   // run's own verdict and its evaluation figure is never left unaccounted.
@@ -78,6 +82,7 @@ export const ELECTRONIC_TIMING_STAGE_LABEL = Object.freeze({
   [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: "Final candidate selection",
   [ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT]: "Physical placement work",
   [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: "Seating advisory work",
+  [ELECTRONIC_TIMING_STAGE.COORDINATED_SEARCH]: "Phase 9B coordinated search",
   [ELECTRONIC_TIMING_STAGE.STAGE2_WAIT]: "Stage 2 placement wait",
 });
 
@@ -274,11 +279,13 @@ export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTi
     [ELECTRONIC_TIMING_STAGE.CANONICAL_CONFIRMATIONS]: confirmationMs,
     [ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT]: physicalPlacementMs,
     [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: measuredSpan("seating-search"),
+    [ELECTRONIC_TIMING_STAGE.COORDINATED_SEARCH]: measuredSpan("coordinated-search"),
     [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: measuredSpan("final-selection"),
   };
 
   return {
     runId: runtimeMetrics.runId || null,
+    engineRevision: runtimeMetrics.engineRevision || null,
     counts: runtimeMetrics.counts || {},
     stage2: runtimeMetrics.stage2 || null,
     stage2Terminal: runtimeMetrics.stage2Terminal || null,

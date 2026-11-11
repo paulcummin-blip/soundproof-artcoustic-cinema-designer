@@ -131,6 +131,7 @@ export function resolveOptimiserPlanStatus({
       // plan. Developer diagnostics only; absent on a plan saved before the
       // trail existed.
       crossQuantityAudit: plan.crossQuantityAudit || null,
+      coordinatedSummary: plan.coordinatedSummary || null,
       staleReason: null,
       // The evidence is kept even when the payload version cannot be read: the
       // panel still reports what that run retained.
@@ -193,6 +194,7 @@ export function resolveOptimiserPlanStatus({
       // The run's compact cross-quantity audit trail, retained with the saved
       // plan. Developer diagnostics only.
       crossQuantityAudit: plan.crossQuantityAudit || null,
+      coordinatedSummary: plan.coordinatedSummary || null,
       // Why the run ended, when it ended in a failure that must be stated:
       // { status, category, message, publicationError, at }. Null for a run that
       // finished and saved.
@@ -365,6 +367,7 @@ export function resolveOptimiserPlanStatus({
     // The run's compact cross-quantity audit trail, retained with the saved
     // plan. Developer diagnostics only; null when this run recorded none.
     crossQuantityAudit: plan.crossQuantityAudit || null,
+    coordinatedSummary: plan.coordinatedSummary || null,
     // A publication the run could not complete travels with the record it belongs
     // to, so the panel states the failure rather than a silent success.
     failure: plan.failure || plan.run?.failure || null,
@@ -387,6 +390,8 @@ export function resolveOptimiserPlanStatus({
     // Measurement only: it is read inside the developer diagnostics level and no
     // value in it decides anything.
     runtimeBreakdown: plan.runtimeBreakdown || null,
+    // The V2 engine revision that executed the run. Diagnostic only.
+    engineRevision: plan.engineRevision || null,
     // What ADI did with the calibration levers, and why: the decision saved with
     // the run, so the panel states it after a refresh instead of guessing.
     calibrationDecision: plan.calibrationDecision || null,
