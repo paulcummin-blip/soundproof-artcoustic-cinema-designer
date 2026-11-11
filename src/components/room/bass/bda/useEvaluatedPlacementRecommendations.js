@@ -61,10 +61,6 @@ import { normaliseModelKey } from "@/components/models/speakers/registry";
 import { computeStage1Fingerprint } from "../stage1/stage1Fingerprint";
 import { DEFAULT_BEST_SUB_LAYOUT_PHYSICS } from "../best-layout/bestSubLayoutPhysicsSnapshot";
 import {
-  subscribeStage2,
-  getStage2State,
-} from "../stage2/stage2PlacementStore";
-import {
   subscribeStage1,
   getStage1State,
 } from "../stage1/stage1PlacementStore";
