@@ -43,37 +43,20 @@ import {
   buildImprovementDescription,
   buildCompromiseDescription,
 } from "./evaluatedOptionPresentation.js";
+import { isMateriallyEquivalentLayout } from "./shortlistMaterialEquivalence.js";
 
 const SHORTLIST_MAX = 3;
-// Cabinet centres within 2 cm are materially equivalent — the same physical
-// placement arrived at by different families. The canonical ranking already
-// sorts best-first, so the first-seen equivalent wins.
-const COORD_BUCKET_M = 0.02;
 
-/**
- * Deterministic geometry key for material-equivalence deduplication.
- * Buckets cabinet centres to ~2 cm so near-identical placements collapse.
- * Different quantities naturally produce different keys (different coordinate
- * counts), so a 1-sub and 2-sub arrangement are never merged.
- * @private
- */
-function geometryKey(result) {
-  const coords = (Array.isArray(result?.coordinates) ? result.coordinates : [])
-    .map((c) => ({
-      x: Math.round(Number(c.x) / COORD_BUCKET_M),
-      y: Math.round(Number(c.y) / COORD_BUCKET_M),
-    }))
-    .filter((c) => Number.isFinite(c.x) && Number.isFinite(c.y));
-  if (!coords.length) return null;
-  return coords.map((c) => `${c.x}:${c.y}`).sort().join("|");
-}
-
-// Dedup is tracked by TWO independent sets: material-equivalence geometry
-// (bucketed cabinet centres) and candidate identity (finalistId). Two
-// candidates sharing the same geometry are the same physical placement; two
-// with the same finalistId are the same candidate. Either match deduplicates
-// (the first-seen, best-ranked instance wins). Uses existing identity and
-// geometry only — no new acoustic threshold.
+// Dedup is tracked by TWO independent authorities: pairwise material
+// equivalence (same quantity + model + P19/P20 Levels + worst-seat variation
+// + pairwise cabinet geometry within tolerance) and candidate identity
+// (finalistId). Two materially equivalent candidates are the same design
+// choice presented by different families; two with the same finalistId are
+// the same candidate. Either match deduplicates — the first-seen, best-ranked
+// instance wins. Uses existing candidate evidence only — no new acoustic
+// threshold. Genuinely different arrangements (different quantities,
+// different models, materially different geometry or seat-to-seat evidence)
+// are retained even when their displayed Levels match.
 
 function buildOption(result, seatPriorityMap, context, placementKind, runFingerprint) {
   const option = buildEvaluatedOption(result, seatPriorityMap, {
@@ -130,8 +113,8 @@ export function buildAdiShortlist(stage2State, seatPriorityMap, context) {
   // acoustic winner stands (fallback below).
   const bestPracticalResult = practicalRanked[0] || null;
 
-  const seenGeometry = new Set();
   const seenFinalistIds = new Set();
+  const acceptedResults = [];
   const shortlist = [];
 
   // Walk the GLOBAL ranking (best-first). Practical candidates enter
@@ -144,10 +127,13 @@ export function buildAdiShortlist(stage2State, seatPriorityMap, context) {
   // whole-Level improvement never enters.
   for (const result of globallyRanked) {
     if (shortlist.length >= SHORTLIST_MAX) break;
-    const gKey = geometryKey(result);
     const finalistId = result?.finalistId || null;
-    if (gKey && seenGeometry.has(gKey)) continue;
     if (finalistId && seenFinalistIds.has(finalistId)) continue;
+    // Drop a candidate that is materially equivalent (same quantity + model +
+    // P19/P20 Levels + worst-seat variation + pairwise cabinet geometry) to
+    // one already accepted — it is the same design choice presented by a
+    // different family. The best-ranked instance is already in the shortlist.
+    if (acceptedResults.some((acc) => isMateriallyEquivalentLayout(result, acc, context))) continue;
 
     const isPractical = isPracticalWallContactPlacement(result, context);
     if (!isPractical) {
@@ -160,8 +146,8 @@ export function buildAdiShortlist(stage2State, seatPriorityMap, context) {
       if (!hasWholeLevelImprovement(result, bestPracticalResult)) continue;
     }
 
-    if (gKey) seenGeometry.add(gKey);
     if (finalistId) seenFinalistIds.add(finalistId);
+    acceptedResults.push(result);
     const placementKind = isPractical ? "practical" : "alternative";
     const option = buildOption(result, seatPriorityMap, context, placementKind, runFingerprint);
     if (!option) continue;
@@ -185,12 +171,11 @@ export function buildAdiShortlist(stage2State, seatPriorityMap, context) {
   if (shortlist.length === 0) {
     for (const result of globallyRanked) {
       if (shortlist.length >= SHORTLIST_MAX) break;
-      const gKey = geometryKey(result);
       const finalistId = result?.finalistId || null;
-      if (gKey && seenGeometry.has(gKey)) continue;
       if (finalistId && seenFinalistIds.has(finalistId)) continue;
-      if (gKey) seenGeometry.add(gKey);
+      if (acceptedResults.some((acc) => isMateriallyEquivalentLayout(result, acc, context))) continue;
       if (finalistId) seenFinalistIds.add(finalistId);
+      acceptedResults.push(result);
       const option = buildOption(result, seatPriorityMap, context, "practical", runFingerprint);
       if (!option) continue;
       shortlist.push(option);

@@ -241,7 +241,9 @@ function makeBucket(ranked) {
 }
 
 // 6. Material-equivalence dedup: two 2-sub candidates with the same
-//    coordinates (within 2 cm) collapse to one — the best-ranked instance.
+//    coordinates (within 2 cm) AND the same acoustic outcome collapse to one —
+//    the best-ranked instance. Same geometry necessarily produces the same
+//    Levels, so both candidates share P19/P20 outcomes here.
 {
   const a = makeResult({
     finalistId: 'two-A',
@@ -252,8 +254,8 @@ function makeBucket(ranked) {
   const b = makeResult({
     finalistId: 'two-B',
     familyId: 'FRONT_THIRD_PAIR', quantity: 2,
-    coordinates: [{ x: 1.255, y: FRONT_Y }, { x: 3.745, y: FRONT_Y }], // 5 mm from A, same 2 cm bucket
-    p19Level: 2, p20PrimaryLevel: 2,
+    coordinates: [{ x: 1.255, y: FRONT_Y }, { x: 3.745, y: FRONT_Y }], // 5 mm from A
+    p19Level: 3, p20PrimaryLevel: 3, // same acoustic outcome as A
   });
   const stage2State = {
     status: 'complete', fingerprint: 'fp-2',
@@ -262,9 +264,178 @@ function makeBucket(ranked) {
     four_sub_result: null,
   };
   const shortlist = buildAdiShortlist(stage2State, SEAT_PRIORITY, CONTEXT);
-  assert.equal(shortlist.length, 1, 'materially equivalent geometry deduped to one');
+  assert.equal(shortlist.length, 1, 'materially equivalent geometry + outcome deduped to one');
   assert.equal(shortlist[0].finalistId, 'two-A', 'best-ranked equivalent wins');
-  console.log('  ✔ Materially equivalent geometry deduplicated (best-ranked wins)');
+  console.log('  ✔ Materially equivalent geometry + outcome deduplicated (best-ranked wins)');
+}
+
+// 6b. Documented defect: two 4-sub front/rear arrangements 86 mm apart with
+//     identical P19/P20 Levels and variation (RP22_C vs FOUR_THIRD_PAIRS)
+//     collapse into ONE practical card — they are not meaningfully different
+//     design choices. The better-ranked arrangement survives.
+{
+  // Front/rear X coordinates 1.677 / 2.623 (RP22_C-like) vs 1.763 / 2.537
+  // (FOUR_THIRD_PAIRS-like): 86 mm apart. Same Y at the walls.
+  const rp22c = makeResult({
+    finalistId: 'four-RP22_C',
+    familyId: 'RP22_C', quantity: 4,
+    coordinates: [
+      { x: 1.677, y: FRONT_Y }, { x: 2.623, y: FRONT_Y },
+      { x: 1.677, y: REAR_Y }, { x: 2.623, y: REAR_Y },
+    ],
+    p19Level: 4, p19Variation: 2.0,
+    p20PrimaryLevel: 1, p20PrimaryVariation: 6.0,
+    p20SecondaryLevel: 1, p20SecondaryVariation: 15.0,
+  });
+  const thirdPairs = makeResult({
+    finalistId: 'four-FOUR_THIRD_PAIRS',
+    familyId: 'FOUR_THIRD_PAIRS', quantity: 4,
+    coordinates: [
+      { x: 1.763, y: FRONT_Y }, { x: 2.537, y: FRONT_Y },
+      { x: 1.763, y: REAR_Y }, { x: 2.537, y: REAR_Y },
+    ],
+    p19Level: 4, p19Variation: 2.0,
+    p20PrimaryLevel: 1, p20PrimaryVariation: 6.0,
+    p20SecondaryLevel: 1, p20SecondaryVariation: 15.0,
+  });
+  // RP22_C ranks better (first in the pool). Both are practical wall-contact.
+  const stage2State = {
+    status: 'complete', fingerprint: 'fp-86mm',
+    one_sub_result: null,
+    two_sub_result: null,
+    four_sub_result: makeBucket([rp22c, thirdPairs]),
+  };
+  const shortlist = buildAdiShortlist(stage2State, SEAT_PRIORITY, CONTEXT);
+  assert.equal(shortlist.length, 1, 'two near-identical 4-sub arrangements collapse to one card');
+  assert.equal(shortlist[0].finalistId, 'four-RP22_C', 'better-ranked arrangement survives');
+  assert.equal(shortlist[0].placementKind, 'practical', 'surviving card is practical');
+  console.log('  ✔ Documented 86 mm-apart duplicate collapses (better-ranked survives)');
+}
+
+// 6c. Clearly different front/rear layouts remain distinct even when their
+//     RP22 Levels match. Front subs at x=1.25 vs x=2.0 are 750 mm apart — well
+//     outside the material placement tolerance — so both are retained.
+{
+  const narrow = makeResult({
+    finalistId: 'four-narrow',
+    familyId: 'RP22_C', quantity: 4,
+    coordinates: [
+      { x: 1.25, y: FRONT_Y }, { x: 3.75, y: FRONT_Y },
+      { x: 1.25, y: REAR_Y }, { x: 3.75, y: REAR_Y },
+    ],
+    p19Level: 4, p20PrimaryLevel: 1, p20SecondaryLevel: 1,
+  });
+  const wide = makeResult({
+    finalistId: 'four-wide',
+    familyId: 'FOUR_THIRD_PAIRS', quantity: 4,
+    coordinates: [
+      { x: 2.0, y: FRONT_Y }, { x: 3.0, y: FRONT_Y },
+      { x: 2.0, y: REAR_Y }, { x: 3.0, y: REAR_Y },
+    ],
+    p19Level: 4, p20PrimaryLevel: 1, p20SecondaryLevel: 1, // identical Levels
+  });
+  const stage2State = {
+    status: 'complete', fingerprint: 'fp-distinct',
+    one_sub_result: null,
+    two_sub_result: null,
+    four_sub_result: makeBucket([narrow, wide]),
+  };
+  const shortlist = buildAdiShortlist(stage2State, SEAT_PRIORITY, CONTEXT);
+  assert.equal(shortlist.length, 2, 'genuinely different layouts retained despite matching Levels');
+  console.log('  ✔ Clearly different front/rear layouts remain distinct');
+}
+
+// 6d. Materially different seat-to-seat response evidence is not suppressed
+//     merely because displayed Levels match. Same Levels, same geometry
+//     within tolerance, but worst-seat variation differs by > tolerance →
+//     both retained.
+{
+  const lowVar = makeResult({
+    finalistId: 'four-low-var',
+    familyId: 'RP22_C', quantity: 4,
+    coordinates: [
+      { x: 1.677, y: FRONT_Y }, { x: 2.623, y: FRONT_Y },
+      { x: 1.677, y: REAR_Y }, { x: 2.623, y: REAR_Y },
+    ],
+    p19Level: 4, p20PrimaryLevel: 1, p20PrimaryVariation: 6.0,
+    p20SecondaryLevel: 1, p20SecondaryVariation: 15.0,
+  });
+  const highVar = makeResult({
+    finalistId: 'four-high-var',
+    familyId: 'FOUR_THIRD_PAIRS', quantity: 4,
+    coordinates: [
+      { x: 1.70, y: FRONT_Y }, { x: 2.60, y: FRONT_Y }, // within 150 mm of lowVar
+      { x: 1.70, y: REAR_Y }, { x: 2.60, y: REAR_Y },
+    ],
+    p19Level: 4, p20PrimaryLevel: 1, p20PrimaryVariation: 9.0, // +3 dB — materially different
+    p20SecondaryLevel: 1, p20SecondaryVariation: 15.0,
+  });
+  const stage2State = {
+    status: 'complete', fingerprint: 'fp-var',
+    one_sub_result: null,
+    two_sub_result: null,
+    four_sub_result: makeBucket([lowVar, highVar]),
+  };
+  const shortlist = buildAdiShortlist(stage2State, SEAT_PRIORITY, CONTEXT);
+  assert.equal(shortlist.length, 2, 'materially different seat-to-seat evidence retained');
+  console.log('  ✔ Different seat-to-seat evidence not suppressed by matching Levels');
+}
+
+// 6e. Different subwoofer quantities are never collapsed solely because their
+//     RP22 outcomes match. A 2-sub and a 4-sub with identical Levels both stay.
+{
+  const twoSub = makeResult({
+    finalistId: 'two-same',
+    familyId: 'C_FRONT_PAIR', quantity: 2,
+    coordinates: [{ x: 1.25, y: FRONT_Y }, { x: 3.75, y: FRONT_Y }],
+    p19Level: 4, p20PrimaryLevel: 1, p20SecondaryLevel: 1,
+  });
+  const fourSub = makeResult({
+    finalistId: 'four-same',
+    familyId: 'RP22_C', quantity: 4,
+    coordinates: [
+      { x: 1.677, y: FRONT_Y }, { x: 2.623, y: FRONT_Y },
+      { x: 1.677, y: REAR_Y }, { x: 2.623, y: REAR_Y },
+    ],
+    p19Level: 4, p20PrimaryLevel: 1, p20SecondaryLevel: 1, // identical Levels
+  });
+  const stage2State = {
+    status: 'complete', fingerprint: 'fp-qty',
+    one_sub_result: null,
+    two_sub_result: makeBucket([twoSub]),
+    four_sub_result: makeBucket([fourSub]),
+  };
+  const shortlist = buildAdiShortlist(stage2State, SEAT_PRIORITY, CONTEXT);
+  assert.equal(shortlist.length, 2, 'different quantities retained despite matching outcomes');
+  console.log('  ✔ Different quantities not collapsed by matching RP22 outcomes');
+}
+
+// 6f. Two near-identical arrangements with DIFFERENT acoustic outcomes are
+//     NOT collapsed — a Level difference means they are materially different
+//     design choices. (Same geometry with different Levels cannot occur in
+//     the real engine, but the guard is asserted explicitly.)
+{
+  const a = makeResult({
+    finalistId: 'two-better',
+    familyId: 'C_FRONT_PAIR', quantity: 2,
+    coordinates: [{ x: 1.25, y: FRONT_Y }, { x: 3.740, y: FRONT_Y }],
+    p19Level: 3, p20PrimaryLevel: 3,
+  });
+  const b = makeResult({
+    finalistId: 'two-worse',
+    familyId: 'FRONT_THIRD_PAIR', quantity: 2,
+    coordinates: [{ x: 1.255, y: FRONT_Y }, { x: 3.745, y: FRONT_Y }], // 5 mm from A
+    p19Level: 2, p20PrimaryLevel: 2, // different acoustic outcome
+  });
+  const stage2State = {
+    status: 'complete', fingerprint: 'fp-outcome',
+    one_sub_result: null,
+    two_sub_result: makeBucket([a, b]),
+    four_sub_result: null,
+  };
+  const shortlist = buildAdiShortlist(stage2State, SEAT_PRIORITY, CONTEXT);
+  assert.equal(shortlist.length, 2, 'different acoustic outcomes not collapsed');
+  console.log('  ✔ Different acoustic outcomes retained (not collapsed by geometry)');
 }
 
 // 7. Fewer than three: only one quantity has an eligible candidate.
