@@ -13,15 +13,15 @@ import { DEFAULT_BASS_CURVE_VISIBILITY } from '../components/room/bass/BassCurve
 
 const KEYS = ['raw', 'room', 'product', 'combined', 'house', 'finalEq'];
 
-test('TEST 1: raw is declared and off by default', () => {
+test('TEST 1: raw is declared and on by default', () => {
   assert.ok(Object.prototype.hasOwnProperty.call(DEFAULT_BASS_CURVE_VISIBILITY, 'raw'),
     'raw must be an explicit key, not an implicit fallback');
-  assert.equal(DEFAULT_BASS_CURVE_VISIBILITY.raw, false, 'expert layer is off by default');
+  assert.equal(DEFAULT_BASS_CURVE_VISIBILITY.raw, true, 'raw is the primary reference, on by default');
 });
 
 test('TEST 2: default set is exactly as specified', () => {
   assert.deepEqual({ ...DEFAULT_BASS_CURVE_VISIBILITY }, {
-    raw: false,
+    raw: true,
     room: false,
     product: false,
     combined: true,
@@ -94,7 +94,7 @@ test('TEST 6: an older visibility object still yields every key', () => {
   const legacy = { room: true, product: false, combined: true, house: true, finalEq: true };
   const merged = { ...DEFAULT_BASS_CURVE_VISIBILITY, ...legacy };
   for (const key of KEYS) assert.equal(typeof merged[key], 'boolean', `${key} resolves`);
-  assert.equal(merged.raw, false, 'pre-existing session state stays on the ADI default');
+  assert.equal(merged.raw, true, 'pre-existing session state picks up the new raw default');
 });
 
 // ── source readers (presentation contract only) ──────────────────────────

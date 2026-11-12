@@ -95,11 +95,11 @@ export function buildProductMaximumSplSeries(optimisationResult, smoothingMode =
 const rawRspSeries = (rspRawCurve, smoothingMode) => ({
   id: "rsp-raw",
   kind: "raw",
-  label: "RSP before EQ",
-  tooltipLabel: "RSP before EQ",
-  color: "#64748B",
-  strokeWidth: 1.75,
-  strokeDasharray: "6 4",
+  label: "Raw / before EQ",
+  tooltipLabel: "Raw / before EQ — RSP",
+  color: "#1B1A1A",
+  strokeWidth: 3,
+  strokeDasharray: null,
   data: applyBassSmoothing(rspRawCurve, smoothingMode),
 });
 
@@ -208,12 +208,12 @@ export function buildBassGraphSeries({
     // A seat selected via its saved post-EQ curve (cached reopen, no raw)
     // simply shows no raw layer — its Final EQ curve still renders.
     if (seatValidationActive && selectedRawSeats.length > 0) {
-      series = selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `${seat.id} before EQ`, tooltipLabel: `${seat.id} before EQ`, strokeDasharray: "6 4", strokeWidth: 1.5, data: applyBassSmoothing(seat.data, smoothingMode) }));
+      series = selectedRawSeats.map((seat) => ({ ...seat, id: `${seat.id}-raw`, kind: "raw", label: `Raw / before EQ — ${seat.id}`, tooltipLabel: `Raw / before EQ — ${seat.id}`, strokeDasharray: null, strokeWidth: 2, data: applyBassSmoothing(seat.data, smoothingMode) }));
     } else if (seatValidationActive) {
       // Seats selected via post-EQ only — no raw layer.
       series = [];
     } else if (hasStoredBlueCurve) {
-      series = [{ id: "rsp-raw", kind: "raw", label: "Physical RSP before EQ", tooltipLabel: "Product-aware physical RSP before EQ", color: "#64748B", strokeWidth: 1.75, strokeDasharray: "6 4", data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }];
+      series = [{ id: "rsp-raw", kind: "raw", label: "Raw / before EQ", tooltipLabel: "Raw / before EQ — RSP (stored)", color: "#1B1A1A", strokeWidth: 3, strokeDasharray: null, data: applyBassSmoothing(storedRspBeforePeq, smoothingMode) }];
     } else if (rspRawCurve.length) {
       series = [rawRspSeries(rspRawCurve, smoothingMode)];
     } else {

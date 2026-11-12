@@ -255,7 +255,7 @@ export default function BassGraph({
         "room-response": 10,
         "product-maximum": 20,
         "maximum-spl": 30,
-        raw: 40,
+        raw: 68,
         "house-curve": 50,
         "normalized-target": 50,
         "focus-house-target": 52,
