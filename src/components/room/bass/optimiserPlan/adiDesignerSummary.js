@@ -44,6 +44,7 @@ import {
   ADI_ROW_OUTCOME,
   ADI_ROW_STATUS,
   buildFamilyLedgerRows,
+  familySearchEvaluated,
 } from "./optimiserFamilyLedgerRows.js";
 import { PLACEMENT_THEORETICAL_NOTE, describePlacementMove } from "./placementMoveAuthority.js";
 import {
@@ -274,6 +275,12 @@ export function buildTestedOptionRows(
 ) {
   if (Array.isArray(liveRows) && liveRows.length) return liveRows;
   const lastKey = leverOrder()[leverOrder().length - 1] || null;
+  // The run's resolved per-category search status — the SAME authority the
+  // Searches-performed list reads. A family the run did not genuinely evaluate
+  // (zero probes, gate closed, zero confirmed candidates) is never shown as
+  // "Tested" here, so the tested table and the search-status list never
+  // contradict each other for the same run.
+  const searchStatus = planView?.searchStatus || null;
   // The run's own per-family evidence: what each family actually did. Null for a
   // saved record that carries no family ledger (an older plan), in which case
   // the plan's own lever rows are the only evidence there is.
@@ -281,6 +288,7 @@ export function buildTestedOptionRows(
     families: planView?.run?.families,
     baseline: planView?.baseline || null,
     runComplete,
+    searchStatus,
     // The calibration levers' own retained evidence: a calibration row may state
     // "no useful improvement found" only when this proves the search ran.
     calibrationEvidence: planView?.calibrationEvidence || null,
@@ -362,6 +370,21 @@ export function buildTestedOptionRows(
             action: null,
           };
         }
+        // The calibration evidence and the run's resolved search status must
+        // agree. When the searchStatus says this category was not genuinely
+        // evaluated (zero confirmed candidates), the retained evidence does not
+        // override it — the row states the evidence was not retained and asks
+        // for the re-run, so the tested table never contradicts the
+        // Searches-performed list.
+        if (familySearchEvaluated(searchStatus, key) === false) {
+          return {
+            key,
+            label,
+            status: ADI_ROW_STATUS.NOT_RUN,
+            outcome: CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+            action: null,
+          };
+        }
         return {
           key,
           label,
@@ -389,16 +412,26 @@ export function buildTestedOptionRows(
       // without ever claiming the capability is missing.
       if (/layout/i.test(key)) {
         const placement = findLeverRow(planView, "placement");
+        // Layout is searched inside the placement pool, so it follows the run's
+        // resolved placement search status. When the run did not genuinely
+        // evaluate placement (gate closed, no terminal status), layout is not
+        // stated as searched either — the tested table and the Searches-performed
+        // list read the same authority.
+        const placementGenuinelyEvaluated =
+          familySearchEvaluated(searchStatus, "placement") !== false;
         // A completed pass searched the alternative layouts inside the placement
         // pool, so its outcome is stated either way.
-        const layoutSearched = runComplete
+        const layoutSearched = placementGenuinelyEvaluated && (
+          runComplete
           || placement?.evaluated === true
           || buildFamilyLedgerRows({
             families: planView?.run?.families,
             runComplete,
+            searchStatus,
             calibrationEvidence: planView?.calibrationEvidence || null,
           })
-            ?.["placement"]?.status === ADI_ROW_STATUS.TESTED;
+            ?.["placement"]?.status === ADI_ROW_STATUS.TESTED
+        );
         return {
           key,
           label,
@@ -421,8 +454,11 @@ export function buildTestedOptionRows(
       // A completed pass covered the calibration levers (delay, gain, polarity):
       // the row states the outcome of that pass — Tested with no useful
       // improvement — never "Not yet run". This is the one rule that keeps the
-      // result panel and this table in agreement after a run.
-      if (runComplete) {
+      // result panel and this table in agreement after a run. It is gated by the
+      // run's resolved search status: a lever the run did not genuinely evaluate
+      // (zero confirmed candidates, no canonical evaluation) is never shown as
+      // "Tested" merely because the pass completed.
+      if (runComplete && familySearchEvaluated(searchStatus, key) !== false) {
         return {
           key,
           label,

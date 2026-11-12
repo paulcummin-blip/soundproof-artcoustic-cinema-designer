@@ -348,6 +348,10 @@ test('seating reports a tested outcome once the seating search ran', () => {
         achievedP19VariationDb: -4,
         p14AchievedDb: 118,
       },
+      // The seating search genuinely ran: confirmed probes exist. The family
+      // ledger and the run's resolved search status now read the same authority,
+      // so a seating search with zero confirmed probes can never show "Tested".
+      seatingDiagnostics: { confirmed: 1, tested: 1, status: 'completed' },
     },
   });
   const seating = rowFor(summaryFor(planView), 'Seating');

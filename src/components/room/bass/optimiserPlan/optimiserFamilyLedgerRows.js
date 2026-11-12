@@ -465,11 +465,78 @@ function rowFor(key, entry, families, baseline, runComplete = false, calibration
 }
 
 /**
+ * The ONE mapping from a tested-table family to the search-status category that
+ * proves a genuine canonical evaluation occurred. The family ledger and the
+ * Searches-performed list (AdiSearchStatusList) read the SAME run searchStatus,
+ * so a family the searchStatus says was not genuinely evaluated can never be
+ * shown as "Tested" here. A family with no mapping (polarity, subwoofer_option)
+ * is judged by its own retained evidence.
+ *
+ * layout is searched inside the placement pool, so it follows placement.
+ */
+const FAMILY_TO_SEARCH_CATEGORY = Object.freeze({
+  delay: "delay",
+  gain: "gain",
+  placement: "placement",
+  layout: "placement",
+  seating: "seating",
+});
+
+/** Row statuses that claim the family WAS evaluated. These are downgraded when
+ *  the run's searchStatus says the mapped category was not genuinely evaluated. */
+const EVALUATED_ROW_STATUSES = new Set([
+  ADI_ROW_STATUS.TESTED,
+  ADI_ROW_STATUS.RECOMMENDED,
+  ADI_ROW_STATUS.TRADE_OFF,
+  ADI_ROW_STATUS.REJECTED,
+  ADI_ROW_STATUS.COMBINED_ONLY,
+]);
+
+/**
+ * Whether the run's resolved searchStatus proves the family was genuinely
+ * evaluated. Returns true/false when the family maps to a category the
+ * searchStatus records; null when the family has no mapping (its own evidence
+ * stands) or the searchStatus itself is absent (an older plan with no
+ * per-category evidence — the family ledger remains the authority there).
+ */
+export function familySearchEvaluated(searchStatus, familyKey) {
+  const category = FAMILY_TO_SEARCH_CATEGORY[familyKey];
+  if (!category) return null;
+  if (!searchStatus || !Array.isArray(searchStatus.categories)) return null;
+  const found = searchStatus.categories.find((c) => c?.key === category);
+  if (!found) return null;
+  return found.evaluated === true;
+}
+
+/**
+ * The not-run row the ledger falls back to when the run's searchStatus refutes a
+ * legacy "Tested" claim. Each family keeps its own honest wording: seating is
+ * the last-resort policy state, gain states the groups can be trimmed, and the
+ * rest ask for the one re-run that produces the evidence.
+ */
+function downgradedNotRun(key) {
+  if (key === "seating") {
+    return { status: ADI_ROW_STATUS.LAST_RESORT, outcome: ADI_ROW_OUTCOME.SEATING_LAST_RESORT, actionText: null };
+  }
+  if (key === "gain") {
+    return { status: ADI_ROW_STATUS.NOT_RUN, outcome: ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED, actionText: ADI_ROW_ACTION.RERUN_ADI };
+  }
+  return { status: ADI_ROW_STATUS.NOT_RUN, outcome: ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN, actionText: ADI_ROW_ACTION.RERUN_ADI };
+}
+
+/**
  * The tested-table rows' status and outcome, read from the saved run evidence.
  *
  * Only the families ADI evaluates are iterated: a capability that is not live
  * (crossover-region phase, subwoofer model/quantity) can never become a row of
  * the designer's tested table, whatever the run ledger records about it.
+ *
+ * The run's resolved `searchStatus` (the same authority AdiSearchStatusList reads)
+ * is reconciled against each row: a family whose mapped search category was NOT
+ * genuinely evaluated is never shown as "Tested" — it is downgraded to its own
+ * not-run wording. This removes the contradictory legacy completion claims where
+ * the family ledger said "Tested" while the Searches-performed list said "Skipped"
+ * or "Not completed" for the same run.
  *
  * @param {object} params
  * @param {Array|null} params.families - run.families from the saved plan/evidence
@@ -477,6 +544,9 @@ function rowFor(key, entry, families, baseline, runComplete = false, calibration
  * @param {boolean} [params.runComplete] - a pass has completed for this design.
  *   Every supported lever then reports its own outcome: a lever the completed
  *   pass covered is Tested with no useful improvement, never "Not yet run".
+ * @param {object|null} [params.searchStatus] - the run's resolved per-category
+ *   search status (planView.searchStatus). When present, a family whose mapped
+ *   category was not genuinely evaluated is downgraded from "Tested" to not-run.
  * @returns {Record<string, {status: string, outcome: string}>|null} null when the
  *   saved record carries no per-family evidence (older plans) — the caller then
  *   falls back to the plan's own lever rows.
@@ -486,6 +556,7 @@ export function buildFamilyLedgerRows({
   baseline = null,
   runComplete = false,
   calibrationEvidence = null,
+  searchStatus = null,
 } = {}) {
   if (!Array.isArray(families) || families.length === 0) return null;
 
@@ -498,7 +569,32 @@ export function buildFamilyLedgerRows({
       continue;
     }
     recognised += 1;
-    rows[key] = rowFor(key, entry, families, baseline, runComplete, calibrationEvidence);
+    const row = rowFor(key, entry, families, baseline, runComplete, calibrationEvidence);
+    // Reconcile against the run's resolved searchStatus: a family the run did
+    // not genuinely evaluate (zero probes, gate closed, zero confirmed
+    // candidates) never reads as "Tested". This is the single authority
+    // AdiSearchStatusList uses, so the two never contradict.
+    //
+    // A family that genuinely confirmed candidates (candidatesEvaluated > 0)
+    // keeps its own outcome — its retained evidence IS the proof of evaluation,
+    // and a searchStatus built from missing diagnostics must not override it.
+    // A family that genuinely FAILED or was INCOMPLETE also keeps its row: it
+    // ran and recorded its failure, and the audit requires that genuine
+    // terminal failures retain their first error. The downgrade is reserved for
+    // a family that claims "Tested" with zero confirmed candidates while the
+    // run's searchStatus says the category was not genuinely evaluated.
+    const confirmedCandidates = Number(entry?.candidatesEvaluated || 0);
+    const genuineFailure = entry?.status === OPTIMISER_FAMILY_STATUS.FAILED
+      || entry?.status === OPTIMISER_FAMILY_STATUS.INCOMPLETE;
+    if (row
+      && familySearchEvaluated(searchStatus, key) === false
+      && EVALUATED_ROW_STATUSES.has(row.status)
+      && confirmedCandidates <= 0
+      && !genuineFailure) {
+      rows[key] = downgradedNotRun(key);
+    } else {
+      rows[key] = row;
+    }
   }
   return recognised > 0 ? rows : null;
 }
