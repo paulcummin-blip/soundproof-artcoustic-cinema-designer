@@ -103,6 +103,10 @@ export function serializeOptimiserPlan(plan) {
     // re-deriving either. Absent on records saved before these existed.
     hierarchyGateDiagnostics: plan.hierarchyGateDiagnostics || null,
     searchStatus: plan.searchStatus || null,
+    // The first genuine evaluation issue (stage/source), preserved so a
+    // reopened terminal record can distinguish a genuine technical failure
+    // from a completed search that found nothing worth applying.
+    firstEvaluationIssue: plan.firstEvaluationIssue || null,
   };
 }
 

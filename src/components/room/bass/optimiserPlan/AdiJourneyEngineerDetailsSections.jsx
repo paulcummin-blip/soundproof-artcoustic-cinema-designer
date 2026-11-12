@@ -113,6 +113,10 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     // engineer details state exactly which searches were genuinely performed.
     searchStatus = null,
     hierarchyGateDiagnostics = null,
+    // The first genuine evaluation issue (stage/source), preserved so the
+    // panel can distinguish a genuine technical failure from a completed
+    // search that found nothing worth applying.
+    firstEvaluationIssue = null,
   } = view;
 
   // The labelled CURRENT and PROPOSED values. They are two different things and
@@ -136,6 +140,25 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
         searchStatus={searchStatus}
         hierarchyGateDiagnostics={hierarchyGateDiagnostics}
       />
+
+      {firstEvaluationIssue && (
+        <div className="rounded-md border border-[#F5D7D3] bg-[#FBF1EF] px-3 py-2" data-adi-first-issue="true">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#B91C1C] mb-0.5">
+            First evaluation issue
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">
+            {firstEvaluationIssue.stage ? (
+              <span className="font-medium">Stage: {firstEvaluationIssue.stage}. </span>
+            ) : null}
+            {firstEvaluationIssue.source ? (
+              <span className="text-[#8A7B6A]">Source: {firstEvaluationIssue.source}. </span>
+            ) : null}
+            {firstEvaluationIssue.error || (Array.isArray(firstEvaluationIssue.issues)
+              ? firstEvaluationIssue.issues.join(" · ")
+              : null) || "the evaluation did not complete."}
+          </div>
+        </div>
+      )}
 
       {(assessment || why) && (
         <div className="space-y-0.5">

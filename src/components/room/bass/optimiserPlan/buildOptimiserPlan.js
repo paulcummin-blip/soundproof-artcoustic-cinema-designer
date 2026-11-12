@@ -633,6 +633,7 @@ export function buildOptimiserPlan({
       placementGate: selection?.hierarchyGateDiagnostics?.placementGate || false,
       seatingGate: selection?.hierarchyGateDiagnostics?.seatingGate || false,
       placementEvaluated: Boolean(positionResult),
+      placementSearchStatus: selection?.hierarchyGateDiagnostics?.placementSearchStatus || null,
       seatingDiagnostics: selection?.seatingDiagnostics || null,
     }),
   };

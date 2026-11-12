@@ -870,6 +870,7 @@ export default function AdiOptimisationJourney({
     // never inferred from the optimiser finishing.
     searchStatus: planView?.searchStatus || null,
     hierarchyGateDiagnostics: planView?.hierarchyGateDiagnostics || null,
+    firstEvaluationIssue: planView?.firstEvaluationIssue || null,
   };
 
   // The joint option has its own canonical verification and persisted receipt.

@@ -38,6 +38,7 @@ import {
 } from "./optimiserRunFamilies.js";
 import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
 import { buildCoordinatedSummary } from "./coordinatedSummary.js";
+import { buildSearchStatusEvidence } from "./searchStatusEvidence.js";
 
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -179,6 +180,23 @@ export function buildActionableOptimiserRunSummary({
     // Phase 9B coordinated physical search summary — always present so a
     // completed run states what happened to Phase 9B explicitly.
     coordinatedSummary: buildCoordinatedSummary(selection?.coordinatedDiagnostics),
+    // The hierarchy gate decision and per-category search status, preserved
+    // for every actionable plan so a reopened plan states the same gate
+    // decision and the same search evidence instead of re-deriving either.
+    hierarchyGateDiagnostics: selection?.hierarchyGateDiagnostics || null,
+    searchStatus: buildSearchStatusEvidence({
+      phaseDiagnostics: selection?.phaseDiagnostics || null,
+      calibrationDiagnostics: selection?.calibrationDiagnostics || null,
+      gainDiagnostics: selection?.gainDiagnostics || null,
+      combinedDiagnostics: selection?.combinedDiagnostics || null,
+      placementGate: selection?.hierarchyGateDiagnostics?.placementGate || false,
+      seatingGate: selection?.hierarchyGateDiagnostics?.seatingGate || false,
+      placementEvaluated: Boolean((selection?.confirmedResults || [])
+        .some((r) => r?.isPositionCandidate && r?.candidateKind !== "current"
+          && (r?.positionCoordinates || r?.coordinates))),
+      placementSearchStatus: selection?.hierarchyGateDiagnostics?.placementSearchStatus || null,
+      seatingDiagnostics: selection?.seatingDiagnostics || null,
+    }),
   };
 }
 
@@ -337,6 +355,22 @@ export function buildOptimiserRunEvidence({
     }));
   const nonAssessableCount = nonAssessableCandidates.length;
 
+  // The FIRST genuine evaluation issue, with its stage/source, so a terminal
+  // record can explain why an incomplete or failed run ended that way. A
+  // completed acoustic search that found no worthwhile improvement has no
+  // first issue and is never confused with a genuine technical failure.
+  const firstEvaluationIssue = evaluationIssues.length > 0
+    ? (() => {
+      const issue = evaluationIssues[0];
+      return {
+        stage: issue?.stage || null,
+        source: issue?.source || null,
+        error: typeof issue?.error === "string" && issue.error ? issue.error : null,
+        issues: Array.isArray(issue?.issues) ? issue.issues.filter(Boolean) : [],
+      };
+    })()
+    : null;
+
   const outcome = terminalOutcome
     || (failureReason
       ? OPTIMISER_TERMINAL_OUTCOME.FAILED
@@ -479,5 +513,33 @@ export function buildOptimiserRunEvidence({
     // completed run states what happened to Phase 9B explicitly, whether it
     // produced an actionable plan or not.
     coordinatedSummary: buildCoordinatedSummary(selection?.coordinatedDiagnostics),
+    // The hierarchy gate decision this run reached: electronics completion,
+    // the confirmed electronic levels (P19 RSP, P20 Primary, P20 Secondary),
+    // the electronic candidate the gate assessed (or an explicit Current
+    // fallback), the placement gate and its terminal search status, and the
+    // seating gate. Preserved for every terminal outcome so the record can
+    // explain why its gates opened or closed.
+    hierarchyGateDiagnostics: selection?.hierarchyGateDiagnostics || null,
+    // Per-category search status (Phase/Delay/Gain/Crossover/Placement/Seating)
+    // built from the run's own diagnostics. A green "tested" dot appears ONLY
+    // for a genuinely completed evaluation — never merely because a gate
+    // opened, candidates were generated or a stage was entered.
+    searchStatus: buildSearchStatusEvidence({
+      phaseDiagnostics: selection?.phaseDiagnostics || null,
+      calibrationDiagnostics: selection?.calibrationDiagnostics || null,
+      gainDiagnostics: selection?.gainDiagnostics || null,
+      combinedDiagnostics: selection?.combinedDiagnostics || null,
+      placementGate: selection?.hierarchyGateDiagnostics?.placementGate || false,
+      seatingGate: selection?.hierarchyGateDiagnostics?.seatingGate || false,
+      placementEvaluated: Boolean((selection?.confirmedResults || [])
+        .some((r) => r?.isPositionCandidate && r?.candidateKind !== "current"
+          && (r?.positionCoordinates || r?.coordinates))),
+      placementSearchStatus: selection?.hierarchyGateDiagnostics?.placementSearchStatus || null,
+      seatingDiagnostics: selection?.seatingDiagnostics || null,
+    }),
+    // The first genuine evaluation issue, with its stage/source. Null for a
+    // run that completed its acoustic search and found nothing worth applying
+    // — that is NO_USEFUL_IMPROVEMENT, never a technical failure.
+    firstEvaluationIssue,
   };
 }

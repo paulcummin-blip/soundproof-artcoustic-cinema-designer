@@ -1360,7 +1360,18 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       electronicsComplete: electronicsGate.complete,
       electronicsReasons: electronicsGate.reasons,
       electronicLevels: bestElectronicResult ? readEscalationLevels(bestElectronicResult) : null,
+      // The electronic result the gate actually assessed: its candidate id, or
+      // an explicit Current fallback when no electronic winner was confirmed.
+      // Preserved with the run so a terminal record can state which result the
+      // gate read, instead of guessing.
+      electronicCandidateId: bestElectronicResult?.candidateId || null,
+      electronicCandidateKind: bestElectronicResult?.candidateKind || null,
+      electronicIsCurrentFallback:
+        !bestElectronicResult
+        || bestElectronicResult === existingAuthority
+        || bestElectronicResult?.candidateKind === "current",
       placementGate,
+      placementSearchStatus: null,
       seatingGate: null,
     };
     let seatingGate = false;
@@ -1799,7 +1810,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
 
     // Publish sub_positions stage verdict (purely observational). When the
     // placement gate is closed, no physical search ran: report "skipped".
-    setStageVerdict(projectId, versionId, "sub_positions", !placementGate ? "skipped" : materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
+    const placementSearchStatus = !placementGate ? "skipped" : materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement";
+    setStageVerdict(projectId, versionId, "sub_positions", placementSearchStatus);
+    hierarchyGateDiagnostics.placementSearchStatus = placementSearchStatus;
 
     // ── Phase 9: Seating position search (Stage 11C) ────────────────────
     // Move the complete seating layout together along the room length axis.

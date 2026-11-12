@@ -242,6 +242,7 @@ export function resolveOptimiserPlanStatus({
       savedAt: plan.savedAt || null,
       candidateId: plan.candidateId || null,
       engineVersion: plan.engineVersion || null,
+      firstEvaluationIssue: plan.firstEvaluationIssue || plan.run?.firstEvaluationIssue || null,
     };
   }
 
@@ -438,5 +439,11 @@ export function resolveOptimiserPlanStatus({
     savedAt: plan.savedAt || null,
     candidateId: plan.candidateId || null,
     engineVersion: plan.engineVersion || null,
+    // The hierarchy gate decision and per-category search status, preserved
+    // for an actionable plan so the panel states the same gate decision and
+    // search evidence after refresh/reopen.
+    hierarchyGateDiagnostics: plan.hierarchyGateDiagnostics || null,
+    searchStatus: plan.searchStatus || null,
+    firstEvaluationIssue: plan.firstEvaluationIssue || null,
   };
 }
