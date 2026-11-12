@@ -452,7 +452,23 @@ export default function OptimiseAndCalculate({
         if (typeof sharedStart?.onCalculate === "function") {
           sharedStart.onCalculate();
         }
-        if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
+        if (!(await waitForCurrentPublication(sharedRef, phaseRef))) {
+          // The preflight wait returns false ONLY on an explicit user cancel
+          // (phaseRef === "cancelled"). The run ID was already minted above, so
+          // this started run must receive its own terminal receipt: a cancelled
+          // record, never an acoustic failure. Without this, refresh could
+          // discard the in-memory run authority and restore the previous run's
+          // result as though this run never happened.
+          const cancelReason = "Optimisation cancelled by the user before completion.";
+          saveRunFailure(cancelReason, { terminalOutcome: "evaluation_incomplete" });
+          logRunHistory({
+            terminalStatus: "cancelled",
+            publicationStatus: "not_attempted",
+            publicationError: null,
+          }).catch(() => null);
+          setCancelled(projectId, versionId);
+          return;
+        }
         recordRunTiming(projectId, versionId, RUN_TIMING.CALCULATION_COMPLETE);
       }
 

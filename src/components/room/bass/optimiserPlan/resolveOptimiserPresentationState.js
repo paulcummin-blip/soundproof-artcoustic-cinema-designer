@@ -421,6 +421,10 @@ export function resolveOptimiserPresentationState({
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
+      // The failed run's own terminal evidence (run.families, rejectionReasons,
+      // firstEvaluationIssue, searchStatus, hierarchyGateDiagnostics) is forwarded
+      // so Engineer Details can state the real reason, not a generic "failed".
+      evidence,
       ...failureExtras,
     });
   }

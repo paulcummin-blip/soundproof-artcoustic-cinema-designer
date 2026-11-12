@@ -441,8 +441,19 @@ export function buildTestedOptionRows(
         };
       }
       // Seating is the last resort: it is searched only once the practical
-      // options are exhausted, so an untouched seating search is a policy state.
+      // options are exhausted. The run's resolved searchStatus is the authority
+      // for whether a seating evaluation genuinely ran. When it did, the row is
+      // Tested; when it did not, the last-resort policy state — never "Tested".
       if (isLast) {
+        if (familySearchEvaluated(searchStatus, key) === true) {
+          return {
+            key,
+            label,
+            status: ADI_ROW_STATUS.TESTED,
+            outcome: ADI_ROW_OUTCOME.NO_USEFUL,
+            action: null,
+          };
+        }
         return {
           key,
           label,

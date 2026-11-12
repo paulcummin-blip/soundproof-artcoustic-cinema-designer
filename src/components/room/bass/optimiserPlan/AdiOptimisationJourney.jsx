@@ -370,11 +370,15 @@ export default function AdiOptimisationJourney({
   // Re-test the panel must show RUNNING, not a historical terminal result.
   const isRunning = freshRunActive;
   // The latest run owns its status even when a previous calibration is still active.
-  const latestRunFailed = !isRunning && (
-    presentation?.state === "failed"
-    || ["failed", "error"].includes(runStatus)
-    || planView?.run?.outcome === "failed"
-  );
+  // THE "OptIMISATION FAILED" BADGE IS RECEIPT-BACKED. It is shown ONLY when the
+  // current plan view carries a failed terminal outcome for the run that owns
+  // the panel. A transient runStatus alone (failed/error) is NOT enough — the
+  // run may still be in flight, or the receipt may belong to a superseded run.
+  // When a failure has no matching receipt, the presentation state's own badge
+  // ("Unable To Evaluate") is the truthful unconfirmed state, never a confirmed
+  // "Optimisation failed" claimed without evidence.
+  const latestRunFailed = !isRunning
+    && planView?.run?.outcome === "failed";
   const latestRunOwnsMessage = latestRunFailed || (!isRunning
     && [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT,
       OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE].includes(presentation?.state));

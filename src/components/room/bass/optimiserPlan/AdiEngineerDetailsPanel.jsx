@@ -38,9 +38,12 @@ const EVALUATED_STATUS = new Set([
   ADI_ROW_STATUS.TRADE_OFF,
   ADI_ROW_STATUS.REJECTED,
   ADI_ROW_STATUS.COMBINED_ONLY,
-  ADI_ROW_STATUS.LAST_RESORT,
   ADI_ROW_STATUS.APPLIED,
 ]);
+// LAST_RESORT is deliberately excluded: it describes Seating's recommendation
+// policy (searched only once practical options are exhausted), NOT proof that
+// a seating evaluation ran. Zero seating probes must display "not tested", not
+// "tested" or "considered".
 
 /**
  * An outcome that is GUIDANCE rather than a result ("Re-run the Bass Optimiser

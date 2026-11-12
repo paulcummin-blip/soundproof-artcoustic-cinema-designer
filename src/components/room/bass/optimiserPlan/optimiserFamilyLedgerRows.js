@@ -321,7 +321,7 @@ function calibrationOutcomeRow(record) {
  * SUBWOOFER OPTION is never searched at all. Neither may read as an unevaluated
  * family, and neither is reported as a tested lever in its own right.
  */
-function rowFor(key, entry, families, baseline, runComplete = false, calibrationEvidence = null) {
+function rowFor(key, entry, families, baseline, runComplete = false, calibrationEvidence = null, searchStatus = null) {
   const status = entry?.status || null;
   const tested = wasTested(entry);
 
@@ -435,7 +435,14 @@ function rowFor(key, entry, families, baseline, runComplete = false, calibration
 
   // ── Seating ── the last resort, tried only once the practical options are
   // exhausted, so an untouched seating search is a policy state, not a gap.
+  // The run's resolved searchStatus is the authority: when it says seating was
+  // genuinely evaluated (completed with confirmed probes), the row is Tested;
+  // when it did not, the last-resort policy state — never "Tested" for a search
+  // that never ran.
   if (key === "seating" && !tested) {
+    if (familySearchEvaluated(searchStatus, "seating") === true) {
+      return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL };
+    }
     return { status: ADI_ROW_STATUS.LAST_RESORT, outcome: ADI_ROW_OUTCOME.SEATING_LAST_RESORT };
   }
 
@@ -569,7 +576,7 @@ export function buildFamilyLedgerRows({
       continue;
     }
     recognised += 1;
-    const row = rowFor(key, entry, families, baseline, runComplete, calibrationEvidence);
+    const row = rowFor(key, entry, families, baseline, runComplete, calibrationEvidence, searchStatus);
     // Reconcile against the run's resolved searchStatus: a family the run did
     // not genuinely evaluate (zero probes, gate closed, zero confirmed
     // candidates) never reads as "Tested". This is the single authority
