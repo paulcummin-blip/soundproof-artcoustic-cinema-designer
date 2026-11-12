@@ -33,6 +33,7 @@ import { describePlacementMove } from "./placementMoveAuthority.js";
 import { subwooferGroupCounts } from "./placementPlausibilityAuthority.js";
 import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
 import { buildCoordinatedSummary } from "./coordinatedSummary.js";
+import { buildSearchStatusEvidence } from "./searchStatusEvidence.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -615,6 +616,25 @@ export function buildOptimiserPlan({
     // Phase 9B coordinated physical search summary — always present so a
     // completed plan states what happened to Phase 9B explicitly.
     coordinatedSummary: buildCoordinatedSummary(selection?.coordinatedDiagnostics),
+    // The hierarchy gate decision this run reached: electronics completion,
+    // the confirmed electronic levels, the placement gate and the seating gate.
+    // Persisted so a reopened plan states the SAME decision instead of
+    // re-deriving one, and so the UI can show accurate search status.
+    hierarchyGateDiagnostics: selection?.hierarchyGateDiagnostics || null,
+    // Per-category search status built from the run's own diagnostics: Phase,
+    // Delay, Gain, Crossover, Placement, Seating. Each carries a status and
+    // an evaluated flag, so the UI shows a green dot ONLY for a genuinely
+    // completed evaluation — never merely because the optimiser finished.
+    searchStatus: buildSearchStatusEvidence({
+      phaseDiagnostics: selection?.phaseDiagnostics || null,
+      calibrationDiagnostics: selection?.calibrationDiagnostics || null,
+      gainDiagnostics: selection?.gainDiagnostics || null,
+      combinedDiagnostics: selection?.combinedDiagnostics || null,
+      placementGate: selection?.hierarchyGateDiagnostics?.placementGate || false,
+      seatingGate: selection?.hierarchyGateDiagnostics?.seatingGate || false,
+      placementEvaluated: Boolean(positionResult),
+      seatingDiagnostics: selection?.seatingDiagnostics || null,
+    }),
   };
 }
 

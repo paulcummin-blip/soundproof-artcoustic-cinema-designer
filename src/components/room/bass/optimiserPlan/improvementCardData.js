@@ -87,6 +87,24 @@ function metricFromPlacementRow(rows, label) {
   };
 }
 
+/** Numeric RP22 level 1..4 from a value or "L2" string, or null. */
+function numericLevel(level) {
+  if (level == null) return null;
+  if (Number.isFinite(Number(level))) return Number(level);
+  const match = String(level).trim().toUpperCase().match(/^L?([1-4])$/);
+  return match ? Number(match[1]) : null;
+}
+
+/** "up" | "down" | "same" | null — only when both levels are known. */
+function levelChange(beforeLevel, afterLevel) {
+  const b = numericLevel(beforeLevel);
+  const a = numericLevel(afterLevel);
+  if (b == null || a == null) return null;
+  if (a > b) return "up";
+  if (a < b) return "down";
+  return "same";
+}
+
 /** Build one metric card datum, or null when either side is missing. */
 function buildMetric(key, label, before, after) {
   if (!before?.display && !after?.display) return null;
@@ -101,6 +119,10 @@ function buildMetric(key, label, before, after) {
     beforeLevel: before?.level || null,
     afterLevel: after?.level || null,
     improvement,
+    // Colour authority: green only when the RP22 Level rose, red when it
+    // fell, neutral when it stayed the same. A same-Level dB change is never
+    // coloured as an improvement.
+    levelChange: levelChange(before?.level, after?.level),
   };
 }
 

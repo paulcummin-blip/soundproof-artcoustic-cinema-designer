@@ -34,8 +34,29 @@ export default function AdiBeforeAfterResult({
 
   const improvement = Number(improvementDb);
   const improvementText = Number.isFinite(improvement) && improvement >= 1
-    ? `${Math.round(improvement)} dB improvement`
+    ? `${Math.round(improvement)} dB change`
     : null;
+
+  // Significance colour: green only when the RP22 Level rose, red when it
+  // fell, neutral when it stayed the same. The dB improvement text stays
+  // neutral unless the Level itself changed.
+  const numericLevel = (lvl) => {
+    if (lvl == null) return null;
+    if (Number.isFinite(Number(lvl))) return Number(lvl);
+    const m = String(lvl).trim().toUpperCase().match(/^L?([1-4])$/);
+    return m ? Number(m[1]) : null;
+  };
+  const lvlBefore = numericLevel(levelBefore);
+  const lvlAfter = numericLevel(levelAfter);
+  const levelChange = (lvlBefore != null && lvlAfter != null)
+    ? (lvlAfter > lvlBefore ? "up" : lvlAfter < lvlBefore ? "down" : "same")
+    : null;
+  const valueColour = levelChange === "up" ? "text-[#213428]"
+    : levelChange === "down" ? "text-[#B91C1C]"
+    : "text-[#1B1A1A]";
+  const improvementColour = levelChange === "up" ? "text-[#213428]"
+    : levelChange === "down" ? "text-[#B91C1C]"
+    : "text-[#625143]";
 
   return (
     <div className={`space-y-0.5 ${className}`}>
@@ -46,9 +67,9 @@ export default function AdiBeforeAfterResult({
             <span className="text-[11px] text-[#8A7B6A]">{beforeText} →</span>
           )}
           {/* The predicted final result — the figure the decision rests on. */}
-          <span className="text-[15px] font-bold leading-none text-[#1B1A1A]">{finalText}</span>
+          <span className={`text-[15px] font-bold leading-none ${valueColour}`}>{finalText}</span>
           {improvementText && (
-            <span className="text-[11px] font-medium text-[#213428]">({improvementText})</span>
+            <span className={`text-[11px] font-medium ${improvementColour}`}>({improvementText})</span>
           )}
         </div>
       )}

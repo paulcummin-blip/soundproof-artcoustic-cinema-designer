@@ -98,6 +98,11 @@ export function serializeOptimiserPlan(plan) {
     // arrays, curves or tuning payloads.
     crossQuantityAudit: plan.crossQuantityAudit || null,
     coordinatedSummary: plan.coordinatedSummary || null,
+    // The hierarchy gate decision and per-category search status, so a reopened
+    // plan states the same decision and the same search evidence instead of
+    // re-deriving either. Absent on records saved before these existed.
+    hierarchyGateDiagnostics: plan.hierarchyGateDiagnostics || null,
+    searchStatus: plan.searchStatus || null,
   };
 }
 

@@ -22,6 +22,7 @@ import { runInWorker } from "./improveBassV2WorkerLifecycle.js";
 import { effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
 import { compareZeroFailFirst } from "./zeroFailOptimiser.js";
 import { isMaterialImprovement } from "./materialityGate.js";
+import { readEscalationLevels } from "./nonIntrusiveHierarchyGate.js";
 
 const COMBINED_BUDGET_MS = 15000;
 const MAX_COMBINED_CONFIRMATIONS = 3;
@@ -36,7 +37,18 @@ export function identifyBestPositionCandidate(confirmedResults, existingAuthorit
     (r) => r?.isPositionCandidate && r.candidateKind !== "current",
   );
   if (!positionResults.length) return null;
-  return positionResults.slice().sort((a, b) => compareZeroFailFirst(a, b))[0];
+  // Only canonically confirmed, practical placement results with valid level
+  // evidence may represent a qualifying placement. An impractical, rejected or
+  // stale candidate must not open the seating gate — and a candidate without
+  // canonical P19/P20 levels is not evidence of a qualifying placement.
+  const qualifying = positionResults.filter((r) => {
+    if (!r) return false;
+    if (r.practical === false) return false;
+    const levels = readEscalationLevels(r);
+    return levels.p19Rsp != null && levels.p20Primary != null;
+  });
+  if (!qualifying.length) return null;
+  return qualifying.slice().sort((a, b) => compareZeroFailFirst(a, b))[0];
 }
 
 /**

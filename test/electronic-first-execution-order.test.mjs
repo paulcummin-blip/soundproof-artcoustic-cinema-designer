@@ -82,12 +82,19 @@ test("4: failed or no-coverage crossover is not complete", () => {
   });
   assert.equal(failed.complete, false);
   assert.ok(failed.reasons.some((r) => r.startsWith("crossover:")));
-  const noCoverage = electronicsCompleted({
+  // Screening without canonical confirmation is not a genuine evaluation.
+  const screenedNotConfirmed = electronicsCompleted({
     phaseDiagnostics: done, calibrationDiagnostics: done, gainDiagnostics: done,
-    crossoverDiagnostics: { status: "unavailable", screened: 0, tested: 0, confirmed: 0 },
+    crossoverDiagnostics: { status: "completed", screened: 5, confirmed: 0, tested: 5 },
   });
-  assert.equal(noCoverage.complete, false);
-  assert.ok(noCoverage.reasons.some((r) => r.startsWith("crossover:")));
+  assert.equal(screenedNotConfirmed.complete, false);
+  assert.ok(screenedNotConfirmed.reasons.some((r) => r.startsWith("crossover:")));
+  // A skipped-not-run crossover is not complete.
+  const skipped = electronicsCompleted({
+    phaseDiagnostics: done, calibrationDiagnostics: done, gainDiagnostics: done,
+    crossoverDiagnostics: { status: "skipped", screened: 0, confirmed: 0 },
+  });
+  assert.equal(skipped.complete, false);
 });
 
 // 5 — All applicable Levels L1 after completed electronics opens placement.

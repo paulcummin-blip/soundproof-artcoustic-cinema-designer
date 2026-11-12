@@ -114,6 +114,10 @@ export function isSeatingEligible(bestPracticalResult) {
 export function electronicCategoryCompleted(diagnostics) {
   if (!diagnostics) return { complete: false, reason: "missing-diagnostics" };
   if (diagnostics.error) return { complete: false, reason: "error" };
+  // Stale or cancelled: the search did not reach a terminal state.
+  if (diagnostics.status === "stale" || diagnostics.status === "cancelled") {
+    return { complete: false, reason: diagnostics.status };
+  }
   if (diagnostics.status === "incomplete" || diagnostics.status === "not_run") {
     return { complete: false, reason: diagnostics.status };
   }
@@ -130,9 +134,14 @@ export function electronicCategoryCompleted(diagnostics) {
       ? { complete: true, reason: "not-applicable" }
       : { complete: false, reason: "skipped-not-run" };
   }
-  // completed-shortlist / completed / done — a search that ran and produced
-  // (or confirmed) at least one candidate, OR explicitly found none valid.
-  return { complete: true, reason: null };
+  // completed-shortlist / completed / done: a stage that was entered is NOT
+  // complete merely because it ran. Require canonical confirmation evidence —
+  // at least one candidate was canonically confirmed OR explicitly validated.
+  // Screening or retention alone is not proof of a genuine evaluation.
+  const confirmed = Number(diagnostics.confirmed || 0);
+  const valid = Number(diagnostics.valid || 0);
+  if (confirmed > 0 || valid > 0) return { complete: true, reason: null };
+  return { complete: false, reason: "no-confirmation-evidence" };
 }
 
 /**
@@ -167,21 +176,28 @@ export function electronicsCompleted({ phaseDiagnostics, calibrationDiagnostics,
 export function crossoverGenuinelyCompleted(diagnostics) {
   if (!diagnostics) return { complete: false, reason: "missing-diagnostics" };
   if (diagnostics.error) return { complete: false, reason: "error" };
-  // Explicit not-applicable terminal state for crossover.
-  if (diagnostics.status === "skipped" || diagnostics.status === "not_applicable") {
-    const coverage = Number(diagnostics.crossoverCandidates || 0)
-      + Number(diagnostics.screened || 0)
-      + Number(diagnostics.tested || 0);
-    return coverage > 0
-      ? { complete: true, reason: "not-applicable" }
-      : { complete: false, reason: "skipped-no-coverage" };
+  // Stale or cancelled: the search did not reach a terminal state.
+  if (diagnostics.status === "stale" || diagnostics.status === "cancelled") {
+    return { complete: false, reason: diagnostics.status };
   }
-  const screened = Number(diagnostics.crossoverCandidates || diagnostics.screened || 0);
-  const tested = Number(diagnostics.tested || 0);
+  // Genuine not-applicable: no combined LCR/subwoofer response is available.
+  // Crossover cannot be tested — this is a legitimate terminal state, not an
+  // unattempted search. Do not describe an unattempted crossover as tested.
+  if (diagnostics.status === "unavailable" || diagnostics.status === "not_applicable") {
+    return { complete: true, reason: "not-applicable" };
+  }
+  // A skipped search without an unavailable reason was never attempted.
+  if (diagnostics.status === "skipped") {
+    return { complete: false, reason: "skipped-not-run" };
+  }
+  // completed / no_safe_improvement: require canonical confirmation evidence.
+  // Screening alone (candidates generated but never canonically confirmed) is
+  // NOT a genuine evaluation. A search that confirmed and then rejected every
+  // candidate is still genuinely complete — it does not need a winner.
   const confirmed = Number(diagnostics.confirmed || 0);
-  if (screened > 0 || tested > 0 || confirmed > 0) {
-    return { complete: true, reason: null };
-  }
+  if (confirmed > 0) return { complete: true, reason: null };
+  const screened = Number(diagnostics.crossoverCandidates || diagnostics.screened || 0);
+  if (screened > 0) return { complete: false, reason: "screened-not-confirmed" };
   return { complete: false, reason: "no-coverage" };
 }
 

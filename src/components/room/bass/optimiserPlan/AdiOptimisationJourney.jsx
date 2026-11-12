@@ -865,6 +865,11 @@ export default function AdiOptimisationJourney({
       || liveState?.winner?.crossQuantityAudit
       || null,
     confirmedResults: liveState?.winner?.confirmedResults || null,
+    // The run's per-category search status and hierarchy gate decision, so the
+    // engineer details state exactly which searches were genuinely performed —
+    // never inferred from the optimiser finishing.
+    searchStatus: planView?.searchStatus || null,
+    hierarchyGateDiagnostics: planView?.hierarchyGateDiagnostics || null,
   };
 
   // The joint option has its own canonical verification and persisted receipt.

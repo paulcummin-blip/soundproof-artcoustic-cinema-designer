@@ -42,6 +42,7 @@ import AdiJourneyRuntimeCostBlock from "./AdiJourneyRuntimeCostBlock.jsx";
 import AdiRecommendationPublicationStatus from "./AdiRecommendationPublicationStatus.jsx";
 import AdiCrossQuantityAuditBlock from "./AdiCrossQuantityAuditBlock.jsx";
 import CoordinatedCandidateDeveloperPanel from "../improveBassV2/CoordinatedCandidateDeveloperPanel.jsx";
+import AdiSearchStatusList from "./AdiSearchStatusList.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { OPTIMISER_TESTED_PLACEMENT_LABEL } from "./optimiserResultViewModel.js";
@@ -108,6 +109,10 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     // receipt reference can be resolved to its canonical P19/P20 evidence.
     // Absent on cold reopen — the resolver then returns an explicit unavailable.
     confirmedResults = null,
+    // The run's per-category search status and hierarchy gate decision, so the
+    // engineer details state exactly which searches were genuinely performed.
+    searchStatus = null,
+    hierarchyGateDiagnostics = null,
   } = view;
 
   // The labelled CURRENT and PROPOSED values. They are two different things and
@@ -127,6 +132,11 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
 
   return (
     <>
+      <AdiSearchStatusList
+        searchStatus={searchStatus}
+        hierarchyGateDiagnostics={hierarchyGateDiagnostics}
+      />
+
       {(assessment || why) && (
         <div className="space-y-0.5">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">Diagnosis</div>

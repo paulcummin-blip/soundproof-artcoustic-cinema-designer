@@ -1820,12 +1820,22 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     const seatingSearchStarted = performance.now();
     // ── Non-intrusive-first hierarchy: seating gate ───────────────────
     // Seating movement is a last resort after subwoofer placement. Eligible
-    // only when the placement gate passed AND the best confirmed practical
-    // result (best position candidate, or Current when none improved) still
-    // leaves P19 RSP, P20 Primary and P20 Secondary all at L1.
-    const bestPracticalResult = identifyBestPositionCandidate(confirmedResults, existingAuthority) || existingAuthority;
-    seatingGate = !!(placementGate && existingAuthority && isSeatingEligible(bestPracticalResult));
+    // only when the placement gate passed AND a qualifying practical placement
+    // result was canonically confirmed AND that result still leaves P19 RSP,
+    // P20 Primary and P20 Secondary all at L1. A failed, skipped or impractical
+    // placement search must NOT be silently treated as completed merely because
+    // Current can be used as a fallback — Current is the electronic baseline,
+    // not a qualifying placement result.
+    const bestPracticalResult = identifyBestPositionCandidate(confirmedResults, existingAuthority);
+    seatingGate = !!(placementGate && bestPracticalResult && existingAuthority
+      && isSeatingEligible(bestPracticalResult));
     hierarchyGateDiagnostics.seatingGate = seatingGate;
+    hierarchyGateDiagnostics.seatingPlacementResult = bestPracticalResult
+      ? {
+        candidateId: bestPracticalResult.candidateId || null,
+        levels: readEscalationLevels(bestPracticalResult),
+      }
+      : null;
     try {
       const screenWall = "front"; // default; could be derived from project
       const seatingCandidates = generateSeatingCandidates(seatingPositions, roomDims, screenWall);

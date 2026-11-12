@@ -110,6 +110,8 @@ export function resolveOptimiserPlanStatus({
       savedAt: null,
       candidateId: null,
       engineVersion: null,
+      hierarchyGateDiagnostics: null,
+      searchStatus: null,
     };
   }
 
@@ -132,6 +134,8 @@ export function resolveOptimiserPlanStatus({
       // trail existed.
       crossQuantityAudit: plan.crossQuantityAudit || null,
       coordinatedSummary: plan.coordinatedSummary || null,
+      hierarchyGateDiagnostics: plan.hierarchyGateDiagnostics || null,
+      searchStatus: plan.searchStatus || null,
       staleReason: null,
       // The evidence is kept even when the payload version cannot be read: the
       // panel still reports what that run retained.
@@ -195,6 +199,8 @@ export function resolveOptimiserPlanStatus({
       // plan. Developer diagnostics only.
       crossQuantityAudit: plan.crossQuantityAudit || null,
       coordinatedSummary: plan.coordinatedSummary || null,
+      hierarchyGateDiagnostics: plan.hierarchyGateDiagnostics || null,
+      searchStatus: plan.searchStatus || null,
       // Why the run ended, when it ended in a failure that must be stated:
       // { status, category, message, publicationError, at }. Null for a run that
       // finished and saved.

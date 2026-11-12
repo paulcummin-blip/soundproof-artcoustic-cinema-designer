@@ -185,8 +185,12 @@ test("electronicsCompleted: one incomplete blocks", () => {
 
 // ── Crossover genuine coverage ─────────────────────────────────────────
 
-test("crossoverGenuinelyCompleted: screened>0 is complete", () => {
-  assert.equal(crossoverGenuinelyCompleted({ screened: 5, tested: 2 }).complete, true);
+test("crossoverGenuinelyCompleted: confirmed>0 is complete (screening alone is not)", () => {
+  // Screening without canonical confirmation is NOT a genuine evaluation.
+  assert.equal(crossoverGenuinelyCompleted({ status: "completed", screened: 5, tested: 2, confirmed: 0 }).complete, false);
+  // Confirmed candidates prove a genuine evaluation, with or without a winner.
+  assert.equal(crossoverGenuinelyCompleted({ status: "completed", screened: 5, tested: 2, confirmed: 3 }).complete, true);
+  assert.equal(crossoverGenuinelyCompleted({ status: "no_safe_improvement", screened: 5, confirmed: 5 }).complete, true);
 });
 
 test("crossoverGenuinelyCompleted: no coverage is not complete", () => {

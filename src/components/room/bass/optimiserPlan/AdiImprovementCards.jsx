@@ -39,7 +39,12 @@ const PILL_CLASS_APPLIED =
   "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-[#E8F0EC] text-[#213428] border border-[#213428]";
 
 function MetricCard({ metric, applied }) {
-  const valueColour = applied ? "text-[#213428]" : "text-[#1B1A1A]";
+  // Significance colour: green only when the RP22 Level rose, red when it
+  // fell, neutral when it stayed the same. A same-Level dB change is never
+  // coloured as an improvement, whether pending or applied.
+  const valueColour = metric.levelChange === "up" ? "text-[#213428]"
+    : metric.levelChange === "down" ? "text-[#B91C1C]"
+    : "text-[#1B1A1A]";
   return (
     <div
       className="rounded-lg border border-[#E5E5E5] bg-white px-3 py-2.5"
