@@ -1218,6 +1218,7 @@ export default function AdiOptimisationJourney({
       {!freshRunActive && !isRunning && shouldShowCoordinatedAlternatives(planView) && (
         <AdiCoordinatedPhysicalAlternatives
           coordinatedSummary={planView.coordinatedSummary}
+          roomDims={roomDims}
         />
       )}
 
