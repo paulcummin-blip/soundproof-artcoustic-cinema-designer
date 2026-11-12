@@ -1258,18 +1258,102 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
+    // ── Phase 1.7: Combined electronic optimisation (crossover + retune) ──
+    // The supported installed-layout electronic levers must ALL finish before
+    // the physical placement gate is evaluated. The combined search reuses
+    // the saved Current rawTransfer + effective baseline (no new modal
+    // simulation) and canonically confirms its candidates. When an integration
+    // context is present it runs the crossover frequency/slope search; the
+    // fallback path retunes phase+delay+gain on Current. Seating/position
+    // retune candidates are not available before physical stages and are
+    // skipped here — the combined search runs exactly once.
+    let combinedResult = null;
+    let combinedMaterial = null;
+    let combinedDiagnostics = { status: "skipped", tested: 0, confirmed: 0, valid: 0 };
+    let positionRawTransfer = null;
+    const confirmedResults = [];
+    try {
+      if (existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
+        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
+        setStageVerdict(projectId, versionId, "combining_best", "done");
+        const combinedStartTime = Date.now();
+        const { combinedCandidates, diagnostics: combinedDiag } = await runCombinedOptimisation({
+          confirmedResults,
+          existingAuthority,
+          snapshot,
+          worker,
+          controller,
+          isCancelled: () => isCancelled(),
+          isStale: () => isStale(),
+          onProgress: (phase, label, current, total) => {
+            onProgress(phase, label, current, total);
+          },
+          onBestSoFar: (bsf) => onBestSoFar(bsf),
+          metrics,
+          bindConfirmation,
+          validationContext,
+          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
+          roomDims, subwooferInstances, rspPosition,
+          seatingResult: null, seatingMaterial: null, seatingRawTransfer: null,
+          currentRawTransfer: savedCurrentRawTransfer,
+          effectiveBaseline: savedEffectiveBaseline,
+          positionRawTransfer: null,
+          combinedStartTime,
+          integrationContext,
+        });
+
+        combinedDiagnostics = combinedDiag;
+        metrics.addStage("combined-search", Date.now() - combinedStartTime);
+
+        // Add confirmed combined candidates to the pool
+        for (const cc of combinedCandidates) {
+          confirmedResults.push(cc);
+          funnelCandidates.push(cc);
+          metrics.recordChallengerConfirmed();
+        }
+
+        if (combinedCandidates.length > 0 && existingAuthority) {
+          const combinedSelection = selectConfirmedRecommendations(combinedCandidates, snapshot, existingAuthority);
+          combinedResult = combinedSelection.winner;
+          combinedMaterial = { material: !!combinedResult, reason: combinedSelection.materialityReason };
+          setStageVerdict(projectId, versionId, "confirming_finalists", combinedMaterial?.material ? "improvement" : "no_improvement");
+        } else {
+          setStageVerdict(projectId, versionId, "confirming_finalists", "no_improvement");
+        }
+        setCombinedResult(projectId, versionId, combinedResult, combinedMaterial, combinedDiagnostics);
+      } else {
+        setStageVerdict(projectId, versionId, "combining_best", "skipped");
+        setStageVerdict(projectId, versionId, "confirming_finalists", "skipped");
+      }
+    } catch (err) {
+      if (isFatalLifecycleError(err)) throw err;
+      evaluationIssues.push({ stage: "combined", error: err.message });
+      setStageVerdict(projectId, versionId, "combining_best", "incomplete");
+      setStageVerdict(projectId, versionId, "confirming_finalists", "incomplete");
+    }
+    await yieldToUI();
+    if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
+    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
+
     // ── Non-intrusive-first hierarchy: placement gate ───────────────────
     // Post-calculation subwoofer placement is a LAST RESORT. It is eligible
-    // only when the supported installed-layout electronic levers have
-    // genuinely finished AND the best confirmed electronic result still
-    // leaves P19 RSP, P20 Primary and P20 Secondary all at L1. If electronics
-    // lifted any metric above L1, or any electronic search is incomplete, the
-    // physical search (global candidates + Stage 11B escalation) is skipped.
-    // The initial Starting Layout search (Stage 1/2) is unaffected.
-    const bestElectronicResult = selectConfirmedRecommendations(
-      [...phaseCandidates, ...calibrationCandidates], snapshot, existingAuthority,
-    ).winner || existingAuthority;
-    const electronicsGate = electronicsCompleted({ phaseDiagnostics, calibrationDiagnostics, gainDiagnostics });
+    // only when the supported installed-layout electronic levers — phase,
+    // delay, gain AND combined/crossover — have genuinely finished AND the
+    // best confirmed electronic result still leaves P19 RSP, P20 Primary and
+    // P20 Secondary all at L1. If electronics lifted any metric above L1, or
+    // any electronic search (including crossover) is incomplete, the physical
+    // search (global candidates + Stage 11B escalation) is skipped. The
+    // initial Starting Layout search (Stage 1/2) is unaffected.
+    const electronicPool = funnelCandidates.filter((r) => !isPhysicalCandidate(r));
+    const bestElectronicResult = (existingAuthority && electronicPool.length)
+      ? (selectConfirmedRecommendations(electronicPool, snapshot, existingAuthority).winner || existingAuthority)
+      : existingAuthority;
+    const electronicsGate = electronicsCompleted({
+      phaseDiagnostics, calibrationDiagnostics, gainDiagnostics,
+      ...(integrationContext ? { crossoverDiagnostics: combinedDiagnostics } : {}),
+    });
     const placementGate = !!(electronicsGate.complete && existingAuthority
       && isPhysicalPlacementEligible(bestElectronicResult));
     const hierarchyGateDiagnostics = {
@@ -1362,7 +1446,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // ── Confirm Current (if no existing authority) ──────────────────────
     // BLOCKER 2: If no valid authority exists, canonically recalculate Current
     // with the EXACT installed tuning (no proxy optimisation).
-    const confirmedResults = [];
+    // confirmedResults is declared with the combined electronic search above.
     if (!existingAuthority) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
@@ -1731,7 +1815,6 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let seatingMaterial = null;
     let seatingDiagnostics = { status: "incomplete", tested: 0, valid: 0, best: null };
     let seatingRawTransfer = null;
-    let positionRawTransfer = null;
     let seatingProfiler = createSeatingProfiler();
     setStageVerdict(projectId, versionId, "seating_positions", "skipped");
     const seatingSearchStarted = performance.now();
@@ -2052,96 +2135,19 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
-    // ── Phase 10: Combined optimisation ────────────────────────────────
-    // Build combined candidates by retuning FULL calibration (phase → delay →
-    // gain chained) on Current, seating, and position rawTransfers. Reuses
-    // existing rawTransfers — NO new modal simulation. Budget: +5-15 seconds.
-    //
-    // CANDIDATES (max 3 canonical confirmations):
-    //   1. Calibration-only combined (on Current's rawTransfer) — ALWAYS
-    //   2. Calibration + seating (retuned on seating rawTransfer) — if seating material
-    //   3. Position + retuned calibration (retuned on position rawTransfer) — if position useful
-    //
-    // The position-candidate hard gate is REMOVED: calibration + seating is
-    // evaluated independently of whether subwoofer position improved.
-    let combinedResult = null;
-    let combinedMaterial = null;
-    let combinedDiagnostics = { status: "skipped", tested: 0, confirmed: 0, valid: 0 };
-    try {
-      if (existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length) {
-        // Find the best position candidate and its rawTransfer (may be null)
-        const bestPositionCandidate = identifyBestPositionCandidate(confirmedResults, existingAuthority);
-        positionRawTransfer = null;
-        if (bestPositionCandidate) {
-          const positionCandidateWithTransfer = allCandidates.find(
-            (c) => c.id === bestPositionCandidate.candidateId || c.finalist?.id === bestPositionCandidate.candidateId,
-          );
-          positionRawTransfer = positionCandidateWithTransfer?.rawTransfer || null;
-        }
-
-        if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
-        if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
-
-        setStageVerdict(projectId, versionId, "combining_best", "done");
-        const combinedStartTime = Date.now();
-        const { combinedCandidates, diagnostics: combinedDiag } = await runCombinedOptimisation({
-          confirmedResults,
-          existingAuthority,
-          snapshot,
-          worker,
-          controller,
-          isCancelled: () => isCancelled(),
-          isStale: () => isStale(),
-          onProgress: (phase, label, current, total) => {
-            onProgress(phase, label, current, total);
-          },
-          onBestSoFar: (bsf) => onBestSoFar(bsf),
-          metrics,
-          bindConfirmation,
-          validationContext,
-          p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis,
-          roomDims, subwooferInstances, rspPosition,
-          seatingResult, seatingMaterial,
-          seatingRawTransfer,
-          currentRawTransfer: savedCurrentRawTransfer,
-          effectiveBaseline: savedEffectiveBaseline,
-          positionRawTransfer,
-          combinedStartTime,
-          integrationContext,
-        });
-
-        combinedDiagnostics = combinedDiag;
-        metrics.addStage("combined-search", Date.now() - combinedStartTime);
-
-        // Add confirmed combined candidates to the pool
-        for (const cc of combinedCandidates) {
-          confirmedResults.push(cc);
-          funnelCandidates.push(cc);
-          metrics.recordChallengerConfirmed();
-        }
-
-        if (combinedCandidates.length > 0 && existingAuthority) {
-          const combinedSelection = selectConfirmedRecommendations(combinedCandidates, snapshot, existingAuthority);
-          combinedResult = combinedSelection.winner;
-          combinedMaterial = { material: !!combinedResult, reason: combinedSelection.materialityReason };
-          setStageVerdict(projectId, versionId, "confirming_finalists", combinedMaterial?.material ? "improvement" : "no_improvement");
-        } else {
-          setStageVerdict(projectId, versionId, "confirming_finalists", "no_improvement");
-        }
-        setCombinedResult(projectId, versionId, combinedResult, combinedMaterial, combinedDiagnostics);
-      } else {
-        setStageVerdict(projectId, versionId, "combining_best", "skipped");
-        setStageVerdict(projectId, versionId, "confirming_finalists", "skipped");
+    // ── Combined electronic search already ran before the placement gate ─
+    // (Phase 1.7 above). Its confirmed candidates are in confirmedResults and
+    // funnelCandidates. Physical stage results (seating/position rawTransfers)
+    // are resolved here for the preview only — no second combined search runs.
+    if (existingAuthority && confirmedResults.length) {
+      const bestPositionForPreview = identifyBestPositionCandidate(confirmedResults, existingAuthority);
+      if (bestPositionForPreview) {
+        const positionCandidateWithTransfer = allCandidates.find(
+          (c) => c.id === bestPositionForPreview.candidateId || c.finalist?.id === bestPositionForPreview.candidateId,
+        );
+        positionRawTransfer = positionCandidateWithTransfer?.rawTransfer || null;
       }
-    } catch (err) {
-      if (isFatalLifecycleError(err)) throw err;
-      evaluationIssues.push({ stage: "combined", error: err.message });
-      setStageVerdict(projectId, versionId, "combining_best", "incomplete");
-      setStageVerdict(projectId, versionId, "confirming_finalists", "incomplete");
     }
-    await yieldToUI();
-    if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
-    if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
     // ── Phase 8: Final single winner selection ───────────────────────────
     onProgress("finalising", "Finalising recommendation", 0, 1);
