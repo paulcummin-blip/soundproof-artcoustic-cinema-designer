@@ -50,6 +50,15 @@ import { classifyPlacementPracticality, describeTheoreticalCandidate, PLACEMENT_
 import { generateSeatingCandidates, describeSeatingChange } from "./seatingPositionSearch.js";
 import { createSeatingProfiler } from "./seatingStageProfiler.js";
 import { selectSeatingShortlist, selectSeatingWinner, SEATING_SHORTLIST_SIZE } from "./seatingShortlistPolicy.js";
+import {
+  readEscalationLevels,
+  isPhysicalPlacementEligible,
+  isSeatingEligible,
+  electronicsCompleted,
+  isPhysicalRecommendationAcceptable,
+  isPhysicalCandidate,
+  filterPhysicalForSignificance,
+} from "./nonIntrusiveHierarchyGate.js";
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
 import {
@@ -1249,6 +1258,29 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     if (isCancelled()) return { status: "cancelled", snapshot };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
 
+    // ── Non-intrusive-first hierarchy: placement gate ───────────────────
+    // Post-calculation subwoofer placement is a LAST RESORT. It is eligible
+    // only when the supported installed-layout electronic levers have
+    // genuinely finished AND the best confirmed electronic result still
+    // leaves P19 RSP, P20 Primary and P20 Secondary all at L1. If electronics
+    // lifted any metric above L1, or any electronic search is incomplete, the
+    // physical search (global candidates + Stage 11B escalation) is skipped.
+    // The initial Starting Layout search (Stage 1/2) is unaffected.
+    const bestElectronicResult = selectConfirmedRecommendations(
+      [...phaseCandidates, ...calibrationCandidates], snapshot, existingAuthority,
+    ).winner || existingAuthority;
+    const electronicsGate = electronicsCompleted({ phaseDiagnostics, calibrationDiagnostics, gainDiagnostics });
+    const placementGate = !!(electronicsGate.complete && existingAuthority
+      && isPhysicalPlacementEligible(bestElectronicResult));
+    const hierarchyGateDiagnostics = {
+      electronicsComplete: electronicsGate.complete,
+      electronicsReasons: electronicsGate.reasons,
+      electronicLevels: bestElectronicResult ? readEscalationLevels(bestElectronicResult) : null,
+      placementGate,
+      seatingGate: null,
+    };
+    let seatingGate = false;
+
     // ── Phase 2: Gather global Stage 2 candidates (GLOBAL challengers) ──
     // These are the existing geometric finalist search results — they give
     // the engine the ability to discover that the best answer is not merely
@@ -1282,7 +1314,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       }
     }
 
-    // Compute raw transfers for global candidates (cached or worker)
+    // Compute raw transfers for global candidates (cached or worker).
+    // Skipped when the placement gate is closed: no physical search runs.
+    if (placementGate) {
     for (let i = 0; i < allCandidates.length; i++) {
       if (isCancelled()) return { status: "cancelled", snapshot };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded" };
@@ -1323,6 +1357,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       onProgress("testing_positions", `Optimising timing (${i + 1}/${allCandidates.length})`, i + 1, allCandidates.length);
       await yieldToUI();
     }
+    } // end placementGate — physical global candidate search
 
     // ── Confirm Current (if no existing authority) ──────────────────────
     // BLOCKER 2: If no valid authority exists, canonically recalculate Current
@@ -1481,6 +1516,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     ];
 
     for (const escPhase of escalationPhases) {
+      // Placement gate: skip the entire physical escalation when the gate is
+      // closed (electronics incomplete or any escalation metric already above
+      // L1). The break exits the phase loop before any candidate generation.
+      if (!placementGate) break;
       if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
       if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
@@ -1655,9 +1694,13 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       funnel[funnelKey].completed = !evaluationIssues.some(e=>e.stage===escPhase.name);
       funnel[funnelKey].invalid = evaluationIssues.filter(e=>e.stage===escPhase.name).length;
 
-      // ── Check CANONICAL materiality — proxy does NOT decide this
+      // ── Check CANONICAL materiality — proxy does NOT decide this.
+      // Physical significance: a physical candidate that only improves dB
+      // within the same RP22 Level is NOT a material sub improvement — keep
+      // escalating. Electronic candidates are never filtered out here.
       if (existingAuthority) {
-        const chosen = selectConfirmedRecommendations(confirmedResults,snapshot,existingAuthority);
+        const significancePool = filterPhysicalForSignificance(confirmedResults, existingAuthority);
+        const chosen = selectConfirmedRecommendations(significancePool,snapshot,existingAuthority);
         const matCheck = {material:!!chosen.winner,winner:chosen.winner};
         if (matCheck.material) {
           materialSubImprovementFound = true;
@@ -1670,8 +1713,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     if (isCancelled()) return { status: "cancelled", snapshot, bestSoFar: confirmedResults };
     if (isStale()) return { status: "stale", snapshot, message: "Design changed — optimisation result discarded", bestSoFar: confirmedResults };
 
-    // Publish sub_positions stage verdict (purely observational)
-    setStageVerdict(projectId, versionId, "sub_positions", materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
+    // Publish sub_positions stage verdict (purely observational). When the
+    // placement gate is closed, no physical search ran: report "skipped".
+    setStageVerdict(projectId, versionId, "sub_positions", !placementGate ? "skipped" : materialSubImprovementFound ? "improvement" : evaluationIssues.some(e=>e.stage!=="calibration") ? "incomplete" : "no_improvement");
 
     // ── Phase 9: Seating position search (Stage 11C) ────────────────────
     // Move the complete seating layout together along the room length axis.
@@ -1691,13 +1735,21 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let seatingProfiler = createSeatingProfiler();
     setStageVerdict(projectId, versionId, "seating_positions", "skipped");
     const seatingSearchStarted = performance.now();
+    // ── Non-intrusive-first hierarchy: seating gate ───────────────────
+    // Seating movement is a last resort after subwoofer placement. Eligible
+    // only when the placement gate passed AND the best confirmed practical
+    // result (best position candidate, or Current when none improved) still
+    // leaves P19 RSP, P20 Primary and P20 Secondary all at L1.
+    const bestPracticalResult = identifyBestPositionCandidate(confirmedResults, existingAuthority) || existingAuthority;
+    seatingGate = !!(placementGate && existingAuthority && isSeatingEligible(bestPracticalResult));
+    hierarchyGateDiagnostics.seatingGate = seatingGate;
     try {
       const screenWall = "front"; // default; could be derived from project
       const seatingCandidates = generateSeatingCandidates(seatingPositions, roomDims, screenWall);
       const validCandidates = seatingCandidates.filter((c) => c.valid && c.offsetMm !== 0);
       seatingDiagnostics.tested = validCandidates.length;
 
-      if (validCandidates.length > 0 && existingAuthority) {
+      if (seatingGate && validCandidates.length > 0 && existingAuthority) {
         onProgress("finalising", "Testing seating position changes", 0, validCandidates.length);
         const currentFinalist = buildCurrentFinalist(subwooferInstances, roomDims);
         const proxyResults = [];
@@ -1937,11 +1989,13 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     const coordinatedStarted = performance.now();
     try {
       setStageVerdict(projectId, versionId, "coordinated_physical", "skipped");
-      const coordinatedEligible = !!(existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length);
+      // Phase 9B must not bypass the hierarchy: it requires the seating gate
+      // (electronics complete + placement assessed + all three still L1).
+      const coordinatedEligible = !!(seatingGate && existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length);
       coordinatedDiagnostics.eligible = coordinatedEligible;
       coordinatedDiagnostics.skipReason = coordinatedEligible
         ? null
-        : !existingAuthority ? "no_existing_authority" : "no_current_transfer";
+        : !seatingGate ? "hierarchy_gate_closed" : !existingAuthority ? "no_existing_authority" : "no_current_transfer";
       if (coordinatedEligible) {
         // ── Extract cross-quantity Stage 2 finalists (1, 2, 4 subs) ──────
         // Only quantities that differ from the installed count and have
@@ -2097,7 +2151,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // and the diagnostic ledger. Measured so a slow selection can be told apart
     // from a slow search.
     const selectionStarted = performance.now();
-    const selection = selectWinnerWithProtection([...confirmedResults,...calibrationCandidates], snapshot, existingAuthority);
+    // Physical significance: a physical candidate that only improves dB
+    // within the same RP22 Level cannot be the final recommendation.
+    // Electronic candidates pass through untouched.
+    const selectionPool = filterPhysicalForSignificance([...confirmedResults, ...calibrationCandidates], existingAuthority);
+    const selection = selectWinnerWithProtection(selectionPool, snapshot, existingAuthority);
     selection.phaseResult=phaseResult;
     selection.phaseMaterial=phaseMaterial;
     selection.phaseDiagnostics=phaseDiagnostics;
@@ -2124,6 +2182,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.combinedMaterial=combinedMaterial;
     selection.combinedDiagnostics=combinedDiagnostics;
     selection.coordinatedDiagnostics=coordinatedDiagnostics;
+    selection.hierarchyGateDiagnostics=hierarchyGateDiagnostics;
     // Enrich the coordinated diagnostics with the selection evaluation outcomes
     // (validation, safety, protected-primary-seat, materiality) so the
     // persisted coordinated summary carries the full decision evidence.
