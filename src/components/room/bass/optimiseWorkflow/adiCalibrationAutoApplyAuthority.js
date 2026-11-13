@@ -638,6 +638,8 @@ export function resolveCalibrationAutoApply({
   objectives = null,
   instances = [],
   appliedCalibration = null,
+  applyValidatedSimulation = false,
+  crossoverChanged = false,
 } = {}) {
   const tuning = calibrationTuningOf(candidate);
   const candidateId = String(candidate?.candidateId || candidate?.id || "");
@@ -646,7 +648,7 @@ export function resolveCalibrationAutoApply({
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NO_CANDIDATE,
       NO_USEFUL_CALIBRATION_IMPROVEMENT, { candidateId });
   }
-  if (isCalibrationApplied(instances, tuning)) {
+  if (!crossoverChanged && isCalibrationApplied(instances, tuning)) {
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.ALREADY_APPLIED,
       "The applied calibration already matches the best confirmed candidate — nothing to change.",
       { candidateId, tuning });
@@ -740,7 +742,8 @@ export function resolveCalibrationAutoApply({
     tradeOffAppliedNote = describeTradeOffAutoApply(tradeOff);
   }
 
-  if (!materiality?.material) {
+  if (!materiality?.material && !(applyValidatedSimulation && materiality?.valid !== false &&
+      ((improvement?.p19DeltaDb > 0.000001) || (improvement?.p20DeltaDb > 0.000001)))) {
     // An improvement that clears the canonical action figure with no regression
     // guard breached is a SUGGESTION: the overall result improves, so it is
     // stated as what to change and what it buys — never as a failed
@@ -787,7 +790,7 @@ export function resolveCalibrationAutoApply({
 
   // Calibration a human set by hand is the designer's own work: ADI states the
   // candidate and leaves the decision to them.
-  if (human) {
+  if (human && !applyValidatedSimulation) {
     return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.HUMAN_CALIBRATION,
       `A better calibration was confirmed (${changeSentence(before, after) || "see values"}), but the current calibration was set by hand. It has not been applied — your approval is required.`,
       context);
