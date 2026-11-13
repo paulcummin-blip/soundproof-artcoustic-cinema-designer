@@ -1,5 +1,6 @@
 // Extracted verbatim from src/pages/RoomDesigner.jsx (lines 204–1132)
 import { useState, useCallback, useEffect, useRef } from "react";
+import { registerElectronicPersistence } from "@/components/room/bass/optimiseWorkflow/electronicPersistence.js";
 import { Project } from "@/entities/Project";
 import { base44 } from "@/api/base44Client";
 import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
@@ -1063,6 +1064,67 @@ appState, // Pass appState directly for setters
   loadProject,
   setProjectIdState]
   );
+
+
+  const electronicSaveLiveRef = useRef(null);
+  electronicSaveLiveRef.current = { buildSharedProjectPayload, appState };
+  useEffect(() => {
+    const projectId = activeProjectId || projectIdState;
+    const versionId = appState?.activeVersionId;
+    if (!projectId || !versionId || loadState.phase !== "loaded") return;
+    return registerElectronicPersistence(projectId, versionId, async work => {
+      const bucket = globalThis[`__rdAutosaveRefs_${projectId}`];
+      if (!bucket) throw new Error("The save owner is not ready.");
+      const generation = loadGenerationRef.current;
+      const current = () => isMountedRef.current && generation === loadGenerationRef.current &&
+        activeVersionIdRef.current === versionId &&
+        hydrationCanSave(hydrationAuthorityRef.current, projectId, generation);
+      const waitStart = Date.now();
+      while (bucket.inFlight && Date.now()-waitStart < 30000) await new Promise(resolve=>setTimeout(resolve,50));
+      if (bucket.inFlight || !current()) throw new Error("The project is busy or changed before saving.");
+      // Flush existing user edits before taking the same one-writer lock.
+      await autosaveAttemptRef.current?.run();
+      if (bucket.inFlight || !current()) throw new Error("The project changed before the ADI save.");
+      bucket.inFlight = true;
+      if (bucket.debounceId) clearTimeout(bucket.debounceId);
+      const read = async () => {
+        const row=await readProjectVersionRecord(versionId,{force:true});
+        if (!row || (row.project_id && row.project_id!==projectId)) throw new Error("The saved design version does not match.");
+        return row;
+      };
+      const readback = async () => {
+        const row=await read(), ds=row.design_state;
+        return {instances:ds.subwooferInstances,crossover:ds.spl_config?.crossover,receipt:ds.spl_config?.bassAdiReceipt};
+      };
+      const persist = async (settings,receipt) => {
+        const row=await read();
+        // A single entity update contains ALL electronic settings and the receipt.
+        // Merge only those fields; preserve physical and unrelated design data.
+        const ds=row.design_state;
+        const next={...ds,subwooferInstances:settings.instances,
+          spl_config:{...ds.spl_config,crossover:settings.crossover,bassAdiReceipt:receipt}};
+        await base44.entities.ProjectVersion.update(versionId,{design_state:next});
+      };
+      try {
+        setAutosaveStatus("saving");
+        const result=await work({readback,persist,current});
+        if(current()) setAutosaveStatus("saved");
+        return result;
+      } catch(error) {
+        if(current()) setAutosaveStatus("error");
+        throw error;
+      } finally {
+        bucket.inFlight=false;
+        // Reconcile the normal save queue with the latest React state. Do not
+        // clear newer edits or stamp a signature for a different project.
+        if(current()){
+          bucket.dirty=true;
+          bucket.saveToken=(bucket.saveToken||0)+1;
+          bucket.debounceId=setTimeout(()=>autosaveAttemptRef.current?.run(),1000);
+        }
+      }
+    });
+  }, [activeProjectId,projectIdState,appState?.activeVersionId,loadState.phase]);
 
   const manualSaveProject = useCallback(async () => {
     // Work out which project we are saving into:
