@@ -67,6 +67,8 @@ export function prepareElectronicCandidate({candidate,context,inputIdentity,cach
   if (!context.instances.length || context.instances.some(s => s.enabled !== false &&
       (!nonempty(s.model) || !finite(s.position?.x) || !finite(s.position?.y) ||
        !finite(s.bottomHeightM) || !finite(s.rotationDeg)))) return {ok:false,reason:"Incomplete installed geometry."};
+  if ((candidate.combinedFrom?.crossover || candidate.integrationVerified) && !completeCrossover(candidate.crossover))
+    return {ok:false,reason:"Incomplete confirmed crossover settings."};
   const tuning = candidate.appliedTuning;
   const crossover = candidate.crossover || currentCrossover;
   if (!completeTuning(tuning,context.instances) || !completeCrossover(crossover) ||
