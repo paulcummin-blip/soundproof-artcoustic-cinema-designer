@@ -546,15 +546,16 @@ export default function OptimiseAndCalculate({
 
       measuredRuntime = result.runtimeMetrics || measuredRuntime;
       trace.engineStatus = result.status || null;
-      const selection = result.selection;
-      const hierarchy = selection?.hierarchyGateDiagnostics;
-      trace.baselineValid = selection?.baselineValidation?.valid ?? result.baselineParity?.valid
+      trace.superseded = getLatestOptimiserRun(projectId, versionId)?.runId !== activeRun.runId;
+      const engineSelection = result.selection;
+      const hierarchy = engineSelection?.hierarchyGateDiagnostics;
+      trace.baselineValid = engineSelection?.baselineValidation?.valid ?? result.baselineParity?.valid
         ?? (result.status === "blocked" ? false : null);
       trace.electronicCandidateId = hierarchy?.electronicCandidateId || null;
       trace.electronicIsCurrentFallback = hierarchy?.electronicIsCurrentFallback ?? null;
       trace.placementGate = hierarchy?.placementGate ?? null;
       trace.seatingGate = hierarchy?.seatingGate ?? null;
-      const firstIssue = selection?.evaluationIssues?.[0];
+      const firstIssue = engineSelection?.evaluationIssues?.[0];
       if (firstIssue) recordIssue(firstIssue.stage || "engine", "Engine reported an evaluation issue. See saved evaluation evidence.", "evaluation_issue");
       traceStage = "engine-return";
       if (result.status === "cancelled") {
@@ -1115,7 +1116,11 @@ export default function OptimiseAndCalculate({
     } catch (err) {
       const errorClass = err instanceof TypeError ? "TypeError"
         : err instanceof ReferenceError ? "ReferenceError" : "Error";
-      recordIssue(traceStage, errorClass + " during " + traceStage + ".", "exception");
+      const message = typeof err?.message === "string" ? err.message : "";
+      // Allow only familiar JS runtime messages with identifier-shaped operands.
+      const safeMessage = /^(?:[A-Za-z_$][\w$]{0,63} is (?:not defined|not a function)|Cannot read properties of (?:null|undefined) \(reading '[\w$]{1,64}'\))$/.test(message)
+        ? message : "Unexpected exception.";
+      recordIssue(traceStage, errorClass + ": " + safeMessage, "exception");
       const reason = err?.message || "Optimisation failed.";
       if (optimiserCompleted) {
         // FAILURE CLASSIFICATION BY PHASE: the optimiser completed and its plan
