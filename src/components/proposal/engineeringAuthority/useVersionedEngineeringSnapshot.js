@@ -16,11 +16,13 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import {
   readProjectRecord,
   readProjectVersionRecord,
 } from '@/components/state/projectReadCache';
 import { mergeProjectAndVersion } from '@/lib/versionAuthority';
+import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
 import { useEngineeringSnapshot } from './useEngineeringSnapshot';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 
@@ -29,6 +31,12 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
   const [error, setError] = useState(null);
   const [project, setProject] = useState(null);
   const [version, setVersion] = useState(null);
+  // The saved Project Report's priceData — the commercial pricing the report
+  // actually documents, frozen at generation time against the Product Master
+  // then current. Preferred over the engineering publication's earlier-frozen
+  // priceData so the Proposal Centre receives the pricing associated with the
+  // same project/version and report snapshot.
+  const [savedReportPriceData, setSavedReportPriceData] = useState(null);
 
   // The single version-scoped engineering authority (durable first).
   const authority = useVersionedEngineeringAuthority(projectId, versionId);
@@ -62,6 +70,34 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
         setProject(nextProject);
         setVersion(nextVersion);
         setLoading(false);
+
+        // The Proposal Centre's commercial pricing comes from the SAME saved
+        // Project Report the readiness gate judges. Its priceData was frozen at
+        // report generation time against the Product Master then current, so it
+        // carries the prices the report actually documents (£4,500 ex / £5,400
+        // inc / 0 incomplete). The engineering publication's own priceData is
+        // frozen earlier — at publication time — and grows stale when prices
+        // change after publication, so it is only a fallback when no saved
+        // report exists for this version.
+        try {
+          const targetVersionIdForReport = versionId || nextProject.active_version_id || null;
+          if (targetVersionIdForReport) {
+            const snapshotPage = await base44.entities.ReportSnapshot.filter(
+              { project_id: projectId, version_id: targetVersionIdForReport, report_type: 'project' },
+              { sort: '-generated_at', limit: 50 },
+            );
+            if (cancelled) return;
+            const snapshotRows = Array.isArray(snapshotPage) ? snapshotPage : (snapshotPage?.items || []);
+            const currentFingerprintByVersion = new Map([
+              [targetVersionIdForReport, nextVersion?.published_fingerprint || null],
+            ]);
+            const byKey = selectCanonicalReportSnapshotsByKey(snapshotRows, { currentFingerprintByVersion });
+            const savedReport = byKey.get(`${targetVersionIdForReport}::project`) || null;
+            setSavedReportPriceData(savedReport?.payload?.presentation?.priceData || null);
+          }
+        } catch {
+          if (!cancelled) setSavedReportPriceData(null);
+        }
       } catch (err) {
         if (cancelled) return;
         setProject(null);
@@ -89,7 +125,7 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     publishedEngineering,
     seats: publishedEngineering?.seatingPositions || [],
     placedSpeakers: publishedEngineering?.placedSpeakers || [],
-    priceCalculation: publishedEngineering?.priceData || null,
+    priceCalculation: savedReportPriceData || publishedEngineering?.priceData || null,
     proposalAssets: options.proposalAssets,
     brandAsset: options.brandAsset,
     proposalMetadata: options.proposalMetadata,

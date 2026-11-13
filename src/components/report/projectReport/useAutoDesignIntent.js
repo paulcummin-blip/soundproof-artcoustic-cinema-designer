@@ -39,6 +39,7 @@ const inFlight = new Set();
 const listeners = new Set();
 const keyOf = (projectId, versionId) => `adi_auto_intent_v3:${projectId}:${versionId}`;
 const genKeyOf = (key) => `${key}:generation`;
+const reasonKeyOf = (key) => `${key}:reason`;
 
 function readStored(key) {
   try {
@@ -49,16 +50,30 @@ function readStored(key) {
   } catch { return AUTO_INTENT.IDLE; }
 }
 
-function setStatus(key, status, generation) {
+function setStatus(key, status, generation, reason = null) {
   try {
     window.localStorage.setItem(key, status);
     if (generation) window.localStorage.setItem(genKeyOf(key), generation);
+    // Preserve the backend's own refusal reason alongside a FAILED outcome, so
+    // the UI can state WHY the writer refused (writer_flag_off,
+    // validation_failed, provider_failed, …) instead of a generic FAILED
+    // state. Cleared on any non-FAILED outcome so a later success never shows a
+    // stale refusal.
+    if (status === AUTO_INTENT.FAILED) {
+      window.localStorage.setItem(reasonKeyOf(key), typeof reason === 'string' && reason.length > 0 ? reason : '');
+    } else {
+      window.localStorage.removeItem(reasonKeyOf(key));
+    }
   } catch { /* memory only */ }
   listeners.forEach((listener) => listener());
 }
 
 const readGeneration = (key) => {
   try { return window.localStorage.getItem(genKeyOf(key)); } catch { return null; }
+};
+
+const readReason = (key) => {
+  try { const value = window.localStorage.getItem(reasonKeyOf(key)); return typeof value === 'string' && value.length > 0 ? value : null; } catch { return null; }
 };
 
 const subscribe = (listener) => { listeners.add(listener); return () => listeners.delete(listener); };
@@ -68,6 +83,14 @@ export function useAutoDesignIntentStatus(projectId, versionId) {
   const key = keyOf(projectId, versionId);
   return useSyncExternalStore(subscribe, () => (
     projectId && versionId ? readStored(key) : AUTO_INTENT.IDLE
+  ));
+}
+
+/** The backend's own refusal reason when the status is FAILED, else null. */
+export function useAutoDesignIntentReason(projectId, versionId) {
+  const key = keyOf(projectId, versionId);
+  return useSyncExternalStore(subscribe, () => (
+    projectId && versionId ? readReason(key) : null
   ));
 }
 
@@ -103,6 +126,7 @@ function narrativeIsCurrent(snapshot) {
 
 export default function useAutoDesignIntent({ projectId, versionId }) {
   const status = useAutoDesignIntentStatus(projectId, versionId);
+  const reason = useAutoDesignIntentReason(projectId, versionId);
   const key = keyOf(projectId, versionId);
 
   const run = useCallback(async (generation) => {
@@ -110,6 +134,7 @@ export default function useAutoDesignIntent({ projectId, versionId }) {
     inFlight.add(key);
     setStatus(key, AUTO_INTENT.RUNNING, generation);
     let outcome = AUTO_INTENT.FAILED;
+    let refusalReason = null;
     try {
       const response = await base44.functions.invoke('generateReportDesignIntent', {
         project_id: projectId,
@@ -123,10 +148,14 @@ export default function useAutoDesignIntent({ projectId, versionId }) {
         else outcome = AUTO_INTENT.FAILED;
       } else {
         outcome = AUTO_INTENT.FAILED;
+        // Preserve the backend's own refusal reason (writer_flag_off,
+        // validation_failed, provider_failed, …) instead of collapsing every
+        // refusal into a generic FAILED state.
+        refusalReason = data.reason || data.detail || data.error || null;
       }
-    } catch { outcome = AUTO_INTENT.FAILED; }
+    } catch (err) { outcome = AUTO_INTENT.FAILED; refusalReason = err?.message || null; }
     inFlight.delete(key);
-    setStatus(key, outcome, generation);
+    setStatus(key, outcome, generation, refusalReason);
     window.dispatchEvent(new Event(INTENT_UPDATED_EVENT));
   }, [key, projectId, versionId]);
 
@@ -164,5 +193,5 @@ export default function useAutoDesignIntent({ projectId, versionId }) {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [projectId, versionId, status, run, key]);
 
-  return { status, retry: () => readSnapshot(projectId, versionId).then((s) => run(s?.generated_at || s?.id || 'retry')) };
+  return { status, reason, retry: () => readSnapshot(projectId, versionId).then((s) => run(s?.generated_at || s?.id || 'retry')) };
 }

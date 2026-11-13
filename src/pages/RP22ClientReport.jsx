@@ -508,7 +508,7 @@ export default function RP22ClientReport() {
   // The automatic ADI Project Summary. Mounted before the page composition so
   // its status is available to the Project Summary page (failure card + Retry)
   // and to the export gate. One generation, no separate editorial pass.
-  const { status: autoIntentStatus, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId });
+  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId });
 
   // The page CONTENT is assembled by the report's own composition hook; the
   // composition authority (projectReportRegistry) owns the document — the section
@@ -554,6 +554,7 @@ export default function RP22ClientReport() {
     projectId,
     versionId: authority.versionId || null,
     autoIntentStatus,
+    autoIntentReason,
     onRetryAutoIntent: retryAutoIntent,
   });
 
@@ -718,7 +719,7 @@ export default function RP22ClientReport() {
         ? handleExport
         : undefined;
   const failedReason = adiFailed
-    ? 'The project summary could not be written. Try again, or return to the project.'
+    ? (autoIntentReason || 'The project summary could not be written. Try again, or return to the project.')
     : (readiness.reason || 'The report could not be generated.');
 
   // Leaving Preparing closes the window, so a later attempt measures its own wait.

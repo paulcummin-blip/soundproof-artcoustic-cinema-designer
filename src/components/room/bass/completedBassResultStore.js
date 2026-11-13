@@ -760,7 +760,14 @@ export async function reconcileBassAuthorityWithPersisted(projectId, versionId, 
   assertNotAuthoritativeReadOnly('reconcileBassAuthorityWithPersisted', 'reconcile-bass-authority');
   const key = projectKey(projectId, versionId);
   const fingerprint = identity?.cacheKey || null;
-  if (key === "free::free") return { matched: false, fingerprint, source: null, reason: "free-scope" };
+  // Reconciliation is scoped by project ID, version ID AND fingerprint — never
+  // fingerprint alone. An unresolved scope where EITHER dimension is still
+  // "free" can never identify a real saved contract, so it is rejected before
+  // any read or write: matching by fingerprint alone would let a contract built
+  // for one project/version be promoted for another.
+  if (!projectId || String(projectId) === "free" || !versionId || String(versionId) === "free") {
+    return { matched: false, fingerprint, source: null, reason: "free-scope" };
+  }
   if (!fingerprint) return { matched: false, fingerprint: null, source: null, reason: "missing-rebuilt-identity" };
 
   const current = memoryByProject.get(key);

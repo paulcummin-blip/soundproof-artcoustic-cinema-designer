@@ -125,6 +125,7 @@ export default function ProjectReportDesignSummary({
   // failure card with Retry here instead of the summary text, so an unfinished
   // summary is never presented as the finished ADI narrative.
   autoIntentStatus = null,
+  autoIntentReason = null,
   onRetryAutoIntent = null,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
@@ -228,7 +229,9 @@ export default function ProjectReportDesignSummary({
             ADI could not write the project summary.
           </div>
           <div style={{ fontSize: 12.5, color: '#625143', marginTop: 4, lineHeight: 1.5 }}>
-            The summary could not be generated from this design. Retry to generate it again.
+            {autoIntentReason
+              ? `The writer refused: ${autoIntentReason}. Retry to generate it again.`
+              : 'The summary could not be generated from this design. Retry to generate it again.'}
           </div>
           <button
             type="button"

@@ -111,6 +111,7 @@ export function useProjectReportPages({
   // the Project Summary page so a failed generation shows Retry there instead of
   // the deterministic fallback.
   autoIntentStatus = null,
+  autoIntentReason = null,
   onRetryAutoIntent = null,
 }) {
   // The front page's DESIGN INTENT: the designer's own account of the cinema this
@@ -725,6 +726,7 @@ export function useProjectReportPages({
           opening={opening}
           systemFormat={systemFormat}
           autoIntentStatus={autoIntentStatus}
+          autoIntentReason={autoIntentReason}
           onRetryAutoIntent={onRetryAutoIntent}
         />
       ),
@@ -786,5 +788,5 @@ export function useProjectReportPages({
     // where the complete P1–P21 parameter-card sequence, the drawing set, the
     // bass curves and the single closing About Sound Proof page print.
     return [projectSummaryPage, adiHighlightsPage, systemProductsPage, ...pageList];
-  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary, autoIntentStatus, onRetryAutoIntent]);
+  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary, autoIntentStatus, autoIntentReason, onRetryAutoIntent]);
 }

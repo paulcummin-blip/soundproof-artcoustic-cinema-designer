@@ -125,8 +125,13 @@ export function useBassAuthorityReconciliation({
   );
   // Readable after the async read: the guard compares the identity as it is NOW
   // against the identity the match was computed from.
-  const latestIdentityRef = useRef({ cacheKey: null, digest: null });
-  latestIdentityRef.current = { cacheKey, digest };
+  // Tracks the live identity the hook is currently rendering for. The async
+  // reconciliation guard compares the scope (projectId + versionId) AND the
+  // fingerprint/digest the match was built from against the values live NOW,
+  // so a result computed for one project/version can never be applied to a
+  // different one — even if two scopes happened to share a fingerprint.
+  const latestIdentityRef = useRef({ cacheKey: null, digest: null, scopeId: null, versionId: null });
+  latestIdentityRef.current = { cacheKey, digest, scopeId, versionId };
 
   // Publish every eligibility exit; a mounted hook must never fail silently.
   useEffect(() => {
@@ -155,6 +160,10 @@ export function useBassAuthorityReconciliation({
     if (!identityEligible) return;
     if (!fingerprints || !targetKey || !baseDesignFingerprint) return;
     if (manualRequestActive || calculationInProgress) return;
+    // Reconciliation is scoped by project ID, version ID AND fingerprint — never
+    // fingerprint alone. An unresolved "free" scope is rejected here too, so the
+    // async read inside the store never runs for a scope it would have to refuse.
+    if (!scopeId || scopeId === "free" || !versionId || versionId === "free") return;
     if (reconciliationRef.current.fingerprint === cacheKey) return;
 
     const alreadyCurrent = authorityStatus === "AUTHORITATIVE" && authorityCurrentFingerprint === cacheKey;
@@ -210,10 +219,17 @@ export function useBassAuthorityReconciliation({
       // the one this match was built from, the result is discarded and the next
       // eligible identity is awaited.
       verifyIdentity: () => latestIdentityRef.current.cacheKey === callFingerprint
-        && latestIdentityRef.current.digest === callDigest,
+        && latestIdentityRef.current.digest === callDigest
+        && latestIdentityRef.current.scopeId === scopeId
+        && latestIdentityRef.current.versionId === versionId,
     })
       .then((outcome) => {
         if (!outcome || outcome.fingerprint !== cacheKey) return;
+        // The result is for the project/version the reconciliation was started
+        // for. If the live identity has moved to a different scope while the
+        // cache record was being read, the result is discarded — it is never
+        // applied to a different project/version.
+        if (latestIdentityRef.current.scopeId !== scopeId || latestIdentityRef.current.versionId !== versionId) return;
         const differences = !outcome.matched && outcome.reason?.startsWith("no-saved-contract-for-rebuilt-identity") && targetCacheHydrated
           ? describeFingerprintDifferences(digest, getFingerprintInputDigest(scopeId, versionId, authorityCurrentFingerprint))
           : null;
