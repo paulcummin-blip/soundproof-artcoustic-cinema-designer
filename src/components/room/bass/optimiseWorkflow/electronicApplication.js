@@ -2,6 +2,8 @@
 import { isCalibrationOnlyResult } from "./calibrationIdentityGuard.js";
 import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration.js";
 
+import { canonicalLevel } from "../improveBassV2/confirmedCandidateValidity.js";
+
 export const clone = value => JSON.parse(JSON.stringify(value));
 export function stable(value) {
   if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
@@ -102,10 +104,27 @@ export function resultLevels(result) {
   const seats=result?.perSeatP20 || [];
   const group=primary=>{
     const rows=seats.filter(s=>s.isPrimary===primary);
-    const levels=rows.map(s=>s.level??s.achievedLevel??s.p20Level);
+    const levels=rows.map(s=>canonicalLevel(s.level??s.achievedLevel??s.p20Level));
     return rows.length && levels.every(finite)?Math.min(...levels):null;
   };
-  return {p19:result?.achievedP19Level??null,primary:group(true),secondary:group(false)};
+  return {p19:canonicalLevel(result?.achievedP19Level),primary:group(true),secondary:group(false)};
+}
+
+
+export function physicalContext(context){
+  if(!context)return null;
+  const c=clone(context);
+  c.instances=(c.instances||[]).map(s=>{
+    const x={...s};
+    for(const k of ["delayMs","gainDb","phaseControlDeg","phaseAdjust","polarity","tuningSource","phaseAdjustDeg","calibrationSource"])delete x[k];
+    return x;
+  });
+  if(c.integrationContext){delete c.integrationContext.crossover;delete c.integrationContext.identity;}
+  return c;
+}
+export function comparisonReceipt(result){
+  const keys=["achievedP19VariationDb","achievedP19Level","achievedP20VariationDb","achievedP20Level","p14AchievedDb","p14AchievedLevel","achievedP18Hz","p18AchievedLevel","perSeatP20"];
+  return Object.fromEntries(keys.map(k=>[k,result?.[k]??null]));
 }
 
 // Pure transaction orchestrator. The persistence owner supplies the save lock,
