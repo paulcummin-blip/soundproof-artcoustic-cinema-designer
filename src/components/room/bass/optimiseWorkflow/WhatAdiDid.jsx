@@ -1,6 +1,8 @@
 import React from "react";
 import { settingsEqual } from "./electronicApplication.js";
 const level=n=>n==null?"—":n===0?"Fail":"L"+n;
+// Display precision only; the receipt and applied settings retain exact values.
+const setting=value=>String(value).replace(/-?\d+\.\d{4,}/g,n=>String(Number(Number(n).toFixed(3))));
 export default function WhatAdiDid({receipt,instances,crossover,fingerprint,authorityCurrent,busy,onRun,onRestore,disabled,physical,children}){
   const matches=receipt && receipt.resultFingerprint===fingerprint &&
     settingsEqual({instances,crossover},receipt.after);
@@ -15,7 +17,7 @@ export default function WhatAdiDid({receipt,instances,crossover,fingerprint,auth
     <div><h3 className="text-[15px] font-semibold tracking-tight">What ADI did</h3>
       <p className="mt-1 text-[12px] text-[#6B6B68]" role="status">{message}</p></div>
     {verified && receipt.changes?.length>0 && <dl className="space-y-2">
-      {receipt.changes.map((r,i)=><div key={i} className="flex justify-between gap-4 text-[12px]"><dt>{r.label}</dt><dd className="text-right tabular-nums">{r.from} <span className="px-1 text-[#979792]">→</span> {r.to}</dd></div>)}
+      {receipt.changes.map((r,i)=><div key={i} className="flex justify-between gap-4 text-[12px]"><dt>{r.label}</dt><dd className="text-right tabular-nums"><span title={r.from}>{setting(r.from)}</span> <span className="px-1 text-[#979792]">→</span> <span title={r.to}>{setting(r.to)}</span></dd></div>)}
     </dl>}
     {(verified||noChanges) && <div className="grid grid-cols-3 gap-3 border-t border-[#EEEDEB] pt-3" aria-label="RP22 Level comparison">
       {metrics.map(([key,label])=>{
