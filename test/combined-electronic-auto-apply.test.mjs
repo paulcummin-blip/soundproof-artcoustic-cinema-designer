@@ -51,6 +51,13 @@ for(const [label,mutate] of [
  ["missing independent frequency",a=>delete a.candidate.crossover.subwooferFrequencyHz],
 ])test(label+" rejects the complete application",()=>{const a=args();mutate(a);assert.equal(prepareElectronicCandidate(a).ok,false);});
 test("tuning-only preserves complete crossover",()=>{const a=args();delete a.candidate.crossover;delete a.candidate.combinedFrom;const p=prepareElectronicCandidate(a);assert.equal(p.ok,true);assert.deepEqual(p.crossover,crossover);});
+test("canonical installed crossover defaults are retained without inventing candidate settings",()=>{
+ const a=args();a.currentCrossover=undefined;a.currentEffectiveCrossover=clone(crossover);
+ const p=prepareElectronicCandidate(a);assert.equal(p.ok,true);
+ assert.equal(p.before.crossover,undefined);assert.deepEqual(p.before.effectiveCrossover,crossover);
+ assert.ok(changedSettings(p.before,p).some(r=>r.label==="Speaker high-pass slope"&&r.from==="24 dB/oct"));
+ delete a.candidate.crossover;assert.equal(prepareElectronicCandidate(a).ok,false);
+});
 test("combined winner retained even when incomplete, never actionable",()=>{
  const winner=clone(candidate);delete winner.crossover.speakerHpSlopeDbPerOct;
  const lever=buildCombinedElectronicLever({winner,instances,identity:{inputIdentity:"v2-full",cacheKey:"bass-cache",electronicContext:context},currentCrossover:crossover});
