@@ -2230,6 +2230,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     const objectivePool = dedupeCandidates([
       ...funnelCandidates, ...confirmedResults, ...calibrationCandidates, ...phaseCandidates,
     ]);
+    // Retain every confirmed installed-layout electronic candidate, including
+    // same-Level improvements below the advisory plan materiality threshold.
+    selection.electronicCandidates = objectivePool.filter(c=>c?.electronicContext && !c.isCurrent);
     selection.objectives = selectCanonicalObjectives({
       candidates: objectivePool, baseline: existingAuthority,
     });
