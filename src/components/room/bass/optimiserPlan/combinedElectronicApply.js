@@ -36,11 +36,11 @@ const blocked = (code) => ({
 });
 
 
-export function buildCombinedElectronicApply({lever,instances,currentCrossover,identity={}}={}){
-  const p=prepareElectronicCandidate({candidate:lever?.confirmedCandidate,context:identity.electronicContext,
-    inputIdentity:identity.inputIdentity,cacheKey:identity.cacheKey||identity.designFingerprint,currentCrossover});
-  return p.ok?{...p,previousInstances:p.before.instances,previousCrossover:p.before.crossover}
-    :{...p,code:COMBINED_ELECTRONIC_APPLY_BLOCK.INCOMPLETE};
+export function buildCombinedElectronicApply(){
+  // Legacy lever consumers commit only instances. They must never execute half
+  // of a combined change; the mounted ADI workflow owns the full transaction.
+  return {ok:false,code:COMBINED_ELECTRONIC_APPLY_BLOCK.INCOMPLETE,
+    reason:"Run ADI to apply and verify the complete electronic configuration."};
 }
 export function buildCombinedElectronicUndo(){
   return {ok:false,code:COMBINED_ELECTRONIC_APPLY_BLOCK.INCOMPLETE,
