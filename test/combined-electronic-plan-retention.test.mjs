@@ -385,6 +385,21 @@ describe("Combined electronic plan retention", () => {
     const canonical = resolveCanonicalTerminalOutcome({ actionability });
     assert.equal(canonical, "no_useful_improvement");
   });
+
+  it("classifies a combined electronic winner with failed identity proof as NON_ACTIONABLE_ELECTRONIC", () => {
+    const winner = makeCombinedElectronicWinner({ inputIdentity: "stale-fingerprint" });
+    const selection = makeSelection({ winner });
+    const plan = buildOptimiserPlan({
+      selection, baseline: selection.currentResult,
+      identity: IDENTITY, instances: makeInstances(),
+      seatingPositions: [], roomDims: { widthM: 4, lengthM: 6, heightM: 2.4 },
+    });
+    const actionability = resolvePlanActionability({ plan, selection });
+    assert.equal(actionability.actionable, false);
+    assert.equal(actionability.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_ELECTRONIC);
+    assert.ok(actionability.reason);
+    assert.equal(actionability.offerableLevers.length, 0);
+  });
 });
 
 describe("leverIsOfferable gates combined electronic by materiality", () => {
