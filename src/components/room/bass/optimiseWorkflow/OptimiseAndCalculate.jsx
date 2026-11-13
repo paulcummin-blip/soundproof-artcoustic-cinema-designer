@@ -276,16 +276,16 @@ export default function OptimiseAndCalculate({
           if(settingsEqual({instances:live.subwooferInstances,crossover:live.appState?.splConfig?.crossover},settings))break;
           await sleep(50);
         }
+        const currentSettings=liveElectronicRef.current;
+        if(!settingsEqual({instances:currentSettings.subwooferInstances,crossover:currentSettings.appState?.splConfig?.crossover},settings))return false;
         const live=sharedRef.current;
         if(typeof live?.onCalculate!=="function")return false;
         live.onCalculate();
         if(!(await waitForCurrentPublication(sharedRef,phaseRef)))return false;
         const state=sharedRef.current;
         const expected=restoring?receipt.beforeResult:receipt.expectedResult;
-        const tuning=settings.instances.filter(s=>s.enabled!==false).map(s=>({
-          sourceId:s.id,delayMs:s.delayMs??0,gainDb:s.gainDb??0,
-          phaseControlDeg:s.phaseControlDeg??s.phaseAdjust??0,polarity:s.polarity,
-        }));
+        const tuning=restoring?receipt.beforeEffectiveTuning:receipt.expectedEffectiveTuning;
+        if(!Array.isArray(tuning)||!tuning.length)return false;
         if(!recommendationSettingsMatch(state.authoritative,{crossover:settings.crossover,tuning}) ||
            !recommendationResultMatches(state.completedBassAuthority,expected))return false;
         return {fingerprint:state.cacheKey,levels:resultLevels(extractAuthorityForComparison(state.completedBassAuthority))};
@@ -301,6 +301,7 @@ export default function OptimiseAndCalculate({
       phaseRef.current="applying";setApplying(projectId,versionId);
       await performElectronicUpdate({...receipt,operation:"restore",runId:receipt.runId+":restore",
         before:receipt.after,after:receipt.before,beforeResult:receipt.expectedResult,expectedResult:receipt.beforeResult,
+        beforeEffectiveTuning:receipt.expectedEffectiveTuning,expectedEffectiveTuning:receipt.beforeEffectiveTuning,
         beforeLevels:receipt.afterLevels,changes:changedSettings(receipt.after,receipt.before)});
       setComplete(projectId,versionId,{},null,false);
     }catch(error){setWorkflowError(projectId,versionId,error.message);}
@@ -1020,6 +1021,8 @@ export default function OptimiseAndCalculate({
           physicalContext:physicalContext(context),before:prepared.before,
           after:{instances:prepared.instances,crossover:prepared.crossover},
           beforeResult:comparisonReceipt(baseline),expectedResult:comparisonReceipt(candidate),
+          beforeEffectiveTuning:clone(sharedRef.current.authoritative.sources.map(s=>({sourceId:s.id,...s.tuning}))),
+          expectedEffectiveTuning:clone(candidate.appliedTuning),
           beforeLevels:resultLevels(baseline),changes:changedSettings(prepared.before,prepared),
         };
         await performElectronicUpdate(receipt);
