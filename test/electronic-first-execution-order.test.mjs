@@ -102,18 +102,23 @@ test("5: all L1 after electronics opens placement", () => {
   assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 })), true);
 });
 
-// 6 — Any Level above L1 closes placement.
-test("6: any level above L1 closes placement", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), false);
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), false);
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), false);
+// 6 — A single L1 group opens placement even when another group is L2+; all L2+ closes.
+test("6: a single L1 group opens placement; all L2+ closes placement", () => {
+  // One group still L1: placement eligible (limitation remains).
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), true);
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), true);
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), true);
+  // Every applicable group L2 or better: no limitation, placement closed.
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 2, p20Secondary: 2 })), false);
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 4 })), false);
 });
 
-// 7 — Any Level above L1 after practical placement closes seating.
-test("7: any level above L1 after placement closes seating", () => {
-  assert.equal(isSeatingEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), false);
-  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), false);
-  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), false);
+// 7 — A single L1 group after practical placement opens seating; all L2+ closes.
+test("7: a single L1 group after placement opens seating; all L2+ closes seating", () => {
+  assert.equal(isSeatingEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), true);
+  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), true);
+  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), true);
+  assert.equal(isSeatingEligible(result({ p19Level: 2, p20Primary: 2, p20Secondary: 2 })), false);
 });
 
 // 8 — Phase 9B cannot bypass the seating gate.
@@ -174,8 +179,12 @@ test("13: single-row design treats P20 Secondary as not applicable", () => {
   const singleRow = result({ p19Level: 1, p20Primary: 1, p20Secondary: null });
   const levels = readEscalationLevels(singleRow);
   assert.equal(levels.p20Secondary, "not_applicable");
-  // Gate still requires P19 + Primary at L1.
+  // P19 L1 limitation: placement eligible.
   assert.equal(isPhysicalPlacementEligible(singleRow), true);
-  const singleRowAbove = result({ p19Level: 2, p20Primary: 1, p20Secondary: null });
-  assert.equal(isPhysicalPlacementEligible(singleRowAbove), false);
+  // Single-row with P19 L2 + Primary L2: no limitation, placement closed.
+  const singleRowStrong = result({ p19Level: 2, p20Primary: 2, p20Secondary: null });
+  assert.equal(isPhysicalPlacementEligible(singleRowStrong), false);
+  // Single-row with P19 L2 + Primary L1: Primary limitation, placement eligible.
+  const singleRowPrimaryL1 = result({ p19Level: 2, p20Primary: 1, p20Secondary: null });
+  assert.equal(isPhysicalPlacementEligible(singleRowPrimaryL1), true);
 });

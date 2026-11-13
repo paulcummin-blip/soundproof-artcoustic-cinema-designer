@@ -93,9 +93,11 @@ test("5: placement gate reads exact electronic levels", () => {
   assert.ok(engineSource.includes("placementGate,"), "placement gate decision recorded");
 });
 
-// 6 — FAIL, missing or stale Levels cannot be treated as L1.
-test("6: FAIL, missing or stale levels cannot open the gate", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 0, p20Primary: 1, p20Secondary: 1 })), false);
+// 6 — FAIL is a material limitation (opens the gate); missing/stale levels cannot be assessed.
+test("6: FAIL opens the gate; missing levels cannot be assessed", () => {
+  // FAIL (0) is a material limitation: placement eligible to investigate.
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 0, p20Primary: 1, p20Secondary: 1 })), true);
+  // Missing P19: cannot assess the limitation, gate closed.
   assert.equal(isPhysicalPlacementEligible(result({ p19Level: null, p20Primary: 1, p20Secondary: 1 })), false);
   const missingPrimary = result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 });
   missingPrimary.perSeatP20[0] = { seatId: "p1", isPrimary: true, level: null };
@@ -112,23 +114,35 @@ test("7: impractical placement cannot open seating", () => {
   assert.equal(best, null, "impractical candidate filtered out");
 });
 
-// 8 — Failed or incomplete placement cannot open seating.
-test("8: no qualifying placement result closes the seating gate", () => {
+// 8 — Seating is assessed independently of placement: no qualifying placement
+// result does NOT close the seating gate when a limitation remains on the
+// electronic baseline.
+test("8: seating is not blocked by an absent placement result", () => {
   const baseline = result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 });
   // No position candidates at all.
   assert.equal(identifyBestPositionCandidate([], baseline), null);
   // Position candidates without canonical level evidence.
   const noLevels = { isPositionCandidate: true, candidateId: "noLevel", perSeatP20: [] };
   assert.equal(identifyBestPositionCandidate([noLevels], baseline), null);
-  // The engine must not fall back to Current for the seating gate.
-  assert.ok(engineSource.includes("bestPracticalResult && existingAuthority"),
-    "seating gate requires a qualifying placement result, not a Current fallback");
+  // The seating gate is assessed on the best available baseline, not blocked
+  // by an absent placement result. The engine falls back to the electronic
+  // result when no qualifying placement was confirmed.
+  assert.ok(engineSource.includes("const seatingBaseline = bestPracticalResult || bestElectronicResult || existingAuthority"),
+    "seating gate assesses the best available baseline (practical, else electronic)");
+  assert.ok(!engineSource.includes("placementGate && bestPracticalResult && existingAuthority"),
+    "seating gate is no longer hard-gated on a qualifying placement result");
 });
 
-// 9 — Eligible practical placement raising one Level above L1 blocks seating.
-test("9: placement raising a level above L1 blocks seating", () => {
-  const placementAboveL1 = result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 });
-  assert.equal(isSeatingEligible(placementAboveL1), false);
+// 9 — Placement raising one Level above L1 but leaving another at L1 keeps
+// seating open; only all applicable groups at L2+ close seating.
+test("9: a remaining L1 group keeps seating open; all L2+ closes seating", () => {
+  // P19 raised to L2 but Primary and Secondary still L1: seating still eligible.
+  const placementOneRaised = result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 });
+  assert.equal(isSeatingEligible(placementOneRaised), true);
+  // All applicable groups L2+: seating closed (no remaining limitation).
+  const placementAllStrong = result({ p19Level: 2, p20Primary: 2, p20Secondary: 2 });
+  assert.equal(isSeatingEligible(placementAllStrong), false);
+  // All L1: seating eligible.
   const placementAllL1 = result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 });
   assert.equal(isSeatingEligible(placementAllL1), true);
 });
