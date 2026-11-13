@@ -107,6 +107,7 @@ export function serializeOptimiserPlan(plan) {
     // reopened terminal record can distinguish a genuine technical failure
     // from a completed search that found nothing worth applying.
     firstEvaluationIssue: plan.firstEvaluationIssue || null,
+    terminalTrace: plan.terminalTrace || null,
   };
 }
 
@@ -119,6 +120,9 @@ export function hydrateOptimiserPlan(projectId, versionId, persistedPlan) {
   if (!projectId || !versionId || !persistedPlan || typeof persistedPlan !== "object") return null;
   if (!persistedPlan.designFingerprint && !persistedPlan.resultFingerprint) return null;
   const plan = serializeOptimiserPlan(persistedPlan);
+  if (plan.terminalTrace?.runId === plan.run?.runId && plan.terminalTrace) {
+    plan.terminalTrace = { ...plan.terminalTrace, planSave: "acknowledged" };
+  }
   setOptimiserPlanAuthority(projectId, versionId, plan);
   return plan;
 }
@@ -141,6 +145,11 @@ export function acknowledgeOptimiserPlanSave(projectId, versionId, plan) {
   const key = projectId + "::" + versionId;
   const value = { runId: plan.run.runId, at: Date.now() };
   savedRuns.set(key, value);
+  if (plan.terminalTrace?.runId === value.runId) {
+    console.info("[Bass ADI plan save acknowledgement]", JSON.stringify({
+      runId: value.runId, projectId, versionId, planSave: "acknowledged",
+    }));
+  }
   for (const notify of saveWaiters) notify(key, value);
 }
 export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs = 60000) {

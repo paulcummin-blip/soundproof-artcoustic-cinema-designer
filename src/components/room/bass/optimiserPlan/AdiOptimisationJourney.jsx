@@ -1277,6 +1277,14 @@ export default function AdiOptimisationJourney({
               orchestration layer. Developer diagnostics only: fingerprints, ids,
               per-candidate detail, cache and job internals. */}
           <AdiJourneyEngineerDetailsSections view={engineerDetailsView} />
+          {showDeveloperDiagnostics && planView?.terminalTrace && (
+            <details data-adi-terminal-trace>
+              <summary>Bass ADI terminal trace</summary>
+              <pre className="overflow-auto whitespace-pre-wrap text-[10px]">
+                {JSON.stringify(planView.terminalTrace, null, 2)}
+              </pre>
+            </details>
+          )}
 
           {/* LEVEL 3 — the pre-run search-space totals (how many design options
               ADI will evaluate and the acoustic calculations behind them). Search

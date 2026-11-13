@@ -62,6 +62,10 @@ export function useOptimiserPlanView({
         supersededByRunId: presentation.supersededByRunId,
         supersededPlanSavedAt: presentation.supersededPlanSavedAt,
       }
-      : resolved;
+      : {
+        ...resolved,
+        terminalTrace: presentation.plan?.terminalTrace?.runId === presentation.plan?.run?.runId
+          ? presentation.plan?.terminalTrace || null : null,
+      };
   }, [storedPlan, latestRun, currentDesignFingerprint, instances, seatingPositions]);
 }

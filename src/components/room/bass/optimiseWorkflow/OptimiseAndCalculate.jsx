@@ -87,7 +87,7 @@ import {
 // (useRunOptimisationPlan → beginOptimiserRun), so every saved plan/evidence,
 // save acknowledgement and run history row carries a non-null runId regardless
 // of entry button, winner or terminal outcome.
-import { beginOptimiserRun } from "@/components/room/bass/optimiserPlan/optimiserRunAuthority.js";
+import { beginOptimiserRun, getLatestOptimiserRun } from "@/components/room/bass/optimiserPlan/optimiserRunAuthority.js";
 import { persistOptimiserRunHistory, updateOptimiserRunHistoryPublication } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
 import {
   RUN_TIMING,
@@ -345,6 +345,38 @@ export default function OptimiseAndCalculate({
     // Durable history + failure-evidence helpers, mirroring useRunOptimisationPlan
     // so both routes write through the same authorities and the same runId.
     let measuredRuntime = null;
+    let traceStage = "preflight";
+    const trace = {
+      runId: activeRun.runId,
+      projectId,
+      versionId,
+      designFingerprint: sharedRef.current?.cacheKey || null,
+      engineStatus: null,
+      baselineValid: null,
+      electronicCandidateId: null,
+      electronicIsCurrentFallback: null,
+      placementGate: null,
+      seatingGate: null,
+      terminalOutcome: null,
+      planSave: "not_requested",
+      historySave: "not_requested",
+      firstIssue: null,
+    };
+    // Keep arbitrary exception text, stack traces and response payloads out
+    // of the persisted diagnostic. The stage and error class are sufficient
+    // to locate the exception in the browser's developer tools.
+    const recordIssue = (stage, message, kind) => {
+      trace.firstIssue ??= { stage, message, kind };
+    };
+    const attachTrace = (record) => ({
+      ...record,
+      terminalTrace: { ...trace },
+    });
+    const saveTracedRecord = (record) => {
+      if (getLatestOptimiserRun(projectId, versionId)?.runId !== activeRun.runId) return;
+      trace.planSave = "requested";
+      setOptimiserPlanAuthority(projectId, versionId, attachTrace(record));
+    };
     // The plan actionability decided at the save boundary, used at the terminal
     // history row so a winnerless re-test records "no_useful_improvement" rather
     // than "actionable_plan".
@@ -363,6 +395,7 @@ export default function OptimiseAndCalculate({
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
       const timings = getRunTimings(projectId, versionId);
       const live = sharedRef.current;
+      trace.historySave = "requested";
       return persistOptimiserRunHistory({
         runId: activeRun.runId,
         projectId,
@@ -392,6 +425,14 @@ export default function OptimiseAndCalculate({
           timings: buildPersistedRunTimings(timings),
         },
         engineRevision: measuredRuntime?.engineRevision || null,
+      }).then((receipt) => {
+        trace.historySave = receipt?.ok === true ? "acknowledged" : "failed";
+        if (trace.historySave === "failed") recordIssue("history-save", "History write was not acknowledged.", "save_failure");
+        return receipt;
+      }, (error) => {
+        trace.historySave = "failed";
+        recordIssue("history-save", "History write threw an exception.", "save_failure");
+        throw error;
       });
     };
     const saveRunFailure = (reason, extra = {}) => {
@@ -420,7 +461,10 @@ export default function OptimiseAndCalculate({
         } : null,
         runIdentity: activeRun,
       });
-      if (evidence) setOptimiserPlanAuthority(projectId, versionId, evidence);
+      if (evidence) {
+        trace.terminalOutcome ??= evidence.terminalOutcome || null;
+        saveTracedRecord(evidence);
+      }
     };
 
     try {
@@ -460,6 +504,8 @@ export default function OptimiseAndCalculate({
           // discard the in-memory run authority and restore the previous run's
           // result as though this run never happened.
           const cancelReason = "Optimisation cancelled by the user before completion.";
+          recordIssue("preflight", "Cancelled during publication readiness wait.", "cancelled");
+          trace.terminalOutcome = "cancelled";
           saveRunFailure(cancelReason, { terminalOutcome: "evaluation_incomplete" });
           logRunHistory({
             terminalStatus: "cancelled",
@@ -481,6 +527,8 @@ export default function OptimiseAndCalculate({
       // threads it into every runtimeMetrics record and the V2 optimisation
       // params, so the Stage 2 wait, the search and the saved plan reconcile
       // as ONE run. No second id is minted.
+      traceStage = "engine";
+      trace.designFingerprint = sharedRef.current?.cacheKey || null;
       const result = await runOptimisation({
         projectId,
         versionId,
@@ -497,11 +545,25 @@ export default function OptimiseAndCalculate({
       });
 
       measuredRuntime = result.runtimeMetrics || measuredRuntime;
+      trace.engineStatus = result.status || null;
+      const selection = result.selection;
+      const hierarchy = selection?.hierarchyGateDiagnostics;
+      trace.baselineValid = selection?.baselineValidation?.valid ?? result.baselineParity?.valid
+        ?? (result.status === "blocked" ? false : null);
+      trace.electronicCandidateId = hierarchy?.electronicCandidateId || null;
+      trace.electronicIsCurrentFallback = hierarchy?.electronicIsCurrentFallback ?? null;
+      trace.placementGate = hierarchy?.placementGate ?? null;
+      trace.seatingGate = hierarchy?.seatingGate ?? null;
+      const firstIssue = selection?.evaluationIssues?.[0];
+      if (firstIssue) recordIssue(firstIssue.stage || "engine", "Engine reported an evaluation issue. See saved evaluation evidence.", "evaluation_issue");
+      traceStage = "engine-return";
       if (result.status === "cancelled") {
         // Only an explicit user Cancel is a user cancellation. Other stop
         // reasons (inputs-incomplete, user-interaction, superseded, etc.) are
         // preserved as evaluation_incomplete with the actual reason.
         const userCancel = result.reason === "user-cancel";
+        recordIssue(traceStage, userCancel ? "Cancelled by the designer." : "Execution stopped before completion.", userCancel ? "cancelled" : "incomplete");
+        trace.terminalOutcome = userCancel ? "cancelled" : "evaluation_incomplete";
         const stopReason = result.reason || result.error || null;
         const reason = userCancel
           ? "Optimisation cancelled by the user before completion."
@@ -518,6 +580,7 @@ export default function OptimiseAndCalculate({
       }
       if (result.status === "error" || result.status === "stale") {
         const reason = result.error || "Optimisation failed.";
+        recordIssue(traceStage, result.status === "stale" ? "Design identity changed during execution." : "Optimiser returned an error.", result.status);
         // The failed run still carries its own runId in the saved terminal
         // evidence and history — run identity never depends on a winner.
         saveRunFailure(reason, { baselineParity: result.baselineParity || null });
@@ -536,6 +599,8 @@ export default function OptimiseAndCalculate({
         // block is still saved as terminal run evidence with the run's own
         // identity, so the panel states it after refresh and the history row
         // carries the runId.
+        recordIssue(traceStage, "Current bass authority did not pass preflight.", "blocked");
+        trace.terminalOutcome = "blocked";
         const blockedShared = sharedRef.current;
         const blockedEvidence = buildOptimiserRunEvidence({
           identity: {
@@ -551,7 +616,7 @@ export default function OptimiseAndCalculate({
           baselineParity: result.baselineParity || null,
           runIdentity: activeRun,
         });
-        if (blockedEvidence) setOptimiserPlanAuthority(projectId, versionId, blockedEvidence);
+        if (blockedEvidence) saveTracedRecord(blockedEvidence);
         logRunHistory({
           terminalStatus: "blocked",
           publicationStatus: "not_attempted",
@@ -622,10 +687,12 @@ export default function OptimiseAndCalculate({
       // the no-apply path publishes once against the current fingerprint; the
       // apply path publishes once against the post-recalculation fingerprint.
       const saveOptimiserPlanForTerminal = () => {
+        traceStage = "plan-construction";
         const fingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
           || sharedRef.current?.completedBassAuthority?.currentFingerprint
           || null;
         if (!fingerprint) {
+          recordIssue(traceStage, "Completed result fingerprint unavailable.", "missing_authority");
           return { fingerprint: null, persistedPlan: null, runEvidence: null, actionability: null, decision: null };
         }
         const currentShared = sharedRef.current;
@@ -690,17 +757,23 @@ export default function OptimiseAndCalculate({
           runIdentity: activeRun,
         });
         recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
+        traceStage = "terminal-classification";
         runTerminalStatus = resolveCanonicalTerminalOutcome({
           actionability,
           calibrationDecision: calibrationApplication,
         });
+        trace.terminalOutcome = runTerminalStatus;
+        if (["failed", "evaluation_incomplete"].includes(runTerminalStatus)) {
+          recordIssue(traceStage, "Terminal selection reported failed or incomplete evidence.", runTerminalStatus);
+        }
+        traceStage = "plan-save";
         if (persistedPlan) {
-          setOptimiserPlanAuthority(projectId, versionId, {
+          saveTracedRecord({
             ...persistedPlan,
             timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
           });
         } else if (runEvidence) {
-          setOptimiserPlanAuthority(projectId, versionId, {
+          saveTracedRecord({
             ...runEvidence,
             timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
           });
@@ -780,6 +853,7 @@ export default function OptimiseAndCalculate({
       // background publication will create the row from scratch on its own
       // outcome.
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
+      traceStage = "history-save";
       phaseRef.current = "history";
       let historyPersistenceError = null;
       {
@@ -1039,6 +1113,9 @@ export default function OptimiseAndCalculate({
         })).catch(() => {});
       }
     } catch (err) {
+      const errorClass = err instanceof TypeError ? "TypeError"
+        : err instanceof ReferenceError ? "ReferenceError" : "Error";
+      recordIssue(traceStage, errorClass + " during " + traceStage + ".", "exception");
       const reason = err?.message || "Optimisation failed.";
       if (optimiserCompleted) {
         // FAILURE CLASSIFICATION BY PHASE: the optimiser completed and its plan
@@ -1092,6 +1169,7 @@ export default function OptimiseAndCalculate({
         setWorkflowError(projectId, versionId, err.message);
       }
     } finally {
+      console.info("[Bass ADI terminal trace]", JSON.stringify(trace));
       runningRef.current = false;
       phaseRef.current = "idle";
     }
