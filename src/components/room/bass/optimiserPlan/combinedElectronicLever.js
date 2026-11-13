@@ -17,15 +17,19 @@
 //     slopes) — before and after.
 //   - The exact per-source tuning (delay, gain, phase, polarity) — before and
 //     after.
+//   - Per-source model and physical geometry identity (position, height,
+//     rotation) so the candidate is reproducible exactly.
+//   - Seating and RSP authority snapshot.
+//   - Confirmation and design fingerprints.
 //   - Positive identity proof (same installed geometry, current fingerprint,
-//     no physical change, complete payload).
+//     complete payload, no physical change).
 //
-// Crossover application is NOT yet supported by the existing apply pathway
-// (applyCalibrationTuning handles delay/gain/phase/polarity only). So this
-// lever is always actionable: false — it is never offered for automatic Apply.
-// The user's rule: "Do not apply only its delay, gain, phase or polarity while
-// omitting crossover. No partial or approximate Apply." The lever retains the
-// full evidence for diagnostics and for a future crossover-aware apply path.
+// When identity proof passes (identityProof.valid === true) the lever IS
+// actionable: the existing CrossoverRecommendation apply path already writes
+// crossover + tuning + recalculate + verify, and the combined electronic apply
+// builder (combinedElectronicApply.js) reproduces the same design state update
+// from this lever. When identity proof fails the lever is NOT actionable — it
+// retains the full evidence for diagnostics but is never offered for Apply.
 //
 // READ-ONLY: reads the confirmed winner and the current instances. It changes
 // no acoustic maths, no scoring, no grading, and no search.
@@ -141,9 +145,26 @@ function buildCrossoverChange(winner, currentCrossover) {
   };
 }
 
-/** Reason stated when the lever is not automatically applyable. */
-const NON_ACTIONABLE_REASON =
-  "This is a combined crossover and electronic tuning improvement. Crossover settings cannot be applied automatically yet — review the evaluated settings and apply them manually in your processor.";
+/**
+ * Per-source identity snapshot: model, physical geometry, and source id.
+ * This makes the candidate reproducible exactly — the apply path can verify
+ * the installed geometry matches before writing tuning + crossover.
+ */
+function buildSourceIdentity(winner, instances) {
+  const rows = pairTuning(winner?.appliedTuning || winner?.tuning, instances);
+  return rows.map(({ instance, entry }) => ({
+    sourceId: instance.id,
+    model: instance.model || null,
+    label: describeSub(instances, instance),
+    group: instance.legacyGroup || null,
+    geometry: {
+      x: round(num(instance.position?.x), 3),
+      y: round(num(instance.position?.y), 3),
+      bottomHeightM: round(num(instance.bottomHeightM), 3),
+      rotationDeg: round(num(instance.rotationDeg), 1),
+    },
+  }));
+}
 
 /**
  * Build the combined electronic lever for a combined crossover + tuning winner.
@@ -155,12 +176,19 @@ const NON_ACTIONABLE_REASON =
  * misclassified as "winning change not retained." The identity proof result
  * is carried on the lever so the terminal evidence can state the exact reason.
  *
+ * The lever is actionable (offerable for Apply) ONLY when identity proof
+ * passes — same geometry, current fingerprint, complete payload, no physical
+ * change. When proof fails, actionable is false and the lever is retained
+ * for diagnostics only.
+ *
  * @param {object} params
  * @param {object|null} params.winner - selection.winner (the confirmed result)
  * @param {Array} params.instances - current subwooferInstances
  * @param {object|null} params.baselineResult - the baseline result for effect
  * @param {object} [params.identity] - the run's identity (designFingerprint)
  * @param {object|null} [params.currentCrossover] - the design's current crossover
+ * @param {Array} [params.seatingPositions] - current seating positions snapshot
+ * @param {object} [params.rspAuthority] - { rspMode, manualRspY_m, manualRspX_m, designated_rsp_seat_id }
  * @returns {object|null} the lever, or null when the winner is not combined electronic
  */
 export function buildCombinedElectronicLever({
@@ -169,6 +197,8 @@ export function buildCombinedElectronicLever({
   baselineResult,
   identity = {},
   currentCrossover = null,
+  seatingPositions = null,
+  rspAuthority = null,
 } = {}) {
   if (!winner) return null;
   // Only a combined crossover integration candidate gets this lever.
@@ -179,7 +209,16 @@ export function buildCombinedElectronicLever({
   const effect = leverEffectFrom(winner, baselineResult);
   const tuning = buildTuningChanges(winner, instances);
   const crossover = buildCrossoverChange(winner, currentCrossover);
+  const sourceIdentity = buildSourceIdentity(winner, instances);
   const changes = tuning.filter((row) => row.changed);
+
+  // The lever is actionable ONLY when identity proof passes: same geometry,
+  // current fingerprint, complete payload, no physical change. A combined
+  // electronic candidate whose identity cannot be proven is retained as
+  // evidence but never offered for automatic Apply — a partial apply
+  // (tuning without crossover, or against a different geometry) would not
+  // reproduce the confirmed result.
+  const actionable = identityProof.valid === true;
 
   return {
     lever: OPTIMISER_LEVER.COMBINED_ELECTRONIC,
@@ -190,10 +229,14 @@ export function buildCombinedElectronicLever({
     sourceCandidateId: winner.candidateId || null,
     // The measured improvement, read from the canonically confirmed result.
     effect,
-    // No automatic Apply: crossover apply is not yet supported. The lever
-    // retains the complete payload for diagnostics and manual application.
-    actionable: false,
-    reason: NON_ACTIONABLE_REASON,
+    // Actionable when identity proof passes — the apply path can reproduce
+    // the complete configuration (crossover + per-source tuning) against the
+    // installed geometry. Not actionable when proof fails: retained for
+    // diagnostics, never offered for automatic Apply.
+    actionable,
+    reason: actionable
+      ? "Combined crossover and electronic tuning improvement, confirmed on the installed geometry."
+      : "This combined crossover and tuning improvement could not be verified against the current design. Review the evaluated settings in Technical Details.",
     // Positive identity proof: same geometry, current fingerprint, complete
     // payload. When proof fails, the lever still exists (so the plan is not
     // null) but carries the issues for the terminal evidence to state.
@@ -205,8 +248,30 @@ export function buildCombinedElectronicLever({
     tuning,
     // Only changed rows, for the plan's `changes` contract.
     changes: changes.length > 0 || crossover ? changes : [],
+    // Per-source model and physical geometry identity — makes the candidate
+    // reproducible exactly. The apply path verifies these match before writing.
+    sourceIdentity,
     // The winning candidate's own origin and retune flags.
     candidateOrigin: winner.candidateOrigin || null,
     combinedFrom: winner.combinedFrom || null,
+    // Seating and RSP authority snapshot at confirmation time.
+    seatingAuthority: Array.isArray(seatingPositions)
+      ? seatingPositions.map((seat) => ({
+        id: seat?.id ?? null,
+        y: round(num(seat?.y ?? seat?.y_m), 3),
+        isPrimary: Boolean(seat?.isPrimary),
+      }))
+      : null,
+    rspAuthority: rspAuthority ? {
+      rspMode: rspAuthority.rspMode || null,
+      manualRspY_m: round(num(rspAuthority.manualRspY_m), 3),
+      manualRspX_m: round(num(rspAuthority.manualRspX_m), 3),
+      designated_rsp_seat_id: rspAuthority.designated_rsp_seat_id || null,
+    } : null,
+    // Confirmation and design fingerprints — the run's own identity, so a
+    // reopened plan states which design the candidate was confirmed against.
+    designFingerprint: identity.designFingerprint || null,
+    resultFingerprint: identity.resultFingerprint || null,
+    cacheKey: identity.cacheKey || identity.designFingerprint || null,
   };
 }
