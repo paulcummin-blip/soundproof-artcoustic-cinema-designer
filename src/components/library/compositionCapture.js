@@ -252,11 +252,13 @@ function waitForFrameAssets(frame) {
         }, { once: true });
       });
 
+    console.info('[SpeakerCaptureTrace] waiting for document');
     settled
-      .then(() => waitForFrameFonts(win))
-      .then(() => loadFrameFaces(win))
-      .then(() => waitForFrameFonts(win))
+      .then(() => { console.info('[SpeakerCaptureTrace] document settled; fonts'); return waitForFrameFonts(win); })
+      .then(() => { console.info('[SpeakerCaptureTrace] loading faces'); return loadFrameFaces(win); })
+      .then(() => { console.info('[SpeakerCaptureTrace] faces loaded; fonts'); return waitForFrameFonts(win); })
       .then(() => {
+        console.info('[SpeakerCaptureTrace] fonts ready; images');
         const images = Array.from(win.document?.images || []);
         const pending = images.filter((img) => !img.complete);
         if (pending.length === 0) return Promise.resolve();
@@ -282,7 +284,8 @@ function waitForFrameAssets(frame) {
           resolve();
           return;
         }
-        raf(() => raf(() => setTimeout(resolve, 60)));
+        console.info('[SpeakerCaptureTrace] awaiting frame animation');
+        raf(() => { console.info('[SpeakerCaptureTrace] first animation'); raf(() => { console.info('[SpeakerCaptureTrace] second animation'); setTimeout(resolve, 60); }); });
       })
       .catch(() => resolve());
   });
