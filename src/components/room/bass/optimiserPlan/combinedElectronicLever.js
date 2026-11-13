@@ -9,6 +9,7 @@ export function buildCombinedElectronicLever({winner,instances,baselineResult,id
   const tuning=(winner.appliedTuning||[]).map(t=>{
     const s=before.find(i=>i.id===t.sourceId);
     return {subId:t.sourceId,label:t.sourceId,
+      changed:!!s && (s.delayMs!==t.delayMs || s.gainDb!==t.gainDb || (s.phaseControlDeg??s.phaseAdjust)!==(t.phaseControlDeg??t.phaseAdjust) || s.polarity!==t.polarity),
       fromDelayMs:s?.delayMs??null,toDelayMs:t.delayMs,
       fromGainDb:s?.gainDb??null,toGainDb:t.gainDb,
       fromPhaseDeg:s?.phaseControlDeg??s?.phaseAdjust??null,toPhaseDeg:t.phaseControlDeg??t.phaseAdjust,
@@ -18,7 +19,7 @@ export function buildCombinedElectronicLever({winner,instances,baselineResult,id
     evaluated:true,notEvaluated:false,actionable:proof.valid,identityProof:proof,
     reason:proof.valid?"Complete electronic improvement confirmed.":proof.issues.join(" "),
     sourceCandidateId:winner.candidateId,effect:leverEffectFrom(winner,baselineResult),
-    confirmedCandidate:clone(winner),tuning,changes:tuning,
+    confirmedCandidate:clone(winner),tuning,changes:tuning.filter(t=>t.changed),
     crossover:{before:currentCrossover?clone(currentCrossover):null,after:winner.crossover?clone(winner.crossover):null},
     sourceIdentity:clone(before),candidateOrigin:winner.candidateOrigin,combinedFrom:winner.combinedFrom,
     electronicContext:winner.electronicContext?clone(winner.electronicContext):null,
