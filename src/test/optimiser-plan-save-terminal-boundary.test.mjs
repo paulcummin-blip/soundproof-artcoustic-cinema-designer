@@ -306,9 +306,11 @@ describe("5 · one run publishes once", () => {
   it("writes the run's own record for the publication's outcome, and nothing else", () => {
     const hook = source(RUN_HOOK);
     const writes = hook.match(/^\s+setOptimiserPlanAuthority\(/gm) || [];
-    // The save, the terminal authority, and ONE further write for the secondary
-    // publication's outcome.
-    assert.equal(writes.length, 3);
+    // The save, the terminal authority, ONE further write for the secondary
+    // publication's outcome, and the save-failure fallback that overlays a
+    // PLAN_SAVE_FAILED failure onto the completed evidence when the version
+    // save is not acknowledged.
+    assert.equal(writes.length, 4);
   });
 });
 
