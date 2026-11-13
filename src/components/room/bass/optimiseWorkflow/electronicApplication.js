@@ -64,6 +64,9 @@ export function prepareElectronicCandidate({candidate,context,inputIdentity,cach
   if (!nonempty(inputIdentity) || !nonempty(cacheKey) ||
       candidate.inputIdentity !== inputIdentity || candidate.baselineCacheKey !== cacheKey ||
       stable(candidate.electronicContext) !== stable(context)) return {ok:false,reason:"The design changed after confirmation."};
+  if (!context.instances.length || context.instances.some(s => s.enabled !== false &&
+      (!nonempty(s.model) || !finite(s.position?.x) || !finite(s.position?.y) ||
+       !finite(s.bottomHeightM) || !finite(s.rotationDeg)))) return {ok:false,reason:"Incomplete installed geometry."};
   const tuning = candidate.appliedTuning;
   const crossover = candidate.crossover || currentCrossover;
   if (!completeTuning(tuning,context.instances) || !completeCrossover(crossover) ||
@@ -135,7 +138,8 @@ export async function executeElectronicTransaction({before,after,receipt,persist
   const ensure=()=>{if(!guard())throw new Error("The design changed; ADI stopped applying settings.");};
   try {
     ensure();
-    await persist(after,{...receipt,status:"verifying"}); wrote=true;
+    wrote=true;
+    await persist(after,{...receipt,status:"verifying"});
     ensure();
     if(!settingsEqual(await readback(),after))throw new Error("Saved settings did not match the confirmed candidate.");
     commit(after,{...receipt,status:"verifying"});
