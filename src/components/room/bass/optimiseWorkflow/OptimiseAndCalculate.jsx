@@ -294,7 +294,8 @@ export default function OptimiseAndCalculate({
     });
   };
   const restoreElectronicSettings=async()=>{
-    const receipt=liveElectronicRef.current.appState?.splConfig?.bassAdiReceipt;
+    const currentReceipt=liveElectronicRef.current.appState?.splConfig?.bassAdiReceipt;
+    const receipt=currentReceipt?.status==="verified"||currentReceipt?.status==="verifying"?currentReceipt:currentReceipt?.restoreReceipt;
     if(!receipt?.before || !receipt?.after || isBusy)return;
     try{
       phaseRef.current="applying";setApplying(projectId,versionId);
@@ -1030,10 +1031,13 @@ export default function OptimiseAndCalculate({
       }else{
         const noBenefit=result.status==="complete" && !selection.winner && !rejected.length &&
           !(selection.evaluationIssues||[]).length;
-        if(noBenefit){
+        {
           const settings={instances:subInstancesRef.current,crossover:currentCrossover};
           const fingerprint=sharedRef.current.cacheKey;
-          const receipt={schemaVersion:1,status:"no-changes",runId:activeRun.runId,projectId,versionId,
+          const previousReceipt=liveElectronicRef.current.appState?.splConfig?.bassAdiReceipt;
+          const receipt={schemaVersion:1,status:noBenefit?"no-changes":"not-applied",runId:activeRun.runId,projectId,versionId,
+            diagnostics:{rejected,eligibleCount:eligible.length,candidateCount:candidates.length},
+            restoreReceipt:previousReceipt?.status==="verified"?previousReceipt:previousReceipt?.restoreReceipt??null,
             resultFingerprint:fingerprint,before:settings,after:settings,changes:[],
             beforeLevels:resultLevels(baseline),afterLevels:resultLevels(baseline)};
           await withElectronicPersistence(projectId,versionId,async io=>{
