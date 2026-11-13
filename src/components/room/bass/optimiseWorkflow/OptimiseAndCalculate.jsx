@@ -252,10 +252,14 @@ export default function OptimiseAndCalculate({
         const live=liveElectronicRef.current;
         if(!io.current() || live.projectId!==projectId || live.versionId!==versionId || phaseRef.current==="cancelled")return false;
         const context=electronicContextFromUi(live);
-        return stable(physicalContext(context))===stable(receipt.physicalContext);
+        return stable(physicalContext(context))===stable(receipt.physicalContext) &&
+          (settingsEqual({instances:live.subwooferInstances,crossover:live.appState?.splConfig?.crossover},before) ||
+           settingsEqual({instances:live.subwooferInstances,crossover:live.appState?.splConfig?.crossover},after));
       };
       const commit=(settings,record)=>{
         if(!io.current())return;
+        const liveSettings={instances:liveElectronicRef.current.subwooferInstances,crossover:liveElectronicRef.current.appState?.splConfig?.crossover};
+        if(!settingsEqual(liveSettings,before) && !settingsEqual(liveSettings,after))return;
         unstable_batchedUpdates(()=>{
           commitInstances(settings.instances);
           liveElectronicRef.current.appState.updateGlobalSpl({crossover:settings.crossover,bassAdiReceipt:record});
@@ -293,10 +297,9 @@ export default function OptimiseAndCalculate({
     if(!receipt?.before || !receipt?.after || isBusy)return;
     try{
       phaseRef.current="applying";setApplying(projectId,versionId);
-      const restored=await performElectronicUpdate({...receipt,runId:receipt.runId+":restore",
+      await performElectronicUpdate({...receipt,operation:"restore",runId:receipt.runId+":restore",
         before:receipt.after,after:receipt.before,beforeResult:receipt.expectedResult,expectedResult:receipt.beforeResult,
         beforeLevels:receipt.afterLevels,changes:changedSettings(receipt.after,receipt.before)});
-      liveElectronicRef.current.appState.updateGlobalSpl({bassAdiReceipt:{...restored,status:"restored"}});
       setComplete(projectId,versionId,{},null,false);
     }catch(error){setWorkflowError(projectId,versionId,error.message);}
     finally{phaseRef.current="idle";}
