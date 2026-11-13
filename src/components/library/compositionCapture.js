@@ -24,6 +24,7 @@
  */
 
 import { jsPDF } from 'jspdf';
+import { waitForCapturePaint, withCaptureDeadline } from './captureTiming';
 import { pageCaptureFailure } from '@/components/library/capturePagePng';
 import {
   captureViewport,
@@ -252,13 +253,11 @@ function waitForFrameAssets(frame) {
         }, { once: true });
       });
 
-    console.info('[SpeakerCaptureTrace] waiting for document');
     settled
-      .then(() => { console.info('[SpeakerCaptureTrace] document settled; fonts'); return waitForFrameFonts(win); })
-      .then(() => { console.info('[SpeakerCaptureTrace] loading faces'); return loadFrameFaces(win); })
-      .then(() => { console.info('[SpeakerCaptureTrace] faces loaded; fonts'); return waitForFrameFonts(win); })
+      .then(() => waitForFrameFonts(win))
+      .then(() => loadFrameFaces(win))
+      .then(() => waitForFrameFonts(win))
       .then(() => {
-        console.info('[SpeakerCaptureTrace] fonts ready; images');
         const images = Array.from(win.document?.images || []);
         const pending = images.filter((img) => !img.complete);
         if (pending.length === 0) return Promise.resolve();
@@ -279,13 +278,9 @@ function waitForFrameAssets(frame) {
         });
       })
       .then(() => {
-        const raf = win.requestAnimationFrame?.bind(win);
-        if (!raf) {
-          resolve();
-          return;
-        }
-        console.info('[SpeakerCaptureTrace] awaiting frame animation');
-        raf(() => { console.info('[SpeakerCaptureTrace] first animation'); raf(() => { console.info('[SpeakerCaptureTrace] second animation'); setTimeout(resolve, 60); }); });
+        // Offscreen iframe animation can be suspended in the Build preview.
+        // Assets have settled; layout reads below force the final measurement.
+        return waitForCapturePaint(win).then(resolve);
       })
       .catch(() => resolve());
   });
@@ -373,7 +368,11 @@ function overflowElementOf(page, availableMm) {
  *   capture validates them and never makes new page-allocation decisions.
  * @returns {Promise<{blob: Blob, pageCount: number}>}
  */
-export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null }) {
+export function captureCompositionToPdf(input) {
+  return withCaptureDeadline((signal) => captureComposition(input, signal));
+}
+
+async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null }, signal) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
@@ -386,9 +385,16 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
 
   // Installed for the duration of this capture only, and always restored.
   let gradientGuard = null;
+  const cleanup = () => {
+    gradientGuard?.restore();
+    gradientGuard = null;
+    frame.remove();
+  };
+  signal.addEventListener('abort', cleanup, { once: true });
 
   try {
     await waitForFrameAssets(frame);
+    signal.throwIfAborted();
 
     const scope = frame.contentDocument;
 
@@ -502,6 +508,7 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       }),
     });
 
+    signal.throwIfAborted();
     let pageCount = 0;
     for (let index = 0; index < pageRasters.length; index += 1) {
       const raster = pageRasters[index];
@@ -588,6 +595,7 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       },
     };
   } finally {
+    signal.removeEventListener('abort', cleanup);
     if (gradientGuard) {
       try {
         gradientGuard.restore();
