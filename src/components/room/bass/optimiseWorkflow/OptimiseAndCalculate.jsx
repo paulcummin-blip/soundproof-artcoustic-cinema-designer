@@ -977,6 +977,7 @@ export default function OptimiseAndCalculate({
       const context=electronicContextFromUi(liveElectronicRef.current);
       const currentCrossover=liveElectronicRef.current.appState?.splConfig?.crossover;
       const candidates=[
+        ...(selection.electronicCandidates||[]),
         selection.winner,selection.integrationRecommendation,selection.combinedResult,
         selection.calibrationResult,selection.gainResult,selection.phaseResult,
         ...(selection.calibrationDiagnostics?.options||[]).map(o=>o.canonical),
