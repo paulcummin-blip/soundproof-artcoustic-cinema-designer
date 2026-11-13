@@ -286,7 +286,7 @@ export default function OptimiseAndCalculate({
         const expected=restoring?receipt.beforeResult:receipt.expectedResult;
         const tuning=restoring?receipt.beforeEffectiveTuning:receipt.expectedEffectiveTuning;
         if(!Array.isArray(tuning)||!tuning.length)return false;
-        if(!recommendationSettingsMatch(state.authoritative,{crossover:settings.crossover,tuning}) ||
+        if(!recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning}) ||
            !recommendationResultMatches(state.completedBassAuthority,expected))return false;
         return {fingerprint:state.cacheKey,levels:resultLevels(extractAuthorityForComparison(state.completedBassAuthority))};
       };
@@ -987,7 +987,7 @@ export default function OptimiseAndCalculate({
         if(seen.has(candidate.candidateId))continue;
         seen.add(candidate.candidateId);
         const prepared=prepareElectronicCandidate({candidate,context,
-          inputIdentity:result.inputIdentityAuthority,cacheKey:sharedRef.current?.cacheKey,currentCrossover});
+          inputIdentity:result.inputIdentityAuthority,cacheKey:sharedRef.current?.cacheKey,currentCrossover,currentEffectiveCrossover:sharedRef.current.authoritative?.crossover});
         if(!prepared.ok){rejected.push(prepared.reason);continue;}
         const valid=validateCandidateForRun(candidate,{seats:seatingPositions,
           sourceIds:context.instances.filter(s=>s.enabled!==false).map(s=>s.id),
@@ -1022,7 +1022,7 @@ export default function OptimiseAndCalculate({
           after:{instances:prepared.instances,crossover:prepared.crossover},
           beforeResult:comparisonReceipt(baseline),expectedResult:comparisonReceipt(candidate),
           beforeEffectiveTuning:clone(sharedRef.current.authoritative.sources.map(s=>({sourceId:s.id,...s.tuning}))),
-          expectedEffectiveTuning:clone(candidate.appliedTuning),
+          expectedEffectiveTuning:clone(candidate.appliedTuning.map(t=>({...t,phaseControlDeg:t.phaseControlDeg??t.phaseAdjust}))),
           beforeLevels:resultLevels(baseline),changes:changedSettings(prepared.before,prepared),
         };
         await performElectronicUpdate(receipt);
