@@ -169,7 +169,7 @@ test("Combined electronic apply produces complete instances + crossover", () => 
   const active = result.instances.filter((i) => i.enabled !== false);
   assert.equal(active[0].delayMs, 3.5, "delay must be applied");
   assert.equal(active[0].gainDb, -1.0, "gain must be applied");
-  assert.equal(active[0].tuningSource, "combined-electronic", "provenance must be stamped");
+  assert.equal(active[0].tuningSource, "v2-optimised", "provenance must be stamped");
   assert.equal(active[1].polarity, -1, "polarity must be applied");
 });
 
@@ -217,13 +217,19 @@ test("Combined electronic apply refuses when identity proof failed", () => {
 
 test("Combined electronic undo restores previous tuning and crossover", () => {
   const winner = makeWinner();
-  const instances = makeInstances([{ delayMs: 3.5, gainDb: -1.0, phaseControlDeg: 45, polarity: 1, tuningSource: "v2-optimised" }, { delayMs: 0, gainDb: 0, phaseControlDeg: 0, polarity: -1, tuningSource: "v2-optimised" }]);
-  const lever = buildCombinedElectronicLever({ winner, instances, baselineResult, identity });
-  const result = buildCombinedElectronicUndo({ lever, instances });
+  // Build the lever from NEUTRAL instances so `from` values are the pre-apply state.
+  const neutralInstances = makeInstances();
+  const previousCrossover = { frequencyHz: 80, speakerHpSlopeDbPerOct: 24, subwooferLpSlopeDbPerOct: 24, linkFrequencies: true, subwooferFrequencyHz: 80 };
+  const lever = buildCombinedElectronicLever({ winner, instances: neutralInstances, baselineResult, identity, currentCrossover: previousCrossover });
+  // Apply first, then undo from the applied instances.
+  const applyResult = buildCombinedElectronicApply({ lever, instances: neutralInstances, currentCrossover: previousCrossover, identity });
+  assert.equal(applyResult.ok, true);
+  const result = buildCombinedElectronicUndo({ lever, instances: applyResult.instances });
 
   assert.equal(result.ok, true);
   assert.ok(result.instances);
-  assert.ok(result.crossover);
+  assert.ok(result.crossover, "crossover must be restored from before");
+  assert.equal(result.crossover.frequencyHz, 80, "crossover frequency must be restored");
   const active = result.instances.filter((i) => i.enabled !== false);
   assert.equal(active[0].delayMs, 0, "delay must be restored");
   assert.equal(active[0].gainDb, 0, "gain must be restored");
@@ -274,24 +280,21 @@ test("leverIsOfferable accepts a combined electronic lever with valid identity p
   const winner = makeWinner();
   const instances = makeInstances();
   const lever = buildCombinedElectronicLever({ winner, instances, baselineResult, identity });
-  // Provide a baseline with a limiting metric so the verdict resolves.
-  const baseline = { p19Level: 2, p20Level: 2 };
-  assert.equal(leverIsOfferable(lever, baseline), true);
+  assert.equal(leverIsOfferable(lever, baselinePlan), true);
 });
 
 test("leverIsOfferable rejects a combined electronic lever with failed identity proof", () => {
   const winner = makeWinner({ inputIdentity: "fp-design-old" });
   const instances = makeInstances();
   const lever = buildCombinedElectronicLever({ winner, instances, baselineResult, identity: { designFingerprint: "fp-design-current" } });
-  const baseline = { p19Level: 2, p20Level: 2 };
-  assert.equal(leverIsOfferable(lever, baseline), false);
+  assert.equal(leverIsOfferable(lever, baselinePlan), false);
 });
 
 test("resolvePlanActionability returns actionable when combined electronic lever is offerable", () => {
   const winner = makeWinner();
   const instances = makeInstances();
   const lever = buildCombinedElectronicLever({ winner, instances, baselineResult, identity });
-  const plan = { levers: { [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: lever }, baseline: { p19Level: 2, p20Level: 2 } };
+  const plan = { levers: { [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: lever }, baseline: baselinePlan };
   const result = resolvePlanActionability({ plan, selection: { winner } });
   assert.equal(result.actionable, true);
   assert.ok(result.offerableLevers.includes(OPTIMISER_LEVER.COMBINED_ELECTRONIC));
@@ -301,7 +304,7 @@ test("resolvePlanActionability returns NON_ACTIONABLE_ELECTRONIC when identity p
   const winner = makeWinner({ inputIdentity: "fp-design-old" });
   const instances = makeInstances();
   const lever = buildCombinedElectronicLever({ winner, instances, baselineResult, identity: { designFingerprint: "fp-design-current" } });
-  const plan = { levers: { [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: lever }, baseline: { p19Level: 2, p20Level: 2 } };
+  const plan = { levers: { [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: lever }, baseline: baselinePlan };
   const result = resolvePlanActionability({ plan, selection: { winner } });
   assert.equal(result.actionable, false);
   assert.equal(result.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_ELECTRONIC);

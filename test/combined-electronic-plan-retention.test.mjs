@@ -249,7 +249,9 @@ describe("Combined electronic lever builder", () => {
     assert.equal(lever.lever, OPTIMISER_LEVER.COMBINED_ELECTRONIC);
     assert.equal(lever.evaluated, true);
     assert.equal(lever.evidenceStatus, OPTIMISER_LEVER_EVIDENCE.EVALUATED);
-    assert.equal(lever.actionable, false);
+    // Identity proof passes (same fingerprint, same geometry), so the lever IS
+    // actionable — the combined electronic apply path can reproduce it.
+    assert.equal(lever.actionable, true);
     assert.ok(lever.effect);
     assert.ok(lever.crossover);
     assert.ok(Array.isArray(lever.tuning));
@@ -316,11 +318,12 @@ describe("Combined electronic plan retention", () => {
     assert.ok(plan);
     assert.equal(plan.planVersion, OPTIMISER_PLAN_VERSION);
     assert.ok(plan.levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC]);
-    assert.equal(plan.levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC].actionable, false);
+    // Identity proof passes, so the lever is actionable (available for Apply).
+    assert.equal(plan.levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC].actionable, true);
     assert.ok(plan.combined, "combined block should be populated");
   });
 
-  it("classifies a combined electronic winner as NON_ACTIONABLE_ELECTRONIC, not EVALUATION_INCOMPLETE", () => {
+  it("classifies a combined electronic winner with sub-materiality improvement as NO_USEFUL_IMPROVEMENT, not EVALUATION_INCOMPLETE", () => {
     const winner = makeCombinedElectronicWinner();
     const selection = makeSelection({ winner });
     const plan = buildOptimiserPlan({
@@ -329,8 +332,11 @@ describe("Combined electronic plan retention", () => {
       seatingPositions: [], roomDims: { widthM: 4, lengthM: 6, heightM: 2.4 },
     });
     const actionability = resolvePlanActionability({ plan, selection });
+    // The winner's deltas are below the 1 dB materiality threshold, so the lever
+    // is actionable (identity proof passes) but not offerable — the run is
+    // NO_USEFUL_IMPROVEMENT, never EVALUATION_INCOMPLETE.
     assert.equal(actionability.actionable, false);
-    assert.equal(actionability.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_ELECTRONIC);
+    assert.notEqual(actionability.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE);
     assert.ok(actionability.reason);
     assert.equal(actionability.offerableLevers.length, 0);
   });
@@ -359,13 +365,15 @@ describe("Combined electronic plan retention", () => {
       plan, selection, identity: IDENTITY,
     });
     assert.ok(runEvidence);
-    assert.equal(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_ELECTRONIC);
+    // Sub-materiality improvement with passing identity proof: the lever is
+    // actionable but not offerable, so the outcome is NO_USEFUL_IMPROVEMENT.
+    assert.equal(runEvidence.terminalOutcome, OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT);
     assert.ok(runEvidence.combinedElectronicResult);
     assert.equal(runEvidence.combinedElectronicResult.candidateId, "combined-integration-0");
     assert.ok(runEvidence.combinedElectronicResult.crossover);
   });
 
-  it("resolves the canonical terminal outcome as non_actionable_electronic", () => {
+  it("resolves the canonical terminal outcome as no_useful_improvement for sub-materiality winner", () => {
     const winner = makeCombinedElectronicWinner();
     const selection = makeSelection({ winner });
     const plan = buildOptimiserPlan({
@@ -375,17 +383,39 @@ describe("Combined electronic plan retention", () => {
     });
     const actionability = resolvePlanActionability({ plan, selection });
     const canonical = resolveCanonicalTerminalOutcome({ actionability });
-    assert.equal(canonical, "non_actionable_electronic");
+    assert.equal(canonical, "no_useful_improvement");
   });
 });
 
-describe("leverIsOfferable rejects combined electronic", () => {
-  it("never offers a combined electronic lever for automatic Apply", () => {
+describe("leverIsOfferable gates combined electronic by materiality", () => {
+  it("does not offer a sub-materiality combined electronic lever", () => {
     const winner = makeCombinedElectronicWinner();
     const lever = buildCombinedElectronicLever({
       winner, instances: makeInstances(),
       baselineResult: makeBaselineResult(), identity: IDENTITY,
     });
+    assert.equal(leverIsOfferable(lever, makeBaselineResult()), false);
+  });
+
+  it("offers an above-materiality combined electronic lever with passing identity proof", () => {
+    // Winner improves P20 by > 1 dB (4.71 → 3.0) and P19 by > 1 dB (4.5 → 3.0).
+    const winner = makeCombinedElectronicWinner({ p20: 3.0, p20Level: "L3", p19: 3.0, p19Level: "L2" });
+    const lever = buildCombinedElectronicLever({
+      winner, instances: makeInstances(),
+      baselineResult: makeBaselineResult(), identity: IDENTITY,
+    });
+    assert.equal(lever.identityProof.valid, true);
+    assert.equal(lever.actionable, true);
+    assert.equal(leverIsOfferable(lever, makeBaselineResult()), true);
+  });
+
+  it("does not offer a combined electronic lever with failed identity proof", () => {
+    const winner = makeCombinedElectronicWinner({ inputIdentity: "stale-fingerprint" });
+    const lever = buildCombinedElectronicLever({
+      winner, instances: makeInstances(),
+      baselineResult: makeBaselineResult(), identity: IDENTITY,
+    });
+    assert.equal(lever.actionable, false);
     assert.equal(leverIsOfferable(lever, makeBaselineResult()), false);
   });
 });
