@@ -23,6 +23,10 @@ import {
 } from "./optimiserPlanConstants.js";
 import { normaliseCanonicalPolarity, resolveLeverMatch, resolveSeatingMatch } from "./optimiserPlanMatching.js";
 import { PLACEMENT_THEORETICAL_NOTE } from "./placementMoveAuthority.js";
+import {
+  COMBINED_ELECTRONIC_APPLY_BLOCK,
+  COMBINED_ELECTRONIC_APPLY_BLOCK_MESSAGE,
+} from "./combinedElectronicApply.js";
 
 /** Why a lever cannot be applied on its own. */
 export const LEVER_APPLY_BLOCK = Object.freeze({
@@ -72,6 +76,7 @@ export const LEVER_APPLY_LABEL = Object.freeze({
   [OPTIMISER_LEVER.DELAY]: "Apply delay",
   [OPTIMISER_LEVER.GAIN]: "Apply gain",
   [OPTIMISER_LEVER.POLARITY]: "Apply polarity",
+  [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: "Apply crossover & tuning",
   [OPTIMISER_LEVER.SEATING]: "Move Seating",
 });
 
@@ -80,6 +85,7 @@ export const LEVER_UNDO_LABEL = Object.freeze({
   [OPTIMISER_LEVER.DELAY]: "Undo delay",
   [OPTIMISER_LEVER.GAIN]: "Undo gain",
   [OPTIMISER_LEVER.POLARITY]: "Undo polarity",
+  [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: "Restore crossover & tuning",
   [OPTIMISER_LEVER.SEATING]: "Restore Seating",
 });
 
@@ -117,6 +123,19 @@ export function resolveLeverApplyState({
   // evidence and its reason; only the offer is withheld.
   if (leverKey === OPTIMISER_LEVER.PLACEMENT && lever.practical === false) {
     return blocked(LEVER_APPLY_BLOCK.IMPRACTICAL);
+  }
+  // Combined electronic: actionable only when identity proof passed. A lever
+  // whose identity could not be proven (stale fingerprint, geometry mismatch,
+  // incomplete payload) is retained as evidence but never offered for Apply.
+  if (leverKey === OPTIMISER_LEVER.COMBINED_ELECTRONIC) {
+    if (lever.identityProof?.valid !== true) {
+      return blocked(LEVER_APPLY_BLOCK.NOT_EVALUATED);
+    }
+    if (!lever.crossover?.after || !Array.isArray(lever.tuning) || lever.tuning.length === 0) {
+      return blocked(LEVER_APPLY_BLOCK.NO_CHANGES);
+    }
+    if (applied) return blocked(LEVER_APPLY_BLOCK.ALREADY_APPLIED);
+    return { canApply: true, code: null, reason: null };
   }
   if (lever.evaluated !== true || lever.notEvaluated === true || !lever.effect) {
     return blocked(LEVER_APPLY_BLOCK.NOT_EVALUATED);

@@ -74,9 +74,11 @@ export const OPTIMISER_LEVER = Object.freeze({
   /**
    * Combined crossover + electronic tuning. A canonically confirmed joint
    * change (crossover frequency/slopes + per-source delay/gain/phase/polarity)
-   * evaluated on the installed geometry. Crossover apply is not yet supported,
-   * so this lever is always actionable: false — it is retained for diagnostics
-   * and manual application, never offered for automatic Apply.
+   * evaluated on the installed geometry. Actionable when identity proof passes
+   * (same geometry, current fingerprint, complete payload, no physical change):
+   * the combined electronic apply path writes both crossover and tuning in one
+   * coherent update. When identity proof fails, actionable is false and the
+   * lever is retained for diagnostics only — never offered for automatic Apply.
    */
   COMBINED_ELECTRONIC: "combined_electronic",
   /**
@@ -160,11 +162,13 @@ export const OPTIMISER_TERMINAL_OUTCOME = Object.freeze({
   NON_ACTIONABLE_WINNER: "non_actionable_winner",
   /**
    * A combined crossover + electronic tuning winner WAS canonically confirmed,
-   * but crossover settings cannot be applied automatically yet. The improvement
-   * is real and the evidence is retained for diagnostics and manual application.
-   * Distinct from NO_USEFUL_IMPROVEMENT (no improvement found) and
-   * EVALUATION_INCOMPLETE (the run failed): a valid completed search found a
-   * non-actionable electronic result.
+   * but its identity could not be proven against the current design (stale
+   * fingerprint, geometry mismatch, incomplete payload, or a physical change
+   * marker). The improvement is real and the evidence is retained for
+   * diagnostics and manual application. Distinct from NO_USEFUL_IMPROVEMENT (no
+   * improvement found) and EVALUATION_INCOMPLETE (the run failed): a valid
+   * completed search found a non-actionable electronic result. When identity
+   * proof DOES pass, the lever is actionable and this outcome does not apply.
    */
   NON_ACTIONABLE_ELECTRONIC: "non_actionable_electronic",
   EVALUATION_INCOMPLETE: "evaluation_incomplete",

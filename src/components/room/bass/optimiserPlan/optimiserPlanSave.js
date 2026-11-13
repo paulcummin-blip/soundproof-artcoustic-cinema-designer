@@ -31,9 +31,9 @@ import {
   buildOptimiserRunEvidence,
 } from "./buildOptimiserRunEvidence.js";
 
-/** A combined electronic winner was confirmed but crossover apply is not yet supported. */
+/** A combined electronic winner was confirmed but its identity could not be proven. */
 export const NON_ACTIONABLE_ELECTRONIC_REASON =
-  "A combined crossover and electronic tuning improvement was confirmed, but crossover settings cannot be applied automatically yet. Review the evaluated settings in Technical Details and apply them manually in your processor.";
+  "A combined crossover and electronic tuning improvement was confirmed, but it could not be verified against the current design. Review the evaluated settings in Technical Details and apply them manually in your processor.";
 
 /** The winning candidate's change was lost before it was persisted. */
 export const WINNING_CHANGE_NOT_RETAINED_REASON =
@@ -90,9 +90,12 @@ function evaluationIssueReason(selection) {
 export function leverIsOfferable(lever, baseline) {
   if (!lever || lever.evaluated !== true) return false;
   if (lever.notEvaluated === true || !lever.effect) return false;
-  // A combined electronic lever is never offered for automatic Apply: crossover
-  // apply is not yet supported, and a partial apply (delay/gain/phase/polarity
-  // without crossover) would not reproduce the confirmed result.
+  // A combined electronic lever is offered for Apply ONLY when its identity
+  // proof passed (same geometry, current fingerprint, complete payload, no
+  // physical change). When proof failed, actionable is false and the lever
+  // is retained as evidence — never offered for automatic Apply, because a
+  // partial apply (tuning without crossover, or against a different geometry)
+  // would not reproduce the confirmed result.
   if (lever.actionable === false) return false;
   const changes = Array.isArray(lever.changes) ? lever.changes : [];
   if (changes.length === 0) return false;
@@ -180,11 +183,15 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
     };
   }
 
-  // A combined electronic winner was confirmed but crossover apply is not yet
-  // supported. This is NOT "no useful improvement" (the improvement is real) and
-  // NOT "evaluation incomplete" (the search completed). The dedicated terminal
-  // outcome states the distinction so the panel never says "no improvement
-  // found" for a run that DID find a confirmed electronic improvement.
+  // A combined electronic winner was confirmed but its identity could not be
+  // proven against the current design (stale fingerprint, geometry mismatch,
+  // incomplete payload, or a physical change marker). This is NOT "no useful
+  // improvement" (the improvement is real) and NOT "evaluation incomplete" (the
+  // search completed). The dedicated terminal outcome states the distinction
+  // so the panel never says "no improvement found" for a run that DID find a
+  // confirmed electronic improvement.
+  // When identity proof DID pass, the lever is actionable and is included in
+  // the offerable levers above — it is not a terminal outcome.
   const combinedElectronic = levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC];
   if (combinedElectronic && combinedElectronic.actionable === false) {
     const identityIssues = combinedElectronic.identityProof?.issues;

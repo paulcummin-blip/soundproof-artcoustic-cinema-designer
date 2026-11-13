@@ -495,11 +495,20 @@ export function buildOptimiserPlan({
   // separate delay-only candidate). Without this lever, a combined electronic
   // winner with no material individual lever makes the plan return null — the
   // run is then misclassified as "winning change not retained."
-  // The lever is always actionable: false (crossover apply is not yet
-  // supported), so it is never offered for automatic Apply. It retains the full
-  // evidence for diagnostics and a future crossover-aware apply path.
+  // The lever is actionable when identity proof passes (same geometry,
+  // current fingerprint, complete payload, no physical change): the combined
+  // electronic apply path can reproduce the complete configuration. When proof
+  // fails, actionable is false and the lever is retained for diagnostics.
   const combinedElectronic = buildCombinedElectronicLever({
     winner, instances, baselineResult, identity,
+    currentCrossover: null,
+    seatingPositions,
+    rspAuthority: {
+      rspMode: null,
+      manualRspY_m: null,
+      manualRspX_m: null,
+      designated_rsp_seat_id: null,
+    },
   });
   if (combinedElectronic) levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC] = combinedElectronic;
 
