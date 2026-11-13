@@ -251,6 +251,7 @@ export default function OptimiseAndCalculate({
       const guard=()=>{
         const live=liveElectronicRef.current;
         if(!io.current() || live.projectId!==projectId || live.versionId!==versionId || phaseRef.current==="cancelled")return false;
+        if(receipt.operation!=="restore" && getLatestOptimiserRun(projectId,versionId)?.runId!==receipt.runId)return false;
         const context=electronicContextFromUi(live);
         return stable(physicalContext(context))===stable(receipt.physicalContext) &&
           (settingsEqual({instances:live.subwooferInstances,crossover:live.appState?.splConfig?.crossover},before) ||
