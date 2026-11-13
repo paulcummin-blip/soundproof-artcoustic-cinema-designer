@@ -7,7 +7,7 @@ export default function WhatAdiDid({receipt,instances,crossover,fingerprint,auth
   const verified=matches && authorityCurrent && receipt.status==="verified";
   const noChanges=matches && authorityCurrent && receipt.status==="no-changes";
   const metrics=[["p19","P19"],["primary","P20 Primary"],["secondary","P20 Secondary"]];
-  let message=busy?"Checking the best result…":verified?"Electronic adjustments saved and verified.":noChanges?"No changes needed":
+  let message=busy?"Checking the best result…":verified?(receipt.operation==="restore"?"Previous settings restored and verified.":"Electronic adjustments saved and verified."):noChanges?"No changes needed":
     receipt?.status==="restored"?"Previous settings restored.":receipt?.status==="verifying"?"Verification incomplete. Previous settings are available for restoration.":
     receipt?"Design changed. Run ADI to check this design.":"Run ADI to check electronic improvements.";
   return <section aria-label="What ADI did" className="rounded-xl border border-[#E6E5E2] bg-white p-5 space-y-4 text-[#262626]">
@@ -25,7 +25,7 @@ export default function WhatAdiDid({receipt,instances,crossover,fingerprint,auth
     </div>}
     <div className="flex gap-4 text-[12px]">
       <button type="button" disabled={busy||disabled} onClick={onRun} className="font-medium disabled:opacity-40">{receipt?"Run ADI again":"Optimise bass"}</button>
-      {(verified||receipt?.status==="verifying") && receipt?.before && <button type="button" disabled={busy} onClick={onRestore} className="text-[#6B6B68] disabled:opacity-40">Restore previous settings</button>}
+      {(verified||receipt?.status==="verifying") && receipt?.operation!=="restore" && receipt?.before && <button type="button" disabled={busy} onClick={onRestore} className="text-[#6B6B68] disabled:opacity-40">Restore previous settings</button>}
     </div>
     {physical && <aside className="border-t border-[#EEEDEB] pt-3 text-[12px]">
       <p className="font-medium">Physical recommendations</p>
