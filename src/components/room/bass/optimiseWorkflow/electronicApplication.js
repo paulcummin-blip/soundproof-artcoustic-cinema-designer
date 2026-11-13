@@ -41,12 +41,20 @@ export function electronicContext(p) {
     frontOrientation: p.frontOrientation ?? null, rearOrientation: p.rearOrientation ?? null,
     integrationContext: p.integrationContext ?? null,
     rspMode: p.rspMode ?? null, designatedRspSeatId: p.designatedRspSeatId ?? null,
+    manualRspX_m:p.manualRspX_m??null,manualRspY_m:p.manualRspY_m??null,
+    targets:[p.p14TargetBasis??null,p.p14TargetLevel??null,p.p14TargetDb??null,p.p18TargetBasis??null],
   });
 }
 export function electronicContextFromUi({shared,appState,subwooferInstances,roomDims,seatingPositions,frontSubsCfg,rearSubsCfg,amplifierPowerPerSubW}) {
   const a = shared?.authoritative;
   if (!a?.rspPosition || !Array.isArray(subwooferInstances) || !Array.isArray(seatingPositions)) return null;
+  const requested=a.requested||{}, authority=shared.completedBassAuthority||{};
   return electronicContext({
+    p14TargetBasis:requested.p14TargetBasis||authority.p14TargetBasis||"minimum",
+    p14TargetLevel:requested.requestedLevel||requested.selectedP14Level||requested.p14TargetLevel||requested.selectedP14TargetLevel||authority.p14TargetLevel||2,
+    p14TargetDb:requested.selectedP14TargetDb||authority.p14TargetDb||117,
+    p18TargetBasis:requested.p18TargetBasis||requested.selectedP18TargetBasis||authority.p18TargetBasis||"minimum",
+    manualRspX_m:appState?.manualRspX_m??null,manualRspY_m:appState?.manualRspY_m??null,
     subwooferInstances, roomDims, seatingPositions, rspPosition:a.rspPosition,
     selectedSubModel:frontSubsCfg?.model || rearSubsCfg?.model || null,
     amplifierPowerPerSubW,
