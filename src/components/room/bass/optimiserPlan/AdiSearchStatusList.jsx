@@ -75,12 +75,18 @@ export default function AdiSearchStatusList({ searchStatus = null, hierarchyGate
                 <span className="font-medium text-[#3E4349]">
                   {hierarchyGateDiagnostics.placementGate ? "Open" : "Closed"}
                 </span>
+                {hierarchyGateDiagnostics.placementExclusionReason
+                  ? ` (not eligible: ${hierarchyGateDiagnostics.placementExclusionReason})`
+                  : ""}
               </div>
               <div>
                 Seating gate:{" "}
                 <span className="font-medium text-[#3E4349]">
                   {hierarchyGateDiagnostics.seatingGate ? "Open" : "Closed"}
                 </span>
+                {hierarchyGateDiagnostics.seatingExclusionReason
+                  ? ` (not eligible: ${hierarchyGateDiagnostics.seatingExclusionReason})`
+                  : ""}
               </div>
               {hierarchyGateDiagnostics.electronicLevels && (
                 <div>

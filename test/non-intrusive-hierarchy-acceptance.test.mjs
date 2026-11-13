@@ -14,6 +14,7 @@ import { test } from "node:test";
 import fs from "node:fs";
 import {
   readEscalationLevels,
+  hasMaterialLimitation,
   isPhysicalPlacementEligible,
   isSeatingEligible,
   electronicsCompleted,
@@ -43,36 +44,47 @@ function physicalResult({ p19Level, p20Primary, p20Secondary, p14Level = 2, p14D
 const ENGINE = "src/components/room/bass/improveBassV2/improveBassV2Engine.js";
 const engineSource = fs.readFileSync(ENGINE, "utf8");
 
-// 1 — Electronics raise P19 above L1: no physical search.
-test("1: P19 RSP above L1 blocks placement gate", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), false);
+// 1 — A single poor group permits placement even when others perform well.
+test("1: P19 L1 with good P20 permits placement gate", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 4, p20Secondary: 4 })), true);
 });
 
-// 2 — Electronics raise only Primary P20 above L1: no physical search.
-test("2: P20 Primary above L1 blocks placement gate", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), false);
+// 2 — Primary P20 L1 with strong others permits placement gate.
+test("2: P20 Primary L1 with strong P19 permits placement gate", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 1, p20Secondary: 4 })), true);
 });
 
-// 3 — Electronics raise only Secondary P20 above L1: no physical search.
-test("3: P20 Secondary above L1 blocks placement gate", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), false);
+// 3 — Secondary P20 L1 with strong others permits placement gate.
+test("3: P20 Secondary L1 with strong others permits placement gate", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 1 })), true);
 });
 
-// 4 — All three remain L1: physical subwoofer placement becomes eligible.
-test("4: all three L1 permits placement gate", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 })), true);
+// 3a — The audit example: P19 L4, Primary P20 L3, Secondary P20 L1 — eligible.
+test("3a: P19 L4, Primary L3, Secondary L1 permits placement gate", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 3, p20Secondary: 1 })), true);
 });
 
-// 5 — Placement raises any metric above L1: seating search remains closed.
-test("5: placement raising any metric above L1 blocks seating gate", () => {
-  assert.equal(isSeatingEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), false);
-  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), false);
-  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), false);
+// 4 — Strong performance across all applicable groups: no physical search.
+test("4: all applicable groups L2+ blocks placement gate", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 4 })), false);
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 2, p20Secondary: 2 })), false);
 });
 
-// 6 — Electronics and placement leave all three L1: seating search eligible.
-test("6: all three still L1 after placement permits seating gate", () => {
-  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 })), true);
+// 5 — A single poor group permits seating even when others perform well.
+test("5: a single L1 group permits seating gate", () => {
+  assert.equal(isSeatingEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 1 })), true);
+  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 4, p20Secondary: 4 })), true);
+});
+
+// 6 — Strong performance across all groups: seating search not eligible.
+test("6: all applicable groups L2+ blocks seating gate", () => {
+  assert.equal(isSeatingEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 4 })), false);
+});
+
+// 6a — hasMaterialLimitation is the single authority both gates consult.
+test("6a: hasMaterialLimitation drives both gates", () => {
+  assert.equal(hasMaterialLimitation(readEscalationLevels(result({ p19Level: 4, p20Primary: 3, p20Secondary: 1 }))), true);
+  assert.equal(hasMaterialLimitation(readEscalationLevels(result({ p19Level: 4, p20Primary: 4, p20Secondary: 4 }))), false);
 });
 
 // 7 — Phase 9B cannot bypass either physical gate (engine wiring).

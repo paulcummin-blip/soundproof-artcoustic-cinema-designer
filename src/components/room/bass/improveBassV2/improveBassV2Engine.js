@@ -55,6 +55,7 @@ import {
   readEscalationLevels,
   isPhysicalPlacementEligible,
   isSeatingEligible,
+  physicalEligibilityReason,
   electronicsCompleted,
   isPhysicalRecommendationAcceptable,
   isPhysicalCandidate,
@@ -1345,13 +1346,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
 
     // ── Non-intrusive-first hierarchy: placement gate ───────────────────
     // Post-calculation subwoofer placement is a LAST RESORT. It is eligible
-    // only when the supported installed-layout electronic levers — phase,
-    // delay, gain AND combined/crossover — have genuinely finished AND the
-    // best confirmed electronic result still leaves P19 RSP, P20 Primary and
-    // P20 Secondary all at L1. If electronics lifted any metric above L1, or
-    // any electronic search (including crossover) is incomplete, the physical
-    // search (global candidates + Stage 11B escalation) is skipped. The
-    // initial Starting Layout search (Stage 1/2) is unaffected.
+    // when the supported installed-layout electronic levers — phase, delay,
+    // gain AND combined/crossover — have genuinely finished AND any applicable
+    // P19 or P20 group still has a material limitation (FAIL or L1). A design
+    // whose every applicable group already performs at L2 or better has no
+    // remaining limitation, so no physical search runs; a single poor group is
+    // enough to permit investigation even when the other parameters perform
+    // well. If any electronic search (including crossover) is incomplete, the
+    // physical search (global candidates + Stage 11B escalation) is skipped.
+    // The initial Starting Layout search (Stage 1/2) is unaffected.
     const electronicPool = funnelCandidates.filter((r) => !isPhysicalCandidate(r));
     const bestElectronicResult = (existingAuthority && electronicPool.length)
       ? (selectConfirmedRecommendations(electronicPool, snapshot, existingAuthority).winner || existingAuthority)
@@ -1362,6 +1365,13 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     });
     const placementGate = !!(electronicsGate.complete && existingAuthority
       && isPhysicalPlacementEligible(bestElectronicResult));
+    // The reason the placement gate closed, preserved with the run so a
+    // terminal record can state why a physical search was not eligible rather
+    // than guessing. Null when the gate is open or electronics are incomplete.
+    const placementExclusionReason = !placementGate && electronicsGate.complete && existingAuthority
+      ? physicalEligibilityReason(bestElectronicResult ? readEscalationLevels(bestElectronicResult) : null)
+      : (!electronicsGate.complete ? "electronics-incomplete"
+        : !existingAuthority ? "no-existing-authority" : null);
     const hierarchyGateDiagnostics = {
       electronicsComplete: electronicsGate.complete,
       electronicsReasons: electronicsGate.reasons,
@@ -1377,6 +1387,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         || bestElectronicResult === existingAuthority
         || bestElectronicResult?.candidateKind === "current",
       placementGate,
+      placementExclusionReason,
       placementSearchStatus: null,
       seatingGate: null,
     };
@@ -1838,17 +1849,30 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     setStageVerdict(projectId, versionId, "seating_positions", "skipped");
     const seatingSearchStarted = performance.now();
     // ── Non-intrusive-first hierarchy: seating gate ───────────────────
-    // Seating movement is a last resort after subwoofer placement. Eligible
-    // only when the placement gate passed AND a qualifying practical placement
-    // result was canonically confirmed AND that result still leaves P19 RSP,
-    // P20 Primary and P20 Secondary all at L1. A failed, skipped or impractical
-    // placement search must NOT be silently treated as completed merely because
-    // Current can be used as a fallback — Current is the electronic baseline,
-    // not a qualifying placement result.
+    // Seating movement is a last resort, assessed INDEPENDENTLY of subwoofer
+    // placement. It is eligible when the electronic evaluation has completed
+    // AND the best available confirmed result still has a material limitation
+    // on any applicable P19 or P20 group. It is NOT blocked merely because
+    // subwoofer placement could not be evaluated — seating movement is
+    // independently feasible and is assessed on its own baseline (the practical
+    // placement result when one was confirmed, otherwise the electronic result).
+    // A nonexistent secondary seating group is not a failed parameter.
     const bestPracticalResult = identifyBestPositionCandidate(confirmedResults, existingAuthority);
-    seatingGate = !!(placementGate && bestPracticalResult && existingAuthority
-      && isSeatingEligible(bestPracticalResult));
+    const seatingBaseline = bestPracticalResult || bestElectronicResult || existingAuthority;
+    const seatingExclusionReason = !electronicsGate.complete
+      ? "electronics-incomplete"
+      : !existingAuthority
+        ? "no-existing-authority"
+        : (seatingBaseline
+          ? physicalEligibilityReason(readEscalationLevels(seatingBaseline))
+          : "no-baseline");
+    seatingGate = !!(electronicsGate.complete && existingAuthority
+      && isSeatingEligible(seatingBaseline));
     hierarchyGateDiagnostics.seatingGate = seatingGate;
+    hierarchyGateDiagnostics.seatingExclusionReason = seatingGate ? null : seatingExclusionReason;
+    hierarchyGateDiagnostics.seatingBaselineCandidateId = seatingBaseline?.candidateId || null;
+    hierarchyGateDiagnostics.seatingBaselineKind = seatingBaseline?.candidateKind || null;
+    hierarchyGateDiagnostics.seatingBaselineIsPractical = !!bestPracticalResult;
     hierarchyGateDiagnostics.seatingPlacementResult = bestPracticalResult
       ? {
         candidateId: bestPracticalResult.candidateId || null,
@@ -2102,7 +2126,8 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     try {
       setStageVerdict(projectId, versionId, "coordinated_physical", "skipped");
       // Phase 9B must not bypass the hierarchy: it requires the seating gate
-      // (electronics complete + placement assessed + all three still L1).
+      // (electronics complete + a material limitation remains on any applicable
+      // group), which is now assessed independently of the placement gate.
       const coordinatedEligible = !!(seatingGate && existingAuthority && savedCurrentRawTransfer?.perSourcePerSeatComplexTransfers?.length);
       coordinatedDiagnostics.eligible = coordinatedEligible;
       coordinatedDiagnostics.skipReason = coordinatedEligible

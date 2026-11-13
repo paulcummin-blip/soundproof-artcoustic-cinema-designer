@@ -5,11 +5,19 @@
 // Post-calculation Bass Optimisation must exhaust the installed-layout
 // electronic levers (phase, delay, gain, crossover) BEFORE any physical
 // subwoofer or seating movement is considered. Physical movement is a
-// last resort: it is eligible only when the best confirmed electronic
-// result still leaves P19 RSP, P20 Primary and P20 Secondary all at L1
-// (the poorest passing level). Seating movement is eligible only after
-// subwoofer placement has been assessed and the best confirmed practical
-// result STILL leaves all three at L1.
+// last resort: it is eligible when the electronic evaluation has completed
+// AND any applicable P19 or P20 group still has a material performance
+// limitation (FAIL or L1 — the poorest passing level). A design whose every
+// applicable group already performs at L2 or better has no remaining
+// limitation to investigate, so no physical search runs. A single poor group
+// is enough to permit investigation even when the other parameters perform
+// well — ADI investigates the meaningful acoustic problem rather than
+// stopping because one parameter already performs well.
+//
+// Seating movement is assessed independently: it is NOT blocked merely
+// because subwoofer placement could not be evaluated, where seating movement
+// is independently feasible. A nonexistent secondary seating group is not a
+// failed parameter.
 //
 // A physical recommendation must deliver a genuine RP22 Level improvement —
 // a same-level dB gain alone never justifies moving subwoofers or seating.
@@ -76,6 +84,10 @@ export function readEscalationLevels(result) {
  * P19 RSP and P20 Primary are always required. P20 Secondary is required only
  * when the design has secondary seats. A level of null, undefined, FAIL (0)
  * or L2/L3/L4 never satisfies the gate.
+ *
+ * Retained for callers that still ask the all-L1 question; the placement and
+ * seating gates below no longer require it — they ask whether ANY applicable
+ * group still has a material limitation instead.
  */
 export function isAllL1(levels) {
   if (!levels) return false;
@@ -87,18 +99,68 @@ export function isAllL1(levels) {
   return required.every((l) => l === 1);
 }
 
-/** Eligibility for post-calculation subwoofer placement search. */
-export function isPhysicalPlacementEligible(bestElectronicResult) {
-  return isAllL1(readEscalationLevels(bestElectronicResult));
+/**
+ * The applicable escalation levels, excluding not_applicable groups.
+ * Returns an empty array when no group is applicable.
+ */
+function applicableLevels(levels) {
+  if (!levels) return [];
+  const required = [];
+  if (levels.p19Rsp !== "not_applicable") required.push(levels.p19Rsp);
+  if (levels.p20Primary !== "not_applicable") required.push(levels.p20Primary);
+  if (levels.p20Secondary !== "not_applicable") required.push(levels.p20Secondary);
+  return required;
 }
 
 /**
- * Eligibility for seating movement. Requires that placement has been
- * assessed (placementGate passed) AND the best confirmed practical result
- * still leaves all applicable levels at L1.
+ * Whether ANY applicable P19 or P20 group still has a material performance
+ * limitation — FAIL (0) or L1 (the poorest passing level).
+ *
+ * A design whose every applicable group already performs at L2 or better has
+ * no remaining limitation to investigate, so no physical search is eligible.
+ * A single poor group is enough to permit investigation even when the other
+ * parameters perform well. A missing (null) level on any applicable group is
+ * incomplete evidence: the limitation cannot be assessed, so the gate closes
+ * rather than search on incomplete evidence. A nonexistent secondary seating
+ * group (not_applicable) is not a failed parameter and never blocks the gate.
+ */
+export function hasMaterialLimitation(levels) {
+  const required = applicableLevels(levels);
+  if (required.length === 0) return false;
+  // Missing evidence on any applicable group blocks: the limitation cannot be
+  // assessed, so a physical search is never run on incomplete evidence.
+  if (required.some((l) => l == null)) return false;
+  return required.some((l) => l === 0 || l === 1);
+}
+
+/**
+ * Why the physical gate closed, for the run's own diagnostics. Returns null
+ * when the gate is open (eligible). The reason is preserved with the run so a
+ * terminal record can state why a physical search was not eligible, instead
+ * of guessing.
+ */
+export function physicalEligibilityReason(levels) {
+  const required = applicableLevels(levels);
+  if (required.length === 0) return "no-applicable-groups";
+  if (required.some((l) => l == null)) return "missing-evidence";
+  if (required.every((l) => l >= 2)) return "no-material-limitation";
+  return null;
+}
+
+/** Eligibility for post-calculation subwoofer placement search. */
+export function isPhysicalPlacementEligible(bestElectronicResult) {
+  return hasMaterialLimitation(readEscalationLevels(bestElectronicResult));
+}
+
+/**
+ * Eligibility for seating movement. Assessed on the best available confirmed
+ * result (the practical placement result when one was confirmed, otherwise
+ * the electronic result). Seating movement is NOT blocked merely because
+ * subwoofer placement could not be evaluated — where seating movement is
+ * independently feasible it is assessed on its own baseline.
  */
 export function isSeatingEligible(bestPracticalResult) {
-  return isAllL1(readEscalationLevels(bestPracticalResult));
+  return hasMaterialLimitation(readEscalationLevels(bestPracticalResult));
 }
 
 /**

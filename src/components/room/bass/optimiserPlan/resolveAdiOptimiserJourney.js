@@ -294,6 +294,20 @@ export function resolveOptimisationPlanRunBlock({
 }
 
 /**
+ * Whether a physical search (placement or seating) was genuinely tested, read
+ * from the run's own per-category search status. Returns true only when at least
+ * one physical category was genuinely evaluated (confirmed candidates or a
+ * terminal completed search). Used so the "no useful improvement" message does
+ * not imply all physical alternatives were evaluated when only electronic
+ * adjustments were tested.
+ */
+function physicalSearchTested(searchStatus) {
+  if (!searchStatus || !Array.isArray(searchStatus.categories)) return false;
+  return searchStatus.categories.some((c) =>
+    (c?.key === "placement" || c?.key === "seating") && c?.evaluated === true);
+}
+
+/**
  * Resolve the journey state and its copy.
  *
  * @param {object} params
@@ -419,11 +433,20 @@ export function resolveAdiOptimiserJourney({
 
   // ── 4b. Evaluation finished with no candidate worth applying ──
   // Complete, trustworthy evidence: the best attempted result is stated as
-  // rejected evidence. Nothing is offered for application.
+  // rejected evidence. Nothing is offered for application. When only electronic
+  // adjustments were tested, the message says so explicitly — it never implies
+  // that all physical alternatives were evaluated when they were not eligible or
+  // not tested.
   if (status === OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT) {
+    const physicalTested = physicalSearchTested(planView?.searchStatus || null);
+    const noImprovementMessage = physicalTested
+      ? "ADI completed its search without finding a change worth applying."
+      : "No useful electronic improvement found.";
     return build(ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT, {
-      message: withLead("ADI completed its search without finding a change worth applying."),
-      explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
+      message: withLead(noImprovementMessage),
+      explanation: physicalTested
+        ? "Nothing is offered for application. The evidence below is what the run evaluated."
+        : "Physical placement and seating were not tested — the search did not identify a reason to investigate them. The evidence below is what the run evaluated.",
       action: ADI_OPTIMISER_ACTION.RERUN,
       showPlan: false,
     });

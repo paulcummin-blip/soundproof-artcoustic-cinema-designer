@@ -10,6 +10,8 @@ import { test } from "node:test";
 import {
   readEscalationLevels,
   isAllL1,
+  hasMaterialLimitation,
+  physicalEligibilityReason,
   isPhysicalPlacementEligible,
   isSeatingEligible,
   electronicsCompleted,
@@ -110,22 +112,67 @@ test("isAllL1: false for empty/missing input", () => {
   assert.equal(isAllL1({}), false);
 });
 
+// ── hasMaterialLimitation ───────────────────────────────────────────────
+
+test("hasMaterialLimitation: true when any applicable group is L1", () => {
+  assert.equal(hasMaterialLimitation({ p19Rsp: 1, p20Primary: 2, p20Secondary: 2 }), true);
+  assert.equal(hasMaterialLimitation({ p19Rsp: 2, p20Primary: 1, p20Secondary: 2 }), true);
+  assert.equal(hasMaterialLimitation({ p19Rsp: 2, p20Primary: 2, p20Secondary: 1 }), true);
+});
+
+test("hasMaterialLimitation: true when any applicable group is FAIL (0)", () => {
+  assert.equal(hasMaterialLimitation({ p19Rsp: 0, p20Primary: 2, p20Secondary: 2 }), true);
+  assert.equal(hasMaterialLimitation({ p19Rsp: 2, p20Primary: 0, p20Secondary: 2 }), true);
+});
+
+test("hasMaterialLimitation: false when every applicable group is L2 or better", () => {
+  assert.equal(hasMaterialLimitation({ p19Rsp: 2, p20Primary: 2, p20Secondary: 2 }), false);
+  assert.equal(hasMaterialLimitation({ p19Rsp: 4, p20Primary: 4, p20Secondary: 4 }), false);
+});
+
+test("hasMaterialLimitation: false when any applicable level is missing (null)", () => {
+  assert.equal(hasMaterialLimitation({ p19Rsp: null, p20Primary: 1, p20Secondary: 1 }), false);
+  assert.equal(hasMaterialLimitation({ p19Rsp: 1, p20Primary: null, p20Secondary: 1 }), false);
+});
+
+test("hasMaterialLimitation: single-row (Secondary not_applicable) checks P19 + Primary", () => {
+  assert.equal(hasMaterialLimitation({ p19Rsp: 1, p20Primary: 2, p20Secondary: "not_applicable" }), true);
+  assert.equal(hasMaterialLimitation({ p19Rsp: 2, p20Primary: 2, p20Secondary: "not_applicable" }), false);
+});
+
+test("hasMaterialLimitation: false for empty/missing input", () => {
+  assert.equal(hasMaterialLimitation(null), false);
+  assert.equal(hasMaterialLimitation({}), false);
+});
+
+// ── physicalEligibilityReason ──────────────────────────────────────────
+
+test("physicalEligibilityReason: null when a limitation exists (eligible)", () => {
+  assert.equal(physicalEligibilityReason({ p19Rsp: 1, p20Primary: 2, p20Secondary: 2 }), null);
+});
+
+test("physicalEligibilityReason: no-material-limitation when all L2+", () => {
+  assert.equal(physicalEligibilityReason({ p19Rsp: 2, p20Primary: 2, p20Secondary: 2 }), "no-material-limitation");
+  assert.equal(physicalEligibilityReason({ p19Rsp: 4, p20Primary: 4, p20Secondary: 4 }), "no-material-limitation");
+});
+
+test("physicalEligibilityReason: missing-evidence when a level is null", () => {
+  assert.equal(physicalEligibilityReason({ p19Rsp: null, p20Primary: 1, p20Secondary: 1 }), "missing-evidence");
+});
+
 // ── Placement / Seating gates ───────────────────────────────────────────
 
-test("isPhysicalPlacementEligible: all L1 permits placement", () => {
+test("isPhysicalPlacementEligible: any L1 group permits placement", () => {
   assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 })), true);
+  // P19 L4 strong, but Secondary P20 L1 poor: placement still eligible.
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 3, p20Secondary: 1 })), true);
+  // P19 L1 poor with Primary P20 strong: placement eligible on P19 limitation.
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 4, p20Secondary: 4 })), true);
 });
 
-test("isPhysicalPlacementEligible: P20 Primary L2 blocks placement", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: 1 })), false);
-});
-
-test("isPhysicalPlacementEligible: P19 RSP L2 blocks placement", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 1, p20Secondary: 1 })), false);
-});
-
-test("isPhysicalPlacementEligible: P20 Secondary L2 blocks placement", () => {
-  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), false);
+test("isPhysicalPlacementEligible: strong performance across all groups blocks placement", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 4 })), false);
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 2, p20Secondary: 2 })), false);
 });
 
 test("isPhysicalPlacementEligible: missing P19 blocks placement", () => {
@@ -133,9 +180,17 @@ test("isPhysicalPlacementEligible: missing P19 blocks placement", () => {
   assert.equal(isPhysicalPlacementEligible(r), false);
 });
 
-test("isSeatingEligible: same gate on the best practical result", () => {
+test("isPhysicalPlacementEligible: single-row with P19 L1 eligible", () => {
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 1, p20Primary: 2, p20Secondary: null })), true);
+  assert.equal(isPhysicalPlacementEligible(result({ p19Level: 2, p20Primary: 2, p20Secondary: null })), false);
+});
+
+test("isSeatingEligible: same any-limitation gate on the best available result", () => {
   assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 1 })), true);
-  assert.equal(isSeatingEligible(result({ p19Level: 1, p20Primary: 1, p20Secondary: 2 })), false);
+  // Secondary L1 with others strong: seating eligible.
+  assert.equal(isSeatingEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 1 })), true);
+  // All strong: seating not eligible.
+  assert.equal(isSeatingEligible(result({ p19Level: 4, p20Primary: 4, p20Secondary: 4 })), false);
 });
 
 // ── Electronic completion ───────────────────────────────────────────────
