@@ -648,7 +648,7 @@ export function resolveCalibrationAutoApply({
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NO_CANDIDATE,
       NO_USEFUL_CALIBRATION_IMPROVEMENT, { candidateId });
   }
-  if (!crossoverChanged && isCalibrationApplied(instances, tuning)) {
+  if (!applyValidatedSimulation && !crossoverChanged && isCalibrationApplied(instances, tuning)) {
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.ALREADY_APPLIED,
       "The applied calibration already matches the best confirmed candidate — nothing to change.",
       { candidateId, tuning });
@@ -742,8 +742,16 @@ export function resolveCalibrationAutoApply({
     tradeOffAppliedNote = describeTradeOffAutoApply(tradeOff);
   }
 
+  const rawP19Gain = baseline.achievedP19VariationDb - candidate.achievedP19VariationDb;
+  const rawP20Gain = baseline.achievedP20VariationDb - candidate.achievedP20VariationDb;
+  const rawBenefit = Math.max(rawP19Gain,rawP20Gain);
+  const rawDamage = Math.max(0,-rawP19Gain,-rawP20Gain);
+  if(applyValidatedSimulation && (levelDrop || (rawDamage>0 && rawBenefit<3*rawDamage))){
+    return outcome(CALIBRATION_APPLY_DECISION.HOLD,CALIBRATION_APPLY_REASON.TRADEOFF_REVIEW_REQUIRED,
+      "This electronic trade-off was not applied.",context);
+  }
   if (!materiality?.material && !(applyValidatedSimulation && materiality?.valid !== false &&
-      ((improvement?.p19DeltaDb > 0.000001) || (improvement?.p20DeltaDb > 0.000001)))) {
+      Number.isFinite(rawBenefit) && rawBenefit > 0.000001)) {
     // An improvement that clears the canonical action figure with no regression
     // guard breached is a SUGGESTION: the overall result improves, so it is
     // stated as what to change and what it buys — never as a failed
