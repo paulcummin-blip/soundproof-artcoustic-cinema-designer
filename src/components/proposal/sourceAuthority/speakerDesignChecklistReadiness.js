@@ -78,10 +78,11 @@ const exportedAtMs = (record) => {
  * for that version. Every earlier one is superseded by a newer export, which is
  * how Project Library reads them too.
  */
-export function selectStoredSpeakerDesign(records = [], versionId = null) {
+export function selectStoredSpeakerDesign(records = [], versionId = null, projectId = null) {
   const list = (Array.isArray(records) ? records : [])
     .filter((record) => String(record?.document_type || '') === SPEAKER_DESIGN_DOCUMENT_TYPE)
-    .filter((record) => !versionId || String(record?.version_id || '') === String(versionId));
+    .filter((record) => !versionId || String(record?.version_id || '') === String(versionId))
+    .filter((record) => !projectId || String(record?.project_id || '') === String(projectId));
   if (list.length === 0) return null;
   return list.reduce((newest, record) => (exportedAtMs(record) > exportedAtMs(newest) ? record : newest));
 }
@@ -106,6 +107,8 @@ export function resolveSpeakerDesignCell({
   currentEngineeringFingerprint = null,
   presentationOnlyMove = false,
   checking = false,
+  projectId = null,
+  versionId = null,
 } = {}) {
   if (checking) {
     return {
@@ -129,10 +132,64 @@ export function resolveSpeakerDesignCell({
     };
   }
 
+  // A real stored export record must carry a file reference. A record with no
+  // file_uri and no file_url is an incomplete historical row and can never be
+  // Current — it is not a document anyone can open, and it is never satisfied
+  // by an in-memory generation flag, a launched request or a local download.
+  if (!stored.file_uri && !stored.file_url) {
+    return {
+      state: READINESS_STATE.STALE,
+      status: SPEAKER_DESIGN_STATUS_TEXT[READINESS_STATE.STALE],
+      current: false,
+      checking: false,
+      generatedAt: stored.exported_at || null,
+      reason: SPEAKER_DESIGN_STALE_COPY,
+    };
+  }
+
+  // Matching project ID and version ID — the record must belong to the version
+  // the row states. The selector above pre-filters, but this is the explicit
+  // authority the readiness contract holds, so a cross-project or cross-version
+  // record can never satisfy readiness for a different version.
+  if (projectId && String(stored.project_id || '') !== String(projectId)) {
+    return {
+      state: READINESS_STATE.STALE,
+      status: SPEAKER_DESIGN_STATUS_TEXT[READINESS_STATE.STALE],
+      current: false,
+      checking: false,
+      generatedAt: stored.exported_at || null,
+      reason: SPEAKER_DESIGN_STALE_COPY,
+    };
+  }
+  if (versionId && String(stored.version_id || '') !== String(versionId)) {
+    return {
+      state: READINESS_STATE.STALE,
+      status: SPEAKER_DESIGN_STATUS_TEXT[READINESS_STATE.STALE],
+      current: false,
+      checking: false,
+      generatedAt: stored.exported_at || null,
+      reason: SPEAKER_DESIGN_STALE_COPY,
+    };
+  }
+
   const storedFingerprint = asFingerprint(stored.source_fingerprints?.engineeringFingerprint);
   const currentFingerprint = asFingerprint(currentEngineeringFingerprint);
-  const movedOn = storedFingerprint && currentFingerprint && storedFingerprint !== currentFingerprint;
-  if (movedOn && presentationOnlyMove !== true) {
+
+  // Missing fingerprints are never equivalent: a record that states no
+  // engineering fingerprint, or a current design that has none, cannot be
+  // verified as matching, so the document is not Current.
+  if (!storedFingerprint || !currentFingerprint) {
+    return {
+      state: READINESS_STATE.STALE,
+      status: SPEAKER_DESIGN_STATUS_TEXT[READINESS_STATE.STALE],
+      current: false,
+      checking: false,
+      generatedAt: stored.exported_at || null,
+      reason: SPEAKER_DESIGN_STALE_COPY,
+    };
+  }
+
+  if (storedFingerprint !== currentFingerprint && presentationOnlyMove !== true) {
     return {
       state: READINESS_STATE.STALE,
       status: SPEAKER_DESIGN_STATUS_TEXT[READINESS_STATE.STALE],

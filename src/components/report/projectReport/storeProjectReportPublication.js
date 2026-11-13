@@ -120,11 +120,12 @@ async function storeCompanionDocument({ params }) {
   if (result.status === 'stored' || result.status === 'reused') {
     return { ok: true, record: result.record || null };
   }
-  if (result.status === 'already-preparing') {
-    // A concurrent attempt is already storing this schedule; treat as success —
-    // the in-flight attempt will notify readiness when it lands.
-    return { ok: true, record: null };
-  }
+  // 'already-preparing' is never returned: concurrent callers await the SAME
+  // Promise and its actual outcome, so a second caller receives the verified
+  // result — not a success claim before the PDF exists. Any status that is not
+  // a verified stored or reused export is a failure, never a completed
+  // publication, and no caller marks the companion document complete on the
+  // strength of a request that has merely started.
   if (result.status === 'blocked') {
     return { ok: false, error: result.reason || 'This version has no speaker design to export yet.' };
   }

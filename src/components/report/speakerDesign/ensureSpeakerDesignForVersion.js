@@ -42,8 +42,19 @@ import { notifyReportSourceStored } from '@/components/proposal/sourceAuthority/
 import {
   beginSpeakerDesignGeneration,
   completeSpeakerDesignGeneration,
-  isPreparingSpeakerDesign,
 } from './speakerDesignGenerationStatus';
+
+/**
+ * ONE in-flight operation per project/version/fingerprint. Concurrent callers
+ * for the same design await the SAME Promise and its actual outcome: a second
+ * caller never reports success merely because another operation has started,
+ * and a failure propagates to every caller so no one marks the companion
+ * document complete. The Promise is removed when it settles, so a later call
+ * for a changed design starts a fresh attempt.
+ */
+const inflight = new Map(); // `${projectId}::${versionId}::${fingerprint}` -> Promise
+const inflightKeyOf = (projectId, versionId, fingerprint) =>
+  `${projectId || ''}::${versionId || ''}::${fingerprint || ''}`;
 
 /** Read the first record from a filter page that may be an array or a page. */
 function firstRecord(page) {
@@ -78,9 +89,32 @@ function describeError(error) {
  * @param {Function|null} [input.resolveSource] — optional identity resolver override
  * @param {string|null} [input.exportedBy]
  * @returns {Promise<{status: string, record?: Object, reason?: string, error?: string}>}
- *   status: 'already-preparing' | 'reused' | 'stored' | 'blocked' | 'failed' | 'skipped'
+ *   status: 'reused' | 'stored' | 'blocked' | 'failed' | 'skipped'
  */
-export async function ensureSpeakerDesignForVersion({
+export function ensureSpeakerDesignForVersion(input = {}) {
+  const { projectId = null, versionId = null, engineeringFingerprint = null } = input;
+  if (!projectId || !versionId) {
+    return Promise.resolve({ status: 'skipped', reason: 'A project id and version id are required.' });
+  }
+
+  // Concurrent callers for the same project/version/fingerprint await the SAME
+  // Promise and its actual outcome. A second caller never reports success
+  // merely because another operation has started; if the operation fails, every
+  // caller receives the failure and no caller marks the companion complete.
+  const key = inflightKeyOf(projectId, versionId, engineeringFingerprint);
+  const existing = inflight.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = runEnsureSpeakerDesign(input).finally(() => {
+    inflight.delete(key);
+  });
+  inflight.set(key, promise);
+  return promise;
+}
+
+async function runEnsureSpeakerDesign({
   projectId = null,
   versionId = null,
   engineeringFingerprint = null,
@@ -95,33 +129,30 @@ export async function ensureSpeakerDesignForVersion({
   resolveSource = null,
   exportedBy = null,
 } = {}) {
-  if (!projectId || !versionId) {
-    return { status: 'skipped', reason: 'A project id and version id are required.' };
-  }
-
-  // ONE attempt per version at a time. A second caller — a concurrent report
-  // save, an export, a background catch-up or the Proposal Centre opening —
-  // receives 'already-preparing' and re-reads when the in-flight attempt lands.
-  if (isPreparingSpeakerDesign(projectId, versionId)) {
-    return { status: 'already-preparing' };
-  }
-
   beginSpeakerDesignGeneration(projectId, versionId);
 
   try {
-    // 1. Reuse: a Speaker Design whose engineering fingerprint matches the
-    //    current design is already the document Proposal Centre needs.
+    // 1. Reuse: find an EXISTING stored Speaker Design whose engineering
+    //    fingerprint matches the current design AND whose file reference is
+    //    valid. The search reads every stored export for this version, not only
+    //    the newest, so a matching older export is reused even when a newer
+    //    export exists for a different design fingerprint. A stale document for a
+    //    changed design is never reused.
     if (engineeringFingerprint) {
       const page = await base44.entities.ProjectAssetExport.filter(
         { project_id: projectId, document_type: 'speaker_design', version_id: versionId },
-        { sort: '-exported_at', limit: 1 },
+        { sort: '-exported_at', limit: 50 },
       );
-      const latest = firstRecord(page);
-      const storedFp = latest?.source_fingerprints?.engineeringFingerprint || null;
-      if (latest && storedFp === engineeringFingerprint) {
+      const records = Array.isArray(page) ? page : (page?.items || []);
+      const match = records.find((record) => {
+        const fp = record?.source_fingerprints?.engineeringFingerprint || null;
+        const hasFile = !!(record?.file_uri || record?.file_url);
+        return fp === engineeringFingerprint && hasFile;
+      });
+      if (match) {
         notifyReportSourceStored({ projectId, versionId });
         completeSpeakerDesignGeneration(projectId, versionId, null);
-        return { status: 'reused', record: latest };
+        return { status: 'reused', record: match };
       }
     }
 

@@ -188,7 +188,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         const frozenFingerprintFor = {
           project: (versionId) => savedByKey.get(`${versionId}::project`)
             ?.source_fingerprints?.engineeringFingerprint || null,
-          speaker_design: (versionId) => selectStoredSpeakerDesign(speakerDesignRecords, versionId)
+          speaker_design: (versionId) => selectStoredSpeakerDesign(speakerDesignRecords, versionId, projectId)
             ?.source_fingerprints?.engineeringFingerprint || null,
         };
         const presentationOnlyBySource = { project: new Map(), speaker_design: new Map() };
@@ -269,9 +269,11 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
             presentationOnlyMove: presentationOnlyBySource.project.get(versionId) === true,
           });
           let speakerDesignCell = resolveSpeakerDesignCell({
-            stored: selectStoredSpeakerDesign(speakerDesignRecords, versionId),
+            stored: selectStoredSpeakerDesign(speakerDesignRecords, versionId, projectId),
             currentEngineeringFingerprint: currentFingerprints.engineeringFingerprint,
             presentationOnlyMove: presentationOnlyBySource.speaker_design.get(versionId) === true,
+            projectId,
+            versionId,
           });
 
           // Overlay the shared generation status: a Speaker Design being stored
