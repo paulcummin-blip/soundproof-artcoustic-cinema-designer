@@ -10,6 +10,15 @@
 // proven to match. This module proves that — it invents nothing, weakens no
 // existing guard, and never sets calibrationOnly true by default.
 //
+// IDENTITY DOMAINS — the V2 engine stamps TWO distinct fingerprints on every
+// bound candidate:
+//   - inputIdentity    = startFingerprint (V2 design fingerprint, full format)
+//   - baselineCacheKey = liveCacheKey (completed-bass-authority cache key)
+// OptimiseAndCalculate passes identity.cacheKey = currentShared.cacheKey and
+// identity.inputIdentity = the run's V2 start fingerprint. Each domain is
+// checked against its OWN authority — never cross-domain. A cross-domain
+// comparison (inputIdentity vs cacheKey) always rejects real candidates.
+//
 // When identity or payload completeness cannot be established, the candidate
 // must NOT become an actionable calibration winner. The proof returns its
 // issues so the plan builder can state them instead of fabricating a lever.
@@ -50,8 +59,11 @@ function tuningIsComplete(tuning, instances) {
   if (tuning.length !== active.length) return false;
   const activeIds = new Set(active.map((inst) => inst?.id).filter(Boolean));
   if (activeIds.size !== active.length) return false;
+  const seenIds = new Set();
   for (const entry of tuning) {
     if (!entry?.sourceId || !activeIds.has(entry.sourceId)) return false;
+    if (seenIds.has(entry.sourceId)) return false; // duplicate ID
+    seenIds.add(entry.sourceId);
     if (!Number.isFinite(Number(entry.delayMs))) return false;
     if (!Number.isFinite(Number(entry.gainDb))) return false;
     if (!Number.isFinite(Number(entry.phaseControlDeg ?? entry.phaseAdjust))) return false;
@@ -83,13 +95,40 @@ function hasPhysicalChangeMarker(winner) {
 }
 
 /**
+ * Require two fingerprint values to be nonempty strings that match exactly.
+ * Returns an issue string when the check fails, null when it passes.
+ */
+function fingerprintMatches(candidateValue, authorityValue, label) {
+  if (!candidateValue || typeof candidateValue !== "string") {
+    return `The winning candidate's ${label} is missing.`;
+  }
+  if (!authorityValue || typeof authorityValue !== "string") {
+    return `The current design's ${label} is missing — re-run the Optimisation Plan.`;
+  }
+  if (candidateValue !== authorityValue) {
+    return `The winning candidate's ${label} does not match the current design — re-run the Optimisation Plan.`;
+  }
+  return null;
+}
+
+/**
  * Prove that a combined electronic winner's identity matches the installed
  * design and that its payload is complete.
+ *
+ * Two identity domains are checked, each against its own authority:
+ *   - winner.inputIdentity (V2 start fingerprint) vs identity.inputIdentity
+ *   - winner.baselineCacheKey (live cache key) vs identity.cacheKey
+ *
+ * Both must be nonempty and match exactly. A cross-domain comparison is never
+ * performed.
  *
  * @param {object} params
  * @param {object|null} params.winner - the confirmed combined electronic winner
  * @param {Array} params.instances - current subwooferInstances
- * @param {object} [params.identity] - the run's identity (designFingerprint)
+ * @param {object} [params.identity] - the run's identity
+ * @param {string} [params.identity.inputIdentity] - V2 start fingerprint authority
+ * @param {string} [params.identity.cacheKey] - completed-bass cache key authority
+ * @param {string} [params.identity.designFingerprint] - alias for cacheKey
  * @returns {{valid: boolean, issues: string[]}}
  */
 export function proveCombinedElectronicIdentity({ winner, instances, identity = {} } = {}) {
@@ -114,12 +153,21 @@ export function proveCombinedElectronicIdentity({ winner, instances, identity = 
     issues.push("The winning candidate involves a physical placement or seating change — it is not a calibration-only electronic result.");
   }
 
-  // 4. The candidate's confirmed design fingerprint is current.
-  const candidateFingerprint = winner.inputIdentity || null;
-  const currentFingerprint = identity.designFingerprint || null;
-  if (candidateFingerprint && currentFingerprint && candidateFingerprint !== currentFingerprint) {
-    issues.push("The winning candidate was confirmed against a different design — re-run the Optimisation Plan.");
-  }
+  // 4. Fingerprint domains — each checked against its own authority.
+  const cacheKeyAuthority = identity.cacheKey || identity.designFingerprint || null;
+  const inputIdentityIssue = fingerprintMatches(
+    winner.inputIdentity || null,
+    identity.inputIdentity || null,
+    "V2 design fingerprint (inputIdentity)",
+  );
+  if (inputIdentityIssue) issues.push(inputIdentityIssue);
+
+  const cacheKeyIssue = fingerprintMatches(
+    winner.baselineCacheKey || null,
+    cacheKeyAuthority,
+    "completed-bass cache key (baselineCacheKey)",
+  );
+  if (cacheKeyIssue) issues.push(cacheKeyIssue);
 
   // 5. This IS a crossover integration candidate.
   if (winner.combinedFrom?.crossover !== true) {

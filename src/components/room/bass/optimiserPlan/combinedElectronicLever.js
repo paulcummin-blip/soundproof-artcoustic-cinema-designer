@@ -16,19 +16,19 @@
 //   - The exact canonically evaluated crossover config (frequency, linking,
 //     slopes) — before and after.
 //   - The exact per-source tuning (delay, gain, phase, polarity) — before and
-//     after.
+//     after, read from the WINNER'S OWN appliedTuning (raw, unrounded), never
+//     reconstructed from display rows or defaulted via Number(...) || 0.
 //   - Per-source model and physical geometry identity (position, height,
-//     rotation) so the candidate is reproducible exactly.
+//     rotation) captured from the canonical candidate, not stamped from
+//     current instances at plan-build time.
 //   - Seating and RSP authority snapshot.
-//   - Confirmation and design fingerprints.
-//   - Positive identity proof (same installed geometry, current fingerprint,
+//   - Both identity domain fingerprints: inputIdentity (V2 start fingerprint)
+//     and baselineCacheKey (live cache key).
+//   - Positive identity proof (same installed geometry, current fingerprints,
 //     complete payload, no physical change).
 //
 // When identity proof passes (identityProof.valid === true) the lever IS
-// actionable: the existing CrossoverRecommendation apply path already writes
-// crossover + tuning + recalculate + verify, and the combined electronic apply
-// builder (combinedElectronicApply.js) reproduces the same design state update
-// from this lever. When identity proof fails the lever is NOT actionable — it
+// actionable. When identity proof fails the lever is NOT actionable — it
 // retains the full evidence for diagnostics but is never offered for Apply.
 //
 // READ-ONLY: reads the confirmed winner and the current instances. It changes
@@ -63,7 +63,26 @@ function describeSub(instances, instance) {
   return index >= 0 ? `${groupLabel} sub ${index + 1}` : `${groupLabel} sub`;
 }
 
-/** Pair the winner's per-source tuning with the current instances. */
+/**
+ * Resolve the candidate-owned instances for source identity capture.
+ * For a non-cross-quantity candidate the winner's designContext is absent and
+ * the installed instances ARE the candidate's geometry. For a cross-quantity
+ * candidate the winner carries its own designContext.instances. The identity
+ * is captured from the candidate's own data — never stamped from current
+ * instances at plan-build time.
+ */
+function resolveCandidateInstances(winner, installedInstances) {
+  if (winner?.designContext?.instances && Array.isArray(winner.designContext.instances)) {
+    return winner.designContext.instances;
+  }
+  return installedInstances || [];
+}
+
+/**
+ * Pair the winner's per-source tuning with the candidate-owned instances.
+ * The winner's appliedTuning is the raw, canonically confirmed tuning — never
+ * reconstructed from display rows.
+ */
 function pairTuning(tuning, instances) {
   const active = activeInstances(instances);
   const rows = [];
@@ -79,10 +98,14 @@ function pairTuning(tuning, instances) {
 
 /**
  * The per-source tuning changes the winner proposes, with before/after values.
- * Only sources whose tuning actually changed are listed as changes.
+ * The `from` values come from the candidate-owned instances (the design the
+ * candidate was confirmed against). The `to` values come from the winner's own
+ * raw appliedTuning — never reconstructed from rounded display rows or
+ * defaulted via Number(...) || 0.
  */
 function buildTuningChanges(winner, instances) {
-  const rows = pairTuning(winner?.appliedTuning || winner?.tuning, instances);
+  const candidateInstances = resolveCandidateInstances(winner, instances);
+  const rows = pairTuning(winner?.appliedTuning || winner?.tuning, candidateInstances);
   return rows.map(({ instance, entry }) => {
     const fromDelayMs = num(instance.delayMs) ?? 0;
     const toDelayMs = num(entry.delayMs) ?? 0;
@@ -99,7 +122,7 @@ function buildTuningChanges(winner, instances) {
       || fromPolarity !== toPolarity;
     return {
       subId: instance.id,
-      label: describeSub(instances, instance),
+      label: describeSub(candidateInstances, instance),
       group: instance.legacyGroup || null,
       fromDelayMs: round(fromDelayMs, 2),
       toDelayMs: round(toDelayMs, 2),
@@ -147,15 +170,17 @@ function buildCrossoverChange(winner, currentCrossover) {
 
 /**
  * Per-source identity snapshot: model, physical geometry, and source id.
- * This makes the candidate reproducible exactly — the apply path can verify
- * the installed geometry matches before writing tuning + crossover.
+ * Captured from the CANONICAL CANDIDATE's own instances (designContext or
+ * installed), not stamped from current instances at plan-build time. The apply
+ * path verifies these match the CURRENT installed instances before writing.
  */
 function buildSourceIdentity(winner, instances) {
-  const rows = pairTuning(winner?.appliedTuning || winner?.tuning, instances);
+  const candidateInstances = resolveCandidateInstances(winner, instances);
+  const rows = pairTuning(winner?.appliedTuning || winner?.tuning, candidateInstances);
   return rows.map(({ instance, entry }) => ({
     sourceId: instance.id,
     model: instance.model || null,
-    label: describeSub(instances, instance),
+    label: describeSub(candidateInstances, instance),
     group: instance.legacyGroup || null,
     geometry: {
       x: round(num(instance.position?.x), 3),
@@ -177,7 +202,7 @@ function buildSourceIdentity(winner, instances) {
  * is carried on the lever so the terminal evidence can state the exact reason.
  *
  * The lever is actionable (offerable for Apply) ONLY when identity proof
- * passes — same geometry, current fingerprint, complete payload, no physical
+ * passes — same geometry, current fingerprints, complete payload, no physical
  * change. When proof fails, actionable is false and the lever is retained
  * for diagnostics only.
  *
@@ -185,7 +210,10 @@ function buildSourceIdentity(winner, instances) {
  * @param {object|null} params.winner - selection.winner (the confirmed result)
  * @param {Array} params.instances - current subwooferInstances
  * @param {object|null} params.baselineResult - the baseline result for effect
- * @param {object} [params.identity] - the run's identity (designFingerprint)
+ * @param {object} [params.identity] - the run's identity
+ * @param {string} [params.identity.inputIdentity] - V2 start fingerprint
+ * @param {string} [params.identity.cacheKey] - completed-bass cache key
+ * @param {string} [params.identity.designFingerprint] - alias for cacheKey
  * @param {object|null} [params.currentCrossover] - the design's current crossover
  * @param {Array} [params.seatingPositions] - current seating positions snapshot
  * @param {object} [params.rspAuthority] - { rspMode, manualRspY_m, manualRspX_m, designated_rsp_seat_id }
@@ -213,12 +241,14 @@ export function buildCombinedElectronicLever({
   const changes = tuning.filter((row) => row.changed);
 
   // The lever is actionable ONLY when identity proof passes: same geometry,
-  // current fingerprint, complete payload, no physical change. A combined
+  // current fingerprints, complete payload, no physical change. A combined
   // electronic candidate whose identity cannot be proven is retained as
   // evidence but never offered for automatic Apply — a partial apply
   // (tuning without crossover, or against a different geometry) would not
   // reproduce the confirmed result.
   const actionable = identityProof.valid === true;
+
+  const cacheKeyAuthority = identity.cacheKey || identity.designFingerprint || null;
 
   return {
     lever: OPTIMISER_LEVER.COMBINED_ELECTRONIC,
@@ -237,7 +267,7 @@ export function buildCombinedElectronicLever({
     reason: actionable
       ? "Combined crossover and electronic tuning improvement, confirmed on the installed geometry."
       : "This combined crossover and tuning improvement could not be verified against the current design. Review the evaluated settings in Technical Details.",
-    // Positive identity proof: same geometry, current fingerprint, complete
+    // Positive identity proof: same geometry, current fingerprints, complete
     // payload. When proof fails, the lever still exists (so the plan is not
     // null) but carries the issues for the terminal evidence to state.
     identityProof,
@@ -248,12 +278,17 @@ export function buildCombinedElectronicLever({
     tuning,
     // Only changed rows, for the plan's `changes` contract.
     changes: changes.length > 0 || crossover ? changes : [],
-    // Per-source model and physical geometry identity — makes the candidate
-    // reproducible exactly. The apply path verifies these match before writing.
+    // Per-source model and physical geometry identity — captured from the
+    // canonical candidate, not stamped from current instances. The apply path
+    // verifies these match the CURRENT installed instances before writing.
     sourceIdentity,
     // The winning candidate's own origin and retune flags.
     candidateOrigin: winner.candidateOrigin || null,
     combinedFrom: winner.combinedFrom || null,
+    // Both identity domain fingerprints from the canonical candidate — never
+    // cross-domain compared.
+    inputIdentity: winner.inputIdentity || null,
+    baselineCacheKey: winner.baselineCacheKey || null,
     // Seating and RSP authority snapshot at confirmation time.
     seatingAuthority: Array.isArray(seatingPositions)
       ? seatingPositions.map((seat) => ({
@@ -268,10 +303,12 @@ export function buildCombinedElectronicLever({
       manualRspX_m: round(num(rspAuthority.manualRspX_m), 3),
       designated_rsp_seat_id: rspAuthority.designated_rsp_seat_id || null,
     } : null,
-    // Confirmation and design fingerprints — the run's own identity, so a
-    // reopened plan states which design the candidate was confirmed against.
-    designFingerprint: identity.designFingerprint || null,
+    // The run's own identity, so a reopened plan states which design the
+    // candidate was confirmed against. Both fingerprint domains are stored.
+    designFingerprint: cacheKeyAuthority,
+    inputIdentityAuthority: identity.inputIdentity || null,
+    cacheKeyAuthority,
     resultFingerprint: identity.resultFingerprint || null,
-    cacheKey: identity.cacheKey || identity.designFingerprint || null,
+    cacheKey: cacheKeyAuthority,
   };
 }

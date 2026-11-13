@@ -711,6 +711,19 @@ export default function OptimiseAndCalculate({
             seatingPositions,
           },
         });
+        // Both identity domains from the canonical winner: the V2 start
+        // fingerprint (inputIdentity) and the live cache key (baselineCacheKey).
+        // Each is checked against its OWN authority in identity proof — never
+        // cross-domain.
+        const winnerInputIdentity = result.selection?.winner?.inputIdentity || null;
+        const winnerBaselineCacheKey = result.selection?.winner?.baselineCacheKey || null;
+        const currentCrossover = appState?.splConfig?.crossover || null;
+        const rspAuthority = {
+          rspMode: appState?.rspMode || null,
+          manualRspY_m: appState?.manualRspY_m ?? null,
+          manualRspX_m: appState?.manualRspX_m ?? null,
+          designated_rsp_seat_id: appState?.designatedRspSeatId || null,
+        };
         const optimiserPlan = buildOptimiserPlan({
           selection: result.selection,
           baseline: result.selection?.currentResult || null,
@@ -722,6 +735,8 @@ export default function OptimiseAndCalculate({
             baselineParity: result.baselineParity || null,
             cacheKey: currentShared?.cacheKey || null,
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
+            inputIdentity: winnerInputIdentity,
+            baselineCacheKey: winnerBaselineCacheKey,
             target: {
               p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb
                 ?? currentShared?.completedBassAuthority?.p14TargetDb
@@ -737,6 +752,8 @@ export default function OptimiseAndCalculate({
           leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
           calibrationDecision: calibrationApplication,
           decisionApplied: calibrationApplied,
+          currentCrossover,
+          rspAuthority,
         });
         const { actionability, actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
           plan: optimiserPlan,

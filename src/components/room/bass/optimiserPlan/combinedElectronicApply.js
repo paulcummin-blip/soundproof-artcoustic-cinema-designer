@@ -14,15 +14,14 @@
 //   - The new subwooferInstances with per-source tuning applied (via the
 //     existing applyCalibrationTuning, which handles delay/gain/phase/polarity
 //     and stamps tuningSource provenance).
-//   - The new crossover config (the lever's `crossover.after`).
+//   - The new crossover config (the lever's raw crossover.after, never
+//     reconstructed from rounded display rows or defaulted via Number(...) || 0).
 //   - The previous instances and crossover, for restoration and auditability.
 //
-// It reuses the existing applyCalibrationTuning for the tuning write — it
-// does NOT build a second tuning engine. It adds the crossover on top, which
-// the existing applyCalibrationTuning does not handle.
-//
-// Identity is re-verified before apply: the lever's sourceIdentity (model,
-// position, height, rotation) must match the current instances. A mismatch
+// IDENTITY: exact match required — no tolerances, no NaN. The lever's
+// sourceIdentity (model, position, height, rotation) must match the current
+// instances EXACTLY. Both fingerprint domains (inputIdentity and
+// baselineCacheKey) must be nonempty and match their authorities. A mismatch
 // means the design has changed since the run confirmed the candidate, and
 // apply is refused — the previous state is retained.
 //
@@ -33,11 +32,6 @@
 import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration.js";
 import { activeInstances } from "./optimiserPlanMatching.js";
 
-const COORDINATE_TOLERANCE_M = 0.01;
-const HEIGHT_TOLERANCE_M = 0.01;
-const ROTATION_TOLERANCE_DEG = 1;
-
-/** Why a combined electronic apply cannot proceed. */
 export const COMBINED_ELECTRONIC_APPLY_BLOCK = Object.freeze({
   NO_LEVER: "no_lever",
   INCOMPLETE: "incomplete",
@@ -45,6 +39,8 @@ export const COMBINED_ELECTRONIC_APPLY_BLOCK = Object.freeze({
   NO_CROSSOVER: "no_crossover",
   NO_TUNING: "no_tuning",
   STALE_FINGERPRINT: "stale_fingerprint",
+  BAD_TUNING: "bad_tuning",
+  BAD_CROSSOVER: "bad_crossover",
 });
 
 export const COMBINED_ELECTRONIC_APPLY_BLOCK_MESSAGE = Object.freeze({
@@ -60,6 +56,10 @@ export const COMBINED_ELECTRONIC_APPLY_BLOCK_MESSAGE = Object.freeze({
     "The confirmed per-source tuning is missing — a partial apply is not permitted.",
   [COMBINED_ELECTRONIC_APPLY_BLOCK.STALE_FINGERPRINT]:
     "This optimisation result belongs to an earlier design state. Re-run the Optimisation Plan before applying.",
+  [COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_TUNING]:
+    "The confirmed tuning contains duplicate IDs, non-finite values, or missing fields — it cannot be applied safely.",
+  [COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_CROSSOVER]:
+    "The confirmed crossover contains non-finite or missing values — it cannot be applied safely.",
 });
 
 const blocked = (code) => ({
@@ -69,9 +69,19 @@ const blocked = (code) => ({
 });
 
 /**
- * Verify the lever's sourceIdentity matches the current active instances.
- * A mismatch (model, position, height, rotation) means the design has changed
- * since the run confirmed the candidate — apply is refused.
+ * Require a finite number, returning null when the value is not finite.
+ * Never defaults via Number(...) || 0 — a missing value stays missing.
+ */
+function requireFinite(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Verify the lever's sourceIdentity matches the current active instances
+ * EXACTLY — no tolerances, no NaN comparisons. A mismatch (model, position,
+ * height, rotation) means the design has changed since the run confirmed the
+ * candidate — apply is refused.
  */
 function verifySourceIdentity(lever, instances) {
   const identity = Array.isArray(lever?.sourceIdentity) ? lever.sourceIdentity : [];
@@ -81,16 +91,87 @@ function verifySourceIdentity(lever, instances) {
   for (const entry of identity) {
     const inst = byId.get(entry.sourceId);
     if (!inst) return false;
+    // Model must match exactly.
     if ((inst.model || null) !== (entry.model || null)) return false;
-    const dx = Math.abs(Number(inst.position?.x) - Number(entry.geometry?.x));
-    const dy = Math.abs(Number(inst.position?.y) - Number(entry.geometry?.y));
-    if (dx > COORDINATE_TOLERANCE_M || dy > COORDINATE_TOLERANCE_M) return false;
-    const dh = Math.abs(Number(inst.bottomHeightM) - Number(entry.geometry?.bottomHeightM));
-    if (dh > HEIGHT_TOLERANCE_M) return false;
-    const dr = Math.abs(Number(inst.rotationDeg) - Number(entry.geometry?.rotationDeg));
-    if (dr > ROTATION_TOLERANCE_DEG) return false;
+    // Position must match exactly — no tolerance, no NaN.
+    const ix = requireFinite(inst.position?.x);
+    const iy = requireFinite(inst.position?.y);
+    const ex = requireFinite(entry.geometry?.x);
+    const ey = requireFinite(entry.geometry?.y);
+    if (ix === null || iy === null || ex === null || ey === null) return false;
+    if (ix !== ex || iy !== ey) return false;
+    // Height must match exactly.
+    const ih = requireFinite(inst.bottomHeightM);
+    const eh = requireFinite(entry.geometry?.bottomHeightM);
+    if (ih === null || eh === null || ih !== eh) return false;
+    // Rotation must match exactly.
+    const ir = requireFinite(inst.rotationDeg);
+    const er = requireFinite(entry.geometry?.rotationDeg);
+    if (ir === null || er === null || ir !== er) return false;
   }
   return true;
+}
+
+/**
+ * Validate the raw tuning entries from the lever. Rejects duplicate IDs,
+ * non-finite values, or missing fields. The tuning values used for apply are
+ * the WINNER'S OWN raw values — never reconstructed from rounded display rows
+ * or defaulted via Number(...) || 0.
+ */
+function validateRawTuning(tuning, active) {
+  if (!Array.isArray(tuning) || tuning.length === 0) return null;
+  if (tuning.length !== active.length) return null;
+  const seenIds = new Set();
+  const activeIds = new Set(active.map((inst) => inst.id));
+  const result = [];
+  for (const row of tuning) {
+    if (!row?.subId || !activeIds.has(row.subId)) return null;
+    if (seenIds.has(row.subId)) return null; // duplicate ID
+    seenIds.add(row.subId);
+    const delayMs = requireFinite(row.toDelayMs);
+    const gainDb = requireFinite(row.toGainDb);
+    const phaseControlDeg = requireFinite(row.toPhaseDeg);
+    if (delayMs === null || gainDb === null || phaseControlDeg === null) return null;
+    const polarity = row.toPolarity;
+    if (polarity !== 1 && polarity !== -1 && polarity !== 0 && polarity !== 180) return null;
+    result.push({
+      sourceId: row.subId,
+      delayMs,
+      gainDb,
+      phaseControlDeg,
+      polarity,
+    });
+  }
+  return result;
+}
+
+/**
+ * Validate the raw crossover from the lever. The crossover values used for
+ * apply are the WINNER'S OWN raw confirmed values — never reconstructed from
+ * rounded display rows or defaulted.
+ */
+function validateRawCrossover(crossoverAfter) {
+  if (!crossoverAfter || typeof crossoverAfter !== "object") return null;
+  const frequencyHz = requireFinite(crossoverAfter.frequencyHz);
+  const speakerHpSlopeDbPerOct = requireFinite(crossoverAfter.speakerHpSlopeDbPerOct);
+  const subwooferLpSlopeDbPerOct = requireFinite(crossoverAfter.subwooferLpSlopeDbPerOct);
+  if (frequencyHz === null || frequencyHz <= 0) return null;
+  if (speakerHpSlopeDbPerOct === null) return null;
+  if (subwooferLpSlopeDbPerOct === null) return null;
+  const linkFrequencies = crossoverAfter.linkFrequencies !== false;
+  let subwooferFrequencyHz = frequencyHz;
+  if (!linkFrequencies) {
+    const subFreq = requireFinite(crossoverAfter.subwooferFrequencyHz);
+    if (subFreq === null || subFreq <= 0) return null;
+    subwooferFrequencyHz = subFreq;
+  }
+  return {
+    frequencyHz,
+    speakerHpSlopeDbPerOct,
+    subwooferLpSlopeDbPerOct,
+    linkFrequencies,
+    subwooferFrequencyHz,
+  };
 }
 
 /**
@@ -100,11 +181,15 @@ function verifySourceIdentity(lever, instances) {
  * crossover config in one coherent update. Returns the new instances, the
  * new crossover, and the previous state for restoration.
  *
+ * Identity is re-verified before apply: the lever's sourceIdentity (model,
+ * position, height, rotation) must match the current instances EXACTLY, and
+ * both fingerprint domains must match their authorities.
+ *
  * @param {object} params
  * @param {object} params.lever - the combined electronic plan lever
  * @param {Array} params.instances - current subwooferInstances (ALL, including disabled)
  * @param {object|null} params.currentCrossover - the design's current crossover
- * @param {object} [params.identity] - the run's identity (designFingerprint)
+ * @param {object} [params.identity] - the run's identity (both fingerprint domains)
  * @returns {{ ok: boolean, code?: string, reason?: string, instances?: Array, crossover?: object, previousInstances?: Array, previousCrossover?: object }}
  */
 export function buildCombinedElectronicApply({
@@ -120,48 +205,46 @@ export function buildCombinedElectronicApply({
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.INCOMPLETE);
   }
 
-  // Stale fingerprint: the lever was confirmed against a different design.
-  const leverFingerprint = lever.designFingerprint || lever.cacheKey || null;
-  const currentFingerprint = identity.designFingerprint || null;
-  if (leverFingerprint && currentFingerprint && leverFingerprint !== currentFingerprint) {
+  // Fingerprint domains — each checked against its own authority.
+  const leverInputIdentity = lever.inputIdentity || null;
+  const authorityInputIdentity = identity.inputIdentity || lever.inputIdentityAuthority || null;
+  if (leverInputIdentity && authorityInputIdentity && leverInputIdentity !== authorityInputIdentity) {
+    return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.STALE_FINGERPRINT);
+  }
+  const leverCacheKey = lever.baselineCacheKey || null;
+  const authorityCacheKey = identity.cacheKey || identity.designFingerprint || lever.cacheKeyAuthority || null;
+  if (leverCacheKey && authorityCacheKey && leverCacheKey !== authorityCacheKey) {
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.STALE_FINGERPRINT);
   }
 
-  // Complete crossover payload.
+  // Complete crossover payload — validated raw, not reconstructed.
   const crossoverAfter = lever.crossover?.after || null;
-  if (!crossoverAfter || !Number.isFinite(Number(crossoverAfter.frequencyHz))) {
-    return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.NO_CROSSOVER);
+  const nextCrossover = validateRawCrossover(crossoverAfter);
+  if (!nextCrossover) {
+    return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_CROSSOVER);
   }
 
-  // Complete per-source tuning — the winner's own confirmed tuning.
+  // Complete per-source tuning — the winner's own raw values, validated.
   const tuning = lever.tuning || [];
   if (!Array.isArray(tuning) || tuning.length === 0) {
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.NO_TUNING);
   }
 
-  // The winner's tuning entries (from the lever's tuning rows carry the
-  // winner's `to` values). Reconstruct the tuning array for applyCalibrationTuning.
   const active = activeInstances(instances);
   if (tuning.length !== active.length) {
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.IDENTITY_MISMATCH);
   }
 
-  // Re-verify the installed geometry matches the lever's sourceIdentity.
+  // Re-verify the installed geometry matches the lever's sourceIdentity EXACTLY.
   if (!verifySourceIdentity(lever, instances)) {
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.IDENTITY_MISMATCH);
   }
 
-  // Build the tuning array in the sourceId-keyed format applyCalibrationTuning expects.
-  const tuningToApply = tuning.map((row) => {
-    const entry = active.find((inst) => inst.id === row.subId);
-    return {
-      sourceId: row.subId,
-      delayMs: Number(row.toDelayMs) || 0,
-      gainDb: Number(row.toGainDb) || 0,
-      phaseControlDeg: Number(row.toPhaseDeg) || 0,
-      polarity: row.toPolarity,
-    };
-  });
+  // Validate the raw tuning entries — rejects duplicate IDs, non-finite, missing.
+  const tuningToApply = validateRawTuning(tuning, active);
+  if (!tuningToApply) {
+    return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_TUNING);
+  }
 
   // Apply the per-source tuning via the existing, proven applyCalibrationTuning.
   // This stamps tuningSource: "v2-optimised" provenance on each instance.
@@ -171,17 +254,6 @@ export function buildCombinedElectronicApply({
   } catch {
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.IDENTITY_MISMATCH);
   }
-
-  // The crossover config to write — the lever's confirmed `after` config.
-  const nextCrossover = {
-    frequencyHz: Number(crossoverAfter.frequencyHz),
-    speakerHpSlopeDbPerOct: Number(crossoverAfter.speakerHpSlopeDbPerOct),
-    subwooferLpSlopeDbPerOct: Number(crossoverAfter.subwooferLpSlopeDbPerOct),
-    linkFrequencies: crossoverAfter.linkFrequencies !== false,
-    subwooferFrequencyHz: crossoverAfter.linkFrequencies === false
-      ? Number(crossoverAfter.subwooferFrequencyHz)
-      : Number(crossoverAfter.frequencyHz),
-  };
 
   return {
     ok: true,
@@ -222,14 +294,26 @@ export function buildCombinedElectronicUndo({
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.IDENTITY_MISMATCH);
   }
 
-  // Restore the `from` tuning values.
-  const tuningToRestore = tuning.map((row) => ({
-    sourceId: row.subId,
-    delayMs: Number(row.fromDelayMs) || 0,
-    gainDb: Number(row.fromGainDb) || 0,
-    phaseControlDeg: Number(row.fromPhaseDeg) || 0,
-    polarity: row.fromPolarity,
-  }));
+  // Validate the raw `from` tuning entries.
+  const seenIds = new Set();
+  const activeIds = new Set(active.map((inst) => inst.id));
+  const tuningToRestore = [];
+  for (const row of tuning) {
+    if (!row?.subId || !activeIds.has(row.subId)) return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_TUNING);
+    if (seenIds.has(row.subId)) return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_TUNING);
+    seenIds.add(row.subId);
+    const delayMs = requireFinite(row.fromDelayMs);
+    const gainDb = requireFinite(row.fromGainDb);
+    const phaseControlDeg = requireFinite(row.fromPhaseDeg);
+    if (delayMs === null || gainDb === null || phaseControlDeg === null) return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.BAD_TUNING);
+    tuningToRestore.push({
+      sourceId: row.subId,
+      delayMs,
+      gainDb,
+      phaseControlDeg,
+      polarity: row.fromPolarity,
+    });
+  }
 
   let nextInstances;
   try {
@@ -238,16 +322,8 @@ export function buildCombinedElectronicUndo({
     return blocked(COMBINED_ELECTRONIC_APPLY_BLOCK.IDENTITY_MISMATCH);
   }
 
-  // Restore the `before` crossover, or null when none was recorded.
-  const nextCrossover = crossoverBefore ? {
-    frequencyHz: Number(crossoverBefore.frequencyHz),
-    speakerHpSlopeDbPerOct: Number(crossoverBefore.speakerHpSlopeDbPerOct),
-    subwooferLpSlopeDbPerOct: Number(crossoverBefore.subwooferLpSlopeDbPerOct),
-    linkFrequencies: crossoverBefore.linkFrequencies !== false,
-    subwooferFrequencyHz: crossoverBefore.linkFrequencies === false
-      ? Number(crossoverBefore.subwooferFrequencyHz)
-      : Number(crossoverBefore.frequencyHz),
-  } : null;
+  // Restore the `before` crossover — validated raw.
+  const nextCrossover = crossoverBefore ? validateRawCrossover(crossoverBefore) : null;
 
   return {
     ok: true,

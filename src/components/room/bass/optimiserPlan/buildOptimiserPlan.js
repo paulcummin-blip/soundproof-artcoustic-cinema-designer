@@ -362,6 +362,11 @@ export function buildOptimiserPlan({
   // refresh, and never re-derives one.
   calibrationDecision = null,
   decisionApplied = false,
+  // The design's current crossover config and RSP authority, passed through to
+  // the combined electronic lever so its before/after snapshots are captured
+  // from the real design state at plan-build time.
+  currentCrossover = null,
+  rspAuthority = null,
 } = {}) {
   if (!selection || typeof selection !== "object") return null;
   const winner = selection.winner || null;
@@ -501,9 +506,9 @@ export function buildOptimiserPlan({
   // fails, actionable is false and the lever is retained for diagnostics.
   const combinedElectronic = buildCombinedElectronicLever({
     winner, instances, baselineResult, identity,
-    currentCrossover: null,
+    currentCrossover,
     seatingPositions,
-    rspAuthority: {
+    rspAuthority: rspAuthority || {
       rspMode: null,
       manualRspY_m: null,
       manualRspX_m: null,
