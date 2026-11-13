@@ -66,7 +66,7 @@ export function electronicContextFromUi({shared,appState,subwooferInstances,room
     } : null,
   });
 }
-export function prepareElectronicCandidate({candidate,context,inputIdentity,cacheKey,currentCrossover}) {
+export function prepareElectronicCandidate({candidate,context,inputIdentity,cacheKey,currentCrossover,currentEffectiveCrossover=currentCrossover}) {
   if (!candidate || !isCalibrationOnlyResult(candidate) || candidate.isCrossQuantity ||
       !candidate.electronicContext || !context) return {ok:false,reason:"Unproven installed configuration."};
   if (!nonempty(inputIdentity) || !nonempty(cacheKey) ||
@@ -78,13 +78,13 @@ export function prepareElectronicCandidate({candidate,context,inputIdentity,cach
   if ((candidate.combinedFrom?.crossover || candidate.integrationVerified) && !completeCrossover(candidate.crossover))
     return {ok:false,reason:"Incomplete confirmed crossover settings."};
   const tuning = candidate.appliedTuning;
-  const crossover = candidate.crossover || currentCrossover;
-  if (!completeTuning(tuning,context.instances) || !completeCrossover(crossover) ||
-      !completeCrossover(currentCrossover)) return {ok:false,reason:"Incomplete confirmed electronic settings."};
+  const crossover = candidate.crossover || currentEffectiveCrossover;
+  if (!completeTuning(tuning,context.instances)) return {ok:false,reason:"Incomplete confirmed per-source tuning."};
+  if (!completeCrossover(crossover) || !completeCrossover(currentEffectiveCrossover)) return {ok:false,reason:"Incomplete canonical crossover settings."};
   const nextInstances = applyCalibrationTuning(context.instances,clone(tuning));
   // The only mutated fields are those written by the established tuning adapter.
   return {ok:true,instances:nextInstances,crossover:clone(crossover),tuning:clone(tuning),
-    before:{instances:clone(context.instances),crossover:clone(currentCrossover)}};
+    before:clone({instances:context.instances,crossover:currentCrossover,effectiveCrossover:currentEffectiveCrossover})};
 }
 export function settingsEqual(a,b) {
   return !!a && !!b && stable(a.instances) === stable(b.instances) && stable(a.crossover) === stable(b.crossover);
@@ -103,7 +103,7 @@ export function changedSettings(before,after) {
     add(label+"Delay",old.delayMs??0,s.delayMs??0," ms");
     add(label+"Gain",old.gainDb??0,s.gainDb??0," dB");
   });
-  const a=before.crossover,b=after.crossover;
+  const a=before.effectiveCrossover||before.crossover,b=after.effectiveCrossover||after.crossover;
   if(a&&b){
     add("Speaker high-pass",a.frequencyHz,b.frequencyHz," Hz");
     add("Speaker high-pass slope",a.speakerHpSlopeDbPerOct,b.speakerHpSlopeDbPerOct," dB/oct");
