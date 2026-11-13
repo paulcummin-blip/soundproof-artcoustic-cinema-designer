@@ -1003,8 +1003,8 @@ export default function OptimiseAndCalculate({
           eligible.push({candidate:valid.result,prepared,decision});
         }
       }
-      eligible.sort((a,b)=>(b.decision.improvement?.p20DeltaDb||0)-(a.decision.improvement?.p20DeltaDb||0) ||
-        (b.decision.improvement?.p19DeltaDb||0)-(a.decision.improvement?.p19DeltaDb||0));
+      eligible.sort((a,b)=>a.candidate.achievedP20VariationDb-b.candidate.achievedP20VariationDb ||
+        a.candidate.achievedP19VariationDb-b.candidate.achievedP19VariationDb);
       const chosen=eligible[0];
       const summary=buildAutoApplySummary(selection,subInstancesRef.current);
       const recommendations={
