@@ -15,6 +15,15 @@
 // The existing engineering workflow (Calculate + Improve Bass Response V2) is
 // retained behind an Advanced Diagnostics toggle.
 
+import { unstable_batchedUpdates } from "react-dom";
+import { clone, stable, electronicContextFromUi, physicalContext, prepareElectronicCandidate, settingsEqual,
+  changedSettings, resultLevels, comparisonReceipt, executeElectronicTransaction } from "./electronicApplication.js";
+import { withElectronicPersistence } from "./electronicPersistence.js";
+import { resolveCalibrationAutoApply } from "./adiCalibrationAutoApplyAuthority.js";
+import { validateCandidateForRun, canonicalLevel } from "../improveBassV2/confirmedCandidateValidity.js";
+import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification.js";
+import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison.js";
+import WhatAdiDid from "./WhatAdiDid.jsx";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
 import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
@@ -230,6 +239,68 @@ export default function OptimiseAndCalculate({
     : Number.isFinite(Number(appState?.splConfig?.subwooferAmplifierPowerW))
       ? Number(appState.splConfig.subwooferAmplifierPowerW)
       : DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W;
+
+
+  const liveElectronicRef=useRef(null);
+  liveElectronicRef.current={projectId,versionId,shared,appState,subwooferInstances,roomDims,seatingPositions,
+    frontSubsCfg,rearSubsCfg,amplifierPowerPerSubW:resolvedAmplifierPowerPerSubW};
+  const performElectronicUpdate=async receipt=>{
+    const before=receipt.before,after=receipt.after;
+    return withElectronicPersistence(projectId,versionId,async io=>{
+      if(!settingsEqual(await io.readback(),before))throw new Error("The saved starting settings changed. Run ADI again.");
+      const guard=()=>{
+        const live=liveElectronicRef.current;
+        if(!io.current() || live.projectId!==projectId || live.versionId!==versionId || phaseRef.current==="cancelled")return false;
+        const context=electronicContextFromUi(live);
+        return stable(physicalContext(context))===stable(receipt.physicalContext);
+      };
+      const commit=(settings,record)=>{
+        if(!io.current())return;
+        unstable_batchedUpdates(()=>{
+          commitInstances(settings.instances);
+          liveElectronicRef.current.appState.updateGlobalSpl({crossover:settings.crossover,bassAdiReceipt:record});
+        });
+      };
+      const verify=async(settings,restoring=false)=>{
+        phaseRef.current="recalculating";setRecalculating(projectId,versionId);
+        const start=Date.now();
+        // Wait for the complete state update and its new calculation identity.
+        while(Date.now()-start<15000){
+          if(!io.current())return false;
+          const live=liveElectronicRef.current;
+          if(settingsEqual({instances:live.subwooferInstances,crossover:live.appState?.splConfig?.crossover},settings))break;
+          await sleep(50);
+        }
+        const live=sharedRef.current;
+        if(typeof live?.onCalculate!=="function")return false;
+        live.onCalculate();
+        if(!(await waitForCurrentPublication(sharedRef,phaseRef)))return false;
+        const state=sharedRef.current;
+        const expected=restoring?receipt.beforeResult:receipt.expectedResult;
+        const tuning=settings.instances.filter(s=>s.enabled!==false).map(s=>({
+          sourceId:s.id,delayMs:s.delayMs??0,gainDb:s.gainDb??0,
+          phaseControlDeg:s.phaseControlDeg??s.phaseAdjust??0,polarity:s.polarity,
+        }));
+        if(!recommendationSettingsMatch(state.authoritative,{crossover:settings.crossover,tuning}) ||
+           !recommendationResultMatches(state.completedBassAuthority,expected))return false;
+        return {fingerprint:state.cacheKey,levels:resultLevels(extractAuthorityForComparison(state.completedBassAuthority))};
+      };
+      return executeElectronicTransaction({before,after,receipt,persist:io.persist,readback:io.readback,commit,verify,guard});
+    });
+  };
+  const restoreElectronicSettings=async()=>{
+    const receipt=liveElectronicRef.current.appState?.splConfig?.bassAdiReceipt;
+    if(!receipt?.before || !receipt?.after || isBusy)return;
+    try{
+      phaseRef.current="applying";setApplying(projectId,versionId);
+      const restored=await performElectronicUpdate({...receipt,runId:receipt.runId+":restore",
+        before:receipt.after,after:receipt.before,beforeResult:receipt.expectedResult,expectedResult:receipt.beforeResult,
+        beforeLevels:receipt.afterLevels,changes:changedSettings(receipt.after,receipt.before)});
+      liveElectronicRef.current.appState.updateGlobalSpl({bassAdiReceipt:{...restored,status:"restored"}});
+      setComplete(projectId,versionId,{},null,false);
+    }catch(error){setWorkflowError(projectId,versionId,error.message);}
+    finally{phaseRef.current="idle";}
+  };
 
   const bassActionDisabled = disabled
     || !hasActiveSubModel
@@ -715,7 +786,7 @@ export default function OptimiseAndCalculate({
         // fingerprint (inputIdentity) and the live cache key (baselineCacheKey).
         // Each is checked against its OWN authority in identity proof — never
         // cross-domain.
-        const winnerInputIdentity = result.selection?.winner?.inputIdentity || null;
+        const winnerInputIdentity = result.inputIdentityAuthority || null;
         const winnerBaselineCacheKey = result.selection?.winner?.baselineCacheKey || null;
         const currentCrossover = appState?.splConfig?.crossover || null;
         const rspAuthority = {
@@ -736,6 +807,7 @@ export default function OptimiseAndCalculate({
             cacheKey: currentShared?.cacheKey || null,
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
             inputIdentity: winnerInputIdentity,
+            electronicContext: electronicContextFromUi(liveElectronicRef.current),
             baselineCacheKey: winnerBaselineCacheKey,
             target: {
               p14TargetDb: currentShared?.authoritative?.requested?.selectedP14TargetDb
@@ -893,316 +965,83 @@ export default function OptimiseAndCalculate({
       }
       phaseRef.current = "idle";
 
-      // Phase 3: Route through the Recommendation Authority
-      // The optimiser's calibration tuning is now a RECOMMENDATION, not an
-      // auto-apply. The Recommendation Authority owns the proposal; the
-      // Accept Transition owns the mutation.
-      //
-      // First run (no Applied Calibration): auto-accept to preserve the
-      //   one-click behaviour — there is no existing design to protect.
-      // Existing calibration: STOP — the recommendation is set, and
-      //   BassDecisionActions renders the Accept/Continue decision.
-      const selection = result.selection;
-      const autoApplySummary = buildAutoApplySummary(selection, subInstancesRef.current);
-      const stageResults = autoApplySummary.stageResults;
-      const hasPhysical = hasPhysicalRecommendations(autoApplySummary);
-
-      // ── The calibration decision (made once, above) ──
-      // ADI applies a CALIBRATION change on its own — subwoofer delay, group
-      // delay, rear-sub acoustic delay offset, gain trim, polarity, all-pass
-      // phase — when the run's CONFIRMED canonical P19/P20 results support it:
-      // the improvement is material, it is at least three times any trade-off it
-      // carries (the 3:1 rule), no primary seat regresses, no level drops and no
-      // calibration a human set by hand is overwritten. The strongest qualifying
-      // candidate is the one applied; every other states why it was not.
-      //
-      // It never applies a PHYSICAL change, an unconfirmed result, or an
-      // overwrite of calibration a human set by hand. Those are stated and left
-      // to the designer. The only thing this path can write is the tuning.
-      const hasCal = Boolean(calibrationApplication.selected);
-
-      // NULL-TUNING GUARD: a validated tuning payload exists only when ADI
-      // selected a safe calibration candidate (hasCal) OR the optimiser winner
-      // carries its own appliedTuning. Null tuning (winner=null, no auto-apply)
-      // is a VALID no-apply outcome, not an exception. Do not .map(), do not
-      // apply, do not trigger post-apply recalculation.
-      const winnerTuning = autoApplySummary.tuning;
-      const hasValidTuning = hasCal
-        ? (Array.isArray(calibrationApplication.tuning) && calibrationApplication.tuning.length > 0)
-        : (Array.isArray(winnerTuning) && winnerTuning.length > 0);
-
-      // 4a. NO-APPLY COMPLETION: terminal at the durable plan save. Release the
-      // terminal UI NOW. The recommendation publication is ONE background write.
-      // No recalculation: nothing changed, so the published RP22 results still
-      // describe the current design.
-      if (!hasValidTuning) {
-        setComplete(projectId, versionId, {
-          phase: false,
-          delay: false,
-          gain: false,
-          globalBassTrim: false,
-          details: autoApplySummary.changeSummary,
-          calibration: calibrationApplication,
-        }, {
-          subPositions: autoApplySummary.hasPositions
-            ? autoApplySummary.stageResults?.subPositions?.result || null
-            : null,
-          seating: autoApplySummary.hasSeating
-            ? autoApplySummary.stageResults?.seating?.result || null
-            : null,
-          addSubs: false,
-        }, true);
-        publishAdiRecommendationInBackground(planFingerprint, persistedPlan, planRunEvidence, adiDecision);
-        return;
-      }
-
-      // 4b. APPLY PATH: a validated tuning payload exists.
-      phaseRef.current = "applying";
-      setApplying(projectId, versionId);
-
-      if (hasValidTuning) {
-        const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
-        const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
-
-        const basisFp = (() => {
-          try {
-            return computeAppliedCalibrationBasisFingerprint({
-              subwooferInstances: subInstancesRef.current,
-              roomDims,
-              seatingPositions,
-              rspPosition,
-              selectedSubModel,
-            });
-          } catch { return null; }
-        })();
-
-        if (hasCal && (!basisFp || !commitInstances)) {
-          throw new Error("The safe calibration could not be applied. The saved decision remains unapplied.");
-        }
-        if (basisFp) {
-          // 1. Build recommendationValues from the tuning ADI decided to apply:
-          //    the selected safe calibration candidate, or the optimiser's own
-          //    tuning when nothing was authorised for automatic application.
-          const tuningToApply = hasCal ? calibrationApplication.tuning : autoApplySummary.tuning;
-          const recommendationValues = tuningToApply.map((t) => ({
-            id: String(t.sourceId || t.id || ""),
-            delayMs: Number(t.delayMs) || 0,
-            gainDb: Number(t.gainDb) || 0,
-            polarity: (Number(t.polarity) < 0 || Number(t.polarity) === 180) ? -1 : 1,
-            phaseControlDeg: Number(t.phaseControlDeg ?? t.phaseAdjust) || 0,
-          }));
-
-          // 2. Create and set the Recommendation Authority object
-          const recommendation = createRecommendation({
-            geometryFingerprint: basisFp,
-            intent: RECOMMENDATION_INTENT.CALIBRATION,
-            recommendationValues,
-            generatedBy: "Bass Optimiser V2",
-            originatingCandidateId: calibrationApplication.selected?.candidateId
-              || selection?.winner?.candidateId || "auto-optimise",
-          });
-          setRecommendation(projectId, versionId, recommendation);
-
-          // 3. Apply ONLY the calibration the decision authorised. Anything the
-          //    decision held back is left for the designer — never applied
-          //    silently, whatever it would have gained.
-          if (hasCal) {
-            acceptRecommendation(projectId, versionId, {
-              currentGeometryFingerprint: basisFp,
-            });
-            const newInstances = applyRecommendationToInstances(
-              subInstancesRef.current,
-              recommendationValues,
-            );
-            try {
-              commitInstances(newInstances);
-              calibrationApplied = true;
-            } catch {
-              // Pre-apply checkpoint could not be captured — block the auto-apply
-              // so the designer is not left without Restore. Nothing is committed.
-              calibrationApplied = false;
-            }
-          } else {
-            // Not applied — a trade-off, an immaterial or ambiguous result, or a
-            // hand-set calibration. The recommendation is ready for the designer
-            // and NOTHING is recalculated: nothing changed, so the published RP22
-            // results still describe the current design.
-            setComplete(projectId, versionId, {
-              phase: false,
-              delay: false,
-              gain: false,
-              globalBassTrim: false,
-              details: autoApplySummary.changeSummary,
-              calibration: calibrationApplication,
-            }, {
-              subPositions: autoApplySummary.hasPositions
-                ? autoApplySummary.stageResults?.subPositions?.result || null
-                : null,
-              seating: autoApplySummary.hasSeating
-                ? autoApplySummary.stageResults?.seating?.result || null
-                : null,
-              addSubs: false,
-            }, false);
-            publishAdiRecommendationInBackground(planFingerprint, persistedPlan, planRunEvidence, adiDecision);
-            return;
-          }
+      // Apply one complete candidate-owned electronic configuration.
+      const selection=result.selection;
+      const baseline=selection.currentResult;
+      const context=electronicContextFromUi(liveElectronicRef.current);
+      const currentCrossover=liveElectronicRef.current.appState?.splConfig?.crossover;
+      const candidates=[
+        selection.winner,selection.integrationRecommendation,selection.combinedResult,
+        selection.calibrationResult,selection.gainResult,selection.phaseResult,
+        ...(selection.calibrationDiagnostics?.options||[]).map(o=>o.canonical),
+        ...(selection.gainDiagnostics?.options||[]).map(o=>o.canonical),
+      ].filter(Boolean);
+      const seen=new Set(), eligible=[], rejected=[];
+      for(const candidate of candidates){
+        if(seen.has(candidate.candidateId))continue;
+        seen.add(candidate.candidateId);
+        const prepared=prepareElectronicCandidate({candidate,context,
+          inputIdentity:result.inputIdentityAuthority,cacheKey:sharedRef.current?.cacheKey,currentCrossover});
+        if(!prepared.ok){rejected.push(prepared.reason);continue;}
+        const valid=validateCandidateForRun(candidate,{seats:seatingPositions,
+          sourceIds:context.instances.filter(s=>s.enabled!==false).map(s=>s.id),
+          inputIdentity:result.inputIdentityAuthority});
+        if(!valid.valid){rejected.push("Candidate confirmation is incomplete.");continue;}
+        const decision=resolveCalibrationAutoApply({baseline,candidate:valid.result,
+          objectives:selection.objectives,instances:context.instances,applyValidatedSimulation:true,
+          crossoverChanged:stable(prepared.crossover)!==stable(currentCrossover)});
+        // Preserve the canonical output/extension safety envelope.
+        const safeOutput=candidate.p14AchievedDb>=baseline.p14AchievedDb-0.1 &&
+          canonicalLevel(candidate.p14AchievedLevel)>=canonicalLevel(baseline.p14AchievedLevel) &&
+          candidate.achievedP18Hz<=baseline.achievedP18Hz+0.1;
+        if(decision.decision==="applied" && safeOutput && changedSettings(prepared.before,prepared).length){
+          eligible.push({candidate:valid.result,prepared,decision});
         }
       }
-
-      // ── Combined electronic crossover auto-apply ──
-      // When the plan carries a combined electronic lever whose identity proof
-      // passed, the winner's crossover config is written automatically alongside
-      // the tuning. The tuning was already committed by the calibration auto-apply
-      // above; the crossover is written here, BEFORE the recalculation, so the
-      // recalculation includes both. After recalculation, P19/P20 are verified;
-      // if they do not reproduce the predicted result, the previous crossover is
-      // restored (fail closed — the designer's previous config is retained).
-      const combinedLever = optimiserPlan?.levers?.[OPTIMISER_LEVER.COMBINED_ELECTRONIC] || null;
-      const combinedElectronicWinner = combinedLever?.identityProof?.valid === true
-        && combinedLever?.crossover?.after
-        ? combinedLever
-        : null;
-      let previousCrossoverForRollback = null;
-      let combinedElectronicApplied = false;
-      if (combinedElectronicWinner && typeof appState?.updateGlobalSpl === "function") {
-        const crossoverAfter = combinedElectronicWinner.crossover.after;
-        previousCrossoverForRollback = appState?.splConfig?.crossover || null;
-        const crossoverToWrite = {
-          frequencyHz: Number(crossoverAfter.frequencyHz),
-          speakerHpSlopeDbPerOct: Number(crossoverAfter.speakerHpSlopeDbPerOct),
-          subwooferLpSlopeDbPerOct: Number(crossoverAfter.subwooferLpSlopeDbPerOct),
-          linkFrequencies: crossoverAfter.linkFrequencies !== false,
-          subwooferFrequencyHz: crossoverAfter.linkFrequencies === false
-            ? Number(crossoverAfter.subwooferFrequencyHz)
-            : Number(crossoverAfter.frequencyHz),
+      eligible.sort((a,b)=>(b.decision.improvement?.p20DeltaDb||0)-(a.decision.improvement?.p20DeltaDb||0) ||
+        (b.decision.improvement?.p19DeltaDb||0)-(a.decision.improvement?.p19DeltaDb||0));
+      const chosen=eligible[0];
+      const summary=buildAutoApplySummary(selection,subInstancesRef.current);
+      const recommendations={
+        subPositions:summary.hasPositions?summary.stageResults?.subPositions?.result:null,
+        seating:summary.hasSeating?summary.stageResults?.seating?.result:null,addSubs:false,
+      };
+      if(chosen){
+        phaseRef.current="applying";setApplying(projectId,versionId);
+        const {prepared,candidate}=chosen;
+        const receipt={
+          schemaVersion:1,projectId,versionId,runId:activeRun.runId,candidateId:candidate.candidateId,
+          inputIdentity:result.inputIdentityAuthority,baselineCacheKey:candidate.baselineCacheKey,
+          physicalContext:physicalContext(context),before:prepared.before,
+          after:{instances:prepared.instances,crossover:prepared.crossover},
+          beforeResult:comparisonReceipt(baseline),expectedResult:comparisonReceipt(candidate),
+          beforeLevels:resultLevels(baseline),changes:changedSettings(prepared.before,prepared),
         };
-        try {
-          appState.updateGlobalSpl({ crossover: crossoverToWrite });
-          combinedElectronicApplied = true;
-        } catch {
-          // Fail closed: could not write the crossover — do NOT recalculate with
-          // a half-applied state. Restore the previous crossover and continue
-          // with tuning-only (the calibration auto-apply already succeeded).
-          try { appState.updateGlobalSpl({ crossover: previousCrossoverForRollback }); } catch { /* nothing more to restore */ }
-          combinedElectronicApplied = false;
+        await performElectronicUpdate(receipt);
+        calibrationApplied=true;
+        const keys=new Set(receipt.changes.map(r=>r.label.split(" · ").pop()));
+        setComplete(projectId,versionId,{phase:keys.has("Phase"),delay:keys.has("Delay"),
+          gain:keys.has("Gain"),polarity:keys.has("Polarity"),calibration:null},recommendations,false);
+        publishAdiRecommendationInBackground(sharedRef.current.cacheKey,persistedPlan,planRunEvidence,adiDecision);
+      }else{
+        const noBenefit=result.status==="complete" && !selection.winner && !rejected.length &&
+          !(selection.evaluationIssues||[]).length;
+        if(noBenefit){
+          const settings={instances:subInstancesRef.current,crossover:currentCrossover};
+          const fingerprint=sharedRef.current.cacheKey;
+          const receipt={schemaVersion:1,status:"no-changes",runId:activeRun.runId,projectId,versionId,
+            resultFingerprint:fingerprint,before:settings,after:settings,changes:[],
+            beforeLevels:resultLevels(baseline),afterLevels:resultLevels(baseline)};
+          await withElectronicPersistence(projectId,versionId,async io=>{
+            if(!io.current() || sharedRef.current.cacheKey!==fingerprint ||
+               !settingsEqual(await io.readback(),settings))throw new Error("The design changed before saving the ADI result.");
+            await io.persist(settings,receipt);
+            if((await io.readback()).receipt?.runId!==receipt.runId)throw new Error("The ADI result could not be read back.");
+            liveElectronicRef.current.appState.updateGlobalSpl({bassAdiReceipt:receipt});
+          });
         }
-      }
-
-      // Phase 4: Recalculate with the optimised system
-      phaseRef.current = "recalculating";
-      setRecalculating(projectId, versionId);
-
-      if (typeof sharedRef.current?.onCalculate === "function") {
-        // Small delay to let the instance commit propagate
-        await sleep(150);
-        sharedRef.current?.onCalculate();
-      }
-
-      // Wait for recalculation to complete — read live state via sharedRef
-      // (NOT the stale closure-captured `shared`) so layout/position changes
-      // between runs don't freeze the break condition on an old snapshot.
-      if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
-
-      // ── Combined electronic fail-closed verification ──
-      // After recalculation, verify the P19/P20 result reproduces the combined
-      // electronic winner's predicted improvement. If the authoritative result
-      // does NOT match the winner's P19/P20, restore the previous crossover
-      // (fail closed — the designer's previous config is retained, the tuning
-      // remains as the calibration auto-apply wrote it).
-      if (combinedElectronicApplied && previousCrossoverForRollback !== null) {
-        const postAuthority = sharedRef.current?.completedBassAuthority;
-        const winnerForVerify = result?.selection?.winner || null;
-        const predictedP19 = winnerForVerify?.achievedP19VariationDb;
-        const predictedP20 = winnerForVerify?.achievedP20VariationDb;
-        const actualP19 = postAuthority?.contract?.selectedCandidate?.achievedP19VariationDb;
-        const actualP20 = postAuthority?.contract?.selectedCandidate?.achievedP20VariationDb;
-        const p19Match = Number.isFinite(predictedP19) && Number.isFinite(actualP19)
-          && Math.abs(Number(actualP19) - Number(predictedP19)) < 0.5;
-        const p20Match = Number.isFinite(predictedP20) && Number.isFinite(actualP20)
-          && Math.abs(Number(actualP20) - Number(predictedP20)) < 0.5;
-        if (!p19Match || !p20Match) {
-          // Fail closed: restore the previous crossover. The tuning remains.
-          try {
-            appState?.updateGlobalSpl?.({ crossover: previousCrossoverForRollback });
-            combinedElectronicApplied = false;
-            // Trigger a recalculation with the restored crossover.
-            if (typeof sharedRef.current?.onCalculate === "function") {
-              await sleep(150);
-              sharedRef.current?.onCalculate();
-              await waitForCurrentPublication(sharedRef, phaseRef);
-            }
-          } catch {
-            // Restoration failed — the crossover is in an indeterminate state.
-            // The tuning is still applied; the designer is warned via the plan.
-          }
-        }
-      }
-
-      // ── Re-publish the recommendation with the POST-recalculation fingerprint ──
-      // The recommendation was initially published with the pre-auto-apply
-      // fingerprint. After the auto-apply + recalculate phases, the current
-      // fingerprint has changed. Re-publish the same recommendation against
-      // the new current fingerprint so it survives a page refresh and is
-      // available in completedBassAuthority.contract.recommendation for ADI
-      // cold-load restoration.
-      // Phase 5: Publishing
-      phaseRef.current = "publishing";
-      setPublishing(projectId, versionId);
-      await sleep(300);
-
-      // Build the summary from the settings ACTUALLY applied to the instances.
-      const appliedSettingKeys = new Set(
-        calibrationApplication.settings.map((setting) => setting.key.split(":")[0]),
-      );
-      const autoApplied = {
-        phase: appliedSettingKeys.has("phase"),
-        delay: appliedSettingKeys.has("delay"),
-        gain: appliedSettingKeys.has("gain"),
-        polarity: appliedSettingKeys.has("polarity"),
-        globalBassTrim: false,
-        details: autoApplySummary.changeSummary,
-        calibration: calibrationApplication,
-      };
-
-      const liveAuthority = sharedRef.current?.completedBassAuthority;
-      const globalTrim = liveAuthority?.contract?.selectedCandidate?.globalLevelAlignment
-        || liveAuthority?.contract?.productAnalysis?.parameters?.globalLevelAlignment
-        || null;
-      if (globalTrim && Number.isFinite(globalTrim.recommendedTrimDb) && Math.abs(globalTrim.recommendedTrimDb) > 0.05) {
-        autoApplied.globalBassTrim = true;
-        autoApplied.details = autoApplied.details || {};
-        autoApplied.details.globalTrimDb = globalTrim.recommendedTrimDb;
-      }
-
-      const recommendations = {
-        subPositions: autoApplySummary.hasPositions
-          ? autoApplySummary.stageResults?.subPositions?.result || null
-          : null,
-        seating: autoApplySummary.hasSeating
-          ? autoApplySummary.stageResults?.seating?.result || null
-          : null,
-        addSubs: false,
-      };
-
-      const noImprovements = !hasCal && !hasPhysical && !autoApplied.globalBassTrim;
-
-      // TERMINAL: release the card, then publish in the background.
-      setComplete(projectId, versionId, autoApplied, recommendations, noImprovements);
-
-      // ONE background re-publish against the POST-recalculation fingerprint,
-      // only when an apply actually changed the fingerprint. When it did not,
-      // no second write runs (the pre-apply write is the final state).
-      const postRecalcFingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
-        || sharedRef.current?.completedBassAuthority?.currentFingerprint
-        || null;
-      if (calibrationApplied && postRecalcFingerprint && postRecalcFingerprint !== planFingerprint) {
-        publishAdiRecommendationInBackground(postRecalcFingerprint, persistedPlan, planRunEvidence, adiDecision);
-      } else {
-        Promise.resolve(updateOptimiserRunHistoryPublication({
-          runId: activeRun.runId, projectId, versionId,
-          publicationStatus: "published",
-          publicationCompletedAt: new Date().toISOString(),
-        })).catch(() => {});
+        setComplete(projectId,versionId,{phase:false,delay:false,gain:false,calibration:null},recommendations,noBenefit);
+        publishAdiRecommendationInBackground(planFingerprint,persistedPlan,planRunEvidence,adiDecision);
       }
     } catch (err) {
       const errorClass = err instanceof TypeError ? "TypeError"
