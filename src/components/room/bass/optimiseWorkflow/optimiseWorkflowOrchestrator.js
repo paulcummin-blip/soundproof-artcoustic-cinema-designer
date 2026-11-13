@@ -268,6 +268,7 @@ export async function runOptimisation(opts) {
     correctabilityAssessment,
     integrationContext,
     crossQuantityQuantities,
+    manualRspX_m:appState?.manualRspX_m??null,manualRspY_m:appState?.manualRspY_m??null,
     rspMode: appState?.rspMode || null,
     designatedRspSeatId: appState?.designatedRspSeatId || null,
   };
