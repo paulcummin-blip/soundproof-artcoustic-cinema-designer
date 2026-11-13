@@ -608,6 +608,7 @@ export default function RP22ClientReport() {
     // The source identity is resolved at export time, in the background.
     issuedDocument: {
       projectId,
+      versionId: authority.versionId || null,
       accountId: projectDetails?.account_id || null,
       documentType: PROJECT_REPORT_DOCUMENT_TYPE,
       title: PROJECT_REPORT_TITLE,

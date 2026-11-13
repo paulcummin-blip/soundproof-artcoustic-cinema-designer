@@ -31,6 +31,8 @@ import { buildDurableSnapshot, fetchDurablePublication } from '@/components/engi
 import { auditReportSaveAuthority } from '@/components/engineering/publicationGateAuthority';
 import { resolveIssuedDocumentAccountId } from '@/components/library/issuedDocument/issuedDocumentOwnership';
 import { readProjectOwnership } from '@/components/library/issuedDocument/projectOwnershipRead';
+import { isProjectReportType } from '@/components/report/projectReport/projectReportIdentity';
+import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
 import {
   REPORT_SNAPSHOT_STATUS,
   buildSavedSourceFingerprints,
@@ -276,6 +278,19 @@ export function useReportSnapshot({
         publishSavedReportFingerprint();
         setEvidenceIncomplete(!parity.passed);
         setEvidenceMismatches([...parity.mismatches, ...parity.missing.map((field) => ({ area: field }))]);
+      }
+      // A saved PROJECT Report brings the same version's Speaker Design PDF with
+      // it: the schedule is created and stored from the saved version's own
+      // authority, through the one pipeline every path shares. It runs after the
+      // report save so the designer is never blocked, and it reuses a matching
+      // stored PDF instead of duplicating one. Only the Project Report owns the
+      // companion schedule — the Technical Report is its own document.
+      if (isProjectReportType(reportType) && written?.id) {
+        void ensureSpeakerDesignForVersion({
+          projectId,
+          versionId,
+          engineeringFingerprint: savedFingerprints.engineeringFingerprint || null,
+        });
       }
       return written;
     } catch (error) {

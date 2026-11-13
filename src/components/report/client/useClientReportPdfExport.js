@@ -193,6 +193,7 @@ export function useClientReportPdfExport({
           versionName,
           versionNumber,
           projectId: issuedDocument.projectId,
+          versionId: issuedDocument.versionId || null,
           accountId: issuedDocument.accountId || null,
           resolveSource: issuedDocument.resolveSource || null,
           exportedBy: issuedDocument.exportedBy || null,

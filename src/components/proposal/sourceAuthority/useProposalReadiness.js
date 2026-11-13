@@ -46,6 +46,7 @@ import {
   proposalEvidenceDifferenceIsSafe,
 } from '@/components/report/designIdentityComparison';
 import {
+  READINESS_STATE,
   resolveCalculationAuthority,
   resolveSavedReportCell,
   resolveVersionReadinessRow,
@@ -55,6 +56,11 @@ import {
   resolveSpeakerDesignCell,
   selectStoredSpeakerDesign,
 } from './speakerDesignChecklistReadiness';
+import {
+  getSpeakerDesignGenerationError,
+  isPreparingSpeakerDesign,
+  subscribeSpeakerDesignGenerationStatus,
+} from '@/components/report/speakerDesign/speakerDesignGenerationStatus';
 
 export function useProposalReadiness({ projectId = null, versionIds = [] } = {}) {
   const ids = useMemo(

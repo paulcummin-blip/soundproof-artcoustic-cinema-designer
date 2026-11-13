@@ -22,7 +22,7 @@ import {
   storeIssuedDocument,
 } from '@/components/library/issuedDocument/recordIssuedExport';
 import { clearPendingExport } from '@/components/library/issuedDocument/pendingIssuedExportStore';
-import { storeSpeakerDesign } from '@/components/report/speakerDesign/speakerDesignIssuedDocument';
+import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
 import {
   asExportStorageError,
   buildExportStorageDiagnostic,
@@ -73,23 +73,62 @@ async function storeReportDocument({ identity, snapshot }) {
 }
 
 /**
- * Store the companion Speaker Design PDF through the existing awaited storage
- * pipeline. Returns { ok, record } on success or { ok: false, error } on failure.
+ * Store the companion Speaker Design PDF through the ONE shared authority. The
+ * export path reuses a matching stored PDF instead of duplicating one, and a
+ * concurrent background attempt is never raced into two copies.
+ *
+ * Returns { ok, record } on success or { ok: false, error } on failure.
  */
 async function storeCompanionDocument({ params }) {
+  if (!params?.projectId) {
+    return { ok: false, error: 'The Speaker Design storage requires a project id.' };
+  }
+  // The version id and engineering fingerprint come from the export's own
+  // resolved source identity, so the stored schedule can only ever belong to the
+  // version the report was made from.
+  let resolvedSource = {};
   try {
-    const record = await storeSpeakerDesign(params);
-    return { ok: true, record };
+    resolvedSource = typeof params.resolveSource === 'function'
+      ? (await params.resolveSource()) || {}
+      : {};
   } catch (error) {
-    const filename = params?.filename || null;
-    const identity = {
-      documentType: 'speaker_design',
-      filename,
-      projectId: params?.projectId || null,
-    };
-    const message = logFailure(error, identity, filename);
+    const message = describeError(error);
     return { ok: false, error: message };
   }
+  const versionId = params.versionId || resolvedSource.versionId || null;
+  const engineeringFingerprint = resolvedSource.sourceFingerprints?.engineeringFingerprint || null;
+
+  const result = await ensureSpeakerDesignForVersion({
+    projectId: params.projectId,
+    versionId,
+    engineeringFingerprint,
+    schedule: {
+      groups: params.groups,
+      layout: params.layout || null,
+    },
+    projectName: params.projectName || null,
+    dealerName: params.dealerName || null,
+    clientName: params.clientName || null,
+    projectReference: params.projectReference || null,
+    versionName: params.versionName || null,
+    versionNumber: params.versionNumber ?? null,
+    accountId: params.accountId || null,
+    resolveSource: params.resolveSource || null,
+    exportedBy: params.exportedBy || null,
+  });
+
+  if (result.status === 'stored' || result.status === 'reused') {
+    return { ok: true, record: result.record || null };
+  }
+  if (result.status === 'already-preparing') {
+    // A concurrent attempt is already storing this schedule; treat as success —
+    // the in-flight attempt will notify readiness when it lands.
+    return { ok: true, record: null };
+  }
+  if (result.status === 'blocked') {
+    return { ok: false, error: result.reason || 'This version has no speaker design to export yet.' };
+  }
+  return { ok: false, error: result.error || 'The Speaker Design PDF could not be stored.' };
 }
 
 /**
