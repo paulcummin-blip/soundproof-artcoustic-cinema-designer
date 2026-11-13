@@ -221,20 +221,37 @@ async function runEnsureSpeakerDesign({
     // 5. Await the EXISTING storage pipeline. A failure here is returned with the
     //    real reason; the status is never marked Current on the strength of a
     //    request alone.
-    const record = await storeSpeakerDesign({
-      groups,
-      layout,
-      projectName: projectName || project?.name || null,
-      dealerName: dealerName || project?.dealer_name || null,
-      clientName: clientName || project?.client_name || null,
-      projectReference: projectReference || project?.project_reference || null,
-      versionName: resolvedVersionName,
-      versionNumber: resolvedVersionNumber,
-      projectId,
-      accountId: accountId || project?.account_id || null,
-      resolveSource: source,
-      exportedBy,
-    });
+    //
+    // The capture (html2canvas) inside the storage pipeline is a client-side
+    // rasterisation with no internal timeout. If it hangs — a resource that never
+    // loads, a canvas the browser will not allocate — the promise never settles,
+    // completeSpeakerDesignGeneration is never called, and the Proposal Centre
+    // row spins forever. A safety timeout races the storage call: if it does not
+    // settle, the timeout rejects, the catch clears the loading state with the
+    // real reason, and the card offers a Retry instead of an infinite spinner.
+    const STORAGE_TIMEOUT_MS = 120000;
+    const record = await Promise.race([
+      storeSpeakerDesign({
+        groups,
+        layout,
+        projectName: projectName || project?.name || null,
+        dealerName: dealerName || project?.dealer_name || null,
+        clientName: clientName || project?.client_name || null,
+        projectReference: projectReference || project?.project_reference || null,
+        versionName: resolvedVersionName,
+        versionNumber: resolvedVersionNumber,
+        projectId,
+        accountId: accountId || project?.account_id || null,
+        resolveSource: source,
+        exportedBy,
+      }),
+      new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Speaker Design PDF generation timed out. The document capture did not complete. Retry, or export the Speaker Design from the Current Speaker Design panel.')),
+          STORAGE_TIMEOUT_MS,
+        );
+      }),
+    ]);
 
     // 6. Verify a stored file reference came back. The record IS the authority;
     //    a record with no file reference is a failure, not a success.
