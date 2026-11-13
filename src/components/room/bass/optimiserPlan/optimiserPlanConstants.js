@@ -72,6 +72,14 @@ export const OPTIMISER_LEVER = Object.freeze({
   POLARITY: "polarity",
   GAIN: "gain",
   /**
+   * Combined crossover + electronic tuning. A canonically confirmed joint
+   * change (crossover frequency/slopes + per-source delay/gain/phase/polarity)
+   * evaluated on the installed geometry. Crossover apply is not yet supported,
+   * so this lever is always actionable: false — it is retained for diagnostics
+   * and manual application, never offered for automatic Apply.
+   */
+  COMBINED_ELECTRONIC: "combined_electronic",
+  /**
    * Listener movement. A real lever with its own evaluated result, its own
    * Apply/Undo path (it writes the seat positions, not the subwoofers) and the
    * strictest gate of all: nothing is offered unless the movement itself was
@@ -94,6 +102,7 @@ export const OPTIMISER_LEVER_ORDER = Object.freeze([
   OPTIMISER_LEVER.DELAY,
   OPTIMISER_LEVER.GAIN,
   OPTIMISER_LEVER.POLARITY,
+  OPTIMISER_LEVER.COMBINED_ELECTRONIC,
   OPTIMISER_LEVER.PLACEMENT,
   OPTIMISER_LEVER.SEATING,
 ]);
@@ -103,6 +112,7 @@ export const OPTIMISER_LEVER_LABEL = Object.freeze({
   [OPTIMISER_LEVER.DELAY]: "DELAY",
   [OPTIMISER_LEVER.POLARITY]: "POLARITY",
   [OPTIMISER_LEVER.GAIN]: "GAIN",
+  [OPTIMISER_LEVER.COMBINED_ELECTRONIC]: "COMBINED ELECTRONIC",
   [OPTIMISER_LEVER.SEATING]: "SEATING",
 });
 
@@ -148,6 +158,15 @@ export const OPTIMISER_TERMINAL_OUTCOME = Object.freeze({
    * actionable", never "no improvement found".
    */
   NON_ACTIONABLE_WINNER: "non_actionable_winner",
+  /**
+   * A combined crossover + electronic tuning winner WAS canonically confirmed,
+   * but crossover settings cannot be applied automatically yet. The improvement
+   * is real and the evidence is retained for diagnostics and manual application.
+   * Distinct from NO_USEFUL_IMPROVEMENT (no improvement found) and
+   * EVALUATION_INCOMPLETE (the run failed): a valid completed search found a
+   * non-actionable electronic result.
+   */
+  NON_ACTIONABLE_ELECTRONIC: "non_actionable_electronic",
   EVALUATION_INCOMPLETE: "evaluation_incomplete",
   FAILED: "failed",
 });

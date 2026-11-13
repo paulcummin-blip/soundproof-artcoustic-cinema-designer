@@ -31,6 +31,10 @@ import {
   buildOptimiserRunEvidence,
 } from "./buildOptimiserRunEvidence.js";
 
+/** A combined electronic winner was confirmed but crossover apply is not yet supported. */
+export const NON_ACTIONABLE_ELECTRONIC_REASON =
+  "A combined crossover and electronic tuning improvement was confirmed, but crossover settings cannot be applied automatically yet. Review the evaluated settings in Technical Details and apply them manually in your processor.";
+
 /** The winning candidate's change was lost before it was persisted. */
 export const WINNING_CHANGE_NOT_RETAINED_REASON =
   "The winning candidate's change was not retained with this run, so it cannot be shown or applied. Re-run the Optimisation Plan.";
@@ -86,6 +90,10 @@ function evaluationIssueReason(selection) {
 export function leverIsOfferable(lever, baseline) {
   if (!lever || lever.evaluated !== true) return false;
   if (lever.notEvaluated === true || !lever.effect) return false;
+  // A combined electronic lever is never offered for automatic Apply: crossover
+  // apply is not yet supported, and a partial apply (delay/gain/phase/polarity
+  // without crossover) would not reproduce the confirmed result.
+  if (lever.actionable === false) return false;
   const changes = Array.isArray(lever.changes) ? lever.changes : [];
   if (changes.length === 0) return false;
   const verdict = resolveLeverVerdict({
@@ -168,6 +176,25 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
       terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
       reason: `${SEATING_NOT_SAFE_REASON_PREFIX} ${blockedByGeometry.validation?.reason
         || "the destination seat positions could not be confirmed."} (${label})`,
+      offerableLevers: [],
+    };
+  }
+
+  // A combined electronic winner was confirmed but crossover apply is not yet
+  // supported. This is NOT "no useful improvement" (the improvement is real) and
+  // NOT "evaluation incomplete" (the search completed). The dedicated terminal
+  // outcome states the distinction so the panel never says "no improvement
+  // found" for a run that DID find a confirmed electronic improvement.
+  const combinedElectronic = levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC];
+  if (combinedElectronic && combinedElectronic.actionable === false) {
+    const identityIssues = combinedElectronic.identityProof?.issues;
+    const reason = (Array.isArray(identityIssues) && identityIssues.length > 0)
+      ? `${NON_ACTIONABLE_ELECTRONIC_REASON} (${identityIssues.join("; ")})`
+      : NON_ACTIONABLE_ELECTRONIC_REASON;
+    return {
+      actionable: false,
+      terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_ELECTRONIC,
+      reason,
       offerableLevers: [],
     };
   }

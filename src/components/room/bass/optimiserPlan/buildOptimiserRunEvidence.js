@@ -23,6 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import {
+  OPTIMISER_LEVER,
   OPTIMISER_LEVER_LABEL,
   OPTIMISER_NO_WINNER_REASON,
   OPTIMISER_PLAN_VERSION,
@@ -402,7 +403,9 @@ export function buildOptimiserRunEvidence({
   // already describe a ranking winner that exists but is not practical. The
   // NON_ACTIONABLE_WINNER outcome is a distinct terminal state — a winner exists,
   // the improvement is real, the movement is not buildable — so the generic
-  // "no candidate was confirmed" wording is never appended to it.
+  // "no candidate was confirmed" wording is never appended to it. The
+  // NON_ACTIONABLE_ELECTRONIC outcome is likewise distinct: a confirmed
+  // electronic improvement exists but crossover apply is not yet supported.
   if (outcome === OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT
     && !failureReason?.startsWith?.(OPTIMISER_WINNER_NON_PRACTICAL_REASON)) {
     rejectionReasons.push(OPTIMISER_NO_WINNER_REASON);
@@ -432,6 +435,22 @@ export function buildOptimiserRunEvidence({
     calibrationDecision,
     decisionApplied,
   });
+
+  // The combined electronic winner's evidence, retained for diagnostics when
+  // the run's only result is a non-actionable combined crossover + tuning
+  // improvement. The plan builder constructs a COMBINED_ELECTRONIC lever from
+  // the winner; the terminal evidence preserves a compact version here so a
+  // reopened run states the exact evaluated configuration without fabricating
+  // a plan. Null when the winner is not a combined electronic candidate.
+  const combinedElectronicResult = (selection?.winner?.combinedFrom?.crossover === true)
+    ? {
+      candidateId: selection.winner.candidateId || null,
+      candidateOrigin: selection.winner.candidateOrigin || null,
+      effect: null,
+      crossover: selection.winner.crossover || null,
+      identityProof: selection.winner.identityProof || null,
+    }
+    : null;
 
   return {
     recordKind: OPTIMISER_RECORD_KIND.RUN_EVIDENCE,
@@ -495,6 +514,10 @@ export function buildOptimiserRunEvidence({
     nonAssessableCandidates,
     // No levers: a rejected candidate is never presented as an available change.
     levers: {},
+    // The combined electronic winner's compact evidence, retained for
+    // diagnostics when the run's only result is a non-actionable crossover +
+    // tuning improvement. Null when the winner is not combined electronic.
+    combinedElectronicResult,
     // What the calibration searches themselves produced, so "no useful
     // calibration improvement" is a statement the saved record can prove.
     calibrationEvidence,

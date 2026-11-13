@@ -93,6 +93,14 @@ export function resolveCanonicalTerminalOutcome({
     return "non_actionable_winner";
   }
 
+  // 2b. A non-actionable electronic winner: a combined crossover + tuning
+  //     improvement was confirmed but crossover apply is not yet supported.
+  //     The improvement is real and the search completed — this is never
+  //     classified as a technical failure or "no improvement found."
+  if (planOutcome === OPTIMISER_TERMINAL_OUTCOME.NON_ACTIONABLE_ELECTRONIC) {
+    return "non_actionable_electronic";
+  }
+
   // 3. Technical states are never trade-offs — the run did not produce a
   //    usable result to trade.
   if (planOutcome === OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE) {

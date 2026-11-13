@@ -34,6 +34,7 @@ import { subwooferGroupCounts } from "./placementPlausibilityAuthority.js";
 import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
 import { buildCoordinatedSummary } from "./coordinatedSummary.js";
 import { buildSearchStatusEvidence } from "./searchStatusEvidence.js";
+import { buildCombinedElectronicLever } from "./combinedElectronicLever.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -487,6 +488,20 @@ export function buildOptimiserPlan({
   // seating search retained no evaluated movement.
   const seating = seatingLever({ selection, baselineResult, seatingPositions, roomDims });
   if (seating) levers[OPTIMISER_LEVER.SEATING] = seating;
+
+  // ── Combined electronic ── the winning candidate's complete crossover +
+  // per-source tuning payload, canonically confirmed as one joint change.
+  // Built from the WINNER (not from selection.calibrationResult, which is a
+  // separate delay-only candidate). Without this lever, a combined electronic
+  // winner with no material individual lever makes the plan return null — the
+  // run is then misclassified as "winning change not retained."
+  // The lever is always actionable: false (crossover apply is not yet
+  // supported), so it is never offered for automatic Apply. It retains the full
+  // evidence for diagnostics and a future crossover-aware apply path.
+  const combinedElectronic = buildCombinedElectronicLever({
+    winner, instances, baselineResult, identity,
+  });
+  if (combinedElectronic) levers[OPTIMISER_LEVER.COMBINED_ELECTRONIC] = combinedElectronic;
 
   if (Object.keys(levers).length === 0) return null;
 
