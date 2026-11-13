@@ -13,6 +13,7 @@
 //
 // The engine, calculations, RP22 grading, and publication are NOT changed.
 
+import { electronicContext } from "./electronicApplication.js";
 import { runImproveBassV2 } from "../improveBassV2/improveBassV2Engine";
 import {
   startImproveBassV2,
@@ -299,6 +300,8 @@ export async function runOptimisation(opts) {
   try {
     const result = await runImproveBassV2(projectId, versionId, params, callbacks);
     result.runtimeMetrics = runtimeMetrics || result.runtimeMetrics;
+    result.inputIdentityAuthority = startFingerprint;
+    result.electronicContext = electronicContext(params);
 
     if (result.status === "cancelled") {
       // V2 engine cancelled is always user-initiated (AbortError from cancelRequested).
