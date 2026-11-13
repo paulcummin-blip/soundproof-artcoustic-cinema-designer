@@ -116,7 +116,7 @@ export function physicalContext(context){
   const c=clone(context);
   c.instances=(c.instances||[]).map(s=>{
     const x={...s};
-    for(const k of ["delayMs","gainDb","phaseControlDeg","phaseAdjust","polarity","tuningSource","phaseAdjustDeg","calibrationSource"])delete x[k];
+    for(const k of ["delayMs","gainDb","phaseControlDeg","phaseAdjust","polarity","tuningSource","phaseAdjustDeg","calibrationSource","appliedV2Provenance"])delete x[k];
     return x;
   });
   if(c.integrationContext){delete c.integrationContext.crossover;delete c.integrationContext.identity;}
