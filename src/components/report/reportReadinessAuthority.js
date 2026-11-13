@@ -104,6 +104,11 @@ export function deriveReportReadiness({
   assessment = null,
   bassPerformance = null,
   pricingStatus = "unknown",
+  // An optional missing-item that names the specific unpriced products, built
+  // by the caller from the priced schedule (see buildPricingMissingItem). When
+  // pricing is incomplete this replaces the generic PRICING item so the
+  // not-ready screen names the product, not just the domain.
+  pricingMissingItem = null,
   requiresImages = false,
   hasImages = true,
   bassCalculating = false,
@@ -155,7 +160,7 @@ export function deriveReportReadiness({
   if (!speakersAreReady(placedSpeakers)) missing.push(REPORT_MISSING_ITEM.SPEAKERS);
   if (!engineeringSummary) missing.push(REPORT_MISSING_ITEM.RP22);
   if (!bassPerformance) missing.push(REPORT_MISSING_ITEM.BASS);
-  if (pricingStatus === "incomplete") missing.push(REPORT_MISSING_ITEM.PRICING);
+  if (pricingStatus === "incomplete") missing.push(pricingMissingItem || REPORT_MISSING_ITEM.PRICING);
   if (requiresImages && !hasImages) missing.push(REPORT_MISSING_ITEM.IMAGES);
 
   if (missing.length > 0) {
@@ -189,6 +194,33 @@ export function deriveReportReadiness({
     nextAction: null,
     reason: null,
     canExport: true,
+  };
+}
+
+/**
+ * Build a pricing missing-item that NAMES the unpriced products, so the
+ * not-ready screen and the Room Designer popover can state exactly which
+ * product lacks a price instead of a generic "Pricing/products incomplete".
+ *
+ * Only active product lines with no unit price are incomplete (manual extras
+ * carry a 0 unit price, not null; inactive products live in their own list).
+ * Returns null when every line is priced, so the caller only attaches it when
+ * the blocker is genuine.
+ */
+export function buildPricingMissingItem(priceData = null) {
+  const breakdown = Array.isArray(priceData?.breakdown) ? priceData.breakdown : [];
+  const incomplete = breakdown.filter(
+    (line) => line && (line.unitPriceExVat === null || line.unitPriceExVat === undefined),
+  );
+  if (incomplete.length === 0) return null;
+  const names = incomplete.map((line) => line.description || line.model).filter(Boolean);
+  const label = names.length > 0
+    ? `Pricing incomplete: ${names.join(', ')}`
+    : 'Pricing/products incomplete';
+  return {
+    key: 'pricing',
+    label,
+    action: 'Set the price for these products in the Product Master.',
   };
 }
 

@@ -18,6 +18,7 @@ import {
   subscribePlanDrawingReadiness,
 } from "@/components/report/projectReport/planDrawingReadiness";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
+import { useReportPricing } from "@/components/report/client/useReportPricing";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { selectClientP9Overhead } from "@/components/report/client/selectClientP9Overhead";
 import { selectClientP5SeatResults } from "@/components/report/client/selectClientP5SeatResults";
@@ -145,6 +146,27 @@ export default function RP22ClientReport() {
     versionNumber,
     versionName,
   } = authority;
+
+  // The report's priced schedule is recomputed from the FROZEN product
+  // selection (the publication's placed speakers, subwoofers and acoustic
+  // treatment) against the CURRENT Product Master — the same engine the Room
+  // Designer prices with. A price added after publication no longer leaves a
+  // stale "price not set" blocker, and the report and the Room Designer make
+  // one consistent pricing decision. The product selection stays frozen; only
+  // the price lookup is current.
+  const reportPricing = useReportPricing({
+    appState,
+    placedSpeakers,
+    projectId,
+    frozenPriceData: authority.authoritySnapshot?.priceData || null,
+  });
+  // The report content reads appState.reportPriceData for the priced schedule
+  // (e.g. the acoustic treatment quantity). Override it with the recomputed
+  // schedule so the content and the readiness verdict share one price source.
+  const effectiveAppState = useMemo(
+    () => ({ ...appState, reportPriceData: reportPricing.priceSummary }),
+    [appState, reportPricing.priceSummary],
+  );
 
   // The report's canonical readiness state is derived below, once the
   // published bass authority has resolved. One state governs the whole report.
@@ -366,13 +388,12 @@ export default function RP22ClientReport() {
     return () => clearInterval(interval);
   }, [preparingWindowKey]);
 
-  const priceSummary = authority.authoritySnapshot?.priceData || null;
-
-  // Pricing is only reported as incomplete when it genuinely is — an absent
-  // price summary for this project is treated as unknown, never as a blocker.
-  const pricingStatus = priceSummary
-    ? (Number(priceSummary.incompletePriceCount) > 0 ? "incomplete" : "ok")
-    : "unknown";
+  const priceSummary = reportPricing.priceSummary;
+  // Pricing is only reported as incomplete when the CURRENT Product Master
+  // genuinely has no price for a selected product. While the Product Master
+  // loads, pricing is unknown — never a transient false blocker from an empty
+  // price map. A genuine missing price names the product (see pricingMissingItem).
+  const pricingStatus = reportPricing.pricingStatus;
 
   const derivedReadiness = deriveReportReadiness({
     // A saved report is never rendered from the current authority while its own
@@ -385,6 +406,7 @@ export default function RP22ClientReport() {
     assessment: { reportComplete:authority.reportComplete, status:authority.publicationGate?.status,
       reason:authority.reportCompleteness?.reason, missing:authority.publicationGate?.missing },
     pricingStatus,
+    pricingMissingItem: reportPricing.pricingMissingItem,
     elapsedSeconds: stateSeconds,
   });
   // ── THE TWO NOT-READY STATES ARE DISTINCT ────────────────────────────────
@@ -528,7 +550,7 @@ export default function RP22ClientReport() {
     coverageSentence,
     reportGeometry,
     reportSystem,
-    appState,
+    appState: effectiveAppState,
     projectId,
     versionId: authority.versionId || null,
     autoIntentStatus,
@@ -724,7 +746,7 @@ export default function RP22ClientReport() {
         engineeringFingerprint: authority.authoritySnapshot?.engineeringFingerprint || null,
         presentation: {
           showAsdr: authority.authoritySnapshot?.showAsdr,
-          priceData: authority.authoritySnapshot?.priceData || null,
+          priceData: reportPricing.priceSummary,
           seatingPositions,
           placedSpeakers,
           subwooferInstances,
@@ -747,7 +769,7 @@ export default function RP22ClientReport() {
     samePhysicalDesign: savedReport.presentationOnlyMove === true,
     payload: snapshotPayload,
     reportSource: { project: projectDetails, engineeringSummary, app: appState,
-      presentation: { seatingPositions, placedSpeakers, priceData: authority.authoritySnapshot?.priceData } },
+      presentation: { seatingPositions, placedSpeakers, priceData: reportPricing.priceSummary } },
     ready: reportReady && orderedPages.length > 0,
   });
 

@@ -1069,6 +1069,7 @@ function RoomDesignerWithState() {
     territoryCode: priceData.territoryCode,
     currency: priceData.currency,
     priceListAvailable: priceData.priceListAvailable,
+    priceMapLoading: priceData.priceMapLoading,
     breakdown: priceData.breakdown,
     inactiveBreakdown: priceData.inactiveBreakdown || [],
     baseTotalExVat: priceData.baseTotalExVat,
@@ -2178,6 +2179,7 @@ function RoomDesignerWithState() {
         isProjectMode={isProjectMode}
         handleSaveProject={triggerSaveProject}
         loadedVersionId={appState?.activeVersionId || null}
+        priceData={publishedPriceData}
       />
 
       {isProjectMode && <EngineeringPublicationStatus publication={engineeringPublication}

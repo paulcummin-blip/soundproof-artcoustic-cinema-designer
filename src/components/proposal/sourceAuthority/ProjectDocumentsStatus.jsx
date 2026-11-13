@@ -52,6 +52,7 @@ export const DOCUMENTS_HEADLINE = Object.freeze({
   CURRENT: 'Documents current',
   UPDATING: 'Updating project documents…',
   PREPARING: 'Preparing documents…',
+  NOT_GENERATED: 'Documents not generated',
 });
 
 /** The one sentence a card that needs updating states. */
@@ -61,6 +62,10 @@ export const DOCUMENTS_UPDATE_LINE =
 /** The one sentence a card preparing a Speaker Design states. */
 export const DOCUMENTS_PREPARING_LINE =
   'Sound Proof is preparing the Speaker Design PDF for this version.';
+
+/** The one sentence a card with a missing document states. */
+export const DOCUMENTS_NOT_GENERATED_LINE =
+  'The Project Report or Speaker Design for this version has not been generated yet. Create it before continuing.';
 
 /** The one action's label for the Project Report update. */
 export const DOCUMENTS_UPDATE_ACTION_LABEL = 'Update project documents';
@@ -228,17 +233,31 @@ export default function ProjectDocumentsStatus({
     const checklistBlocked = isMissing(row.speakerDesign) || isStale(row.speakerDesign);
     return projectCurrent && checklistBlocked && !!preparingVersionIds?.has(row.versionId);
   });
+  // "Documents current" is reserved for the case where EVERY required document
+  // row is genuinely Current. A missing, stale, incomplete or unavailable row
+  // — or one still being prepared — must never read as Current. This is the fix
+  // for the summary that showed "Documents current" while both documents were
+  // missing: the missing rows were not stale and not preparing, so they fell
+  // through to the Current fallback.
+  const allCurrent = rows.length > 0 && rows.every(
+    (row) => isCurrent(row.project) && isCurrent(row.speakerDesign),
+  );
+  const anyMissing = rows.some(
+    (row) => isMissing(row.project) || isMissing(row.speakerDesign),
+  );
 
   const headline = checking
     ? DOCUMENTS_HEADLINE.UPDATING
     : (genuinelyStale ? DOCUMENTS_HEADLINE.UPDATE_REQUIRED
-      : (preparingAny ? DOCUMENTS_HEADLINE.PREPARING : DOCUMENTS_HEADLINE.CURRENT));
+      : (preparingAny ? DOCUMENTS_HEADLINE.PREPARING
+        : (allCurrent ? DOCUMENTS_HEADLINE.CURRENT
+          : (anyMissing ? DOCUMENTS_HEADLINE.NOT_GENERATED : DOCUMENTS_HEADLINE.UPDATE_REQUIRED))));
   const multiple = rows.length > 1;
 
   return (
     <section
       className={`mt-8 ${className}`}
-      data-project-documents-status={checking ? 'updating' : (genuinelyStale ? 'update_required' : (preparingAny ? 'preparing' : 'current'))}
+      data-project-documents-status={checking ? 'updating' : (genuinelyStale ? 'update_required' : (preparingAny ? 'preparing' : (allCurrent ? 'current' : (anyMissing ? 'not_generated' : 'update_required'))))}
     >
       <h3
         className="text-[11px] uppercase tracking-[0.18em] text-[#A79E8C] mb-2"
@@ -258,6 +277,12 @@ export default function ProjectDocumentsStatus({
         {!checking && genuinelyStale && (
           <p className="text-[13px] text-[#625143] leading-relaxed mt-2" style={{ fontFamily: REPORT_FONT_BODY }}>
             {DOCUMENTS_UPDATE_LINE}
+          </p>
+        )}
+
+        {!checking && !genuinelyStale && !allCurrent && anyMissing && (
+          <p className="text-[13px] text-[#625143] leading-relaxed mt-2" style={{ fontFamily: REPORT_FONT_BODY }}>
+            {DOCUMENTS_NOT_GENERATED_LINE}
           </p>
         )}
 

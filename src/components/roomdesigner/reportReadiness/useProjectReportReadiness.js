@@ -20,7 +20,7 @@ import { useAppState } from '@/components/AppStateProvider';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 import { statesBassAuthority } from '@/components/engineering/versionedEngineeringAuthority';
 import { readBassPendingIndicator } from '@/components/state/designReviewHandoff';
-import { deriveReportReadiness } from '@/components/report/reportReadinessAuthority';
+import { deriveReportReadiness, buildPricingMissingItem } from '@/components/report/reportReadinessAuthority';
 import { useReportSnapshot } from '@/components/report/useReportSnapshot';
 import {
   REPORT_SNAPSHOT_TYPE,
@@ -33,6 +33,11 @@ export function useProjectReportReadiness({
   projectId = null,
   versionId = null,
   hydrating = false,
+  // The Room Designer's live priced schedule (the same object its sidebar
+  // reads). The verdict reads the CURRENT Product Master from it so the button
+  // never claims commercial readiness from unknown pricing and agrees with the
+  // report's pricing decision. Null/undefined = pricing not available yet.
+  priceData = null,
 } = {}) {
   const appState = useAppState();
 
@@ -70,6 +75,19 @@ export function useProjectReportReadiness({
     currentFingerprints,
   });
 
+  // Pricing status from the Room Designer's live priced schedule — the same
+  // object the page already computes for the sidebar. Reusing it means no
+  // second pricing computation and no new readiness authority: the button and
+  // the report read the same CURRENT Product Master. While the Product Master
+  // loads, pricing is unknown (never a transient block). A genuine missing
+  // price names the product so the popover states exactly what to fix.
+  const priceLoading = !!priceData?.priceMapLoading;
+  const priceIncompleteCount = Number(priceData?.incompletePriceCount) || 0;
+  const pricingStatus = !priceData || priceLoading
+    ? 'unknown'
+    : (priceIncompleteCount > 0 ? 'incomplete' : 'ok');
+  const pricingMissingItem = pricingStatus === 'incomplete' ? buildPricingMissingItem(priceData) : null;
+
   const readiness = useMemo(
     () =>
       deriveReportReadiness({
@@ -83,9 +101,8 @@ export function useProjectReportReadiness({
           reason: authority.reportCompleteness?.reason,
         },
         bassPerformance: statesBassAuthority(engineeringSummary) ? engineeringSummary : null,
-        // The report page states pricing as unknown when the design carries no
-        // schedule; it is never a blocker here either.
-        pricingStatus: 'unknown',
+        pricingStatus,
+        pricingMissingItem,
         bassCalculating: readBassPendingIndicator(projectId) === true,
       }),
     [
@@ -99,6 +116,8 @@ export function useProjectReportReadiness({
       appState?.speakerSystem?.placedSpeakers,
       engineeringSummary,
       projectId,
+      pricingStatus,
+      pricingMissingItem,
       tick,
     ],
   );

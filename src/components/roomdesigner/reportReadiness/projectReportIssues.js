@@ -191,6 +191,16 @@ export function resolveProjectReportIssues({ readiness = null, reportCompletenes
 
   // ── Required data the readiness checklist reported ──
   for (const item of Array.isArray(readiness?.missing) ? readiness.missing : []) {
+    // Pricing carries its own product-named label (built from the priced
+    // schedule), so state that verbatim instead of a generic domain line.
+    if (item?.key === 'pricing') {
+      push({
+        key: 'pricing',
+        label: item.label || 'Pricing incomplete',
+        reason: item.action || 'Set the product price in the Product Master.',
+      });
+      continue;
+    }
     const mapped = CHECKLIST_LABELS[item?.key];
     if (mapped) push({ key: item.key, ...mapped });
   }

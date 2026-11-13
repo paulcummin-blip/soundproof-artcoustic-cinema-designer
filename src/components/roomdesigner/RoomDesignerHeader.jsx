@@ -31,6 +31,11 @@ export default function RoomDesignerHeader({
   isProjectMode,
   handleSaveProject = null,
   loadedVersionId = null,
+  // The Room Designer's live priced schedule (the same object the page publishes
+  // to the sidebar). The Project Report readiness verdict reads the CURRENT
+  // Product Master from it, so the button never claims commercial readiness
+  // from unknown pricing and agrees with the report's pricing decision.
+  priceData = null,
 }) {
   const navigate = useNavigate();
 
@@ -145,6 +150,7 @@ export default function RoomDesignerHeader({
     projectId: effectiveProjectId,
     versionId: reportVersionId,
     hydrating: loadState?.phase !== "loaded",
+    priceData,
   });
   const handleProjectReportClick = () => openReport(REPORT_ROUTE.VISUAL);
   const handleProjectReportUpdate = () => openReport(REPORT_ROUTE.VISUAL, { updateReport: true });
