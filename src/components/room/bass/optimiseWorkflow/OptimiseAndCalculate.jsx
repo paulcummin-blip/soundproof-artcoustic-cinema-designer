@@ -98,7 +98,7 @@ import {
   runTimingAt,
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
-import { OPTIMISER_FAILURE_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
+import { OPTIMISER_FAILURE_STATUS, OPTIMISER_LEVER } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { canReuseCurrentBaselineForOptimiser } from "./retestPreflightAuthority.js";
@@ -1049,6 +1049,45 @@ export default function OptimiseAndCalculate({
         }
       }
 
+      // ── Combined electronic crossover auto-apply ──
+      // When the plan carries a combined electronic lever whose identity proof
+      // passed, the winner's crossover config is written automatically alongside
+      // the tuning. The tuning was already committed by the calibration auto-apply
+      // above; the crossover is written here, BEFORE the recalculation, so the
+      // recalculation includes both. After recalculation, P19/P20 are verified;
+      // if they do not reproduce the predicted result, the previous crossover is
+      // restored (fail closed — the designer's previous config is retained).
+      const combinedLever = optimiserPlan?.levers?.[OPTIMISER_LEVER.COMBINED_ELECTRONIC] || null;
+      const combinedElectronicWinner = combinedLever?.identityProof?.valid === true
+        && combinedLever?.crossover?.after
+        ? combinedLever
+        : null;
+      let previousCrossoverForRollback = null;
+      let combinedElectronicApplied = false;
+      if (combinedElectronicWinner && typeof appState?.updateGlobalSpl === "function") {
+        const crossoverAfter = combinedElectronicWinner.crossover.after;
+        previousCrossoverForRollback = appState?.splConfig?.crossover || null;
+        const crossoverToWrite = {
+          frequencyHz: Number(crossoverAfter.frequencyHz),
+          speakerHpSlopeDbPerOct: Number(crossoverAfter.speakerHpSlopeDbPerOct),
+          subwooferLpSlopeDbPerOct: Number(crossoverAfter.subwooferLpSlopeDbPerOct),
+          linkFrequencies: crossoverAfter.linkFrequencies !== false,
+          subwooferFrequencyHz: crossoverAfter.linkFrequencies === false
+            ? Number(crossoverAfter.subwooferFrequencyHz)
+            : Number(crossoverAfter.frequencyHz),
+        };
+        try {
+          appState.updateGlobalSpl({ crossover: crossoverToWrite });
+          combinedElectronicApplied = true;
+        } catch {
+          // Fail closed: could not write the crossover — do NOT recalculate with
+          // a half-applied state. Restore the previous crossover and continue
+          // with tuning-only (the calibration auto-apply already succeeded).
+          try { appState.updateGlobalSpl({ crossover: previousCrossoverForRollback }); } catch { /* nothing more to restore */ }
+          combinedElectronicApplied = false;
+        }
+      }
+
       // Phase 4: Recalculate with the optimised system
       phaseRef.current = "recalculating";
       setRecalculating(projectId, versionId);
@@ -1063,6 +1102,41 @@ export default function OptimiseAndCalculate({
       // (NOT the stale closure-captured `shared`) so layout/position changes
       // between runs don't freeze the break condition on an old snapshot.
       if (!(await waitForCurrentPublication(sharedRef, phaseRef))) return;
+
+      // ── Combined electronic fail-closed verification ──
+      // After recalculation, verify the P19/P20 result reproduces the combined
+      // electronic winner's predicted improvement. If the authoritative result
+      // does NOT match the winner's P19/P20, restore the previous crossover
+      // (fail closed — the designer's previous config is retained, the tuning
+      // remains as the calibration auto-apply wrote it).
+      if (combinedElectronicApplied && previousCrossoverForRollback !== null) {
+        const postAuthority = sharedRef.current?.completedBassAuthority;
+        const winnerForVerify = result?.selection?.winner || null;
+        const predictedP19 = winnerForVerify?.achievedP19VariationDb;
+        const predictedP20 = winnerForVerify?.achievedP20VariationDb;
+        const actualP19 = postAuthority?.contract?.selectedCandidate?.achievedP19VariationDb;
+        const actualP20 = postAuthority?.contract?.selectedCandidate?.achievedP20VariationDb;
+        const p19Match = Number.isFinite(predictedP19) && Number.isFinite(actualP19)
+          && Math.abs(Number(actualP19) - Number(predictedP19)) < 0.5;
+        const p20Match = Number.isFinite(predictedP20) && Number.isFinite(actualP20)
+          && Math.abs(Number(actualP20) - Number(predictedP20)) < 0.5;
+        if (!p19Match || !p20Match) {
+          // Fail closed: restore the previous crossover. The tuning remains.
+          try {
+            appState?.updateGlobalSpl?.({ crossover: previousCrossoverForRollback });
+            combinedElectronicApplied = false;
+            // Trigger a recalculation with the restored crossover.
+            if (typeof sharedRef.current?.onCalculate === "function") {
+              await sleep(150);
+              sharedRef.current?.onCalculate();
+              await waitForCurrentPublication(sharedRef, phaseRef);
+            }
+          } catch {
+            // Restoration failed — the crossover is in an indeterminate state.
+            // The tuning is still applied; the designer is warned via the plan.
+          }
+        }
+      }
 
       // ── Re-publish the recommendation with the POST-recalculation fingerprint ──
       // The recommendation was initially published with the pre-auto-apply
