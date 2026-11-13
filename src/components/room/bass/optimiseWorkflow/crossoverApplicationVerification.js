@@ -18,7 +18,7 @@ export function recommendationResultMatches(authority, expected, tolerance = 0.1
 export function recommendationSettingsMatch(authoritative, expected) {
   if (!authoritative || !expected?.crossover) return false;
   const a=authoritative.crossover,b=expected.crossover;
-  if (!a || a.frequencyHz!==b.frequencyHz || (a.subwooferFrequencyHz??a.frequencyHz)!==(b.subwooferFrequencyHz??b.frequencyHz)
+  if (!a || a.linkFrequencies!==b.linkFrequencies || a.frequencyHz!==b.frequencyHz || (a.subwooferFrequencyHz??a.frequencyHz)!==(b.subwooferFrequencyHz??b.frequencyHz)
     || a.speakerHpSlopeDbPerOct!==b.speakerHpSlopeDbPerOct || a.subwooferLpSlopeDbPerOct!==b.subwooferLpSlopeDbPerOct) return false;
   const sources=authoritative.sources||[];
   return sources.length===expected.tuning.length && expected.tuning.every(t=>{
