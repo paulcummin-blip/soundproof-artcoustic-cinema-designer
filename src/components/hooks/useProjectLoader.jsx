@@ -808,7 +808,16 @@ appState, // Pass appState directly for setters
         await Project.update(effectiveProjectId, sharedData);
         if (activeVersionIdRef.current) {
           const savedVersionId = activeVersionIdRef.current;
-          await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designState });
+          const terminalTrace = designState.optimiser_plan?.terminalTrace;
+          try {
+            await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designState });
+          } catch (error) {
+            if (terminalTrace) console.info("[Bass ADI plan save failure]", JSON.stringify({
+              runId: terminalTrace.runId, projectId: effectiveProjectId, versionId: savedVersionId,
+              planSave: "failed", stage: "project-version-update",
+            }));
+            throw error;
+          }
           acknowledgeOptimiserPlanSave(effectiveProjectId, savedVersionId, designState.optimiser_plan);
         }
 
@@ -1168,7 +1177,16 @@ appState, // Pass appState directly for setters
         savedProject = await Project.update(effectiveProjectId, sharedDataMS);
         if (activeVersionIdRef.current) {
           const savedVersionId = activeVersionIdRef.current;
-          await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designStateMS });
+          const terminalTrace = designStateMS.optimiser_plan?.terminalTrace;
+          try {
+            await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designStateMS });
+          } catch (error) {
+            if (terminalTrace) console.info("[Bass ADI plan save failure]", JSON.stringify({
+              runId: terminalTrace.runId, projectId: effectiveProjectId, versionId: savedVersionId,
+              planSave: "failed", stage: "project-version-update",
+            }));
+            throw error;
+          }
           acknowledgeOptimiserPlanSave(effectiveProjectId, savedVersionId, designStateMS.optimiser_plan);
         }
 
