@@ -1367,6 +1367,13 @@ export default function OptimiseAndCalculate({
           of: Recommended Improvement, No further engineering, or No further EQ. */}
       {hasResults && (
         <div className={`mt-3 ${shared?.placementPreviewActive ? "opacity-45" : ""}`}>
+          <WhatAdiDid
+            receipt={appState?.splConfig?.bassAdiReceipt}
+            instances={subwooferInstances} crossover={appState?.splConfig?.crossover}
+            fingerprint={shared?.cacheKey} authorityCurrent={hasPublishedCurrentDesign(shared)}
+            busy={isCalculating} disabled={!!reoptimiseDisabledReason}
+            onRun={runCalibrationAutoApply} onRestore={restoreElectronicSettings}
+            physical={Boolean(workflowState.recommendations?.subPositions || workflowState.recommendations?.seating)}>
           <AdiRecommendation
             jointReceiptState={jointReceiptState}
             autoApplied={workflowState.autoApplied}
@@ -1395,7 +1402,7 @@ export default function OptimiseAndCalculate({
             optimisationRunBlockReason={optimisationRunBlockReason}
             optimisationRunStatus={planRunStatus}
             optimisationRunError={planRunError}
-            onRunOptimisationPlan={runOptimisationPlan}
+            onRunOptimisationPlan={runCalibrationAutoApply}
             onCalculateBassPerformance={() => {
               if (typeof sharedRef.current?.onCalculate === "function") sharedRef.current.onCalculate();
             }}
@@ -1412,23 +1419,11 @@ export default function OptimiseAndCalculate({
             canCancelRun={canCancel}
             onCancelRun={handleCancel}
           />
+          </WhatAdiDid>
         </div>
       )}
 
-      <CrossoverRecommendation
-        receiptState={jointReceiptState}
-        onOperationChange={setJointOperation}
-        projectId={projectId}
-        producingPlan={savedJointPlan}
-        candidate={v2State?.combinedResult}
-        diagnostics={v2State?.combinedDiagnostics}
-        shared={shared}
-        appState={appState}
-        instances={subwooferInstances}
-        commitInstances={commitInstances}
-        onRecalculate={handlePhysicalRecalculate}
-        busy={isBusy || shared?.calculationInProgress || planRunStatus === "running"}
-      />
+      {/* Combined electronic changes use the single saved-and-verified transaction above. */}
 
       {/* ── Error state ── */}
       {isError && (
