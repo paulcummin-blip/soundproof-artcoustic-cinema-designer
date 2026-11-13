@@ -28,6 +28,10 @@ export default function VersionSelectStep({
   versions = [],
   collisions = [],
   loading = false,
+  onGenerateSpeakerDesign = null,
+  generatingVersionIds = null,
+  preparingVersionIds = null,
+  speakerDesignErrors = null,
 }) {
   const typeDef = getProposalType(proposalType);
   const isComparison = proposalType === 'comparison';
@@ -122,6 +126,10 @@ export default function VersionSelectStep({
       <VersionReadinessTable
         gate={readiness}
         projectId={projectId}
+        onGenerateSpeakerDesign={onGenerateSpeakerDesign}
+        generatingVersionIds={generatingVersionIds}
+        preparingVersionIds={preparingVersionIds}
+        speakerDesignErrors={speakerDesignErrors}
       />
     </div>
   );

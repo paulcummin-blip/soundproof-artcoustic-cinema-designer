@@ -17,6 +17,8 @@ import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAu
 import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
 import { isReadinessRefusalMessage, resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
+import useSpeakerDesignGeneration from '@/components/proposal/sourceAuthority/useSpeakerDesignGeneration';
+import useEnsureSpeakerDesignDocuments from '@/components/proposal/sourceAuthority/useEnsureSpeakerDesignDocuments';
 import ProposalPreparationPanel from '@/components/proposal/preparation/ProposalPreparationPanel';
 import useProposalPreparation from '@/components/proposal/wizard/useProposalPreparation';
 import useAdiKnowledgeGate from '@/components/proposal/wizard/useAdiKnowledgeGate';
@@ -223,6 +225,34 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     projectId: selectedProjectId,
     versionIds: selectedVersionIds,
   });
+
+  // The Speaker Design PDF is a supporting document the designer never manages
+  // by hand. The auto-preparation hook asks the shared authority to store it for
+  // any selected version whose Project Report is Current but whose Speaker
+  // Design is missing or stale; the generation hook exposes the Retry a failed
+  // attempt offers. Both read from the same in-session status store the report
+  // save and export write to, so no two paths can race into a duplicate.
+  const speakerDesignGeneration = useSpeakerDesignGeneration(selectedProjectId);
+  useEnsureSpeakerDesignDocuments({
+    projectId: selectedProjectId,
+    rows: readinessRows,
+    enabled: !!selectedProjectId && selectedVersionIds.length > 0 && !readinessLoading,
+  });
+  const handleGenerateSpeakerDesign = useCallback((versionId) => {
+    speakerDesignGeneration.clearError(versionId);
+    void speakerDesignGeneration.generate(versionId);
+  }, [speakerDesignGeneration]);
+  const speakerDesignPreparingIds = useMemo(
+    () => new Set((readinessRows || []).filter((row) => row?.speakerDesignPreparing).map((row) => row.versionId)),
+    [readinessRows],
+  );
+  const speakerDesignErrors = useMemo(() => {
+    const map = {};
+    (readinessRows || []).forEach((row) => {
+      if (row?.speakerDesignError) map[row.versionId] = row.speakerDesignError;
+    });
+    return map;
+  }, [readinessRows]);
   const selectedType = getProposalType(proposalType);
   const baseReadiness = resolveProposalReadinessGate({
     rows: readinessRows,
@@ -715,6 +745,10 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           versions={canonicalVersions}
           collisions={versionCollisions}
           loading={versionsLoading}
+          onGenerateSpeakerDesign={handleGenerateSpeakerDesign}
+          generatingVersionIds={speakerDesignPreparingIds}
+          preparingVersionIds={speakerDesignPreparingIds}
+          speakerDesignErrors={speakerDesignErrors}
         />
       )}
 
@@ -762,6 +796,10 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
             className="mb-8"
             onRetry={readinessError ? retryReadiness : null}
             detailed
+            onGenerateSpeakerDesign={handleGenerateSpeakerDesign}
+            generatingVersionIds={speakerDesignPreparingIds}
+            preparingVersionIds={speakerDesignPreparingIds}
+            speakerDesignErrors={speakerDesignErrors}
           />
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />

@@ -30,8 +30,6 @@ import {
 } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import {
   SPEAKER_DESIGN_LABEL,
-  SPEAKER_DESIGN_GENERATE_LABEL,
-  buildSpeakerDesignAction,
 } from '@/components/proposal/sourceAuthority/speakerDesignChecklistReadiness';
 import ProjectDocumentsStatus from './ProjectDocumentsStatus';
 
@@ -83,6 +81,7 @@ function VersionRow({
   projectId,
   onGenerateSpeakerDesign = null,
   generatingVersionIds = null,
+  preparingVersionIds = null,
   speakerDesignErrors = null,
 }) {
   const cell = row.project || row.cells?.project || null;
@@ -95,13 +94,16 @@ function VersionRow({
   // beside the report; it never blocks generation.
   const checklist = row.speakerDesign || row.cells?.speaker_design || null;
   const checklistBlocked = !!checklist && !checklist.current && !checklist.checking;
-  // While the report row is blocked its own action already produces the
-  // checklist, so the checklist offers a button only when the report is Current.
-  const checklistAction = checklistBlocked && cell?.current
-    ? buildSpeakerDesignAction({ state: checklist.state, projectId, versionId: row.versionId })
-    : null;
+  const projectCurrent = !!cell?.current;
+  const preparing = !!(preparingVersionIds?.has(row.versionId));
   const generating = !!(generatingVersionIds?.has(row.versionId));
   const speakerDesignError = speakerDesignErrors?.[row.versionId] || null;
+  // The normal flow is automatic: a missing or stale checklist beside a Current
+  // report is prepared by the shared authority, so the designer sees "Preparing
+  // documents…" — never a manual Generate button. The button appears only when a
+  // generation genuinely failed, as a Retry.
+  const speakerDesignAutoPreparing = projectCurrent && checklistBlocked && !speakerDesignError;
+  const speakerDesignRetry = projectCurrent && checklistBlocked && !!speakerDesignError && !preparing;
 
   return (
     <div className="py-4 border-b border-[#EAE8E3]" data-readiness-version={row.versionId}>
@@ -141,25 +143,20 @@ function VersionRow({
         </div>
       )}
 
-      {checklistBlocked && checklist.reason && !checklistAction && (
-        <p className="text-[12px] text-[#7A5A10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
-          {checklist.reason}
+      {speakerDesignAutoPreparing && (
+        <p className="text-[12px] text-[#625143] mt-1.5 flex items-center gap-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
+          {preparing && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#8A8477' }} />}
+          {preparing ? 'Preparing documents…' : 'Preparing documents…'}
         </p>
       )}
 
-      {checklistBlocked && checklist.reason && checklistAction?.kind === 'generate' && (
-        <p className="text-[12px] text-[#7A5A10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
-          {checklist.reason}
-        </p>
-      )}
-
-      {speakerDesignError && checklistAction?.kind === 'generate' && (
+      {speakerDesignError && (
         <p className="text-[12px] text-[#7A2E10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
           {speakerDesignError}
         </p>
       )}
 
-      {checklistAction?.kind === 'generate' && (
+      {speakerDesignRetry && (
         <button
           type="button"
           disabled={generating}
@@ -168,18 +165,8 @@ function VersionRow({
           style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
         >
           {generating && <Loader2 className="w-3 h-3 animate-spin" />}
-          {generating ? 'Generating…' : checklistAction.label || SPEAKER_DESIGN_GENERATE_LABEL}
+          {generating ? 'Retrying…' : 'Retry Speaker Design'}
         </button>
-      )}
-
-      {checklistAction?.kind === 'url' && (
-        <a
-          href={withProposalContext(checklistAction.url)}
-          className="inline-block mt-2 mr-2 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
-          style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
-        >
-          {checklistAction.label}
-        </a>
       )}
 
       {action && (
@@ -220,6 +207,7 @@ export default function VersionReadinessTable({
   detailed = false,
   onGenerateSpeakerDesign = null,
   generatingVersionIds = null,
+  preparingVersionIds = null,
   speakerDesignErrors = null,
 }) {
   if (!detailed) {
@@ -230,6 +218,7 @@ export default function VersionReadinessTable({
         className={className}
         onGenerateSpeakerDesign={onGenerateSpeakerDesign}
         generatingVersionIds={generatingVersionIds}
+        preparingVersionIds={preparingVersionIds}
         speakerDesignErrors={speakerDesignErrors}
       />
     );
@@ -258,6 +247,7 @@ export default function VersionReadinessTable({
           projectId={projectId}
           onGenerateSpeakerDesign={onGenerateSpeakerDesign}
           generatingVersionIds={generatingVersionIds}
+          preparingVersionIds={preparingVersionIds}
           speakerDesignErrors={speakerDesignErrors}
         />
       ))}

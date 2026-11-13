@@ -89,6 +89,16 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
     });
   }, [projectId]);
 
+  // A Speaker Design generation starting or finishing changes the checklist
+  // cell from "Not generated" to "Preparing…" and back, so the readiness read
+  // re-runs the moment the shared status store moves.
+  useEffect(() => {
+    if (!projectId) return undefined;
+    return subscribeSpeakerDesignGenerationStatus(() => {
+      setRefreshToken((value) => value + 1);
+    });
+  }, [projectId]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -253,25 +263,46 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
               || null,
           };
 
+          const savedReportCell = resolveSavedReportCell({
+            saved: savedProjectReport,
+            currentFingerprints,
+            presentationOnlyMove: presentationOnlyBySource.project.get(versionId) === true,
+          });
+          let speakerDesignCell = resolveSpeakerDesignCell({
+            stored: selectStoredSpeakerDesign(speakerDesignRecords, versionId),
+            currentEngineeringFingerprint: currentFingerprints.engineeringFingerprint,
+            presentationOnlyMove: presentationOnlyBySource.speaker_design.get(versionId) === true,
+          });
+
+          // Overlay the shared generation status: a Speaker Design being stored
+          // right now reads "Preparing…" instead of "Not generated", and a failed
+          // attempt carries its real reason so the card can offer a Retry. The
+          // stored-record verdict above is still the authority for Current; this
+          // only shapes how a missing or stale checklist is presented while the
+          // system is already handling it.
+          const preparing = isPreparingSpeakerDesign(projectId, versionId);
+          const generationError = getSpeakerDesignGenerationError(projectId, versionId);
+          if (preparing) {
+            speakerDesignCell = {
+              ...speakerDesignCell,
+              state: READINESS_STATE.CHECKING,
+              status: 'Preparing…',
+              checking: true,
+              current: false,
+              reason: null,
+              error: null,
+            };
+          } else if (generationError && !speakerDesignCell.current) {
+            speakerDesignCell = { ...speakerDesignCell, error: generationError };
+          }
+
           const row = resolveVersionReadinessRow({
             versionId,
             versionName: versionDisplayName(version || { version_number: index + 1 }),
             versionNumber: version?.version_number ?? index + 1,
             cells: {
-              project: resolveSavedReportCell({
-                saved: savedProjectReport,
-                currentFingerprints,
-                presentationOnlyMove: presentationOnlyBySource.project.get(versionId) === true,
-              }),
-              // The equipment checklist this version has stored, stated beside
-              // the report. It never blocks: a proposal is gated on the Project
-              // Report, and the checklist's own row offers that same report
-              // action, which stores the schedule with the report.
-              speaker_design: resolveSpeakerDesignCell({
-                stored: selectStoredSpeakerDesign(speakerDesignRecords, versionId),
-                currentEngineeringFingerprint: currentFingerprints.engineeringFingerprint,
-                presentationOnlyMove: presentationOnlyBySource.speaker_design.get(versionId) === true,
-              }),
+              project: savedReportCell,
+              speaker_design: speakerDesignCell,
             },
           });
           // Two further facts, taken from the SAME reads that decided this row: the
@@ -280,6 +311,14 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           // step offers; the designer never reads them.
           return {
             ...row,
+            // The current engineering fingerprint, so the Proposal Centre's own
+            // auto-preparation can ensure the Speaker Design for this exact design.
+            engineeringFingerprint: currentFingerprints.engineeringFingerprint || null,
+            // Whether a Speaker Design generation is in flight for this version,
+            // and the plain reason the last attempt failed — read by the document
+            // status card so it shows "Preparing documents" and a targeted Retry.
+            speakerDesignPreparing: preparing,
+            speakerDesignError: preparing ? null : (generationError || null),
             publicationStatus: durable?.status || null,
             hasCompletedAuthority: !!calculationAuthority,
           };
