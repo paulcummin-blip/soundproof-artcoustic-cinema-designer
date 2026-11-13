@@ -155,6 +155,29 @@ describe('FIX 1 — bass identity uses canonical product identity', () => {
 });
 
 describe('FIX 2 — proposal quantity join uses canonical product identity', () => {
+  it('resolves the Cable Smart front pair from its saved LCR equipment quantity without changing the snapshot', () => {
+    const snapshot = { system: {
+      product_roles: [
+        { role: 'front_left_right', position_label: 'Front Left / Right', model_label: 'EVOLVE 3-1', model_key: 'evolve-3-1', cabinet_count: 0, channel_count: 2 },
+        { role: 'centre', position_label: 'Centre', model_label: 'C4-1', model_key: 'c4-1', cabinet_count: 1, channel_count: 1 },
+      ],
+      products_selected_by_layer: { lcr: [
+        { model: 'C4-1', quantity: 1 },
+        { model: 'EVOLVE 3-1', quantity: 2 },
+      ] },
+    } };
+    const before = JSON.stringify(snapshot);
+    expect(buildPackageRows(snapshot)).toEqual([
+      { role: 'Front left', model: 'EVOLVE 3-1', qty: 1 },
+      { role: 'Front right', model: 'EVOLVE 3-1', qty: 1 },
+      { role: 'Centre', model: 'C4-1', qty: 1 },
+    ]);
+    expect(unresolvedPackageQuantities(snapshot)).toEqual([]);
+    expect(JSON.stringify(snapshot)).toBe(before);
+    snapshot.system.products_selected_by_layer.lcr.pop();
+    expect(unresolvedPackageQuantities(snapshot).length).toBe(2);
+  });
+
   // Three overhead positions of the ONE Architect product, but the front and
   // rear were saved as "Mk2" and the middle as "MkII". The layer total is six.
   // Before the fix the join compared architect42mk2 vs architect42mkii and
