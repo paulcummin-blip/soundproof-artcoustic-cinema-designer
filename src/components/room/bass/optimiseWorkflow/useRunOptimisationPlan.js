@@ -180,11 +180,8 @@ export default function useRunOptimisationPlan({
         baselineParity: extra.baselineParity || null,
         failureReason: reason,
         terminalOutcome: extra.terminalOutcome || null,
-        // THE PLAN COULD NOT BE SAVED. This is a real optimiser failure and it is
-        // recorded as itself — the analysis produced no result that could be saved
-        // for this design — with the two actions that answer it (retry, or keep
-        // the current bass result). It is persisted WITH the record, so a reload
-        // restores this same terminal state instead of rebuilding another one.
+        // Plan-save failure: persisted with the record so a reload restores the
+        // same terminal state, with retry / keep-current actions.
         failure: extra.planSaveFailed
           ? {
             status: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
