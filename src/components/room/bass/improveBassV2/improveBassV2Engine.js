@@ -1,3 +1,4 @@
+import { electronicContext, stable } from "../optimiseWorkflow/electronicApplication.js";
 import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
 import { currentPlacementFailure } from "./currentPlacementEvidence.js";
 import { extractAuthorityForComparison } from "./currentAuthorityComparison.js";
@@ -590,6 +591,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     }
   }, V2_WHOLE_RUN_TIMEOUT_MS_PROVISIONAL);
 
+  const confirmedElectronicContext = electronicContext(params);
   const startFingerprint = computeV2DesignFingerprint({
     subwooferInstances, roomDims, seatingPositions, rspPosition,
     selectedSubModel, p14TargetBasis, p14TargetLevel, p14TargetDb,
@@ -870,6 +872,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         groupedDelay:candidate.groupedDelay || null,
         groupedPhase:candidate.groupedPhase || null,
         isCurrent:kind==="current",candidateOrigin:kind==="phase"?"phase-only":kind==="calibration"?"calibration-only":candidate.candidateOrigin};
+      if (!designContext && ["current","phase","calibration"].includes(kind) &&
+          stable(instances.map(s=>s.position)) === stable(snapshot.allInstances.filter(s=>s.enabled!==false).map(s=>s.position))) {
+        bound.electronicContext = confirmedElectronicContext;
+      }
       if(designContext){bound.designContext=designContext;bound.isCrossQuantity=true;}
       return bound;
     }
