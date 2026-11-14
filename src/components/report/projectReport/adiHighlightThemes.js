@@ -141,6 +141,19 @@ function roomResult(byKey, summary, id) {
   return { level, value: statedSummaryValue(summary, id) };
 }
 
+/**
+ * The leading numeric dBC figure in a stated value, e.g. "102 dBC (SS)" → 102.
+ * Used to compare raw output capability between layers: when two layers publish
+ * the same dBC figure, the comparison reads "comparable capability" regardless of
+ * the level each carries, so a client is never told one layer has greater output
+ * than another when their published figures are equal.
+ */
+function extractDbc(value) {
+  if (!value) return null;
+  const match = String(value).match(/(-?\d+(?:\.\d+)?)\s*dBC/i);
+  return match ? Number(match[1]) : null;
+}
+
 /** The numeric segments of a stated layout, e.g. "9.1.6" → [9, 1, 6]. */
 function layoutDigits(layout) {
   const token = String(layout ?? '').trim().split(/[\s_]+/)[0] || '';
@@ -203,7 +216,7 @@ function buildSpatialTheme({ byKey, summary, counts, dolbyConfig, sevenBedLayout
   const placementStrengths = [];
   if (p11 && isStrength(p11.level)) placementStrengths.push('every surround, wide and overhead speaker sits within its recommended RP22 position zone');
   if (p7 && isStrength(p7.level)) placementStrengths.push('front wides keep the front soundstage continuous');
-  if (placementStrengths.length) sentences.push(`${capify(listClauses(placementStrengths))}, so sound is placed precisely around the room.`);
+  if (placementStrengths.length) sentences.push(`${capify(listClauses(placementStrengths))}, supporting accurate placement and movement of sound around the room.`);
 
   const seatStrengths = [];
   if (p4 && isStrength(p4.level)) seatStrengths.push('the screen channels stay level-matched');
@@ -349,7 +362,12 @@ function buildDynamicTheme({ byKey, summary, counts }) {
   const sentences = [`The system offers ${overallTone} dynamic capability for this room.`];
 
   if (p12 && p13) {
-    if (levelRank(p12.level) < levelRank(p13.level)) {
+    const v12 = extractDbc(p12.value);
+    const v13 = extractDbc(p13.value);
+    const equalDbc = v12 != null && v13 != null && v12 === v13;
+    if (equalDbc) {
+      sentences.push(`The screen stage and the ${layer} channels offer comparable capability at the reference position.`);
+    } else if (levelRank(p12.level) < levelRank(p13.level)) {
       sentences.push(`The screen stage is the limiting layer at the reference position, while the ${layer} channels provide greater capability.`);
     } else if (levelRank(p12.level) > levelRank(p13.level)) {
       sentences.push(`The ${layer} channels are the limiting layer at the reference position, while the screen stage provides greater capability.`);
