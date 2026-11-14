@@ -106,10 +106,13 @@ import {
   runTimingAt,
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
-import { OPTIMISER_FAILURE_STATUS, OPTIMISER_LEVER } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
+import { OPTIMISER_FAILURE_STATUS, OPTIMISER_LEVER, OPTIMISER_PLAN_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { canReuseCurrentBaselineForOptimiser } from "./retestPreflightAuthority.js";
+import { useOptimiserPlanView } from "../optimiserPlan/useOptimiserPlanView.js";
+import AdiOptimiserResults from "./AdiOptimiserResults.jsx";
+import { useLeverApplyActions } from "./useLeverApplyActions.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1202,6 +1205,34 @@ export default function OptimiseAndCalculate({
     return { action: "blocked", reason: "applied-design-fingerprint-not-ready" };
   }, []);
 
+  // ── Persistent ADI results panel ──
+  // Reads the saved optimiser plan evidence (the SAME authority every other
+  // surface reads) and the existing lever apply/undo handlers. The panel is
+  // shown after a run completes, in place of the live checklist, and stays
+  // visible until a new run replaces it or the design invalidates the plan.
+  const planView = useOptimiserPlanView({
+    projectId,
+    versionId,
+    completedBassAuthority: shared?.completedBassAuthority,
+    currentDesignFingerprint: shared?.cacheKey || null,
+    instances: subwooferInstances,
+    seatingPositions,
+  });
+  const { handleApplyLever, handleUndoLever, leverApplyBusy } = useLeverApplyActions({
+    commitInstances,
+    commitSeating,
+    currentInstances: subwooferInstances,
+    seatingPositions,
+    appState,
+    onRecalculate: handlePhysicalRecalculate,
+    shared,
+  });
+  const planStatus = planView?.status || null;
+  const planSuperseded = planView?.superseded === true;
+  const showResultsPanel = !planSuperseded && planStatus
+    && ![OPTIMISER_PLAN_STATUS.ABSENT, OPTIMISER_PLAN_STATUS.STALE, OPTIMISER_PLAN_STATUS.UNSUPPORTED].includes(planStatus);
+  const planStale = planStatus === OPTIMISER_PLAN_STATUS.STALE;
+
   // ── Render ──
   const status = workflowState.status;
   const isError = status === "error";
@@ -1237,7 +1268,7 @@ export default function OptimiseAndCalculate({
            technical diagnostics are rendered from this section. Saved
            optimisation evidence and recommendations remain in their own
            existing result areas; nothing is deleted or altered. */}
-      {!adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && (
+      {!adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && !showResultsPanel && (
         <button
           type="button"
           onClick={runCalibrationAutoApply}
@@ -1247,6 +1278,26 @@ export default function OptimiseAndCalculate({
           <Sparkles className="h-4 w-4" />
           Run ADI Bass Optimiser
         </button>
+      )}
+
+      {planStale && !adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && (
+        <div className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] px-3 py-2 text-[11px] leading-relaxed text-[#4A230F]">
+          Previous ADI results are stale — the design has changed. Re-run to update the analysis.
+        </div>
+      )}
+
+      {!adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && showResultsPanel && (
+        <AdiOptimiserResults
+          planView={planView}
+          projectId={projectId}
+          versionId={versionId}
+          currentDesignFingerprint={shared?.cacheKey || null}
+          onRunAgain={runCalibrationAutoApply}
+          handleApplyLever={handleApplyLever}
+          handleUndoLever={handleUndoLever}
+          leverApplyBusy={leverApplyBusy}
+          isRunning={false}
+        />
       )}
 
       {/* During a run: a meaningful current-stage heading and a cumulative
