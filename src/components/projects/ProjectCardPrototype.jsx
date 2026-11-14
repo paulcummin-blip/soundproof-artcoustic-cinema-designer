@@ -5,6 +5,7 @@ import { normalizeStatusId } from "@/components/projects/statusDefaults";
 import OpenVersionDropdown from "@/components/versions/OpenVersionDropdown";
 import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 import { dolbySystemLabel } from "@/shared/systemFormat";
+import AdminAccountBanner from "@/components/projects/AdminAccountBanner";
 
 // Refined prototype card — lighter, calmer, more architectural.
 // Only used for the "Bass Test" project to assess the design before rollout.
@@ -143,6 +144,7 @@ function buildSupportingDetail(p) {
 
 export default function ProjectCardPrototype({
   p,
+  isAdmin = false,
   onEdit,
   onArchive,
   onUnarchive,
@@ -237,6 +239,14 @@ export default function ProjectCardPrototype({
           background: statusColor,
         }}
       />
+
+      {/* Admin-only account ownership banner — above the project title */}
+      {isAdmin && (
+        <AdminAccountBanner
+          accountId={p.account_id}
+          account={p.account}
+        />
+      )}
 
       <div
         style={{

@@ -261,6 +261,7 @@ export default function ProjectsPage() {
                 client: p.client_name || "",
                 project_reference: p.project_reference || "",
                 dealer_name: rawP.dealer_name || null,
+                account_id: rawP.account_id || null,
                 account: accountById[rawP.account_id] || null,
                 status: normalizeStatusId(p.project_status || "Prospective"),
                 active_version_id: rawP.active_version_id || null,
@@ -306,6 +307,8 @@ export default function ProjectsPage() {
                 client: rawP.client_name || "",
                 project_reference: rawP.project_reference || "",
                 dealer_name: rawP.dealer_name || null,
+                account_id: rawP.account_id || null,
+                account: accountById[rawP.account_id] || null,
                 status: normalizeStatusId(rawP.project_status || "Prospective"),
                 createdAt: Date.now(),
               };
@@ -1084,6 +1087,7 @@ export default function ProjectsPage() {
               <ProjectCardPrototype
                 key={p.id}
                 p={p}
+                isAdmin={isAdmin}
                 onEdit={handleEditProject}
                 onArchive={() => setArchiveConfirm(p)}
                 onUnarchive={() => handleUnarchive(p.id)}
