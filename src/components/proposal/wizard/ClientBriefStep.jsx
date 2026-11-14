@@ -1,41 +1,39 @@
 import React from 'react';
-import AdiSuggestionChips from '@/components/proposal/wizard/AdiSuggestionChips';
 import ComparisonMessagePrompt from '@/components/proposal/wizard/ComparisonMessagePrompt';
+import { useDesignContextClarifications } from '@/components/proposal/wizard/useDesignContextClarifications';
+
+const FONT = { fontFamily: 'Didact Gothic, sans-serif' };
 
 /**
- * Step 4 — Client Brief & Narrative Steer.
+ * Three optional writing aids — simple prompts, not generated answers and not
+ * technical controls. They sit below the field to help a dealer start writing.
+ */
+const WRITING_PROMPTS = [
+  'What matters most to the client?',
+  'Why this speaker arrangement?',
+  'What compromises have you made?',
+];
+
+/**
+ * Step 4 — Design Context.
  *
- * Two separate things live here, and they carry different authority:
+ * The designer's own words about what matters in this design and why they are
+ * recommending it. It is the strongest narrative authority in the document: it
+ * guides wording and emphasis, and it NEVER alters engineering results, RP22
+ * values, Design Ratings or recommendations.
  *
- *   THE BRIEF — the designer's own words about what matters in this design and
- *   why they are recommending it. It is the strongest narrative authority in the
- *   document, it guides wording and emphasis, and it NEVER alters engineering
- *   results, RP22 values, Design Ratings or recommendations.
- *
- *   THE NARRATIVE STEER — the topics ADI should weigh, each in one of three
- *   states: neutral, prefer, or do not discuss. A preference is an ingredient,
- *   not a section plan: it can appear briefly, in passing, combined with another
- *   point, or not at all where forcing it would damage the writing. "Do not
- *   discuss" keeps a topic out of the client-facing narrative and touches no
- *   evidence, no reported result and no technical table.
- *
- * The topics under the brief are ADI's own suggestions, derived from this
- * project's strongest published evidence (see AdiSuggestionChips). Selecting one
- * never writes anything into the brief.
- *
- * Anything ADI cannot explain from the evidence — a design decision with no reason
- * on record — is asked about on the Clarifications step that follows, where it
- * collects a real answer or is passed. No question is ever written into the brief.
- *
- * The brief is optional — the user can proceed without either and the proposal
- * will generate intelligently from the project intent, the strongest design
+ * The field is optional — the user can proceed without it and the proposal will
+ * generate intelligently from the project intent, the strongest design
  * highlights and the published evidence.
+ *
+ * Anything ADI cannot explain from the evidence — a design decision with no
+ * reason on record — is asked about on the Clarifications step that follows,
+ * where it collects a real answer or is passed. No question is ever written
+ * into the brief.
  */
 export default function ClientBriefStep({
   value,
   onChange,
-  steer = {},
-  onSteerChange,
   projectId,
   selectedVersionIds,
   proposalType,
@@ -46,25 +44,34 @@ export default function ClientBriefStep({
   existingClarifications = [],
   onClarifications,
 }) {
+  // The clarification questions ADI asks about this design are still fetched
+  // from the same evidence the suggestion chips read. The chip UI is gone; the
+  // questions are preserved so the Clarify step still works.
+  useDesignContextClarifications({
+    projectId,
+    selectedVersionIds,
+    proposalType,
+    engineeringSnapshot,
+    versionSnapshots,
+    versionsLoading,
+    snapshotLoading,
+    clientBrief: value,
+    existingClarifications,
+    onClarifications,
+  });
+
   return (
     <div>
       <div className="mb-6">
         <h3
-          className="text-lg font-semibold text-[#1B1A1A] mb-2"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+          className="text-lg font-semibold text-[#1B1A1A] mb-3"
+          style={FONT}
         >
-          Client Brief &amp; Narrative Steer
+          Design Context
         </h3>
-        <p
-          className="text-sm font-semibold text-[#1B1A1A] mb-1"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          What matters most in this design, and why are you recommending this solution?
-        </p>
-        <p className="text-xs text-[#625143] leading-relaxed">
-          Tell us about the client&apos;s priorities, practical constraints and decisions behind your
-          recommendation. What have you prioritised, where have you made compromises, and why is this
-          the right solution? Your words here carry more weight than any topic you steer below.
+        <p className="text-sm text-[#625143] leading-relaxed">
+          Tell ADI anything that will help explain this design to your client. What's important,
+          why you've made particular choices, or what you'd like the proposal to focus on.
         </p>
       </div>
 
@@ -77,20 +84,23 @@ export default function ClientBriefStep({
         style={{ fontFamily: 'Inter, sans-serif', lineHeight: 1.6 }}
       />
 
-      <AdiSuggestionChips
-        projectId={projectId}
-        selectedVersionIds={selectedVersionIds}
-        proposalType={proposalType}
-        clientBrief={value}
-        engineeringSnapshot={engineeringSnapshot}
-        versionSnapshots={versionSnapshots}
-        versionsLoading={versionsLoading}
-        snapshotLoading={snapshotLoading}
-        existingClarifications={existingClarifications}
-        steer={steer}
-        onSteerChange={onSteerChange}
-        onClarifications={onClarifications}
-      />
+      <div className="mt-6">
+        <p className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C] mb-3" style={FONT}>
+          Writing prompts
+        </p>
+        <ul className="space-y-2">
+          {WRITING_PROMPTS.map((prompt) => (
+            <li
+              key={prompt}
+              className="flex items-start gap-2.5 text-sm text-[#625143] leading-relaxed"
+              style={FONT}
+            >
+              <span className="text-[#A79E8C] mt-0.5 select-none">•</span>
+              <span>{prompt}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* Asked only when the project's Library holds comparison images that
           state no message of their own: the note the designer writes here is
