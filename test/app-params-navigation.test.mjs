@@ -17,7 +17,7 @@ function boot(localStorage, sessionStorage, query = '') {
     history: { replaceState(_state, _title, url) { window.location = new URL(url, window.location); } } };
   const context = vm.createContext({ window, document: { title: 'Sound Proof' }, URLSearchParams,
     env: { VITE_BASE44_APP_ID: 'app', VITE_BASE44_BACKEND_URL: 'https://base44.app' } });
-  return vm.runInContext(source + '\n({ appParams, window, clear: typeof clearAppParamAuthFallback === "function" ? clearAppParamAuthFallback : undefined })', context);
+  return vm.runInContext(source + ';\n({ appParams, window, clear: typeof clearAppParamAuthFallback === "function" ? clearAppParamAuthFallback : undefined })', context);
 }
 const query = '?access_token=fresh-preview-token&server_url=https%3A%2F%2Fpreview.example&base44_data_env=prod';
 
