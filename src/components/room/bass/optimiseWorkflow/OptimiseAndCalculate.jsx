@@ -1204,19 +1204,22 @@ export default function OptimiseAndCalculate({
     return { action: "blocked", reason: "applied-design-fingerprint-not-ready" };
   }, []);
 
-  // ── Build the stage display ──
-  // Computed while the run is busy AND after completion, so the cumulative
-  // checklist keeps showing each stage's outcome once the run ends.
-  const stageDisplay = React.useMemo(() => {
-    if (!isBusy && !isComplete) return null;
-    return buildStageDisplay(v2State);
-  }, [v2State, isBusy, isComplete]);
-
   // ── Render ──
   const status = workflowState.status;
   const isError = status === "error";
   const isCancelledState = status === "cancelled";
   const isComplete = status === "complete";
+
+  // ── Build the stage display ──
+  // Computed while the run is busy AND after completion, so the cumulative
+  // checklist keeps showing each stage's outcome once the run ends.
+  // NOTE: isComplete must be declared above this useMemo — it is read inside
+  // the factory and the dependency array, so a declaration placed below would
+  // be in the temporal dead zone and throw on first render.
+  const stageDisplay = React.useMemo(() => {
+    if (!isBusy && !isComplete) return null;
+    return buildStageDisplay(v2State);
+  }, [v2State, isBusy, isComplete]);
 
   return (
     <div className="space-y-3">
