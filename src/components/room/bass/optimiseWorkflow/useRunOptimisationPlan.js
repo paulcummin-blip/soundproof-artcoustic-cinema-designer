@@ -31,6 +31,7 @@
 import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
 import { waitForOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { flushProjectSaveForOptimiserPlan } from "./optimiserPlanFlush.js";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
@@ -432,6 +433,16 @@ export default function useRunOptimisationPlan({
       // still attached, rather than a blank failure that lost the run's work.
       let savedAt = null;
       try {
+        // Explicitly flush the existing save queue so the plan reaches
+        // ProjectVersion.design_state without relying on incidental autosave
+        // propagation. The flush reuses the same single-writer save path
+        // (manual save) with all its hydration, instance and concurrency
+        // protections.
+        const flushResult = await flushProjectSaveForOptimiserPlan(projectId, versionId);
+        if (!flushResult?.success) {
+          throw new Error(flushResult?.error || "The optimiser plan save was not completed.");
+        }
+        // Confirm the matching run ID was acknowledged by the version writer.
         savedAt = await waitForOptimiserPlanSave(projectId, versionId, activeRun.runId);
       } catch (saveAckError) {
         const saveFailReason = saveAckError?.message

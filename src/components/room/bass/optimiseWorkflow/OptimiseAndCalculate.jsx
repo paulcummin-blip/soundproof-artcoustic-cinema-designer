@@ -108,6 +108,7 @@ import {
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import { OPTIMISER_FAILURE_STATUS, OPTIMISER_LEVER, OPTIMISER_PLAN_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 import { waitForOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { flushProjectSaveForOptimiserPlan } from "./optimiserPlanFlush.js";
 import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { canReuseCurrentBaselineForOptimiser } from "./retestPreflightAuthority.js";
@@ -954,6 +955,16 @@ export default function OptimiseAndCalculate({
       // save failed: the completed evidence is preserved with a SAVE FAILED
       // marker, the run is reported as failed, and the design is not changed.
       try {
+        // Explicitly flush the existing save queue so the plan reaches
+        // ProjectVersion.design_state without relying on incidental autosave
+        // propagation. The flush reuses the same single-writer save path
+        // (manual save) with all its hydration, instance and concurrency
+        // protections.
+        const flushResult = await flushProjectSaveForOptimiserPlan(projectId, versionId);
+        if (!flushResult?.success) {
+          throw new Error(flushResult?.error || "The optimiser plan save was not completed.");
+        }
+        // Confirm the matching run ID was acknowledged by the version writer.
         const planSavedAt = await waitForOptimiserPlanSave(projectId, versionId, activeRun.runId);
         recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED, { at: planSavedAt });
         trace.planSave = "acknowledged";

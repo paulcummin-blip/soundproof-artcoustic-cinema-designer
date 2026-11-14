@@ -58,15 +58,23 @@ export function buildStageResults(selection) {
   const phase = {
     verdict: phaseSearchSkipped
       ? "not_tested"
-      : phaseMaterial && phaseResult
-        ? "improvement"
-        : "no_improvement",
+      : phaseDiagnostics?.status === "incomplete"
+        ? "incomplete"
+        : phaseDiagnostics?.status === "failed" || phaseDiagnostics?.error
+          ? "failed"
+          : phaseMaterial && phaseResult
+            ? "improvement"
+            : "no_improvement",
     result: phaseMaterial ? phaseResult : null,
     reason: phaseSearchSkipped
       ? phaseDiagnostics?.grouping?.reason || "No differential phase control is applicable."
-      : phaseMaterial
-        ? null
-        : "No material all-pass phase improvement found.",
+      : phaseDiagnostics?.status === "failed" || phaseDiagnostics?.error
+        ? phaseDiagnostics?.error || "The phase search encountered an error."
+        : phaseDiagnostics?.status === "incomplete"
+          ? phaseDiagnostics?.grouping?.reason || "The phase search could not reach a conclusive result."
+          : phaseMaterial
+            ? null
+            : "No material all-pass phase improvement found.",
     phaseGroupLabel: phaseGroup?.label || null,
     phaseAtReferenceDeg: Number(groupedPhase?.phaseAtReferenceDeg) || 0,
     phaseReferenceHz: Number(groupedPhase?.phaseReferenceHz)

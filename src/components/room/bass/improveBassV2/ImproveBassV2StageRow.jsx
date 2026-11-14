@@ -70,6 +70,22 @@ function StageVerdictBadge({ verdict }) {
       </span>
     );
   }
+  if (verdict === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-red-50 border border-red-200 px-2 py-0.5">
+        <AlertCircle className="h-3 w-3 text-red-700" />
+        <span className="text-[10px] font-medium text-red-700">Failed</span>
+      </span>
+    );
+  }
+  if (verdict === "incomplete") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-[#F5F4F1] border border-[#D9D5CE] px-2 py-0.5">
+        <AlertCircle className="h-3 w-3 text-[#8A7B6A]" />
+        <span className="text-[10px] font-medium text-[#625143]">Incomplete</span>
+      </span>
+    );
+  }
   if (verdict === "not_available") {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-[#F5F4F1] border border-[#D9D5CE] px-2 py-0.5">

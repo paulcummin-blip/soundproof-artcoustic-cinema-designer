@@ -1,6 +1,7 @@
 // Extracted verbatim from src/pages/RoomDesigner.jsx (lines 204–1132)
 import { useState, useCallback, useEffect, useRef } from "react";
 import { registerElectronicPersistence } from "@/components/room/bass/optimiseWorkflow/electronicPersistence.js";
+import { registerOptimiserPlanFlush } from "@/components/room/bass/optimiseWorkflow/optimiserPlanFlush.js";
 import { Project } from "@/entities/Project";
 import { base44 } from "@/api/base44Client";
 import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
@@ -25,7 +26,7 @@ import {
 import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire";
 import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
-import { useOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
+import { useOptimiserPlanAuthority, getOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
 import { serializeOptimiserPlan, acknowledgeOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 import {
   COMMERCIAL_BLOCK_REASON,
@@ -227,7 +228,10 @@ appState, // Pass appState directly for setters
       p21EarlyReflectionPreset: appState?.p21EarlyReflectionPreset,
       existingRoomDimensionsEdited: loadedRoomDimensionsEditedRef.current,
       appliedCalibration: serializeAppliedCalibration(appliedCalAuthority),
-      optimiserPlan: serializeOptimiserPlan(optimiserPlanAuthority),
+      optimiserPlan: serializeOptimiserPlan(getOptimiserPlanAuthority(
+        activeProjectId || projectIdState || null,
+        appState?.activeVersionId || null,
+      )),
       // Commercial selections (per-version). Read from hydrated app state, so a
       // save can never invent a default for a value that failed to load.
       manualExtras: appState?.manualExtras,
@@ -1337,6 +1341,34 @@ appState, // Pass appState directly for setters
   projectIdFromUrl,
   isProjectMode]
   );
+
+  // ── Explicit optimiser plan save flush ──────────────────────────────
+  // The ADI workflow sets the plan in the external store then needs the
+  // existing save queue to persist it WITHOUT relying on incidental autosave
+  // propagation. This registers a flush handler that waits for any in-flight
+  // save and then calls the same manual save path (with all its hydration,
+  // instance and concurrency protections). It creates no second persistence
+  // mechanism — the handler reuses the same single-writer save queue.
+  const manualSaveRef = useRef(manualSaveProject);
+  manualSaveRef.current = manualSaveProject;
+  useEffect(() => {
+    const flushProjectId = activeProjectId || projectIdState;
+    const flushVersionId = appState?.activeVersionId;
+    if (!flushProjectId || !flushVersionId || loadState.phase !== "loaded") return;
+    return registerOptimiserPlanFlush(flushProjectId, flushVersionId, async () => {
+      const bucket = globalThis[`__rdAutosaveRefs_${flushProjectId}`];
+      if (bucket?.inFlight) {
+        const waitStart = Date.now();
+        while (bucket.inFlight && Date.now() - waitStart < 30000) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        if (bucket.inFlight) {
+          return { success: false, error: "A save is still in progress." };
+        }
+      }
+      return manualSaveRef.current();
+    });
+  }, [activeProjectId, projectIdState, appState?.activeVersionId, loadState.phase]);
 
   return {
     projectId: projectIdState,

@@ -166,11 +166,13 @@ export function buildStageDisplay(state) {
 
     // Phase — a real grouped all-pass search, never a display-only claim.
     if (key === 'phase_polarity') {
-      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement' || stageVerdicts[key] === 'done') {
+      if (stageVerdicts[key] === 'improvement' || stageVerdicts[key] === 'no_improvement' || stageVerdicts[key] === 'done' || stageVerdicts[key] === 'failed') {
         stageStatus = 'completed';
       } else if (activeStageKey === 'phase_polarity') {
         stageStatus = 'active';
       } else if (stageVerdicts[key] === 'skipped') {
+        stageStatus = 'not_tested';
+      } else if (stageVerdicts[key] === 'incomplete') {
         stageStatus = 'not_tested';
       } else if (calibratingDone) {
         stageStatus = 'completed';
@@ -297,7 +299,8 @@ export function formatStageVerdict(verdict) {
   if (verdict === 'improvement') return 'improvement found';
   if (verdict === 'no_improvement') return 'no improvement';
   if (verdict === 'done') return 'reviewed';
-  if (verdict === 'incomplete') return 'not yet settled';
+  if (verdict === 'failed') return 'failed';
+  if (verdict === 'incomplete') return 'incomplete';
   if (verdict === 'not_available') return 'not applicable';
   return null;
 }

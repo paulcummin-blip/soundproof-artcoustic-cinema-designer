@@ -1021,26 +1021,33 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               evaluationIssues.push({stage:"phase",index,issues:check.issues});
             }
           }
+          // A completed search that found no qualifying candidate is NOT
+          // incomplete: the search ran normally and concluded there is nothing
+          // worth applying. Only an ambiguous grouping (genuinely inconclusive)
+          // is "incomplete" here; a genuine exception is "failed" (caught below).
           phaseDiagnostics.status = phaseSearch?.status === "skipped"
             ? "skipped"
-            : phaseDiagnostics.valid
-              ? "completed-shortlist"
-              : "incomplete";
+            : phaseSearch?.status === "ambiguous"
+              ? "incomplete"
+              : phaseDiagnostics.valid
+                ? "completed-shortlist"
+                : "no_improvement";
           setStageVerdict(
             projectId,
             versionId,
             "phase_polarity",
             phaseDiagnostics.status === "skipped"
               ? "skipped"
-              : phaseDiagnostics.invalid || phaseDiagnostics.error || !phaseDiagnostics.valid
+              : phaseDiagnostics.status === "incomplete"
                 ? "incomplete"
                 : "done",
           );
         } catch (err) {
           if (isFatalLifecycleError(err)) throw err;
           phaseDiagnostics.error = err.message;
+          phaseDiagnostics.status = "failed";
           evaluationIssues.push({stage:"phase",error:err.message});
-          setStageVerdict(projectId, versionId, "phase_polarity", "incomplete");
+          setStageVerdict(projectId, versionId, "phase_polarity", "failed");
         }
 
         onProgress("calibrating", "Testing grouped delay adjustments", 0, 61);
@@ -1575,7 +1582,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       phaseMaterial={material:!!phaseResult,reason:phaseSelection.materialityReason};
       phaseDiagnostics.evaluations=phaseSelection.evaluations;
       setStageVerdict(projectId, versionId,"phase_polarity",phaseDiagnostics.status==="skipped"?"skipped":
-        phaseResult?"improvement":phaseDiagnostics.invalid || phaseDiagnostics.error || !phaseDiagnostics.valid?"incomplete":"no_improvement");
+        phaseDiagnostics.status==="incomplete"?"incomplete":
+        phaseDiagnostics.status==="failed"||phaseDiagnostics.error?"failed":
+        phaseResult?"improvement":"no_improvement");
 
       const calSelection=selectConfirmedRecommendations(calibrationCandidates,snapshot,existingAuthority);
       calibrationResult=calSelection.winner;
