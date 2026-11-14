@@ -40,7 +40,7 @@
  * fetching, no side effects.
  */
 
-import { collectEligibleEvidence, levelRank } from './adiHighlightImportance';
+import { collectEligibleEvidence, levelRank, levelLabel, isStrength } from './adiHighlightImportance';
 import { productEntries, PLACEMENT_PHRASES } from './adiHighlightStories';
 import { statedSummaryValue } from './projectReportPublishedValues';
 import { systemFormat } from '@/shared/systemFormat';
@@ -84,6 +84,48 @@ function listClauses(clauses, joiner = ', ') {
   }
   if (list.length === 2) return `${list[0]} and ${list[1]}`;
   return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
+/** Capitalise the first letter of a sentence fragment. */
+const capify = (text) => String(text || '').replace(/^([a-z])/, (m) => m.toUpperCase());
+
+/**
+ * P20 seat-level breakdown: how many assessed seats sit at each published level.
+ * Read from the published authority's own per-seat results, so a seat-to-seat
+ * claim can distinguish the limiting seats from the better-performing ones
+ * without ever implying every seat shares one result. Returns null when no
+ * per-seat result was published.
+ */
+function p20SeatBreakdown(summary) {
+  const seats = summary?.parameterAuthority?.p20?.seats;
+  if (!seats || typeof seats !== 'object') return null;
+  const levels = {};
+  let assessed = 0;
+  for (const seatId of Object.keys(seats)) {
+    const seat = seats[seatId];
+    if (seat?.state !== 'scored') continue;
+    const label = levelLabel(seat.level);
+    if (label == null) continue;
+    assessed += 1;
+    levels[label] = (levels[label] || 0) + 1;
+  }
+  return assessed > 0 ? { assessed, levels } : null;
+}
+
+/**
+ * The P20 distribution as a wording authority: the floor (weakest) level, how
+ * many seats sit at it, and how many sit above it. `uniform` is true when every
+ * assessed seat shares one level, so no variation claim is made.
+ */
+function p20Distribution(summary) {
+  const breakdown = p20SeatBreakdown(summary);
+  if (!breakdown) return null;
+  const { assessed, levels } = breakdown;
+  const sorted = Object.keys(levels).sort((a, b) => levelRank(a) - levelRank(b));
+  const floor = sorted[0];
+  const floorCount = levels[floor] || 0;
+  const betterCount = assessed - floorCount;
+  return { assessed, floor, floorCount, betterCount, uniform: sorted.length === 1 };
 }
 
 /**
@@ -149,26 +191,31 @@ function buildSpatialTheme({ byKey, summary, counts, dolbyConfig, sevenBedLayout
     p9 ? pill('P9', p9.level, PLACEMENT_PHRASES.p9) : null,
   ].filter(Boolean);
 
+  const overheadPhrase = overheads > 0
+    ? `, with ${overheads} overhead speaker${overheads === 1 ? '' : 's'} extending effects above the audience`
+    : '';
   const opening = format && Number.isFinite(bed)
-    ? `The room is built as a ${format} layout: ${bedStructure(bed, sevenBedLayoutType)} at listener level${overheads > 0 ? `, plus ${overheads} overhead speakers` : ''}.`
-    : `The room is built as a ${counts.lcr || 0} speaker screen stage with ${counts.surrounds || 0} surround and wide positions${overheads > 0 ? ` and ${overheads} overhead speakers` : ''}.`;
-
-  const clauses = [
-    p7 ? 'Front wides sit inside their deviation limit, closing the gap between the screen and the side speakers so movement across the front of the room stays continuous' : null,
-    p11 ? 'every surround, wide and overhead speaker is inside the recommended RP22 position zones' : null,
-  ].filter(Boolean);
-  // The seat-scoped results are stated for the seats they were assessed across, in
-  // their own sentence, so a seat-scoped result is never carried into a room-wide
-  // claim by the wording around it.
-  const seatClauses = [
-    p4 ? 'the screen channels stay level-matched' : null,
-    p5 ? 'the surround spacing holds within the horizontal limit' : null,
-    p9 ? 'the overhead speakers are spaced within the vertical limit' : null,
-  ].filter(Boolean);
+    ? `The room is built as a ${format} layout: ${bedStructure(bed, sevenBedLayoutType)} at listener level${overheadPhrase}.`
+    : `The room is built with ${counts.lcr || 0} screen channels and ${counts.surrounds || 0} surround position${(counts.surrounds || 0) === 1 ? '' : 's'}${overheadPhrase}.`;
 
   const sentences = [opening];
-  if (clauses.length > 0) sentences.push(`${listClauses(clauses, ', and ')}.`);
-  if (seatClauses.length > 0) sentences.push(`Across the assessed seats ${listClauses(seatClauses)}.`);
+
+  const placementStrengths = [];
+  if (p11 && isStrength(p11.level)) placementStrengths.push('every surround, wide and overhead speaker sits within its recommended RP22 position zone');
+  if (p7 && isStrength(p7.level)) placementStrengths.push('front wides keep the front soundstage continuous');
+  if (placementStrengths.length) sentences.push(`${capify(listClauses(placementStrengths))}, so sound is placed precisely around the room.`);
+
+  const seatStrengths = [];
+  if (p4 && isStrength(p4.level)) seatStrengths.push('the screen channels stay level-matched');
+  if (p5 && isStrength(p5.level)) seatStrengths.push('the surround spacing holds within its limit');
+  if (p9 && isStrength(p9.level)) seatStrengths.push('the overhead speakers are spaced within the vertical limit');
+  if (seatStrengths.length) sentences.push(`Across the assessed seats, ${listClauses(seatStrengths)}.`);
+
+  const limits = [];
+  if (p5 && !isStrength(p5.level)) limits.push('surround spacing is the main limitation in how precisely sound can be positioned around the listeners');
+  if (p9 && !isStrength(p9.level) && overheads > 0) limits.push('overhead spacing is wider than the recommended limit');
+  if (p7 && !isStrength(p7.level)) limits.push('front-wide placement sits outside its recommended deviation');
+  if (limits.length) sentences.push(`${capify(listClauses(limits, ', and '))}.`);
 
   return {
     ...ADI_HIGHLIGHT_THEMES[0],
@@ -190,14 +237,16 @@ function buildSpatialTheme({ byKey, summary, counts, dolbyConfig, sevenBedLayout
  * and for its own level. No claim is made for a layer whose result is absent.
  */
 function buildTimbreTheme({ byKey, counts }) {
-  const layer = (counts.overheads || 0) > 0 ? 'surround and overhead' : 'surround';
+  const hasOverheads = (counts.overheads || 0) > 0;
+  const layer = hasOverheads ? 'surround and overhead' : 'surround';
   const p16 = eligible(byKey, 'p16');
   const p17 = eligible(byKey, 'p17');
   const seats = Math.max(p16?.assessed || 0, p17?.assessed || 0);
+  const seatPhrase = seats > 0 ? `across the ${seats} assessed seat${seats === 1 ? '' : 's'}` : 'across the assessed seats';
 
   const evidence = [
-    p16 ? pill('P16', p16.level, p16.value ? `Screen channels across the seats · ${p16.value}` : 'Screen channels across the assessed seats') : null,
-    p17 ? pill('P17', p17.level, p17.value ? `${layer} channels across the seats · ${p17.value}` : `${layer} channels across the assessed seats`) : null,
+    p16 ? pill('P16', p16.level, p16.value ? `Screen channels · ${p16.value}` : 'Screen channels') : null,
+    p17 ? pill('P17', p17.level, p17.value ? `${layer} channels · ${p17.value}` : `${layer} channels`) : null,
   ].filter(Boolean);
 
   if (!p16 && !p17) {
@@ -213,19 +262,42 @@ function buildTimbreTheme({ byKey, counts }) {
     };
   }
 
-  const parts = [
-    p16 ? `the screen channels hold their tonal balance${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}` : null,
-    p17 ? `the ${layer} channels hold theirs across the same seats` : null,
-  ].filter(Boolean);
+  const both = p16 && p17;
+  const screenStrength = p16 && isStrength(p16.level);
+  const nonScreenStrength = p17 && isStrength(p17.level);
+  const bothStrong = both && screenStrength && nonScreenStrength;
+
+  const sentences = [];
+  if (bothStrong) {
+    sentences.push('Tonal consistency is a particular strength of this design.');
+  } else if (screenStrength || nonScreenStrength) {
+    sentences.push('Tonal consistency is a genuine strength within the speaker groups that reach it.');
+  } else {
+    sentences.push('Tonal consistency is assessed within each speaker group.');
+  }
+
+  const parts = [];
+  if (p16) {
+    parts.push(screenStrength
+      ? `voices and instruments keep a similar character ${seatPhrase} within the screen group`
+      : `the screen channels hold their tonal balance ${seatPhrase}`);
+  }
+  if (p17) {
+    parts.push(`the ${layer} channels hold theirs within their own group`);
+  }
+  if (parts.length) sentences.push(`${capify(listClauses(parts))}.`);
+  if (bothStrong) sentences.push('This helps listeners hear a balanced soundtrack across the seating area.');
 
   return {
     ...ADI_HIGHLIGHT_THEMES[1],
     order: 2,
     category: null,
     weight: THEME_WEIGHT,
-    level: levelRank(p16?.level) <= levelRank(p17?.level) ? (p16?.level ?? p17?.level) : p17.level,
+    level: both
+      ? (levelRank(p16.level) <= levelRank(p17.level) ? (p16.level ?? p17.level) : p17.level)
+      : (p16?.level ?? p17?.level ?? null),
     evidence,
-    explanation: `${p16 && p17 ? 'Screen, surround and overhead groups maintain close tonal consistency within their respective layers. ' : ''}${parts.join(', and ').replace(/^([a-z])/, (m) => m.toUpperCase())}${p16 && p17 ? ', so a voice or an instrument keeps its character as it moves around and above the room' : ''}.`,
+    explanation: sentences.join(' '),
     sources: ['P16', 'P17'].filter((key) => eligible(byKey, key.toLowerCase())),
   };
 }
@@ -248,7 +320,7 @@ function buildDynamicTheme({ byKey, summary, counts }) {
   const evidence = [
     p12 ? pill('P12', p12.level, p12.value ? `Screen stage · ${p12.value}` : 'Screen stage') : null,
     p13 ? pill('P13', p13.level, p13.value ? `${layer} layers · ${p13.value}` : `${layer} layers`) : null,
-    p14 ? pill('P14', p14.level, p14.value ? `Subwoofer output · ${p14.value}` : 'Subwoofer output') : null,
+    p14 ? pill('P14', p14.level, p14.value ? `Bass target · ${p14.value}` : 'Bass output target') : null,
     p18 ? pill('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'Extension') : null,
   ].filter(Boolean);
 
@@ -265,12 +337,38 @@ function buildDynamicTheme({ byKey, summary, counts }) {
     };
   }
 
-  const parts = [
-    p12 ? `the screen stage reaches ${p12.value} at the reference seating position, giving strong front-stage headroom` : null,
-    p13 ? `the ${layer} channels reach ${p13.value}, a useful reserve around and above the seats` : null,
-    p14 ? `the subwoofers add ${p14.value} of low-frequency output` : null,
-    p18 ? `the low end holds its output down to a predicted ${p18.value}` : null,
-  ].filter(Boolean);
+  const layerLevels = [p12, p13, p14].filter(Boolean).map((entry) => entry.level);
+  const weakestLayer = layerLevels.reduce(
+    (min, lvl) => (levelRank(lvl) < levelRank(min) ? lvl : min),
+    layerLevels[0],
+  );
+  const weakestRank = levelRank(weakestLayer);
+  const overallTone = weakestRank >= 4 ? 'strong'
+    : weakestRank >= 2 ? 'useful'
+    : 'limited';
+  const sentences = [`The system offers ${overallTone} dynamic capability for this room.`];
+
+  if (p12 && p13) {
+    if (levelRank(p12.level) < levelRank(p13.level)) {
+      sentences.push(`The screen stage is the limiting layer at the reference position, while the ${layer} channels provide greater capability.`);
+    } else if (levelRank(p12.level) > levelRank(p13.level)) {
+      sentences.push(`The ${layer} channels are the limiting layer at the reference position, while the screen stage provides greater capability.`);
+    } else {
+      sentences.push(`The screen stage and the ${layer} channels offer comparable capability at the reference position.`);
+    }
+  } else if (p12) {
+    sentences.push(`The screen stage provides the system's principal capability at the reference position.`);
+  } else if (p13) {
+    sentences.push(`The ${layer} channels provide capability around and above the seats.`);
+  }
+
+  if (p14 && p18) {
+    sentences.push(`The bass system is assessed against a ${p14.value || 'published'} output target, with predicted in-room extension to ${p18.value}.`);
+  } else if (p14) {
+    sentences.push(`The bass system is assessed against a ${p14.value || 'published'} output target.`);
+  } else if (p18) {
+    sentences.push(`Predicted in-room extension reaches ${p18.value}.`);
+  }
 
   return {
     ...ADI_HIGHLIGHT_THEMES[2],
@@ -280,7 +378,7 @@ function buildDynamicTheme({ byKey, summary, counts }) {
     level: [p12, p13, p14].filter(Boolean)
       .reduce((weakest, item) => (levelRank(item.level) < levelRank(weakest) ? item.level : weakest), 'L4'),
     evidence,
-    explanation: `Dynamic range is delivered as one system rather than by the screen channels alone: ${parts.join('; ')}.`,
+    explanation: sentences.join(' '),
     sources: ['P12', 'P13', 'P14', 'P18'].filter((key) => (key === 'P18' ? Boolean(p18) : Boolean(eligible(byKey, key.toLowerCase())))),
   };
 }
@@ -294,15 +392,16 @@ function buildDynamicTheme({ byKey, summary, counts }) {
  * weakest assessed seat's result, so a consistency claim is only ever made at the
  * level the seats support.
  */
-function buildBassTheme({ byKey, summary }) {
+function buildBassTheme({ byKey, summary, counts }) {
   const p18 = roomResult(byKey, summary, 18);
   const p19 = roomResult(byKey, summary, 19);
   const p20 = eligible(byKey, 'p20');
+  const subCount = counts?.subwoofers || 0;
 
   const evidence = [
     p18 ? pill('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room extension') : null,
-    p19 ? pill('P19', p19.level, p19.value ? `At the reference seating position · ${p19.value}` : 'At the reference seating position') : null,
-    p20 ? pill('P20', p20.level, p20.seats ? `Across the ${p20.assessed} assessed seats · ${p20.value ?? ''}`.trim().replace(/ ·$/, '') : 'Across the assessed seats') : null,
+    p19 ? pill('P19', p19.level, p19.value ? `At the reference seat · ${p19.value}` : 'At the reference seat') : null,
+    p20 ? pill('P20', p20.level, p20.assessed ? `Across the ${p20.assessed} assessed seats` : 'Across the assessed seats') : null,
   ].filter(Boolean);
 
   if (evidence.length === 0) {
@@ -318,25 +417,45 @@ function buildBassTheme({ byKey, summary }) {
     };
   }
 
-  // Each sentence starts on its own capital: the extension, the reference-seat
-  // result stated with the level it actually achieved, then the seat-to-seat
-  // limitation with the level it actually has. A sentence is only written for a
-  // result this design's publication carries, and the levels are the published
-  // ones, never restated from memory.
-  const p19Level = p19?.level ? String(p19.level).replace(/^L/i, '') : null;
-  const p20Level = p20?.level ? String(p20.level).replace(/^L/i, '') : null;
+  const seatWord = (n) => `seat${n === 1 ? '' : 's'}`;
+  const verb = (n) => (n === 1 ? 's' : '');
 
-  const sentences = [
-    p18 ? `Predicted in-room extension reaches ${p18.value}.` : null,
-    p19
-      ? (p19Level
-        ? `At the reference seating position, the corrected response achieves P19 Level ${p19Level} against the target across the assessed band.`
-        : 'At the reference seating position, the corrected response is assessed against the target across the assessed band.')
-      : null,
-    p20
-      ? `Seat-to-seat consistency remains the principal limitation, with P20 at Level ${p20Level} across the${p20.assessed ? ` ${p20.assessed}` : ''} assessed seats.`
-      : null,
-  ].filter(Boolean);
+  const sentences = [];
+  if (p18) {
+    const subPhrase = subCount > 0
+      ? `${subCount} subwoofer${subCount === 1 ? '' : 's'} provide${subCount === 1 ? 's' : ''} `
+      : 'The design provides ';
+    sentences.push(`${subPhrase}predicted bass extension to ${p18.value}, adding depth to music and film soundtracks.`);
+  }
+  if (p19) {
+    sentences.push('At the reference seating position, the corrected response is assessed against the target across the assessed band.');
+  }
+
+  if (p20) {
+    const dist = p20Distribution(summary);
+    if (dist) {
+      const floorStrength = isStrength(dist.floor);
+      const uniform = dist.uniform || dist.betterCount === 0;
+      if (uniform) {
+        sentences.push(floorStrength
+          ? `The response is consistent across the ${dist.assessed} assessed ${seatWord(dist.assessed)}.`
+          : `Seat-to-seat consistency is the principal limitation of the bass response, with similar deviation across the ${dist.assessed} assessed ${seatWord(dist.assessed)}.`);
+      } else if (floorStrength) {
+        sentences.push(
+          `Most seats achieve a consistent result across the ${dist.assessed} assessed ${seatWord(dist.assessed)}, `
+          + `with ${dist.floorCount} ${seatWord(dist.floorCount)} show${verb(dist.floorCount)} slightly greater deviation from the target response.`,
+        );
+      } else {
+        sentences.push(
+          `Performance varies across the ${dist.assessed} assessed ${seatWord(dist.assessed)}: `
+          + `${dist.floorCount} ${seatWord(dist.floorCount)} show${verb(dist.floorCount)} the greatest deviation from the target response, `
+          + `while the remaining ${dist.betterCount} achieve${verb(dist.betterCount)} a more consistent result.`,
+        );
+      }
+    } else {
+      sentences.push('Seat-to-seat consistency is the principal limitation of the bass response.');
+    }
+  }
 
   return {
     ...ADI_HIGHLIGHT_THEMES[3],
@@ -375,7 +494,7 @@ export function buildAdiHighlightThemes(sources = {}) {
     buildSpatialTheme({ byKey, summary, counts: connections, dolbyConfig, sevenBedLayoutType }),
     buildTimbreTheme({ byKey, counts: connections }),
     buildDynamicTheme({ byKey, summary, counts: connections }),
-    buildBassTheme({ byKey, summary }),
+    buildBassTheme({ byKey, summary, counts: connections }),
   ];
 }
 
