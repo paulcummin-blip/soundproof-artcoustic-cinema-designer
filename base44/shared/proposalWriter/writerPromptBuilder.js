@@ -30,7 +30,7 @@
  * here.
  */
 
-import { buildProposalWritingAuthority } from '../soundProofWritingAuthority.js';
+import { buildDesignIntentWritingAuthority, buildProposalWritingAuthority } from '../soundProofWritingAuthority.js';
 // THE CLIENT NARRATIVE PRIORITY, section by section: which client question each
 // section answers and what its copy leads on. The proposal authority already
 // carries the priority itself; this adds only the per-section emphasis, and it
@@ -217,6 +217,16 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     throw new Error('A writer input built from the frozen evidence pack is required: the writer is given no other source.');
   }
 
+  // THE DESIGN INTENT GENERATION PATH uses its own writing authority: the shared
+  // Sound Proof authority WITHOUT the proposal-sales instructions, so the Design
+  // Intent is not briefed as a sales document and does not inherit proposal-stage
+  // voice guidance that conflicts with its own purpose. The proposal path and
+  // every other proposal section are unchanged.
+  const isDesignIntent = !!input.design_intent_scope;
+  const writingAuthority = isDesignIntent
+    ? buildDesignIntentWritingAuthority()
+    : buildProposalWritingAuthority();
+
   const recommendationAuthority = input.editorial_rules?.recommendation_authority
     || NATURAL_RECOMMENDATION_RULE;
   const naturalVoiceRule = recommendationAuthority.startsWith('RECOMMENDATION AUTHORITY:')
@@ -228,10 +238,9 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     'You do not calculate, measure, estimate or infer anything. You turn the frozen evidence you are given into client-facing narrative copy, and you claim nothing it does not support.',
     '',
     // The authority this writer is held to: the shared Sound Proof writing
-    // authority with the proposal sales authority inserted after CORE PRINCIPLE.
-    // It is ONE string and is carried as one entry — spreading it here would
-    // spread its characters, one per line.
-    buildProposalWritingAuthority(),
+    // authority. For the Design Intent, the proposal-sales authority is excluded
+    // so the block is briefed as design intent, not as a sales document.
+    writingAuthority,
     '',
     // THE PROFESSIONAL JUDGEMENT the copy is allowed to explain: the Sound Proof
     // design philosophy, carried whole as its own block. It adds no claim, changes
@@ -249,7 +258,11 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     // the finished design will deliver. The design stage diagnoses and the report
     // stage evidences; neither voice belongs here, and nothing is written as
     // though the performance had already been demonstrated in the room.
-    'You are writing at the PROPOSAL stage. The engineering analysis is complete and frozen: this proposal describes the design that has been specified and what it will deliver, not a design whose performance has already been demonstrated in the room. Sound like an experienced home cinema designer presenting a completed design, not an engineer auditing it.',
+    ...(isDesignIntent ? [
+      'You are writing the Project Report\'s Design Intent: an experienced cinema designer explaining this design to the client. The engineering analysis is complete and frozen, and this block is the design team\'s own account of the design — not a sales document, not a recommendation and not a proposal. Sound like an experienced home cinema designer presenting a completed design, not an engineer auditing it and not a salesperson selling it.',
+    ] : [
+      'You are writing at the PROPOSAL stage. The engineering analysis is complete and frozen: this proposal describes the design that has been specified and what it will deliver, not a design whose performance has already been demonstrated in the room. Sound like an experienced home cinema designer presenting a completed design, not an engineer auditing it.',
+    ]),
     'DESIGN INTERPRETATION: design_interpretation carries the verified ADI interpretation of this design: the room and its intended use, the display and the seating, the system architecture, the constraints, the reasons behind the important design decisions, the strongest engineering characteristics, the results that are reliable evidence, and what is deliberately not stated. Read it first: it is why the design is what it is, and the copy is written from it. It explains the design and is never a source of figures: every figure, level, parameter and product still comes from the evidence pack and its own claims, and where the two differ the frozen evidence governs. Where the interpretation is unavailable, refused or silent, invent nothing.',
     'SEATING CLEARANCE (RP22 Parameter 1): design_interpretation may carry a seating_clearance block: where the seating actually sits, read from the saved geometry, the principle behind that distance and the trade the seating makes. Use it only where that block marks itself relevant to this design, and only in the section that already explains the seating: explain what the distance does for the listener rather than what it measures, keep the distance to the nearest boundary and the distance to the wall behind the seating as two separate measurements that are never read from one another, and state the balance plainly where the room or the layout takes one. The block states no Performance Level and no measured result, so never attach a level or a promise to it, and never write it as a paragraph repeated across sections.',
     'COMPARISON READING: comparison_reading carries the Stage 1 interpretation of what the options share and what changes between them. It is supplied only for a comparison proposal (supplied: true). Alongside the designer\'s brief, it is the primary authority for the NARRATIVE PURPOSE of the comparison: what each design is for, how the room would be used, and what the viewing and listening experience would be like. For each version, explain what the design is intended to achieve, how the room would be used, what the viewing and listening experience would be like, which saved design decisions create that experience, and the relevant engineering strengths and practical trade-offs. Engineering evidence remains the authority for every technical and performance claim: never attach a figure, a level or a product to the comparison reading. Do not recommend one option over another because it has higher RP22 scores, a larger speaker system, a larger screen or a higher price: a genuine engineering difference is stated objectively and never makes one option universally preferable. Recommend one option only where the designer\'s stated brief gives a clear priority that supports it; where it does not, present the options as credible alternatives without choosing a winner. The designer\'s text is context and guidance, never wording to copy, and no client preference, room use, design feature or performance claim is ever invented. Where comparison_reading is not supplied (a single-option proposal, or a comparison whose reading is absent), write nothing about it and follow the single-option or comparison rules as they stand.',

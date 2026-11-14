@@ -20,8 +20,8 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  DESIGN_INTENT_CONTENT_BRIEF,
   DESIGN_INTENT_REQUIREMENT,
-  DESIGN_INTENT_SENTENCE_FRAMES,
 } from '../base44/shared/reportDesignIntent/designIntentBrief.js';
 import { buildWritingStyleContract, BANNED_WORDS } from '../base44/shared/reportWritingStyleContract.js';
 import {
@@ -74,9 +74,9 @@ describe('A. No writing contract requires a recommendation opening', () => {
     expect(buildWritingStyleContract({})).toContain(DESIGN_INTENT_WRITING);
     expect(buildProposalWritingAuthority()).toContain(DESIGN_INTENT_WRITING);
     expect(DESIGN_INTENT_WRITING).toMatch(/never offered as a recommendation and it never opens on one/i);
-    // The frames guide the content and evidence each paragraph covers rather than
-    // fixing the wording: the writer develops them naturally from the evidence.
-    expect(DESIGN_INTENT_WRITING).toMatch(/approved sentence frames, they guide the content and evidence/i);
+    // The brief states the content to develop and the evidence to draw from; the
+    // writer develops each idea naturally from the evidence.
+    expect(DESIGN_INTENT_WRITING).toMatch(/section's brief states the content to develop and the evidence to draw from/i);
     expect(DESIGN_INTENT_WRITING).toMatch(/natural expression are the goal, not verbatim repetition/i);
     expect(DESIGN_INTENT_WRITING).not.toMatch(/no fixed narrative structure/i);
     // And the copy is stated as what it is: a controlled engineering summary.
@@ -145,80 +145,50 @@ describe('C. The final Design Intent language rules reach the prompt', () => {
     expect(authority).toContain('never as "calculated reserve to draw on"');
   });
 
-  it('gives the three ideas approved sentence frames, in the approved register', () => {
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/APPROVED SENTENCE FRAMES/);
+  it('gives the three ideas as content areas, not as fixed sentence frames', () => {
+    // The brief states the content areas without prescribing their wording or
+    // their paragraph order.
+    expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/spatial resolution/i);
+    expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/timbre matching/i);
+    expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/dynamic range/i);
     expect(DESIGN_INTENT_REQUIREMENT).toContain(
-      'dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers',
+      'substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers',
     );
-    // The frames themselves are the approved wording this block is written in.
-    const frames = DESIGN_INTENT_SENTENCE_FRAMES.map((entry) => entry.frame).join(' ');
-    expect(frames).toContain('at the reference position');
-    expect(frames).toContain('provide strong spatial resolution around and above the seating');
-    expect(frames).toContain('each maintain close tonal consistency within their respective layers');
+    // No literal sentence frames remain.
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/APPROVED SENTENCE FRAMES/);
   });
 
   it('takes the bass extension from the project, never from a stored figure', () => {
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/this project's own P18 evidence/i);
-    expect(DESIGN_INTENT_SENTENCE_FRAMES.map((entry) => entry.frame).join(' '))
-      .toContain('extends the predicted low-frequency response to');
-    // No hard-coded extension anywhere in the brief, and no figure in a frame: the
-    // extension figure is a slot, filled from this project's own evidence.
+    expect(DESIGN_INTENT_REQUIREMENT).toContain('extends the predicted low-frequency response to');
+    // No hard-coded extension anywhere in the brief: the extension figure comes
+    // from this project's own evidence.
     expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/\b\d+\s?Hz\b/);
-    for (const entry of DESIGN_INTENT_SENTENCE_FRAMES) {
-      expect(entry.frame).not.toMatch(/\d/);
-      expect(entry.frame).not.toMatch(/\bHz\b/);
-    }
   });
 });
 
-describe('D. The approved sentence frames govern the copy', () => {
-  const frameText = DESIGN_INTENT_SENTENCE_FRAMES.map((entry) => entry.frame).join(' ');
-
-  it('guides the frames as content and evidence, and lets the writer express them naturally', () => {
-    expect(DESIGN_INTENT_SENTENCE_FRAMES).toHaveLength(3);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/APPROVED SENTENCE FRAMES/);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/take each frame as your starting point/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/Prefer the frame's content and evidence/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/natural expression are the goal/i);
-    // And the weak-paraphrase route is still named, so the meaning is never weakened.
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/KEEP THE MEANING, EXPRESS IT NATURALLY/i);
-    // Every frame is populated from this project's own evidence, and no bracket is
-    // ever left in the copy.
-    for (const entry of DESIGN_INTENT_SENTENCE_FRAMES) {
-      expect(entry.label.length).toBeGreaterThan(0);
-      expect(entry.populate).toMatch(/this design|this project|the evidence|the seat scope/);
-    }
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/no bracket is ever left in the copy/i);
+describe('D. The content brief lets the writer choose emphasis and order', () => {
+  it('states the content areas without prescribing paragraph structure or wording', () => {
+    expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/design choices/i);
+    expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/No fixed opening, paragraph sequence or conclusion/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/no fixed order is imposed beyond that/i);
+    // No literal sentence frames remain.
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/APPROVED SENTENCE FRAMES/);
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/take each frame as your starting point/i);
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/KEEP THE MEANING, EXPRESS IT NATURALLY/i);
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/no bracket is ever left in the copy/i);
   });
 
-  it('keeps every project fact dynamic: the frames carry slots, never facts', () => {
-    // The layers, the seat scope, the tonal groups, the arrangement and the
-    // extension figure are all slots.
-    expect(frameText).toMatch(/\[loudspeaker layers this design actually has\]/i);
-    expect(frameText).toMatch(/\[seat scope the evidence states that result for\]/i);
-    expect(frameText).toMatch(/\[authoritative tonal groups the evidence supports\]/i);
-    expect(frameText).toMatch(/\[this design's own subwoofer arrangement\]/i);
-    expect(frameText).toMatch(/\[this project's own authoritative extension figure\]/i);
-    // No frame names a project, a product, a room, a distance or a figure of its own.
-    for (const entry of DESIGN_INTENT_SENTENCE_FRAMES) {
-      expect(entry.frame).not.toMatch(/Barton|Marquee|Artcoustic|Genesis/i);
-      expect(entry.frame).not.toMatch(/\d/);
-      expect(entry.frame).not.toMatch(/\bm\b|\bmetres\b|\bmm\b/);
-    }
-    // The requirement states where every one of them comes from.
-    expect(DESIGN_INTENT_REQUIREMENT)
-      .toMatch(/populate its brackets from this project's own frozen evidence/i);
+  it('keeps every project fact dynamic: the brief carries no hard-coded figure', () => {
+    // The brief never names a project, a product, a room, a distance or a figure.
+    expect(DESIGN_INTENT_CONTENT_BRIEF).not.toMatch(/Barton|Marquee|Artcoustic|Genesis/i);
+    expect(DESIGN_INTENT_CONTENT_BRIEF).not.toMatch(/\b\d+\s?Hz\b/);
+    // The requirement states where every fact comes from.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/taken from the frozen evidence/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/this design's own subwoofer arrangement/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/this project's own extension figure/i);
   });
 
-  it('keeps the room-type vocabulary dynamic', () => {
-    expect(frameText).toMatch(/dedicated cinema/);
-    expect(DESIGN_INTENT_SENTENCE_FRAMES[2].populate).toMatch(/room-type vocabulary/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/room-type vocabulary this room actually has/i);
-  });
-
-  it('bans the weaker paraphrases the approved frames replace', () => {
+  it('bans the weaker paraphrases the brief still rejects', () => {
     for (const phrase of [
       'not unused floor space',
       'part of how the room is arranged',
@@ -236,11 +206,8 @@ describe('D. The approved sentence frames govern the copy', () => {
     }
   });
 
-  it('reaches the writer prompt as the section it is given', () => {
-    // The authority the Design Intent prompt is composed from states the frames rule,
-    // so the writer reads it whether the copy is the report's block or a proposal's.
+  it('reaches the writer prompt through the shared authority', () => {
     const authority = buildProposalWritingAuthority();
-    expect(authority).toMatch(/approved sentence frames, they guide the content and evidence/i);
     expect(authority).toMatch(/controlled engineering summary/i);
     expect(authority).not.toMatch(/no fixed narrative structure/i);
   });
@@ -255,10 +222,10 @@ describe('D. The approved sentence frames govern the copy', () => {
  * untouched: three paragraphs, three approved frames, engineering-led.
  */
 describe('E. The project renders are experience context, never evidence', () => {
-  it('DESIGN INTENT REMAINS ENGINEERING-LED: three paragraphs, three frames, unchanged', () => {
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/three short paragraphs/i);
-    expect(DESIGN_INTENT_SENTENCE_FRAMES).toHaveLength(3);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/APPROVED SENTENCE FRAMES/);
+  it('DESIGN INTENT REMAINS ENGINEERING-LED: the content brief governs, unchanged', () => {
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/a few short paragraphs/i);
+    // No literal sentence frames remain.
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/APPROVED SENTENCE FRAMES/);
     // The render's influence is bounded to ONE restrained place, and the block is
     // still the design explanation.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/at most ONE restrained place in this block/);

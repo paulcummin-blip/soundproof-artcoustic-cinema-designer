@@ -15,26 +15,19 @@
  * The voice, the natural-writing standard and the shared Sound Proof writing
  * authority are not restated here: they travel with the writer's contract, which
  * the prompt carries. This file holds only what is specific to the Design Intent:
- * the three things it explains, the project's own facts it is written from, the
- * plain register it is written in, the APPROVED SENTENCE FRAMES this block is
- * written in and populated from this project's own evidence, the words and phrases
- * it never uses, and the length it may run to on the report's first page.
+ * the purpose it serves, the project's own facts it is written from, the plain
+ * register it is written in, the words and phrases it never uses, and the length
+ * it may run to on the report's first page.
  *
- * The frames show the content and evidence each paragraph covers, in the order
- * the block is written, so the writer develops each idea from this project's own
- * frozen evidence. They hold the intended meaning and the evidence requirements;
- * the writer expresses them naturally in confident, professional British English.
- * Accuracy, clarity and natural expression are the goal.
- *
- * THE ORDER IS THE POINT. The block runs EXPERIENCE -> SYSTEM -> DETAILED DESIGN
- * REASONING. Paragraph one is the cinema the client is buying: the display and its
- * format, how many seats there are and how they are arranged, and the screen size and
- * seating distances considered together as the relationship that gives the room its
- * picture scale. Paragraph two is the system that carries that experience around and
- * above the audience. Paragraph three is the capability, the bass, and the detailed
- * design decisions that still need explaining. A constraint is never the opening
- * idea: the seating kept clear of the rear wall supports a paragraph-three decision,
- * and only where this project's own evidence records it.
+ * THE CONTENT BRIEF, NOT SENTENCE FRAMES. The brief states what the Design Intent
+ * explains — the design choices, the relationship between the picture and the
+ * sound, the meaningful performance strengths, and any limitations relevant to the
+ * client — and lets Astra decide which supported details deserve emphasis and how
+ * to organise the narrative. No fixed opening, paragraph sequence or conclusion is
+ * imposed, so each project can read differently because its design is different.
+ * The factual safeguards, source-evidence restrictions and prohibited claims
+ * below are preserved exactly: they govern what may be claimed, never how it must
+ * be sequenced.
  *
  * The length is a real constraint rather than a style note: the block occupies a
  * fixed place in the report's page budget, so the ceiling is set to the width of
@@ -58,122 +51,53 @@ export const DESIGN_INTENT_TARGET_WORDS = '130 to 175';
 export const DESIGN_INTENT_WORD_LIMIT = 200;
 
 /**
- * THE DESIGN INTENT'S APPROVED SENTENCE FRAMES.
+ * THE DESIGN INTENT CONTENT BRIEF.
  *
- * Three approved frames, one per paragraph, in the register Sound Proof publishes
- * this block in and in the order it publishes it in: the cinema experience, spatial
- * resolution with timbre matching, and dynamic capability with the bass and the
- * design decisions. They show the writer exactly what to write
- * rather than describing a register to write towards, because this block is a
- * controlled engineering summary: the approved wording is the deliverable, and free
- * paraphrasing of it is a defect rather than a variation.
- *
- * Each frame is the approved sentence, and each states which parts of it are
- * populated from this project's own frozen evidence. None of them carries a figure,
- * a product, a room, a distance or a project of its own, so no fact can be carried
- * into another design from them: the brackets are the only variable, and every one
- * of them is filled from THIS project's evidence.
+ * A concise statement of what the Design Intent explains, replacing the former
+ * literal sentence frames. It preserves the purpose of the block — the design
+ * choices, the picture-and-sound relationship, the performance strengths and the
+ * limitations relevant to the client — while letting Astra decide which supported
+ * details deserve emphasis and how to organise the narrative. No fixed opening,
+ * paragraph sequence or conclusion is imposed.
  */
-export const DESIGN_INTENT_SENTENCE_FRAMES = Object.freeze([
-  {
-    id: 'cinema_experience',
-    label: 'PARAGRAPH ONE: THE CINEMA EXPERIENCE',
-    frame: 'This [the room type this design is] is designed around [this project\'s own display and its format] and [this project\'s own row arrangement]. The screen size and the seating distances have been considered together to give the room strong cinematic picture scale.',
-    populate: 'the room type this design is, this project\'s own display and its format, and this project\'s own row arrangement',
-  },
-  {
-    id: 'spatial_and_timbre',
-    label: 'PARAGRAPH TWO: SPATIAL RESOLUTION AND TIMBRE MATCHING',
-    frame: 'The loudspeaker layout extends that experience around and above the audience. The [loudspeaker layers this design actually has] provide strong spatial resolution around and above the seating. The screen channels maintain close level consistency across the [seat scope the evidence states that result for], while the [authoritative tonal groups the evidence supports] each maintain close tonal consistency within their respective layers.',
-    populate: 'the layers this design actually has, the seat scope the evidence states the level-consistency result for, and the tonal groups the evidence actually supports',
-  },
-  {
-    id: 'dynamic_and_bass',
-    label: 'PARAGRAPH THREE: DYNAMIC RANGE, BASS AND THE DESIGN DECISIONS',
-    frame: 'Dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. The [this design\'s own subwoofer arrangement] extends the predicted low-frequency response to [this project\'s own authoritative extension figure], giving film soundtracks the depth and impact expected from a dedicated cinema.',
-    populate: 'this design\'s own subwoofer arrangement, this project\'s own extension figure, the room-type vocabulary that fits this room, and any design decision this project\'s own evidence records for it',
-  },
-]);
+export const DESIGN_INTENT_CONTENT_BRIEF = [
+  'THE DESIGN INTENT CONTENT BRIEF: explain the design choices, the relationship between the picture and the sound, the meaningful performance strengths, and any limitations relevant to the client.',
+  'Write it as an experienced home cinema designer talking the client through the design.',
+  'Choose which supported details deserve emphasis and organise the narrative so each project reads differently because its design is different. No fixed opening, paragraph sequence or conclusion is imposed: the content and the evidence the frozen pack supplies guide the order that reads most naturally for this room.',
+  'The three performance ideas the block may draw on are spatial resolution, timbre matching and dynamic range, developed as prose and never as headings or a list. The detailed design decisions, where this project records them, are explained where they fit the narrative, never forced into a fixed position.',
+].join(' ');
 
 /**
- * THE ONE OPTIONAL SENTENCE OF PARAGRAPH THREE.
- *
- * A detailed design decision is stated only where this project's own evidence
- * records it AND it is genuinely part of why this room is laid out as it is. The
- * seating kept clear of the rear wall is the common case, not a required sentence:
- * a project that records no such clearance writes no such sentence and forces
- * nothing in its place, and the block stays three paragraphs either way.
- *
- * It is deliberately NOT a fourth frame: the paragraph count and the three-paragraph
- * shape are unchanged, and this sentence is appended inside paragraph three.
- */
-export const DESIGN_INTENT_DECISION_SENTENCE = Object.freeze({
-  id: 'design_decision',
-  label: 'PARAGRAPH THREE, ONLY WHERE THIS PROJECT RECORDS IT: THE DETAILED DESIGN DECISION',
-  frame: 'The seating is set forward of the rear wall to leave useful space behind the audience for the surround system. Keeping listeners away from that boundary also avoids a position where bass can be more difficult to control, making the clearance a deliberate part of the room layout.',
-  include_when: 'this project\'s own geometry records the clearance behind the seating and that decision is genuinely part of why the room is laid out as it is — never add it because the frame exists, and never write it where the evidence records no clearance',
-  populate: 'the boundary this design actually clears, the surround layers this design actually has, and the room type this design is',
-});
-
-/**
- * The approved frames as the writer reads them, as ONE block: the three frames it
- * writes this block with, and what each bracket is populated from.
- *
- * @returns {string} the block, carried inside the section requirement
- */
-export function designIntentSentenceFrameBlock() {
-  return [
-    '=== DESIGN INTENT SENTENCE FRAMES (the content and evidence for each paragraph) ===',
-    'These three frames guide the APPROVED SENTENCE FRAMES for this block, one frame per paragraph, in the order the block is written: the cinema experience the client is buying, then the system that carries it around and above the audience, then capability and the detailed design decisions. Each frame shows the idea to develop and the evidence to populate it from. Take each frame as your starting point, populate every bracket from this project\'s own frozen evidence, and express the paragraph naturally in confident, professional British English. Prefer the frame\'s content and evidence; adapt the wording where it reads more naturally for this project, and keep the meaning and the register. Accuracy, clarity and natural expression are the goal.',
-    'No frame carries a figure, a product, a room, a distance or a project of its own, so nothing can be carried across from them, and no bracket is ever left in the copy.',
-    '',
-    ...DESIGN_INTENT_SENTENCE_FRAMES.flatMap((entry) => [
-      entry.label,
-      entry.frame,
-      `POPULATE FROM THIS PROJECT: ${entry.populate}.`,
-      '',
-    ]),
-    '=== OPTIONAL SENTENCE, PARAGRAPH THREE ONLY: THE DETAILED DESIGN DECISION ===',
-    DESIGN_INTENT_DECISION_SENTENCE.frame,
-    `INCLUDE IT ONLY WHERE ${DESIGN_INTENT_DECISION_SENTENCE.include_when}.`,
-    `POPULATE FROM THIS PROJECT: ${DESIGN_INTENT_DECISION_SENTENCE.populate}.`,
-    'This sentence is not a fourth paragraph and is not a fourth idea: it is appended inside paragraph three, it keeps the block at three paragraphs, and where it is not included the paragraph closes on the bass sentence.',
-  ].join('\n');
-}
-
-/**
- * The Design Intent's own instruction. It states the three things the block
- * explains, the project facts it is written from, the three performance ideas it
- * develops as prose, the plain register it is written in, what it never recites
- * and what it never invents, and the shape and length it may run to on the
- * report's first page. It is written as the shape of the copy rather than as a
- * sentence to paste: the room, the display, the seating and the system all come
- * from this project's own frozen evidence.
+ * The Design Intent's own instruction. It states the purpose the block serves, the
+ * project facts it is written from, the plain register it is written in, what it
+ * never recites and what it never invents, and the length it may run to on the
+ * report's first page. The factual safeguards, source-evidence restrictions and
+ * prohibited claims are preserved; the rigid paragraph structure and literal
+ * sentence frames are removed, so Astra develops the narrative from this
+ * project's own frozen evidence in the order that reads most naturally.
  */
 export const DESIGN_INTENT_REQUIREMENT = [
   'This block is the report\'s Design Intent: it opens the Project Report above its facts sheet, and it is written for the client as the design team\'s own account of the design.',
-  'Explain three things and nothing else: what this room is designed around, why the layout was chosen for it, and what the system does well. Write it as an experienced home cinema designer talking the client through the design, and never announce a recommendation: never open on a formulaic phrase such as "Our recommendation is" or "We recommend".',
-  'OPEN ON THE CINEMA EXPERIENCE, AND NEVER ON A DETAILED CONSTRAINT. Paragraph one is the big idea of the room: the display this design is built around and its format, how the seating is arranged across the room, the scale of the room and what it is for, and the design relationship between the screen size and the seating distances that gives the room its picture scale. Take the display, its format and the seating arrangement from this project\'s own frozen evidence — a projection screen or a television, the size and aspect ratio that evidence states, and the row arrangement it states (the number of rows, never an exact seat count or a people-per-row figure, unless the client brief explicitly specifies a physical capacity) — and never a figure, a size or a seat count from any other project.',
-  'THE ORDER IS THE HIERARCHY: THE EXPERIENCE FIRST, THE SYSTEM SECOND, THE DETAIL THIRD. Screen and display experience, then the seating and the audience, then the system architecture, then spatial resolution, then timbre matching, then dynamic range and the bass, and only then the detailed constraints and design decisions. A detailed constraint never opens the block unless it genuinely defines the whole project.',
+  'Explain the design choices, the relationship between the picture and the sound, the meaningful performance strengths, and any limitations relevant to the client. Write it as an experienced home cinema designer talking the client through the design, and never announce a recommendation: never open on a formulaic phrase such as "Our recommendation is" or "We recommend".',
+  DESIGN_INTENT_CONTENT_BRIEF,
+  'The experience leads and the engineering follows, but no fixed order is imposed beyond that: move naturally between what has been specified, why the approach is appropriate, what it is intended to provide and what the frozen evidence supports, vary that progression from subject to subject, and never give each form of knowledge its own formulaic sentence.',
   'NEVER CLAIM THE SAME EXPERIENCE AT EVERY SEAT. Describe the picture scale the seating sits within and the coverage this project\'s own evidence supports, and never write that every seat sees the same picture or hears the same performance unless this project\'s own RP22 or RP23 results state it for those seats. Never use a generic phrase such as "cinematic scale across the seating": state the actual screen size, viewing angle and RP23 level the evidence publishes.',
-  'DRIVE THE COPY WITH THIS PROJECT\'S OWN FACTS, taken from the frozen evidence and cited to the claim each one rests on. The Project Summary and the evidence pages state the specification in full, so this block states the few facts it actually explains rather than reciting them, and those facts are the display and its format with how the seating is arranged in the room, stated in paragraph one; the loudspeaker layers this design actually has, stated in paragraph two; and the subwoofer arrangement with how low the bass system reaches, stated in paragraph three. Name a product model only where the frozen evidence states it for this design.',
-  'NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK. The Project Summary immediately above this copy already states the room dimensions, the display and its format, the seating rows, the system format, the screen channels, the surrounds, the overheads and the subwoofers, and the evidence pages beside it state the results in full. The display and how the seating is arranged are named once, in paragraph one, because they are the experience the client is buying, and no detailed constraint is mentioned there; every other one of those facts is mentioned only where it helps explain why the design works, and the channel list earns nothing.',
+  'DRIVE THE COPY WITH THIS PROJECT\'S OWN FACTS, taken from the frozen evidence and cited to the claim each one rests on. The Project Summary and the evidence pages state the specification in full, so this block states the few facts it actually explains rather than reciting them. Name a product model only where the frozen evidence states it for this design.',
+  'NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK. The Project Summary immediately above this copy already states the room dimensions, the display and its format, the seating rows, the system format, the screen channels, the surrounds, the overheads and the subwoofers, and the evidence pages beside it state the results in full. Mention a fact only where it helps explain why the design works, and the channel list earns nothing.',
   'Then never recite the specification: no equipment-by-equipment schedule, no repeated room dimensions, no Performance Level, no parameter name or code, no channel-by-channel account, and no output figure the client can already read on the evidence pages beside this block.',
-  'Develop the three core performance ideas as prose, never as headings, never as a list and never one paragraph per idea. SPATIAL RESOLUTION is how the loudspeaker arrangement carries sound around and above the seating, and how consistent the front soundstage is across the primary seats. TIMBRE MATCHING is how the loudspeaker layers hold their own tonal balance, stated for the layer and the seats those results cover. DYNAMIC RANGE is how much headroom the front stage, the surround and overhead layers and the bass system have for demanding film soundtracks. Paragraph two carries SPATIAL RESOLUTION and then TIMBRE MATCHING; paragraph three carries DYNAMIC RANGE, the bass, and any detailed design decision that still has to be explained.',
-  'Make SPATIAL RESOLUTION specific and evidence-led: name the loudspeaker layers and channels THIS design actually has — the front wides, the surrounds, the rear surrounds, the overhead channels — and say what they cover around and above the seating, how the screen channels hold the front soundstage across the primary seats, and what the primary-seat results show. State the resolution, then explain what produces it. TIMBRE MATCHING is written in plain, credible language: the screen, surround and overhead groups each maintain close tonal consistency within their respective layers, and a stronger form such as excellent tonal consistency is used only where the authoritative evidence supports it. DYNAMIC RANGE is the whole system\'s capability, explained from the authoritative evidence behind it — the headroom the screen channels have at the reference position, useful reserve from the surround and overhead speakers, and what the bass system adds — and never as a vague impression of scale or power.',
-  'DETAILED DESIGN DECISIONS COME LAST, AND ONLY WHERE THEY ARE RELEVANT. Where a layout decision still needs explaining — the seating kept clear of the rear wall, the space kept behind the audience, or a constraint the room itself imposes — state it in paragraph three, after the experience and the system, and only where this project\'s own evidence records it. The clearance behind the seating earns its sentence because it explains the space behind the audience and one of the more difficult room boundaries for bass performance; a project that records no such clearance writes no such sentence and forces nothing in its place. Paragraph two follows the experience: it states what the layout adds around and above the audience, and it never re-opens the screen or the seating.',
+  'The three performance ideas the block may draw on are SPATIAL RESOLUTION, TIMBRE MATCHING and DYNAMIC RANGE, developed as prose, never as headings, never as a list and never one paragraph per idea. SPATIAL RESOLUTION is how the loudspeaker arrangement carries sound around and above the seating, and how consistent the front soundstage is across the primary seats. TIMBRE MATCHING is how the loudspeaker layers hold their own tonal balance, stated for the layer and the seats those results cover. DYNAMIC RANGE is how much headroom the front stage, the surround and overhead layers and the bass system have for demanding film soundtracks. Develop whichever of these this design\'s evidence supports, in the order that reads most naturally for this room.',
+  'Make each idea specific and evidence-led: name the loudspeaker layers and channels THIS design actually has — the front wides, the surrounds, the rear surrounds, the overhead channels — and say what they cover around and above the seating, how the screen channels hold the front soundstage across the primary seats, and what the primary-seat results show. State the resolution, then explain what produces it. TIMBRE MATCHING is written in plain, credible language: the screen, surround and overhead groups each maintain close tonal consistency within their respective layers, and a stronger form such as excellent tonal consistency is used only where the authoritative evidence supports it. DYNAMIC RANGE is the whole system\'s capability, explained from the authoritative evidence behind it — the headroom the screen channels have at the reference position, useful reserve from the surround and overhead speakers, and what the bass system adds — and never as a vague impression of scale or power.',
   'State a measured result only where the frozen evidence states it and only at the scope that result covers. An intention is never written as an achieved result, and a measured or calculated result is never written as an intention.',
   'Write plainly and concretely: short direct sentences, active voice, practical design reasoning, and specifics this project\'s own evidence states. Describe what the loudspeakers do and where the client sits and listens, never what the sound is like as a feeling: no figurative or anthropomorphic language about sound, no metaphor, no cinematic cliche, no vague claim about immersion and no marketing language. Explain each point once, add no filler, and never explain the same idea twice in different words.',
   'WRITE AS THE DESIGNER WHO MADE THE DECISIONS, NOT A SYSTEM IMPRESSING THE READER. Use the actual screen size, seating row arrangement, viewing angle, RP23 level, loudspeaker configuration and calculated performance figures this project\'s evidence carries. Describe the seating as a row arrangement, never an exact seat count or a people-per-row figure, unless the client brief explicitly specifies a physical capacity. Each project must read differently because its design is different: a single seating row at 51° is a different sentence from two rows at 45° and 56°. State the figure, then the benefit it delivers, in the natural register of an experienced professional explaining their own work. Never replace a specific figure with a poetic abstraction, so "a 51° viewing angle" is right and "the picture fills the eye" is wrong. Acknowledge a genuine design compromise plainly, without presenting every lower performance level as a failure.',
   'NEVER USE THESE WORDS AND PHRASES: remarkably; exceptional experience; serious cinema-scale; drawn into the action; becomes part of the scene; preserve their own tonal character; stable connection between sound and picture; substantial scale alongside quiet dialogue; calculated reserve to draw on; reserve to draw on; alongside its low-frequency output capability; effects have clear positions; the picture fills the eye; carries the same presence; reads at its intended scale; chosen by eye; the whole frame is read at once rather than scanned; holds the attention; immersive sound; strong cinematic scale; powerful dynamics. Write with these instead: consistent; close; strong; substantial headroom; useful reserve; clear coverage; predicted response; tonal consistency. Never write "the render shows", "the visual confirms", "shown in the visual", "the approved interior" or "the finishes shown" either: state what the design does, never what a picture contains.',
   'NEVER WRITE A VAGUE "MAKES THE MOST OF IT" CLAIM. Never write "arranged to make the most of it", "to make the most of the screen", "works well together", "makes good use of the space", "maximises the experience" or "creates the best experience". State the design relationship itself instead: the screen size, the seating distance, the row arrangement and the picture scale. Say what the arrangement does for the picture and the room, never that the room has been made the most of. A vague claim about using the space well is a defect: the copy states the relationship between the display and where the audience sits, in the same register as the rest of the block.',
-  'DO NOT STACK STRONG ADJECTIVES AND NEVER REPEAT ONE. Excellent, exceptional, considerable, powerful and substantial are used only where this project\'s own evidence genuinely justifies them, and no paragraph carries more than one of them. Prefer close, strong, useful and consistent, and keep substantial headroom for headroom the evidence actually shows. PREFER THE EVIDENCE TO THE BENEFIT IT DESCRIBES: where the frozen evidence publishes a measured or modelled result, state that result instead of a general claim about the sound — the layout extends the predicted low-frequency response to the published figure, never the system provides powerful bass output.',
-  'KEEP EACH PERFORMANCE POINT PRACTICAL AND GROUNDED. Timbre matching states that the screen, surround and overhead groups each maintain close tonal consistency within their respective layers and stops there. Dynamic range states substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers, never considerable reserve around and overhead. The bass states the published extension and then what it gives the client — giving film soundtracks the depth and impact expected from a dedicated cinema — never supports the low notes and atmosphere of a film soundtrack, and never a sensation the evidence does not state.',
+  'DO NOT STACK STRONG ADJECTIVES AND NEVER REPEAT ONE. Excellent, exceptional, considerable, powerful and substantial are used only where this project\'s own evidence genuinely justifies them, and no paragraph carries more than one of them. Prefer close, strong, useful and consistent, and keep substantial headroom for headroom the evidence actually shows. PREFER THE EVIDENCE TO THE BENEFIT IT DESCRIBES: where the frozen evidence publishes a measured or modelled result, state that result instead of a general claim about the sound.',
+  'KEEP EACH PERFORMANCE POINT PRACTICAL AND GROUNDED. Timbre matching states that the screen, surround and overhead groups each maintain close tonal consistency within their respective layers and stops there. Dynamic range states substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. The bass states the published extension and then what it gives the client, never a sensation the evidence does not state.',
   'BASS IS THE PUBLISHED RESULT, NOT A FEELING. Where the frozen evidence publishes how low this design reaches, state it as the predicted response it is — the layout extends the predicted low-frequency response to the published figure — and then say in one short sentence what that gives the client in a film soundtrack. Never invent room gain, never describe bass as a sensation, and never put a subjective claim about weight or power in place of the extension the evidence publishes.',
-  'WRITE THE THREE PARAGRAPHS IN THE APPROVED SENTENCE FRAMES BELOW. The frames guide the content and evidence each paragraph covers: take each frame as your starting point and populate its brackets from this project\'s own frozen evidence. Spatial resolution names the layers this design actually has, the seat scope the evidence states that result for, and the tonal groups the evidence supports. Dynamic range states substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers. Bass names this design\'s own subwoofer arrangement and this project\'s own extension figure, and uses the room-type vocabulary this room actually has. Express each paragraph naturally in confident, professional British English; keep the meaning and the evidence, and make the wording your own. Accuracy, clarity and natural expression are the goal.',
-  'KEEP THE MEANING, EXPRESS IT NATURALLY. The frames carry the meaning and the evidence; the wording is yours. Keep the specific meaning of each frame and never weaken it: write "the seating is set forward of the rear wall to leave useful space behind the audience", never "not unused floor space" and never "part of how the room is arranged". Name the layers that provide the resolution and say what they cover, never "covering directions" and never "sound travels around the room". Keep "dynamic capability is strong, with substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers", never "predicted dynamic capability provides". State the arrangement that extends the predicted low-frequency response, never "combining bass depth with output capability" and never "demanding effects their impact". No bracket is ever left in the copy.',
   'RESERVE IS USEFUL RESERVE, AND NEVER A RESERVE TO DRAW ON. Never write "calculated reserve to draw on" and never write "reserve to draw on": the reserve the surround and overhead speakers provide is written as useful reserve, inside the sentence that says what it is there for. Never write "Alongside its low-frequency output capability" and never write "Effects have clear positions": state the capability and the coverage directly instead of attaching either to a noun phrase, and never describe effects as having positions of their own.',
-  'THE BASS EXTENSION IS THIS PROJECT\'S OWN PUBLISHED FIGURE. Where the copy states how low this design reaches, take the extension from this project\'s own P18 evidence, state it as the predicted response it is, and name the arrangement it comes from. Never carry a figure across from another project and never state an extension the frozen evidence does not publish for this design.',
+  'NEVER USE THESE WEAKER PARAPHRASES: "not unused floor space"; "part of how the room is arranged"; "covering directions"; "sound travels around the room"; "predicted dynamic capability provides"; "combining bass depth with output capability"; "demanding effects their impact". State the design relationship directly instead: the seating set forward of the rear wall to leave useful space behind the audience; the layers that carry sound around and above the seating; the substantial headroom from the screen channels at the reference position; the arrangement that extends the predicted low-frequency response.',
+  'THE BASS EXTENSION IS THIS PROJECT\'S OWN PUBLISHED FIGURE. Where the copy states how low this design reaches, take the extension from this project\'s own P18 evidence, state it as the predicted response it is, and name this design\'s own subwoofer arrangement it comes from. Never carry a figure across from another project and never state an extension the frozen evidence does not publish for this design.',
   'Translate the established engineering principles this design rests on into client benefits, confidently and in plain language. A principle may be explained confidently without a high Performance Level behind it.',
   'Where recorded designer intent is supplied, understand the engineering principle it explains and state it professionally in your own words. It is semantic input, never finished prose: never paraphrase the designer, and never reproduce a note, a brief, an instruction or a filename.',
   'Acoustic treatment is supporting evidence, never a selling point: never name a treatment product and never state a treatment quantity.',
@@ -184,8 +108,7 @@ export const DESIGN_INTENT_REQUIREMENT = [
   'SELL THE POSSIBILITY THE ROOM OFFERS, NEVER THE OBJECT A PICTURE SHOWS. A render may show a bar, casual secondary seating, cabinetry or a social space behind the main seats, and none of that is a requirement, a recommendation or a promise: it is illustrative only. Write about what the picture helps the client imagine, never about the object in the frame: a bar may suggest social flexibility, never a bar requirement; a large sofa may suggest relaxed family use, never a furniture specification; decorative lighting may suggest a room that feels special to spend time in, never a lighting design. Never present anything shown as approved, final, specified or built.',
   'THE ROOM IS FOR MORE THAN FILMS. The client is buying a complete room they will spend time in, not a list of equipment: day to day with family, and in more social use with friends. Where this project\'s own brief or recorded intent says so, shared use may be acknowledged as films, television, sport, music and concerts, gaming or simply time spent together; where nothing records a social or family use, keep the wording general, such as a room designed to be enjoyed regularly, and never invent family movie nights or entertaining friends. Keep it restrained and credible: this is an engineering report, not lifestyle marketing.',
   'Be positive, fluent and confident, in natural British English.',
-  `Length: ${DESIGN_INTENT_TARGET_WORDS} words in three short paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it states what the design is and what it gives the client and then stops: paragraph one is the cinema experience, the display and its format and how the seating is arranged around it; paragraph two develops spatial resolution and timbre matching; paragraph three develops dynamic range and the bass capability, and states any detailed design decision that still has to be explained. Every fact the summary above this block already states stays out of it, except the display and the seating arrangement paragraph one names as the experience.`,
-  designIntentSentenceFrameBlock(),
+  `Length: ${DESIGN_INTENT_TARGET_WORDS} words in a few short paragraphs, and never more than the word limit. This block sits inside the report's fixed first-page budget, so it states what the design is and what it gives the client and then stops. Every fact the summary above this block already states stays out of it, except where it helps explain why the design works.`,
 ].join(' ');
 
 /** The scope rule the writer reads beside the section it is being given. */

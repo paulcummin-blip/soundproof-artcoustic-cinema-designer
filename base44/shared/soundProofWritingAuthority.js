@@ -197,7 +197,7 @@ export const DESIGN_INTENT_WRITING = [
   '',
   'This copy is design intent: an experienced cinema designer explaining a system they believe in.',
   '',
-  'It is never offered as a recommendation and it never opens on one. This copy is a controlled engineering summary. Where the section\'s own brief supplies approved sentence frames, they guide the content and evidence each paragraph covers rather than fixing the wording: develop each paragraph naturally in confident, professional British English and populate it from this project\'s own evidence. The meaning and the evidence stay; the wording is the writer\'s own, so accuracy, clarity and natural expression are the goal, not verbatim repetition.',
+  'It is never offered as a recommendation and it never opens on one. This copy is a controlled engineering summary. The section\'s brief states the content to develop and the evidence to draw from; develop each idea naturally in confident, professional British English and populate it from this project\'s own evidence. The meaning and the evidence stay; the wording is the writer\'s own, so accuracy, clarity and natural expression are the goal, not verbatim repetition.',
   '',
   'WHAT THE COPY COMMUNICATES',
   '- What makes this particular cinema special.',
@@ -783,4 +783,34 @@ export function buildProposalWritingAuthority() {
   const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
   const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
   return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${proposalNarrativePriority()}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${DESIGN_INTENT_WRITING}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
+}
+
+/**
+ * THE DESIGN INTENT WRITING AUTHORITY.
+ *
+ * The authority the Project Report's Design Intent generation path is given: the
+ * shared Sound Proof writing authority WITHOUT the proposal-sales authority or the
+ * proposal narrative priority, so the Design Intent is not briefed as a sales
+ * document and does not inherit proposal-stage instructions that conflict with its
+ * own purpose. The shared factual safeguards — the writing knowledge classes, the
+ * client benefit standard, the Design Intent philosophy and the absent-feature
+ * framing rule — are preserved exactly, and the proposal path is untouched.
+ *
+ * The sales authority and the proposal narrative priority are proposal-specific:
+ * "This proposal is a sales document" and the six proposal-section emphasis lines
+ * belong to the proposal writer, not to the report's Design Intent. Excluding them
+ * removes the conflicting purpose and voice instructions identified by the
+ * pre-launch editorial audit without weakening any factual, grounding or
+ * prohibited-claim rule.
+ *
+ * @returns {string}
+ */
+export function buildDesignIntentWritingAuthority() {
+  const at = SOUND_PROOF_WRITING_AUTHORITY.indexOf(SALES_AUTHORITY_ANCHOR);
+  if (at < 0) {
+    throw new Error('The Design Intent writing authority could not be composed: the CORE PRINCIPLE block was not found.');
+  }
+  const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
+  const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
+  return `${head}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${DESIGN_INTENT_WRITING}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
 }
