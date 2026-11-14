@@ -342,6 +342,9 @@ export function draftAttemptRecord(record, { draftProposalId = null } = {}) {
     createdAt: record.created_at,
     generationNumber: record.generation_number,
     retryOfGenerationId: record.retry_of_generation_id,
+    // The correction audit travels with the attempt, so a draft filed on the
+    // draft identity after rollback still carries its full correction journey.
+    correction: record.correction,
   });
 }
 
