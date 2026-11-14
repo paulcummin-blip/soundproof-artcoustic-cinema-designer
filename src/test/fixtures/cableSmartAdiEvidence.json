@@ -7231,5 +7231,15 @@
   "project": null,
   "screen": null,
   "seatingPositions": null,
-  "dolbyConfig": null
+  "dolbyConfig": "5.1.2",
+  "sevenBedLayoutType": "rears",
+  "productsSelected": {
+    "rows": [
+      {
+        "key": "subwoofers",
+        "area": "Subwoofers",
+        "value": "2 active"
+      }
+    ]
+  }
 }
