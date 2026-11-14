@@ -103,13 +103,13 @@ describe("Apply freshness gate (useLeverApplyActions)", () => {
     const planRunId = "run-A";
     const latestRunId = null;
     const blocked = planRunId && latestRunId && planRunId !== latestRunId;
-    assert.equal(blocked, false, "no latest run must not block (graceful before history read)");
+    assert.ok(!blocked, "no latest run must not block (graceful before history read)");
   });
 
   it("allows a lever apply when plan has no run identity (legacy plan)", () => {
     const planRunId = null;
     const latestRunId = "run-B";
     const blocked = planRunId && latestRunId && planRunId !== latestRunId;
-    assert.equal(blocked, false, "legacy plan without runId must not be blocked by the gate");
+    assert.ok(!blocked, "legacy plan without runId must not be blocked by the gate");
   });
 });
