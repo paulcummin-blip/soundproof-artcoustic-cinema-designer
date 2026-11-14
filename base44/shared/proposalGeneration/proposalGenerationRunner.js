@@ -37,6 +37,8 @@ import { assertWriterInputCarriesNoLiveState } from '../proposalWriter/writerPro
 import { callWriterProvider } from '../proposalWriter/writerProvider.js';
 import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js';
 import { buildClientBriefCoverage } from '../proposalWriter/writerClientBriefCoverage.js';
+import { isEligibleForWordingCorrection, WORDING_CORRECTION_REASON } from '../proposalWriter/writerCorrectionPolicy.js';
+import { buildCorrectionPromptBlock } from '../proposalWriter/writerCorrectionPrompt.js';
 import { GENERATION_STATUS } from './generationStatuses.js';
 import { createGenerationHistory } from './proposalGenerationRepository.js';
 
@@ -263,15 +265,76 @@ export async function runProposalCopyGeneration({
     ? validateWriterOutput({ input: writerInput, output: provider.output })
     : null;
 
+  // 7a. THE BOUNDED WORDING CORRECTION. When the initial draft arrived and
+  //     failed validation on wording-only rejections alone, ONE additional
+  //     writer call is made: the writer's own draft is handed back with the
+  //     exact rejected passages, rule IDs and guidance, and it corrects ONLY
+  //     the offending language. The corrected draft is validated by the SAME
+  //     complete validator — never a weakened one — and is accepted only when it
+  //     passes every existing rule. A correction that touches an engineering
+  //     fact, a figure, a level, a product, a scope or a citation is refused.
+  //     No loop: exactly one correction attempt, then the attempt is terminal.
+  let correction = null;
+  let finalOutput = provider.output;
+  let finalValidation = validation;
+
+  if (
+    provider.output !== null && provider.output !== undefined
+    && validation && validation.valid !== true
+  ) {
+    const eligibility = isEligibleForWordingCorrection(validation.violations);
+    if (eligibility.eligible) {
+      const correctionBlock = buildCorrectionPromptBlock({
+        initialOutput: provider.output,
+        violations: validation.violations,
+      });
+      const correctionProvider = await callWriterProvider({
+        invokeLLM,
+        input: writerInput,
+        model: flag?.model ?? null,
+        correction: { needed: true, block: correctionBlock },
+      });
+
+      const correctionValidation = correctionProvider.output !== null && correctionProvider.output !== undefined
+        ? validateWriterOutput({ input: writerInput, output: correctionProvider.output })
+        : null;
+
+      correction = {
+        attempted: true,
+        reason: WORDING_CORRECTION_REASON,
+        eligible_rule_ids: eligibility.eligible_rule_ids,
+        initial_output: provider.output,
+        initial_validation: validation,
+        correction_output: correctionProvider.output,
+        correction_validation: correctionValidation,
+        correction_provider_error: correctionProvider.provider_error ?? null,
+        // The correction succeeded only when the corrected draft arrived AND
+        // passed the complete validator. Anything else is a failed correction,
+        // and the attempt is terminal: the initial draft stands as the output.
+        succeeded: correctionValidation?.valid === true,
+      };
+
+      // The corrected draft becomes the final output ONLY when it passes the
+      // full validator. A correction that failed validation, or a provider that
+      // returned nothing, leaves the initial draft as the recorded output so the
+      // rejection is diagnosable.
+      if (correction.succeeded) {
+        finalOutput = correctionProvider.output;
+        finalValidation = correctionValidation;
+      }
+    }
+  }
+
   // 7b. What the draft did with the designer's own brief: every substantive
   //     request is either addressed in the narrative or flagged here, so nothing is
   //     silently ignored. This is an audit of coverage — it rejects nothing, and it
-  //     is never itself published.
+  //     is never itself published. It reads the FINAL output (the corrected draft
+  //     when the correction succeeded, the initial draft otherwise).
   const clientBriefCoverage = buildClientBriefCoverage({
     brief: writerInput.editorial_brief,
     pack,
     interpretation: writerInput.design_interpretation?.view || null,
-    sections: validation?.output?.sections || provider.output?.sections || [],
+    sections: finalValidation?.output?.sections || finalOutput?.sections || [],
   });
 
   // 8. One appended record, whatever happened.
@@ -288,8 +351,8 @@ export async function runProposalCopyGeneration({
       selectedVersionIds: versionIds,
       pack,
       writerInput,
-      output: provider.output,
-      validation,
+      output: finalOutput,
+      validation: finalValidation,
       providerError: provider.provider_error,
       outcome: provider.provider_error ? 'provider_failed' : 'generated',
       provider: provider.provider,
@@ -297,6 +360,7 @@ export async function runProposalCopyGeneration({
       createdBy: user?.full_name || user?.email || 'Unknown user',
       createdAt: now,
       retryOfGenerationId: retryTarget?.generation_id ?? null,
+      correction,
     });
   } catch (error) {
     const message = error?.message || 'The attempt could not be recorded.';
@@ -344,6 +408,22 @@ export async function runProposalCopyGeneration({
     },
     issue_ready: record.status === GENERATION_STATUS.VALID_GENERATED
       && clientBriefCoverage.complete === true,
+    // THE BOUNDED WORDING CORRECTION, reported so a caller can see whether a
+    // correction was attempted, whether it succeeded, and what the initial and
+    // second validations said. The full audit is on the record itself.
+    correction: correction
+      ? {
+        attempted: true,
+        succeeded: correction.succeeded,
+        reason: correction.reason,
+        eligible_rule_ids: correction.eligible_rule_ids,
+        initial_valid: correction.initial_validation?.valid === true,
+        initial_violation_count: correction.initial_validation?.violations?.length || 0,
+        correction_valid: correction.correction_validation?.valid === true,
+        correction_violation_count: correction.correction_validation?.violations?.length || 0,
+        correction_provider_error: correction.correction_provider_error,
+      }
+      : { attempted: false },
     prompt_version: record.prompt_version,
     schema_version: record.schema_version,
     contract_version: record.contract_version,

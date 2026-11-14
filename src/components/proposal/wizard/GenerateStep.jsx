@@ -24,7 +24,7 @@ const PHASE_DETAIL = Object.freeze({
   [GENERATION_PHASE.WRITING]: 'Sound Proof is writing the report sections. This takes 30-60 seconds.',
   [GENERATION_PHASE.OPENING]: 'The proposal is saved. Checking that every section is present before opening the editor.',
   [GENERATION_PHASE.READY]: 'The proposal is complete. Opening the editor.',
-  [GENERATION_PHASE.FAILED]: 'The proposal was not generated. Nothing was saved — retry when you are ready.',
+  [GENERATION_PHASE.FAILED]: 'Your project, design information and selections are all safe. Try again whenever you are ready.',
 });
 
 const STEPS = [
@@ -53,7 +53,7 @@ export default function GenerateStep({ phase = GENERATION_PHASE.PREPARING, error
               className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
               style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
             >
-              Retry Generate Proposal
+              Try Again
             </button>
           )}
           <button

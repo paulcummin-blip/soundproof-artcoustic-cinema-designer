@@ -163,7 +163,7 @@
     "gpt_output": {
       "type": "object",
       "nullable": true,
-      "description": "The GPT output if one was received, stored verbatim \u2014 including output that failed validation. Null when the provider returned nothing."
+      "description": "The GPT output if one was received, stored verbatim \u2014 including output that failed validation. Null when the provider returned nothing. When a bounded wording correction was attempted and succeeded, this carries the CORRECTED output; the initial output is preserved in the correction field."
     },
     "gpt_output_fingerprint": {
       "type": "string",
@@ -173,7 +173,7 @@
     "validation_result": {
       "type": "object",
       "nullable": true,
-      "description": "The writer-contract validation result and internal validator provenance. Null when no output was validated."
+      "description": "The writer-contract validation result and internal validator provenance. Null when no output was validated. When a bounded wording correction was attempted, this carries the FINAL validation: the corrected draft's validation when the correction succeeded, the initial draft's validation when it did not."
     },
     "validation_errors": {
       "type": "array",
@@ -187,6 +187,50 @@
       "type": "string",
       "nullable": true,
       "description": "The provider failure this attempt ended in, recorded verbatim. Null when the provider returned output or was never called."
+    },
+    "correction": {
+      "type": "object",
+      "nullable": true,
+      "description": "The bounded wording-correction audit for this attempt. Null when no correction was attempted. When the initial draft arrived and failed validation on wording-only rejections alone, ONE additional writer call was made: the writer's own draft was handed back with the exact rejected passages, rule IDs and guidance, and it corrected only the offending language. The corrected draft was validated by the same complete validator and accepted only when it passed every existing rule. This field carries the initial output, the initial validation, the correction output, the second validation, the reason and the eligible rule IDs, so the whole journey is auditable from one record. The record's own gpt_output and validation_result carry the FINAL output and validation: the corrected draft when the correction succeeded, the initial draft when it did not.",
+      "properties": {
+        "attempted": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "nullable": true
+        },
+        "eligible_rule_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "initial_output": {
+          "type": "object",
+          "nullable": true
+        },
+        "initial_validation": {
+          "type": "object",
+          "nullable": true
+        },
+        "correction_output": {
+          "type": "object",
+          "nullable": true
+        },
+        "correction_validation": {
+          "type": "object",
+          "nullable": true
+        },
+        "correction_provider_error": {
+          "type": "string",
+          "nullable": true
+        },
+        "succeeded": {
+          "type": "boolean"
+        }
+      }
     },
     "created_at": {
       "type": "string",

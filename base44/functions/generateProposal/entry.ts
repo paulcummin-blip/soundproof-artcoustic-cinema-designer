@@ -667,8 +667,7 @@ export default async function(req) {
  * told what happened to the proposal and what to do about it.
  */
 const WRITER_DRAFT_REJECTED_MESSAGE =
-  'The proposal copy did not pass its evidence check, so no proposal was saved. '
-  + 'Generate the proposal again, and if this repeats, contact support.';
+  'ADI couldn\'t complete the proposal. Your project and design information are safe. Please try again.';
 
 /**
  * The approved writer's configuration, read for one value only: the model

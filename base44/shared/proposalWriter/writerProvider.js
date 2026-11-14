@@ -76,7 +76,7 @@ export const MAX_WRITER_IMAGES = 4;
  *   Omitted or empty sends the text-only request the writer has always sent.
  * @returns {Promise<Object>} { output, provider_error, provider, model, duration_ms, received }
  */
-export async function callWriterProvider({ invokeLLM, input, model = null, fileUrls = null } = {}) {
+export async function callWriterProvider({ invokeLLM, input, model = null, fileUrls = null, correction = null } = {}) {
   const resolvedModel = writerModelFor(model);
   const images = (Array.isArray(fileUrls) ? fileUrls : []).slice(0, MAX_WRITER_IMAGES);
 
@@ -86,7 +86,7 @@ export async function callWriterProvider({ invokeLLM, input, model = null, fileU
 
   let request = null;
   try {
-    request = buildWriterProviderRequest({ input, model: resolvedModel, fileUrls: images });
+    request = buildWriterProviderRequest({ input, model: resolvedModel, fileUrls: images, correction });
   } catch (error) {
     return outcome({ model: resolvedModel, providerError: cleanError(error) });
   }

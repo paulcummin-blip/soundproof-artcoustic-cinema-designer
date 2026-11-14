@@ -73,6 +73,7 @@ export const GENERATION_RECORD_FIELDS = Object.freeze([
   'created_at',
   'created_by',
   'record_fingerprint',
+  'correction',
 ]);
 
 /**
@@ -122,6 +123,10 @@ function requireText(value, message) {
  * @param {number} attempt.generationNumber — this attempt's place in the proposal's chain
  * @param {string} [attempt.generationId] — supplied only to pin a known ID
  * @param {string|null} [attempt.retryOfGenerationId]
+ * @param {Object|null} [attempt.correction] — the bounded wording-correction
+ *   audit, when one was attempted. Carries the initial output, the initial
+ *   validation, the correction output, the second validation and the reason.
+ *   Null when no correction was attempted.
  * @returns {Object} the frozen record
  */
 export function buildGenerationRecord(attempt = {}) {
@@ -148,6 +153,7 @@ export function buildGenerationRecord(attempt = {}) {
     generationNumber = null,
     generationId = null,
     retryOfGenerationId = null,
+    correction = null,
   } = attempt;
 
   // The audit identity. Without these there is nothing to audit.
@@ -249,6 +255,15 @@ export function buildGenerationRecord(attempt = {}) {
     created_at: createdAt,
     created_by: createdBy,
     record_fingerprint: null,
+    // THE BOUNDED WORDING-CORRECTION AUDIT. Null when no correction was
+    // attempted. When a draft failed validation on wording-only rejections, one
+    // additional writer call was made; this field carries the initial output,
+    // the initial validation, the correction output, the second validation and
+    // the reason, so the whole journey is auditable from one record. The record's
+    // own gpt_output and validation_result carry the FINAL output and validation:
+    // the corrected draft when the correction passed, the initial draft when it
+    // did not.
+    correction: correction ? jsonClone(correction) : null,
   };
 
   // The ID is derived from the attempt itself — its proposal, its evidence, its

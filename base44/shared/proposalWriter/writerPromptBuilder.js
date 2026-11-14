@@ -212,7 +212,7 @@ export function writerOutputJsonSchema() {
  * @param {Object} input.input — buildWriterInput output
  * @returns {string}
  */
-export function buildWriterPrompt({ input, briefRevision = null } = {}) {
+export function buildWriterPrompt({ input, briefRevision = null, correction = null } = {}) {
   if (!input || typeof input !== 'object' || !input.evidence_pack?.pack_fingerprint) {
     throw new Error('A writer input built from the frozen evidence pack is required: the writer is given no other source.');
   }
@@ -435,6 +435,16 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
       'Do not restate another section to do it, do not add a new heading, and keep this section inside its own word limit.',
       '',
     ] : []),
+    // THE one bounded wording correction. Appended only when a draft already
+    // passed every engineering and evidence check and was rejected solely for
+    // wording-only violations: the writer's own draft is handed back with the
+    // exact rejected passages, rule IDs and guidance, and it corrects ONLY the
+    // offending language. The corrected draft is validated by the same full
+    // validator, so a correction that touches an engineering fact is refused.
+    ...(correction?.needed === true ? [
+      correction.block,
+      '',
+    ] : []),
     '=== WHAT TO RETURN ===',
     `Return one JSON object only, matching the output schema in the input exactly (${WRITER_OUTPUT_MODE}).`,
     `Top-level keys: ${['contract_version', 'pack_fingerprint', 'sections'].join(', ')}.`,
@@ -453,13 +463,13 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
  * @param {Object} input.input — buildWriterInput output
  * @param {string} [input.model]
  */
-export function buildWriterProviderRequest({ input, model = null, briefRevision = null, fileUrls = null } = {}) {
+export function buildWriterProviderRequest({ input, model = null, briefRevision = null, correction = null, fileUrls = null } = {}) {
   const images = Array.isArray(fileUrls)
     ? fileUrls.filter((url) => typeof url === 'string' && url.trim().length > 0)
     : [];
 
   return {
-    prompt: buildWriterPrompt({ input, briefRevision }),
+    prompt: buildWriterPrompt({ input, briefRevision, correction }),
     response_json_schema: writerOutputJsonSchema(),
     model: typeof model === 'string' && model.trim().length > 0 ? model.trim() : WRITER_DEFAULT_MODEL,
     // THE MULTIMODAL IMAGE INPUT, where the caller has pictures to attach: the
