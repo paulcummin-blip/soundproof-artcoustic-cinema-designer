@@ -161,6 +161,27 @@ export function resetOptimiserRunAuthority(projectId, versionId) {
 }
 
 /**
+ * Does a saved plan require run-identity verification that has not yet been
+ * completed?
+ *
+ * A MODERN plan (one with run.runId) must not be presented as current until its
+ * run identity has been established. When the in-memory run store has no run
+ * for this version (after a page reload, before the history read completes, or
+ * when the history read found no rows or failed), the plan's identity is
+ * unverified and the plan is suppressed — the UI shows the Run ADI action
+ * instead, retaining the evidence without deleting it.
+ *
+ * A LEGACY plan (no run.runId) is exempt: it was saved before durable run
+ * identity existed, and is presented as current for backward compatibility.
+ */
+export function planIdentityIsUnverified(plan, latestRun) {
+  if (!plan) return false;
+  const isModernPlan = Boolean(plan?.run?.runId);
+  if (!isModernPlan) return false;
+  return !latestRun;
+}
+
+/**
  * Does a newer run supersede this saved record?
  *
  * True when a run has been started for this design version AFTER the record was

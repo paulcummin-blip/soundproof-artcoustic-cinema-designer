@@ -1274,6 +1274,7 @@ export default function OptimiseAndCalculate({
     shared,
     planRunId: planView?.run?.runId || null,
     latestRunId: latestJointRun?.runId || null,
+    runIdentityStatus: planView?.runIdentityStatus || "pending",
   });
   const planStatus = planView?.status || null;
   const planSuperseded = planView?.superseded === true;

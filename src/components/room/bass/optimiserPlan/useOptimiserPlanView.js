@@ -19,9 +19,9 @@
 // optimiserRunAuthority.js.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOptimiserPlanAuthority } from "./optimiserPlanStore.js";
-import { useLatestOptimiserRun, resolvePresentationPlan, restoreLatestRunIdentity } from "./optimiserRunAuthority.js";
+import { useLatestOptimiserRun, resolvePresentationPlan, restoreLatestRunIdentity, planIdentityIsUnverified } from "./optimiserRunAuthority.js";
 import { hydrateOptimiserPlan, readPublishedOptimiserPlan } from "./optimiserPlanPersistence.js";
 import { resolveOptimiserPlanStatus } from "./resolveOptimiserPlanStatus.js";
 import { readOptimiserRunHistory } from "./optimiserRunHistory.js";
@@ -39,6 +39,17 @@ export function useOptimiserPlanView({
   // that run began is the previous run's result: history, not the panel's subject.
   const latestRun = useLatestOptimiserRun(projectId, versionId);
 
+  // ── RUN IDENTITY RESOLUTION STATE ──
+  // 'pending'  — history lookup not yet completed (initial load).
+  // 'resolved'  — history lookup completed (row found or confirmed absent).
+  // 'failed'    — history lookup threw (network/database error).
+  // A modern plan (with run.runId) is NOT presented as current until this is
+  // 'resolved' AND the latest run matches. This closes the freshness gap: an
+  // older saved plan can never temporarily render as current while the async
+  // history read is in flight, and a failed lookup never silently treats an
+  // unverified plan as valid.
+  const [runIdentityStatus, setRunIdentityStatus] = useState("pending");
+
   // Restore from the published payload only when this version has no saved plan.
   useEffect(() => {
     if (storedPlan || !projectId || !versionId) return;
@@ -55,20 +66,23 @@ export function useOptimiserPlanView({
   useEffect(() => {
     if (!projectId || !versionId) return;
     let cancelled = false;
+    setRunIdentityStatus("pending");
     (async () => {
       try {
         const rows = await readOptimiserRunHistory({ projectId, versionId, limit: 1 });
-        if (cancelled || !Array.isArray(rows) || rows.length === 0) return;
-        const latestHistory = rows[0];
+        if (cancelled) return;
+        const latestHistory = Array.isArray(rows) ? rows[0] : null;
         const historyRunId = latestHistory?.run_id || null;
         const historyStartedAt = latestHistory?.started_at || null;
-        if (!historyRunId) return;
-        restoreLatestRunIdentity(projectId, versionId, {
-          runId: historyRunId,
-          startedAt: historyStartedAt,
-        });
+        if (historyRunId) {
+          restoreLatestRunIdentity(projectId, versionId, {
+            runId: historyRunId,
+            startedAt: historyStartedAt,
+          });
+        }
+        setRunIdentityStatus("resolved");
       } catch {
-        // History read failure is non-fatal — the plan is shown as current.
+        if (!cancelled) setRunIdentityStatus("failed");
       }
     })();
     return () => { cancelled = true; };
@@ -76,25 +90,47 @@ export function useOptimiserPlanView({
 
   return useMemo(() => {
     const presentation = resolvePresentationPlan({ plan: storedPlan, run: latestRun });
+    const effectivePlan = presentation.plan;
+
+    // ── RUN IDENTITY FRESHNESS GATE ──
+    // A modern plan (with run.runId) must not be presented as current until its
+    // run identity has been verified against the latest durable run. During the
+    // history lookup (pending), after a failed lookup, or when no history is
+    // found, the plan is suppressed — resolveOptimiserPlanStatus receives null
+    // and returns ABSENT, so the UI shows the Run ADI action instead. The saved
+    // evidence is retained (never deleted), only withheld from presentation.
+    // Legacy plans (no run.runId) are exempt for backward compatibility.
+    const identitySuppressed = planIdentityIsUnverified(effectivePlan, latestRun);
+    const planForStatus = identitySuppressed ? null : effectivePlan;
+
     const resolved = resolveOptimiserPlanStatus({
-      plan: presentation.plan,
+      plan: planForStatus,
       currentDesignFingerprint,
       instances,
       seatingPositions,
     });
+
+    const base = {
+      ...resolved,
+      runIdentityStatus,
+      ...(identitySuppressed ? { identitySuppressed: true } : {}),
+    };
+
     // The superseded run is stated so a surface can say WHY no result is being
     // described; it never carries any of the earlier run's own values.
-    return presentation.superseded
-      ? {
-        ...resolved,
+    if (presentation.superseded) {
+      return {
+        ...base,
         superseded: true,
         supersededByRunId: presentation.supersededByRunId,
         supersededPlanSavedAt: presentation.supersededPlanSavedAt,
-      }
-      : {
-        ...resolved,
-        terminalTrace: presentation.plan?.terminalTrace?.runId === presentation.plan?.run?.runId
-          ? presentation.plan?.terminalTrace || null : null,
       };
-  }, [storedPlan, latestRun, currentDesignFingerprint, instances, seatingPositions]);
+    }
+
+    return {
+      ...base,
+      terminalTrace: effectivePlan?.terminalTrace?.runId === effectivePlan?.run?.runId
+        ? effectivePlan?.terminalTrace || null : null,
+    };
+  }, [storedPlan, latestRun, currentDesignFingerprint, instances, seatingPositions, runIdentityStatus]);
 }
