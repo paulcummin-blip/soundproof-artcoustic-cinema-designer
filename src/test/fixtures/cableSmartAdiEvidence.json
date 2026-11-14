@@ -7236,9 +7236,24 @@
   "productsSelected": {
     "rows": [
       {
+        "key": "lcr",
+        "area": "LCR",
+        "value": "Screen LCR × 3"
+      },
+      {
+        "key": "surrounds",
+        "area": "Surrounds / wides",
+        "value": "Surround × 2"
+      },
+      {
+        "key": "overheads",
+        "area": "Overheads",
+        "value": "Overhead × 2"
+      },
+      {
         "key": "subwoofers",
         "area": "Subwoofers",
-        "value": "2 active"
+        "value": "Subwoofer × 2"
       }
     ]
   }
