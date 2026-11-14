@@ -23,7 +23,6 @@ import { resolveCalibrationAutoApply } from "./adiCalibrationAutoApplyAuthority.
 import { validateCandidateForRun, canonicalLevel } from "../improveBassV2/confirmedCandidateValidity.js";
 import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification.js";
 import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison.js";
-import WhatAdiDid from "./WhatAdiDid.jsx";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
 import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
@@ -59,7 +58,6 @@ import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalib
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
-import AdiRecommendation from "./AdiRecommendation";
 import ResetSubwooferTuningButton from "./ResetSubwooferTuningButton";
 import CrossoverRecommendation from "./CrossoverRecommendation";
 import useRunOptimisationPlan from "./useRunOptimisationPlan";
@@ -1209,6 +1207,12 @@ export default function OptimiseAndCalculate({
   const isError = status === "error";
   const isCancelledState = status === "cancelled";
   const isComplete = status === "complete";
+  // ADI workflow is actively running (or wrapping up) when the workflow store
+  // is in an active phase. This is the ONLY signal that decides whether the
+  // single "Run ADI Bass Optimiser" button is replaced by the progress checklist
+  // — never hasCurrentResult or the stale lifecycle state. A completed run
+  // returns to the button.
+  const adiWorkflowRunning = isCalculating;
 
   // ── Build the stage display ──
   // Computed while the run is busy AND after completion, so the cumulative
@@ -1223,12 +1227,17 @@ export default function OptimiseAndCalculate({
 
   return (
     <div className="space-y-3">
-      {/* ── Run ADI Bass Optimiser (inactive state: needs run or rerun) ──
-          One prominent button only — no heading, explanatory text,
-          "What ADI did", previous results or diagnostics. Launches the
-          existing full optimise-and-calculate workflow (runCalibrationAutoApply),
-          the same ADI optimisation process used by the Re-test route. */}
-      {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && (!hasResults || isStale) && (
+      {/* ── Run ADI Bass Optimiser / progress ──
+           Presentation only, driven by the ADI WORKFLOW state — never by
+           hasCurrentResult or the stale lifecycle state:
+             • idle (or after a completed run) → one prominent button only;
+             • running → the progress checklist replaces the button;
+             • error/cancelled/timed-out → the dedicated state blocks below.
+           No "What ADI did" heading, explanatory text, "Run ADI again" link or
+           technical diagnostics are rendered from this section. Saved
+           optimisation evidence and recommendations remain in their own
+           existing result areas; nothing is deleted or altered. */}
+      {!adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && (
         <button
           type="button"
           onClick={runCalibrationAutoApply}
@@ -1240,20 +1249,20 @@ export default function OptimiseAndCalculate({
         </button>
       )}
 
-      {/* ── ADI Sub Optimiser progress and completion ──
-          During a run: a meaningful current-stage heading and a cumulative
-          stage checklist in execution order with per-stage outcomes. After a
-          run: a concise final summary. Pure presentation — the new component
-          reads the V2 store stage verdicts, the workflow status and the saved
-          receipt; it changes no calculation, acceptance rule or saved data. */}
-      {(isCalculating || isComplete) && (
+      {/* During a run: a meaningful current-stage heading and a cumulative
+           stage checklist in execution order with per-stage outcomes. Pure
+           presentation — the new component reads the V2 store stage verdicts,
+           the workflow status and the saved receipt; it changes no
+           calculation, acceptance rule or saved data. Rendered ONLY while the
+           workflow is running, so a completed run returns to the button. */}
+      {adiWorkflowRunning && (
         <AdiOptimiserProgress
           v2State={v2State}
           workflowPhase={status}
           stageDisplay={stageDisplay}
           calculationPhaseLabel={shared?.calculationPhaseLabel}
           isCalculating={isCalculating}
-          isComplete={isComplete}
+          isComplete={false}
           receipt={appState?.splConfig?.bassAdiReceipt}
           recommendations={workflowState.recommendations}
           autoApplied={workflowState.autoApplied}
@@ -1278,70 +1287,11 @@ export default function OptimiseAndCalculate({
         disabled={disabled}
       />
 
-      {/* ── Recommended Improvement: ADI Recommendation ── */}
-      {/* Authoritative project state drives the zone; workflow status only
-          modifies presentation. When authoritative bass results exist, the
-          zone always renders — AdiRecommendation internally resolves to one
-          of: Recommended Improvement, No further engineering, or No further EQ. */}
-      {hasResults && !isStale && (
-        <div className={`mt-3 ${shared?.placementPreviewActive ? "opacity-45" : ""}`}>
-          <WhatAdiDid
-            receipt={appState?.splConfig?.bassAdiReceipt}
-            instances={subwooferInstances} crossover={appState?.splConfig?.crossover}
-            fingerprint={shared?.cacheKey} authorityCurrent={hasPublishedCurrentDesign(shared)}
-            busy={isCalculating} disabled={!!reoptimiseDisabledReason}
-            onRun={runCalibrationAutoApply} onRestore={restoreElectronicSettings}
-            physical={Boolean(workflowState.recommendations?.subPositions || workflowState.recommendations?.seating)}>
-          <AdiRecommendation
-            jointReceiptState={jointReceiptState}
-            autoApplied={workflowState.autoApplied}
-            v2State={v2State}
-            completedBassAuthority={shared?.completedBassAuthority}
-            subwooferCount={
-              Array.isArray(subwooferInstances)
-                ? subwooferInstances.filter(
-                    (i) => i?.enabled !== false && i?.model,
-                  ).length
-                : 0
-            }
-            shared={shared}
-            roomDims={roomDims}
-            seatingPositions={seatingPositions}
-            recommendations={workflowState.recommendations}
-            currentInstances={subwooferInstances}
-            selectedSubModel={frontSubsCfg?.model || rearSubsCfg?.model || null}
-            commitInstances={commitInstances}
-            commitSeating={commitSeating}
-            commitSeatingProvenance={commitSeatingProvenance}
-            hasCanonicalInstances={hasCanonicalInstances}
-            appState={appState}
-            amplifierPowerPerSubW={resolvedAmplifierPowerPerSubW}
-            onRecalculate={handlePhysicalRecalculate}
-            optimisationRunBlockReason={optimisationRunBlockReason}
-            optimisationRunStatus={planRunStatus}
-            optimisationRunError={planRunError}
-            onRunOptimisationPlan={runCalibrationAutoApply}
-            onCalculateBassPerformance={() => {
-              if (typeof sharedRef.current?.onCalculate === "function") sharedRef.current.onCalculate();
-            }}
-            // The calibration apply workflow is offered whenever saved authority
-            // exists AND the design is current. When the design is stale, the
-            // "Update Bass Performance" action above already runs this same
-            // workflow, so the card does not offer a second run button for it.
-            onReoptimiseCalibration={hasResults && !isStale ? runCalibrationAutoApply : null}
-            reoptimiseBusy={isCalculating && !jointReceiptState.operationActive}
-            reoptimiseDisabledReason={reoptimiseDisabledReason}
-            // The journey card's stall notice states the ONE cancel path, whose
-            // availability is owned solely by bassCalculationLifecycle. No
-            // second cancel action is created here.
-            canCancelRun={canCancel}
-            onCancelRun={handleCancel}
-          />
-          </WhatAdiDid>
-        </div>
-      )}
-
-      {/* Combined electronic changes use the single saved-and-verified transaction above. */}
+      {/* The "What ADI did" panel (heading, "Run ADI again" link, explanatory
+          text, technical diagnostics) is no longer rendered from this section.
+          Saved optimisation evidence and recommendations remain in their own
+          existing result areas elsewhere in the Room Designer; nothing here is
+          deleted or altered. */}
 
       {/* ── Error state ── */}
       {isError && (
