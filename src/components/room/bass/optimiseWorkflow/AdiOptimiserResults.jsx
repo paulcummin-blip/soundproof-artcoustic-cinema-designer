@@ -30,6 +30,7 @@ import {
 import { OPTIMISER_LEVER_VERDICT } from "../optimiserPlan/optimiserLeverVerdict.js";
 import {
   deviationText,
+  levelText,
   p14DbText,
   frequencyText,
 } from "../optimiserPlan/optimiserWholeNumberDb.js";
@@ -158,6 +159,49 @@ function formatSeatingChange(c) {
   const mm = c.deltaMm != null ? ` (${Math.abs(c.deltaMm)} mm${c.direction ? ` ${c.direction}` : ""})` : "";
   return `${c.label || "Seat"}: ${fmt(c.fromY, 2)} m → ${fmt(c.toY, 2)} m${mm}`;
 }
+
+// ── Seating grouping by row ──
+// Where all seats in one row share the same confirmed movement (same deltaMm
+// and direction), show one recommendation instead of repeating every seat.
+// Only groups seats whose actual proposed movement matches; individual details
+// are preserved where movements differ or the row cannot be inferred.
+const ROW_LABEL_RE = /Row\s*(\d+)/i;
+
+function rowNumberOf(label) {
+  const m = String(label || "").match(ROW_LABEL_RE);
+  return m ? Number(m[1]) : null;
+}
+
+function formatSeatingChangesGrouped(changes) {
+  if (!Array.isArray(changes) || changes.length === 0) return [];
+  const groups = new Map();
+  const ungrouped = [];
+  for (const c of changes) {
+    const row = rowNumberOf(c.label);
+    if (row == null) { ungrouped.push(c); continue; }
+    const key = `${row}|${c.deltaMm ?? ""}|${c.direction ?? ""}`;
+    if (!groups.has(key)) groups.set(key, { row, deltaMm: c.deltaMm, direction: c.direction, seats: [] });
+    groups.get(key).seats.push(c);
+  }
+  const lines = [];
+  for (const [, group] of groups) {
+    if (group.seats.length < 2) {
+      // Single seat or no grouping — show individual detail.
+      for (const c of group.seats) lines.push(formatSeatingChange(c));
+      continue;
+    }
+    // All seats in this row moved the same distance in the same direction.
+    const mm = Math.abs(group.deltaMm || 0);
+    const dir = group.direction || "";
+    const fromYs = group.seats.map((c) => num(c.fromY)).filter(Number.isFinite);
+    const toYs = group.seats.map((c) => num(c.toY)).filter(Number.isFinite);
+    const moveText = `Move Row ${group.row}${dir ? ` ${dir}` : ""} by ${mm} mm`;
+    const seatLine = `${group.seats.length} seats · ${fmt(fromYs[0], 2)} m → ${fmt(toYs[0], 2)} m`;
+    lines.push(`${moveText} · ${seatLine}`);
+  }
+  for (const c of ungrouped) lines.push(formatSeatingChange(c));
+  return lines;
+}
 function formatCombinedRow(row) {
   if (!row?.changed) return null;
   const parts = [];
@@ -176,24 +220,70 @@ function formatCrossoverChange(lever) {
   return null;
 }
 
-function formatEffect(effect, baseline) {
-  if (!effect) return null;
+// ── RP22 parameter level changes ──
+// Leads with the RP22 Level transition (e.g. "P19: L1 → L4") when the level
+// changed, with the supporting before/after dB values underneath. If the
+// level remains unchanged despite a worthwhile dB improvement, the dB
+// improvement is shown without inventing a level upgrade. P19 and P20 are
+// displayed as separate lines. This never implies that improving one
+// parameter changes the overall cinema Performance Level.
+function metricLevelNumber(level) {
+  if (level == null) return null;
+  if (Number.isFinite(Number(level))) return Number(level);
+  const m = String(level).trim().toUpperCase().match(/^L?([1-4])$/);
+  return m ? Number(m[1]) : null;
+}
+
+function formatMetricLines(label, beforeDb, afterDb, levelBefore, levelAfter) {
   const lines = [];
-  const p20B = deviationText(baseline?.p20VariationDb);
-  const p20A = deviationText(effect.p20VariationDb);
-  if (p20A) lines.push(`P20 ${p20B && p20B !== p20A ? `${p20B} → ${p20A}` : p20A}`);
-  const p19B = deviationText(baseline?.p19VariationDb);
-  const p19A = deviationText(effect.p19VariationDb);
-  if (p19A) lines.push(`P19 ${p19B && p19B !== p19A ? `${p19B} → ${p19A}` : p19A}`);
+  const lvlBefore = metricLevelNumber(levelBefore);
+  const lvlAfter = metricLevelNumber(levelAfter);
+  const levelChanged = lvlBefore != null && lvlAfter != null && lvlAfter !== lvlBefore;
+  const dbChanged = Boolean(beforeDb && afterDb && beforeDb !== afterDb);
+
+  if (levelChanged) {
+    // Lead with the Level transition prominently.
+    lines.push({ kind: "level", text: `${label}: ${levelText(lvlBefore)} → ${levelText(lvlAfter)}` });
+    // Supporting dB values underneath.
+    if (beforeDb && afterDb) {
+      lines.push({ kind: "db", text: `${beforeDb} → ${afterDb}` });
+    } else if (afterDb) {
+      lines.push({ kind: "db", text: afterDb });
+    }
+  } else if (dbChanged) {
+    // dB improvement, Level unchanged — show dB without inventing a level upgrade.
+    lines.push({ kind: "db", text: `${label}: ${beforeDb} → ${afterDb}` });
+  } else if (afterDb) {
+    lines.push({ kind: "db", text: `${label}: ${afterDb}` });
+  }
+  return lines;
+}
+
+function formatEffectLines(effect, baseline) {
+  if (!effect) return [];
+  const lines = [];
+
+  const p19BeforeDb = deviationText(baseline?.p19VariationDb);
+  const p19AfterDb = deviationText(effect.p19VariationDb);
+  const p19LevelBefore = levelText(effect.p19LevelBefore ?? baseline?.p19Level);
+  const p19LevelAfter = levelText(effect.p19LevelAfter);
+  lines.push(...formatMetricLines("P19", p19BeforeDb, p19AfterDb, p19LevelBefore, p19LevelAfter));
+
+  const p20BeforeDb = deviationText(baseline?.p20VariationDb);
+  const p20AfterDb = deviationText(effect.p20VariationDb);
+  const p20LevelBefore = levelText(effect.p20LevelBefore ?? baseline?.p20Level);
+  const p20LevelAfter = levelText(effect.p20LevelAfter);
+  lines.push(...formatMetricLines("P20", p20BeforeDb, p20AfterDb, p20LevelBefore, p20LevelAfter));
+
   if (effect.p14DeltaDb != null && Math.abs(effect.p14DeltaDb) >= 1) {
     const p14 = p14DbText(effect.p14AchievedDb);
-    if (p14) lines.push(`P14 ${p14}`);
+    if (p14) lines.push({ kind: "db", text: `P14 ${p14}` });
   }
   if (effect.worstSeatId) {
     const hz = frequencyText(effect.worstFrequencyHz);
-    lines.push(`Worst seat: ${effect.worstSeatId}${hz ? ` · ${hz}` : ""}`);
+    lines.push({ kind: "db", text: `Worst seat: ${effect.worstSeatId}${hz ? ` · ${hz}` : ""}` });
   }
-  return lines.length ? lines.join(" · ") : null;
+  return lines;
 }
 
 function describeAppliedLever(lever) {
@@ -269,19 +359,21 @@ function CategoryRow({
       adjustmentLines = rows.map((r) => `${r.label}: ${r.text}`);
       const xo = formatCrossoverChange(lever);
       if (xo) adjustmentLines.unshift(xo);
+    } else if (cat.key === "seating") {
+      // Group identical seating movements by row; fall back to individual detail.
+      adjustmentLines = formatSeatingChangesGrouped(changes);
+      if (lever.seating?.movementLabel && adjustmentLines.length === 0) {
+        adjustmentLines.push(lever.seating.movementLabel);
+      }
     } else {
       adjustmentLines = changes.slice(0, 4).map((c) => {
         if (cat.key === "delay") return formatDelayChange(c);
         if (cat.key === "gain") return formatGainChange(c);
         if (cat.key === "placement") return formatPlacementChange(c);
-        if (cat.key === "seating") return formatSeatingChange(c);
         return null;
       }).filter(Boolean);
       if (cat.key === "placement" && lever.movementLabel && adjustmentLines.length === 0) {
         adjustmentLines.push(lever.movementLabel);
-      }
-      if (cat.key === "seating" && lever.seating?.movementLabel) {
-        adjustmentLines.unshift(lever.seating.movementLabel);
       }
     }
   } else if (!lever && calibLever?.bestCandidate && (isIdentified || isApplied)) {
@@ -291,7 +383,7 @@ function CategoryRow({
     if (p20) adjustmentLines.push(`Best option P20 ${deviationText(bc.p20Before) && deviationText(bc.p20After) ? `${deviationText(bc.p20Before)} → ${deviationText(bc.p20After)}` : p20}`);
   }
 
-  const effectLine = formatEffect(effect, baseline);
+  const effectLines = formatEffectLines(effect, baseline);
 
   return (
     <div className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2" data-adi-result-category={cat.key}>
@@ -313,14 +405,21 @@ function CategoryRow({
         </div>
       )}
 
-      {!dismissed && (isIdentified || isApplied) && adjustmentLines.length > 0 && (
+      {!dismissed && (isIdentified || isApplied) && (adjustmentLines.length > 0 || effectLines.length > 0) && (
         <div className="mt-1.5 space-y-0.5">
           {adjustmentLines.map((line, i) => (
-            <div key={i} className="text-[11px] text-[#1B1A1A] leading-relaxed">{line}</div>
+            <div key={`adj-${i}`} className="text-[11px] text-[#1B1A1A] leading-relaxed">{line}</div>
           ))}
-          {effectLine && (
+          {effectLines.length > 0 && (
             <div className="text-[11px] text-[#625143] leading-relaxed">
-              Predicted: {effectLine}
+              {effectLines.map((line, i) => (
+                <div
+                  key={`eff-${i}`}
+                  className={line.kind === "level" ? "font-semibold text-[#213428]" : ""}
+                >
+                  {line.text}
+                </div>
+              ))}
             </div>
           )}
         </div>

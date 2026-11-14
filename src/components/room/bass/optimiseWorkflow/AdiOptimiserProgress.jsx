@@ -39,15 +39,32 @@ const STAGES = [
 
 // Resolve a single stage's display state from its verdict + stage status.
 // A recorded verdict is permanent for this run — it never reverts to waiting.
-function resolveStageState({ verdict, stage, isActive }) {
+//
+// SEATING UNIFICATION: the standalone seating search and the coordinated
+// placement+seating search both contribute to one Seating category outcome.
+// A confirmed seating improvement from EITHER search — signalled by a truthy
+// recommendations.seating — shows "Improvement identified", even when the
+// standalone search's own verdict was "skipped". A skipped standalone search
+// never overwrites a confirmed coordinated improvement.
+function resolveStageState({ verdict, stage, isActive, stageKey, recommendations }) {
+  // Seating: a confirmed improvement from either the standalone or coordinated
+  // search is the single Seating outcome.
+  if (stageKey === "seating_positions" && recommendations?.seating) {
+    return "improvement";
+  }
   if (verdict === "improvement") return "improvement";
   if (verdict === "no_improvement") return "no_improvement";
   if (verdict === "done") return "reviewed";
-  if (verdict === "skipped" || verdict === "not_available") return "not_applicable";
+  // A skipped/not-available seating search is "Not tested", not "Not applicable":
+  // the standalone search may be skipped while a coordinated search found the
+  // improvement (handled above), or the run genuinely did not search seating.
+  if (verdict === "skipped" || verdict === "not_available") {
+    return stageKey === "seating_positions" ? "not_tested" : "not_applicable";
+  }
   if (verdict === "incomplete") return "failed";
   if (stage?.status === "completed") return "reviewed";
   if (isActive || stage?.status === "active") return "active";
-  if (stage?.status === "not_tested") return "not_applicable";
+  if (stage?.status === "not_tested") return "not_tested";
   return "waiting";
 }
 
@@ -58,6 +75,7 @@ const STATE_META = {
   no_improvement: { icon: "done", label: "No improvement found", colour: "#625143" },
   reviewed: { icon: "done", label: "Analysed", colour: "#625143" },
   not_applicable: { icon: "skip", label: "Not applicable", colour: "#8A7B6A" },
+  not_tested: { icon: "skip", label: "Not tested", colour: "#8A7B6A" },
   failed: { icon: "fail", label: "Failed", colour: "#B91C1C" },
 };
 
@@ -182,8 +200,11 @@ export default function AdiOptimiserProgress({
               ?? v2State?.stageVerdicts?.[stage.key]
               ?? null;
             const isActive = stageDisplay?.activeStageKey === stage.key;
-            const state = resolveStageState({ verdict, stage: stageEntry, isActive });
+            const state = resolveStageState({ verdict, stage: stageEntry, isActive, stageKey: stage.key, recommendations });
             const meta = STATE_META[state] || STATE_META.waiting;
+            const notTestedReason = state === "not_tested" && stage.key === "seating_positions"
+              ? (stageEntry?.supportingText || "Seating not searched in this run")
+              : null;
             return (
               <div key={stage.key} className="flex items-start gap-2 text-[12px]" data-adi-progress-stage={stage.key} data-adi-progress-state={state}>
                 <div className="pt-0.5"><StageIcon state={state} /></div>
@@ -196,8 +217,8 @@ export default function AdiOptimiserProgress({
                   <span className="text-[10px] ml-1.5" style={{ color: meta.colour }}>
                     {meta.label}
                   </span>
-                  {state === "not_applicable" && stageEntry?.verdict === "skipped" && (
-                    <span className="text-[10px] text-[#8A7B6A] ml-1">(not applicable)</span>
+                  {notTestedReason && (
+                    <span className="text-[10px] text-[#8A7B6A] ml-1">— {notTestedReason}</span>
                   )}
                 </div>
               </div>
