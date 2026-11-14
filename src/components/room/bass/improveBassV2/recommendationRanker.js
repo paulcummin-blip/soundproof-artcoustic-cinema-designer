@@ -12,6 +12,7 @@ const PRACTICAL_PRIORITY = {
   position: 2,
   seating: 3,
   combined: 4,
+  coordinated: 5,
 };
 
 // Threshold for "broadly equivalent" raw improvements.
@@ -63,6 +64,10 @@ function worstPrimarySeatDeviation(result) {
 
 function classifyIntervention(result) {
   if (!result) return 'position';
+  // Coordinated candidates move BOTH seating and subwoofers. They are physical
+  // interventions, never standalone calibration, so the ranker prefers simpler
+  // interventions when the acoustic result is effectively equivalent.
+  if (result.candidateOrigin === 'coordinated' || result.isCoordinatedCandidate) return 'coordinated';
   // Combined candidates (position + retuned calibration, or calibration + seating)
   // are classified separately so the ranker prefers simpler interventions when
   // the acoustic result is effectively equivalent.

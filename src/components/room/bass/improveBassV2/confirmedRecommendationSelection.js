@@ -163,8 +163,14 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     nonAssessableCount,
     terminalOutcome,message:(winner||hasTradeOffs)?null:(baselineInvalid ? CURRENT_BASELINE_UNVALIDATED : messages[terminalOutcome]),
     materialityReason:recommendations[0]?.materialityReason || null,
-    calibrationResult:eligible.find(r=>r.candidateKind==="calibration") || null,
-    calibrationMaterial:{material:eligible.some(r=>r.candidateKind==="calibration")},
+    // The isolated delay winner only. A coordinated physical candidate and a
+    // combined electronic candidate are NOT the isolated delay result: matching
+    // them here let a physical alternative or a joint crossover change be
+    // presented as evidence that an isolated delay search succeeded. The
+    // isolated delay candidates carry a groupedDelay record; combined and
+    // coordinated candidates do not.
+    calibrationResult:eligible.find(r=>r?.candidateKind==="calibration" && r?.groupedDelay && !r?.isCoordinatedCandidate) || null,
+    calibrationMaterial:{material:eligible.some(r=>r?.candidateKind==="calibration" && r?.groupedDelay && !r?.isCoordinatedCandidate)},
     tradeOffs: limitedTradeOffs,
   };
 }

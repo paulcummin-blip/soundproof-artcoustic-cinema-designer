@@ -85,6 +85,7 @@ import {
 } from "./candidateDesignContext.js";
 import { createCrossQuantityAuditTrail } from "./crossQuantityAuditTrail.js";
 import { V2_ENGINE_REVISION } from "./v2EngineRevision.js";
+import { buildElectronicConfirmationLedger } from "./electronicConfirmationLedger.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -2318,6 +2319,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     }
 
     selection.calibrationTuning=selection.calibrationResult?.appliedTuning || null;
+    // Compact electronic confirmation ledger: the baseline plus every canonically
+    // confirmed electronic finalist, with the tested tuning, confirmed P19/P20,
+    // P14 output/headroom and the individual safety-check rejection reasons.
+    // Evidence only — no response curves, no acoustic recalculation.
+    selection.electronicConfirmationLedger = buildElectronicConfirmationLedger(selection);
 
     // Stage 11B: Build per-phase exhaustion state from the unified winner
     const positionOpt = buildPositionOptimisationState(phasesRun, funnel, existingAuthority, selection.winner, theoreticalExcluded);

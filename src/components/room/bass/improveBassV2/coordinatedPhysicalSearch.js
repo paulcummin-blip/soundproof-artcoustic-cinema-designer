@@ -443,7 +443,13 @@ export async function runCoordinatedPhysicalSearch(ctx) {
       continue;
     }
     const result = check.result;
-    result.candidateKind = "calibration";
+    // Coordinated placement/seating candidates are PHYSICAL interventions, not
+    // standalone calibration candidates. Classifying them as "calibration" let
+    // the isolated-delay evidence and the intervention ranker misread a physical
+    // alternative as a delay improvement. They carry their own coordinated
+    // identity so the ranker and the calibrationResult selector never confuse
+    // them with an isolated electronic search.
+    result.candidateKind = "coordinated";
     result.candidateId = `coordinated:${combo.placementId}:${combo.offsetMm}`;
     result.candidateOrigin = "coordinated";
     result.isCoordinatedCandidate = true;

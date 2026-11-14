@@ -189,12 +189,13 @@ describe("practical pair authority — the 100 mm band and its five refusals", (
     assert.equal(grouping.groups.length, 2);
   });
 
-  it("keeps the frozen two-source pair suppression for a genuine 10 mm pair", () => {
+  it("searches a genuine 10 mm symmetric pair as two independent groups", () => {
     const a = sub("s1", "SUB3-12", 1.15, 4.6, "rear");
     const b = sub("s2", "SUB3-12", 3.45, 4.605, "rear");
     assert.equal(isIdenticalSymmetricPair(a, b, { widthM: ROOM.widthM }), true);
     const grouping = detectSubwooferGroups([a, b], ROOM);
-    assert.equal(grouping.status, "skipped", "a symmetric same-wall pair is still one group");
+    assert.equal(grouping.status, "eligible", "a symmetric same-wall pair has independently adjustable electronic settings");
+    assert.equal(grouping.groups.length, 2);
   });
 });
 

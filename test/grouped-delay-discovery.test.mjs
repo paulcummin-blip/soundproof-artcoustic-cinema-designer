@@ -17,7 +17,7 @@ test('An established processor limit rejects without clipping',()=>{const c=crea
 test('Missing/duplicate effective identities fail closed',()=>{assert.throws(()=>generateGroupedCoarseCandidates(groups,[...baseline.slice(0,3),baseline[0]]));assert.throws(()=>generateGroupedCoarseCandidates(groups,baseline.slice(0,3)));});
 test('Two front/rear sources form singleton groups',()=>assert.deepEqual(defineDelayGroups([instances[0],instances[2]],room).groups.map(g=>g.sourceIds),[['f-left'],['b-left']]));
 test('Asymmetric same-wall pair is eligible',()=>assert.equal(defineDelayGroups([instances[0],{...instances[1],position:{x:4,y:.2}}],room).status,'eligible'));
-test('Symmetric same-wall pair skips differential delay',()=>assert.equal(defineDelayGroups(instances.slice(0,2),room).status,'skipped'));
+test('Symmetric same-wall pair is eligible for differential delay',()=>{const g=defineDelayGroups(instances.slice(0,2),room);assert.equal(g.status,'eligible');assert.equal(g.groups.length,2);assert.deepEqual(g.groups.map(group=>group.sourceIds),[['f-left'],['f-right']]);});
 test('Single-source Current remains valid with no differential search',()=>{const g=defineDelayGroups([instances[0]],room);assert.equal(g.status,'skipped');assert.equal(generateGroupedCoarseCandidates(g,[baseline[0]]).length,1);});
 test('Ambiguous four-source grouping is reported',()=>assert.equal(defineDelayGroups(instances.map(s=>({...s,group:null,position:{...s.position,y:.2}})),room).status,'ambiguous'));
 test('Conflicting geometry and group metadata is reported',()=>assert.equal(defineDelayGroups([{...instances[0],group:'rear'},...instances.slice(1)],room).status,'ambiguous'));

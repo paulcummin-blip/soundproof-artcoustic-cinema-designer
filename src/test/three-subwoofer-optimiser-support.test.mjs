@@ -523,12 +523,22 @@ test("1-SUB REGRESSION: unchanged — no grouped search, one frozen current, no 
   expect(estimate.groups).toBe(0);
 });
 
-test("2-SUB REGRESSION: symmetric pair still skipped, asymmetric pair still searchable", () => {
+test("2-SUB REGRESSION: symmetric pair is searchable, asymmetric pair is searchable", () => {
   const paired = defineDelayGroups(CASE_2, ROOM);
-  expect(paired.status).toBe(SUBWOOFER_GROUP_STATUS.SKIPPED);
-  expect(paired.groups).toEqual([]);
-  expect(defineGainGroups(CASE_2, ROOM).status).toBe(SUBWOOFER_GROUP_STATUS.SKIPPED);
+  expect(paired.status).toBe(SUBWOOFER_GROUP_STATUS.ELIGIBLE);
+  expect(paired.groups.map((entry) => entry.id)).toEqual(["A", "B"]);
+  expect(defineGainGroups(CASE_2, ROOM).status).toBe(SUBWOOFER_GROUP_STATUS.ELIGIBLE);
   expect(resolveSearchGroupCount(2, null)).toBe(2);
+
+  const pairedTransfer = buildTransfer(CASE_2);
+  const pairedDelay = searchOf(runGroupedDelaySearch, CASE_2, pairedTransfer);
+  expect(pairedDelay.coarseCount).toBe(61);
+  expect(pairedDelay.candidates.length).toBeGreaterThan(0);
+  expect(directionsOf(pairedDelay)).toEqual(new Set(["A", "B"]));
+  const pairedPhase = searchOf(runGroupedPhaseSearch, CASE_2, pairedTransfer);
+  const pairedGain = searchOf(runGroupedGainSearch, CASE_2, pairedTransfer);
+  expect(pairedPhase.optionCount).toBeGreaterThan(36);
+  expect(pairedGain.coarseCount).toBe(25);
 
   const asymmetric = defineDelayGroups(CASE_2_ASYMMETRIC, ROOM);
   expect(asymmetric.status).toBe(SUBWOOFER_GROUP_STATUS.ELIGIBLE);

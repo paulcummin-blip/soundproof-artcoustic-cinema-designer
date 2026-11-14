@@ -665,6 +665,10 @@ export function buildOptimiserPlan({
       placementSearchStatus: selection?.hierarchyGateDiagnostics?.placementSearchStatus || null,
       seatingDiagnostics: selection?.seatingDiagnostics || null,
     }),
+    // Compact electronic confirmation ledger: baseline + every confirmed
+    // electronic finalist with its tested tuning, confirmed P19/P20, P14
+    // output/headroom and individual rejection reasons. Evidence only.
+    electronicConfirmationLedger: selection?.electronicConfirmationLedger || null,
   };
 }
 

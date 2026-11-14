@@ -118,6 +118,7 @@ import useOptimiserRunProgress from "./useOptimiserRunProgress.js";
 import { buildOptimiserRunWorkload } from "./optimiserRunWorkload.js";
 import AdiJourneyRunningPanel from "./AdiJourneyRunningPanel.jsx";
 import AdiJourneyEngineerDetailsSections from "./AdiJourneyEngineerDetailsSections.jsx";
+import AdiSearchStatusList from "./AdiSearchStatusList.jsx";
 import { buildElectronicTimingRows } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
@@ -1231,6 +1232,17 @@ export default function AdiOptimisationJourney({
           roomDims={roomDims}
         />
       )}
+
+      {/* ── THE PERSISTENT OPTIMISATION CHECKLIST ── always visible throughout
+          the run and after completion. Each search family (Placement, Seating,
+          Gain, Delay, Phase) keeps its own final status, read from the run's
+          saved per-category search evidence — a completed test never reverts to
+          "not applicable" when ADI moves to another stage. Isolated electronic
+          searches are distinguished from the integrated crossover search. */}
+      <AdiSearchStatusList
+        searchStatus={planView?.searchStatus || null}
+        hierarchyGateDiagnostics={planView?.hierarchyGateDiagnostics || null}
+      />
 
       {/* ── LEVEL 2 — TECHNICAL DETAILS ── collapsed, and below the primary
           action. The concise professional summary: what ADI checked, the

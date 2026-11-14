@@ -94,10 +94,12 @@ test("group identities and candidate IDs are stable when source order changes", 
   );
 });
 
-test("a symmetric same-wall pair is not offered a differential phase search", () => {
+test("a symmetric same-wall pair is eligible for a differential phase search", () => {
   const grouping = definePhaseGroups(instances.slice(0, 2), room);
-  assert.equal(grouping.status, "skipped");
-  assert.equal(generateGroupedPhaseCandidates(grouping, baseline.slice(0, 2)).length, 1);
+  assert.equal(grouping.status, "eligible");
+  assert.equal(grouping.groups.length, 2);
+  // The frozen Current control is always present; the sweep adds candidates.
+  assert.ok(generateGroupedPhaseCandidates(grouping, baseline.slice(0, 2)).length > 1);
 });
 
 test("complex re-sum applies the stored all-pass transfer function", () => {

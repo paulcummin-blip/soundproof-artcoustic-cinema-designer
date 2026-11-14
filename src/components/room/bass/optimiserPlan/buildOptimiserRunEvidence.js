@@ -564,5 +564,9 @@ export function buildOptimiserRunEvidence({
     // run that completed its acoustic search and found nothing worth applying
     // — that is NO_USEFUL_IMPROVEMENT, never a technical failure.
     firstEvaluationIssue,
+    // Compact electronic confirmation ledger: baseline + every confirmed
+    // electronic finalist with its tested tuning, confirmed P19/P20, P14
+    // output/headroom and individual rejection reasons. Evidence only.
+    electronicConfirmationLedger: selection?.electronicConfirmationLedger || null,
   };
 }

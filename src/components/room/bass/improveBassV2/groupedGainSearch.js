@@ -6,7 +6,8 @@
 // from the physical layout rather than the source count:
 // For four subs: front pair = Group A, rear pair = Group B.
 // For three subs: front + rear pair · front pair + rear · three groups.
-// For two subs: each sub is its own group (unless symmetric same-wall pair).
+// For two subs: each sub is its own independent group (a symmetric same-wall
+// pair still has independently adjustable gain, delay and phase).
 // For one sub: no inter-sub gain search.
 //
 // PRODUCT RULE: gain is a basic, valid lever for any system with more than one

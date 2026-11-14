@@ -11,7 +11,8 @@
 // One, two, three and four active sources are all searchable:
 //
 //   1 source    no inter-sub adjustment; position options remain
-//   2 sources   one group per source, unless a symmetric same-wall pair
+//   2 sources   one independent group per source (symmetric pair still
+//               has independently adjustable electronic settings)
 //   3 sources   front + rear pair  ·  front pair + rear  ·  three independent
 //   4 sources   front pair + rear pair
 //
@@ -20,18 +21,17 @@
 // own per-seat transfer and all of them contribute to every seat/frequency
 // result, so a group is never substituted for the real sources it contains.
 //
-// SYMMETRIC PAIR RULE: a clear same-model mirrored pair on one wall stays ONE
-// group initially. It preserves symmetry, reflects normal calibration practice
-// and keeps the search bounded. Breaking a sensible pair into independent
-// settings is an escalation for later, never the first move. The band the pair
-// is read with is named in ONE place — practicalPairAuthority: the frozen
-// identical band for two sources, the 100 mm installation band for two of three.
+// SYMMETRIC PAIR RULE: a same-model mirrored pair on one wall still has
+// independently adjustable electronic settings (gain, delay, phase), so the
+// isolated electronic searches are eligible. Symmetry of placement alone is
+// not a technical limitation — the physical-validation, safety, materiality
+// and correction-limit checks decide whether a candidate is accepted, and the
+// original settings are retained whenever no candidate passes them. Only a
+// single source is a genuine technical limitation. The band the pair is read
+// with (for the three-source grouping) is named in practicalPairAuthority.
 // ---------------------------------------------------------------------------
 
-import {
-  isPracticalSymmetricPair,
-  isIdenticalSymmetricPair,
-} from "./practicalPairAuthority.js";
+import { isPracticalSymmetricPair } from "./practicalPairAuthority.js";
 
 /** Geometry tolerance (m) for "same wall" and the centre-line singleton test. */
 export const GROUP_GEOMETRY_TOLERANCE_M = 0.01;
@@ -198,13 +198,14 @@ export function detectSubwooferGroups(instances, roomDims) {
     };
   }
 
-  // Two sources: unchanged — one group each, unless they are one symmetric pair.
-  // Judged on the frozen identical band, so the two-source rule is not widened.
+  // Two sources: one independent group each. A symmetric same-wall pair still
+  // has independently adjustable electronic settings (gain, delay, phase), so
+  // the isolated electronic searches are eligible. Symmetry of placement alone
+  // is not a genuine technical limitation — the existing physical-validation,
+  // safety, materiality and correction-limit checks decide whether a candidate
+  // is accepted. The original settings are retained whenever no candidate
+  // passes those checks.
   if (active.length === 2) {
-    const [a, b] = active;
-    if (side(a) && side(a) === side(b) && isIdenticalSymmetricPair(a, b, { widthM })) {
-      return skipped("Symmetric same-wall pair: differential grouped timing is disabled by default.");
-    }
     const ordered = [...active].sort((a, b) => a.position.y - b.position.y || a.id.localeCompare(b.id));
     return {
       status: SUBWOOFER_GROUP_STATUS.ELIGIBLE,
