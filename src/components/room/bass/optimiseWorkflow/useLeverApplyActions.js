@@ -28,11 +28,21 @@ export function useLeverApplyActions({
   appState = null,
   onRecalculate = null,
   shared = null,
+  planRunId = null,
+  latestRunId = null,
 } = {}) {
   const [leverApplyBusy, setLeverApplyBusy] = useState(null);
 
   const commitLeverChange = useCallback((lever, direction = "to") => {
     if (!lever?.key) return;
+
+    // ── RUN-ID FRESHNESS GATE ──
+    // A lever from a plan whose run is not the latest known run for this design
+    // version must never be applied, even if its coordinates or tuning still
+    // match the current design. This is the durable boundary: the button state
+    // is presentation only, and a stale plan that coincidentally matches is
+    // blocked here.
+    if (planRunId && latestRunId && planRunId !== latestRunId) return;
 
     if (lever.key === OPTIMISER_LEVER.SEATING) {
       if (!commitSeating) return;
@@ -78,7 +88,7 @@ export function useLeverApplyActions({
     if (typeof onRecalculate === "function") {
       onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
-  }, [commitInstances, commitSeating, currentInstances, seatingPositions, appState, onRecalculate, shared]);
+  }, [commitInstances, commitSeating, currentInstances, seatingPositions, appState, onRecalculate, shared, planRunId, latestRunId]);
 
   const handleApplyLever = useCallback((lever) => {
     setLeverApplyBusy(lever?.key || null);

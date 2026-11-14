@@ -107,6 +107,7 @@ import {
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import { OPTIMISER_FAILURE_STATUS, OPTIMISER_LEVER, OPTIMISER_PLAN_STATUS } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants.js";
+import { waitForOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 import { resolveOptimisationPlanRunBlock } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { resolveP14TargetSelectionState } from "../p14TargetSelectionState";
 import { canReuseCurrentBaselineForOptimiser } from "./retestPreflightAuthority.js";
@@ -483,6 +484,7 @@ export default function OptimiseAndCalculate({
         resultFingerprint: live?.completedBassAuthority?.contract?.job?.resultFingerprint
           || live?.currentFingerprint || null,
         startedAt: activeRun.startedAt,
+        planSavedAt: runTimingAt(timings, RUN_TIMING.SAVE_COMPLETED) || null,
         userTerminalAt: runTimingAt(timings, RUN_TIMING.USER_TERMINAL)
           || new Date().toISOString(),
         terminalAt: runTimingAt(timings, RUN_TIMING.USER_TERMINAL)
@@ -876,7 +878,8 @@ export default function OptimiseAndCalculate({
             timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
           });
         }
-        recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
+        // SAVE_COMPLETED is recorded AFTER the durable save is acknowledged
+        // (see waitForOptimiserPlanSave below), not from this in-memory write.
         return { fingerprint, persistedPlan, runEvidence, actionability, decision };
       };
 
@@ -942,6 +945,49 @@ export default function OptimiseAndCalculate({
         actionability,
         decision: adiDecision,
       } = saveOptimiserPlanForTerminal();
+
+      // ── 1b. AWAIT DURABLE SAVE ACKNOWLEDGEMENT ──
+      // The plan is in the in-memory authority; the autosave queue writes it to
+      // ProjectVersion.design_state.optimiser_plan and acknowledges it. The run
+      // is NOT terminal — and auto-apply / publication do NOT proceed — until the
+      // exact runId is acknowledged from the version writer. A timeout means the
+      // save failed: the completed evidence is preserved with a SAVE FAILED
+      // marker, the run is reported as failed, and the design is not changed.
+      try {
+        const planSavedAt = await waitForOptimiserPlanSave(projectId, versionId, activeRun.runId);
+        recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED, { at: planSavedAt });
+        trace.planSave = "acknowledged";
+      } catch (saveAckError) {
+        trace.planSave = "failed";
+        recordIssue("plan-save", "The version save was not acknowledged.", "save_failure");
+        const saveFailReason = saveAckError?.message
+          || "The optimiser plan is ready, but its version save was not acknowledged. Retry saving the project.";
+        const existingCompleted = getOptimiserPlanAuthority(projectId, versionId);
+        if (existingCompleted && existingCompleted.run?.runId === activeRun.runId) {
+          setOptimiserPlanAuthority(projectId, versionId, {
+            ...existingCompleted,
+            failure: {
+              status: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+              category: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+              message: saveFailReason,
+              publicationError: null,
+              attempts: null,
+              at: new Date().toISOString(),
+              runId: activeRun.runId,
+            },
+          });
+        }
+        runTerminalStatus = "failed";
+        trace.terminalOutcome = "failed";
+        logRunHistory({
+          terminalStatus: "failed",
+          publicationStatus: "not_attempted",
+          publicationError: saveFailReason,
+        }).catch(() => null);
+        setWorkflowError(projectId, versionId,
+          "The optimisation completed, but its results could not be saved. Retry saving the project.");
+        return;
+      }
 
       // ── 2. PRE-WRITE HISTORY (awaited so the row exists before any status update) ──
       // The row MUST exist before any later publication-status update can target
@@ -1226,6 +1272,8 @@ export default function OptimiseAndCalculate({
     appState,
     onRecalculate: handlePhysicalRecalculate,
     shared,
+    planRunId: planView?.run?.runId || null,
+    latestRunId: latestJointRun?.runId || null,
   });
   const planStatus = planView?.status || null;
   const planSuperseded = planView?.superseded === true;

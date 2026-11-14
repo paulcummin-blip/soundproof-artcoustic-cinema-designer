@@ -21,9 +21,10 @@
 
 import { useEffect, useMemo } from "react";
 import { useOptimiserPlanAuthority } from "./optimiserPlanStore.js";
-import { useLatestOptimiserRun, resolvePresentationPlan } from "./optimiserRunAuthority.js";
+import { useLatestOptimiserRun, resolvePresentationPlan, restoreLatestRunIdentity } from "./optimiserRunAuthority.js";
 import { hydrateOptimiserPlan, readPublishedOptimiserPlan } from "./optimiserPlanPersistence.js";
 import { resolveOptimiserPlanStatus } from "./resolveOptimiserPlanStatus.js";
+import { readOptimiserRunHistory } from "./optimiserRunHistory.js";
 
 export function useOptimiserPlanView({
   projectId = null,
@@ -44,6 +45,34 @@ export function useOptimiserPlanView({
     const published = readPublishedOptimiserPlan(completedBassAuthority);
     if (published) hydrateOptimiserPlan(projectId, versionId, published);
   }, [storedPlan, projectId, versionId, completedBassAuthority]);
+
+  // ── ESTABLISH LATEST DURABLE RUN IDENTITY ON LOAD ──
+  // The in-memory run store is empty after a page reload. Read the latest
+  // OptimiserRunHistory row for this version and restore its run identity, so
+  // planIsSupersededByRun can detect a newer run that failed to save: when
+  // the history runId differs from the restored plan's runId, the older plan
+  // is marked superseded and is not presented as the current recommendation.
+  useEffect(() => {
+    if (!projectId || !versionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await readOptimiserRunHistory({ projectId, versionId, limit: 1 });
+        if (cancelled || !Array.isArray(rows) || rows.length === 0) return;
+        const latestHistory = rows[0];
+        const historyRunId = latestHistory?.run_id || null;
+        const historyStartedAt = latestHistory?.started_at || null;
+        if (!historyRunId) return;
+        restoreLatestRunIdentity(projectId, versionId, {
+          runId: historyRunId,
+          startedAt: historyStartedAt,
+        });
+      } catch {
+        // History read failure is non-fatal — the plan is shown as current.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, versionId]);
 
   return useMemo(() => {
     const presentation = resolvePresentationPlan({ plan: storedPlan, run: latestRun });

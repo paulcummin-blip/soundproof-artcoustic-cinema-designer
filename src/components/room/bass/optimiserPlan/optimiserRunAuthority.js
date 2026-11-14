@@ -127,6 +127,33 @@ export function subscribeOptimiserRun(listener) {
   return () => listeners.delete(listener);
 }
 
+/**
+ * RESTORE the latest run identity from a durable source (saved plan or run
+ * history) WITHOUT minting a new run. Used on project load to establish run
+ * authority so planIsSupersededByRun can detect a newer run that failed to
+ * save: the restored plan is then marked superseded and not presented as the
+ * current recommendation.
+ *
+ * Only sets the store when no run has been started for this version in this
+ * session — a begun run (beginOptimiserRun) is never overwritten by a restore.
+ */
+export function restoreLatestRunIdentity(projectId, versionId, { runId = null, startedAt = null } = {}) {
+  const key = keyOf(projectId, versionId);
+  if (!runId || store.has(key)) return;
+  const restoredStartedAt = startedAt || new Date().toISOString();
+  store.set(key, {
+    runId,
+    startedAt: restoredStartedAt,
+    lastProgressAt: restoredStartedAt,
+    currentStageStartedAt: restoredStartedAt,
+    supersededRunId: null,
+    superseded: null,
+    history: [],
+    restored: true,
+  });
+  notify();
+}
+
 /** Test/reopen support: forget the run lifecycle for one design version. */
 export function resetOptimiserRunAuthority(projectId, versionId) {
   store.delete(keyOf(projectId, versionId));
