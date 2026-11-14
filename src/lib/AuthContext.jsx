@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { portalLaunchRejectionMessage } from '@/components/account/portalLaunchFailureCopy';
 import { buildPlatformAdminAccessContext } from '@/lib/platformAdminAccessContext';
-import { appParams } from '@/lib/app-params';
+import { appParams, clearAppParamAuthFallback } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
@@ -239,6 +239,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = (shouldRedirect = true) => {
+    clearAppParamAuthFallback();
     setUser(null);
     setIsAuthenticated(false);
     
