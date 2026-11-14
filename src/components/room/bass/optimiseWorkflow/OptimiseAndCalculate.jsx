@@ -29,7 +29,7 @@ import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
 import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
 import { useLatestOptimiserRun } from "../optimiserPlan/optimiserRunAuthority.js";
 import { useSyncExternalStore } from "react";
-import { Sparkles, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Sparkles, AlertCircle } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { capturePublicationTrace } from "../publicationTraceStore";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -1159,7 +1159,7 @@ export default function OptimiseAndCalculate({
       if (typeof sharedRef.current?.onCalculate === "function") sharedRef.current.onCalculate();
     }, 50);
   }, [handleReset, bassActionDisabled, hasCanonicalInstances]);
-  const handleUpdateBass = handleCalculateOnly;
+
 
   // Expose a recalculate function via registerRecalculate so the compact
   // Recalculate control in the Performance header can trigger the full
@@ -1223,37 +1223,20 @@ export default function OptimiseAndCalculate({
 
   return (
     <div className="space-y-3">
-      {/* ── Main button ── */}
-      {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && !hasResults && (
-        <>
-          <button
-            type="button"
-            onClick={handleCalculateOnly}
-            disabled={bassActionDisabled}
-            className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45 flex items-center justify-center gap-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            Calculate Bass Results
-          </button>
-          {!hasActiveSubModel && (
-            <p className="mt-2 text-[11px] text-[#625143]">Select a subwoofer model and quantity before optimising.</p>
-          )}
-          {shared?.completedBassAuthority?.authorityStatus === "STALE" && (
-            <p className="mt-2 text-[11px] font-medium text-[#4A230F]">Previous result needs recalculation — press Recalculate Bass Results to update.</p>
-          )}
-        </>
-      )}
-
-      {/* ── Update Bass Performance (published result exists but design changed) ── */}
-      {!isCalculating && !isError && !isTimedOut && hasResults && isStale && (
+      {/* ── Run ADI Bass Optimiser (inactive state: needs run or rerun) ──
+          One prominent button only — no heading, explanatory text,
+          "What ADI did", previous results or diagnostics. Launches the
+          existing full optimise-and-calculate workflow (runCalibrationAutoApply),
+          the same ADI optimisation process used by the Re-test route. */}
+      {!isCalculating && !isComplete && !isError && !isCancelledState && !isTimedOut && (!hasResults || isStale) && (
         <button
           type="button"
-          onClick={handleUpdateBass}
+          onClick={runCalibrationAutoApply}
           disabled={bassActionDisabled}
           className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45 flex items-center justify-center gap-2"
         >
-          <RefreshCw className="h-4 w-4" />
-          Recalculate Bass Results
+          <Sparkles className="h-4 w-4" />
+          Run ADI Bass Optimiser
         </button>
       )}
 
@@ -1300,7 +1283,7 @@ export default function OptimiseAndCalculate({
           modifies presentation. When authoritative bass results exist, the
           zone always renders — AdiRecommendation internally resolves to one
           of: Recommended Improvement, No further engineering, or No further EQ. */}
-      {hasResults && (
+      {hasResults && !isStale && (
         <div className={`mt-3 ${shared?.placementPreviewActive ? "opacity-45" : ""}`}>
           <WhatAdiDid
             receipt={appState?.splConfig?.bassAdiReceipt}
