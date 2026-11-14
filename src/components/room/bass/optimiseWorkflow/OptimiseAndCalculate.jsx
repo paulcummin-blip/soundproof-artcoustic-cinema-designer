@@ -29,7 +29,7 @@ import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
 import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
 import { useLatestOptimiserRun } from "../optimiserPlan/optimiserRunAuthority.js";
 import { useSyncExternalStore } from "react";
-import { Sparkles, CheckCircle2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Sparkles, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { capturePublicationTrace } from "../publicationTraceStore";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -64,6 +64,7 @@ import ResetSubwooferTuningButton from "./ResetSubwooferTuningButton";
 import CrossoverRecommendation from "./CrossoverRecommendation";
 import useRunOptimisationPlan from "./useRunOptimisationPlan";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, canCancelBassCalculation } from "../bassCalculationLifecycle";
+import AdiOptimiserProgress from "./AdiOptimiserProgress.jsx";
 import {
   computeAppliedCalibrationBasisFingerprint,
 } from "../appliedCalibrationAuthority/appliedCalibrationAuthority.js";
@@ -1203,63 +1204,13 @@ export default function OptimiseAndCalculate({
     return { action: "blocked", reason: "applied-design-fingerprint-not-ready" };
   }, []);
 
-  // ── Build the simplified progress display ──
+  // ── Build the stage display ──
+  // Computed while the run is busy AND after completion, so the cumulative
+  // checklist keeps showing each stage's outcome once the run ends.
   const stageDisplay = React.useMemo(() => {
-    if (!isBusy) return null;
+    if (!isBusy && !isComplete) return null;
     return buildStageDisplay(v2State);
-  }, [v2State, isBusy]);
-
-  // Map workflow phases to the simplified progress stages
-  const progressSteps = React.useMemo(() => {
-    const steps = [
-      { key: "phase", label: "Phase analysed", workflowPhase: "optimising", stageKey: "phase_polarity" },
-      { key: "delay", label: "Delay analysed", workflowPhase: "optimising", stageKey: "delays" },
-      { key: "gain", label: "Gain analysed", workflowPhase: "optimising", stageKey: "gain" },
-      { key: "placement", label: "Placement analysed", workflowPhase: "optimising", stageKey: "sub_positions" },
-      { key: "seating", label: "Seating analysed", workflowPhase: "optimising", stageKey: "seating_positions" },
-      { key: "globalAlignment", label: "Global level alignment", workflowPhase: "recalculating", stageKey: null },
-    ];
-
-    const workflowPhase = workflowState.status;
-    const v2Complete = v2State?.status === "complete";
-
-    return steps.map((step) => {
-      let status = "pending";
-
-      if (workflowPhase === "calculating") {
-        status = "pending";
-      } else if (workflowPhase === "optimising") {
-        // Use the V2 stage display to determine completion
-        if (stageDisplay) {
-          const stage = stageDisplay.stages?.find((s) => s.key === step.stageKey);
-          if (stage) {
-            if (stage.status === "completed") status = "done";
-            else if (stage.status === "active") status = "active";
-            else if (stage.status === "not_tested") status = "skipped";
-            else status = "pending";
-          }
-        }
-        // Global alignment is after optimisation
-        if (step.key === "globalAlignment") status = "pending";
-      } else if (workflowPhase === "applying" || workflowPhase === "recalculating" || workflowPhase === "publishing" || workflowPhase === "complete") {
-        // All optimisation steps are done
-        if (step.key === "globalAlignment") {
-          status = workflowPhase === "publishing" || workflowPhase === "complete" ? "done" : "active";
-        } else {
-          // Check if the stage was skipped (not_tested) vs done
-          if (stageDisplay) {
-            const stage = stageDisplay.stages?.find((s) => s.key === step.stageKey);
-            if (stage?.status === "not_tested") status = "skipped";
-            else status = "done";
-          } else {
-            status = "done";
-          }
-        }
-      }
-
-      return { ...step, status };
-    });
-  }, [workflowState.status, v2State?.status, stageDisplay]);
+  }, [v2State, isBusy, isComplete]);
 
   // ── Render ──
   const status = workflowState.status;
@@ -1303,55 +1254,24 @@ export default function OptimiseAndCalculate({
         </button>
       )}
 
-      {/* ── Simplified progress display ── */}
-      {isCalculating && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-[#213428]" />
-            <span className="text-[13px] font-semibold text-[#1B1A1A]">
-              {shared?.calculationPhaseLabel
-                || (status === "applying" && "Applying improvements\u2026")
-                || (status === "publishing" && "Publishing results\u2026")
-                || BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.PREPARING]}
-            </span>
-          </div>
-
-          {/* Stage checklist */}
-          {status === "optimising" && (
-            <div className="space-y-1.5 pl-2">
-              {progressSteps.filter((s) => s.key !== "globalAlignment").map((step) => (
-                <div key={step.key} className="flex items-center gap-2 text-[12px]">
-                  {step.status === "done" && <CheckCircle2 className="h-3.5 w-3.5 text-[#213428] flex-shrink-0" />}
-                  {step.status === "active" && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#213428] flex-shrink-0" />}
-                  {step.status === "pending" && <div className="h-3.5 w-3.5 rounded-full border border-[#DCDBD6] flex-shrink-0" />}
-                  {step.status === "skipped" && <div className="h-3.5 w-3.5 flex-shrink-0 text-[#8A7B6A] text-[10px] flex items-center justify-center">—</div>}
-                  <span className={step.status === "done" ? "text-[#213428]" : step.status === "active" ? "text-[#1B1A1A] font-medium" : step.status === "skipped" ? "text-[#8A7B6A]" : "text-[#8A7B6A]"}>
-                    {step.label}
-                    {step.status === "skipped" && " (not applicable)"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {(status === "recalculating" || status === "publishing") && (
-            <div className="space-y-1.5 pl-2">
-              {progressSteps.map((step) => (
-                <div key={step.key} className="flex items-center gap-2 text-[12px]">
-                  {step.status === "done" && <CheckCircle2 className="h-3.5 w-3.5 text-[#213428] flex-shrink-0" />}
-                  {step.status === "active" && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#213428] flex-shrink-0" />}
-                  {step.status === "pending" && <div className="h-3.5 w-3.5 rounded-full border border-[#DCDBD6] flex-shrink-0" />}
-                  {step.status === "skipped" && <div className="h-3.5 w-3.5 flex-shrink-0 text-[#8A7B6A] text-[10px] flex items-center justify-center">—</div>}
-                  <span className={step.status === "done" ? "text-[#213428]" : step.status === "active" ? "text-[#1B1A1A] font-medium" : step.status === "skipped" ? "text-[#8A7B6A]" : "text-[#8A7B6A]"}>
-                    {step.label}
-                    {step.status === "skipped" && " (not applicable)"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-        </div>
+      {/* ── ADI Sub Optimiser progress and completion ──
+          During a run: a meaningful current-stage heading and a cumulative
+          stage checklist in execution order with per-stage outcomes. After a
+          run: a concise final summary. Pure presentation — the new component
+          reads the V2 store stage verdicts, the workflow status and the saved
+          receipt; it changes no calculation, acceptance rule or saved data. */}
+      {(isCalculating || isComplete) && (
+        <AdiOptimiserProgress
+          v2State={v2State}
+          workflowPhase={status}
+          stageDisplay={stageDisplay}
+          calculationPhaseLabel={shared?.calculationPhaseLabel}
+          isCalculating={isCalculating}
+          isComplete={isComplete}
+          receipt={appState?.splConfig?.bassAdiReceipt}
+          recommendations={workflowState.recommendations}
+          autoApplied={workflowState.autoApplied}
+        />
       )}
 
       {/* Cancel — visibility governed solely by bassCalculationLifecycle */}
