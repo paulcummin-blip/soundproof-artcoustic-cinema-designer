@@ -48,13 +48,6 @@ const CORE_CARDS = [
     href: "/PriceList",
   },
   {
-    title: "Competitor Speaker Library",
-    description: "The competitor loudspeaker list behind RP22 P12/P13 comparison: add, edit, price and delete competitor speakers directly on the RP22 Speaker Capability page.",
-    status: "Ready",
-    count: "Speakers, specifications and prices",
-    href: "/SPLCalculator",
-  },
-  {
     title: "Content Management",
     description: "Publication content — the canonical source for About Sound Proof and future client-facing text used in the app, Visual Report, Technical Report, and proposals.",
     status: "Ready",
