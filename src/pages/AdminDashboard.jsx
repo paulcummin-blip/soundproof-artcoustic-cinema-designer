@@ -15,17 +15,27 @@ const BRAND = {
   accent: "#625143",
 };
 
-// Core administration stays prominent. Setup, configuration and legacy tooling
-// live under Advanced / Setup so the dashboard leads with the tools that are
-// used daily.
-const CORE_CARDS = [
+// Four navigation groups per the sector-based commercial dashboard restructure.
+// Commercial Intelligence leads; the remaining tools are grouped by function.
+
+const COMMERCIAL_INTELLIGENCE_CARDS = [
   {
-    title: "Commercial Control Centre",
-    description: "Dealer accounts, Professional Projects, turnover and activity.",
-    status: "Healthy",
-    countKey: "accounts",
-    href: "/admin/accounts",
+    title: "Commercial Intelligence",
+    description: "Sector-based overview, proposal activity, UK commercial outcomes and verified pipeline value.",
+    status: "Ready",
+    count: "Sectors · Pipeline · Outcomes",
+    href: "/admin/commercial-intelligence",
   },
+  {
+    title: "Project Intelligence",
+    description: "Artcoustic product forecast, demand and export. Projects are counted once; design versions are shown as variations.",
+    status: "Ready",
+    count: "Projects counted once",
+    href: "/admin/project-intelligence",
+  },
+];
+
+const ACCOUNTS_ACCESS_CARDS = [
   {
     title: "Account Access & Credits",
     description: "Dealer access, logins, Sound Proof credits and account diagnostics in one grouped view.",
@@ -34,12 +44,15 @@ const CORE_CARDS = [
     href: "/admin/access",
   },
   {
-    title: "Project Intelligence",
-    description: "Commercial project counts, project values, product demand and export. Projects are counted once; design versions are shown as variations.",
-    status: "Ready",
-    count: "Projects counted once",
-    href: "/admin/project-intelligence",
+    title: "Commercial Control Centre",
+    description: "Dealer accounts, Professional Projects, turnover and activity.",
+    status: "Healthy",
+    countKey: "accounts",
+    href: "/admin/accounts",
   },
+];
+
+const PRODUCTS_ENGINEERING_CARDS = [
   {
     title: "Product Master",
     description: "Product names, availability, Sound Proof roles and retail pricing — the pricing authority.",
@@ -48,32 +61,22 @@ const CORE_CARDS = [
     href: "/PriceList",
   },
   {
-    title: "Content Management",
-    description: "Publication content — the canonical source for About Sound Proof and future client-facing text used in the app, Visual Report, Technical Report, and proposals.",
-    status: "Ready",
-    count: "1 document",
-    href: "/admin/content",
+    title: "RP22 Speaker Capability",
+    description: "Speaker comparison database, model-first product entry and RP22 comparison management.",
+    status: "Healthy",
+    count: "—",
+    href: "/SPLCalculator",
   },
   {
     title: "ADI Design Knowledge",
-    description: "Why decisions are made, learned from the reasons designers give to ADI's clarification questions across separate projects. Review, approve, edit, merge or disable what ADI understands.",
+    description: "Why decisions are made, learned from the reasons designers give to ADI's clarification questions. Review, approve, edit, merge or disable.",
     status: "Curated",
     count: "Design intent only",
     href: "/admin/adi-design-knowledge",
   },
   {
-    title: "System Health",
-    description: "Live status of core systems and infrastructure.",
-    status: "Operational",
-    count: "7 systems monitored",
-    href: "/admin/system-health",
-  },
-];
-
-const ADVANCED_CARDS = [
-  {
     title: "Design Intent Preview",
-    description: "Engineering tool. Run the production Project Report Design Intent writer against any project and version, read what it produced and which evidence it used, and save nothing.",
+    description: "Engineering tool. Run the Project Report Design Intent writer against any project and read what it produced. Saves nothing.",
     status: "Read-only",
     count: "No writes",
     href: "/admin/design-intent-preview",
@@ -84,6 +87,23 @@ const ADVANCED_CARDS = [
     status: "Healthy",
     count: "—",
     href: "/admin/datasets",
+  },
+];
+
+const CONTENT_SYSTEM_CARDS = [
+  {
+    title: "Content Management",
+    description: "Publication content — the canonical source for About Sound Proof and client-facing text.",
+    status: "Ready",
+    count: "1 document",
+    href: "/admin/content",
+  },
+  {
+    title: "System Health",
+    description: "Live status of core systems and infrastructure.",
+    status: "Operational",
+    count: "7 systems monitored",
+    href: "/admin/system-health",
   },
   {
     title: "RP22 Configuration",
@@ -113,6 +133,13 @@ const ADVANCED_CARDS = [
     count: "Feature flag OFF",
     href: "/admin/project-licensing",
   },
+];
+
+const CARD_GROUPS = [
+  { label: "Commercial Intelligence", cards: COMMERCIAL_INTELLIGENCE_CARDS },
+  { label: "Accounts & Access", cards: ACCOUNTS_ACCESS_CARDS },
+  { label: "Products & Engineering", cards: PRODUCTS_ENGINEERING_CARDS },
+  { label: "Content & System", cards: CONTENT_SYSTEM_CARDS },
 ];
 
 export default function AdminDashboard() {
@@ -161,14 +188,6 @@ export default function AdminDashboard() {
     ? `${accountCount} account${accountCount !== 1 ? "s" : ""}`
     : "—";
 
-  const cards = [...CORE_CARDS, ...ADVANCED_CARDS].map((card) => ({
-    ...card,
-    count: card.countKey === "accounts" ? accountCountLabel : card.count,
-  }));
-
-  const coreCards = cards.slice(0, CORE_CARDS.length);
-  const advancedCards = cards.slice(CORE_CARDS.length);
-
   const renderGrid = (list) => (
     <div style={{
       display: "grid",
@@ -180,6 +199,28 @@ export default function AdminDashboard() {
       ))}
     </div>
   );
+
+  const renderGroup = (group) => {
+    const cards = group.cards.map((card) => ({
+      ...card,
+      count: card.countKey === "accounts" ? accountCountLabel : card.count,
+    }));
+    return (
+      <div key={group.label} style={{ marginBottom: 30 }}>
+        <h2 style={{
+          margin: "0 0 12px",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: BRAND.accent,
+        }}>
+          {group.label}
+        </h2>
+        {renderGrid(cards)}
+      </div>
+    );
+  };
 
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
@@ -199,33 +240,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 30 }}>
-        <h2 style={{
-          margin: "0 0 12px",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: BRAND.accent,
-        }}>
-          Core administration
-        </h2>
-        {renderGrid(coreCards)}
-      </div>
-
-      <div>
-        <h2 style={{
-          margin: "0 0 12px",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: BRAND.accent,
-        }}>
-          Advanced / Setup
-        </h2>
-        {renderGrid(advancedCards)}
-      </div>
+      {CARD_GROUPS.map((group) => renderGroup(group))}
 
       <div style={{ marginTop: 30 }}>
         <h2 style={{

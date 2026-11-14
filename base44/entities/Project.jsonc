@@ -555,6 +555,16 @@
           "type": "string"
         }
       }
+    },
+    "commercial_outcome": {
+      "type": "string",
+      "enum": [
+        "won",
+        "lost"
+      ],
+      "nullable": true,
+      "default": null,
+      "description": "Independent UK-only commercial outcome, entirely separate from the dealer's own project_status. null = Live (default for all projects). 'won' = Won, 'lost' = Lost. Mutually exclusive: only one may be set; unticking the selected box returns the project to Live. Admin-only writes via the setProjectCommercialOutcome backend function. Not tracked for International (non-UK) projects. Live projects count towards the potential monetary pipeline; Won and Lost are excluded from Live but remain in historical proposal activity graphs. This field never alters engineering, proposal records, project history, or dealer workflow statuses."
     }
   },
   "required": [

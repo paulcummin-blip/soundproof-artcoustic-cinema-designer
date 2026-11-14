@@ -14,6 +14,7 @@ import AdminAccounts from './pages/AdminAccounts';
 import AdminAccountAccess from './pages/AdminAccountAccess';
 import AccountDashboard from './pages/AccountDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminCommercialIntelligence from './pages/AdminCommercialIntelligence';
 import AdminSystemHealth from './pages/AdminSystemHealth';
 import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminPublicationContent from './pages/AdminPublicationContent';
@@ -143,6 +144,7 @@ const AuthenticatedApp = () => {
         <Route path="/AboutSoundProof" element={<AboutSoundProof />} />
         <Route path="/DealerBranding" element={<AccessGate capability="soundProof"><DealerBranding /></AccessGate>} />
         <Route path="/admin" element={<AccessGate masterAdmin><AdminDashboard /></AccessGate>} />
+        <Route path="/admin/commercial-intelligence" element={<AccessGate masterAdmin><AdminCommercialIntelligence /></AccessGate>} />
         <Route path="/admin/accounts" element={<AccessGate masterAdmin><AdminAccounts /></AccessGate>} />
         <Route path="/admin/accounts/:accountId" element={<AccessGate masterAdmin><AccountDashboard /></AccessGate>} />
         <Route path="/admin/access" element={<AccessGate masterAdmin><AdminAccountAccess /></AccessGate>} />
