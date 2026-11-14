@@ -27,6 +27,55 @@ const round = (value, digits = 2) => (value == null ? null : Math.round(Number(v
 
 const ISOLATED_ELECTRONIC_KINDS = new Set(["phase", "calibration", "gain"]);
 
+// The material threshold mirrors the crossover integration acceptance gate so
+// an objective derived in the ledger (when the search did not stamp one) uses
+// the same figure the gate applied.
+const LEDGER_MATERIAL_THRESHOLD_DB = 0.25;
+
+/**
+ * Which RP22 objective drove a candidate's acceptance: "p19", "p20", "both" or
+ * null. Prefers the search's own stamped `integrationObjective` (the accurate
+ * baseline comparison the crossover search made); otherwise derives it from the
+ * ledger baseline vs the candidate's confirmed metrics. A candidate that
+ * improved only a crossover-region metric but not RP22 P19/P20 returns null — it
+ * is never misreported as an RP22 improvement.
+ */
+function objectiveFor(selection, result) {
+  if (result?.integrationObjective) return result.integrationObjective;
+  const baseline = selection?.currentResult;
+  if (!baseline || !result) return null;
+  const p19Imp = num(baseline.achievedP19VariationDb) - num(result.achievedP19VariationDb);
+  const p20Imp = num(baseline.achievedP20VariationDb) - num(result.achievedP20VariationDb);
+  const q19 = p19Imp != null && p19Imp >= LEDGER_MATERIAL_THRESHOLD_DB;
+  const q20 = p20Imp != null && p20Imp >= LEDGER_MATERIAL_THRESHOLD_DB;
+  if (q19 && q20) return "both";
+  if (q19) return "p19";
+  if (q20) return "p20";
+  return null;
+}
+
+/**
+ * Before/after P19 and P20 values (and deltas, positive = better) for one
+ * candidate, read from the ledger baseline and the candidate's confirmed
+ * metrics. Null when the baseline or candidate values are absent.
+ */
+function improvementsFor(selection, result) {
+  const baseline = selection?.currentResult;
+  if (!baseline || !result) return null;
+  const bP19 = num(baseline.achievedP19VariationDb);
+  const cP19 = num(result.achievedP19VariationDb);
+  const bP20 = num(baseline.achievedP20VariationDb);
+  const cP20 = num(result.achievedP20VariationDb);
+  return {
+    p19BeforeDb: round(bP19, 2),
+    p19AfterDb: round(cP19, 2),
+    p19DeltaDb: (bP19 != null && cP19 != null) ? round(bP19 - cP19, 2) : null,
+    p20BeforeDb: round(bP20, 2),
+    p20AfterDb: round(cP20, 2),
+    p20DeltaDb: (bP20 != null && cP20 != null) ? round(bP20 - cP20, 2) : null,
+  };
+}
+
 /**
  * Whether a confirmed result is an ELECTRONIC candidate the ledger should
  * record. Coordinated physical candidates, position candidates and seating
@@ -156,9 +205,11 @@ function candidateRecord(selection, result) {
     candidateId: result.candidateId || null,
     family: familyOf(result),
     candidateOrigin: result.candidateOrigin || null,
+    objective: objectiveFor(selection, result),
     crossover: compactCrossover(result),
     tuning: compactTuning(result),
     metrics: metricsOf(result),
+    improvements: improvementsFor(selection, result),
     acceptance: acceptanceFor(selection, result),
     rejectionReasons: rejectionReasons(selection, result),
   };

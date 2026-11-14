@@ -16,14 +16,59 @@ const keyOf = c => JSON.stringify([c.crossover, c.tuning.map(t => [t.gainDb,t.de
 const p20 = r => Number.isFinite(r?.achievedP20VariationDb) ? r.achievedP20VariationDb : Infinity;
 const p19 = r => Number.isFinite(r?.achievedP19VariationDb) ? r.achievedP19VariationDb : Infinity;
 
+// Multi-objective acceptance: a crossover candidate qualifies when EITHER the
+// RSP P19 improves materially (P20 held within safety limits) OR the P20
+// seat-to-seat consistency improves materially (P19 held within its regression
+// limit). A candidate need not improve both. The material threshold is the
+// same 0.25 dB the previous P20-only rule used, applied symmetrically. Lower
+// deviation is better for both P19 and P20.
+const MATERIAL_THRESHOLD_DB = 0.25;
+const P19_REGRESSION_LIMIT_DB = 0.1;
+const round2 = v => Math.round(Number(v) * 100) / 100;
+
+export function integrationAcceptanceObjective(baseline, candidate) {
+  if (!baseline || !candidate) return null;
+  const p19Improvement = p19(baseline) - p19(candidate);
+  const p20Improvement = p20(baseline) - p20(candidate);
+  const qualifiesP19 = Number.isFinite(p19Improvement) && p19Improvement >= MATERIAL_THRESHOLD_DB;
+  const qualifiesP20 = Number.isFinite(p20Improvement) && p20Improvement >= MATERIAL_THRESHOLD_DB;
+  if (qualifiesP19 && qualifiesP20) return "both";
+  if (qualifiesP19) return "p19";
+  if (qualifiesP20) return "p20";
+  return null;
+}
+
+export function integrationImprovements(baseline, candidate) {
+  if (!baseline || !candidate) return null;
+  const p19Delta = p19(baseline) - p19(candidate);
+  const p20Delta = p20(baseline) - p20(candidate);
+  return {
+    p19BeforeDb: round2(p19(baseline)),
+    p19AfterDb: round2(p19(candidate)),
+    p19DeltaDb: Number.isFinite(p19Delta) ? round2(p19Delta) : null,
+    p20BeforeDb: round2(p20(baseline)),
+    p20AfterDb: round2(p20(candidate)),
+    p20DeltaDb: Number.isFinite(p20Delta) ? round2(p20Delta) : null,
+  };
+}
+
 export function integrationSafetyIssues(baseline, candidate) {
   if (!baseline || !candidate) return ["Canonical confirmation unavailable"];
   const issues = [];
-  if (p20(candidate) > p20(baseline) - 0.25) issues.push("No useful P20 improvement");
+  // ── Multi-objective acceptance (P19 OR P20) ─────────────────────────
+  // A candidate must improve at least one of RSP P19 or P20 seat-to-seat
+  // consistency by the material threshold. This replaces the previous
+  // P20-only requirement, so an RSP-only improvement is no longer discarded
+  // when seat consistency is unchanged.
+  const objective = integrationAcceptanceObjective(baseline, candidate);
+  if (!objective) issues.push("No useful P19 or P20 improvement");
+  // P19 regression limit applies regardless of which objective qualifies: a
+  // candidate that worsens RSP P19 beyond this limit is rejected even when P20
+  // improves, so a P20 gain never buys an RSP regression.
+  if (p19(candidate) > p19(baseline) + P19_REGRESSION_LIMIT_DB) issues.push("RSP P19 regression");
   if (candidate.physicalValidation?.passed !== true) issues.push("Physical correction constraints failed");
   if (!Number.isFinite(candidate.p14HeadroomDb) || candidate.p14HeadroomDb < 0) issues.push("Insufficient P14 headroom");
   if (candidate.p14HeadroomDb < (baseline.p14HeadroomDb ?? 0) - 1) issues.push("More than 1 dB headroom lost");
-  if (p19(candidate) > p19(baseline) + 0.1) issues.push("RSP P19 regression");
   if (![candidate.assessmentStartHz, candidate.assessmentEndHz, baseline.assessmentStartHz, baseline.assessmentEndHz].every(Number.isFinite) ||
       Math.abs(candidate.assessmentStartHz - baseline.assessmentStartHz) > 0.001 ||
       Math.abs(candidate.assessmentEndHz - baseline.assessmentEndHz) > 0.001) issues.push("Assessment band changed");
@@ -169,17 +214,23 @@ export function runCrossoverIntegrationSearch({
     diagnostics.confirmed++;
     const issues=integrationSafetyIssues(baseline,result);
     if(issues.length){diagnostics.rejected.push({crossover:candidate.crossover,p19:p19(result),p20:p20(result),issues});continue;}
+    const objective=integrationAcceptanceObjective(baseline,result);
     candidates.push({...result,crossover:candidate.crossover,responseBasis:"combined-lcr-sub",integrationVerified:true,
       integrationBaseline:{p19:p19(baseline),p20:p20(baseline),crossover:currentCrossover},
+      integrationObjective:objective,
+      integrationImprovements:integrationImprovements(baseline,result),
       integrationExplanation:baseline.perSeatP20?.some(s=>s.worstFrequencyHz<60&&s.variationDbRaw>=p20(baseline)-0.1)
         ? "The main limitation is below the crossover. Subwoofer interaction or placement remains the stronger lever."
         : "Crossover and subwoofer timing were tested together across all seats.",
     });
   }
-  candidates.sort((a,b)=>p20(a)-p20(b)||p19(a)-p19(b));
+  // Rank finalists by the combined improvement so both P19-driven and
+  // P20-driven candidates surface into the bounded confirmation set. The
+  // final winner is selected downstream by the established least-intrusive
+  // intervention ordering, not by this screening sort.
+  candidates.sort((a,b)=>(p19(baseline)-p19(a)+p20(baseline)-p20(a))-(p19(baseline)-p19(b)+p20(baseline)-p20(b))||p20(a)-p20(b)||p19(a)-p19(b));
   diagnostics.confirmationMs=performance.now()-confirmationStarted;
   diagnostics.runtimeMs=performance.now()-started;
   diagnostics.status=candidates.length?"completed":"no_safe_improvement";
   return {baseline,candidates:candidates.slice(0,3),diagnostics};
 }
-
