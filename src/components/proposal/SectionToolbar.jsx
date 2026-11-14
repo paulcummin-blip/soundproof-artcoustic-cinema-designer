@@ -1,6 +1,5 @@
 import React from 'react';
-import { Pencil, Check, X, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
-import AdiEditorialNotice from '@/components/adi/AdiEditorialNotice';
+import { Pencil, Check, X, Loader2, ShieldCheck } from 'lucide-react';
 import SectionToolbarMore from '@/components/proposal/SectionToolbarMore';
 import { MANUAL_EDIT_LABEL } from '@/components/proposal/proposalManualEdit';
 import {
@@ -32,17 +31,6 @@ import {
  *   no generated copy and so has nothing to approve
  * - isApproving: the approval is being written
  * - onApprove: () => void — the one action that approves this section
- * - onImproveWording: () => void — the editorial pass over this section's wording.
- *   It improves how the copy reads and changes nothing else: the facts, the figures,
- *   the levels, the scope and the products stay exactly as they are, and the copy it
- *   replaces is kept. Null for a section with no generated copy. A whole section is
- *   improved from here; a sentence or a paragraph is improved from the editor's own
- *   toolbar, where the highlighted text is.
- * - onUndoWording: () => void — puts back the wording the editorial pass replaced.
- * - isImprovingWording: the editorial pass is running
- * - canUndoAdi: the copy on screen is an ADI improvement whose earlier wording is
- *   still held behind it
- *
  * Approval is the designer's own decision about this section's generated wording.
  * It is given by the Approve action and by nothing else — not by generating the
  * copy, not by opening the section, not by a passed evidence check — and it
@@ -64,19 +52,10 @@ export default function SectionToolbar({
   approvalStatus = null,
   isApproving = false,
   onApprove,
-  onImproveWording = null,
-  onUndoWording = null,
-  isImprovingWording = false,
-  canUndoAdi = false,
-  // The one line ADI stated about the last editorial action on THIS section, shown
-  // directly beneath these controls, and how it is cleared.
-  notice = null,
-  onDismissNotice = null,
 }) {
   const approved = approvalStatus === APPROVAL_STATUS.APPROVED;
   const approvalChip = approvalChipStyle(approvalStatus);
   return (
-    <>
     <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg shadow-md border border-[#DCDBD6] bg-white">
       {/* Manual edit — wording changes by hand, no AI */}
       {isEditing ? (
@@ -152,31 +131,6 @@ export default function SectionToolbar({
         </>
       )}
 
-      {/* ── IMPROVE THE WORDING WITH ADI ──
-          The editorial pass on the copy that is already here: the same facts said
-          better. It is not writing this section again and it is not a regeneration —
-          the engineering writer is not asked, and no figure, level, scope or product
-          changes. The wording it replaces is kept, so Undo puts it back exactly. */}
-      {onImproveWording && (
-        <>
-          <button
-            type="button"
-            onClick={() => onImproveWording()}
-            disabled={isImprovingWording}
-            title="Improve clarity and tone, and correct statements that disagree with the saved project data."
-            data-adi-improve="section"
-            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold whitespace-nowrap text-[#213428] bg-[#EAF0EC] border border-[#BFCFC4] hover:bg-[#DDE8E0] rounded transition-colors disabled:opacity-50"
-          >
-            {isImprovingWording ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5" />
-            )}
-            Improve with ADI
-          </button>
-        </>
-      )}
-
       {/* Everything else lives in one compact menu */}
       <SectionToolbarMore
         section={section}
@@ -184,9 +138,6 @@ export default function SectionToolbar({
         isRegenerating={isRegenerating}
         onToggleLock={onToggleLock}
         onToggleNotes={onToggleNotes}
-        onUndoWording={onImproveWording ? onUndoWording : null}
-        canUndoAdi={canUndoAdi}
-        isImprovingWording={isImprovingWording}
       />
 
       {isManuallyEdited && !isEditing && (
@@ -219,13 +170,5 @@ export default function SectionToolbar({
         </>
       )}
     </div>
-    {/* What ADI said about the editorial action on this section, in one plain line
-        directly beneath the controls it was taken from. */}
-    <AdiEditorialNotice
-      message={notice}
-      busy={isImprovingWording}
-      onDismiss={onDismissNotice}
-    />
-    </>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Lock, Unlock, StickyNote, Undo2 } from 'lucide-react';
+import { ChevronDown, Lock, Unlock, StickyNote } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +11,13 @@ import { REGENERATION_ACTIONS } from '@/components/proposal/proposalSections';
 
 /**
  * The "More" menu of the section toolbar: every secondary editing action in one
- * compact dropdown — Undo, the regeneration actions (Rewrite, Refine, Expand,
+ * compact dropdown — the regeneration actions (Rewrite, Refine, Expand,
  * Shorten, Technical, Client Friendly), Lock and Notes.
  *
  * Props:
  * - section: the active section
  * - onRegenerate(action), isRegenerating
  * - onToggleLock(), onToggleNotes()
- * - onUndoWording: () => void, or null when the section has no ADI wording to undo
- * - canUndoAdi, isImprovingWording
  */
 export default function SectionToolbarMore({
   section,
@@ -27,9 +25,6 @@ export default function SectionToolbarMore({
   isRegenerating = false,
   onToggleLock,
   onToggleNotes,
-  onUndoWording = null,
-  canUndoAdi = false,
-  isImprovingWording = false,
 }) {
   const locked = Boolean(section?.locked);
   return (
@@ -46,16 +41,6 @@ export default function SectionToolbarMore({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[10rem] text-xs">
-        {onUndoWording && (
-          <DropdownMenuItem
-            data-adi-undo="section"
-            disabled={!canUndoAdi || isImprovingWording}
-            onSelect={() => onUndoWording()}
-          >
-            <Undo2 className="w-3.5 h-3.5 mr-2" />
-            Undo
-          </DropdownMenuItem>
-        )}
         {REGENERATION_ACTIONS.map((action) => (
           <DropdownMenuItem
             key={action.value}

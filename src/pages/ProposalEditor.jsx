@@ -10,9 +10,6 @@ import { resolveProposalComparison, isCompleteComparisonTable } from '@/componen
 import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceState';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
-import useSectionAdiEditorial from '@/components/proposal/editor/useSectionAdiEditorial';
-import useAutoAdiRewrite from '@/components/proposal/editor/useAutoAdiRewrite';
-import AutoAdiStatusBar from '@/components/proposal/editor/AutoAdiStatusBar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
 import {
@@ -140,9 +137,6 @@ export default function ProposalEditor() {
   const [saveStatuses, setSaveStatuses] = useState({});
   const [dirtySections, setDirtySections] = useState(new Set());
   const [regenerating, setRegenerating] = useState(null);
-  // Bumped when an editorial pass has written new wording, so the copy layer is
-  // re-read and the approval each section needs follows the wording on screen.
-  const [adiLayerRefresh, setAdiLayerRefresh] = useState(0);
   const [clientBrief, setClientBrief] = useState('');
   const [showClientBrief, setShowClientBrief] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
@@ -649,43 +643,6 @@ export default function ProposalEditor() {
   // the body, the stamps and the editorial marker the Undo action reads are the
   // stored ones — and so the approval state is resolved again from the wording that
   // is actually there.
-  const reloadSections = useCallback(async () => {
-    if (!proposal?.id) return;
-    const rows = await base44.entities.ProposalSection.filter({ proposal_id: proposal.id });
-    setSections(orderPublicationSections({
-      sections: (rows || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
-      proposalType: proposal.proposal_type,
-    }));
-  }, [proposal?.id, proposal?.proposal_type]);
-
-  // An accepted edit was written by the server, so the hand-edit draft of the active
-  // section is finished — what is on screen is now the stored copy — and the copy
-  // layer is re-read so the approval this section needs follows the new wording.
-  const finishAdiEdit = useCallback(async () => {
-    setEditingSectionId(null);
-    setAdiLayerRefresh((count) => count + 1);
-    await reloadSections();
-  }, [reloadSections]);
-
-  // The one editorial action, in its two ways of working: the whole section, or the
-  // text the designer highlighted. The pass, the meaning gate, the revalidation and
-  // the approval consequence are all resolved on the server; this holds the state and
-  // shows the one plain line it reported.
-  const {
-    notice: adiNotice,
-    busySectionId: adiBusySectionId,
-    improveSection: handleImproveWording,
-    undoSection: handleUndoWording,
-    improveSelection: handleImproveSelection,
-    applySelection: handleApplyAdiSelection,
-    dismissNotice: dismissAdiNotice,
-  } = useSectionAdiEditorial({ proposal, archived, activeSection, onApplied: finishAdiEdit });
-
-  // Automatic ADI pass, once per newly generated report (reuses the action above).
-  const autoAdi = useAutoAdiRewrite({
-    proposal, setProposal, sections, loading, archived, improveSection: handleImproveWording,
-  });
-
   const handleRestore = async () => {
     if (!proposal) return;
     setRestoring(true);
@@ -946,16 +903,15 @@ export default function ProposalEditor() {
         showClientBrief={showClientBrief}
         onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
         exporting={exporting}
-        onExport={autoAdi.blockedReason ? () => {} : handleExportClick}
-        exportDisabled={Boolean(autoAdi.blockedReason)}
-        blockedReason={autoAdi.blockedReason || comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
+        onExport={handleExportClick}
+        exportDisabled={false}
+        blockedReason={comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
         review={copyReview}
         approval={approval}
         error={exportError}
         retryable={exportRetryable}
         errorDetail={exportErrorDetail}
       />
-      <AutoAdiStatusBar status={autoAdi.status} running={autoAdi.running} onRetry={autoAdi.retry} />
 
       <ProposalReviewRequiredDialog
         open={showReviewDialog}
@@ -1001,7 +957,7 @@ export default function ProposalEditor() {
           onBlockedReasonChange={setEditLayerBlockReason}
           onLayerChange={setDocumentLayer}
           documentRevision={JSON.stringify(sections.map(section => [section.id, section.body, section.is_enabled, section.order_index, section.dealer_notes]))}
-          refreshSignal={layerRefreshSignal + adiLayerRefresh}
+          refreshSignal={layerRefreshSignal}
         />
         {/* Proposal typography scope — cover, section headings and body copy
             follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
@@ -1047,12 +1003,6 @@ export default function ProposalEditor() {
                     : (html, editedAt) => handleDirty(section.id, html, editedAt)
                 }
                 onUnloadSave={editingThisSection ? undefined : (html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
-                // The highlighted-text editorial action, offered where a highlight can
-                // actually be made: inside manual edit mode, from this editor's own
-                // toolbar. The editor puts the improved wording back itself and hands
-                // its own copy over to be saved.
-                onImproveSelection={isActive && editingThisSection && !archived ? handleImproveSelection : null}
-                onApplyAdiSelection={isActive && editingThisSection && !archived ? handleApplyAdiSelection : null}
                 editable={isActive && editingThisSection && !archived}
                 saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
               />
@@ -1133,16 +1083,6 @@ export default function ProposalEditor() {
                       approvalStatus={approvalByType?.[section.section_type] || null}
                       isApproving={approvingSectionId === section.id}
                       onApprove={() => handleApproveSection(section)}
-                      // ── The editorial pass on this section's wording ──
-                      // Offered on the copy that is already here, and only for a
-                      // section that carries copy. The one line ADI states about it
-                      // is shown directly beneath these controls.
-                      onImproveWording={() => handleImproveWording(section)}
-                      onUndoWording={() => handleUndoWording(section)}
-                      isImprovingWording={adiBusySectionId === section.id}
-                      canUndoAdi={Boolean(section.metadata?.adi_editorial?.previous_body)}
-                      notice={adiNotice?.sectionId === section.id ? adiNotice.message : null}
-                      onDismissNotice={dismissAdiNotice}
                     />
                   </div>
                 )}
