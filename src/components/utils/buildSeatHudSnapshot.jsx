@@ -19,6 +19,7 @@ import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import { RP22_SEAT_PARAMETERS, createEmptySeatRp22Metrics } from '@/components/utils/rp22ParameterPresentation';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { countDistinctOverheadRows, SINGLE_OVERHEAD_ROW_REASON } from '@/components/utils/rp22/overheadLayerAuthority';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -441,6 +442,19 @@ export function buildSeatHudSnapshot({
         formatted: 'N/A',
         level: 'N/A',
         status: 'not_applicable',
+      };
+    } else if (countDistinctOverheadRows(placedSpeakers) < 2) {
+      // One overhead row (normally two speakers): P10 is N/A — no upper-row
+      // level spread to assess. Displays as "N/A"; the reason is kept on
+      // `note` for diagnostics only. Matches the engine's single-row rule so
+      // the HUD never shows "not calculated" for a genuinely N/A case.
+      data.rp22.p10 = {
+        value: null,
+        formatted: 'N/A',
+        level: 'N/A',
+        status: 'not_applicable',
+        applicable: false,
+        note: SINGLE_OVERHEAD_ROW_REASON,
       };
     } else {
       data.rp22.p10 = {

@@ -52,6 +52,14 @@ export const NO_OVERHEAD_LAYER_REASON =
 export const NO_ZONAL_SPEAKER_LAYER_REASON =
   "Not applicable — this design has no surround, wide or upper speakers to assess.";
 
+/**
+ * The stated reason when exactly one overhead speaker row is present. Kept
+ * internally for validation and diagnostics; the normal interface and PDF show
+ * only "N/A" (see buildSingleOverheadRowNotApplicableMetric).
+ */
+export const SINGLE_OVERHEAD_ROW_REASON =
+  "Not applicable — only one overhead speaker row is present.";
+
 /** Canonical height role? */
 export function isHeightLayerRole(role) {
   return HEIGHT_LAYER_ROLE_SET.has(getCanonicalRole(role));
@@ -116,6 +124,56 @@ export function buildOverheadNotApplicableMetric() {
     status: "not_applicable",
     applicable: false,
     note: NO_OVERHEAD_LAYER_REASON,
+  };
+}
+
+/**
+ * Map a canonical height / overhead role to its overhead row index, using the
+ * same front/mid/rear convention as the P9 row-elevation authority:
+ *   0 = front (TFL, TFR, TF*), 1 = mid (TML, TMR, TM*),
+ *   2 = rear (TRL, TRR, TBL, TBR, TB*). Returns null for anything else.
+ */
+export function overheadRowFromRole(role) {
+  const r = getCanonicalRole(role);
+  if (!r) return null;
+  if (r === "TFL" || r === "TFR" || r.startsWith("TF")) return 0;
+  if (r === "TML" || r === "TMR" || r.startsWith("TM")) return 1;
+  if (r === "TRL" || r === "TRR" || r === "TBL" || r === "TBR" || r.startsWith("TB") || r.startsWith("TR")) return 2;
+  if (r === "TL" || r === "TR") return 0; // legacy top left/right
+  return null;
+}
+
+/**
+ * Count the distinct overhead rows actually installed (enabled, real model,
+ * positioned) — the real speaker-row geometry, not the nominal channel count.
+ * P10 needs two or more rows (four or six speakers in the standard Dolby Atmos
+ * layouts); a single row has no upper-row level spread to assess.
+ */
+export function countDistinctOverheadRows(speakers) {
+  if (!Array.isArray(speakers)) return 0;
+  const rows = new Set();
+  for (const speaker of speakers) {
+    if (!isInstalledSpeaker(speaker)) continue;
+    if (!isHeightLayerRole(speaker.role)) continue;
+    const row = overheadRowFromRole(speaker.role);
+    if (row != null && row >= 0 && row <= 2) rows.add(row);
+  }
+  return rows.size;
+}
+
+/**
+ * The published shape for P10 when only one overhead speaker row is present.
+ * Displays as "N/A" (formatted/level); the note carries the reason internally
+ * for validation and troubleshooting only.
+ */
+export function buildSingleOverheadRowNotApplicableMetric() {
+  return {
+    value: null,
+    formatted: "N/A",
+    level: "N/A",
+    status: "not_applicable",
+    applicable: false,
+    note: SINGLE_OVERHEAD_ROW_REASON,
   };
 }
 

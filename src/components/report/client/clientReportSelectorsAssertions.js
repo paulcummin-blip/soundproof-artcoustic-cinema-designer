@@ -403,7 +403,7 @@ export function runClientReportSelectorAssertions() {
 
   // 7f. P10 N/A objects do not create markers
   const p10NaResult = selectClientSpeakerBalance({
-    analysisResult: { perSeatRp22: { "seat-x": { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 }, 10: { value: null, level: "—", formatted: "N/A (insufficient data)" } } } }, gradedParameters: { primary: {} } },
+    analysisResult: { perSeatRp22: { "seat-x": { rp22: { 4: { valueDb: 1, level: 4 }, 6: { valueDb: 2, level: 3 }, 10: { value: null, level: "—", formatted: "N/A" } } } }, gradedParameters: { primary: {} } },
     seatingPositions: [{ id: "seat-x", x: 2, y: 3 }],
     rsp: null,
   });

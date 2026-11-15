@@ -84,6 +84,24 @@ function isMetricIneligible(metric) {
 }
 
 /**
+ * Is this metric a LEGITIMATE terminal not-applicable result (as opposed to an
+ * insufficient-data result that merely displays as N/A)? A legitimate N/A carries
+ * an explicit not-applicable status or an applicable:false flag. Used for P10 to
+ * keep the single-row / no-overhead N/A terminal (excluded from the rating and
+ * accepted by report readiness) while an applicable-but-uncalculated P10 stays
+ * provisional so the export gate retains it as an unresolved failure.
+ */
+function isLegitimateOverheadNa(metric) {
+  if (!metric || typeof metric !== "object") return false;
+  const status = String(metric.status || "").toLowerCase();
+  if (status === "not_applicable" || status === "na") return true;
+  if (metric.applicable === false) return true;
+  const formatted = String(metric.formatted || "").toUpperCase().trim();
+  if (formatted === "N/A" && metric.level === "N/A") return true;
+  return false;
+}
+
+/**
  * Build the Artcoustic System Design Rating adapter input from existing data.
  *
  * @param {Object} params
@@ -303,7 +321,17 @@ export function buildDesignRatingInput({
 
       // Ineligible check (N/A, Not calculated, calculating, updating, etc.)
       if (isMetricIneligible(metric)) {
-        seatScope[key][seatId] = "na";
+        // P10: distinguish a legitimate terminal N/A (no overhead layer or a
+        // single overhead row — status "not_applicable") from an insufficient-
+        // data result (P10 is applicable but the SPL spread could not be
+        // calculated). The terminal N/A is "na" (excluded from the rating and
+        // accepted by report readiness); insufficient-data stays provisional so
+        // the export gate retains it as an unresolved failure.
+        if (key === "p10" && !isLegitimateOverheadNa(metric)) {
+          seatScope[key][seatId] = null;
+        } else {
+          seatScope[key][seatId] = "na";
+        }
         continue;
       }
 

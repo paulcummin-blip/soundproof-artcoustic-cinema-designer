@@ -39,6 +39,8 @@ import { computeP11Compliance } from "@/components/utils/rp22/computeP11Complian
 import {
   NO_ZONAL_SPEAKER_LAYER_REASON,
   buildOverheadNotApplicableMetric,
+  buildSingleOverheadRowNotApplicableMetric,
+  countDistinctOverheadRows,
   hasOverheadLayer,
   hasZonalSpeakerLayer,
 } from "@/components/utils/rp22/overheadLayerAuthority";
@@ -1172,6 +1174,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // there is no vertical spread and no upper-level spread to assess, so the
     // overhead-only parameters P9 and P10 are N/A — never a missing assessment.
     const overheadLayerPresent = hasOverheadLayer(speakersWithResolvedOverheads);
+    // P10 needs two or more overhead rows (four or six speakers in the standard
+    // Dolby Atmos layouts). A single overhead row — normally two speakers — has
+    // no upper-row level spread to assess, so P10 is N/A by design. The count is
+    // taken from the actual installed overhead geometry (enabled, real model,
+    // positioned), not the nominal channel count.
+    const distinctOverheadRowCount = countDistinctOverheadRows(speakersWithResolvedOverheads);
 
     // RP22 Parameter 11 — Speaker Zone Compliance (canonical zonal geometry)
     // Uses the SAME zone authority as the Room Designer overlays:
@@ -1673,6 +1681,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           // design, not "insufficient data" — the distinction matters, because an
           // absent layer must never read as an incomplete assessment.
           metrics.p10 = buildOverheadNotApplicableMetric();
+        } else if (distinctOverheadRowCount < 2) {
+          // One overhead row (normally two speakers): P10 has no upper-row level
+          // spread to assess. N/A by design — distinct from "insufficient data",
+          // which only applies when P10 is assessable (two or more rows) but the
+          // SPL spread cannot be calculated.
+          metrics.p10 = buildSingleOverheadRowNotApplicableMetric();
         } else if (p10Result) {
           metrics.p10 = {
             value: p10Result.deltaRounded,
@@ -1696,10 +1710,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           if (!_diag.p10.level) _diag.p10.level = p10Result.level;
           // ── END TEMP DIAG ──
         } else {
-          // Less than 2 valid normalised upper SPL values – preserve insufficient-data behaviour
+          // Less than 2 valid normalised upper SPL values: P10 is applicable but
+          // cannot be calculated. The display reads "N/A"; level "—" is retained
+          // internally as the insufficient-data signal for validation/diagnostics.
           metrics.p10 = {
             value: null,
-            formatted: 'N/A (insufficient data)',
+            formatted: 'N/A',
             level: '—',
           };
           // ── TEMP DIAG: capture P10 null result ──
