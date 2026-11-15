@@ -48,17 +48,6 @@ export const OVERHEAD_ONLY_PARAMETER_NUMBERS = Object.freeze([9, 10]);
 export const NO_OVERHEAD_LAYER_REASON =
   "Not applicable — this design has no overhead / height speakers.";
 
-/**
- * The stated reason when an overhead-only parameter is N/A because only one
- * overhead speaker row is present. P10 (upper-layer SPL spread) and P9
- * (adjacent-row vertical spacing) both need at least two distinct overhead
- * rows to produce a meaningful spread/gap; with a single row there is no
- * second row to compare against, so the parameter is genuinely not
- * applicable — not "insufficient data" and not a missing assessment.
- */
-export const SINGLE_OVERHEAD_ROW_REASON =
-  "Not applicable — only one overhead speaker row is present.";
-
 /** The stated reason when there is no surround, wide or upper speaker to assess. */
 export const NO_ZONAL_SPEAKER_LAYER_REASON =
   "Not applicable — this design has no surround, wide or upper speakers to assess.";
@@ -80,24 +69,6 @@ function isInstalledSpeaker(speaker) {
 }
 
 /**
- * Map a canonical height role to its overhead row ("front" | "mid" | "rear").
- * Returns null for a role that is not a height-layer role. This mirrors the
- * row classification used by P9's corridor computation so P10's single-row
- * applicability test stays consistent with P9's.
- */
-export function overheadRowFromRole(role) {
-  const canonical = getCanonicalRole(role);
-  const r = String(canonical || "").toUpperCase();
-  if (r.startsWith("TF")) return "front";
-  if (r.startsWith("TM")) return "mid";
-  if (r.startsWith("TR") || r.startsWith("TB")) return "rear";
-  // Legacy / up-firing variants
-  if (r === "TL") return "front";
-  if (r === "TR") return "rear";
-  return null;
-}
-
-/**
  * Does the design have an overhead / height speaker layer?
  *
  * @param {Array} speakers - placed / layout-visible speakers
@@ -106,26 +77,6 @@ export function overheadRowFromRole(role) {
 export function hasOverheadLayer(speakers) {
   if (!Array.isArray(speakers)) return false;
   return speakers.some((speaker) => isInstalledSpeaker(speaker) && isHeightLayerRole(speaker.role));
-}
-
-/**
- * Count the number of distinct overhead rows that have at least one installed
- * height-layer speaker. A design with overhead speakers in only one row
- * (front, mid OR rear) has a single overhead row — P10 and P9 are then
- * genuinely not applicable because there is no second row to compare against.
- *
- * @param {Array} speakers - placed / layout-visible speakers
- * @returns {number} 0 when no overhead layer, 1 for a single row, 2+ otherwise
- */
-export function countDistinctOverheadRows(speakers) {
-  if (!Array.isArray(speakers)) return 0;
-  const rows = new Set();
-  for (const speaker of speakers) {
-    if (!isInstalledSpeaker(speaker)) continue;
-    const row = overheadRowFromRole(speaker.role);
-    if (row) rows.add(row);
-  }
-  return rows.size;
 }
 
 /**
@@ -165,24 +116,6 @@ export function buildOverheadNotApplicableMetric() {
     status: "not_applicable",
     applicable: false,
     note: NO_OVERHEAD_LAYER_REASON,
-  };
-}
-
-/**
- * The published shape for an overhead-only parameter that is N/A because only
- * one overhead speaker row is present. Same travel-ready shape as the
- * no-overhead-layer metric, but carries the single-row reason so the HUD,
- * compliance panel and reports show the correct explanation instead of
- * "insufficient data" or the no-overhead-layer wording.
- */
-export function buildSingleOverheadRowNotApplicableMetric() {
-  return {
-    value: null,
-    formatted: "N/A",
-    level: "N/A",
-    status: "not_applicable",
-    applicable: false,
-    note: SINGLE_OVERHEAD_ROW_REASON,
   };
 }
 
