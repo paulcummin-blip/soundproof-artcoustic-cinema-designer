@@ -39,6 +39,8 @@ import { computeP11Compliance } from "@/components/utils/rp22/computeP11Complian
 import {
   NO_ZONAL_SPEAKER_LAYER_REASON,
   buildOverheadNotApplicableMetric,
+  buildSingleOverheadRowNotApplicableMetric,
+  countDistinctOverheadRows,
   hasOverheadLayer,
   hasZonalSpeakerLayer,
 } from "@/components/utils/rp22/overheadLayerAuthority";
@@ -1172,6 +1174,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // there is no vertical spread and no upper-level spread to assess, so the
     // overhead-only parameters P9 and P10 are N/A — never a missing assessment.
     const overheadLayerPresent = hasOverheadLayer(speakersWithResolvedOverheads);
+    // P10 (upper-layer SPL spread) needs at least two distinct overhead rows to
+    // produce a meaningful spread. With a single row there is no second row to
+    // compare against, so P10 is genuinely not applicable — never "insufficient
+    // data" and never a missing assessment. P9 applies the same single-row rule
+    // through its own geometry path.
+    const distinctOverheadRowCount = countDistinctOverheadRows(speakersWithResolvedOverheads);
 
     // RP22 Parameter 11 — Speaker Zone Compliance (canonical zonal geometry)
     // Uses the SAME zone authority as the Room Designer overlays:
@@ -1673,6 +1681,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           // design, not "insufficient data" — the distinction matters, because an
           // absent layer must never read as an incomplete assessment.
           metrics.p10 = buildOverheadNotApplicableMetric();
+        } else if (distinctOverheadRowCount < 2) {
+          // A single overhead row has no second row to compare against, so the
+          // upper-layer SPL spread is genuinely not applicable. This is a
+          // terminal N/A with the single-row reason — never "insufficient data"
+          // and never the no-overhead-layer wording.
+          metrics.p10 = buildSingleOverheadRowNotApplicableMetric();
         } else if (p10Result) {
           metrics.p10 = {
             value: p10Result.deltaRounded,

@@ -19,6 +19,7 @@ import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import { RP22_SEAT_PARAMETERS, createEmptySeatRp22Metrics } from '@/components/utils/rp22ParameterPresentation';
 import { attachAuthoritativeP19ToSeatSnapshot, attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
+import { buildSingleOverheadRowNotApplicableMetric, countDistinctOverheadRows } from '@/components/utils/rp22/overheadLayerAuthority';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -442,6 +443,11 @@ export function buildSeatHudSnapshot({
         level: 'N/A',
         status: 'not_applicable',
       };
+    } else if (countDistinctOverheadRows(placedSpeakers) < 2) {
+      // Single overhead row: P10 is genuinely not applicable (no second row
+      // to compare against). Use the authority metric so the explanation
+      // matches the engine's published result.
+      data.rp22.p10 = buildSingleOverheadRowNotApplicableMetric();
     } else {
       data.rp22.p10 = {
         ...notCalculatedHud(),
