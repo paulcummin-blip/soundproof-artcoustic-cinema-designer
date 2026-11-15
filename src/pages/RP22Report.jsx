@@ -56,6 +56,12 @@ import { useSavedReportFingerprint } from '@/components/report/useSavedReportFin
 import useFrozenReportBass from '@/components/report/useFrozenReportBass';
 import frozenPublicationProject from '@/components/report/frozenPublicationProject';
 import TechnicalReportDrawings from '@/components/report/technical/TechnicalReportDrawings';
+import IsometricReportPage from '@/components/report/isometric/IsometricReportPage';
+import BassCalculationsPage from '@/components/report/bassCalculations/BassCalculationsPage';
+import {
+    subscribeIsometricReportReady,
+    isometricReportReady,
+} from '@/components/report/isometric/isometricReportReadinessStore';
 import useTechnicalReportHydration from '@/components/report/technical/useTechnicalReportHydration';
 import { PROJECT_REPORT_SNAPSHOT_TYPE } from '@/components/report/projectReport/projectReportIdentity';
 import { publishPlanDrawingReadiness } from '@/components/report/projectReport/planDrawingReadiness';
@@ -261,6 +267,17 @@ function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
     const technicalFirstPageMeta = reportHeaderMetadata(reportProjectDetails, frozenVersion);
     const completedBassAuthority = useFrozenReportBass(explicitProjectId, reportVersionId, reportAuthority.publication);
     const bassScopeId = String(completedBassAuthority?.projectId || "").split("::")[0] || null;
+    // Isometric report render readiness gate — the WebGL image must finish
+    // before the PDF export may run. Uses the lightweight external store so the
+    // export button disables until the deterministic image is ready.
+    const isometricReadinessKey = (explicitProjectId && reportVersionId)
+        ? `${explicitProjectId}::${reportVersionId}`
+        : null;
+    const isometricReportImageReady = useSyncExternalStore(
+        subscribeIsometricReportReady,
+        () => isometricReportReady(isometricReadinessKey),
+        () => false,
+    );
     const projectIdMatch = !!explicitProjectId
         && !!reportVersionId
         && String(completedBassAuthority?.projectId || "") === `${explicitProjectId}::${reportVersionId}`;
@@ -1240,7 +1257,7 @@ function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={!filenameIdentity.ready || reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || reportDataIncomplete || recommendationsPending || !designAssessmentComplete}
+                        exportDisabled={!filenameIdentity.ready || reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || reportDataIncomplete || recommendationsPending || !designAssessmentComplete || !isometricReportImageReady}
                         exportDisabledMessage={reportDataIncomplete ? reportDataIncompleteReason : (!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")))}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
@@ -1328,6 +1345,32 @@ function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
                         applied in the Bass Optimiser workflow, before report
                         generation. ── */}
                     <TechnicalEngineeringSummaryNote />
+
+                    {/* ── Isometric Room View + Bass Calculations — two additional
+                        technical-evidence pages, placed after the elevation drawing
+                        section and before the existing bass response graphs. The
+                        isometric image is a deterministic report-only render; the
+                        bass calculations page reads the same saved completed bass
+                        contract the P19/Primary Seats graphs read. ── */}
+                    <IsometricReportPage
+                        projectName={reportProjectDetails?.name || ''}
+                        clientName={reportProjectDetails?.client_name || ''}
+                        readinessKey={isometricReadinessKey}
+                        appState={app}
+                        stableDimensions={stableDimensions}
+                        placedSpeakers={placedSpeakers}
+                        seatingPositions={seats}
+                        primarySeatingPosition={primarySeatingPosition}
+                        screen={screen}
+                        roomElements={app?.roomElements || []}
+                        dolbyLayout={dolbyLayout}
+                        getSpeakerVisibility={app?.getSpeakerVisibility || null}
+                    />
+                    <BassCalculationsPage
+                        contract={completedBassAuthority?.contract || null}
+                        authoritative={completedBassAuthority?.authoritative === true}
+                        currentFingerprint={completedBassAuthority?.currentFingerprint || null}
+                    />
 
                     {/* ── Bass response graphs — the final technical evidence pages,
                         placed after the RP22 parameter flow so they never interrupt
@@ -1438,6 +1481,31 @@ function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
                           sightlineScreenMetrics={sightlineScreenMetrics} sightlineRowData={sightlineRowData}
                           projector={projector} exportSystemConfiguration={exportSystemConfiguration}
                           reportScreenFrontPlaneM={reportScreenFrontPlaneM} />
+
+                        {/* ── Isometric Room View + Bass Calculations — two
+                            additional printed pages, placed after the complete
+                            elevation/sightline drawing section and before the
+                            existing bass-response graph pages. Deterministic
+                            report-only render + saved completed bass contract. ── */}
+                        <IsometricReportPage
+                            projectName={reportProjectDetails?.name || ''}
+                            clientName={reportProjectDetails?.client_name || ''}
+                            readinessKey={isometricReadinessKey}
+                            appState={app}
+                            stableDimensions={stableDimensions}
+                            placedSpeakers={placedSpeakers}
+                            seatingPositions={seats}
+                            primarySeatingPosition={primarySeatingPosition}
+                            screen={screen}
+                            roomElements={app?.roomElements || []}
+                            dolbyLayout={dolbyLayout}
+                            getSpeakerVisibility={app?.getSpeakerVisibility || null}
+                        />
+                        <BassCalculationsPage
+                            contract={completedBassAuthority?.contract || null}
+                            authoritative={completedBassAuthority?.authoritative === true}
+                            currentFingerprint={completedBassAuthority?.currentFingerprint || null}
+                        />
 
                         {/* ── Bass response graph pages — the final technical evidence
                             pages, immediately before the closing About Sound Proof

@@ -66,6 +66,10 @@ import {
   clearPreparingWindow,
 } from "@/components/report/reportPreparingClock";
 import useFrozenReportBass from '@/components/report/useFrozenReportBass';
+import {
+  subscribeIsometricReportReady,
+  isometricReportReady,
+} from '@/components/report/isometric/isometricReportReadinessStore';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportUpdatingNotice from "@/components/report/ReportUpdatingNotice";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
@@ -122,6 +126,17 @@ export default function RP22ClientReport() {
   // when the saved post-EQ RSP curve and target are unavailable the P19 page
   // states that plainly instead of drawing an unrelated curve.
   const completedBassAuthority = useFrozenReportBass(projectId, authority.versionId, authority.publication);
+  // Isometric report render readiness gate — the WebGL image must finish
+  // before the PDF export may run. Same lightweight store the Technical Report
+  // reads, so both export paths wait for the same deterministic image.
+  const isometricReadinessKey = (projectId && authority.versionId)
+    ? `${projectId}::${authority.versionId}`
+    : null;
+  const isometricReportImageReady = useSyncExternalStore(
+    subscribeIsometricReportReady,
+    () => isometricReportReady(isometricReadinessKey),
+    () => false,
+  );
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
   const appState = authority.reportApp;
@@ -948,7 +963,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED}
+            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
