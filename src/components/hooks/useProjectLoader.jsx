@@ -1,7 +1,6 @@
 // Extracted verbatim from src/pages/RoomDesigner.jsx (lines 204–1132)
 import { useState, useCallback, useEffect, useRef } from "react";
 import { registerElectronicPersistence } from "@/components/room/bass/optimiseWorkflow/electronicPersistence.js";
-import { registerOptimiserPlanFlush } from "@/components/room/bass/optimiseWorkflow/optimiserPlanFlush.js";
 import { Project } from "@/entities/Project";
 import { base44 } from "@/api/base44Client";
 import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
@@ -415,7 +414,7 @@ appState, // Pass appState directly for setters
         if (!globalThis[loadedRefKey]) {
           globalThis[loadedRefKey] = {
             dirty: false, inFlight: false,
-            lastSavedSig: "", lastQueuedSig: "",
+            lastSavedSig: "", lastSavedSharedSig: "", lastQueuedSig: "",
             lastSaveAt: 0, intervalId: null, debounceId: null, saveToken: 0,
           };
         }
@@ -531,6 +530,7 @@ appState, // Pass appState directly for setters
         let loadedSig = "";
         try { loadedSig = JSON.stringify(loadedProjectData); } catch { loadedSig = ""; }
         rLoad.lastSavedSig = loadedSig;
+        rLoad.lastSavedSharedSig = (() => { try { return JSON.stringify(buildSharedUpdate(loadedProjectData)); } catch { return ""; } })();
         rLoad.lastQueuedSig = loadedSig;
         rLoad.dirty = false;
         // preserve saveToken if already set by a prior save in this session
@@ -655,6 +655,7 @@ appState, // Pass appState directly for setters
         dirty: false,
         inFlight: false,
         lastSavedSig: "",
+        lastSavedSharedSig: "",
         lastQueuedSig: "",
         lastSaveAt: 0,
         intervalId: null,
@@ -810,7 +811,10 @@ appState, // Pass appState directly for setters
         // version's design state is independent from other versions.
         const designState = buildDesignState(data);
         const sharedData = buildSharedUpdate(data);
-        await Project.update(effectiveProjectId, sharedData);
+        const sharedSig = (() => { try { return JSON.stringify(sharedData); } catch { return String(Date.now()); } })();
+        if (sharedSig !== r.lastSavedSharedSig) {
+          await Project.update(effectiveProjectId, sharedData);
+        }
         if (activeVersionIdRef.current) {
           const savedVersionId = activeVersionIdRef.current;
           const terminalTrace = designState.optimiser_plan?.terminalTrace;
@@ -854,6 +858,7 @@ appState, // Pass appState directly for setters
         // design state; otherwise keep the project dirty and re-schedule the
         // latest payload so it receives its own save.
         r.lastSavedSig = sig;
+        r.lastSavedSharedSig = sharedSig;
         r.lastSaveAt = Date.now();
         if (r.lastQueuedSig === sig) {
           r.dirty = false;
@@ -1151,6 +1156,7 @@ appState, // Pass appState directly for setters
         dirty: false,
         inFlight: false,
         lastSavedSig: "",
+        lastSavedSharedSig: "",
         lastQueuedSig: "",
         lastSaveAt: 0,
         intervalId: null,
@@ -1181,6 +1187,7 @@ appState, // Pass appState directly for setters
       });
 
       let savedProject;
+      let sharedSigMS = "";
 
       if (effectiveProjectId) {
         // Updating an existing project.
@@ -1240,7 +1247,12 @@ appState, // Pass appState directly for setters
         // version's design state is independent from other versions.
         const designStateMS = buildDesignState(projectData);
         const sharedDataMS = buildSharedUpdate(projectData);
-        savedProject = await Project.update(effectiveProjectId, sharedDataMS);
+        sharedSigMS = (() => { try { return JSON.stringify(sharedDataMS); } catch { return String(Date.now()); } })();
+        if (sharedSigMS !== rMS.lastSavedSharedSig) {
+          savedProject = await Project.update(effectiveProjectId, sharedDataMS);
+        } else {
+          savedProject = { id: effectiveProjectId };
+        }
         if (activeVersionIdRef.current) {
           const savedVersionId = activeVersionIdRef.current;
           const terminalTrace = designStateMS.optimiser_plan?.terminalTrace;
@@ -1285,6 +1297,7 @@ appState, // Pass appState directly for setters
         // will see r.saveToken !== myToken after its own await and abort its stamp.
         rMS.saveToken = (rMS.saveToken || 0) + 1;
         rMS.lastSavedSig = savedSig;
+        rMS.lastSavedSharedSig = sharedSigMS;
         rMS.lastSaveAt = Date.now();
         // Same acknowledgement guard as autosave: only clear dirty when the
         // acknowledged manual-save payload matches the latest queued design
@@ -1341,34 +1354,6 @@ appState, // Pass appState directly for setters
   projectIdFromUrl,
   isProjectMode]
   );
-
-  // ── Explicit optimiser plan save flush ──────────────────────────────
-  // The ADI workflow sets the plan in the external store then needs the
-  // existing save queue to persist it WITHOUT relying on incidental autosave
-  // propagation. This registers a flush handler that waits for any in-flight
-  // save and then calls the same manual save path (with all its hydration,
-  // instance and concurrency protections). It creates no second persistence
-  // mechanism — the handler reuses the same single-writer save queue.
-  const manualSaveRef = useRef(manualSaveProject);
-  manualSaveRef.current = manualSaveProject;
-  useEffect(() => {
-    const flushProjectId = activeProjectId || projectIdState;
-    const flushVersionId = appState?.activeVersionId;
-    if (!flushProjectId || !flushVersionId || loadState.phase !== "loaded") return;
-    return registerOptimiserPlanFlush(flushProjectId, flushVersionId, async () => {
-      const bucket = globalThis[`__rdAutosaveRefs_${flushProjectId}`];
-      if (bucket?.inFlight) {
-        const waitStart = Date.now();
-        while (bucket.inFlight && Date.now() - waitStart < 30000) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        if (bucket.inFlight) {
-          return { success: false, error: "A save is still in progress." };
-        }
-      }
-      return manualSaveRef.current();
-    });
-  }, [activeProjectId, projectIdState, appState?.activeVersionId, loadState.phase]);
 
   return {
     projectId: projectIdState,
