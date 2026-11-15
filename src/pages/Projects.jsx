@@ -783,35 +783,10 @@ export default function ProjectsPage() {
       data-testid="projects-safe-boot"
     >
       {/* Projects-only visual preview. Illustrations never feed entitlement logic. */}
-      <div data-testid="projects-header" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px 24px" }}>
+      <div data-testid="projects-header" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, maxWidth: "100%" }}>
-            {(showCapacityIndicator || illustrativeHeader) && (
-              <div style={{ fontSize: 13, color: BRAND.subtext }}>
-                Professional Projects: <strong style={{ color: BRAND.text }}>{illustrativeHeader ? 3 : capacityLoading ? '…' : professionalCapacity}</strong> available
-                {illustrativeHeader && <span style={{ fontSize: 11 }}> · Illustrative</span>}
-              </div>
-            )}
-            {((showCapacityIndicator && promotionEffective && !promoLoading) || illustrativeHeader) && (
-              <div
-                title={illustrativeHeader ? "Illustrative entitlement display only" : promoMessage || undefined}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  border: "1px solid #213428",
-                  background: "#F3F0EB",
-                  color: "#213428",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  maxWidth: "100%",
-                }}
-              >
-                {illustrativeHeader
-                  ? 'Special access: Unlimited until 31 Dec 2026 · Illustrative'
-                  : `Special access: Unlimited until ${formatPromotionEndDate(promoEndsAt)}`}
-              </div>
-            )}
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             {showCapacityIndicator && !promotionEffective && (
               <button
                 type="button"
@@ -823,8 +798,7 @@ export default function ProjectsPage() {
                   background: BRAND.card,
                   color: BRAND.subtext,
                   cursor: "pointer",
-                  fontSize: 13,
-                  whiteSpace: "nowrap",
+                  fontSize: 14,
                 }}
               >
                 Buy Projects
@@ -849,25 +823,47 @@ export default function ProjectsPage() {
           </div>
         </div>
         {(showCapacityIndicator || illustrativeHeader) && (
-          <div
-            aria-label="Illustrative offer and renewal preview"
+          <dl
+            aria-label="Project credits, special access and illustrative offer and renewal"
+            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-5"
             style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "baseline",
-              gap: "6px 24px",
-              marginTop: 12,
-              paddingTop: 10,
-              borderTop: `1px solid ${BRAND.border}`,
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: BRAND.subtext,
+              margin: "18px 0 0",
+              padding: "20px 24px",
+              border: `1px solid ${BRAND.border}`,
+              borderRadius: 10,
+              background: "#F3F0EB",
+              color: "#213428",
             }}
           >
-            <span style={{ fontSize: 11 }}>Preview · illustrative offer &amp; renewal dates</span>
-            <span><strong style={{ color: BRAND.text, fontWeight: 600 }}>Current offer</strong> · 3 months’ free access · <span style={{ whiteSpace: "nowrap" }}>Ends 31 Dec 2026</span></span>
-            <span><strong style={{ color: BRAND.text, fontWeight: 600 }}>Access renewal</strong> · <span style={{ whiteSpace: "nowrap" }}>Renew by 15 Feb 2027</span></span>
-          </div>
+            <div style={{ minWidth: 0 }}>
+              <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Professional Projects</dt>
+              <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>
+                <strong>{illustrativeHeader ? 3 : capacityLoading ? '…' : professionalCapacity}</strong> available
+              </dd>
+              {illustrativeHeader && <dd style={{ margin: "6px 0 0", fontSize: 13, color: BRAND.subtext }}>Illustrative balance</dd>}
+            </div>
+            {((showCapacityIndicator && promotionEffective && !promoLoading) || illustrativeHeader) && (
+              <div style={{ minWidth: 0 }} title={illustrativeHeader ? undefined : promoMessage || undefined}>
+                <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Special access</dt>
+                <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>Unlimited</dd>
+                <dd style={{ margin: "6px 0 0", fontSize: 15, lineHeight: 1.4 }}>
+                  Until {illustrativeHeader ? '31 Dec 2026' : formatPromotionEndDate(promoEndsAt)}
+                  {illustrativeHeader && <span style={{ display: "block", fontSize: 13, color: BRAND.subtext }}>Illustrative entitlement</span>}
+                </dd>
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Current offer <span style={{ fontSize: 12, fontWeight: 400, color: BRAND.subtext }}>· Preview</span></dt>
+              <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>3 months’ free access</dd>
+              <dd style={{ margin: "6px 0 0", fontSize: 15, lineHeight: 1.4 }}>Ends 31 Dec 2026</dd>
+              <dd style={{ margin: "4px 0 0", fontSize: 13, color: BRAND.subtext }}>Illustrative offer and date</dd>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Access renewal <span style={{ fontSize: 12, fontWeight: 400, color: BRAND.subtext }}>· Preview</span></dt>
+              <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>Renew by 15 Feb 2027</dd>
+              <dd style={{ margin: "6px 0 0", fontSize: 13, color: BRAND.subtext }}>Illustrative date</dd>
+            </div>
+          </dl>
         )}
       </div>
 
