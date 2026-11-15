@@ -13,10 +13,11 @@ import { useProjectVersionsBatched } from "@/components/versions/useProjectVersi
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useProfessionalCapacity } from "@/lib/commercial/useProfessionalCapacity";
-import { useEffectivePromotion, formatPromotionEndDate } from "@/lib/commercial/useEffectivePromotion";
+import { useEffectivePromotion } from "@/lib/commercial/useEffectivePromotion";
 import { getAgeDays, formatAge, isAgeReviewDue } from "@/components/utils/projectAge";
 import AgeReviewDialog from "@/components/projects/AgeReviewDialog";
 import ProjectCardPrototype from "@/components/projects/ProjectCardPrototype";
+import AccountStatusStrip from "@/components/projects/AccountStatusStrip";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -822,49 +823,16 @@ export default function ProjectsPage() {
             </button>
           </div>
         </div>
-        {(showCapacityIndicator || illustrativeHeader) && (
-          <dl
-            aria-label="Project credits, special access and illustrative offer and renewal"
-            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-5"
-            style={{
-              margin: "18px 0 0",
-              padding: "20px 24px",
-              border: `1px solid ${BRAND.border}`,
-              borderRadius: 10,
-              background: "#F3F0EB",
-              color: "#213428",
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Professional Projects</dt>
-              <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>
-                <strong>{illustrativeHeader ? 3 : capacityLoading ? '…' : professionalCapacity}</strong> available
-              </dd>
-              {illustrativeHeader && <dd style={{ margin: "6px 0 0", fontSize: 13, color: BRAND.subtext }}>Illustrative balance</dd>}
-            </div>
-            {((showCapacityIndicator && promotionEffective && !promoLoading) || illustrativeHeader) && (
-              <div style={{ minWidth: 0 }} title={illustrativeHeader ? undefined : promoMessage || undefined}>
-                <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Special access</dt>
-                <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>Unlimited</dd>
-                <dd style={{ margin: "6px 0 0", fontSize: 15, lineHeight: 1.4 }}>
-                  Until {illustrativeHeader ? '31 Dec 2026' : formatPromotionEndDate(promoEndsAt)}
-                  {illustrativeHeader && <span style={{ display: "block", fontSize: 13, color: BRAND.subtext }}>Illustrative entitlement</span>}
-                </dd>
-              </div>
-            )}
-            <div style={{ minWidth: 0 }}>
-              <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Current offer <span style={{ fontSize: 12, fontWeight: 400, color: BRAND.subtext }}>· Preview</span></dt>
-              <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>3 months’ free access</dd>
-              <dd style={{ margin: "6px 0 0", fontSize: 15, lineHeight: 1.4 }}>Ends 31 Dec 2026</dd>
-              <dd style={{ margin: "4px 0 0", fontSize: 13, color: BRAND.subtext }}>Illustrative offer and date</dd>
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Access renewal <span style={{ fontSize: 12, fontWeight: 400, color: BRAND.subtext }}>· Preview</span></dt>
-              <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>Renew by 15 Feb 2027</dd>
-              <dd style={{ margin: "6px 0 0", fontSize: 13, color: BRAND.subtext }}>Illustrative date</dd>
-            </div>
-          </dl>
-        )}
+        <AccountStatusStrip
+          showCapacityIndicator={showCapacityIndicator}
+          illustrativeHeader={illustrativeHeader}
+          professionalCapacity={professionalCapacity}
+          capacityLoading={capacityLoading}
+          promotionEffective={promotionEffective}
+          promoLoading={promoLoading}
+          promoMessage={promoMessage}
+          promoEndsAt={promoEndsAt}
+        />
       </div>
 
       {/* Controls */}
