@@ -58,7 +58,7 @@ import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalib
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
-import ResetSubwooferTuningButton from "./ResetSubwooferTuningButton";
+
 import CrossoverRecommendation from "./CrossoverRecommendation";
 import useRunOptimisationPlan from "./useRunOptimisationPlan";
 import { BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, canCancelBassCalculation } from "../bassCalculationLifecycle";
@@ -1471,12 +1471,7 @@ export default function OptimiseAndCalculate({
         </button>
       )}
 
-      <ResetSubwooferTuningButton
-        appState={appState}
-        frontSubsCfg={frontSubsCfg}
-        rearSubsCfg={rearSubsCfg}
-        disabled={disabled}
-      />
+
 
       {/* The "What ADI did" panel (heading, "Run ADI again" link, explanatory
           text, technical diagnostics) is no longer rendered from this section.
