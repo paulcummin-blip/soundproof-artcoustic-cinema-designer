@@ -104,6 +104,14 @@ function resolveCategoryStatus({ cat, lever, calibLever, planView, isRunning }) 
   if (lever?.state === OPTIMISER_LEVER_STATE.APPLIED) {
     return { key: "applied", label: "Improvement applied", tone: "applied" };
   }
+  if (lever?.state === OPTIMISER_LEVER_STATE.RESTORED) {
+    return {
+      key: "restored",
+      label: "Original seating restored",
+      tone: "analysed",
+      note: "Design coordinates match the original positions. Historical apply retained; not a verified Undo.",
+    };
+  }
   // Crossover / combined electronic is applied by the run's guarded auto-apply,
   // not by a single-lever apply. The run's own decision is the authority here.
   if (cat.key === "crossover" && planView?.decisionApplied === true && lever) {
@@ -310,6 +318,7 @@ function buildSummary({ planView, dismissedCount }) {
   const identified = [];
   for (const lever of (planView?.levers || [])) {
     if (lever.state === OPTIMISER_LEVER_STATE.APPLIED) applied.push(lever);
+    else if (lever.state === OPTIMISER_LEVER_STATE.RESTORED) continue;
     else if (lever.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED
       || lever.verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) identified.push(lever);
   }
@@ -347,8 +356,9 @@ function CategoryRow({
   const tone = TONE[status.tone] || TONE.analysed;
   const isApplied = status.key === "applied";
   const isIdentified = status.key === "identified";
+  const isRestored = status.key === "restored";
   const directApplySupported = cat.leverKey && cat.leverKey !== OPTIMISER_LEVER.COMBINED_ELECTRONIC;
-  const canApply = directApplySupported && lever?.canApply === true && !isApplied;
+  const canApply = directApplySupported && lever?.canApply === true && !isApplied && !isRestored;
   const canUndo = directApplySupported && lever?.canUndo === true && isApplied;
 
   // The recommended adjustment block (changes + predicted effect).
@@ -410,7 +420,7 @@ function CategoryRow({
         </div>
       )}
 
-      {!dismissed && (isIdentified || isApplied) && (adjustmentLines.length > 0 || effectLines.length > 0) && (
+      {!dismissed && (isIdentified || isApplied || isRestored) && (adjustmentLines.length > 0 || effectLines.length > 0) && (
         <div className="mt-1.5 space-y-1">
           {/* RP22 Level changes lead, above the movement description. */}
           {effectLines.length > 0 && (
@@ -454,7 +464,7 @@ function CategoryRow({
         </div>
       )}
 
-      {!dismissed && (isIdentified || isApplied) && (
+      {!dismissed && (isIdentified || isApplied) && !isRestored && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {canApply && (
             <button

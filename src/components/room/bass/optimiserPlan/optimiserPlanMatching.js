@@ -123,22 +123,35 @@ export function resolveSeatingMatch(lever, seatingPositions = []) {
 
   let known = true;
   let applied = true;
+  let restoredToOriginal = true;
   for (const change of changes) {
     const seat = change?.seatId != null ? byId.get(String(change.seatId)) : null;
     if (!seat) {
       known = false;
       applied = false;
+      restoredToOriginal = false;
       continue;
     }
     const current = seatLengthM(seat);
     const target = Number(change?.toY);
+    const original = Number(change?.fromY);
     if (current == null || !Number.isFinite(target)
       || Math.abs(current - target) > PLAN_MATCH_TOLERANCE.POSITION_M) {
       applied = false;
     }
+    if (current == null || !Number.isFinite(original)
+      || Math.abs(current - original) > PLAN_MATCH_TOLERANCE.POSITION_M) {
+      restoredToOriginal = false;
+    }
   }
 
-  return { applicable: true, applied: applied && known, missingSubIds: [], positionsKnown: known };
+  return {
+    applicable: true,
+    applied: applied && known,
+    missingSubIds: [],
+    positionsKnown: known,
+    restoredToOriginal: restoredToOriginal && known,
+  };
 }
 
 /**

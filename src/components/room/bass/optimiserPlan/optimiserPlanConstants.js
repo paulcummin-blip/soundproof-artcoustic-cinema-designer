@@ -212,6 +212,15 @@ export const OPTIMISER_LEVER_STATE = Object.freeze({
   NEEDS_REEVALUATION: "needs_reevaluation",
   NO_LONGER_APPLICABLE: "no_longer_applicable",
   DISABLED: "disabled",
+  /**
+   * The recommendation was applied historically (a verified Apply record exists
+   * for this run's lever with no recorded Undo), but the current design
+   * coordinates match the recommendation's original (fromY) values. This is a
+   * design-coordinate match, NOT proof of a verified Undo: undoneAt and
+   * undoVerification are not populated, and no Apply/Undo is offered. The
+   * historical analysis and verified Apply result are retained for reference.
+   */
+  RESTORED: "restored",
 });
 
 export const OPTIMISER_LEVER_STATE_LABEL = Object.freeze({
@@ -221,6 +230,7 @@ export const OPTIMISER_LEVER_STATE_LABEL = Object.freeze({
   [OPTIMISER_LEVER_STATE.NEEDS_REEVALUATION]: "Needs re-evaluation",
   [OPTIMISER_LEVER_STATE.NO_LONGER_APPLICABLE]: "No longer applicable",
   [OPTIMISER_LEVER_STATE.DISABLED]: "Disabled",
+  [OPTIMISER_LEVER_STATE.RESTORED]: "Original seating restored",
 });
 
 /** Shown whenever a lever's own effect was never evaluated on its own. */

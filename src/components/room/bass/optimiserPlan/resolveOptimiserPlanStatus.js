@@ -27,7 +27,7 @@ import {
   OPTIMISER_RECORD_KIND,
   OPTIMISER_TERMINAL_OUTCOME,
 } from "./optimiserPlanConstants.js";
-import { resolveLeverState } from "./optimiserPlanMatching.js";
+import { resolveLeverState, resolveSeatingMatch } from "./optimiserPlanMatching.js";
 import { resolveLeverApplyMap } from "./optimiserPlanLeverApply.js";
 import { leverLabel, leverTitle } from "./optimiserLeverOrder.js";
 import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
@@ -401,6 +401,31 @@ export function resolveOptimiserPlanStatus({
         lever.canApply = false;
         lever.applyBlockedReason = lever.applyBlockedReason || SPENT_REASON;
       }
+    }
+  }
+
+  // ── Seating restored to original coordinates ──
+  // When the current seat positions match the recommendation's original (fromY)
+  // coordinates AND there is a historical apply record for this run's seating
+  // lever (undoneAt still null), the recommendation was applied historically but
+  // the design has returned to its original seating. This is a design-coordinate
+  // match, NOT a verified Undo: undoneAt/undoVerification are not populated, and
+  // no Apply/Undo is offered. The historical analysis and verified Apply result
+  // are retained for reference. No acoustic calculation is changed.
+  const seatingLever = levers.find((l) => l.key === OPTIMISER_LEVER.SEATING) || null;
+  if (seatingLever && provenance.appliedLeverKeys.includes(OPTIMISER_LEVER.SEATING)) {
+    const seatingMatch = resolveSeatingMatch(
+      plan.levers?.[OPTIMISER_LEVER.SEATING] || {},
+      seatingPositions,
+    );
+    if (seatingMatch.restoredToOriginal) {
+      seatingLever.state = OPTIMISER_LEVER_STATE.RESTORED;
+      seatingLever.stateLabel =
+        OPTIMISER_LEVER_STATE_LABEL[OPTIMISER_LEVER_STATE.RESTORED]
+        || OPTIMISER_LEVER_STATE.RESTORED;
+      seatingLever.canApply = false;
+      seatingLever.canUndo = false;
+      seatingLever.applyBlockedReason = null;
     }
   }
 
