@@ -44,11 +44,27 @@ function hasInsufficientDataIndicator(entry) {
   return false;
 }
 
+function isValidScoredLevel(level) {
+  return level != null && level !== '—' && level !== '';
+}
+
 function isTerminalScored(param) {
   if (!param) return false;
   if (param.state !== 'scored') return false;
-  const level = param.level;
-  return level != null && level !== '—' && level !== '';
+  // Room-scoped: the top-level level is the scored result.
+  if (isValidScoredLevel(param.level)) return true;
+  // Seat-scoped: the top-level aggregate level may be absent on some published
+  // authorities. A seat-scoped parameter is terminal-scored when every assessed
+  // seat carries a valid scored level — that is the actual evidence the report
+  // renders. This accepts a genuinely complete per-seat assessment without
+  // weakening the room-scoped requirement.
+  if (param.scope === 'seat' && param.seats) {
+    const seats = Object.values(param.seats);
+    if (seats.length === 0) return false;
+    return seats.every((seat) =>
+      seat.state === 'scored' && isValidScoredLevel(seat.level));
+  }
+  return false;
 }
 
 function isLegitimateNotApplicable(param) {

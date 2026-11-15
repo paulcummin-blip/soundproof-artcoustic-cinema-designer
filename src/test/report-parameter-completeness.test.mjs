@@ -197,3 +197,49 @@ test('validateRequiredParameters aggregates missing', () => {
   assert.ok(missing.includes(12), 'P12 provisional should be missing');
   assert.ok(!missing.includes(9), 'P9 legitimate N/A should pass');
 });
+
+test('8. Seat-scoped scored with null top-level level passes when all seats scored', () => {
+  // Mirrors the real Cable Smart P5 authority: state "scored", no top-level
+  // aggregate level, but every seat is scored with a valid level.
+  const result = validateParameterCompleteness({
+    parameterAuthority: {
+      p5: {
+        key: 'p5', scope: 'seat', state: 'scored', level: null,
+        seats: {
+          'seat-r1-c1': { state: 'scored', level: 'L1' },
+          'seat-r1-c2': { state: 'scored', level: 'L1' },
+          'seat-r1-c3': { state: 'scored', level: 'L1' },
+          'seat-r1-c4': { state: 'scored', level: 'L1' },
+        },
+      },
+    },
+    paramId: 5,
+  });
+  assert.equal(result.complete, true);
+});
+
+test('8b. Seat-scoped scored with one provisional seat still fails', () => {
+  const result = validateParameterCompleteness({
+    parameterAuthority: {
+      p5: {
+        key: 'p5', scope: 'seat', state: 'scored', level: null,
+        seats: {
+          'seat-r1-c1': { state: 'scored', level: 'L1' },
+          'seat-r1-c2': { state: 'provisional', level: null },
+        },
+      },
+    },
+    paramId: 5,
+  });
+  assert.equal(result.complete, false);
+});
+
+test('8c. Seat-scoped scored with empty seats fails', () => {
+  const result = validateParameterCompleteness({
+    parameterAuthority: {
+      p5: { key: 'p5', scope: 'seat', state: 'scored', level: null, seats: {} },
+    },
+    paramId: 5,
+  });
+  assert.equal(result.complete, false);
+});

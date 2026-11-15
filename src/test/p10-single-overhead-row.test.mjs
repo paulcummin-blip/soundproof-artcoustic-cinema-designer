@@ -42,6 +42,7 @@ function buildP10Authority(seatMetrics) {
   const seats = {};
   let allNa = true;
   let hasScored = false;
+  const scoredLevels = [];
   for (const id of seatIds) {
     const m = seatMetrics[id];
     const status = String(m?.status || "").toLowerCase();
@@ -51,6 +52,7 @@ function buildP10Authority(seatMetrics) {
       seats[id] = { state: "na", level: null, reason: null };
     } else if (m?.value != null && m?.level != null && m.level !== "—") {
       seats[id] = { state: "scored", level: m.level };
+      scoredLevels.push(m.level);
       hasScored = true;
       allNa = false;
     } else {
@@ -59,7 +61,19 @@ function buildP10Authority(seatMetrics) {
     }
   }
   const state = allNa ? "na" : hasScored ? "scored" : "provisional";
-  return { key: "p10", scope: "seat", state, seats };
+  // The real seat-scoped authority carries a top-level aggregate level (worst
+  // across scored seats) when scored — the validator's isTerminalScored reads
+  // param.level. N/A and provisional carry no top-level level.
+  const aggregateLevel = hasScored && scoredLevels.length
+    ? Math.min(...scoredLevels)
+    : null;
+  return {
+    key: "p10",
+    scope: "seat",
+    state,
+    level: aggregateLevel,
+    seats,
+  };
 }
 
 // ── 1. Authority metric shape ───────────────────────────────────────
