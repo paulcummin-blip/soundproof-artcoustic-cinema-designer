@@ -2,10 +2,11 @@
 // ---------------------------------------------------------------------------
 // Pure camera framing for the report-only isometric view.
 //
-// The report uses a FIXED orthographic camera (≈35° azimuth, �35° elevation),
-// oriented relative to the screen wall, and frames the projected bounds of the
-// complete scene so every speaker, subwoofer, seat and RSP marker fits the
-// portrait page. It never reads a user-saved 3D camera position.
+// The report uses a FIXED orthographic camera (35° azimuth, ≈20° elevation via
+// a 70° polar angle measured from vertical), oriented relative to the screen
+// wall, and frames the projected bounds of the complete scene so every speaker,
+// subwoofer, seat and RSP marker fits the portrait page. It never reads a
+// user-saved 3D camera position.
 //
 // The framing projects the eight corners of the scene's bounding box into
 // camera space (right / up axes) and fits the orthographic frustum to the
@@ -16,7 +17,7 @@
 import * as THREE from "three";
 
 export const REPORT_AZIMUTH_DEG = 35;
-export const REPORT_POLAR_DEG = 35;
+export const REPORT_POLAR_DEG = 70;
 
 /**
  * Compute the fixed report isometric camera position and orthographic frustum.

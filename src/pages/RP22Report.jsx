@@ -140,7 +140,7 @@ function isCapturedPlan(value) {
  *   belong to this route, never to the merged document. Nothing about the
  *   report's pages changes; only the chrome around them is left to the route.
  */
-function RP22ReportInner({ embed = false, p19Graph = null, forceCurrentPublication = false } = {}) {
+function RP22ReportInner({ embed = false, p19Graph = null, completedBassAuthority: embeddedBassAuthority = null, forceCurrentPublication = false } = {}) {
     const liveApp = useAppState();
 
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
@@ -271,7 +271,16 @@ function RP22ReportInner({ embed = false, p19Graph = null, forceCurrentPublicati
       name: frozenProject?.version_name ?? reportVersionName };
     const technicalReportPrintTitle = buildTechnicalReportTitle(reportProjectDetails?.name, frozenVersion, filenameIdentity);
     const technicalFirstPageMeta = reportHeaderMetadata(reportProjectDetails, frozenVersion);
-    const completedBassAuthority = useFrozenReportBass(explicitProjectId, reportVersionId, reportAuthority.publication);
+    // SHARED BASS AUTHORITY: when the consolidated Project Report embeds the
+    // Technical Report, the parent passes its already-resolved frozen bass
+    // authority so both documents render from the SAME verified calculation.
+    // Without this, the embedded report resolves its own authority on a
+    // separate timeline — the parent's export gate can open (its own authority
+    // is authoritative) while the embedded graphs are still resolving, so the
+    // PDF captures empty bass graph pages. Sharing the authority removes that
+    // race: one resolution, one gate, one set of graphs.
+    const ownCompletedBassAuthority = useFrozenReportBass(explicitProjectId, reportVersionId, reportAuthority.publication);
+    const completedBassAuthority = (embed && embeddedBassAuthority) ? embeddedBassAuthority : ownCompletedBassAuthority;
     const bassScopeId = String(completedBassAuthority?.projectId || "").split("::")[0] || null;
     // Isometric report render readiness gate — the WebGL image must finish
     // before the PDF export may run. Uses the lightweight external store so the
@@ -1565,6 +1574,6 @@ export default function RP22Report() {
  * consolidated Project Report. It is the same report, the same pages and the
  * same print layout; see TechnicalReportDocument.
  */
-export function TechnicalReportEmbedded({ p19Graph = null, forceCurrentPublication = false } = {}) {
-    return <RP22ReportInner embed p19Graph={p19Graph} forceCurrentPublication={forceCurrentPublication} />;
+export function TechnicalReportEmbedded({ p19Graph = null, completedBassAuthority = null, forceCurrentPublication = false } = {}) {
+    return <RP22ReportInner embed p19Graph={p19Graph} completedBassAuthority={completedBassAuthority} forceCurrentPublication={forceCurrentPublication} />;
 }
