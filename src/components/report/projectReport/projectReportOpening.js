@@ -4,11 +4,16 @@
  * The Project Report's opening statement: the short, project-specific headline
  * the report leads with, and the design summary paragraph the page closes on.
  *
- * The headline is derived from evidence the report already carries — the saved
- * project's Dolby architecture and screen — so it names THIS cinema and can
- * never state a generic template line. The screen, the room and the seating are
- * deliberately NOT restated under it: each is a fact the page's own fact sheet
- * states once, directly below the headline.
+ * THE HEADLINE describes the actual design — the system format and the display
+ * it is built around — never an imagined mood or lifestyle. It avoids generic
+ * praise (relaxed, high-performance, large) and uses 'discreet' only where the
+ * speaker selection (on-wall or in-ceiling, not freestanding) genuinely supports
+ * that description. Each project's headline reads differently because its
+ * system format and display are different; no fixed template is imposed.
+ *
+ * The screen, the room and the seating are deliberately NOT restated under the
+ * headline: each is a fact the page's own fact sheet states once, directly below
+ * it.
  *
  * Read-only and pure. The speaker count comes from the same
  * specification-connection authority the Highlights page and the System &
@@ -22,12 +27,58 @@
  */
 
 import { classifyProjectIntent } from '@/components/report/projectReport/projectIntentClassification';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import {
   buildProjectReportSummaryOpening,
   isCompactRoom,
-  scaledScreenPhrase,
   screenPhrase,
 } from './projectReportSummaryOpening';
+
+/**
+ * Extract the bare model name from a productsSelected entry such as
+ * "Q8-5 × 3" or "C4-1 × 2 centre cabinets (vertical)".
+ */
+function modelFromProductEntry(entry) {
+  if (!entry) return null;
+  return String(entry).replace(/\s*×\s*\d+.*$/, '').trim() || null;
+}
+
+/**
+ * Whether the design's LCR and surround speakers are on-wall or in-ceiling
+ * (discreet) rather than freestanding floor-standers. Every named model must
+ * resolve to a known Artcoustic model — all of which are on-wall or
+ * in-ceiling — for the description to apply; an unknown or competitor model is
+ * never assumed discreet.
+ */
+function isDiscreetSpeakerSelection(productsSelected) {
+  if (!productsSelected) return false;
+  const lcr = Array.isArray(productsSelected.lcr) ? productsSelected.lcr : [];
+  const surrounds = Array.isArray(productsSelected.surrounds) ? productsSelected.surrounds : [];
+  const names = [...lcr, ...surrounds].map(modelFromProductEntry).filter(Boolean);
+  if (names.length === 0) return false;
+  return names.every((name) => {
+    const meta = getSpeakerModelMeta(name);
+    return meta && !meta.notFound;
+  });
+}
+
+/**
+ * The grammatical article before a display phrase. Display sizes are read as
+ * English numbers, so 'an' is needed before a size whose reading starts with a
+ * vowel sound: 83" (eighty-three), 85" (eighty-five), etc.
+ */
+function articleBefore(display) {
+  if (!display) return 'a';
+  const s = String(display).replace(/^large\s+/i, '').trim();
+  const match = s.match(/^(\d+)/);
+  if (match) {
+    const n = parseInt(match[1], 10);
+    // eight, eleven, eighteen, eighty-something — vowel-initial readings.
+    if (n === 8 || n === 11 || n === 18 || (n >= 80 && n < 90)) return 'an';
+    return 'a';
+  }
+  return /^[aeiou]/i.test(s) ? 'an' : 'a';
+}
 
 /**
  * The Project Report's opening: the headline, and the design summary paragraph
@@ -55,29 +106,33 @@ export function buildProjectReportOpening({
   // states the client's system format (9.3.6) or states nothing.
   const architecture = String(systemFormat || '').trim() || null;
 
-  // The headline leads with the design's intent — the cinema this room is and
-  // the display it is built around — rather than with a channel count. The
-  // speaker count is a fact the fact sheet already states; it is not the story.
-  // The display comes from the report's one display authority, so a television
-  // is named as a television, and 'compact' is read from the room's own floor
-  // area and simply absent from a larger room.
+  // The display the design is built around, from the report's one display
+  // authority — a television is named as a television, a projection screen as a
+  // screen. 'large' is never added: the display's own size is specific enough.
   const display = screenPhrase(projectDetails);
   const compact = isCompactRoom(roomDims) ? 'compact ' : '';
+  const isLounge = classifyProjectIntent({ projectDetails }).isMediaLounge && !!display;
 
-  // A media-lounge television design leads as the room it is rather than as a
-  // cinema, read from the one project-intent authority; a projection design, and a
-  // television design the designer has explicitly marked as a dedicated cinema,
-  // keep the cinema headline.
-  // The size descriptor is the shared large-display rule: a television is
-  // described as large only from 77" upwards, so a media room built around a
-  // smaller set names the television itself.
-  const headline = classifyProjectIntent({ projectDetails }).isMediaLounge && display
-    ? `A relaxed high-performance media room built around a ${scaledScreenPhrase(projectDetails)}`
+  // 'Discreet' is used only where the speaker selection supports it — on-wall or
+  // in-ceiling speakers, not freestanding floor-standers — and only for a media
+  // lounge, where the discreet installation is a defining characteristic.
+  const discreet = isLounge && isDiscreetSpeakerSelection(productsSelected) ? 'discreet ' : '';
+  const article = articleBefore(display);
+
+  // The headline describes the design itself: the system format and the display
+  // it is built around. A media lounge reads as a 'cinema system' (the design,
+  // not a lifestyle); a projection or explicitly dedicated cinema reads as a
+  // 'cinema designed around' its display. No fixed template — the available
+  // details shape the sentence.
+  const headline = isLounge
+    ? (architecture
+      ? `A ${discreet}${architecture} cinema system built around ${article} ${display}`
+      : `A ${discreet}cinema system built around ${article} ${display}`)
     : architecture
       ? (display
-        ? `A ${compact}${architecture} cinema designed around a ${display}`
+        ? `A ${compact}${architecture} cinema designed around ${article} ${display}`
         : `A ${compact}${architecture} cinema`)
-      : (display ? `A ${compact}cinema designed around a ${display}` : null);
+      : (display ? `A ${compact}cinema designed around ${article} ${display}` : null);
 
   return {
     headline,

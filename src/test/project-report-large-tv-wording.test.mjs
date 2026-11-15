@@ -1,12 +1,12 @@
 /**
  * project-report-large-tv-wording.test.mjs
  * ---------------------------------------
- * THE large-television wording rule, as a regression fixture.
+ * THE Project Report headline wording rule, as a regression fixture.
  *
- * The Project Report's opening copy describes a television as "large" only from
- * 77" upwards. A smaller single-row television design is still a media lounge /
- * media room, but it names the set it is built around — `65" TV` — and never
- * calls it large.
+ * The headline describes the actual design — the system format and the display
+ * it is built around — never an imagined mood or lifestyle. It avoids generic
+ * praise (relaxed, high-performance, large) and uses 'discreet' only where the
+ * speaker selection (on-wall or in-ceiling) supports it.
  *
  * Fixtures: Marquee Home / Original Design (100" TV, 5.1) and the same design
  * built around a 65" TV. Read the two designs through the report's own opening
@@ -56,42 +56,46 @@ const MARQUEE_100 = tvDesign("tv100", 2230);
 const LOUNGE_65 = tvDesign("tv65", 1440);
 const BOUNDARY_77 = tvDesign("tv77", 1717);
 
-describe("the large-television wording rule", () => {
-  test('100" TV is large, and the media-room intent is unchanged', () => {
+describe("the design-specific headline wording rule", () => {
+  test('100" TV headline is design-specific, discreet, and never "large"', () => {
     const opening = open(MARQUEE_100);
-    expect(opening.headline).toBe('A relaxed high-performance media room built around a large 100" TV');
+    expect(opening.headline).toBe('A discreet cinema system built around a 100" TV');
+    // The intent paragraph (unchanged) still carries the display scale it always did.
     expect(opening.intent).toContain('built around a large 100" TV');
     expect(opening.intent).toContain("designed for sport, box sets, films and music");
   });
 
-  test("77\" TV is large (the rule's own boundary)", () => {
+  test("77\" TV headline names the display without 'large'", () => {
     const opening = open(BOUNDARY_77);
-    expect(opening.headline).toContain('large 77" TV');
+    expect(opening.headline).toContain('77" TV');
+    expect(opening.headline).not.toMatch(/\blarge\b/i);
+    // The intent paragraph (unchanged) still describes the 77" as large.
     expect(opening.intent).toContain('large 77" TV');
   });
 
-  test('65" TV is a media lounge, and is never called large', () => {
+  test('65" TV headline is design-specific and never called large', () => {
     const opening = open(LOUNGE_65);
     expect(classifyProjectIntent({ projectDetails: LOUNGE_65 }).intent).toBe(PROJECT_INTENT.MEDIA_LOUNGE);
-    expect(opening.headline).toBe('A relaxed high-performance media room built around a 65" TV');
+    expect(opening.headline).toBe('A discreet cinema system built around a 65" TV');
     expect(opening.intent).toContain('built around a 65" TV');
     // The opening carries no supporting line: the screen, the room and the
     // seating are stated by the page's own fact sheet instead.
     expect(opening.supportingLine).toBeUndefined();
     [opening.headline, opening.intent].forEach((text) => {
+      // The headline never says "large"; the intent for a 65" set never did either.
       expect(text).not.toMatch(/\blarge\b/i);
     });
   });
 
-  test('a 65" room still reads as a media room, not a dedicated cinema', () => {
+  test('a 65" room still reads as a media lounge, not a dedicated cinema', () => {
     const opening = open(LOUNGE_65);
-    expect(opening.headline).toContain("media room");
+    expect(opening.headline).toContain("cinema system");
     expect(opening.intent).not.toMatch(/dedicated cinema|cinema bunker|compact dedicated/i);
   });
 
-  test("a 65\" design keeps the 'sensible and intentional' system wording", () => {
+  test("a 65\" design keeps the 'sensible and intentional' system wording in the intent", () => {
     const opening = open(LOUNGE_65);
-    expect(opening.intent).toContain("with a sensible 5.1 system that keeps the room comfortable while still delivering impact when needed");
+    expect(opening.intent).toContain("with a sensible surround system that keeps the room comfortable while still delivering impact when needed");
   });
 
   test("no seating over-emphasis and no absent overhead language, at either size", () => {
@@ -100,5 +104,55 @@ describe("the large-television wording rule", () => {
       expect(intent).not.toMatch(/single seating row|seating row sits/i);
       expect(intent).not.toMatch(/overhead|Atmos|immersive/i);
     });
+  });
+
+  test("the headline never uses banned lifestyle or generic praise language", () => {
+    [MARQUEE_100, LOUNGE_65, BOUNDARY_77].forEach((design) => {
+      const { headline } = open(design);
+      expect(headline).not.toMatch(/relaxed|high-performance|luxurious|exceptional|stunning/i);
+      expect(headline).not.toMatch(/\blarge\b/i);
+    });
+  });
+
+  test("a system format is stated in the headline when supplied", () => {
+    const opening = buildProjectReportOpening({
+      projectDetails: MARQUEE_100,
+      roomDims: ROOM,
+      productsSelected: PRODUCTS,
+      seatingPositions: SEATS,
+      systemFormat: "5.2",
+    });
+    expect(opening.headline).toBe('A discreet 5.2 cinema system built around a 100" TV');
+  });
+
+  test("an 83\" TV uses the correct article 'an'", () => {
+    const design83 = tvDesign("tv83", 1872);
+    const opening = buildProjectReportOpening({
+      projectDetails: design83,
+      roomDims: ROOM,
+      productsSelected: PRODUCTS,
+      seatingPositions: SEATS,
+      systemFormat: "5.2.2",
+    });
+    expect(opening.headline).toBe('A discreet 5.2.2 cinema system built around an 83" TV');
+  });
+
+  test("a projection cinema keeps its dedicated-cinema headline", () => {
+    const projectionDesign = {
+      screen_size: 140,
+      aspect_ratio: "2.35:1",
+      dolby_config: "7.4.6",
+      screen_mount_mode: "baffle",
+    };
+    const opening = buildProjectReportOpening({
+      projectDetails: projectionDesign,
+      roomDims: { widthM: 6, lengthM: 8, heightM: 3 },
+      productsSelected: PRODUCTS,
+      seatingPositions: SEATS,
+      systemFormat: "7.4.6",
+    });
+    expect(opening.headline).toContain("cinema designed around a");
+    expect(opening.headline).toContain('7.4.6');
+    expect(opening.headline).not.toMatch(/media room|cinema system/i);
   });
 });
