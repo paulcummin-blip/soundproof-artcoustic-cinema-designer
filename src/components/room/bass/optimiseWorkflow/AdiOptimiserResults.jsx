@@ -32,7 +32,6 @@ import {
   deviationText,
   levelText,
   p14DbText,
-  frequencyText,
 } from "../optimiserPlan/optimiserWholeNumberDb.js";
 import {
   isRecommendationDismissed,
@@ -187,7 +186,7 @@ function formatSeatingChangesGrouped(changes) {
   for (const [, group] of groups) {
     if (group.seats.length < 2) {
       // Single seat or no grouping — show individual detail.
-      for (const c of group.seats) lines.push(formatSeatingChange(c));
+      for (const c of group.seats) lines.push({ primary: formatSeatingChange(c), detail: null });
       continue;
     }
     // All seats in this row moved the same distance in the same direction.
@@ -196,10 +195,10 @@ function formatSeatingChangesGrouped(changes) {
     const fromYs = group.seats.map((c) => num(c.fromY)).filter(Number.isFinite);
     const toYs = group.seats.map((c) => num(c.toY)).filter(Number.isFinite);
     const moveText = `Move Row ${group.row}${dir ? ` ${dir}` : ""} by ${mm} mm`;
-    const seatLine = `${group.seats.length} seats · ${fmt(fromYs[0], 2)} m → ${fmt(toYs[0], 2)} m`;
-    lines.push(`${moveText} · ${seatLine}`);
+    const detail = `${group.seats.length} seats · ${fmt(fromYs[0], 2)} m → ${fmt(toYs[0], 2)} m`;
+    lines.push({ primary: moveText, detail });
   }
-  for (const c of ungrouped) lines.push(formatSeatingChange(c));
+  for (const c of ungrouped) lines.push({ primary: formatSeatingChange(c), detail: null });
   return lines;
 }
 function formatCombinedRow(row) {
@@ -259,6 +258,14 @@ function formatMetricLines(label, beforeDb, afterDb, levelBefore, levelAfter) {
   return lines;
 }
 
+// P20 is a per-seat parameter. The saved lever evidence carries only the
+// worst-seat headline level (baseline.p20Level / effect.p20Level), not a
+// primary/secondary split — summariseSeats drops isPrimary during
+// persistence. So the main panel shows the worst-seat P20 level, clearly
+// labelled. Primary/secondary detail stays in Technical diagnostics, which
+// read the richer per-seat evidence. No level is ever inferred from a rounded
+// dB figure, and a parameter Level change never implies an overall cinema
+// Performance Level change.
 function formatEffectLines(effect, baseline) {
   if (!effect) return [];
   const lines = [];
@@ -267,22 +274,20 @@ function formatEffectLines(effect, baseline) {
   const p19AfterDb = deviationText(effect.p19VariationDb);
   const p19LevelBefore = levelText(effect.p19LevelBefore ?? baseline?.p19Level);
   const p19LevelAfter = levelText(effect.p19LevelAfter);
-  lines.push(...formatMetricLines("P19", p19BeforeDb, p19AfterDb, p19LevelBefore, p19LevelAfter));
+  lines.push(...formatMetricLines("P19 \u00b7 Reference seat", p19BeforeDb, p19AfterDb, p19LevelBefore, p19LevelAfter));
 
   const p20BeforeDb = deviationText(baseline?.p20VariationDb);
   const p20AfterDb = deviationText(effect.p20VariationDb);
   const p20LevelBefore = levelText(effect.p20LevelBefore ?? baseline?.p20Level);
   const p20LevelAfter = levelText(effect.p20LevelAfter);
-  lines.push(...formatMetricLines("P20", p20BeforeDb, p20AfterDb, p20LevelBefore, p20LevelAfter));
+  lines.push(...formatMetricLines("P20 \u00b7 Worst seat", p20BeforeDb, p20AfterDb, p20LevelBefore, p20LevelAfter));
 
   if (effect.p14DeltaDb != null && Math.abs(effect.p14DeltaDb) >= 1) {
     const p14 = p14DbText(effect.p14AchievedDb);
     if (p14) lines.push({ kind: "db", text: `P14 ${p14}` });
   }
-  if (effect.worstSeatId) {
-    const hz = frequencyText(effect.worstFrequencyHz);
-    lines.push({ kind: "db", text: `Worst seat: ${effect.worstSeatId}${hz ? ` · ${hz}` : ""}` });
-  }
+  // Worst-seat identifiers and limiting frequencies are diagnostic detail —
+  // kept in the Technical diagnostics panel, not the main recommendation.
   return lines;
 }
 
@@ -406,10 +411,8 @@ function CategoryRow({
       )}
 
       {!dismissed && (isIdentified || isApplied) && (adjustmentLines.length > 0 || effectLines.length > 0) && (
-        <div className="mt-1.5 space-y-0.5">
-          {adjustmentLines.map((line, i) => (
-            <div key={`adj-${i}`} className="text-[11px] text-[#1B1A1A] leading-relaxed">{line}</div>
-          ))}
+        <div className="mt-1.5 space-y-1">
+          {/* RP22 Level changes lead, above the movement description. */}
           {effectLines.length > 0 && (
             <div className="text-[11px] text-[#625143] leading-relaxed">
               {effectLines.map((line, i) => (
@@ -422,6 +425,19 @@ function CategoryRow({
               ))}
             </div>
           )}
+          {/* Proposed movement, below the level improvement. */}
+          {adjustmentLines.map((line, i) => {
+            if (typeof line === "string") {
+              return <div key={`adj-${i}`} className="text-[11px] text-[#1B1A1A] leading-relaxed">{line}</div>;
+            }
+            // Structured seating line: bold movement, detail underneath.
+            return (
+              <div key={`adj-${i}`} className="text-[11px] leading-relaxed">
+                <div className="font-semibold text-[#1B1A1A]">{line.primary}</div>
+                {line.detail && <div className="text-[#625143]">{line.detail}</div>}
+              </div>
+            );
+          })}
         </div>
       )}
 

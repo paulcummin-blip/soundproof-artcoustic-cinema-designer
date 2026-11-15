@@ -46,7 +46,13 @@ const STAGES = [
 // recommendations.seating — shows "Improvement identified", even when the
 // standalone search's own verdict was "skipped". A skipped standalone search
 // never overwrites a confirmed coordinated improvement.
-function resolveStageState({ verdict, stage, isActive, stageKey, recommendations }) {
+//
+// While the run is still in progress, a skipped standalone seating search
+// does NOT mean seating is finished — the coordinated search may still be
+// evaluating seating as part of the placement/combining stages. So we show
+// "Analysing..." (active) until the run completes. Only after the run ends
+// without a seating improvement do we show "Not tested" with a genuine reason.
+function resolveStageState({ verdict, stage, isActive, stageKey, recommendations, runInProgress }) {
   // Seating: a confirmed improvement from either the standalone or coordinated
   // search is the single Seating outcome.
   if (stageKey === "seating_positions" && recommendations?.seating) {
@@ -55,15 +61,23 @@ function resolveStageState({ verdict, stage, isActive, stageKey, recommendations
   if (verdict === "improvement") return "improvement";
   if (verdict === "no_improvement") return "no_improvement";
   if (verdict === "done") return "reviewed";
-  // A skipped/not-available seating search is "Not tested", not "Not applicable":
-  // the standalone search may be skipped while a coordinated search found the
-  // improvement (handled above), or the run genuinely did not search seating.
   if (verdict === "skipped" || verdict === "not_available") {
-    return stageKey === "seating_positions" ? "not_tested" : "not_applicable";
+    if (stageKey === "seating_positions") {
+      // While the run is in progress, a skipped standalone search does not
+      // close seating — the coordinated path may still find an improvement.
+      // Show "Analysing..." until the run completes.
+      return runInProgress ? "active" : "not_tested";
+    }
+    return "not_applicable";
   }
   if (verdict === "incomplete") return "failed";
   if (stage?.status === "completed") return "reviewed";
   if (isActive || stage?.status === "active") return "active";
+  // Seating with no verdict yet while the run is in progress: the coordinated
+  // search may still evaluate seating, so show "Analysing...".
+  if (stageKey === "seating_positions" && runInProgress && !verdict && stage?.status !== "not_tested") {
+    return "active";
+  }
   if (stage?.status === "not_tested") return "not_tested";
   return "waiting";
 }
@@ -182,6 +196,10 @@ export default function AdiOptimiserProgress({
   const showChecklist = isCalculating || isComplete;
   const heading = resolveHeading({ workflowPhase, stageDisplay, calculationPhaseLabel });
   const v2Complete = v2State?.status === "complete";
+  // Seating may still be evaluated by the coordinated search while the run is
+  // in progress, even if the standalone search was skipped. This flag keeps
+  // the Seating stage showing "Analysing..." until the run actually ends.
+  const runInProgress = isCalculating && !isComplete;
 
   return (
     <div className="space-y-3" data-adi-optimiser-progress="true">
@@ -200,10 +218,12 @@ export default function AdiOptimiserProgress({
               ?? v2State?.stageVerdicts?.[stage.key]
               ?? null;
             const isActive = stageDisplay?.activeStageKey === stage.key;
-            const state = resolveStageState({ verdict, stage: stageEntry, isActive, stageKey: stage.key, recommendations });
+            const state = resolveStageState({ verdict, stage: stageEntry, isActive, stageKey: stage.key, recommendations, runInProgress });
             const meta = STATE_META[state] || STATE_META.waiting;
+            // Genuine exclusion reason only — never the stage hint, which reads
+            // as "Testing whether…" and contradicts a "Not tested" status.
             const notTestedReason = state === "not_tested" && stage.key === "seating_positions"
-              ? (stageEntry?.supportingText || "Seating not searched in this run")
+              ? "Seating not searched in this run"
               : null;
             return (
               <div key={stage.key} className="flex items-start gap-2 text-[12px]" data-adi-progress-stage={stage.key} data-adi-progress-state={state}>
