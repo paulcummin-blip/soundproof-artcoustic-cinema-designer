@@ -1,24 +1,28 @@
-// Projects-page four-column account-status strip.
+// Projects-page account-status strip with conditional visibility.
 //
-// Column 1 — Professional Projects: the available project-credit count,
-//   clickable to the dealer's own Lovable / Partner Portal Dealer Page
-//   when the authenticated navigation resolver returns a URL.
+// Each section shows only when genuine, currently active data exists:
 //
-// Column 2 — Special access: unlimited-access promotion entitlement,
-//   shown only while an effective promotion is active. Never replaced by
-//   a standard 90-day expiry.
+//   Professional Projects — always shown. Displays the dealer's genuine
+//     available project-credit count and links to the Dealer Page when the
+//     authenticated navigation resolver returns a URL.
 //
-// Column 3 — Current offer: illustrative offer preview.
+//   Special access — shown only when the dealer has a genuine, currently
+//     active special-access entitlement. The entire section is hidden when
+//     no entitlement exists or it has expired. Existing unlimited
+//     entitlements and their expiry dates are preserved.
 //
-// Column 4 — Access renewal: shows the access-expiry date when one is
-//   available from the backend. The renewal link is active only during the
-//   final 14 days before expiry, or when overdue. Renewal itself must be
-//   confirmed by an authenticated backend call (one per 90-day period); it
-//   is never inferred from opening a URL. Until the Lovable renewal
-//   endpoint and access-expiry source exist, the column shows a neutral
-//   "No renewal due" state — no invented dates, no simulated renewals.
+//   Current offer — shown only when a genuine, active offer exists and the
+//     dealer is eligible. Placeholder/illustrative offers are never
+//     displayed. No genuine offer data is wired yet, so this section is
+//     hidden until an offer prop is supplied.
 //
-// All account-status information lives on the Projects page only.
+//   Access renewal — shown only when the 90-day access system is connected
+//     and a genuine renewal status is available. Until then, invented dates
+//     and "No renewal due" placeholders are not displayed.
+//
+// The grid auto-reflows to the number of visible sections, retaining the
+// existing card styling. All account-status information stays on the
+// Projects page only.
 
 import React from 'react';
 import { formatPromotionEndDate } from '@/lib/commercial/useEffectivePromotion';
@@ -32,6 +36,13 @@ const BRAND = {
 
 const RENEWAL_WINDOW_DAYS = 14;
 const OVERDUE_COLOR = '#B23A3A';
+
+const GRID_CLASS_BY_COUNT = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-1 sm:grid-cols-2',
+  3: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+  4: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4',
+};
 
 function isRenewalWindowActive(expiryIso) {
   if (!expiryIso) return false;
@@ -57,9 +68,15 @@ export default function AccountStatusStrip({
   promoLoading,
   promoMessage,
   promoEndsAt,
-  // Future Lovable integration — null until the access-expiry source and
-  // renewal endpoint are wired. Passed as props so the strip is ready
-  // without any code changes when the integration lands.
+  // Future genuine-offer data — null until an active, eligible offer exists.
+  // When supplied (offerActive && dealerEligible), the Current offer section
+  // appears automatically.
+  offerActive = false,
+  dealerOfferEligible = false,
+  offerLabel = null,
+  offerEndDate = null,
+  // 90-day access system — null until connected. When accessExpiry is
+  // supplied, the Access renewal section appears automatically.
   accessExpiry = null,
   renewalUrl = null,
 }) {
@@ -67,27 +84,49 @@ export default function AccountStatusStrip({
 
   if (!showCapacityIndicator && !illustrativeHeader) return null;
 
-  const showSpecialAccess =
-    (showCapacityIndicator && promotionEffective && !promoLoading) || illustrativeHeader;
+  // --- Section visibility (genuine data only) -----------------------------
 
-  // Access renewal is only meaningful for real dealers (not the admin
-  // illustrative preview). A real expiry date is required before the
-  // renewal link can activate.
-  const hasRealExpiry = !illustrativeHeader && !!accessExpiry;
-  const overdue = hasRealExpiry && isOverdue(accessExpiry);
-  const inRenewalWindow = hasRealExpiry && isRenewalWindowActive(accessExpiry);
-  const renewalLinkActive = hasRealExpiry && !!renewalUrl && (inRenewalWindow || overdue);
+  // Professional Projects: always shown.
+  const showProfessionalProjects = true;
 
-  // Professional Projects link — only for real dealers with a resolved
-  // Dealer Page URL, never in the admin illustrative preview.
+  // Special access: only when a genuine, currently active entitlement exists.
+  const showSpecialAccess = showCapacityIndicator && promotionEffective && !promoLoading;
+
+  // Current offer: only when a genuine, active offer exists and the dealer
+  // is eligible. Placeholder/illustrative offers are never displayed.
+  const showCurrentOffer = Boolean(offerActive && dealerOfferEligible && offerLabel);
+
+  // Access renewal: only when the 90-day access system is connected and a
+  // genuine expiry date is available.
+  const showAccessRenewal = Boolean(accessExpiry);
+
+  const visibleCount = [
+    showProfessionalProjects,
+    showSpecialAccess,
+    showCurrentOffer,
+    showAccessRenewal,
+  ].filter(Boolean).length;
+
+  // If nothing is visible at all, render nothing.
+  if (visibleCount === 0) return null;
+
+  const gridClass = GRID_CLASS_BY_COUNT[visibleCount] || GRID_CLASS_BY_COUNT[4];
+
+  // --- Professional Projects link ----------------------------------------
+  // Only real dealers get a clickable Dealer Page link, never the admin
+  // illustrative preview.
   const professionalProjectsLink = dealerPageUrl && !illustrativeHeader;
-
   const capacityValue = illustrativeHeader ? 3 : capacityLoading ? '...' : professionalCapacity;
+
+  // --- Access renewal state ---------------------------------------------
+  const overdue = showAccessRenewal && isOverdue(accessExpiry);
+  const inRenewalWindow = showAccessRenewal && isRenewalWindowActive(accessExpiry);
+  const renewalLinkActive = showAccessRenewal && !!renewalUrl && (inRenewalWindow || overdue);
 
   return (
     <dl
-      aria-label="Project credits, special access and illustrative offer and renewal"
-      className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-5"
+      aria-label="Account status"
+      className={`grid gap-x-8 gap-y-5 ${gridClass}`}
       style={{
         margin: '18px 0 0',
         padding: '20px 24px',
@@ -97,100 +136,83 @@ export default function AccountStatusStrip({
         color: '#213428',
       }}
     >
-      {/* Professional Projects */}
-      <div style={{ minWidth: 0 }}>
-        <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Professional Projects</dt>
-        <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>
-          {professionalProjectsLink ? (
-            <a
-              href={dealerPageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: BRAND.border }}
-              title="View project-credit history on your Dealer Page"
-            >
-              <strong>{capacityValue}</strong>{' available'}
-            </a>
-          ) : (
-            <span>
-              <strong>{capacityValue}</strong>{' available'}
-            </span>
+      {/* Professional Projects — always shown */}
+      {showProfessionalProjects && (
+        <div style={{ minWidth: 0 }}>
+          <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Professional Projects</dt>
+          <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>
+            {professionalProjectsLink ? (
+              <a
+                href={dealerPageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: BRAND.border }}
+                title="View project-credit history on your Dealer Page"
+              >
+                <strong>{capacityValue}</strong>{' available'}
+              </a>
+            ) : (
+              <span>
+                <strong>{capacityValue}</strong>{' available'}
+              </span>
+            )}
+          </dd>
+          {illustrativeHeader && (
+            <dd style={{ margin: '6px 0 0', fontSize: 13, color: BRAND.subtext }}>Illustrative balance</dd>
           )}
-        </dd>
-        {illustrativeHeader && (
-          <dd style={{ margin: '6px 0 0', fontSize: 13, color: BRAND.subtext }}>Illustrative balance</dd>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Special access (unlimited entitlement — never replaced by 90-day expiry) */}
+      {/* Special access — genuine active entitlement only */}
       {showSpecialAccess && (
-        <div style={{ minWidth: 0 }} title={illustrativeHeader ? undefined : promoMessage || undefined}>
+        <div style={{ minWidth: 0 }} title={promoMessage || undefined}>
           <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Special access</dt>
           <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35 }}>Unlimited</dd>
           <dd style={{ margin: '6px 0 0', fontSize: 15, lineHeight: 1.4 }}>
-            {'Until '}{illustrativeHeader ? '31 Dec 2026' : formatPromotionEndDate(promoEndsAt)}
-            {illustrativeHeader && (
-              <span style={{ display: 'block', fontSize: 13, color: BRAND.subtext }}>Illustrative entitlement</span>
-            )}
+            {'Until '}{formatPromotionEndDate(promoEndsAt)}
           </dd>
         </div>
       )}
 
-      {/* Current offer */}
-      <div style={{ minWidth: 0 }}>
-        <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
-          {'Current offer '}<span style={{ fontSize: 12, fontWeight: 400, color: BRAND.subtext }}>{'· Preview'}</span>
-        </dt>
-        <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>{'3 months free access'}</dd>
-        <dd style={{ margin: '6px 0 0', fontSize: 15, lineHeight: 1.4 }}>{'Ends 31 Dec 2026'}</dd>
-        <dd style={{ margin: '4px 0 0', fontSize: 13, color: BRAND.subtext }}>{'Illustrative offer and date'}</dd>
-      </div>
-
-      {/* Access renewal */}
-      <div style={{ minWidth: 0 }}>
-        <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
-          {'Access renewal '}
-          {illustrativeHeader && (
-            <span style={{ fontSize: 12, fontWeight: 400, color: BRAND.subtext }}>{'· Preview'}</span>
+      {/* Current offer — genuine active, eligible offer only */}
+      {showCurrentOffer && (
+        <div style={{ minWidth: 0 }}>
+          <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Current offer</dt>
+          <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>{offerLabel}</dd>
+          {offerEndDate && (
+            <dd style={{ margin: '6px 0 0', fontSize: 15, lineHeight: 1.4 }}>
+              {'Ends '}{formatPromotionEndDate(offerEndDate)}
+            </dd>
           )}
-        </dt>
-        {illustrativeHeader ? (
-          <>
-            <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>{'Renew by 15 Feb 2027'}</dd>
-            <dd style={{ margin: '6px 0 0', fontSize: 13, color: BRAND.subtext }}>{'Illustrative date'}</dd>
-          </>
-        ) : hasRealExpiry ? (
-          <>
-            <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>
-              {renewalLinkActive ? (
-                <a
-                  href={renewalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: overdue ? OVERDUE_COLOR : 'inherit',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  {'Renew by '}{formatPromotionEndDate(accessExpiry)}
-                </a>
-              ) : (
-                `Renew by ${formatPromotionEndDate(accessExpiry)}`
-              )}
-            </dd>
-            {overdue && (
-              <dd style={{ margin: '6px 0 0', fontSize: 13, color: OVERDUE_COLOR }}>{'Overdue'}</dd>
+        </div>
+      )}
+
+      {/* Access renewal — genuine 90-day system only */}
+      {showAccessRenewal && (
+        <div style={{ minWidth: 0 }}>
+          <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Access renewal</dt>
+          <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>
+            {renewalLinkActive ? (
+              <a
+                href={renewalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: overdue ? OVERDUE_COLOR : 'inherit',
+                  textDecoration: 'underline',
+                }}
+              >
+                {'Renew by '}{formatPromotionEndDate(accessExpiry)}
+              </a>
+            ) : (
+              `Renew by ${formatPromotionEndDate(accessExpiry)}`
             )}
-          </>
-        ) : (
-          <>
-            <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4, color: BRAND.subtext }}>
-              {'—'}
-            </dd>
-            <dd style={{ margin: '6px 0 0', fontSize: 13, color: BRAND.subtext }}>{'No renewal due'}</dd>
-          </>
-        )}
-      </div>
+          </dd>
+          {overdue && (
+            <dd style={{ margin: '6px 0 0', fontSize: 13, color: OVERDUE_COLOR }}>{'Overdue'}</dd>
+          )}
+        </div>
+      )}
     </dl>
   );
 }
