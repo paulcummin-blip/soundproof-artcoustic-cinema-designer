@@ -8,6 +8,14 @@
 // It performs no calculation of its own and introduces no second apply
 // mechanism. Combined-electronic (crossover) changes are NOT applied here —
 // they remain the guarded auto-apply workflow's responsibility.
+//
+// APPLY PROVENANCE: when the designer applies or undoes a confirmed
+// recommendation, a durable record is appended to the plan's
+// `appliedLeverRecords` (via optimiserApplyProvenance). The record carries the
+// run ID, lever key, before/after values, source and resulting design
+// fingerprints, and — after the recalculation completes — the verified
+// P19/P20 levels. This is the ONLY authority that proves ADI applied the
+// recommendation; coordinate matching alone is never accepted as proof.
 // ---------------------------------------------------------------------------
 
 import { useCallback, useState } from "react";
@@ -19,6 +27,11 @@ import {
   buildSeatingRspUpdate,
 } from "../optimiserPlan/optimiserPlanLeverApply.js";
 import { OPTIMISER_LEVER } from "../optimiserPlan/optimiserPlanConstants.js";
+import {
+  recordLeverAppliedPending,
+  completeLeverApplyVerification,
+  completeLeverUndoVerification,
+} from "../optimiserPlan/optimiserApplyProvenance.js";
 
 export function useLeverApplyActions({
   commitInstances = null,
@@ -31,10 +44,12 @@ export function useLeverApplyActions({
   planRunId = null,
   latestRunId = null,
   runIdentityStatus = "pending",
+  projectId = null,
+  versionId = null,
 } = {}) {
   const [leverApplyBusy, setLeverApplyBusy] = useState(null);
 
-  const commitLeverChange = useCallback((lever, direction = "to") => {
+  const commitLeverChange = useCallback(async (lever, direction = "to") => {
     if (!lever?.key) return;
 
     // ── RUN-ID FRESHNESS GATE (DURABLE BOUNDARY) ──
@@ -48,6 +63,8 @@ export function useLeverApplyActions({
     // no rows or failed). In all those cases the plan's identity is unverified
     // and the apply is blocked. Legacy plans (no planRunId) are exempt.
     if (planRunId && (!latestRunId || latestRunId !== planRunId)) return;
+
+    const sourceDesignFingerprint = shared?.cacheKey || null;
 
     if (lever.key === OPTIMISER_LEVER.SEATING) {
       if (!commitSeating) return;
@@ -69,8 +86,29 @@ export function useLeverApplyActions({
         return;
       }
       if (rspUpdate.manualRspY_m !== null) appState.setManualRspY_m(rspUpdate.manualRspY_m);
+
+      // Record the apply provenance BEFORE the recalculation, so a reload
+      // mid-recalc preserves the "applied — verifying" state.
+      if (projectId && versionId && direction === "to") {
+        recordLeverAppliedPending(projectId, versionId, {
+          runId: planRunId, leverKey: lever.key, direction, lever,
+          sourceDesignFingerprint,
+          affectedIds: result.affectedSeatIds || [],
+        });
+      }
+
       if (typeof onRecalculate === "function") {
-        onRecalculate({ previousCacheKey: shared?.cacheKey || null });
+        const verification = await onRecalculate({ previousCacheKey: sourceDesignFingerprint });
+        // Update the provenance with the verified levels (or incomplete).
+        if (projectId && versionId && direction === "to") {
+          completeLeverApplyVerification(projectId, versionId, planRunId, lever.key, {
+            status: verification?.action === "verified" ? "verified" : "incomplete",
+            resultingDesignFingerprint: verification?.fingerprint || null,
+            calculationFingerprint: verification?.fingerprint || null,
+            levels: verification?.levels || null,
+            failureReason: verification?.action !== "verified" ? (verification?.reason || "Recalculation did not complete") : null,
+          });
+        }
       }
       return;
     }
@@ -90,27 +128,52 @@ export function useLeverApplyActions({
     } catch {
       return;
     }
-    if (typeof onRecalculate === "function") {
-      onRecalculate({ previousCacheKey: shared?.cacheKey || null });
+
+    // Record the apply provenance BEFORE the recalculation.
+    if (projectId && versionId && direction === "to") {
+      recordLeverAppliedPending(projectId, versionId, {
+        runId: planRunId, leverKey: lever.key, direction, lever,
+        sourceDesignFingerprint,
+        affectedIds: result.affectedSubIds || [],
+      });
     }
-  }, [commitInstances, commitSeating, currentInstances, seatingPositions, appState, onRecalculate, shared, planRunId, latestRunId, runIdentityStatus]);
+
+    if (typeof onRecalculate === "function") {
+      const verification = await onRecalculate({ previousCacheKey: sourceDesignFingerprint });
+      if (projectId && versionId && direction === "to") {
+        completeLeverApplyVerification(projectId, versionId, planRunId, lever.key, {
+          status: verification?.action === "verified" ? "verified" : "incomplete",
+          resultingDesignFingerprint: verification?.fingerprint || null,
+          calculationFingerprint: verification?.fingerprint || null,
+          levels: verification?.levels || null,
+          failureReason: verification?.action !== "verified" ? (verification?.reason || "Recalculation did not complete") : null,
+        });
+      } else if (projectId && versionId && direction === "from") {
+        // Undo: mark the applied record as undone with its own verification.
+        completeLeverUndoVerification(projectId, versionId, planRunId, lever.key, {
+          status: verification?.action === "verified" ? "verified" : "incomplete",
+          calculationFingerprint: verification?.fingerprint || null,
+          levels: verification?.levels || null,
+          failureReason: verification?.action !== "verified" ? (verification?.reason || "Recalculation did not complete") : null,
+        });
+      }
+    }
+  }, [commitInstances, commitSeating, currentInstances, seatingPositions, appState, onRecalculate, shared, planRunId, latestRunId, runIdentityStatus, projectId, versionId]);
 
   const handleApplyLever = useCallback((lever) => {
     setLeverApplyBusy(lever?.key || null);
-    try {
-      commitLeverChange(lever, "to");
-    } finally {
+    // The commit is async but the button just needs to reflect busy state
+    // during the synchronous commit; the recalculation runs in the background.
+    Promise.resolve(commitLeverChange(lever, "to")).finally(() => {
       setLeverApplyBusy(null);
-    }
+    });
   }, [commitLeverChange]);
 
   const handleUndoLever = useCallback((lever) => {
     setLeverApplyBusy(lever?.key || null);
-    try {
-      commitLeverChange(lever, "from");
-    } finally {
+    Promise.resolve(commitLeverChange(lever, "from")).finally(() => {
       setLeverApplyBusy(null);
-    }
+    });
   }, [commitLeverChange]);
 
   return { handleApplyLever, handleUndoLever, leverApplyBusy };

@@ -67,6 +67,13 @@ export function serializeOptimiserPlan(plan) {
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
     leverDecisions: plan.leverDecisions || {},
     applied: plan.applied || {},
+    // Durable Apply provenance: one record per applied/undone lever, carrying
+    // the run ID, lever key, before/after values, source and resulting design
+    // fingerprints, and the verified post-recalc P19/P20 levels. The ONLY
+    // authority that proves ADI applied a recommendation — never inferred from
+    // coordinate matching alone. Persisted through the existing ProjectVersion
+    // autosave (design_state.optimiser_plan).
+    appliedLeverRecords: Array.isArray(plan.appliedLeverRecords) ? plan.appliedLeverRecords : [],
     // Durable run timing instrumentation: when the run was started, when its
     // verdict was ready, when it saved and published, and how many publication
     // attempts that took. Read only inside the developer diagnostics level, and

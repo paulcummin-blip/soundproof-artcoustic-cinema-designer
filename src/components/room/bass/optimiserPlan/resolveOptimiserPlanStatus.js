@@ -43,6 +43,7 @@ import {
   BASELINE_PARITY_STATUS,
   parityBlocksApply,
 } from "./optimiserBaselineAuthority.js";
+import { resolveApplyProvenance } from "./optimiserApplyProvenance.js";
 
 /**
  * The saved baseline-parity record. A result saved BEFORE parity was recorded
@@ -162,12 +163,32 @@ export function resolveOptimiserPlanStatus({
   let status = OPTIMISER_PLAN_STATUS.CURRENT;
   let staleReason = null;
 
+  // ── Apply provenance ──
+  // When the fingerprint mismatches, check whether the change came from ADI's
+  // own confirmed recommendation. A verified apply record whose
+  // resultingDesignFingerprint matches the current design keeps the plan
+  // CURRENT (the panel stays visible with the actual RP22 improvement). A
+  // pending or incomplete record (recalc in progress or failed) also keeps
+  // the plan CURRENT but marks verification as unfinished. Only a genuine
+  // unrelated design change falls through to STALE.
+  const provenance = resolveApplyProvenance(plan, currentDesignFingerprint);
+  const appliedVerified = provenance.status === "verified";
+  const appliedPending = provenance.status === "pending";
+  const appliedIncomplete = provenance.status === "incomplete";
+
   if (!savedFingerprint || !currentDesignFingerprint) {
     status = OPTIMISER_PLAN_STATUS.STALE;
     staleReason = "The design this optimiser result belongs to could not be confirmed — re-evaluation required.";
   } else if (savedFingerprint !== currentDesignFingerprint) {
-    status = OPTIMISER_PLAN_STATUS.STALE;
-    staleReason = "The design has changed since this optimiser result was evaluated — re-evaluation required.";
+    if (appliedVerified || appliedPending || appliedIncomplete) {
+      // The fingerprint mismatch is explained by ADI's own apply. Keep the
+      // plan CURRENT so the panel stays visible. The run is spent — further
+      // applies from this run are disabled below.
+      status = OPTIMISER_PLAN_STATUS.CURRENT;
+    } else {
+      status = OPTIMISER_PLAN_STATUS.STALE;
+      staleReason = "The design has changed since this optimiser result was evaluated — re-evaluation required.";
+    }
   }
 
   const planStale = status === OPTIMISER_PLAN_STATUS.STALE;
@@ -366,6 +387,23 @@ export function resolveOptimiserPlanStatus({
     }
   }
 
+  // ── Run spent gate ──
+  // Once ANY recommendation from this run has been applied (verified, pending,
+  // or incomplete — and even if later undone), the run is spent. Every
+  // remaining Apply control is disabled until ADI is re-run. The applied
+  // lever's Undo stays available (the existing undo logic handles it), but no
+  // new lever can be applied from this run.
+  const runSpent = provenance.hasAppliedRecord;
+  const SPENT_REASON = "This run's recommendations have been applied. Re-run ADI to apply further changes.";
+  if (runSpent) {
+    for (const lever of levers) {
+      if (lever.canApply) {
+        lever.canApply = false;
+        lever.applyBlockedReason = lever.applyBlockedReason || SPENT_REASON;
+      }
+    }
+  }
+
   return {
     status,
     evidenceMessage: null,
@@ -390,6 +428,15 @@ export function resolveOptimiserPlanStatus({
     levers,
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
     baselineParity,
+    // Apply provenance: the durable record of what ADI applied and the
+    // verified post-recalc RP22 levels. Read by the results panel to show the
+    // actual improvement and to disable further applies.
+    appliedVerified,
+    appliedPending,
+    appliedIncomplete,
+    runSpent,
+    appliedVerification: appliedVerified ? provenance.verifiedRecord?.verification || null : null,
+    appliedLeverKeys: provenance.appliedLeverKeys || [],
     // The calibration evidence this run retained, read by the panel's
     // calibration section and its tested-ledger rows.
     calibrationEvidence: plan.calibrationEvidence || null,

@@ -541,8 +541,79 @@ export default function AdiOptimiserResults({
   );
   const summary = buildSummary({ planView, dismissedCount });
 
+  // ── Verified-apply header ──
+  // After a verified application, show "ADI optimisation complete" with the
+  // actual RP22 performance improvement (P19 level transition) and the applied
+  // design change. P20 is displayed separately. This reads ONLY the verified
+  // levels from the plan's appliedLeverRecords — it never invents improvements.
+  const appliedVerification = planView?.appliedVerification || null;
+  const appliedVerified = planView?.appliedVerified === true;
+  const appliedPending = planView?.appliedPending === true;
+  const appliedIncomplete = planView?.appliedIncomplete === true;
+  const verifiedLevels = appliedVerification?.levels || null;
+  const baselineLevels = planView?.baseline || null;
+
+  const verifiedImprovementLines = [];
+  if (appliedVerified && verifiedLevels) {
+    const p19Before = levelText(baselineLevels?.p19Level);
+    const p19After = levelText(verifiedLevels.p19Level);
+    if (p19Before && p19After) {
+      verifiedImprovementLines.push({
+        kind: "level",
+        text: `P19: ${p19Before} \u2192 ${p19After}`,
+      });
+    }
+    const p20Before = levelText(baselineLevels?.p20Level);
+    const p20After = levelText(verifiedLevels.p20Level);
+    if (p20Before && p20After) {
+      verifiedImprovementLines.push({
+        kind: "level",
+        text: `P20: ${p20Before} \u2192 ${p20After}`,
+      });
+    }
+  }
+
+  // Describe the applied change(s) from the applied lever records.
+  const appliedLeverKeys = planView?.appliedLeverKeys || [];
+  const appliedLevers = (planView?.levers || []).filter((l) => appliedLeverKeys.includes(l.key));
+  const appliedChangeDescriptions = appliedLevers.map(describeAppliedLever).filter(Boolean);
+
   return (
     <div className="space-y-2.5" data-adi-optimiser-results="true">
+      {/* Verified-apply header */}
+      {appliedVerified && (
+        <div className="rounded-md border border-[#213428] bg-[#213428] px-3 py-2.5" data-adi-applied-verified="true">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/80">ADI optimisation complete</div>
+          {verifiedImprovementLines.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {verifiedImprovementLines.map((line, i) => (
+                <div key={`vl-${i}`} className="text-[13px] font-semibold text-white">{line.text}</div>
+              ))}
+            </div>
+          )}
+          {appliedChangeDescriptions.length > 0 && (
+            <div className="mt-1.5 space-y-0.5">
+              {appliedChangeDescriptions.map((desc, i) => (
+                <div key={`ac-${i}`} className="text-[11px] text-white/85">{desc} \u00b7 Applied</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Pending verification (recalc in progress or failed) */}
+      {(appliedPending || appliedIncomplete) && (
+        <div className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] px-3 py-2" data-adi-applied-pending="true">
+          <div className="text-[11px] font-semibold text-[#4A230F]">
+            {appliedPending ? "Recommendation applied — verifying performance…" : "Recommendation applied — verification incomplete"}
+          </div>
+          {appliedChangeDescriptions.length > 0 && (
+            <div className="mt-0.5 text-[11px] text-[#625143]">
+              {appliedChangeDescriptions.join(" \u00b7 ")}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Result summary */}
       <div className="rounded-md border border-[#CFDCCF] bg-[#F4F7F4] px-3 py-2">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-[#213428]">ADI summary</div>

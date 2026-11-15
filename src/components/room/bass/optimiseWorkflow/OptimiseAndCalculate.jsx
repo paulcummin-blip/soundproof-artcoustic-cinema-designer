@@ -1241,6 +1241,14 @@ export default function OptimiseAndCalculate({
   // the new calculation fingerprint, then calculate that exact design. Calling
   // the render-captured handler immediately queues the previous fingerprint and
   // leaves the newly applied design permanently stale.
+  //
+  // VERIFICATION: after triggering the recalculation, wait for the completed
+  // bass publication and return the resulting design fingerprint plus the
+  // verified P19/P20 levels. The caller (useLeverApplyActions) records these
+  // on the plan's appliedLeverRecords so the panel can show the actual RP22
+  // improvement and so the plan is not treated as stale. If the recalculation
+  // fails or is cancelled, returns { action: "incomplete" } so the caller can
+  // mark the apply as "applied but verification incomplete".
   const handlePhysicalRecalculate = useCallback(async ({ previousCacheKey = null } = {}) => {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       await sleep(SLEEP_MS);
@@ -1248,7 +1256,26 @@ export default function OptimiseAndCalculate({
       const fingerprintAdvanced = !previousCacheKey
         || (!!live?.cacheKey && live.cacheKey !== previousCacheKey);
       if (fingerprintAdvanced && live?.canCalculate === true && typeof live?.onCalculate === "function") {
-        return live.onCalculate();
+        live.onCalculate();
+        // Wait for the completed bass publication so the caller can verify
+        // the resulting P19/P20 levels against the applied change.
+        try {
+          const published = await waitForCurrentPublication(sharedRef, phaseRef);
+          if (!published) return { action: "incomplete", reason: "recalculation-cancelled" };
+        } catch (err) {
+          return { action: "incomplete", reason: err?.message || "recalculation-failed" };
+        }
+        const state = sharedRef.current;
+        const authority = extractAuthorityForComparison(state.completedBassAuthority);
+        const levels = authority ? {
+          p19Level: authority.achievedP19Level,
+          p19VariationDb: authority.achievedP19VariationDb,
+          p20Level: authority.achievedP20Level,
+          p20VariationDb: authority.achievedP20VariationDb,
+          p14Level: authority.p14AchievedLevel,
+          p14Db: authority.p14AchievedDb,
+        } : null;
+        return { action: "verified", fingerprint: state.cacheKey, levels };
       }
     }
     return { action: "blocked", reason: "applied-design-fingerprint-not-ready" };
@@ -1278,6 +1305,8 @@ export default function OptimiseAndCalculate({
     planRunId: planView?.run?.runId || null,
     latestRunId: latestJointRun?.runId || null,
     runIdentityStatus: planView?.runIdentityStatus || "pending",
+    projectId,
+    versionId,
   });
   const planStatus = planView?.status || null;
   const planSuperseded = planView?.superseded === true;
