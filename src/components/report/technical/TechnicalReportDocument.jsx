@@ -19,12 +19,18 @@
  * Technical review workspace), and its print layout is made visible on screen so
  * the reader sees the Technical pages in the page itself, in the same form the
  * PDF carries.
+ *
+ * `forceCurrentPublication` propagates the parent Project Report's Update intent:
+ * when the Project Report is regenerating against the current publication, the
+ * embedded Technical Report must read the SAME current publication rather than
+ * independently pinning to the saved snapshot's previous publication. Ordinary
+ * viewing passes false, so the embedded report keeps its frozen evidence.
  */
 
 import React from 'react';
 import { TechnicalReportEmbedded } from '@/pages/RP22Report';
 
-export default function TechnicalReportDocument({ p19Graph = null } = {}) {
+export default function TechnicalReportDocument({ p19Graph = null, forceCurrentPublication = false } = {}) {
   return (
     <div className="project-report-technical-document">
       <style>{`
@@ -49,7 +55,7 @@ export default function TechnicalReportDocument({ p19Graph = null } = {}) {
       {/* The document's ONE saved P19 curve payload travels in, so the Technical
           Report's P19 page and the Project Report's own P19 page draw the same
           curve instead of each rebuilding it from its own reading. */}
-      <TechnicalReportEmbedded p19Graph={p19Graph} />
+      <TechnicalReportEmbedded p19Graph={p19Graph} forceCurrentPublication={forceCurrentPublication} />
     </div>
   );
 }

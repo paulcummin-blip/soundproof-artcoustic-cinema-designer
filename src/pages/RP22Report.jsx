@@ -140,7 +140,7 @@ function isCapturedPlan(value) {
  *   belong to this route, never to the merged document. Nothing about the
  *   report's pages changes; only the chrome around them is left to the route.
  */
-function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
+function RP22ReportInner({ embed = false, p19Graph = null, forceCurrentPublication = false } = {}) {
     const liveApp = useAppState();
 
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
@@ -254,7 +254,13 @@ function RP22ReportInner({ embed = false, p19Graph = null } = {}) {
     });
     const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId, {
         finalReport: true,
-        engineeringFingerprint: savedReport.fingerprint,
+        // When the parent Project Report is regenerating against the current
+        // publication (Update Report), the embedded Technical Report must read
+        // the SAME current publication rather than independently pinning to the
+        // saved snapshot's previous publication. Ordinary viewing keeps the
+        // saved fingerprint so the embedded pages stay frozen to their original
+        // evidence.
+        engineeringFingerprint: (embed && forceCurrentPublication) ? null : savedReport.fingerprint,
     });
     const app = useMemo(() => frozenReportAppState(liveApp, reportAuthority.publication), [liveApp, reportAuthority.publication]);
     const frozenProject = useMemo(() => frozenPublicationProject(reportAuthority.publication, savedReport.saved), [reportAuthority.publication, savedReport.saved]);
@@ -1559,6 +1565,6 @@ export default function RP22Report() {
  * consolidated Project Report. It is the same report, the same pages and the
  * same print layout; see TechnicalReportDocument.
  */
-export function TechnicalReportEmbedded({ p19Graph = null } = {}) {
-    return <RP22ReportInner embed p19Graph={p19Graph} />;
+export function TechnicalReportEmbedded({ p19Graph = null, forceCurrentPublication = false } = {}) {
+    return <RP22ReportInner embed p19Graph={p19Graph} forceCurrentPublication={forceCurrentPublication} />;
 }

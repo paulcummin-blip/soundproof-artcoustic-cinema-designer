@@ -169,9 +169,22 @@ export function useReportSnapshot({
       const publication = durableRead.publication;
       const bass = getCompletedBassAuthority(projectId, versionId);
       const caches = await base44.entities.ProjectAnalysisCache.filter({ project_id: projectId, version_id: versionId });
-      const pointers = [...new Set(caches.map(row => row.current_fingerprint).filter(Boolean))];
-      if (publication.provenance?.bass_fingerprint !== bass?.currentFingerprint
-        || pointers.length !== 1 || bass?.currentFingerprint !== pointers[0]
+      // The "current" pointer is the one the active version's publication
+      // designates: the bass fingerprint named by the publication's provenance.
+      // Historical cache rows retain their own fingerprints from when they were
+      // current — they are not competing current authorities, only preserved
+      // evidence. The safeguard still rejects a genuine conflict: two rows
+      // BOTH claiming the publication's bass fingerprint as their current
+      // pointer with status "complete" is a real conflict.
+      const publicationBassFp = publication.provenance?.bass_fingerprint || null;
+      const currentPointers = [...new Set(
+        (caches || [])
+          .filter(row => row.current_fingerprint && row.current_fingerprint === publicationBassFp && row.status === 'complete')
+          .map(row => row.current_fingerprint)
+      )];
+      if (!publicationBassFp
+        || publicationBassFp !== bass?.currentFingerprint
+        || currentPointers.length !== 1
         || !assessRestoredBassAuthorityCurrentness(bass).current) {
         if (mountedRef.current) {
           setPublicationBlocked('Final report blocked: durable current bass pointer does not match the restored authority.');

@@ -11,7 +11,7 @@
  * helpers only.
  */
 
-import React, { useMemo, useSyncExternalStore } from "react";
+import React, { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   readPlanDrawingReadiness,
@@ -88,6 +88,7 @@ import { buildProductsSelected, layoutVisibilityFilter } from "@/components/repo
 import { systemFormat } from "@/shared/systemFormat";
 import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speakerDesignRows";
 import { reportDateLabel } from "@/components/report/reportFirstPageMeta";
+import { validateReportExportIntegrity } from "@/components/report/reportExportIntegrity";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -210,6 +211,23 @@ export default function RP22ClientReport() {
     authoritative: completedBassAuthority?.authoritative === true,
     roomDims,
   }), [completedBassAuthority?.contract, completedBassAuthority?.authoritative, roomDims]);
+
+  // ── Export integrity ────────────────────────────────────────────────────
+  // Content-based validation: the PDF must contain actual engineering evidence,
+  // not merely the correct number of pages. This check runs before the export
+  // button is enabled and again immediately before PDF generation, so an
+  // incomplete report can never export. It never fabricates missing results and
+  // never substitutes old evidence — it only reports what is present.
+  const reportShowDesignRating = authority.authoritySnapshot?.showAsdr !== false;
+  const exportIntegrity = useMemo(() => validateReportExportIntegrity({
+    publication: authority.publication,
+    engineeringSummary,
+    completedBassAuthority,
+    p19Graph,
+    showDesignRating: reportShowDesignRating,
+    isometricReportImageReady,
+    pageCount: orderedPages.length,
+  }), [authority.publication, engineeringSummary, completedBassAuthority, p19Graph, reportShowDesignRating, isometricReportImageReady, orderedPages.length]);
 
   // Design assumptions (P15/P21) are deliberately absent from the client-facing
   // report: they are engineering caveats and remain in the Technical Report.
@@ -642,7 +660,7 @@ export default function RP22ClientReport() {
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
-  const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
+  const { exporting, error: exportError, handleExport: rawHandleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
     // other identity segment: the filename never depends on the report's frozen
@@ -680,6 +698,16 @@ export default function RP22ClientReport() {
     // designer never has to remember a second PDF button.
     speakerDesignCompanion,
   });
+
+  // Final pre-export integrity guard. The button's disabled state and the
+  // autoPrint ready condition already check exportIntegrity.ready, but this
+  // runs one last time immediately before PDF generation — so a race between
+  // readiness and the click, or any path that bypasses the disabled check,
+  // still refuses to print an incomplete report.
+  const handleExport = useCallback(() => {
+    if (!exportIntegrity.ready) return;
+    return rawHandleExport();
+  }, [exportIntegrity.ready, rawHandleExport]);
 
   // A failed export resolves the report to the canonical Failed state.
   const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed || !!savedReport.error;
@@ -814,7 +842,7 @@ export default function RP22ClientReport() {
   // publication.
   useReportActionIntent({
     requested: reportIntent.exportPdf,
-    ready: reportReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting,
+    ready: reportReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
     onRun: handleExport,
   });
   useReportActionIntent({
@@ -980,7 +1008,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED}
+            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED || !exportIntegrity.ready}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
@@ -1113,7 +1141,7 @@ export default function RP22ClientReport() {
             detail, the primary-seat bass curves and the single closing About
             Sound Proof page. Nothing about those pages is edited, re-sectioned,
             split apart or given a competing presentation. */}
-        {reportFullyReady && orderedPages.length > 0 && <TechnicalReportDocument p19Graph={p19Graph} />}
+        {reportFullyReady && orderedPages.length > 0 && <TechnicalReportDocument p19Graph={p19Graph} forceCurrentPublication={updateRequested} />}
         {exportError && (
           <div className="client-report-screen-only" style={{
             marginTop: 16,
