@@ -545,7 +545,11 @@ export default function RP22ClientReport() {
   // The automatic ADI Project Summary. Mounted before the page composition so
   // its status is available to the Project Summary page (failure card + Retry)
   // and to the export gate. One generation, no separate editorial pass.
-  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId });
+  // Design Intent generation is restricted to explicit Update Report or first
+  // generation. Ordinary viewing of a saved report never triggers generation
+  // or modifies the saved snapshot's payload.
+  const autoIntentEnabled = updateRequested || !savedReport.saved;
+  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId, enabled: autoIntentEnabled });
 
   // The page CONTENT is assembled by the report's own composition hook; the
   // composition authority (projectReportRegistry) owns the document — the section
