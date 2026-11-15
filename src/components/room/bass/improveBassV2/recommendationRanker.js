@@ -2,6 +2,7 @@
 // P19, then P20, then P18, then P14. Seat priorities remain explicit.
 
 import { isMaterialImprovement } from './materialityGate.js';
+import { isPhysicalMaterialImprovement, isPhysicalCandidate } from './physicalMaterialityGate.js';
 import { compareZeroFailFirst } from './zeroFailOptimiser.js';
 
 // Practical priority — lower = less disruptive = preferred for equivalent results.
@@ -178,7 +179,11 @@ export function rankRecommendations(selection) {
     if (result === calibrationResult) continue;
     if (!currentResult) continue;
 
-    const mat = isMaterialImprovement(currentResult, result);
+    // Physical candidates (placement, seating, coordinated) use the stricter
+    // physical materiality gate; calibration-only uses the existing gate.
+    const mat = isPhysicalCandidate(result)
+      ? isPhysicalMaterialImprovement(currentResult, result)
+      : isMaterialImprovement(currentResult, result);
     if (!mat.material) continue;
 
     const interventionType = classifyIntervention(result);

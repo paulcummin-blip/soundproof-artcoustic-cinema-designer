@@ -20,7 +20,7 @@
 // independent output-capability and headroom requirement.
 // ---------------------------------------------------------------------------
 
-import { isMaterialImprovement } from "./materialityGate";
+import { isPhysicalMaterialImprovement } from "./physicalMaterialityGate.js";
 
 /**
  * Convert a coordinated candidate evidence object (from
@@ -169,7 +169,9 @@ export function compareWithBaseline(baselineEvidence, candidateEvidence) {
 
   const baselineResult = evidenceToResult(baselineEvidence);
   const candidateResult = evidenceToResult(candidateEvidence);
-  const materiality = isMaterialImprovement(baselineResult, candidateResult);
+  // Coordinated physical alternatives use the stricter physical materiality
+  // gate: a level change (or an L1→L1 ≥6 dB variation gain) is required.
+  const materiality = isPhysicalMaterialImprovement(baselineResult, candidateResult);
 
   const comparison = buildComparison(baselineEvidence, candidateEvidence);
 

@@ -750,8 +750,7 @@ export function resolveCalibrationAutoApply({
     return outcome(CALIBRATION_APPLY_DECISION.HOLD,CALIBRATION_APPLY_REASON.TRADEOFF_REVIEW_REQUIRED,
       "This electronic trade-off was not applied.",context);
   }
-  if (!materiality?.material && !(applyValidatedSimulation && materiality?.valid !== false &&
-      Number.isFinite(rawBenefit) && rawBenefit > 0.000001)) {
+  if (!materiality?.material) {
     // An improvement that clears the canonical action figure with no regression
     // guard breached is a SUGGESTION: the overall result improves, so it is
     // stated as what to change and what it buys — never as a failed

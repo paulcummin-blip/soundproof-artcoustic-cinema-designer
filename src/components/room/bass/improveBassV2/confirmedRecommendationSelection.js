@@ -1,5 +1,6 @@
 import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey, validateCandidateForRun } from "./confirmedCandidateValidity.js";
 import { isMaterialImprovement } from "./materialityGate.js";
+import { isPhysicalMaterialImprovement, isPhysicalCandidate } from "./physicalMaterialityGate.js";
 import { rankRecommendations } from "./recommendationRanker.js";
 import { extractAuthoritativeMetrics, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
 import { classifyVerifiedTradeOff } from "./tradeOffClassifier.js";
@@ -99,7 +100,8 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
     // classification below instead of being force-promoted to eligible.
     const currentFails = countFailingSeats(baseline);
     const candidateFails = countFailingSeats(result);
-    if (!protectedUnsafe && candidateFails < currentFails) {
+    const isPhysical = isPhysicalCandidate(result);
+    if (!protectedUnsafe && candidateFails < currentFails && !isPhysical) {
       const eliminated = currentFails - candidateFails;
       const reason = candidateFails === 0
         ? `All seats now pass P19 and P20 (eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''})`
@@ -108,7 +110,12 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
       eligible.push(result);
       continue;
     }
-    const materiality = isMaterialImprovement(baseline,result);
+    // Physical candidates (placement, seating, coordinated) use the stricter
+    // physical materiality gate: a level change (or an L1→L1 ≥6 dB variation
+    // gain) is required. Calibration-only candidates use the existing gate.
+    const materiality = isPhysical
+      ? isPhysicalMaterialImprovement(baseline, result)
+      : isMaterialImprovement(baseline, result);
     // Check for verified trade-off regardless of materiality — a candidate
     // that materially improves one objective while materially worsening another
     // is a trade-off (designer choice), NOT a normal recommendation.
