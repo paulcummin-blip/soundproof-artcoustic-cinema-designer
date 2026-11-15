@@ -1030,6 +1030,16 @@ export default function RP22ClientReport() {
             {exporting ? "Preparing Project Report…" : "Download Project Report (PDF)"}
           </Button>
         </div>
+        {reportReady && !exportIntegrity.ready && !exporting && (
+          <div className="client-report-screen-only" style={{
+            padding: "4px 32px 0",
+            fontSize: 12,
+            color: "#4A230F",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          }}>
+            PDF not ready: {exportIntegrity.issues[0]}
+          </div>
+        )}
       </div>
 
       {/* ── Body — active pages drive both screen and print ── */}

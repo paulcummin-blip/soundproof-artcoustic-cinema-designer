@@ -19,6 +19,20 @@
  */
 
 /**
+ * Recognise the canonical RP22 terminal N/A result — the same definition used
+ * by overheadLayerAuthority.isNotApplicableMetric. A status of "not_applicable"
+ * or the saved lowercase "na", applicable === false, or a level of "N/A" all
+ * signal a legitimate terminal not-applicable result. Genuinely missing,
+ * provisional or invalid results do not match and still block export.
+ */
+function isTerminalNotApplicable(metric) {
+  if (!metric || typeof metric !== "object") return false;
+  const status = String(metric.status || "").toLowerCase();
+  if (status === "not_applicable" || status === "na") return true;
+  return metric.applicable === false || String(metric.level).toUpperCase() === "N/A";
+}
+
+/**
  * Validate the export integrity of the consolidated Project Report.
  *
  * @param {object} params
@@ -99,12 +113,18 @@ export function validateReportExportIntegrity({
     categories.p19Graph = false;
   }
 
-  // 6. Required RP22 results are populated.
+  // 6. Required RP22 results are populated. A legitimately not-applicable
+  // result is a terminal result and counts as present — only a genuinely
+  // missing, provisional or invalid result blocks export. P9 and P10 are
+  // overhead-only: they are N/A for a design with no height speakers and
+  // required when one is installed.
   const roomResults = engineeringSummary?.roomResultsByParameter || {};
-  const requiredRoomParams = [2, 3, 5, 7, 8, 11, 12, 13, 14, 18, 19, 21];
+  const requiredRoomParams = [2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 18, 19, 21];
   const missingRoomParams = requiredRoomParams.filter(id => {
     const row = roomResults[id] || roomResults[String(id)];
-    return !row || (!row.level && !row.formatted && !row.valueText && row.status !== 'not_applicable');
+    if (!row) return true;
+    if (isTerminalNotApplicable(row)) return false;
+    return !row.level && !row.formatted && !row.valueText;
   });
   if (missingRoomParams.length > 0) {
     issues.push(`RP22 parameter results are missing: ${missingRoomParams.map(p => 'P' + p).join(', ')}.`);

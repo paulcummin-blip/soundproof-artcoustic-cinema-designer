@@ -32,7 +32,7 @@ const PANELS = [
   { key: "raw", label: "01 · Raw Bass Response", subtitle: "Untreated room response" },
   { key: "subs", label: "02 · Selected Subwoofers", subtitle: "Individual subwoofer product capability" },
   { key: "inRoom", label: "03 · Selected Subwoofers In-Room", subtitle: "Predicted pre-EQ response at the RSP" },
-  { key: "final", label: "04 · Final EQ Response", subtitle: "Predicted corrected response at the RSP" },
+  { key: "final", label: "04 · Final EQ Response", subtitle: "Predicted unsmoothed post-EQ response at the RSP" },
 ];
 
 function panelSeries(panelKey, graphs) {
@@ -130,7 +130,10 @@ export default function BassCalculationsPage({
       )}
 
       <div style={{ marginTop: "4mm", fontSize: "8pt", color: "#9B9890", lineHeight: 1.5 }}>
-        Curves are the saved calculated responses for this design. No curve is reconstructed from RP22 scores.
+        <div>Curves are the saved calculated responses for this design. No curve is reconstructed from RP22 scores.</div>
+        <div style={{ marginTop: "2mm" }}>
+          Panel 04 shows the predicted unsmoothed post-EQ response. The separate RP22 P19 assessment applies one-third-octave smoothing; its result is not directly comparable to this curve by visual height. Each graph labels its Frequency (Hz) and SPL (dB) axes, and panels may use different SPL scales.
+        </div>
       </div>
     </section>
   );

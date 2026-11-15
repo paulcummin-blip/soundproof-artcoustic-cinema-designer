@@ -32,6 +32,7 @@ import { auditReportSaveAuthority } from '@/components/engineering/publicationGa
 import { resolveIssuedDocumentAccountId } from '@/components/library/issuedDocument/issuedDocumentOwnership';
 import { readProjectOwnership } from '@/components/library/issuedDocument/projectOwnershipRead';
 import { isProjectReportType } from '@/components/report/projectReport/projectReportIdentity';
+import { detectConflictingBassRecords } from './conflictingBassRecordCheck';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
 import {
   REPORT_SNAPSHOT_STATUS,
@@ -177,17 +178,22 @@ export function useReportSnapshot({
       // BOTH claiming the publication's bass fingerprint as their current
       // pointer with status "complete" is a real conflict.
       const publicationBassFp = publication.provenance?.bass_fingerprint || null;
-      const currentPointers = [...new Set(
-        (caches || [])
-          .filter(row => row.current_fingerprint && row.current_fingerprint === publicationBassFp && row.status === 'complete')
-          .map(row => row.current_fingerprint)
-      )];
+      // Among cache rows claiming the publication's bass fingerprint as their
+      // current pointer, every row must carry the SAME completed contract. Two
+      // rows with the same current_fingerprint but different (or missing)
+      // completed contracts is a genuine conflict — the publication can only
+      // point at one authoritative result. Historical rows with a different
+      // current_fingerprint are preserved evidence and never compete here.
+      const bassConflict = detectConflictingBassRecords(caches, publicationBassFp);
       if (!publicationBassFp
         || publicationBassFp !== bass?.currentFingerprint
-        || currentPointers.length !== 1
+        || bassConflict.noCurrent
+        || bassConflict.conflict
         || !assessRestoredBassAuthorityCurrentness(bass).current) {
         if (mountedRef.current) {
-          setPublicationBlocked('Final report blocked: durable current bass pointer does not match the restored authority.');
+          setPublicationBlocked(bassConflict.conflict
+            ? 'Final report blocked: conflicting completed bass contracts found for the current fingerprint.'
+            : 'Final report blocked: durable current bass pointer does not match the restored authority.');
           setSaveFailure({ reason: 'The saved report does not match the published engineering assessment for this version.' });
         }
         return null;
