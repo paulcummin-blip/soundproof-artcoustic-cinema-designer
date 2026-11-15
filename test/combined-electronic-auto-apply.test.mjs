@@ -106,12 +106,19 @@ for(const failure of ["save","verify","receipt"])test(failure+" failure restores
 });
 test("stale identity writes nothing",async()=>{const h=harness("stale");await assert.rejects(()=>executeElectronicTransaction(h.io));assert.equal(h.events.length,0);});
 
-test("same-Level simulation improvement is eligible without rounding it away",async()=>{
+test("fractional same-Level simulation improvement is not auto-applied merely because positive",async()=>{
  const {resolveCalibrationAutoApply}=await import("../src/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js");
  const b={candidateId:"current",achievedP19VariationDb:4.1,achievedP19Level:"L4",achievedP20VariationDb:6,achievedP20Level:"L1",perSeatP19:[],perSeatP20:[{seatId:"seat1",variationDbRaw:6,level:"L1",isPrimary:true}]};
  const c={...b,candidateId:"gain",candidateKind:"calibration",achievedP20VariationDb:5.95,perSeatP20:[{seatId:"seat1",variationDbRaw:5.95,level:"L1",isPrimary:true}],appliedTuning:tuning};
  const d=resolveCalibrationAutoApply({baseline:b,candidate:c,instances,applyValidatedSimulation:true});
- assert.equal(d.decision,"applied");assert.equal(d.before.p20.level,d.after.p20.level);
+ assert.notEqual(d.decision,"applied");
+});
+test("meaningful same-Level electronic improvement (>= 1.0 dB) is still auto-applied",async()=>{
+ const {resolveCalibrationAutoApply}=await import("../src/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js");
+ const b={candidateId:"current",achievedP19VariationDb:4.1,achievedP19Level:"L4",achievedP20VariationDb:6,achievedP20Level:"L1",perSeatP19:[],perSeatP20:[{seatId:"seat1",variationDbRaw:6,level:"L1",isPrimary:true}]};
+ const c={...b,candidateId:"gain",candidateKind:"calibration",achievedP20VariationDb:5.0,perSeatP20:[{seatId:"seat1",variationDbRaw:5.0,level:"L1",isPrimary:true}],appliedTuning:tuning};
+ const d=resolveCalibrationAutoApply({baseline:b,candidate:c,instances,applyValidatedSimulation:true});
+ assert.equal(d.decision,"applied");
 });
 test("small same-Level trade-off below 3:1 remains held",async()=>{
  const {resolveCalibrationAutoApply}=await import("../src/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js");
