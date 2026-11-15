@@ -107,18 +107,33 @@ export default function RP22ClientReport() {
   // opened the wrong version's report.
   const requestedVersionId = useMemo(() => readRequestedVersionId(searchParams), [searchParams]);
 
-  // VIEW vs GENERATE. A saved report's OWN engineering fingerprint is resolved
-  // first: while a saved Project Report exists this page renders from that exact
-  // immutable publication, so a later design change can mark it Update Needed but
-  // can never alter it. With no saved report the current version authority is
-  // used, which is generation mode.
+  // VIEW vs UPDATE vs GENERATE.
+  //
+  // VIEW: a saved report's OWN engineering fingerprint is resolved first: while a
+  // saved Project Report exists this page renders from that exact immutable
+  // publication, so a later design change can mark it Update Needed but can never
+  // alter it.
+  //
+  // UPDATE: when the URL carries updateReport=1 the page switches to the
+  // version's CURRENT durable engineering publication. A saved report whose
+  // pinned publication is no longer present (e.g. the version's
+  // engineering_publications map has moved on) would otherwise load no summary
+  // and the readiness gate would block the very regeneration the user asked
+  // for. The current publication is the one persist() already saves against, so
+  // this only unblocks the generation path — it never substitutes newer
+  // calculations into a report that is merely being viewed.
+  //
+  // GENERATE: no saved report means the current version authority, which is
+  // generation mode.
+  const reportIntent = readReportActionIntent(searchParams);
+  const updateRequested = reportIntent.updateReport === true;
   const savedReport = useSavedReportFingerprint({
     projectId,
     requestedVersionId,
     reportType: PROJECT_REPORT_SNAPSHOT_TYPE,
   });
   const authority = useClientReportAuthority(projectId, requestedVersionId, {
-    savedEngineeringFingerprint: savedReport.fingerprint,
+    savedEngineeringFingerprint: updateRequested ? null : savedReport.fingerprint,
     savedSnapshot: savedReport.saved,
   });
   // The P19 evidence graph reads the same saved completed bass contract the
@@ -794,7 +809,9 @@ export default function RP22ClientReport() {
   // report's PDF, ?updateReport=1 creates an updated report from the design as it
   // stands. Both run through THIS report's own handlers — the same ones its own
   // buttons call — and neither changes the saved report's status.
-  const reportIntent = readReportActionIntent(searchParams);
+  // reportIntent is read above (before useClientReportAuthority) so an
+  // explicit Update Report request can switch the authority to the current
+  // publication.
   useReportActionIntent({
     requested: reportIntent.exportPdf,
     ready: reportReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting,
