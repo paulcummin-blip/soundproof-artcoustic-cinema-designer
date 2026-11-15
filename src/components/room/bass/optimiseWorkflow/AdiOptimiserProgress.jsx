@@ -26,16 +26,25 @@
 import React from "react";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
-// Stage checklist in the engine's actual execution order. Each entry maps to
-// a v2State stageVerdict key (see improveBassV2StageMapping STAGE_KEYS).
+// Stage checklist in the designer-facing presentation order. Each entry maps
+// to a v2State stageVerdict key (see improveBassV2StageMapping STAGE_KEYS).
+// Presentation order only — the engine's execution sequence is unchanged; each
+// stage's live status is resolved from its verdict/key regardless of order.
+// The first four are electronic adjustments; the last two are physical design
+// adjustments.
 const STAGES = [
-  { key: "phase_polarity", label: "Phase", hint: "phase alignment between subwoofers" },
-  { key: "delays", label: "Delay", hint: "timing alignment between subwoofers" },
-  { key: "gain", label: "Gain", hint: "level balance between subwoofers" },
-  { key: "sub_positions", label: "Placement", hint: "practical subwoofer placement changes" },
-  { key: "seating_positions", label: "Seating", hint: "small seating changes for bass consistency" },
-  { key: "combining_best", label: "Crossover integration", hint: "integrated LCR / subwoofer crossover" },
+  { key: "gain", label: "Gain", hint: "level balance between subwoofers", group: "electronic" },
+  { key: "delays", label: "Delay", hint: "timing alignment between subwoofers", group: "electronic" },
+  { key: "phase_polarity", label: "Phase", hint: "phase alignment between subwoofers", group: "electronic" },
+  { key: "combining_best", label: "Crossover integration", hint: "integrated LCR / subwoofer crossover", group: "electronic" },
+  { key: "sub_positions", label: "Subwoofer placement", hint: "practical subwoofer placement changes", group: "physical" },
+  { key: "seating_positions", label: "Seating position", hint: "small seating changes for bass consistency", group: "physical" },
 ];
+
+const GROUP_LABELS = {
+  electronic: "Electronic adjustments",
+  physical: "Physical design adjustments",
+};
 
 // Resolve a single stage's display state from its verdict + stage status.
 // A recorded verdict is permanent for this run — it never reverts to waiting.
@@ -212,7 +221,7 @@ export default function AdiOptimiserProgress({
 
       {showChecklist && (
         <div className="space-y-1.5 pl-2" data-adi-progress-checklist="true">
-          {STAGES.map((stage) => {
+          {STAGES.map((stage, idx) => {
             const stageEntry = stageDisplay?.stages?.find((s) => s.key === stage.key) || null;
             const verdict = stageDisplay?.stageVerdicts?.[stage.key]
               ?? v2State?.stageVerdicts?.[stage.key]
@@ -225,23 +234,35 @@ export default function AdiOptimiserProgress({
             const notTestedReason = state === "not_tested" && stage.key === "seating_positions"
               ? "Seating not searched in this run"
               : null;
+            const prevGroup = idx > 0 ? STAGES[idx - 1].group : null;
+            const showGroupHeader = stage.group !== prevGroup;
             return (
-              <div key={stage.key} className="flex items-start gap-2 text-[12px]" data-adi-progress-stage={stage.key} data-adi-progress-state={state}>
-                <div className="pt-0.5"><StageIcon state={state} /></div>
-                <div className="min-w-0">
-                  <span
-                    className={state === "active" ? "text-[#1B1A1A] font-medium" : "text-[#3E4349]"}
+              <React.Fragment key={stage.key}>
+                {showGroupHeader && (
+                  <div
+                    className="pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]"
+                    data-adi-progress-group={stage.group}
                   >
-                    {stage.label}
-                  </span>
-                  <span className="text-[10px] ml-1.5" style={{ color: meta.colour }}>
-                    {meta.label}
-                  </span>
-                  {notTestedReason && (
-                    <span className="text-[10px] text-[#8A7B6A] ml-1">— {notTestedReason}</span>
-                  )}
+                    {GROUP_LABELS[stage.group]}
+                  </div>
+                )}
+                <div className="flex items-start gap-2 text-[12px]" data-adi-progress-stage={stage.key} data-adi-progress-state={state}>
+                  <div className="pt-0.5"><StageIcon state={state} /></div>
+                  <div className="min-w-0">
+                    <span
+                      className={state === "active" ? "text-[#1B1A1A] font-medium" : "text-[#3E4349]"}
+                    >
+                      {stage.label}
+                    </span>
+                    <span className="text-[10px] ml-1.5" style={{ color: meta.colour }}>
+                      {meta.label}
+                    </span>
+                    {notTestedReason && (
+                      <span className="text-[10px] text-[#8A7B6A] ml-1">— {notTestedReason}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </React.Fragment>
             );
           })}
         </div>

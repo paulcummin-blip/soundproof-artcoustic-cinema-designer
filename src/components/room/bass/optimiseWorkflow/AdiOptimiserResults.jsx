@@ -62,14 +62,23 @@ const fmt = (v, d = 1) => {
 
 // Fixed category order, mapping each to its saved lever key and its
 // calibration-evidence key (where one exists).
+// Designer-facing presentation order: the first four are electronic
+// adjustments, the final two are physical design adjustments. Presentation
+// order only — lever keys and calibKeys are unchanged, so saved evidence,
+// apply logic and status resolution are unaffected.
 const CATEGORIES = [
-  { key: "phase", label: "Phase", leverKey: null, calibKey: "phase" },
-  { key: "delay", label: "Delay", leverKey: OPTIMISER_LEVER.DELAY, calibKey: "delay" },
-  { key: "gain", label: "Gain", leverKey: OPTIMISER_LEVER.GAIN, calibKey: "gain" },
-  { key: "placement", label: "Placement", leverKey: OPTIMISER_LEVER.PLACEMENT, calibKey: null },
-  { key: "seating", label: "Seating", leverKey: OPTIMISER_LEVER.SEATING, calibKey: null },
-  { key: "crossover", label: "Crossover integration", leverKey: OPTIMISER_LEVER.COMBINED_ELECTRONIC, calibKey: "combined" },
+  { key: "gain", label: "Gain", leverKey: OPTIMISER_LEVER.GAIN, calibKey: "gain", group: "electronic" },
+  { key: "delay", label: "Delay", leverKey: OPTIMISER_LEVER.DELAY, calibKey: "delay", group: "electronic" },
+  { key: "phase", label: "Phase", leverKey: null, calibKey: "phase", group: "electronic" },
+  { key: "crossover", label: "Crossover integration", leverKey: OPTIMISER_LEVER.COMBINED_ELECTRONIC, calibKey: "combined", group: "electronic" },
+  { key: "placement", label: "Subwoofer placement", leverKey: OPTIMISER_LEVER.PLACEMENT, calibKey: null, group: "physical" },
+  { key: "seating", label: "Seating position", leverKey: OPTIMISER_LEVER.SEATING, calibKey: null, group: "physical" },
 ];
+
+const CATEGORY_GROUP_LABELS = {
+  electronic: "Electronic adjustments",
+  physical: "Physical design adjustments",
+};
 
 const TONE = {
   analysing: { bg: "#F1F0EE", border: "#C1B6AD", color: "#4A230F" },
@@ -813,32 +822,43 @@ export default function AdiOptimiserResults({
         <div className="mt-0.5 text-[12px] leading-relaxed text-[#1B1A1A]">{summary}</div>
       </div>
 
-      {/* The six categories */}
+      {/* The six categories, grouped: electronic adjustments then physical design adjustments */}
       <div className="space-y-1.5" data-adi-result-checklist="true">
-        {cats.map((cat) => {
+        {cats.map((cat, idx) => {
           const lever = cat.leverKey ? leversById[cat.leverKey] : null;
           const calibLever = cat.calibKey
             ? (planView?.calibrationEvidence?.levers?.[cat.calibKey]
               || (cat.calibKey === "combined" ? planView?.calibrationEvidence?.combined : null))
             : null;
           const status = resolveCategoryStatus({ cat, lever, calibLever, planView, isRunning });
+          const prevGroup = idx > 0 ? cats[idx - 1].group : null;
+          const showGroupHeader = cat.group !== prevGroup;
           return (
-            <CategoryRow
-              key={cat.key}
-              cat={cat}
-              status={status}
-              lever={lever}
-              calibLever={calibLever}
-              planView={planView}
-              projectId={projectId}
-              versionId={versionId}
-              fingerprint={fingerprint}
-              onApply={handleApplyLever ? () => handleApplyLever(lever) : null}
-              onUndo={handleUndoLever ? () => handleUndoLever(lever) : null}
-              onDismiss={() => dismissRecommendation(projectId, versionId, cat.leverKey, fingerprint)}
-              onRestore={() => restoreRecommendation(projectId, versionId, cat.leverKey, fingerprint)}
-              applyBusy={leverApplyBusy}
-            />
+            <React.Fragment key={cat.key}>
+              {showGroupHeader && (
+                <div
+                  className="pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]"
+                  data-adi-result-group={cat.group}
+                >
+                  {CATEGORY_GROUP_LABELS[cat.group]}
+                </div>
+              )}
+              <CategoryRow
+                cat={cat}
+                status={status}
+                lever={lever}
+                calibLever={calibLever}
+                planView={planView}
+                projectId={projectId}
+                versionId={versionId}
+                fingerprint={fingerprint}
+                onApply={handleApplyLever ? () => handleApplyLever(lever) : null}
+                onUndo={handleUndoLever ? () => handleUndoLever(lever) : null}
+                onDismiss={() => dismissRecommendation(projectId, versionId, cat.leverKey, fingerprint)}
+                onRestore={() => restoreRecommendation(projectId, versionId, cat.leverKey, fingerprint)}
+                applyBusy={leverApplyBusy}
+              />
+            </React.Fragment>
           );
         })}
       </div>
