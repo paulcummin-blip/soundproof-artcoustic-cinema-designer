@@ -31,6 +31,7 @@
 import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
 import { waitForOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { mergeAppliedLeverRecords } from "@/components/room/bass/optimiserPlan/optimiserApplyProvenance.js";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
@@ -419,10 +420,10 @@ export default function useRunOptimisationPlan({
       const runtimeBreakdown = summariseElectronicStageBreakdown({
         runtimeMetrics: result.runtimeMetrics || null,
       });
-      setOptimiserPlanAuthority(projectId, versionId, {
-        ...runRecord,
-        runtimeBreakdown,
-      });
+      setOptimiserPlanAuthority(projectId, versionId, mergeAppliedLeverRecords(
+        getOptimiserPlanAuthority(projectId, versionId),
+        { ...runRecord, runtimeBreakdown },
+      ));
       // ── FAILURE FALLBACK ──
       // The completed run record is already in the authority. If the version
       // save is not acknowledged in time the completed candidate evidence must
@@ -527,11 +528,10 @@ export default function useRunOptimisationPlan({
       // publication below.
       recordRunTiming(projectId, versionId, RUN_TIMING.USER_TERMINAL);
       recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
-      setOptimiserPlanAuthority(projectId, versionId, {
-        ...runRecord,
-        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
-        runtimeBreakdown,
-      });
+      setOptimiserPlanAuthority(projectId, versionId, mergeAppliedLeverRecords(
+        getOptimiserPlanAuthority(projectId, versionId),
+        { ...runRecord, timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)), runtimeBreakdown },
+      ));
       setStatus("complete");
 
       // ── 3. THE RECOMMENDATION PUBLICATION — SECONDARY, NEVER BLOCKING ──
@@ -563,12 +563,15 @@ export default function useRunOptimisationPlan({
       // publication and never repeated — carrying what it did. It changes no
       // result, no design value and no readiness of anything: a reload restores
       // the same terminal state, with the publication's outcome beside it.
-      setOptimiserPlanAuthority(projectId, versionId, {
-        ...runRecord,
-        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
-        runtimeBreakdown: { ...runtimeBreakdown, timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)), publication: publicationDiagnostics },
-        recommendationPublication,
-      });
+      setOptimiserPlanAuthority(projectId, versionId, mergeAppliedLeverRecords(
+        getOptimiserPlanAuthority(projectId, versionId),
+        {
+          ...runRecord,
+          timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+          runtimeBreakdown: { ...runtimeBreakdown, timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)), publication: publicationDiagnostics },
+          recommendationPublication,
+        },
+      ));
 
       // Finalise the pre-written "pending" row in place with the publication's
       // real outcome. When the pre-write did not land, create the row from

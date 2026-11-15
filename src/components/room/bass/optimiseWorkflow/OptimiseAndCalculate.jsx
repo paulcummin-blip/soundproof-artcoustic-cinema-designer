@@ -114,6 +114,7 @@ import { canReuseCurrentBaselineForOptimiser } from "./retestPreflightAuthority.
 import { useOptimiserPlanView } from "../optimiserPlan/useOptimiserPlanView.js";
 import AdiOptimiserResults from "./AdiOptimiserResults.jsx";
 import { useLeverApplyActions } from "./useLeverApplyActions.js";
+import { mergeAppliedLeverRecords } from "../optimiserPlan/optimiserApplyProvenance.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -453,9 +454,10 @@ export default function OptimiseAndCalculate({
       terminalTrace: { ...trace },
     });
     const saveTracedRecord = (record) => {
-      if (getLatestOptimiserRun(projectId, versionId)?.runId !== activeRun.runId) return;
-      trace.planSave = "requested";
-      setOptimiserPlanAuthority(projectId, versionId, attachTrace(record));
+        if (getLatestOptimiserRun(projectId, versionId)?.runId !== activeRun.runId) return;
+        trace.planSave = "requested";
+        setOptimiserPlanAuthority(projectId, versionId,
+          mergeAppliedLeverRecords(getOptimiserPlanAuthority(projectId, versionId), attachTrace(record)));
     };
     // The plan actionability decided at the save boundary, used at the terminal
     // history row so a winnerless re-test records "no_useful_improvement" rather

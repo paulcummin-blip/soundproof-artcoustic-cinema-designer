@@ -47,6 +47,11 @@ import {
   subscribeTradeOffKept,
 } from "@/components/room/bass/optimiserPlan/optimiserKeepTradeOffStore.js";
 import { buildDesignChangeRecommendations } from "@/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import {
+  recordLeverAppliedPending,
+  completeLeverApplyVerification,
+  completeLeverUndoVerification,
+} from "@/components/room/bass/optimiserPlan/optimiserApplyProvenance.js";
 
 // ── Displacement helpers ──
 
@@ -252,6 +257,9 @@ export default function AdiRecommendation({
     // A seating lever writes the evaluated seat positions — the subwoofer
     // instances are never touched by it, and vice versa. Undo writes back the
     // lever's own persisted previous positions.
+    // PROVENANCE: the apply is recorded on the plan's appliedLeverRecords so
+    // the run's recommendation survives the recalculation and any later run.
+    // This mirrors useLeverApplyActions so this path cannot bypass provenance.
     if (lever.key === OPTIMISER_LEVER.SEATING) {
       if (!commitSeating) return;
       const result = direction === "from"
@@ -263,9 +271,8 @@ export default function AdiRecommendation({
         rspMode: appState?.rspMode, manualRspY_m: appState?.manualRspY_m,
       });
       if (!rspUpdate.ok || (rspUpdate.manualRspY_m !== null && typeof appState?.setManualRspY_m !== "function")) return;
-      // Capture the previous design before updating either seats or manual RSP.
-      // Transaction safety: block the seating lever if the pre-apply checkpoint
-      // cannot be captured for a design with a physical configuration.
+      const sourceDesignFingerprint = shared?.cacheKey || null;
+      const planRunId = optimiserPlanView?.run?.runId || null;
       try {
         commitSeating(result.seatingPositions);
       } catch {
@@ -275,8 +282,35 @@ export default function AdiRecommendation({
       setLeverOutcome({
         leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key, direction,
       });
+      if (projectId && versionId && direction === "to") {
+        recordLeverAppliedPending(projectId, versionId, {
+          runId: planRunId, leverKey: lever.key, direction, lever,
+          sourceDesignFingerprint,
+          affectedIds: result.affectedSeatIds || [],
+        });
+      }
       if (typeof onRecalculate === "function") {
-        onRecalculate({ previousCacheKey: shared?.cacheKey || null });
+        const verification = onRecalculate({ previousCacheKey: sourceDesignFingerprint });
+        if (projectId && versionId && direction === "to") {
+          Promise.resolve(verification).then((v) => {
+            completeLeverApplyVerification(projectId, versionId, planRunId, lever.key, {
+              status: v?.action === "verified" ? "verified" : "incomplete",
+              resultingDesignFingerprint: v?.fingerprint || null,
+              calculationFingerprint: v?.fingerprint || null,
+              levels: v?.levels || null,
+              failureReason: v?.action !== "verified" ? (v?.reason || "Recalculation did not complete") : null,
+            });
+          });
+        } else if (projectId && versionId && direction === "from") {
+          Promise.resolve(verification).then((v) => {
+            completeLeverUndoVerification(projectId, versionId, planRunId, lever.key, {
+              status: v?.action === "verified" ? "verified" : "incomplete",
+              calculationFingerprint: v?.fingerprint || null,
+              levels: v?.levels || null,
+              failureReason: v?.action !== "verified" ? (v?.reason || "Recalculation did not complete") : null,
+            });
+          });
+        }
       }
       return;
     }

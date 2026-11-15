@@ -205,9 +205,16 @@ export function completeLeverUndoVerification(projectId, versionId, runId, lever
 export function resolveApplyProvenance(plan, currentDesignFingerprint) {
   const records = Array.isArray(plan?.appliedLeverRecords) ? plan.appliedLeverRecords : [];
   const savedFingerprint = plan?.designFingerprint || null;
+  // Only records from THIS run count towards "spent" and "applied levers."
+  // Records from a previous run are historical evidence: they do not disable
+  // the new run's Apply buttons.
+  const runId = plan?.run?.runId || null;
+  const currentRunRecords = runId
+    ? records.filter((r) => r.runId === runId)
+    : records;
 
-  const hasAppliedRecord = records.some((r) => r.direction === "to");
-  const appliedLeverKeys = [...new Set(records
+  const hasAppliedRecord = currentRunRecords.some((r) => r.direction === "to");
+  const appliedLeverKeys = [...new Set(currentRunRecords
     .filter((r) => r.direction === "to" && !r.undoneAt)
     .map((r) => r.leverKey))];
 
@@ -242,4 +249,28 @@ export function resolveApplyProvenance(plan, currentDesignFingerprint) {
   }
 
   return { status: "none", hasAppliedRecord, appliedLeverKeys };
+}
+
+/**
+ * Merge appliedLeverRecords from the existing plan into a new plan record.
+ *
+ * A later optimisation run must NOT erase the record of a previously applied
+ * recommendation. When a new run saves its plan/evidence, the existing plan's
+ * appliedLeverRecords are carried over so historical Apply provenance survives.
+ *
+ * The records are per-run (each carries its own runId), so resolveApplyProvenance
+ * can distinguish the current run's records from previous runs' records.
+ */
+export function mergeAppliedLeverRecords(existingPlan, newRecord) {
+  if (!newRecord || typeof newRecord !== "object") return newRecord;
+  const existingRecords = Array.isArray(existingPlan?.appliedLeverRecords)
+    ? existingPlan.appliedLeverRecords
+    : [];
+  if (existingRecords.length === 0) return newRecord;
+  // Don't double-add records the new record already carries (defensive).
+  const newRecords = Array.isArray(newRecord.appliedLeverRecords)
+    ? newRecord.appliedLeverRecords
+    : [];
+  if (newRecords.length > 0) return newRecord;
+  return { ...newRecord, appliedLeverRecords: existingRecords };
 }
