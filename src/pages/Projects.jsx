@@ -126,6 +126,10 @@ export default function ProjectsPage() {
   const isAdmin = user?.role === "admin";
   const { available: professionalCapacity, status: capacityStatus, loading: capacityLoading, refresh: refreshCapacity } = useProfessionalCapacity();
   const showCapacityIndicator = capacityStatus === 'OK';
+  // Opt-in admin-only illustration for reviewing the dealer header. Display only:
+  // never changes capacity, promotions, access, timers, or project creation.
+  const illustrativeHeader = isAdmin && capacityStatus === 'ADMIN'
+    && new URLSearchParams(window.location.search).get('headerPreview') === '1';
   const { isEffective: promotionEffective, headline: promoHeadline, message: promoMessage, endsAt: promoEndsAt, loading: promoLoading, refresh: refreshPromotion } = useEffectivePromotion();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -778,73 +782,93 @@ export default function ProjectsPage() {
       }}
       data-testid="projects-safe-boot"
     >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {showCapacityIndicator && (
-            <div style={{ fontSize: 13, color: BRAND.subtext, whiteSpace: "nowrap" }}>
-              Professional Projects: <strong style={{ color: BRAND.text }}>{capacityLoading ? '…' : professionalCapacity}</strong> available
-            </div>
-          )}
-          {showCapacityIndicator && promotionEffective && !promoLoading && (
-            <div
-              title={promoMessage || undefined}
-              style={{
-                padding: "10px 16px",
-                borderRadius: 10,
-                border: `1px solid #213428`,
-                background: "#F3F0EB",
-                color: "#213428",
-                fontSize: 13,
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {`Special access: Unlimited until ${formatPromotionEndDate(promoEndsAt)}`}
-            </div>
-          )}
-          {showCapacityIndicator && !promotionEffective && (
+      {/* Projects-only visual preview. Illustrations never feed entitlement logic. */}
+      <div data-testid="projects-header" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px 24px" }}>
+          <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, maxWidth: "100%" }}>
+            {(showCapacityIndicator || illustrativeHeader) && (
+              <div style={{ fontSize: 13, color: BRAND.subtext }}>
+                Professional Projects: <strong style={{ color: BRAND.text }}>{illustrativeHeader ? 3 : capacityLoading ? '…' : professionalCapacity}</strong> available
+                {illustrativeHeader && <span style={{ fontSize: 11 }}> · Illustrative</span>}
+              </div>
+            )}
+            {((showCapacityIndicator && promotionEffective && !promoLoading) || illustrativeHeader) && (
+              <div
+                title={illustrativeHeader ? "Illustrative entitlement display only" : promoMessage || undefined}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: "1px solid #213428",
+                  background: "#F3F0EB",
+                  color: "#213428",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  maxWidth: "100%",
+                }}
+              >
+                {illustrativeHeader
+                  ? 'Special access: Unlimited until 31 Dec 2026 · Illustrative'
+                  : `Special access: Unlimited until ${formatPromotionEndDate(promoEndsAt)}`}
+              </div>
+            )}
+            {showCapacityIndicator && !promotionEffective && (
+              <button
+                type="button"
+                onClick={() => navigate('/PurchaseProjects')}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${BRAND.border}`,
+                  background: BRAND.card,
+                  color: BRAND.subtext,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Buy Projects
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => navigate('/PurchaseProjects')}
+              onClick={openDialog}
               style={{
-                padding: "10px 16px",
+                padding: "13px 20px",
                 borderRadius: 10,
                 border: `1px solid ${BRAND.border}`,
-                background: BRAND.card,
-                color: BRAND.subtext,
+                background: BRAND.btn,
+                color: BRAND.btnText,
                 cursor: "pointer",
-                fontSize: 13,
+                fontSize: 18,
                 whiteSpace: "nowrap",
               }}
             >
-              Buy Projects
+              + New Project
             </button>
-          )}
-          <button
-            type="button"
-            onClick={openDialog}
+          </div>
+        </div>
+        {(showCapacityIndicator || illustrativeHeader) && (
+          <div
+            aria-label="Illustrative offer and renewal preview"
             style={{
-              padding: "13px 20px",
-              borderRadius: 10,
-              border: `1px solid ${BRAND.border}`,
-              background: BRAND.btn,
-              color: BRAND.btnText,
-              cursor: "pointer",
-              fontSize: 18,
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              gap: "6px 24px",
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: `1px solid ${BRAND.border}`,
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: BRAND.subtext,
             }}
           >
-            + New Project
-          </button>
-        </div>
+            <span style={{ fontSize: 11 }}>Preview · illustrative offer &amp; renewal dates</span>
+            <span><strong style={{ color: BRAND.text, fontWeight: 600 }}>Current offer</strong> · 3 months’ free access · <span style={{ whiteSpace: "nowrap" }}>Ends 31 Dec 2026</span></span>
+            <span><strong style={{ color: BRAND.text, fontWeight: 600 }}>Access renewal</strong> · <span style={{ whiteSpace: "nowrap" }}>Renew by 15 Feb 2027</span></span>
+          </div>
+        )}
       </div>
 
       {/* Controls */}
