@@ -28,7 +28,7 @@ import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
 import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
 import { useLatestOptimiserRun } from "../optimiserPlan/optimiserRunAuthority.js";
 import { useSyncExternalStore } from "react";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle, Info } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { capturePublicationTrace } from "../publicationTraceStore";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -1408,7 +1408,9 @@ export default function OptimiseAndCalculate({
            technical diagnostics are rendered from this section. Saved
            optimisation evidence and recommendations remain in their own
            existing result areas; nothing is deleted or altered. */}
-      {!adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && !showResultsPanel && (
+      {/* State 1 — ADI has not yet run (no current result, design not stale):
+           single dark-green button, no explanatory message. */}
+      {!adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && !showResultsPanel && !planStale && (
         <button
           type="button"
           onClick={runCalibrationAutoApply}
@@ -1420,9 +1422,34 @@ export default function OptimiseAndCalculate({
         </button>
       )}
 
+      {/* State 2 — design has changed since the last ADI analysis (planStale):
+           subtle neutral message + warm-brown "Recheck Bass Performance" button.
+           Not an error or warning box; no animation. The stale signal is owned
+           by the optimiser plan authority (unchanged) — this is presentation only. */}
       {planStale && !adiWorkflowRunning && !isError && !isCancelledState && !isTimedOut && (
-        <div className="rounded-md border border-[#C1B6AD] bg-[#F1F0EE] px-3 py-2 text-[11px] leading-relaxed text-[#4A230F]">
-          Previous ADI results are stale — the design has changed. Re-run to update the analysis.
+        <div className="rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] overflow-hidden">
+          <div className="px-4 py-3">
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 text-[#6B6B6B] mt-0.5 shrink-0" />
+              <div>
+                <div className="text-[13px] font-semibold text-[#1F1F1F]">
+                  Your cinema design has changed
+                </div>
+                <div className="text-[11px] leading-relaxed text-[#3E4349] mt-0.5">
+                  ADI can check whether further improvements are possible.
+                </div>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={runCalibrationAutoApply}
+            disabled={bassActionDisabled}
+            className="w-full bg-[#625143] px-4 py-3 text-[13px] font-semibold text-white transition-opacity hover:bg-[#4A4133] disabled:cursor-not-allowed disabled:opacity-45 flex items-center justify-center gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Recheck Bass Performance
+          </button>
         </div>
       )}
 

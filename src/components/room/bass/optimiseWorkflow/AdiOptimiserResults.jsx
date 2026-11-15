@@ -851,7 +851,7 @@ export default function AdiOptimiserResults({
         data-adi-result-run-again="true"
       >
         <Sparkles className="h-4 w-4" />
-        Run ADI Bass Optimiser
+        Run ADI Again
       </button>
     </div>
   );
