@@ -62,6 +62,10 @@ export function serializeOptimiserPlan(plan) {
     // states the same decision instead of re-deriving one.
     calibrationDecision: plan.calibrationDecision || null,
     decisionApplied: plan.decisionApplied === true,
+    // The separate electronic Apply authorization (applyValidatedSimulation):
+    // persisted so a reopened plan states the same applied decision instead of
+    // re-deriving one. Absent on records saved before this existed.
+    electronicApplyDecision: plan.electronicApplyDecision || null,
     combined: plan.combined || null,
     levers: plan.levers || {},
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,

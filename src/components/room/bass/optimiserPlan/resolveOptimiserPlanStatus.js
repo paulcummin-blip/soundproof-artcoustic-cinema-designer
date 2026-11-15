@@ -98,6 +98,7 @@ export function resolveOptimiserPlanStatus({
       calibrationEvidence: null,
       calibrationDecision: null,
       decisionApplied: false,
+      electronicApplyDecision: null,
       levers: [],
       individualEffectsEvaluated: false,
       baseline: null,
@@ -143,6 +144,7 @@ export function resolveOptimiserPlanStatus({
       calibrationEvidence: plan.calibrationEvidence || null,
       calibrationDecision: plan.calibrationDecision || null,
       decisionApplied: plan.decisionApplied === true,
+      electronicApplyDecision: plan.electronicApplyDecision || null,
       levers: [],
       individualEffectsEvaluated: false,
       baseline: null,
@@ -503,6 +505,7 @@ export function resolveOptimiserPlanStatus({
     // the run, so the panel states it after a refresh instead of guessing.
     calibrationDecision: plan.calibrationDecision || null,
     decisionApplied: plan.decisionApplied === true,
+    electronicApplyDecision: plan.electronicApplyDecision || null,
     baseline: plan.baseline || null,
     // The subwoofer census the run evaluated, so every surface can judge the
     // evaluated move against the layout it was measured in.

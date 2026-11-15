@@ -122,7 +122,12 @@ function resolveCategoryStatus({ cat, lever, calibLever, planView, isRunning }) 
   }
   // Crossover / combined electronic is applied by the run's guarded auto-apply,
   // not by a single-lever apply. The run's own decision is the authority here.
-  if (cat.key === "crossover" && planView?.decisionApplied === true && lever) {
+  // The separate applyValidatedSimulation path can apply and verify a candidate
+  // even when the overall recommendation selector found no winner — in that
+  // case there is no lever, but electronicApplyDecision carries the verified
+  // receipt. Show "Applied and verified" in both cases.
+  if (cat.key === "crossover" && planView?.decisionApplied === true
+      && (lever || planView?.electronicApplyDecision)) {
     return { key: "applied", label: "Applied and verified", tone: "applied" };
   }
   // Run spent: a recommended lever that was not the applied/undone one is
@@ -162,6 +167,12 @@ function resolveCategoryStatus({ cat, lever, calibLever, planView, isRunning }) 
   if (cs === "failed") return { key: "failed", label: "Failed", tone: "failed", note: reasonFor(cat.key, planView) };
   if (cs === "incomplete") return { key: "incomplete", label: "Incomplete", tone: "incomplete", note: reasonFor(cat.key, planView) };
   if (cs === "skipped" || cs === "not_applicable" || cs === "not_run") {
+    // Seating that a run never reached (gate closed, or the run stopped before
+    // the seating search) is "Not tested" — matching the live checklist's
+    // wording, and distinct from a category that was genuinely unavailable.
+    if (cat.key === "seating") {
+      return { key: "not_tested", label: "Not tested", tone: "unavailable", note: reasonFor(cat.key, planView) || "Seating was not searched in this run." };
+    }
     return { key: "unavailable", label: "Unavailable", tone: "unavailable", note: reasonFor(cat.key, planView) };
   }
   return { key: "incomplete", label: "Incomplete", tone: "incomplete" };
@@ -400,8 +411,12 @@ function buildSummary({ planView, dismissedCount }) {
     return "Run spent — original analysis retained. Re-run ADI to evaluate new changes.";
   }
 
-  if (combined && planView?.decisionApplied === true) {
-    applied.push(combined);
+  // The separate applyValidatedSimulation path can apply and verify a
+  // combined electronic candidate even when the overall selector found no
+  // winner — in that case `combined` is undefined but electronicApplyDecision
+  // carries the verified receipt. Count it as applied in both cases.
+  if (planView?.decisionApplied === true && (combined || planView?.electronicApplyDecision)) {
+    applied.push(combined || { key: OPTIMISER_LEVER.COMBINED_ELECTRONIC });
     const idx = identified.indexOf(combined);
     if (idx >= 0) identified.splice(idx, 1);
   }

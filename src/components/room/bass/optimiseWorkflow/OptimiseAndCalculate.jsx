@@ -115,6 +115,7 @@ import { useOptimiserPlanView } from "../optimiserPlan/useOptimiserPlanView.js";
 import AdiOptimiserResults from "./AdiOptimiserResults.jsx";
 import { useLeverApplyActions } from "./useLeverApplyActions.js";
 import { mergeAppliedLeverRecords } from "../optimiserPlan/optimiserApplyProvenance.js";
+import { buildElectronicApplyDecision } from "./electronicApplyDecision.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1079,12 +1080,68 @@ export default function OptimiseAndCalculate({
           expectedEffectiveTuning:clone(candidate.appliedTuning.map(t=>({...t,phaseControlDeg:t.phaseControlDeg??t.phaseAdjust}))),
           beforeLevels:resultLevels(baseline),changes:changedSettings(prepared.before,prepared),
         };
-        await performElectronicUpdate(receipt);
+        const verifiedReceipt=await performElectronicUpdate(receipt);
         calibrationApplied=true;
         const keys=new Set(receipt.changes.map(r=>r.label.split(" · ").pop()));
         setComplete(projectId,versionId,{phase:keys.has("Phase"),delay:keys.has("Delay"),
           gain:keys.has("Gain"),polarity:keys.has("Polarity"),calibration:null},recommendations,false);
-        publishAdiRecommendationInBackground(sharedRef.current.cacheKey,persistedPlan,planRunEvidence,adiDecision);
+        // ── Re-save the plan with the post-Apply fingerprint, decisionApplied,
+        // and the electronic apply decision ──
+        // The separate applyValidatedSimulation path can legitimately accept a
+        // small same-Level improvement the overall recommendation selector did
+        // not choose. The durable record of THAT decision — the exact candidate,
+        // the verified receipt, and the actual before/after crossover and tuning
+        // settings — is carried into the saved plan so the plan, the published
+        // recommendation, and the completed UI all agree the adjustment was
+        // applied and verified. Publication uses the post-Apply plan evidence,
+        // not the pre-Apply plan. The supporting P19/P20 dB improvement is kept
+        // visible without inventing an RP22 Level upgrade.
+        const postApplyDesignFingerprint=sharedRef.current?.cacheKey||null;
+        const postApplyResultFingerprint=sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
+          ||sharedRef.current?.completedBassAuthority?.currentFingerprint||null;
+        if(persistedPlan&&postApplyResultFingerprint){
+          const electronicApplyDecision=buildElectronicApplyDecision({
+            chosen, receipt:verifiedReceipt||receipt, baseline, runId:activeRun.runId,
+          });
+          const postApplyPlan={
+            ...persistedPlan,
+            savedAt:new Date().toISOString(),
+            designFingerprint:postApplyDesignFingerprint,
+            resultFingerprint:postApplyResultFingerprint,
+            cacheKey:postApplyDesignFingerprint,
+            decisionApplied:true,
+            electronicApplyDecision,
+          };
+          saveTracedRecord(postApplyPlan);
+          publishAdiRecommendationInBackground(postApplyDesignFingerprint,postApplyPlan,null,adiDecision);
+        }else{
+          publishAdiRecommendationInBackground(sharedRef.current.cacheKey,persistedPlan,planRunEvidence,adiDecision);
+        }
+        // ── Also re-save terminal run evidence (no_useful_improvement) with the
+        // electronic apply decision ──
+        // When the overall selector found no winner (no offerable levers), the
+        // saved record is terminal run evidence, not an actionable plan. The
+        // separate applyValidatedSimulation path can still apply and verify a
+        // candidate. The durable record must carry that decision so the saved
+        // evidence, the published recommendation, and the completed UI all agree
+        // the adjustment was applied — distinct from the overall selector's
+        // no_useful_improvement verdict.
+        if(!persistedPlan&&planRunEvidence&&postApplyResultFingerprint){
+          const electronicApplyDecision=buildElectronicApplyDecision({
+            chosen, receipt:verifiedReceipt||receipt, baseline, runId:activeRun.runId,
+          });
+          const postApplyEvidence={
+            ...planRunEvidence,
+            savedAt:new Date().toISOString(),
+            designFingerprint:postApplyDesignFingerprint,
+            resultFingerprint:postApplyResultFingerprint,
+            cacheKey:postApplyDesignFingerprint,
+            decisionApplied:true,
+            electronicApplyDecision,
+          };
+          saveTracedRecord(postApplyEvidence);
+          if(postApplyDesignFingerprint) publishAdiRecommendationInBackground(postApplyDesignFingerprint,null,postApplyEvidence,adiDecision);
+        }
       }else{
         const noBenefit=result.status==="complete" && !selection.winner && !rejected.length &&
           !(selection.evaluationIssues||[]).length;

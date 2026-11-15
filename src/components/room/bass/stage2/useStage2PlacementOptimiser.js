@@ -22,6 +22,7 @@ import {
   publishHydratedStage2,
   markStage2Idle,
   markStage2Waiting,
+  markStage2Error,
   adoptStage2Request,
 } from "./stage2PlacementStore";
 import { hydrateStage2PlacementCache, isStage2CacheValid, isRawTransferCacheValid } from "./stage2PlacementPersistence";
@@ -35,6 +36,14 @@ import { STAGE2_START_DELAY_MS } from "./stage2Constants";
 import { resolveQuantityOrder } from "./stage2QuantityOrder";
 import { useIsDragActive } from "@/components/state/userInteractionStore";
 import { normaliseRecommendationScope } from "../stage1/stage1RecommendationScope";
+
+// Bounded no-progress exit for the Stage 1 prerequisite wait. When Stage 1
+// evidence does not match within this window, Stage 2 reports a specific
+// "prerequisite missing" error instead of idling until the 300s safety
+// ceiling. Generous enough for normal Stage 1 startup (typically 10–30s),
+// well under the 300s orchestrator timeout. Existing worker watchdogs and
+// acoustic candidate evaluation limits are unchanged.
+const STAGE2_PREREQUISITE_WAIT_MS = 120000;
 
 function computeTransitionHz(roomDims) {
   const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
@@ -414,6 +423,33 @@ export function useStage2PlacementOptimiser({
       ownerRequestId: requestId,
     });
   }, [fingerprint, placementFingerprint, confirmationFingerprint, projectId, hydrationDone, currentQuantity, enabled, requestId, isInteracting, resolvedAmplifierPowerPerSubW, recScope, stage1State?.status, stage1State?.ownerRequestId, stage1State?.fingerprint, expectedStage1Fingerprint, stage1EvidenceMatches]);
+
+  // ── Bounded no-progress exit for the Stage 1 prerequisite wait ──────
+  // When the hook is active (enabled + requestId + expectedStage1Fingerprint)
+  // but Stage 1 evidence does not match, Stage 2 is parked in
+  // "waiting_for_stage1". If no matching Stage 1 result arrives within
+  // STAGE2_PREREQUISITE_WAIT_MS, report the specific condition as an error so
+  // the V2 engine's waitForStage2Terminal settles promptly with a useful
+  // explanation — instead of idling until the 300s safety ceiling. The timer
+  // clears the moment Stage 1 evidence matches, the request changes, or the
+  // hook unmounts. Existing worker watchdogs and acoustic evaluation limits
+  // are unchanged.
+  useEffect(() => {
+    if (!enabled || !requestId || !expectedStage1Fingerprint || stage1EvidenceMatches) return undefined;
+    const timer = setTimeout(() => {
+      // Re-check at fire time: Stage 1 may have matched between the schedule
+      // and the timeout.
+      const latestStage1 = getStage1State(projectId, versionId);
+      const latestMatches = !!expectedStage1Fingerprint
+        && latestStage1?.status === "complete"
+        && latestStage1?.fingerprint === expectedStage1Fingerprint;
+      if (latestMatches) return;
+      stage2PlacementController.cancelAll("stage1-prerequisite-missing");
+      markStage2Error(projectId, versionId, null,
+        "Stage 1 placement prerequisite missing — no matching result arrived. Re-run the optimisation.");
+    }, STAGE2_PREREQUISITE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [enabled, requestId, expectedStage1Fingerprint, stage1EvidenceMatches, projectId, versionId]);
 
   // Expose the COMPUTED fingerprint (derived from current inputs via useMemo
   // above) alongside the STORED store state. The stored `state.fingerprint` is

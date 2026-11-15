@@ -36,9 +36,7 @@ import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Impor
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
-import { useStage1PlacementOptimiser } from '@/components/room/bass/stage1/useStage1PlacementOptimiser';
-import { useStage2PlacementOptimiser } from '@/components/room/bass/stage2/useStage2PlacementOptimiser';
-import { useBassHeavyAction, markBassHeavyActionRunning, markBassHeavyActionComplete, markBassHeavyActionError } from '@/components/room/bass/bassHeavyActionStore';
+import { useRoomDesignerPlacementOptimisers } from '@/components/room/bass/stage2/useRoomDesignerPlacementOptimisers';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { useAbfuserInclusion } from "@/components/roomdesigner/useAbfuserInclusion";
@@ -657,114 +655,22 @@ function RoomDesignerWithState() {
   // Heavy placement work receives a unique request identity from a deliberate
   // post-result user action. The hooks bind that request to their first valid
   // fingerprint and refuse to follow later geometry/model/target changes.
-  const bassHeavyAction = useBassHeavyAction(activeProjectId, appState?.activeVersionId);
-  const recommendationsActive = !!bassHeavyAction?.requestId
-    && ["optimise", "compare"].includes(bassHeavyAction.action)
-    && ["requested", "running", "complete"].includes(bassHeavyAction.status);
-  // Installed subwoofer count (same rule Stage 2 uses) scopes a selected-quantity Stage 1 run.
-  const _stage1ScopeQty = React.useMemo(() => {
-    const instances = (appState?.subwooferInstances || []).filter(i => i?.enabled !== false);
-    const count = instances.length || (appState?.subwoofers || []).length;
-    return (count === 1 || count === 2 || count === 3 || count === 4) ? count : null;
-  }, [appState?.subwoofers, appState?.subwooferInstances]);
-  const stage1Optimisation = useStage1PlacementOptimiser({
-    projectId: activeProjectId,
-    versionId: appState?.activeVersionId || "free",
-    roomDims: stableDimensions,
-    rspPosition: mlpAnchorEffective,
-    seatingPositions: _seatingPositions,
-    enabled: recommendationsActive,
-    requestId: recommendationsActive ? bassHeavyAction.requestId : null,
-    scopeQuantity: bassHeavyAction?.selectedQuantityOnly === true ? _stage1ScopeQty : null,
-  });
-
-  // ── Stage 2 Subwoofer Placement Optimiser ──────────────────────────
-  // Canonical P19/P20 evaluation of Stage 1 finalists at the selected P14 target.
-  // Product-aware, P14-aware. Reuses the existing canonical bass authority pipeline.
-  const _stage2SubModel = React.useMemo(() => {
-    const subs = appState?.subwoofers || [];
-    const instances = appState?.subwooferInstances || [];
-    const firstInstance = instances.find(i => i?.enabled !== false);
-    if (firstInstance?.model) return firstInstance.model;
-    return subs[0]?.modelKey || subs[0]?.model || null;
-  }, [appState?.subwoofers, appState?.subwooferInstances]);
-
-  const _stage2CurrentQty = React.useMemo(() => {
-    const subs = appState?.subwoofers || [];
-    const instances = (appState?.subwooferInstances || []).filter(i => i?.enabled !== false);
-    const count = instances.length || subs.length;
-    // Quantity 3 is a first-class installed subwoofer count (Stage 1 produces
-    // three_sub_result finalists; STAGE2_QUANTITY_ORDER is [1,2,3,4]). Omitting
-    // it here made resolveQuantityOrder fall back to [2,4,1], so a design whose
-    // only valid Stage 1 finalists were three-source produced zero Stage 2 jobs
-    // and the run sat idle until the global safety timeout. The authoritative
-    // supported-quantity mechanism already includes 3 — the handoff must too.
-    return (count === 1 || count === 2 || count === 3 || count === 4) ? count : null;
-  }, [appState?.subwoofers, appState?.subwooferInstances]);
-
-  // Subwoofer bottom height for Stage 2 acoustic-centre Z derivation.
-  // Read from the first enabled subwoofer instance (same authority as production
-  // bassInputAdapter). Falls back to the adapted subwoofers array, then null
-  // (Stage 2 uses its own fallback bottom height).
-  const _stage2SubBottomHeightM = React.useMemo(() => {
-    const instances = appState?.subwooferInstances || [];
-    const firstInstance = instances.find(i => i?.enabled !== false);
-    if (firstInstance && Number.isFinite(Number(firstInstance.bottomHeightM))) {
-      return Number(firstInstance.bottomHeightM);
-    }
-    const subs = appState?.subwoofers || [];
-    if (subs[0] && Number.isFinite(Number(subs[0].bottomHeightM))) {
-      return Number(subs[0].bottomHeightM);
-    }
-    return null;
-  }, [appState?.subwoofers, appState?.subwooferInstances]);
-
-  const stage2Optimisation = useStage2PlacementOptimiser({
-    projectId: activeProjectId,
-    versionId: appState?.activeVersionId || "free",
-    roomDims: stableDimensions,
-    rspPosition: mlpAnchorEffective,
-    seatingPositions: _seatingPositions,
-    selectedSubModel: _stage2SubModel,
-    amplifierPowerPerSubW: appState?.splConfig?.subwooferAmplifierPowerW,
-    splConfig: appState?.splConfig,
-    currentQuantity: _stage2CurrentQty,
-    subwooferBottomHeightM: _stage2SubBottomHeightM,
-    frontOrientation: appState?.frontSubsCfg?.orientation ?? null,
-    rearOrientation: appState?.rearSubsCfg?.orientation ?? null,
-    enabled: recommendationsActive,
-    requestId: recommendationsActive ? bassHeavyAction.requestId : null,
-    selectedQuantityOnly: bassHeavyAction?.selectedQuantityOnly === true,
-  });
-
-  useEffect(() => {
-    if (!recommendationsActive || !bassHeavyAction?.requestId) return;
-    if (stage1Optimisation?.status === "error" || stage2Optimisation?.status === "error") {
-      markBassHeavyActionError(
-        activeProjectId,
-        appState?.activeVersionId,
-        bassHeavyAction.requestId,
-        stage2Optimisation?.errorMessage || stage1Optimisation?.errorMessage,
-      );
-      return;
-    }
-    if (stage2Optimisation?.status === "complete") {
-      markBassHeavyActionComplete(activeProjectId, appState?.activeVersionId, bassHeavyAction.requestId);
-      return;
-    }
-    if (bassHeavyAction.status === "requested") {
-      markBassHeavyActionRunning(activeProjectId, appState?.activeVersionId, bassHeavyAction.requestId);
-    }
-  }, [
+  // Stage 2 receives the Stage 1 fingerprint the current geometry + selected
+  // quantity WOULD produce, so it can recognise a matching completed Stage 1
+  // result and release scheduling — the Stage 1 → Stage 2 fingerprint handoff.
+  const {
+    stage1Optimisation,
+    stage2Optimisation,
     recommendationsActive,
-    activeProjectId,
-    bassHeavyAction?.requestId,
-    bassHeavyAction?.status,
-    stage1Optimisation?.status,
-    stage1Optimisation?.errorMessage,
-    stage2Optimisation?.status,
-    stage2Optimisation?.errorMessage,
-  ]);
+    bassHeavyAction,
+  } = useRoomDesignerPlacementOptimisers({
+    projectId: activeProjectId,
+    versionId: appState?.activeVersionId,
+    roomDims: stableDimensions,
+    rspPosition: mlpAnchorEffective,
+    seatingPositions: _seatingPositions,
+    appState,
+  });
 
   // manualRspY_m is not yet set, seed it from the current mlpY_m.
   // A ref prevents this from firing more than once per mode entry.

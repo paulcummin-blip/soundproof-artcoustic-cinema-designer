@@ -367,6 +367,13 @@ export function buildOptimiserPlan({
   // from the real design state at plan-build time.
   currentCrossover = null,
   rspAuthority = null,
+  // The separate electronic Apply authorization record: when the run's guarded
+  // auto-apply loop (applyValidatedSimulation) applies and verifies a candidate
+  // that the overall recommendation selector did not choose, the durable record
+  // of that decision — candidate, verified receipt, before/after settings, and
+  // the supporting P19/P20 dB improvement — is carried here so the saved plan,
+  // the published recommendation, and the completed UI all agree.
+  electronicApplyDecision = null,
 } = {}) {
   if (!selection || typeof selection !== "object") return null;
   const winner = selection.winner || null;
@@ -631,6 +638,13 @@ export function buildOptimiserPlan({
     // why, without re-running the decision.
     calibrationDecision: calibrationDecision || null,
     decisionApplied: decisionApplied === true,
+    // The separate electronic Apply authorization (applyValidatedSimulation):
+    // the exact candidate that was applied, the verified receipt, and the
+    // actual before/after crossover and tuning settings. Distinct from
+    // calibrationDecision (the overall recommendation selector's decision) so a
+    // small same-Level improvement applied by the separate path is never lost
+    // from the durable record.
+    electronicApplyDecision: electronicApplyDecision || null,
     individualEffectsEvaluated,
     leverDecisions: normaliseDecisions(leverDecisions),
     applied: resolveAppliedMap(levers, instances, seatingPositions),
