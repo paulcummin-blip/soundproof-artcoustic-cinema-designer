@@ -108,6 +108,14 @@ export function useLeverApplyActions({
             levels: verification?.levels || null,
             failureReason: verification?.action !== "verified" ? (verification?.reason || "Recalculation did not complete") : null,
           });
+        } else if (projectId && versionId && direction === "from") {
+          // Undo: mark the applied record as undone with its own verification.
+          completeLeverUndoVerification(projectId, versionId, planRunId, lever.key, {
+            status: verification?.action === "verified" ? "verified" : "incomplete",
+            calculationFingerprint: verification?.fingerprint || null,
+            levels: verification?.levels || null,
+            failureReason: verification?.action !== "verified" ? (verification?.reason || "Recalculation did not complete") : null,
+          });
         }
       }
       return;

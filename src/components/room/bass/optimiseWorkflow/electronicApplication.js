@@ -114,14 +114,21 @@ export function changedSettings(before,after) {
   return rows;
 }
 export function resultLevels(result) {
-  const seats=result?.perSeatP20 || [];
-  const group=primary=>{
-    const rows=seats.filter(s=>s.isPrimary===primary);
-    const levels=rows.map(s=>canonicalLevel(s.level??s.achievedLevel??s.p20Level));
-    return rows.length && levels.every(finite)?Math.min(...levels):null;
-  };
-  return {p19:canonicalLevel(result?.achievedP19Level),primary:group(true),secondary:group(false)};
-}
+   const seats=result?.perSeatP20 || [];
+   const group=primary=>{
+     const rows=seats.filter(s=>s.isPrimary===primary);
+     const levels=rows.map(s=>canonicalLevel(s.level??s.achievedLevel??s.p20Level));
+     return rows.length && levels.every(finite)?Math.min(...levels):null;
+   };
+   return {
+     p19:canonicalLevel(result?.achievedP19Level),
+     // Display fields consumed by the verified-apply header in the results panel.
+     p19Level:canonicalLevel(result?.achievedP19Level),
+     p19VariationDb:result?.achievedP19VariationDb ?? null,
+     p20Level:canonicalLevel(result?.achievedP20Level),
+     p20VariationDb:result?.achievedP20VariationDb ?? null,
+     primary:group(true),secondary:group(false)};
+ }
 
 
 export function physicalContext(context){

@@ -75,7 +75,7 @@ test("report excludes unchanged settings and includes slopes and linking",()=>{
  assert.ok(!rows.some(r=>r.label==="Sub 1 · Gain"));
 });
 test("Level comparison reads canonical levels including missing secondary",()=>{
- assert.deepEqual(resultLevels({achievedP19Level:"L4",perSeatP20:[{isPrimary:true,level:"L2"}]}),{p19:4,primary:2,secondary:null});
+ assert.deepEqual(resultLevels({achievedP19Level:"L4",perSeatP20:[{isPrimary:true,level:"L2"}]}),{p19:4,p19Level:4,p19VariationDb:null,p20Level:null,p20VariationDb:null,primary:2,secondary:null});
 });
 function harness(failAt){
  const p=prepareElectronicCandidate(args()),before=p.before,after={instances:p.instances,crossover:p.crossover};
@@ -119,4 +119,3 @@ test("small same-Level trade-off below 3:1 remains held",async()=>{
  const c={...b,candidateId:"gain",candidateKind:"calibration",achievedP19VariationDb:4.14,achievedP20VariationDb:5.95,perSeatP20:[{seatId:"seat1",variationDbRaw:5.95,level:"L1",isPrimary:true}],appliedTuning:tuning};
  assert.equal(resolveCalibrationAutoApply({baseline:b,candidate:c,instances,applyValidatedSimulation:true}).decision,"hold");
 });
-

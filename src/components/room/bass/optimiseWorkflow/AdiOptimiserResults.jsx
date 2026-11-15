@@ -553,22 +553,31 @@ export default function AdiOptimiserResults({
   const verifiedLevels = appliedVerification?.levels || null;
   const baselineLevels = planView?.baseline || null;
 
+  // The baseline (plan.baseline) is the raw published bass authority, which
+  // carries achievedP19Level/achievedP20Level and achievedP19VariationDb/
+  // achievedP20VariationDb. The verified levels come from resultLevels, which
+  // returns p19Level/p20Level and p19VariationDb/p20VariationDb.
+  const baselineP19Level = levelText(baselineLevels?.achievedP19Level ?? baselineLevels?.p19Level);
+  const baselineP19Db = num(baselineLevels?.achievedP19VariationDb ?? baselineLevels?.p19VariationDb);
+  const baselineP20Level = levelText(baselineLevels?.achievedP20Level ?? baselineLevels?.p20Level);
+  const baselineP20Db = num(baselineLevels?.achievedP20VariationDb ?? baselineLevels?.p20VariationDb);
+
   const verifiedImprovementLines = [];
   if (appliedVerified && verifiedLevels) {
-    const p19Before = levelText(baselineLevels?.p19Level);
     const p19After = levelText(verifiedLevels.p19Level);
-    if (p19Before && p19After) {
+    if (baselineP19Level && p19After) {
       verifiedImprovementLines.push({
         kind: "level",
-        text: `P19: ${p19Before} \u2192 ${p19After}`,
+        text: `P19: ${baselineP19Level} \u2192 ${p19After}`,
+        dbText: fmt(verifiedLevels.p19VariationDb, 3) ? `${fmt(verifiedLevels.p19VariationDb, 3)} dB` : null,
       });
     }
-    const p20Before = levelText(baselineLevels?.p20Level);
     const p20After = levelText(verifiedLevels.p20Level);
-    if (p20Before && p20After) {
+    if (baselineP20Level && p20After) {
       verifiedImprovementLines.push({
         kind: "level",
-        text: `P20: ${p20Before} \u2192 ${p20After}`,
+        text: `P20: ${baselineP20Level} \u2192 ${p20After}`,
+        dbText: fmt(verifiedLevels.p20VariationDb, 3) ? `${fmt(verifiedLevels.p20VariationDb, 3)} dB` : null,
       });
     }
   }
@@ -585,9 +594,14 @@ export default function AdiOptimiserResults({
         <div className="rounded-md border border-[#213428] bg-[#213428] px-3 py-2.5" data-adi-applied-verified="true">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-white/80">ADI optimisation complete</div>
           {verifiedImprovementLines.length > 0 && (
-            <div className="mt-1 space-y-0.5">
+            <div className="mt-1 space-y-1">
               {verifiedImprovementLines.map((line, i) => (
-                <div key={`vl-${i}`} className="text-[13px] font-semibold text-white">{line.text}</div>
+                <div key={`vl-${i}`}>
+                  <div className="text-[13px] font-semibold text-white">{line.text}</div>
+                  {line.dbText && (
+                    <div className="text-[11px] text-white/70">{line.dbText}</div>
+                  )}
+                </div>
               ))}
             </div>
           )}
