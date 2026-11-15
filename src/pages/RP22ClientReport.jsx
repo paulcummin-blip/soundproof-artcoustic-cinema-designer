@@ -218,17 +218,6 @@ export default function RP22ClientReport() {
   // button is enabled and again immediately before PDF generation, so an
   // incomplete report can never export. It never fabricates missing results and
   // never substitutes old evidence — it only reports what is present.
-  const reportShowDesignRating = authority.authoritySnapshot?.showAsdr !== false;
-  const exportIntegrity = useMemo(() => validateReportExportIntegrity({
-    publication: authority.publication,
-    engineeringSummary,
-    completedBassAuthority,
-    p19Graph,
-    showDesignRating: reportShowDesignRating,
-    isometricReportImageReady,
-    pageCount: orderedPages.length,
-  }), [authority.publication, engineeringSummary, completedBassAuthority, p19Graph, reportShowDesignRating, isometricReportImageReady, orderedPages.length]);
-
   // Design assumptions (P15/P21) are deliberately absent from the client-facing
   // report: they are engineering caveats and remain in the Technical Report.
 
@@ -605,6 +594,23 @@ export default function RP22ClientReport() {
     autoIntentReason,
     onRetryAutoIntent: retryAutoIntent,
   });
+
+  // ── Export integrity ────────────────────────────────────────────────────
+  // Content-based validation: the PDF must contain actual engineering evidence,
+  // not merely the correct number of pages. This check runs before the export
+  // button is enabled and again immediately before PDF generation, so an
+  // incomplete report can never export. It never fabricates missing results and
+  // never substitutes old evidence — it only reports what is present.
+  const reportShowDesignRating = authority.authoritySnapshot?.showAsdr !== false;
+  const exportIntegrity = useMemo(() => validateReportExportIntegrity({
+    publication: authority.publication,
+    engineeringSummary,
+    completedBassAuthority,
+    p19Graph,
+    showDesignRating: reportShowDesignRating,
+    isometricReportImageReady,
+    pageCount: orderedPages.length,
+  }), [authority.publication, engineeringSummary, completedBassAuthority, p19Graph, reportShowDesignRating, isometricReportImageReady, orderedPages.length]);
 
   // The Technical plan drawings (room plan, dimensioned room plan, speaker
   // position plan) are captured by the embedded Technical Report once its pages
