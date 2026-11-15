@@ -175,6 +175,8 @@ export function resolveOptimiserPlanStatus({
   const appliedVerified = provenance.status === "verified";
   const appliedPending = provenance.status === "pending";
   const appliedIncomplete = provenance.status === "incomplete";
+  const undoneVerified = provenance.undoneVerified === true;
+  const undoneRecord = provenance.undoneRecord || null;
 
   if (!savedFingerprint || !currentDesignFingerprint) {
     status = OPTIMISER_PLAN_STATUS.STALE;
@@ -429,6 +431,27 @@ export function resolveOptimiserPlanStatus({
     }
   }
 
+  // ── Undone and verified ──
+  // When a verified Undo record exists for this run's lever and the restored
+  // fingerprint matches the current design, the lever is in the
+  // UNDONE_VERIFIED state. This is distinct from RESTORED (coordinate match
+  // only): a verified Undo carries undoVerification.status === "verified".
+  // No Apply/Undo is offered; the original recommendation and verified Apply
+  // result are retained as historical evidence. No acoustic calculation is
+  // changed.
+  if (undoneVerified && undoneRecord?.leverKey) {
+    const undoneLever = levers.find((l) => l.key === undoneRecord.leverKey) || null;
+    if (undoneLever) {
+      undoneLever.state = OPTIMISER_LEVER_STATE.UNDONE_VERIFIED;
+      undoneLever.stateLabel =
+        OPTIMISER_LEVER_STATE_LABEL[OPTIMISER_LEVER_STATE.UNDONE_VERIFIED]
+        || OPTIMISER_LEVER_STATE.UNDONE_VERIFIED;
+      undoneLever.canApply = false;
+      undoneLever.canUndo = false;
+      undoneLever.applyBlockedReason = null;
+    }
+  }
+
   return {
     status,
     evidenceMessage: null,
@@ -462,6 +485,11 @@ export function resolveOptimiserPlanStatus({
     runSpent,
     appliedVerification: appliedVerified ? provenance.verifiedRecord?.verification || null : null,
     appliedLeverKeys: provenance.appliedLeverKeys || [],
+    // Verified Undo provenance: the durable record of an ADI Undo that was
+    // verified by the recalculation, with the restored P19/P20 levels. Read by
+    // the results panel to show the restored state. Distinct from RESTORED.
+    undoneVerified,
+    undoneVerification: undoneVerified ? undoneRecord?.undoVerification || null : null,
     // The calibration evidence this run retained, read by the panel's
     // calibration section and its tested-ledger rows.
     calibrationEvidence: plan.calibrationEvidence || null,

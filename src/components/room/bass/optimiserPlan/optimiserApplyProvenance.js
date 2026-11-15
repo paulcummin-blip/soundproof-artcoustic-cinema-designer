@@ -228,6 +228,8 @@ export function resolveApplyProvenance(plan, currentDesignFingerprint) {
         status: "verified",
         hasAppliedRecord,
         appliedLeverKeys,
+        undoneVerified: false,
+        undoneRecord: null,
         verifiedRecord: r,
       };
     }
@@ -243,12 +245,33 @@ export function resolveApplyProvenance(plan, currentDesignFingerprint) {
         status: r.verification.status, // "pending" or "incomplete"
         hasAppliedRecord,
         appliedLeverKeys,
+        undoneVerified: false,
+        undoneRecord: null,
         pendingRecord: r,
       };
     }
   }
 
-  return { status: "none", hasAppliedRecord, appliedLeverKeys };
+  // ── Undone and verified: the Undo was verified and the restored
+  // fingerprint (sourceDesignFingerprint) matches the current design ──
+  // This is distinct from RESTORED (coordinate match only): a verified Undo
+  // carries undoVerification.status === "verified". The record stays in the
+  // array so the run remains "spent"; the panel shows the restored levels.
+  for (const r of records) {
+    if (r.direction !== "to" || !r.undoneAt) continue;
+    if (r.undoVerification?.status !== "verified") continue;
+    if (r.sourceDesignFingerprint && r.sourceDesignFingerprint === currentDesignFingerprint) {
+      return {
+        status: "none",
+        hasAppliedRecord,
+        appliedLeverKeys,
+        undoneVerified: true,
+        undoneRecord: r,
+      };
+    }
+  }
+
+  return { status: "none", hasAppliedRecord, appliedLeverKeys, undoneVerified: false, undoneRecord: null };
 }
 
 /**

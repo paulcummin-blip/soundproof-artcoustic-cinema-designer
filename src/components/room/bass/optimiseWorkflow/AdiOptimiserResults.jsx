@@ -101,8 +101,16 @@ function reasonFor(catKey, planView) {
 
 function resolveCategoryStatus({ cat, lever, calibLever, planView, isRunning }) {
   if (isRunning) return { key: "analysing", label: "Analysing…", tone: "analysing" };
+  if (lever?.state === OPTIMISER_LEVER_STATE.UNDONE_VERIFIED) {
+    return {
+      key: "undone",
+      label: "Undone and verified",
+      tone: "analysed",
+      note: "Seating returned to original positions. Original recommendation retained as historical evidence.",
+    };
+  }
   if (lever?.state === OPTIMISER_LEVER_STATE.APPLIED) {
-    return { key: "applied", label: "Improvement applied", tone: "applied" };
+    return { key: "applied", label: "Applied and verified", tone: "applied" };
   }
   if (lever?.state === OPTIMISER_LEVER_STATE.RESTORED) {
     return {
@@ -115,7 +123,19 @@ function resolveCategoryStatus({ cat, lever, calibLever, planView, isRunning }) 
   // Crossover / combined electronic is applied by the run's guarded auto-apply,
   // not by a single-lever apply. The run's own decision is the authority here.
   if (cat.key === "crossover" && planView?.decisionApplied === true && lever) {
-    return { key: "applied", label: "Improvement applied", tone: "applied" };
+    return { key: "applied", label: "Applied and verified", tone: "applied" };
+  }
+  // Run spent: a recommended lever that was not the applied/undone one is
+  // historical analysis, not a currently outstanding recommendation.
+  if (planView?.runSpent && !planView?.appliedVerified && !planView?.undoneVerified
+      && lever && (lever.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED
+          || lever.verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF)) {
+    return {
+      key: "analysed_historical",
+      label: "Analysed — historical",
+      tone: "analysed",
+      note: "Run spent — original analysis retained. Re-run ADI to evaluate new changes.",
+    };
   }
   if (lever && (lever.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED
       || lever.verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF)) {
@@ -299,6 +319,30 @@ function formatEffectLines(effect, baseline) {
   return lines;
 }
 
+// ── Verified effect lines ──
+// Reads the ACTUAL verified P19/P20 levels from the apply or undo verification
+// record, not the original prediction. Used as the main outcome for the
+// "Applied and verified" and "Undone and verified" states, replacing the
+// original predicted effect lines (which move to "Predicted before Apply").
+function formatVerifiedEffectLines(verifiedLevels, baselineLevels) {
+  if (!verifiedLevels) return [];
+  const lines = [];
+
+  const p19After = levelText(verifiedLevels.p19Level);
+  const p19Before = levelText(baselineLevels?.achievedP19Level ?? baselineLevels?.p19Level);
+  const p19AfterDb = deviationText(verifiedLevels.p19VariationDb);
+  const p19BeforeDb = deviationText(baselineLevels?.achievedP19VariationDb ?? baselineLevels?.p19VariationDb);
+  lines.push(...formatMetricLines("P19 \u00b7 Reference seat", p19BeforeDb, p19AfterDb, p19Before, p19After));
+
+  const p20After = levelText(verifiedLevels.p20Level);
+  const p20Before = levelText(baselineLevels?.achievedP20Level ?? baselineLevels?.p20Level);
+  const p20AfterDb = deviationText(verifiedLevels.p20VariationDb);
+  const p20BeforeDb = deviationText(baselineLevels?.achievedP20VariationDb ?? baselineLevels?.p20VariationDb);
+  lines.push(...formatMetricLines("P20 \u00b7 Worst seat", p20BeforeDb, p20AfterDb, p20Before, p20After));
+
+  return lines;
+}
+
 function describeAppliedLever(lever) {
   const c = (lever?.changes || [])[0];
   if (!c) {
@@ -314,16 +358,49 @@ function describeAppliedLever(lever) {
 }
 
 function buildSummary({ planView, dismissedCount }) {
+  // ── Derive the main summary from the current verified Apply/Undo state ──
+  // The six categories remain visible as historical analysis, but their
+  // original outcomes are not mistaken for currently outstanding
+  // recommendations when the run is spent (applied or undone).
+  if (planView?.undoneVerified) {
+    const undoLevels = planView?.undoneVerification?.levels || null;
+    const p19 = undoLevels ? levelText(undoLevels.p19Level) : null;
+    const p20 = undoLevels ? levelText(undoLevels.p20Level) : null;
+    const levelParts = [];
+    if (p19) levelParts.push(`P19 ${p19}`);
+    if (p20) levelParts.push(`P20 ${p20}`);
+    return `Recommendation undone and verified${levelParts.length ? ` — restored to ${levelParts.join(", ")}` : "."} Seating returned to original positions.`;
+  }
+  if (planView?.appliedVerified) {
+    const verifiedLevels = planView?.appliedVerification?.levels || null;
+    const p19After = verifiedLevels ? levelText(verifiedLevels.p19Level) : null;
+    const p20After = verifiedLevels ? levelText(verifiedLevels.p20Level) : null;
+    const baselineP19 = planView?.baseline ? levelText(planView.baseline.achievedP19Level ?? planView.baseline.p19Level) : null;
+    const baselineP20 = planView?.baseline ? levelText(planView.baseline.achievedP20Level ?? planView.baseline.p20Level) : null;
+    const levelParts = [];
+    if (p19After && baselineP19 && p19After !== baselineP19) levelParts.push(`P19 ${baselineP19} \u2192 ${p19After}`);
+    else if (p19After) levelParts.push(`P19 ${p19After}`);
+    if (p20After && baselineP20 && p20After !== baselineP20) levelParts.push(`P20 ${baselineP20} \u2192 ${p20After}`);
+    else if (p20After) levelParts.push(`P20 ${p20After}`);
+    return `Recommendation applied and verified${levelParts.length ? `: ${levelParts.join(", ")}` : "."}`;
+  }
+
   const applied = [];
   const identified = [];
   for (const lever of (planView?.levers || [])) {
-    if (lever.state === OPTIMISER_LEVER_STATE.APPLIED) applied.push(lever);
-    else if (lever.state === OPTIMISER_LEVER_STATE.RESTORED) continue;
-    else if (lever.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED
+    if (lever.state === OPTIMISER_LEVER_STATE.APPLIED
+      || lever.state === OPTIMISER_LEVER_STATE.UNDONE_VERIFIED) continue;
+    if (lever.state === OPTIMISER_LEVER_STATE.RESTORED) continue;
+    if (lever.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED
       || lever.verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) identified.push(lever);
   }
   const combined = (planView?.levers || []).find((l) => l.key === OPTIMISER_LEVER.COMBINED_ELECTRONIC);
-  if (combined && planView?.decisionApplied === true && !applied.includes(combined)) {
+
+  if (planView?.runSpent) {
+    return "Run spent — original analysis retained. Re-run ADI to evaluate new changes.";
+  }
+
+  if (combined && planView?.decisionApplied === true) {
     applied.push(combined);
     const idx = identified.indexOf(combined);
     if (idx >= 0) identified.splice(idx, 1);
@@ -357,8 +434,10 @@ function CategoryRow({
   const isApplied = status.key === "applied";
   const isIdentified = status.key === "identified";
   const isRestored = status.key === "restored";
+  const isUndone = status.key === "undone";
+  const isHistorical = status.key === "analysed_historical";
   const directApplySupported = cat.leverKey && cat.leverKey !== OPTIMISER_LEVER.COMBINED_ELECTRONIC;
-  const canApply = directApplySupported && lever?.canApply === true && !isApplied && !isRestored;
+  const canApply = directApplySupported && lever?.canApply === true && !isApplied && !isRestored && !isUndone && !isHistorical;
   const canUndo = directApplySupported && lever?.canUndo === true && isApplied;
 
   // The recommended adjustment block (changes + predicted effect).
@@ -366,8 +445,18 @@ function CategoryRow({
   const effect = lever?.effect || null;
   const baseline = planView?.baseline || null;
 
+  // Verified effect lines: the ACTUAL post-recalc P19/P20 levels from the
+  // apply or undo verification record, not the original prediction.
+  const appliedVerified = planView?.appliedVerified === true;
+  const undoneVerified = planView?.undoneVerified === true;
+  const verifiedEffectLines = (isApplied && appliedVerified)
+    ? formatVerifiedEffectLines(planView?.appliedVerification?.levels || null, baseline)
+    : (isUndone && undoneVerified)
+      ? formatVerifiedEffectLines(planView?.undoneVerification?.levels || null, baseline)
+      : [];
+
   let adjustmentLines = [];
-  if ((isIdentified || isApplied) && lever) {
+  if ((isIdentified || isApplied || isUndone || isHistorical) && lever) {
     if (cat.key === "crossover") {
       const rows = (Array.isArray(lever.tuning) ? lever.tuning : [])
         .map(formatCombinedRow).filter(Boolean);
@@ -399,6 +488,11 @@ function CategoryRow({
   }
 
   const effectLines = formatEffectLines(effect, baseline);
+  // When applied-verified or undone-verified, the verified levels are the
+  // main outcome; the original predictions become "Predicted before Apply"
+  // (applied) or "Historical prediction" (undone) technical detail.
+  const showVerifiedMain = (isApplied && appliedVerified) || (isUndone && undoneVerified);
+  const mainEffectLines = showVerifiedMain ? verifiedEffectLines : effectLines;
 
   return (
     <div className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2" data-adi-result-category={cat.key}>
@@ -409,7 +503,7 @@ function CategoryRow({
           style={{ background: tone.bg, borderColor: tone.border, color: tone.color }}
           data-adi-result-status={status.key}
         >
-          {isApplied && <Check className="h-3 w-3" />}
+          {(isApplied || isUndone) && <Check className="h-3 w-3" />}
           {status.label}
         </span>
       </div>
@@ -420,12 +514,13 @@ function CategoryRow({
         </div>
       )}
 
-      {!dismissed && (isIdentified || isApplied || isRestored) && (adjustmentLines.length > 0 || effectLines.length > 0) && (
+      {!dismissed && (isIdentified || isApplied || isRestored || isUndone || isHistorical) && (adjustmentLines.length > 0 || mainEffectLines.length > 0) && (
         <div className="mt-1.5 space-y-1">
-          {/* RP22 Level changes lead, above the movement description. */}
-          {effectLines.length > 0 && (
+          {/* Verified RP22 levels lead when applied/undone-verified; otherwise
+              the original predicted effect lines. */}
+          {mainEffectLines.length > 0 && (
             <div className="text-[11px] text-[#625143] leading-relaxed">
-              {effectLines.map((line, i) => (
+              {mainEffectLines.map((line, i) => (
                 <div
                   key={`eff-${i}`}
                   className={line.kind === "level" ? "font-semibold text-[#213428]" : ""}
@@ -435,7 +530,7 @@ function CategoryRow({
               ))}
             </div>
           )}
-          {/* Proposed movement, below the level improvement. */}
+          {/* Applied movement / historical recommendation. */}
           {adjustmentLines.map((line, i) => {
             if (typeof line === "string") {
               return <div key={`adj-${i}`} className="text-[11px] text-[#1B1A1A] leading-relaxed">{line}</div>;
@@ -448,6 +543,20 @@ function CategoryRow({
               </div>
             );
           })}
+          {/* Original predictions relabelled as "Predicted before Apply" when
+              the verified levels are the main outcome. Never shown as achieved. */}
+          {showVerifiedMain && effectLines.length > 0 && (
+            <details className="mt-1">
+              <summary className="text-[10px] text-[#8A7B6A] cursor-pointer hover:text-[#625143]">
+                {isUndone ? "Historical prediction" : "Predicted before Apply"}
+              </summary>
+              <div className="mt-0.5 text-[10px] text-[#8A7B6A] leading-relaxed">
+                {effectLines.map((line, i) => (
+                  <div key={`pred-${i}`}>{line.text}</div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
 
@@ -464,7 +573,7 @@ function CategoryRow({
         </div>
       )}
 
-      {!dismissed && (isIdentified || isApplied) && !isRestored && (
+      {!dismissed && (isIdentified || isApplied) && !isRestored && !isUndone && !isHistorical && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {canApply && (
             <button
@@ -597,12 +706,36 @@ export default function AdiOptimiserResults({
   const appliedLevers = (planView?.levers || []).filter((l) => appliedLeverKeys.includes(l.key));
   const appliedChangeDescriptions = appliedLevers.map(describeAppliedLever).filter(Boolean);
 
+  // ── Undone-verified header ──
+  const undoneVerified = planView?.undoneVerified === true;
+  const undoneVerification = planView?.undoneVerification || null;
+  const undoneLevels = undoneVerification?.levels || null;
+  const undoneImprovementLines = [];
+  if (undoneVerified && undoneLevels) {
+    const p19Restored = levelText(undoneLevels.p19Level);
+    if (p19Restored) {
+      undoneImprovementLines.push({
+        kind: "level",
+        text: `P19: ${p19Restored}`,
+        dbText: fmt(undoneLevels.p19VariationDb, 3) ? `${fmt(undoneLevels.p19VariationDb, 3)} dB` : null,
+      });
+    }
+    const p20Restored = levelText(undoneLevels.p20Level);
+    if (p20Restored) {
+      undoneImprovementLines.push({
+        kind: "level",
+        text: `P20: ${p20Restored}`,
+        dbText: fmt(undoneLevels.p20VariationDb, 3) ? `${fmt(undoneLevels.p20VariationDb, 3)} dB` : null,
+      });
+    }
+  }
+
   return (
     <div className="space-y-2.5" data-adi-optimiser-results="true">
       {/* Verified-apply header */}
       {appliedVerified && (
         <div className="rounded-md border border-[#213428] bg-[#213428] px-3 py-2.5" data-adi-applied-verified="true">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/80">ADI optimisation complete</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-white/80">Applied and verified</div>
           {verifiedImprovementLines.length > 0 && (
             <div className="mt-1 space-y-1">
               {verifiedImprovementLines.map((line, i) => (
@@ -635,6 +768,27 @@ export default function AdiOptimiserResults({
               {appliedChangeDescriptions.join(" \u00b7 ")}
             </div>
           )}
+        </div>
+      )}
+      {/* Undone-verified header */}
+      {undoneVerified && (
+        <div className="rounded-md border border-[#CFDCCF] bg-[#F4F7F4] px-3 py-2.5" data-adi-undone-verified="true">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#213428]">Undone and verified</div>
+          {undoneImprovementLines.length > 0 && (
+            <div className="mt-1 space-y-1">
+              {undoneImprovementLines.map((line, i) => (
+                <div key={`ul-${i}`}>
+                  <div className="text-[13px] font-semibold text-[#213428]">{line.text}</div>
+                  {line.dbText && (
+                    <div className="text-[11px] text-[#625143]">{line.dbText}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-1.5 text-[11px] text-[#625143]">
+            Seating returned to original positions. Original recommendation retained as historical evidence.
+          </div>
         </div>
       )}
 

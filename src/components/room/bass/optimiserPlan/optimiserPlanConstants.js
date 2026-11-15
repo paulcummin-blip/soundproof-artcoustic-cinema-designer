@@ -221,6 +221,15 @@ export const OPTIMISER_LEVER_STATE = Object.freeze({
    * historical analysis and verified Apply result are retained for reference.
    */
   RESTORED: "restored",
+  /**
+   * A verified Undo record exists for this run's lever: undoneAt is set and
+   * undoVerification.status === "verified", and the restored fingerprint
+   * (sourceDesignFingerprint) matches the current design. This is the ONLY
+   * state that proves a verified Undo — it is distinct from RESTORED, which is
+   * a design-coordinate match alone. No Apply/Undo is offered; the original
+   * recommendation and Apply result are retained as historical evidence.
+   */
+  UNDONE_VERIFIED: "undone_verified",
 });
 
 export const OPTIMISER_LEVER_STATE_LABEL = Object.freeze({
@@ -231,6 +240,7 @@ export const OPTIMISER_LEVER_STATE_LABEL = Object.freeze({
   [OPTIMISER_LEVER_STATE.NO_LONGER_APPLICABLE]: "No longer applicable",
   [OPTIMISER_LEVER_STATE.DISABLED]: "Disabled",
   [OPTIMISER_LEVER_STATE.RESTORED]: "Original seating restored",
+  [OPTIMISER_LEVER_STATE.UNDONE_VERIFIED]: "Undone and verified",
 });
 
 /** Shown whenever a lever's own effect was never evaluated on its own. */
