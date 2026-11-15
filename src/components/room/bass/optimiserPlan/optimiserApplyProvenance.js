@@ -207,9 +207,9 @@ export function resolveApplyProvenance(plan, currentDesignFingerprint) {
   const savedFingerprint = plan?.designFingerprint || null;
 
   const hasAppliedRecord = records.some((r) => r.direction === "to");
-  const appliedLeverKeys = records
+  const appliedLeverKeys = [...new Set(records
     .filter((r) => r.direction === "to" && !r.undoneAt)
-    .map((r) => r.leverKey);
+    .map((r) => r.leverKey))];
 
   // ── Verified: resulting fingerprint matches current ──
   for (const r of records) {
