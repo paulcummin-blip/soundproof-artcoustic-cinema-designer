@@ -30,7 +30,7 @@
 import React from 'react';
 import { TechnicalReportEmbedded } from '@/pages/RP22Report';
 
-export default function TechnicalReportDocument({ p19Graph = null, forceCurrentPublication = false } = {}) {
+export default function TechnicalReportDocument({ p19Graph = null, completedBassAuthority = null, forceCurrentPublication = false } = {}) {
   return (
     <div className="project-report-technical-document">
       <style>{`
@@ -52,10 +52,14 @@ export default function TechnicalReportDocument({ p19Graph = null, forceCurrentP
           }
         }
       `}</style>
-      {/* The document's ONE saved P19 curve payload travels in, so the Technical
-          Report's P19 page and the Project Report's own P19 page draw the same
-          curve instead of each rebuilding it from its own reading. */}
-      <TechnicalReportEmbedded p19Graph={p19Graph} forceCurrentPublication={forceCurrentPublication} />
+      {/* The parent Project Report's already-resolved, verified completed bass
+          authority and P19 curve payload travel in here, so the embedded
+          Technical Report renders from the SAME bass calculation as the parent
+          document. The embedded report prefers this supplied authority over its
+          own resolution (see RP22ReportInner) — it never overwrites it — which
+          removes the race where the parent's export gate opens while the
+          embedded bass graphs are still resolving on a separate timeline. */}
+      <TechnicalReportEmbedded p19Graph={p19Graph} completedBassAuthority={completedBassAuthority} forceCurrentPublication={forceCurrentPublication} />
     </div>
   );
 }
