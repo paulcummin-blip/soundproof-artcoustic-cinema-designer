@@ -41,6 +41,7 @@ import {
 import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 import { resolveAssumedParameterResult } from "@/components/utils/assumedParameterAuthority";
 import { P8_NUMBER, buildP8RoomResult } from "@/components/utils/rp22/p8Authority";
+import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 
 const ASSUMED_PARAM_KEYS = new Set(["p8", "p15", "p21"]);
 const isAssumedKey = (key) => ASSUMED_PARAM_KEYS.has(key);
@@ -74,8 +75,63 @@ const isNaMetric = (metric) => {
   return formatted === "N/A" || formatted.includes("N/A (");
 };
 
-export function buildLiveComplianceSummary({ analysisResult, seats, assumedP15Level = null, assumedP21Level = null } = {}) {
+// The general RP22 pass intentionally skips bass. Add only the verified result
+// for this exact design and seat set; a preview or stale contract never grades Live.
+export function withCurrentVerifiedBass(analysisResult, bassResults, seats) {
+  const authority = bassResults?.completedBassAuthority;
+  const contract = authority?.contract;
+  const fingerprint = bassResults?.cacheKey;
+  if (!bassResults?.hasCurrentResult || bassResults?.calculationInProgress
+    || bassResults?.placementPreviewActive || !fingerprint
+    || contract?.job?.resultFingerprint !== fingerprint
+    || authority?.currentFingerprint !== fingerprint) return analysisResult;
+
+  const bass = buildComplianceBassPresentation({ completedBassAuthority: authority });
+  if (!bass.publicationVerified || bass.resultFingerprint !== fingerprint) return analysisResult;
+  const currentSeatIds = (Array.isArray(seats) ? seats : []).map((seat) => seat?.id);
+  const seatRows = bass.perSeatP20Results;
+  const resultSeatIds = (Array.isArray(seatRows) ? seatRows : []).map((row) => row?.seatId);
+  if (!currentSeatIds.length || new Set(currentSeatIds).size !== currentSeatIds.length
+    || resultSeatIds.length !== currentSeatIds.length
+    || new Set(resultSeatIds).size !== resultSeatIds.length
+    || resultSeatIds.some((id) => !currentSeatIds.includes(id))
+    || contract?.provenance?.realSeatCount !== currentSeatIds.length) return analysisResult;
+
+  const primary = { ...(analysisResult?.gradedParameters?.primary || {}) };
+  for (const [key, number] of [["p14", 14], ["p18", 18], ["p19", 19]]) {
+    const metric = bass.parameters[key];
+    if (!metric?.isAuthoritative || !normalizeLevel(metric.level)
+      || !Number.isFinite(metric.rawValue)) return analysisResult;
+    primary[number] = {
+      level: metric.level, value: metric.rawValue, formatted: metric.valueText,
+      status: "complete", resultFingerprint: fingerprint,
+    };
+  }
+
+  const perSeatRp22 = { ...(analysisResult?.perSeatRp22 || {}) };
+  for (const row of seatRows) {
+    const value = Number(row?.variationDbRaw);
+    const level = normalizeLevel(row?.level);
+    if (!Number.isFinite(value) || !level) return analysisResult;
+    const previous = perSeatRp22[row.seatId] || {};
+    perSeatRp22[row.seatId] = {
+      ...previous,
+      rp22: {
+        ...(previous.rp22 || {}),
+        20: { level, value, formatted: `±${value.toFixed(1)} dB`, status: "complete", resultFingerprint: fingerprint },
+      },
+    };
+  }
+  return {
+    ...(analysisResult || {}),
+    gradedParameters: { ...(analysisResult?.gradedParameters || {}), primary },
+    perSeatRp22,
+  };
+}
+
+export function buildLiveComplianceSummary({ analysisResult, bassResults = null, seats, assumedP15Level = null, assumedP21Level = null } = {}) {
   const canonicalSeats = Array.isArray(seats) ? seats : [];
+  const currentAnalysis = withCurrentVerifiedBass(analysisResult, bassResults, canonicalSeats);
   const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(canonicalSeats);
   const allSeatIds = canonicalSeats.map((s) => s?.id).filter(Boolean);
 
@@ -83,7 +139,7 @@ export function buildLiveComplianceSummary({ analysisResult, seats, assumedP15Le
   // Same source as the seat HUD (analysisResult.perSeatRp22). P20 is preserved
   // per seat from the engine; P19 is RSP-scoped and lives in roomResults below.
   const seatHudById = {};
-  const perSeatRp22 = analysisResult?.perSeatRp22 || {};
+  const perSeatRp22 = currentAnalysis?.perSeatRp22 || {};
   for (const seat of canonicalSeats) {
     if (!seat?.id) continue;
     const srcRp22 = perSeatRp22?.[seat.id]?.rp22 || {};
@@ -96,7 +152,7 @@ export function buildLiveComplianceSummary({ analysisResult, seats, assumedP15Le
   }
 
   // ── roomResultsByParameter: live room/RSP results ──
-  const gradedPrimary = analysisResult?.gradedParameters?.primary || {};
+  const gradedPrimary = currentAnalysis?.gradedParameters?.primary || {};
   const roomResultsByParameter = {};
   for (const p of RP22_PRESENTATION_PARAMETERS) {
     const pid = p.id;
