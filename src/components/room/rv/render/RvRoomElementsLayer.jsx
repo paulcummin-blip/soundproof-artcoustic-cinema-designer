@@ -340,7 +340,8 @@ export default function RvRoomElementsLayer({
         const isProjector = element?.type === 'projector';
         const isGenericEl = !isProjector;
         const dragId = element?.id ?? `el-${idx}`;
-        const isDraggable = !!handleMouseDown;
+        // Ceiling openings use the X/Y editor; the existing drag handler is wall-constrained.
+        const isDraggable = !isSkylight && !!handleMouseDown;
 
         const onDown = isDraggable ? (ev) => {
           ev.preventDefault();
