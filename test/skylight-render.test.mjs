@@ -13,5 +13,5 @@ test('plan renders exact skylight size and orange clash; clearing speaker clears
  assert.match(hit,/width="350"/); assert.match(hit,/height="23[12]/);
  assert.match(hit,/#C76A1B/); assert.match(hit,/<circle/);
  assert.doesNotMatch(draw([{...sp,position:{x:0.5,y:0.5,z:2.6}}]),/#C76A1B/);
- assert.doesNotMatch(hit,/cursor:grab/);
+ assert.match(hit,/cursor:grab/);
 });
