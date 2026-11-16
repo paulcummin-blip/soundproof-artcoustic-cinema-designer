@@ -23,10 +23,10 @@ import {
   Images,
   Palette,
   ArrowUpRight,
-  PanelLeftClose,
-  PanelLeftOpen,
   Menu,
-  X
+  X,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
@@ -104,19 +104,17 @@ export default function Layout({ children, currentPageName }) {
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
   const [staleScope, setStaleScope] = React.useState(false);
 
-  // Collapsible sidebar (desktop) and overlay drawer (mobile). The collapsed
-  // preference persists per browser; mobile always renders the full expanded
-  // layout inside the drawer. `isCollapsed` is the single guard the JSX uses, so
-  // the mobile drawer is never accidentally shown in its narrow rail form.
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
-    try { return localStorage.getItem('b44_sidebar_collapsed') === '1'; } catch { return false; }
+  // Only the Workspace navigation links are collapsible (the rest of the sidebar
+  // keeps its full width and content). The mobile overlay drawer is separate.
+  const [workspaceNavOpen, setWorkspaceNavOpen] = React.useState(() => {
+    try { return localStorage.getItem('b44_workspace_nav_open') !== '0'; } catch { return true; }
   });
+  React.useEffect(() => {
+    try { localStorage.setItem('b44_workspace_nav_open', workspaceNavOpen ? '1' : '0'); } catch {}
+  }, [workspaceNavOpen]);
   const [isMobile, setIsMobile] = React.useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 1024);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
-  React.useEffect(() => {
-    try { localStorage.setItem('b44_sidebar_collapsed', sidebarCollapsed ? '1' : '0'); } catch {}
-  }, [sidebarCollapsed]);
   React.useEffect(() => {
     const onResize = () => {
       const mobile = window.innerWidth < 1024;
@@ -126,7 +124,6 @@ export default function Layout({ children, currentPageName }) {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const isCollapsed = !isMobile && sidebarCollapsed;
 
   // Active project identity comes from the canonical hydration source — the same
   // source Project Images, reports and every global page read. The sidebar keeps
@@ -303,17 +300,14 @@ export default function Layout({ children, currentPageName }) {
           )}
           {!isReportAutoPrint && (
           <aside
-            className={`app-shell-sidebar border-r border-brand-border bg-brand-sidebar-bg flex flex-col transition-all duration-200 ${
+            className={`app-shell-sidebar border-r border-brand-border bg-brand-sidebar-bg flex flex-col transition-transform duration-200 ${
               isMobile
                 ? `fixed top-0 left-0 h-full w-64 z-50 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`
-                : isCollapsed
-                  ? 'w-[68px]'
-                  : 'w-64'
+                : 'w-64'
             }`}
             data-app-shell-sidebar="true"
           >
             {/* Brand */}
-            {(!isCollapsed || isMobile) ? (
             <div className="p-4">
               <img
                 src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
@@ -350,14 +344,9 @@ export default function Layout({ children, currentPageName }) {
                 </div>
               </div>
             </div>
-            ) : (
-              <div className="flex items-center justify-center h-12 pt-3">
-                <span style={{ fontFamily: 'Didact Gothic, sans-serif', fontWeight: 700, color: '#213428', fontSize: 18 }}>SP</span>
-              </div>
-            )}
 
-            {/* Collapse / close toggle */}
-            {isMobile ? (
+            {/* Mobile close button */}
+            {isMobile && (
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(false)}
@@ -366,19 +355,9 @@ export default function Layout({ children, currentPageName }) {
               >
                 <X className="w-4 h-4" />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSidebarCollapsed((v) => !v)}
-                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                className="flex items-center justify-center w-full py-2 border-b border-[#ECEAE5] text-[#625143] hover:bg-[#F6F3EE] hover:text-[#213428] transition-colors"
-              >
-                {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-              </button>
             )}
 
-            {accountName && (!isCollapsed || isMobile) && (
+            {accountName && (
               <div style={{
                 padding: '10px 16px 12px',
                 borderTop: '1px solid #DCDBD6',
@@ -407,11 +386,18 @@ export default function Layout({ children, currentPageName }) {
 
             <nav className="flex-1 px-3 py-2">
               <div className="mb-4">
-                {(!isCollapsed || isMobile) && (
-                  <div className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#625143]">
-                    Workspace
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceNavOpen((v) => !v)}
+                  aria-label={workspaceNavOpen ? 'Collapse workspace navigation' : 'Expand workspace navigation'}
+                  className="w-full flex items-center justify-between px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#625143] hover:text-[#213428] transition-colors"
+                >
+                  <span>Workspace</span>
+                  {workspaceNavOpen
+                    ? <ChevronDown className="w-3 h-3" />
+                    : <ChevronRight className="w-3 h-3" />}
+                </button>
+                {workspaceNavOpen && (
                 <div className="space-y-1">
                   {(() => {
                     const currentPath = typeof window !== "undefined" ? (window.location?.pathname || "") : "";
@@ -424,19 +410,17 @@ export default function Layout({ children, currentPageName }) {
                         <a
                           key={item.title}
                           href={item.url}
-                          title={isCollapsed ? item.title : undefined}
                           className={`
-                            group flex items-center rounded-md text-sm
+                            group flex items-center gap-3 px-3 py-2 rounded-md text-sm
                             border transition-all duration-200 ease-out
                             cursor-pointer select-none
-                            ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 py-2'}
                             ${
                               isActive
                                 ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-md'
                                 : 'text-brand-text-muted border-transparent bg-transparent'
                             }
                             hover:bg-white hover:border-[#D9D5CE] hover:text-brand-text-label
-                            hover:shadow-md ${isCollapsed ? '' : 'hover:-translate-y-[2px]'}
+                            hover:shadow-md hover:-translate-y-[2px]
                             active:translate-y-0 active:shadow-sm
                           `}
                         >
@@ -445,53 +429,48 @@ export default function Layout({ children, currentPageName }) {
                               isActive
                                 ? 'text-brand-primary'
                                 : 'text-brand-text-muted group-hover:text-brand-text-label'
-                            } ${isCollapsed ? '' : 'group-hover:-translate-y-[1px]'}`}
+                            } group-hover:-translate-y-[1px]`}
                           />
-                          {(!isCollapsed || isMobile) && (
-                            <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-                              {item.title}
-                            </span>
-                          )}
+                          <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                            {item.title}
+                          </span>
                         </a>
                       );
                     });
                   })()}
                 </div>
+                )}
               </div>
 
               {/* Admin section — only visible to admin users */}
-              {isAdmin && (() => {
+              {isAdmin && workspaceNavOpen && (() => {
                 const currentPath = typeof window !== "undefined" ? (window.location?.pathname || "") : "";
                 const isActive = currentPath.startsWith("/admin");
                 return (
                   <div className="mb-4 mt-2">
-                    {(!isCollapsed || isMobile) && (
-                      <div className="text-xs font-medium text-brand-text-label mb-1 px-3" style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#625143' }}>
-                        Admin
-                      </div>
-                    )}
+                    <div className="text-xs font-medium text-brand-text-label mb-1 px-3" style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#625143' }}>
+                      Admin
+                    </div>
                     <a
                       href="/admin"
-                      title={isCollapsed ? 'Admin Dashboard' : undefined}
                       className={`
-                        group flex items-center rounded-md text-sm
+                        group flex items-center gap-3 px-3 py-2 rounded-md text-sm
                         border transition-all duration-200 ease-out cursor-pointer select-none
-                        ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 py-2'}
                         ${isActive
                           ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-md'
                           : 'text-brand-text-muted border-transparent bg-transparent'}
                         hover:bg-white hover:border-[#D9D5CE] hover:text-brand-text-label
-                        hover:shadow-md ${isCollapsed ? '' : 'hover:-translate-y-[2px]'} active:translate-y-0 active:shadow-sm
+                        hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
                       `}
                     >
-                      <Database className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-brand-primary' : 'text-brand-text-muted group-hover:text-brand-text-label'} ${isCollapsed ? '' : 'group-hover:-translate-y-[1px]'}`} />
-                      {(!isCollapsed || isMobile) && <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>Admin Dashboard</span>}
+                      <Database className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-brand-primary' : 'text-brand-text-muted group-hover:text-brand-text-label'} group-hover:-translate-y-[1px]`} />
+                      <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>Admin Dashboard</span>
                     </a>
                   </div>
                 );
               })()}
 
-              {canUseSoundProof && (!isCollapsed || isMobile) && (
+              {canUseSoundProof && (
               <div className="mb-4" style={{ borderLeft: '4px solid #213428', paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' }}>
                 <div className="text-xs font-medium text-brand-text-label mb-2 px-3" style={{ fontSize: 12, letterSpacing: '0.4px' }}>
                   Active Project
@@ -536,19 +515,7 @@ export default function Layout({ children, currentPageName }) {
                 </div>
               )}
 
-              {canUseSoundProof && isCollapsed && activeProjectSummary.id && (
-                <div className="flex justify-center mb-3" title={activeProjectSummary.name || 'Active project'}>
-                  <span
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#213428] text-white"
-                    style={{ fontFamily: 'Didact Gothic, sans-serif', fontWeight: 700, fontSize: 13 }}
-                  >
-                    {(activeProjectSummary.name || 'P').trim().charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-
                 {/* Visit our showroom — all authenticated users, independent of commercial state */}
-                {(!isCollapsed || isMobile) ? (
                 <a
                   href="https://calendly.com/solutes-impish-0i/artcoustic-showroom"
                   target="_blank"
@@ -593,21 +560,6 @@ export default function Layout({ children, currentPageName }) {
                     />
                   </div>
                 </a>
-                ) : (
-                <a
-                  href="https://calendly.com/solutes-impish-0i/artcoustic-showroom"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Experience Artcoustic — Visit our showroom"
-                  className="group flex items-center justify-center w-10 h-10 mx-auto mb-4 rounded-md transition-all duration-200 hover:shadow-md hover:bg-[#2A4434]"
-                  style={{ background: '#213428', color: '#FFFFFF' }}
-                >
-                  <ArrowUpRight
-                    className="w-4 h-4 text-white transition-transform duration-200 group-hover:translate-x-[2px] group-hover:-translate-y-[2px]"
-                    strokeWidth={1.75}
-                  />
-                </a>
-                )}
                 </nav>
 
                 {(() => {
@@ -615,7 +567,7 @@ export default function Layout({ children, currentPageName }) {
                 return null;
                 })()}
 
-            {canUsePriceList && priceSummary.showPrices && (!isCollapsed || isMobile) && (
+            {canUsePriceList && priceSummary.showPrices && (
               <div className="p-4 border-t border-brand-border">
                 <PriceSummary
                   showPrices={priceSummary.showPrices}
@@ -633,7 +585,7 @@ export default function Layout({ children, currentPageName }) {
               </div>
             )}
 
-            {canUseSoundProof && showAsdr && (!isCollapsed || isMobile) && (
+            {canUseSoundProof && showAsdr && (
               <div className="border-t border-brand-border">
                 <DesignRatingSummary
                   showAsdr={showAsdr}
