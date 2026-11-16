@@ -55,5 +55,5 @@ test('GOOD: published SPL but sensitivity basis unstated', () => {
 
 test('labels are the three admin-facing terms, never A/B/C/D', () => {
   const labels = Object.values(DATA_ADEQUACY).map((d) => d.label);
-  assert.deepEqual(labels.sort(), ['FULL DATA', 'GOOD DATA', 'INCOMPLETE DATA']);
+  assert.deepEqual(labels.sort(), ['FULL DATA', 'GOOD DATA', 'LIMITED DATA']);
 });

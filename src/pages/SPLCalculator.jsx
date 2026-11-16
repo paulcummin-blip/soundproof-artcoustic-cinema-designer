@@ -608,7 +608,7 @@ export default function SPLCalculatorPage() {
                     </div>
                     {candidate?.classKey === "D" && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
-                        Missing essential specifications — see source data.
+                        Unable to calculate RP22 speaker capability from the information published by the manufacturer.
                       </div>
                     )}
                   </div>

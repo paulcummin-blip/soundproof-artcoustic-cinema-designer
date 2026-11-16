@@ -36,10 +36,10 @@ export const DATA_ADEQUACY = Object.freeze({
   },
   INCOMPLETE: {
     key: "INCOMPLETE",
-    label: "INCOMPLETE DATA",
-    short: "INCOMPLETE",
+    label: "LIMITED DATA",
+    short: "LIMITED",
     tone: "#B23A3A",
-    meaning: "Incomplete data — fair P12/P13 comparison not available. Insufficient manufacturer-published information to calculate a fair P12/P13 result.",
+    meaning: "Limited data — fair P12/P13 comparison not available. Insufficient manufacturer-published information to calculate a defensible P12/P13 result.",
   },
 });
 

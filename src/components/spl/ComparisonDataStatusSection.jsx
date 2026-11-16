@@ -71,9 +71,36 @@ function continuousSplRow(record) {
   return textOrNull(record.published_max_continuous_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
 
+function peakSplRow(record) {
+  return textOrNull(record.published_max_peak_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
+}
+
 function measurementBasisRow(record) {
   const basis = String(record.sensitivity_measurement_basis || record.max_spl_measurement_basis || "").trim();
   return basis || "Half Space — assumed by Sound Proof";
+}
+
+// The measurement basis the manufacturer stated for a published max SPL figure.
+// "Basis not stated" is shown explicitly when a max SPL is published but the
+// manufacturer did not state the measurement space — it is never silently
+// upgraded to an assumption. Returns NOT_PUBLISHED when no max SPL exists.
+function maxSplBasisRow(record) {
+  const hasPublishedSpl = hasValue(record.published_max_continuous_spl_db_1m)
+    || hasValue(record.published_max_peak_spl_db_1m);
+  if (!hasPublishedSpl) return NOT_PUBLISHED;
+  const basis = String(record.max_spl_measurement_basis || "").trim();
+  if (basis) return basis;
+  // The manufacturer's own test-conditions text, if any.
+  const testConditions = String(record.max_spl_test_conditions || "").trim();
+  if (testConditions) return testConditions;
+  return "Basis not stated";
+}
+
+// The exact missing inputs that prevent a P12/P13 calculation, read from the
+// normaliser's own warnings. Empty when the record is eligible.
+function missingInputs(record) {
+  const warnings = Array.isArray(record?.normalization_warnings) ? record.normalization_warnings : [];
+  return warnings.map((w) => String(w || "").trim()).filter(Boolean);
 }
 
 function resultMethodText(record) {
@@ -91,7 +118,7 @@ function whyText(adequacy, record) {
     return "Enough transparent manufacturer evidence for a like-for-like P12/P13 comparison on the same basis used for Artcoustic.";
   }
   if (adequacy.key === DATA_ADEQUACY.INCOMPLETE.key) {
-    return "Insufficient transparent information for a defensible numerical P12/P13 result.";
+    return "Unable to calculate RP22 speaker capability from the information published by the manufacturer.";
   }
   // GOOD — tailor the sentence to what is actually published.
   const publishedSpl = hasValue(record.published_max_continuous_spl_db_1m);
@@ -138,8 +165,13 @@ export default function ComparisonDataStatusSection({
     ["Nominal impedance", impedanceRow(record)],
     ["Power authority", powerAuthorityRow(record)],
     ["Continuous SPL (if published)", continuousSplRow(record)],
+    ["Peak SPL (if published)", peakSplRow(record)],
+    ["Max SPL basis", maxSplBasisRow(record)],
     ["Measurement basis", measurementBasisRow(record)],
   ];
+
+  const missing = missingInputs(record);
+  const showMissing = adequacy.key === DATA_ADEQUACY.INCOMPLETE.key && missing.length > 0;
 
   return (
     <div>
@@ -152,6 +184,20 @@ export default function ComparisonDataStatusSection({
       <div style={{ fontSize: 11, lineHeight: 1.45, color: BRAND.subtext, marginBottom: 8 }}>
         {whyText(adequacy, record)}
       </div>
+
+      {/* 2b. Missing inputs — the exact fields preventing calculation */}
+      {showMissing && (
+        <>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: BRAND.hint, marginBottom: 2 }}>
+            Missing inputs
+          </div>
+          <div style={{ fontSize: 11, lineHeight: 1.45, color: BRAND.subtext, marginBottom: 8 }}>
+            {missing.map((m) => (
+              <div key={m} style={{ display: "list-item", marginLeft: 16, marginBottom: 1 }}>{m}</div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* 3. Data used */}
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: BRAND.hint, marginBottom: 2 }}>
