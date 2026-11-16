@@ -1,4 +1,5 @@
 import React from "react";
+import SplitDividerHandle from "@/components/ui/SplitDividerHandle";
 
 // Canonical split measurements. Every clamp — initial mount, container resize
 // and divider drag — reads from this one calculation, so the grid can never be
@@ -181,27 +182,42 @@ export default function ResizableTwoColumnLayout({
       </div>
 
       <div
-        role="separator"
-        aria-orientation="vertical"
-        title="Drag to resize panels"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
         style={{
-          width: dividerWidth,
-          minHeight: 0,
-          cursor: "ew-resize",
+          position: "relative",
           display: "flex",
           alignItems: "stretch",
           justifyContent: "center",
-          borderRadius: 8,
-          background: dividerActive ? "rgba(33, 52, 40, 0.08)" : "transparent",
-          transition: "background 120ms ease",
+          width: dividerWidth,
+          minHeight: 0,
         }}
       >
+        {/* Draggable hit area: wider than the visible divider so the grab
+            target is comfortable without thickening the divider itself. */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          title="Drag to resize panels"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 16,
+            cursor: "col-resize",
+            borderRadius: 8,
+            background: dividerActive ? "rgba(33, 52, 40, 0.08)" : "transparent",
+            transition: "background 120ms ease",
+            zIndex: 1,
+          }}
+        />
+        {/* Visible divider rail (unchanged thickness). */}
         <div
           style={{
             width: 2,
@@ -212,6 +228,8 @@ export default function ResizableTwoColumnLayout({
             transition: "background 120ms ease, opacity 120ms ease",
           }}
         />
+        {/* Permanently visible grab handle, centred vertically. */}
+        <SplitDividerHandle active={dividerActive} />
       </div>
 
       <div style={{ minWidth: 0, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
