@@ -9,7 +9,7 @@ const HEADER_BG_MAP = {
   "Seating Layout":    "#DCDBD6",
   "Speakers":          "rgba(33,52,40,0.16)",
   "Bass Simulation":   "#C1B6AD",
-  "Compliance Report": "#F1F0EE",
+  "Live RP22 Analysis": "#F1F0EE",
   "Options":           "rgba(62,67,73,0.16)",
 };
 

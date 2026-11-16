@@ -56,10 +56,10 @@ export default function ComplianceParameterMatrix({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* 1. Compliance Summary */}
+      {/* 1. RP22 Performance Summary */}
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#625143", marginBottom: 6 }}>
-          Compliance Summary
+          RP22 Performance Summary
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: 6 }}>
           <SummaryTile label="L4" count={publishedSummary.counts.L4} />

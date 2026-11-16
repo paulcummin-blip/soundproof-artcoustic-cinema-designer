@@ -397,7 +397,7 @@ export default function RoomDesignerControlsPanel({
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Compliance Report"
+          title="Live RP22 Analysis"
           icon={<FileText className="w-5 h-5" />}
           defaultOpen={false}>
           {isFrozen('report') &&
