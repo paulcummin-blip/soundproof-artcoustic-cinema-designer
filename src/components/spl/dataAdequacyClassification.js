@@ -60,9 +60,12 @@ export function classifyDataAdequacy(record) {
     && record.max_spl_space_provenance !== "half_space_assumed";
   const basisConfirmed = record.sensitivity_reference === "1W/1m"
     || record.sensitivity_reference === "2.83V/1m";
+  const basisAssumed = record.sensitivity_basis_assumed === true;
 
   // FULL requires published measured capability AND no controlled assumptions
-  // behind the space or the sensitivity basis.
-  if (publishedSpl && spaceConfirmed && basisConfirmed) return DATA_ADEQUACY.FULL;
+  // behind the space or the sensitivity basis. An assumed sensitivity basis
+  // (2.83 V / 1 m when the manufacturer did not state the reference) is a
+  // controlled ADI assumption, so the row stays at GOOD DATA.
+  if (publishedSpl && spaceConfirmed && basisConfirmed && !basisAssumed) return DATA_ADEQUACY.FULL;
   return DATA_ADEQUACY.GOOD;
 }

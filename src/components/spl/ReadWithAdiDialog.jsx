@@ -39,6 +39,7 @@ import {
   sourceUrlOf,
 } from "@/components/spl/adiSourceExtraction";
 import { DATA_ADEQUACY } from "@/components/spl/dataAdequacyClassification";
+import { ASSUMED_SENSITIVITY_BASIS_NOTE } from "@/components/utils/spl/sensitivityBasisAssumption";
 import { base44 } from "@/api/base44Client";
 
 const BRAND = {
@@ -157,11 +158,14 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
   // defaults. Recomputes live as the admin checks or unchecks fields, so the
   // modal shows what the status WILL become if the checked values are
   // accepted — never only what the saved record already is.
-  const proposedAdequacy = useMemo(() => {
+  const proposedStatus = useMemo(() => {
     if (!raw || proposalFields.length === 0) return null;
     try {
       const { readiness } = assessSpeakerForm(mergedForm, existingSpec);
-      return readiness?.adequacy || null;
+      return {
+        adequacy: readiness?.adequacy || null,
+        sensitivityBasisAssumed: readiness?.sensitivityBasisAssumed === true,
+      };
     } catch {
       return null;
     }
@@ -435,16 +439,21 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               </div>
             )}
 
-            {proposedAdequacy && (
-              <div style={{ marginTop: 10, padding: "10px 12px", border: `1px solid ${proposedAdequacy.tone}33`, borderRadius: 10, background: `${proposedAdequacy.tone}08` }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: proposedAdequacy.tone }}>
-                  Proposed comparison status · {proposedAdequacy.label}
+            {proposedStatus && proposedStatus.adequacy && (
+              <div style={{ marginTop: 10, padding: "10px 12px", border: `1px solid ${proposedStatus.adequacy.tone}33`, borderRadius: 10, background: `${proposedStatus.adequacy.tone}08` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: proposedStatus.adequacy.tone }}>
+                  Proposed comparison status · {proposedStatus.adequacy.label}
                 </div>
                 <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 4 }}>
-                  {proposedAdequacy.key === DATA_ADEQUACY.INCOMPLETE.key
+                  {proposedStatus.adequacy.key === DATA_ADEQUACY.INCOMPLETE.key
                     ? "Incomplete data — fair P12/P13 comparison not available with the accepted values."
-                    : proposedAdequacy.meaning}
+                    : proposedStatus.adequacy.meaning}
                 </div>
+                {proposedStatus.sensitivityBasisAssumed && (
+                  <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
+                    {ASSUMED_SENSITIVITY_BASIS_NOTE}
+                  </div>
+                )}
               </div>
             )}
           </>

@@ -23,10 +23,19 @@ function resolvePowerAuthority(s) {
   return { value: null };
 }
 
+// Whether the 2.83 V / 1 m assumption applies: sensitivity + impedance both
+// published but the measurement reference is not stated. The assumption allows
+// the calculation to proceed while holding the row at GOOD DATA, never FULL.
+function sensitivityBasisAssumptionApplies(s) {
+  return present(s.sensitivity_db)
+    && !present(s.sensitivity_basis)
+    && present(s.nominal_impedance_ohm);
+}
+
 // The new critical fields (from COMPARISON_FIELDS after the fix):
 const CRITICAL_FIELDS = [
   { key: 'sensitivity_db', label: 'Sensitivity', check: (s) => present(s.sensitivity_db) },
-  { key: 'sensitivity_basis', label: 'Sensitivity basis', check: (s) => present(s.sensitivity_basis) },
+  { key: 'sensitivity_basis', label: 'Sensitivity basis', check: (s) => present(s.sensitivity_basis) || sensitivityBasisAssumptionApplies(s) },
   { key: 'nominal_impedance_ohm', label: 'Nominal impedance', check: (s) => present(s.nominal_impedance_ohm) },
   { key: 'power_authority', label: 'Power authority', check: (s) => resolvePowerAuthority(s).value !== null || present(s.max_continuous_spl_db) },
 ];
@@ -150,10 +159,70 @@ test('Speaker with NO sensitivity: INCOMPLETE (sensitivity is essential)', () =>
   assert.equal(r.adequacy, 'INCOMPLETE');
 });
 
-test('Speaker with NO sensitivity basis: INCOMPLETE (reference is essential for normalisation)', () => {
+test('Speaker with NO sensitivity basis but sensitivity + impedance: GOOD DATA (assumed 2.83 V/1m)', () => {
   const noBasisSpec = { ...bwSpec, sensitivity_basis: null };
   const r = checkReadiness(noBasisSpec, bwProduct);
-  assert.ok(r.missingCritical.includes('Sensitivity basis'));
+  assert.ok(!r.missingCritical.includes('Sensitivity basis'), 'Assumption covers the basis');
+  assert.equal(r.eligible, true);
+  assert.equal(r.adequacy, 'GOOD');
+});
+
+test('Speaker with NO sensitivity basis AND NO impedance: INCOMPLETE (assumption cannot apply)', () => {
+  const noBasisNoImpSpec = { ...bwSpec, sensitivity_basis: null, nominal_impedance_ohm: null };
+  const r = checkReadiness(noBasisNoImpSpec, bwProduct);
+  assert.ok(r.missingCritical.includes('Sensitivity basis'), 'Basis genuinely missing');
+  assert.equal(r.eligible, false);
+  assert.equal(r.adequacy, 'INCOMPLETE');
+});
+
+test('B&W CWM8.3 D: 89 dB, 8 Ω, 200 W, no basis → GOOD DATA, ~112 dB', () => {
+  const cwmSpec = {
+    sensitivity_db: 89,
+    sensitivity_basis: null,
+    nominal_impedance_ohm: 8,
+    recommended_amp_max_w: 200,
+    measurement_space: 'unspecified',
+    max_continuous_spl_db: null,
+  };
+  const r = checkReadiness(cwmSpec, {});
+  assert.equal(r.missingCritical.length, 0, 'Assumption covers the basis');
+  assert.equal(r.eligible, true);
+  assert.equal(r.adequacy, 'GOOD');
+  // 89 + 10*log10(200) ≈ 112.01 dB
+  const calc = 89 + 10 * Math.log10(200);
+  assert.ok(Math.abs(calc - 112) < 1, `Expected ~112 dB, got ${calc.toFixed(1)}`);
+});
+
+test('4 Ω speaker with assumed 2.83 V/1m: correct normalisation to 1 W/1 m', () => {
+  // 2.83 V into 4 Ω = 2.83²/4 ≈ 2.0 W, so correction = -10*log10(2.0) ≈ -3.01 dB
+  const sensitivity = 90; // dB @ 2.83V/1m into 4 Ω
+  const impedance = 4;
+  const voltageDb = -10 * Math.log10(2.83 ** 2 / impedance);
+  const oneW = sensitivity + voltageDb;
+  assert.ok(Math.abs(oneW - 86.99) < 0.1, `Expected ~87 dB @ 1W/1m, got ${oneW.toFixed(2)}`);
+});
+
+test('Speaker with published 1 W/1 m reference: no assumption applied', () => {
+  const oneWSpec = { ...bwSpec, sensitivity_basis: '1W/1m' };
+  const r = checkReadiness(oneWSpec, bwProduct);
+  assert.ok(!r.missingCritical.includes('Sensitivity basis'), 'Published basis is present');
+  assert.equal(r.eligible, true);
+  assert.equal(r.adequacy, 'GOOD');
+});
+
+test('Speaker missing impedance with unstated basis: no unsupported impedance invented', () => {
+  const noImpedanceSpec = {
+    sensitivity_db: 88,
+    sensitivity_basis: null,
+    nominal_impedance_ohm: null,
+    recommended_amp_max_w: 200,
+    measurement_space: 'unspecified',
+    max_continuous_spl_db: null,
+  };
+  const r = checkReadiness(noImpedanceSpec, {});
+  assert.ok(r.missingCritical.includes('Nominal impedance'), 'Impedance genuinely missing');
+  assert.ok(r.missingCritical.includes('Sensitivity basis'), 'Basis also missing — no assumption without impedance');
+  assert.equal(r.eligible, false);
   assert.equal(r.adequacy, 'INCOMPLETE');
 });
 

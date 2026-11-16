@@ -11,6 +11,7 @@
 
 import { base44 } from "@/api/base44Client";
 import { sameCompetitorIdentity } from "@/components/utils/spl/manufacturerIdentity";
+import { sensitivityBasisAssumptionApplies } from "@/components/utils/spl/sensitivityBasisAssumption";
 
 // Fields without which the RP22 comparison cannot grade P12/P13 for the model.
 // Only the four essential inputs for a power-derived SPL calculation: sensitivity,
@@ -117,7 +118,10 @@ export function findRp22Gaps(specification) {
       continue;
     }
     if (field.key === "sensitivity_basis") {
-      if (!present(spec.sensitivity_basis)) critical.push(field);
+      // The 2.83 V / 1 m assumption covers the basis when sensitivity and
+      // impedance are both published. The gap is not critical in that case;
+      // the assumption is recorded separately and holds the row at GOOD DATA.
+      if (!present(spec.sensitivity_basis) && !sensitivityBasisAssumptionApplies(spec)) critical.push(field);
       continue;
     }
     if (field.key === "max_spl_basis") {

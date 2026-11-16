@@ -138,9 +138,13 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
     patch.sensitivity_basis = REFERENCE_VALUES.has(values.sensitivity_reference) ? values.sensitivity_reference : "unknown";
     authority.sensitivity_basis = "Official Product Page";
   }
-  // Impedance is recorded with the 2.83 V reference it is needed for.
+  // Nominal impedance is saved independently of the sensitivity reference. A
+  // published impedance is manufacturer data in its own right and must persist
+  // even when the reference is unstated — the 2.83 V / 1 m assumption relies on
+  // it for normalisation. The assumed reference itself is never written into
+  // the manufacturer's published sensitivity_basis field.
   const impedance = numberOrNull(values.impedance_ohm);
-  if (values.sensitivity_reference === "2.83V/1m" && impedance !== null) {
+  if (impedance !== null) {
     patch.nominal_impedance_ohm = impedance;
     authority.nominal_impedance_ohm = "Official Product Page";
   }

@@ -25,7 +25,7 @@
 
 import { buildComparisonRow, resolvePowerAuthority } from "./model-first/rp22ComparisonPublish.js";
 import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization.js";
-import { applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption.js";
+import { applySensitivityBasisAssumption, sensitivityBasisAssumptionApplies } from "@/components/utils/spl/sensitivityBasisAssumption.js";
 import { installedSpaceAssumptionForSpecification } from "@/components/utils/spl/installedSpaceAssumption.js";
 import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification.js";
 
@@ -71,7 +71,7 @@ export const READINESS_LEVELS = {
 // sensitivity + power.
 export const COMPARISON_FIELDS = [
   { key: "sensitivity_db", label: "Sensitivity", critical: true, resolve: (s) => present(s.sensitivity_db) },
-  { key: "sensitivity_basis", label: "Sensitivity basis", critical: true, resolve: (s) => present(s.sensitivity_basis) },
+  { key: "sensitivity_basis", label: "Sensitivity basis", critical: true, resolve: (s) => present(s.sensitivity_basis) || sensitivityBasisAssumptionApplies(s) },
   { key: "nominal_impedance_ohm", label: "Nominal impedance", critical: true, resolve: (s) => present(s.nominal_impedance_ohm) },
   {
     key: "power_authority",
