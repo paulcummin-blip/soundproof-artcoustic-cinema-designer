@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { beginPointerDrag, isPrimaryDragStart } from "@/components/room/rv/utils/rvDragGesture";
 import { clientToRoom } from "@/components/room/rv/utils/rvPointerToRoom";
+import { skylightRectM } from "@/components/room/rv/utils/skylightGeometry";
 
 export function useMouseDownHandler({
   byId,
@@ -169,12 +170,23 @@ export function useMouseDownHandler({
         return;
       }
 
-      // Room element drag (non-projector wall elements)
+      // Room element drag (wall elements and ceiling openings)
       if (type === 'roomElement') {
         const el = Array.isArray(roomElements)
           ? roomElements.find(re => String(re?.id) === String(id))
           : null;
         if (!el) return;
+        if (el.type === 'skylight') {
+          const rect = skylightRectM(el, { widthM, lengthM });
+          dragOffsetRoomRef.current = {
+            x: rect.x + rect.w / 2 - cursorRoom.x,
+            y: rect.y + rect.h / 2 - cursorRoom.y,
+          };
+          beginDrag();
+          setDragWarning({ show: false });
+          rsDragLockRef.current = null;
+          return;
+        }
         const wall = String(el?.wall || 'front').toLowerCase();
         const isFrontRear = wall === 'front' || wall === 'rear';
         const posM = Number.isFinite(Number(el?.pos_m)) ? Number(el.pos_m) :
