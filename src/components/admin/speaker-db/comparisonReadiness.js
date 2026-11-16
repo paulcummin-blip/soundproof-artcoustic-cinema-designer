@@ -189,9 +189,9 @@ export function powerBasisText(specification) {
   const spec = specification || {};
   const power = resolvePowerAuthority(spec);
   if (power.value !== null) {
-    return power.source === "power_rating"
-      ? `${power.value} W · ${power.label}`
-      : `${power.value} W · recommended amplifier max`;
+    if (power.source === "power_rating") return `${power.value} W · ${power.label}`;
+    if (power.source === "peak_power_assumed") return `${power.value} W · ${power.label} (provisional)`;
+    return `${power.value} W · recommended amplifier max`;
   }
   if (present(spec.max_continuous_spl_db)) return `${spec.max_continuous_spl_db} dB · published max SPL`;
   return "No power or max SPL";
