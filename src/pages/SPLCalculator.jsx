@@ -239,7 +239,7 @@ export default function SPLCalculatorPage() {
   const [basis, setBasis] = useState("minimum");
   const [artId, setArtId] = useState("");
   const [competitorRows, setCompetitorRows] = useState([]);
-  const [selectedCompetitorIds, setSelectedCompetitorIds] = useState([]);
+  const [selectedCompetitorIds, setSelectedCompetitorIds] = useState([""]);
   const [loadingCompetitors, setLoadingCompetitors] = useState(true);
 
   useEffect(() => {
@@ -252,7 +252,10 @@ export default function SPLCalculatorPage() {
       // Excel imports and database records share one candidate and grading path.
       const candidates = await loadComparisonCandidates({ includeUnpublished: canManageCompetitors });
       setCompetitorRows(candidates);
-      setSelectedCompetitorIds((prev) => prev.filter((id) => candidates.some((c) => c.id === id)));
+      setSelectedCompetitorIds((prev) => {
+        const kept = prev.filter((id) => candidates.some((c) => c.id === id));
+        return kept.length ? kept : [""];
+      });
     } catch (error) {
       console.warn("[RP22 Speaker Capability] comparison candidates unavailable", error);
       setCompetitorRows([]);
@@ -560,8 +563,6 @@ export default function SPLCalculatorPage() {
 
           {loadingCompetitors ? (
             <div style={{ padding: 18, color: BRAND.subtext }}>Loading comparison data…</div>
-          ) : selectedCompetitorIds.length === 0 ? (
-            <div style={{ border: `1px dashed ${BRAND.border}`, borderRadius: 12, padding: 18, color: BRAND.subtext, fontSize: 13 }}>No comparison speakers selected. {competitorRows.length === 0 ? "No comparison speaker is available yet — add the model in the Speaker Database." : "Choose Add speaker to begin."}</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {selectedCompetitorIds.map((id, index) => {
@@ -601,7 +602,7 @@ export default function SPLCalculatorPage() {
                             }
                           />
                         )}
-                        <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
+                        <button type="button" onClick={() => setSelectedCompetitorIds((prev) => { const next = prev.filter((_, i) => i !== index); return next.length ? next : [""]; })} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
                       {compShowDataNote && <div style={{ gridColumn: "4 / 6", fontSize: 11, color: "#7A5C00" }}>Open-back design — installed results vary.</div>}
                     </div>
