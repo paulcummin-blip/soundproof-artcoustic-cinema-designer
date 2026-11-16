@@ -3,14 +3,17 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { normalizeStatusId, getStatusLabel } from "@/components/projects/statusDefaults";
-import { aggregateCapacityBreakdown } from "@/lib/commercial/capacityService";
+import { buildCreditDetail, formatDate, formatDateTime } from "@/lib/commercial/accountAccessOverview";
 import { aggregateTurnoverForYear } from "@/lib/commercial/commercialOverview";
-import CommercialSummaryCard from "@/components/admin/commercial/CommercialSummaryCard";
+import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import AccessPill from "@/components/admin/access/AccessPill";
+import AccountDrawerCredits from "@/components/admin/access/AccountDrawerCredits";
 import AccountStatusActions from "@/components/admin/commercial/AccountStatusActions";
 import AccountPromotionNote from "@/components/admin/promotions/AccountPromotionNote";
 import TargetedPromotionPanel from "@/components/admin/promotions/TargetedPromotionPanel";
 import AccountUsersPanel from "@/components/account/AccountUsersPanel";
 import AccountNameEditor from "@/components/admin/accounts/AccountNameEditor";
+import { Coins, FolderOpen, Gift, Settings, Users } from "lucide-react";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -23,37 +26,20 @@ const BRAND = {
   green: "#213428",
   amber: "#625143",
   red: "#B23A3A",
-  blue: "#2C5AA0",
 };
 
-const STATUS_COLORS = {
-  active: "#213428",
-  inactive: "#3E4349",
-  trial: "#625143",
-  suspended: "#B23A3A",
+const DEALER_GROUP_LABELS = {
+  PREMIUM_PARTNER: "Premium Partner",
+  RICHER_SOUNDS: "Richer Sounds",
+  OTHER_DEALER: "Trade Dealer",
+  INTERNATIONAL: "International Distributor",
+  INTERNAL: "Internal",
+  PROFESSIONAL: "Professional",
 };
 
-const TYPE_LABELS = {
-  dealer: "Dealer",
-  client: "Client",
-  admin: "Admin",
-  demo: "Demo",
-};
+const OCCUPIED_STATUSES = ["pending", "active"];
 
-function StatusPill({ value }) {
-  const color = STATUS_COLORS[value] || BRAND.subtext;
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 6,
-      padding: "4px 10px", borderRadius: 999,
-      border: `1px solid ${BRAND.border}`,
-      background: BRAND.card, fontSize: 12, fontWeight: 600, color,
-    }}>
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-      {value ? value.charAt(0).toUpperCase() + value.slice(1) : "—"}
-    </span>
-  );
-}
+const PANEL_HEADER_BG = "#F4F3F1";
 
 function ProjectStatusPill({ value }) {
   const colorMap = {
@@ -78,15 +64,45 @@ function ProjectStatusPill({ value }) {
   );
 }
 
-function formatDate(val) {
-  if (!val) return "—";
+function formatGBP(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
   try {
-    return new Date(val).toLocaleDateString("en-GB", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency", currency: "GBP",
+      minimumFractionDigits: 0, maximumFractionDigits: 0,
+    }).format(Number(value));
   } catch {
     return "—";
   }
+}
+
+function accessStatus(account, occupiedSeats) {
+  if (account.status === "suspended") return { label: "Suspended", tone: "danger" };
+  if (account.status === "inactive") return { label: "Not Activated", tone: "muted" };
+  if (occupiedSeats === 0) return { label: "Not Activated", tone: "muted" };
+  return { label: "Active", tone: "ok" };
+}
+
+function SummaryFigure({ label, value, accent }) {
+  return (
+    <div style={{
+      background: BRAND.card, border: `1px solid ${BRAND.border}`,
+      borderRadius: 12, padding: "18px 22px",
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: BRAND.subtext,
+        textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize: 28, fontWeight: 700,
+        color: accent || BRAND.text, lineHeight: 1.1,
+      }}>
+        {value}
+      </div>
+    </div>
+  );
 }
 
 export default function AccountDashboard() {
@@ -98,7 +114,10 @@ export default function AccountDashboard() {
 
   const [account, setAccount] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [breakdown, setBreakdown] = useState(null);
+  const [ledgerEntries, setLedgerEntries] = useState([]);
+  const [credits, setCredits] = useState(null);
+  const [memberships, setMemberships] = useState([]);
+  const [externalLinks, setExternalLinks] = useState([]);
   const [turnover, setTurnover] = useState(null);
   const [promotions, setPromotions] = useState([]);
   const [promotionUsage, setPromotionUsage] = useState([]);
@@ -117,53 +136,54 @@ export default function AccountDashboard() {
         setLoading(true);
         setLoadError(null);
 
-        const [accountList, projectList, ledgerEntries, turnoverRecords, promoList, promoUsageList] = await Promise.all([
+        const [accountList, projectList, ledgerList, membershipList, linkList, turnoverRecords, promoList, promoUsageList] = await Promise.all([
           base44.entities.Account.filter({ id: accountId }),
           base44.entities.Project.filter({ account_id: accountId }),
           base44.entities.CapacityLedger.filter({ account_id: accountId }, "-created_date", 1000),
+          base44.entities.AccountMembership.filter({ account_id: accountId }),
+          base44.entities.ExternalAccountLink.filter({ account_id: accountId }),
           base44.entities.TurnoverRecord.filter({ account_id: accountId }),
           base44.entities.Promotion.list("-created_date", 200),
           base44.entities.PromotionUsage.filter({ account_id: accountId }),
         ]);
 
-        if (mounted) {
-          setAccount((accountList || [])[0] || null);
+        if (!mounted) return;
 
-          // ── Version-aware merge ──────────────────────────────────────
-          // The projects table shows dolby_config (a per-version design-state
-          // field). Merge each project with its active ProjectVersion's
-          // design_state so the table reflects the current version, not stale
-          // legacy Project fields.
-          let mergedProjects = projectList || [];
-          const versionIds = mergedProjects
-            .filter((p) => p && p.active_version_id)
-            .map((p) => p.active_version_id);
-          const uniqueVersionIds = [...new Set(versionIds)];
-          if (uniqueVersionIds.length > 0) {
-            try {
-              const versionMap = {};
-              for (let i = 0; i < uniqueVersionIds.length; i += 50) {
-                const batch = uniqueVersionIds.slice(i, i + 50);
-                const versions = await base44.entities.ProjectVersion.filter({ id: batch });
-                if (Array.isArray(versions)) {
-                  for (const v of versions) versionMap[v.id] = v;
-                }
+        setAccount((accountList || [])[0] || null);
+
+        // ── Version-aware merge ──────────────────────────────────────
+        let mergedProjects = projectList || [];
+        const versionIds = mergedProjects
+          .filter((p) => p && p.active_version_id)
+          .map((p) => p.active_version_id);
+        const uniqueVersionIds = [...new Set(versionIds)];
+        if (uniqueVersionIds.length > 0) {
+          try {
+            const versionMap = {};
+            for (let i = 0; i < uniqueVersionIds.length; i += 50) {
+              const batch = uniqueVersionIds.slice(i, i + 50);
+              const versions = await base44.entities.ProjectVersion.filter({ id: batch });
+              if (Array.isArray(versions)) {
+                for (const v of versions) versionMap[v.id] = v;
               }
-              mergedProjects = mergedProjects.map((p) => {
-                const v = p.active_version_id ? versionMap[p.active_version_id] : null;
-                return v ? mergeProjectAndVersion(p, v) : p;
-              });
-            } catch (verErr) {
-              console.warn('[AccountDashboard] Version batch fetch failed, using project-only:', verErr);
             }
+            mergedProjects = mergedProjects.map((p) => {
+              const v = p.active_version_id ? versionMap[p.active_version_id] : null;
+              return v ? mergeProjectAndVersion(p, v) : p;
+            });
+          } catch (verErr) {
+            console.warn('[AccountDashboard] Version batch fetch failed, using project-only:', verErr);
           }
-          setProjects(mergedProjects);
-
-          setBreakdown(aggregateCapacityBreakdown(ledgerEntries || []));
-          setTurnover(aggregateTurnoverForYear(turnoverRecords, accountId, CALENDAR_YEAR));
-          setPromotions(promoList || []);
-          setPromotionUsage(promoUsageList || []);
         }
+        setProjects(mergedProjects);
+
+        setLedgerEntries(ledgerList || []);
+        setCredits(buildCreditDetail(ledgerList || []));
+        setMemberships(membershipList || []);
+        setExternalLinks(linkList || []);
+        setTurnover(aggregateTurnoverForYear(turnoverRecords, accountId, CALENDAR_YEAR));
+        setPromotions(promoList || []);
+        setPromotionUsage(promoUsageList || []);
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load account");
       } finally {
@@ -201,6 +221,12 @@ export default function AccountDashboard() {
     );
   }
 
+  const occupiedSeats = memberships.filter(m => OCCUPIED_STATUSES.includes(m.status || "pending")).length;
+  const creditRow = { credits: credits || {}, ledgerEntries };
+  const dealerGroupLabel = DEALER_GROUP_LABELS[account?.dealer_group] || account?.account_type || "—";
+  const dealerRef = externalLinks[0]?.external_account_number || null;
+  const access = account ? accessStatus(account, occupiedSeats) : { label: "—", tone: "muted" };
+
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
 
@@ -222,177 +248,238 @@ export default function AccountDashboard() {
         <div style={{ padding: 32, textAlign: "center", color: BRAND.subtext }}>Account not found.</div>
       ) : (
         <>
-          {/* Account header */}
+          {/* ── Header ────────────────────────────────────────────────── */}
           <div style={{
             background: BRAND.card, border: `1px solid ${BRAND.border}`,
-            borderRadius: 12, padding: "20px 24px", marginBottom: 24,
+            borderRadius: 12, padding: "20px 24px", marginBottom: 20,
           }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
               <div>
                 <AccountNameEditor account={account} onSaved={(updated) => setAccount(updated)} />
-                {account.contact_email && (
-                  <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-                    {account.contact_email}
+                <div style={{ fontSize: 13, fontWeight: 600, color: BRAND.green, marginTop: 4 }}>
+                  {dealerGroupLabel}
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 2 }}>
+                  {account.territory ? `Territory: ${account.territory}` : ""}
+                  {dealerRef ? ` · Ref: ${dealerRef}` : ""}
+                </div>
+              </div>
+              <AccessPill label={access.label} tone={access.tone} />
+            </div>
+          </div>
+
+          {/* ── Summary figures ──────────────────────────────────────── */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 20 }}>
+            <SummaryFigure label="2026 Turnover" value={formatGBP(turnover)} accent={BRAND.green} />
+            <SummaryFigure label="Available Credits" value={credits?.available ?? 0} accent={BRAND.green} />
+            <SummaryFigure label="Projects" value={projects.length} />
+          </div>
+
+          {/* ── Compact access management ─────────────────────────────── */}
+          <div style={{ marginBottom: 20 }}>
+            <AccountStatusActions account={account} onStatusChanged={(updated) => setAccount(updated)} />
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, marginTop: 10,
+              fontSize: 12, color: BRAND.subtext,
+            }}>
+              <Users style={{ width: 14, height: 14, color: BRAND.amber }} />
+              <span>{occupiedSeats} of 5 logins occupied</span>
+            </div>
+          </div>
+
+          {/* ── Collapsible panels ────────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <CollapsiblePanel
+              title="Professional Project Credits & Ledger History"
+              icon={<Coins className="h-4 w-4 text-[#625143]" />}
+              headerBg={PANEL_HEADER_BG}
+            >
+              <AccountDrawerCredits row={creditRow} />
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
+              title="Users & Membership"
+              icon={<Users className="h-4 w-4 text-[#625143]" />}
+              headerBg={PANEL_HEADER_BG}
+            >
+              <AccountUsersPanel accountId={accountId} />
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
+              title={`Projects (${projects.length})`}
+              icon={<FolderOpen className="h-4 w-4 text-[#625143]" />}
+              headerBg={PANEL_HEADER_BG}
+            >
+              {projects.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: BRAND.subtext, fontSize: 14 }}>
+                  No projects linked to this account yet.
+                </div>
+              ) : (
+                <div style={{ overflow: "hidden", borderRadius: 8, border: `1px solid ${BRAND.border}` }}>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1fr 90px",
+                    padding: "10px 16px",
+                    background: "rgb(244 243 241)",
+                    borderBottom: `1px solid ${BRAND.border}`,
+                    fontSize: 10, fontWeight: 700, color: BRAND.subtext,
+                    letterSpacing: "0.06em", textTransform: "uppercase",
+                  }}>
+                    <div>Project Name</div>
+                    <div>Client</div>
+                    <div>Status</div>
+                    <div>Dolby Layout</div>
+                    <div>Created</div>
+                    <div>Updated</div>
+                    <div style={{ textAlign: "right" }}>Open</div>
+                  </div>
+                  {projects.map((p, i) => (
+                    <div
+                      key={p.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1fr 90px",
+                        padding: "14px 16px",
+                        borderBottom: i < projects.length - 1 ? `1px solid ${BRAND.border}` : "none",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: 14, color: BRAND.text }}>
+                        {p.name || "Untitled Project"}
+                      </div>
+                      <div style={{ fontSize: 13, color: BRAND.subtext }}>
+                        {p.client_name || "—"}
+                      </div>
+                      <div>
+                        <ProjectStatusPill value={p.project_status} />
+                      </div>
+                      <div style={{ fontSize: 12, color: BRAND.subtext }}>
+                        {p.dolby_config || "—"}
+                      </div>
+                      <div style={{ fontSize: 12, color: BRAND.subtext }}>
+                        {formatDate(p.created_date)}
+                      </div>
+                      <div style={{ fontSize: 12, color: BRAND.subtext }}>
+                        {formatDate(p.updated_date)}
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <a
+                          href={`/RoomDesigner?project=${encodeURIComponent(p.id)}`}
+                          style={{
+                            display: "inline-block",
+                            padding: "6px 12px", borderRadius: 8,
+                            background: BRAND.btn, color: BRAND.btnText,
+                            fontSize: 12, fontWeight: 600, textDecoration: "none",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Open →
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
+              title="Promotions & Promotional Usage"
+              icon={<Gift className="h-4 w-4 text-[#625143]" />}
+              headerBg={PANEL_HEADER_BG}
+            >
+              <AccountPromotionNote
+                account={account}
+                promotions={promotions}
+                promotionUsage={promotionUsage}
+              />
+              <TargetedPromotionPanel
+                account={account}
+                promotions={promotions}
+                promotionUsage={promotionUsage}
+                allAccounts={account ? [account] : []}
+                onPromotionsChanged={handlePromotionsChanged}
+              />
+              {promotionUsage.length === 0 ? (
+                <div style={{ padding: 16, textAlign: "center", color: BRAND.subtext, fontSize: 13 }}>
+                  No promotional usage recorded for this account.
+                </div>
+              ) : (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                    Promotional Usage Records ({promotionUsage.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {promotionUsage.map((u) => (
+                      <div key={u.id} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "6px 12px", borderRadius: 8,
+                        background: "#FAFAF9", border: `1px solid ${BRAND.border}`,
+                        fontSize: 12,
+                      }}>
+                        <span style={{ color: BRAND.subtext }}>
+                          {u.promotion_type || "—"} · {formatDate(u.used_at)}
+                        </span>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600,
+                          color: u.usage_status === "ACTIVE_PROJECT" ? BRAND.green : BRAND.amber,
+                        }}>
+                          {u.usage_status?.replaceAll("_", " ") || "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
+              title="Technical Account Details"
+              icon={<Settings className="h-4 w-4 text-[#625143]" />}
+              headerBg={PANEL_HEADER_BG}
+            >
+              <div style={{ display: "grid", gap: 8, fontSize: 12, color: BRAND.subtext }}>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Account ID:</strong>{" "}
+                  <span style={{ fontFamily: "monospace", fontSize: 11 }}>{account.id}</span>
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Account type:</strong> {account.account_type || "—"}
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Dealer group:</strong> {account.dealer_group || "—"}
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Territory:</strong> {account.territory || "—"}
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Contact email:</strong> {account.contact_email || "—"}
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Last access:</strong> {formatDateTime(account.last_access_at)}
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Account.project_count (stale field):</strong> {account.project_count ?? "—"}
+                </div>
+                <div>
+                  <strong style={{ color: BRAND.text }}>Account-linked projects (live count):</strong> {projects.length}
+                </div>
+                {externalLinks.length > 0 && (
+                  <div>
+                    <strong style={{ color: BRAND.text }}>Portal links:</strong>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
+                      {externalLinks.map((link) => (
+                        <li key={link.id} style={{ marginBottom: 4 }}>
+                          {link.external_account_name || "linked"} ({link.external_account_number || "—"})
+                          {link.partner_user_id ? ` · partner_user_id: ${link.partner_user_id}` : ""}
+                          {link.active === false ? " · inactive" : ""}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, color: BRAND.subtext }}>
-                  {TYPE_LABELS[account.account_type] || account.account_type || "—"}
-                </span>
-                <StatusPill value={account.status} />
-              </div>
-            </div>
-
-            {/* Stats row */}
-            <div style={{
-              display: "flex", gap: 32, marginTop: 16,
-              paddingTop: 16, borderTop: `1px solid ${BRAND.border}`,
-            }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
-                  Projects
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: BRAND.green }}>
-                  {projects.length}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.subtext, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
-                  Account ID
-                </div>
-                <div style={{ fontSize: 11, fontFamily: "monospace", color: BRAND.subtext }}>
-                  {account.id}
-                </div>
-              </div>
-            </div>
+            </CollapsiblePanel>
           </div>
-
-          {/* Account-local users and permissions — all changes go through the
-              tenant-aware audited backend authority. */}
-          <div style={{ marginBottom: 24 }}>
-            <AccountUsersPanel accountId={accountId} />
-          </div>
-
-          {/* Active promotion note — group-wide (ALL_DEALER_GROUP) eligibility */}
-          <AccountPromotionNote
-            account={account}
-            promotions={promotions}
-            promotionUsage={promotionUsage}
-          />
-
-          {/* Targeted promotion — SINGLE_ACCOUNT promotions for this account */}
-          <TargetedPromotionPanel
-            account={account}
-            promotions={promotions}
-            promotionUsage={promotionUsage}
-            allAccounts={account ? [account] : []}
-            onPromotionsChanged={handlePromotionsChanged}
-          />
-
-          {/* Commercial summary */}
-          <CommercialSummaryCard
-            account={account}
-            breakdown={breakdown}
-            turnover={turnover}
-            projectCount={projects.length}
-            calendarYear={CALENDAR_YEAR}
-          />
-
-          {/* Admin status controls */}
-          <AccountStatusActions
-            account={account}
-            onStatusChanged={(updated) => setAccount(updated)}
-          />
-
-          {/* Projects table */}
-          <div style={{ marginBottom: 12, fontSize: 13, fontWeight: 700, color: BRAND.text }}>
-            Projects ({projects.length})
-          </div>
-
-          {projects.length === 0 ? (
-            <div style={{
-              padding: 32, textAlign: "center",
-              border: `1px dashed ${BRAND.border}`, borderRadius: 12,
-              background: BRAND.card, color: BRAND.subtext, fontSize: 14,
-            }}>
-              No projects linked to this account yet.
-            </div>
-          ) : (
-            <div style={{
-              background: BRAND.card, border: `1px solid ${BRAND.border}`,
-              borderRadius: 12, overflow: "hidden",
-            }}>
-              {/* Table header */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1fr 90px",
-                padding: "10px 16px",
-                background: "rgb(244 243 241)",
-                borderBottom: `1px solid ${BRAND.border}`,
-                fontSize: 10, fontWeight: 700, color: BRAND.subtext,
-                letterSpacing: "0.06em", textTransform: "uppercase",
-              }}>
-                <div>Project Name</div>
-                <div>Client</div>
-                <div>Status</div>
-                <div>Dolby Layout</div>
-                <div>Created</div>
-                <div>Updated</div>
-                <div style={{ textAlign: "right" }}>Open</div>
-              </div>
-
-              {/* Table rows */}
-              {projects.map((p, i) => (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "2fr 1.5fr 1fr 1fr 1fr 1fr 90px",
-                    padding: "14px 16px",
-                    borderBottom: i < projects.length - 1 ? `1px solid ${BRAND.border}` : "none",
-                    alignItems: "center",
-                    transition: "background 0.15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgb(248 248 247)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <div style={{ fontWeight: 600, fontSize: 14, color: BRAND.text }}>
-                    {p.name || "Untitled Project"}
-                  </div>
-                  <div style={{ fontSize: 13, color: BRAND.subtext }}>
-                    {p.client_name || "—"}
-                  </div>
-                  <div>
-                    <ProjectStatusPill value={p.project_status} />
-                  </div>
-                  <div style={{ fontSize: 12, color: BRAND.subtext }}>
-                    {p.dolby_config || "—"}
-                  </div>
-                  <div style={{ fontSize: 12, color: BRAND.subtext }}>
-                    {formatDate(p.created_date)}
-                  </div>
-                  <div style={{ fontSize: 12, color: BRAND.subtext }}>
-                    {formatDate(p.updated_date)}
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <a
-                      href={`/RoomDesigner?project=${encodeURIComponent(p.id)}`}
-                      style={{
-                        display: "inline-block",
-                        padding: "6px 12px", borderRadius: 8,
-                        background: BRAND.btn, color: BRAND.btnText,
-                        fontSize: 12, fontWeight: 600, textDecoration: "none",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Open →
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </>
       )}
     </div>
