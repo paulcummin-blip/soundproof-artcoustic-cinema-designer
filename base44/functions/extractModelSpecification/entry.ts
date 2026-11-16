@@ -149,10 +149,37 @@ export default async function (req) {
     }
 
     const isPdf = /\.pdf(\?|#|$)/i.test(sourceUrl);
-    const read = isPdf ? { ok: true, note: '', text: '' } : await readSource(sourceUrl);
+    const read = isPdf ? { ok: true, note: '', text: '', isPdf: true } : await readSource(sourceUrl);
 
     let raw = null;
-    if (read.ok && read.text) {
+    let sourceReadFailed = false;
+    let sourceReadNote = read.note || '';
+
+    if (isPdf) {
+      // An official PDF is read as an attached document. The LLM downloads it
+      // from the URL via file_urls and extracts only from it — no web search,
+      // no general knowledge, no alternative source.
+      raw = await base44.integrations.Core.InvokeLLM({
+        prompt: [
+          rulesFor(manufacturerName, model),
+          ``,
+          `SOURCE: ${sourceType} (official PDF) at ${sourceUrl}`,
+          `Read the attached PDF and extract only from it.`,
+          `If you cannot read the attached PDF, return an empty fields array and model_confirmed false.`,
+        ].join('\n'),
+        file_urls: [sourceUrl],
+        response_json_schema: EXTRACTION_SCHEMA,
+      });
+      // Verify the PDF was actually read: if no fields were reported, the LLM
+      // could not access the PDF. Flag this as a read failure so the admin is
+      // told clearly — no silent switch to an alternative source.
+      const reportedCount = (Array.isArray(raw?.fields) ? raw.fields : [])
+        .filter((f) => f && f.status === 'reported').length;
+      if (reportedCount === 0) {
+        sourceReadFailed = true;
+        sourceReadNote = 'The linked PDF could not be read. No values were extracted and no alternative source was used.';
+      }
+    } else if (read.ok && read.text) {
       // The page text is supplied verbatim: no web search, no general knowledge.
       raw = await base44.integrations.Core.InvokeLLM({
         prompt: [
@@ -166,32 +193,13 @@ export default async function (req) {
         ].join('\n'),
         response_json_schema: EXTRACTION_SCHEMA,
       });
-    } else if (isPdf) {
-      // An official PDF is read as an attached document.
-      raw = await base44.integrations.Core.InvokeLLM({
-        prompt: [
-          rulesFor(manufacturerName, model),
-          ``,
-          `SOURCE: ${sourceType} (official PDF) at ${sourceUrl}`,
-          `Read the attached PDF and extract only from it.`,
-        ].join('\n'),
-        file_urls: [sourceUrl],
-        response_json_schema: EXTRACTION_SCHEMA,
-      });
     } else {
-      // The page could not be read directly — fall back to a search restricted
-      // to this one URL and the manufacturer's own domain.
-      raw = await base44.integrations.Core.InvokeLLM({
-        prompt: [
-          rulesFor(manufacturerName, model),
-          ``,
-          `SOURCE: ${sourceType} at ${sourceUrl}`,
-          `Read that specific URL. If it cannot be read, read the specification page for this exact model on the same manufacturer domain. Never use a dealer, retailer or review site.`,
-        ].join('\n'),
-        add_context_from_internet: true,
-        model: 'gemini_3_flash',
-        response_json_schema: EXTRACTION_SCHEMA,
-      });
+      // The linked page could not be read directly. Report the failure clearly
+      // — do NOT fall back to a web search, an alternative product page, an
+      // older PDF or a different regional source. The admin must update the
+      // source URL or try again.
+      sourceReadFailed = true;
+      sourceReadNote = read.note || 'The linked source could not be read. No alternative source was used.';
     }
 
     const reported = [];
@@ -216,8 +224,9 @@ export default async function (req) {
       source_url: sourceUrl,
       source_type: sourceType,
       source_date: new Date().toISOString().split('T')[0],
-      source_read: read.ok,
-      source_read_note: read.note || '',
+      source_read: !sourceReadFailed,
+      source_read_failed: sourceReadFailed,
+      source_read_note: sourceReadNote || '',
       reported,
       ambiguous,
       not_found: notFound,

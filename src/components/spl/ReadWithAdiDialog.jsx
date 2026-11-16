@@ -224,7 +224,8 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
   };
 
   const modelConfirmed = raw?.model_confirmed === true;
-  const sourceReadOk = raw?.source_read === true || (raw && !raw.source_read_note);
+  const sourceReadFailed = raw?.source_read_failed === true;
+  const sourceReadOk = !sourceReadFailed && (raw?.source_read === true || (raw && !raw.source_read_note));
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (next && !loading && !saving) return; if (!next && !loading && !saving) close(); }}>
@@ -256,18 +257,35 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
 
         {!loading && !error && raw && (
           <>
-            {raw.source_read_note && !sourceReadOk && (
-              <div style={{ fontSize: 12, color: BRAND.amber, marginBottom: 8 }}>
-                The page could not be read directly — ADI fell back to a restricted read. Review each value carefully.
+            {sourceReadFailed && (
+              <div style={{ padding: "12px 14px", border: `1px solid ${BRAND.red}55`, borderRadius: 10, background: `${BRAND.red}0a`, marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.red }}>
+                  Source could not be read
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
+                  {raw.source_read_note || "The linked manufacturer document could not be accessed or parsed. No alternative source was used."}
+                </div>
+                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 6 }}>
+                  Update the source URL on the product record and try again. Values from different source versions are never combined without review.
+                </div>
               </div>
             )}
-            {!modelConfirmed && (
+            {!sourceReadFailed && raw.source_read_note && !sourceReadOk && (
+              <div style={{ fontSize: 12, color: BRAND.amber, marginBottom: 8 }}>
+                {raw.source_read_note}
+              </div>
+            )}
+            {!sourceReadFailed && !modelConfirmed && (
               <div style={{ fontSize: 12, color: BRAND.amber, marginBottom: 8 }}>
                 The source did not explicitly name this exact model. Review each value carefully before accepting.
               </div>
             )}
 
-            {proposalFields.length === 0 ? (
+            {sourceReadFailed ? (
+              <div style={{ fontSize: 13, color: BRAND.subtext, padding: "8px 0" }}>
+                No values are proposed because the linked source could not be read.
+              </div>
+            ) : proposalFields.length === 0 ? (
               <div style={{ fontSize: 13, color: BRAND.subtext, padding: "8px 0" }}>
                 ADI found no P12/P13 values stated for this model in the source. No values are proposed.
               </div>
@@ -441,7 +459,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
           <button type="button" onClick={close} disabled={loading || saving} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "9px 16px", background: "#FFF", color: BRAND.text, fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
             Cancel
           </button>
-          {!loading && !error && allBlankFills && proposalFields.length > 0 && (
+          {!loading && !error && !sourceReadFailed && allBlankFills && proposalFields.length > 0 && (
             <button
               type="button"
               onClick={acceptAllFound}
@@ -454,8 +472,8 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
           <button
             type="button"
             onClick={apply}
-            disabled={loading || saving || proposalFields.length === 0}
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: 9, padding: "9px 18px", background: proposalFields.length === 0 ? "#9CA3A0" : BRAND.green, color: "#FFF", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: proposalFields.length === 0 ? "not-allowed" : "pointer" }}
+            disabled={loading || saving || sourceReadFailed || proposalFields.length === 0}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: 9, padding: "9px 18px", background: (sourceReadFailed || proposalFields.length === 0) ? "#9CA3A0" : BRAND.green, color: "#FFF", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: (sourceReadFailed || proposalFields.length === 0) ? "not-allowed" : "pointer" }}
           >
             {saving ? <><Loader2 size={15} className="animate-spin" /> Saving…</> : <>Save accepted values</>}
           </button>
