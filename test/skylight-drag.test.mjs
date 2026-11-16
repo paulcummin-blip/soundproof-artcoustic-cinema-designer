@@ -102,6 +102,8 @@ test('live guides measure opening edges and form fields read the updated centres
   for(const side of ['left','right','front','rear']) assert.match(html,new RegExp('data-clearance="'+side+'"'));
   for(const v of ['0.75','1.75','2.04','3.64']) assert.ok(html.includes(v+' m'),v);
   assert.match(html,/stroke-dasharray="3,3"/);
+  const originalDocument = globalThis.document;
+  globalThis.document = { addEventListener() {}, removeEventListener() {} };
   let form;
   const props={elements:h.elements,onChange:()=>{},roomDims:{widthM:6,lengthM:8,heightM:2.8}};
   act(()=>{form=create(React.createElement(RoomElements,props));});
@@ -113,6 +115,8 @@ test('live guides measure opening edges and form fields read the updated centres
   act(()=>form.update(React.createElement(RoomElements,{...props,elements:h.elements})));
   assert.ok(values().includes(3.1));assert.ok(values().includes(4.2));
   act(()=>form.unmount());
+  if (originalDocument === undefined) delete globalThis.document;
+  else globalThis.document = originalDocument;
   h.drag('sky',{x:-99,y:-99});
   assert.doesNotMatch(guides(h),/data-clearance="left"|data-clearance="front"/);
 });
