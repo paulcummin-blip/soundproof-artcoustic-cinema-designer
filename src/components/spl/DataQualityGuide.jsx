@@ -59,7 +59,7 @@ const CLASSIFICATIONS = [
 ];
 
 const STANDARD_STATEMENT =
-  "All manufacturers are assessed using the same RP22 methodology. Where published information is limited, Sound Proof does not assume additional performance that the manufacturer has not substantiated.";
+  "All manufacturers are assessed using the same RP22 methodology.";
 
 const SCOPE_NOTE =
   "These classifications describe the completeness and transparency of published manufacturer evidence, not loudspeaker sound quality.";
