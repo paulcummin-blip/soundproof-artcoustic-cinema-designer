@@ -4,6 +4,7 @@ import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import { buildLiveComplianceSummary } from "@/components/rp22/buildLiveComplianceSummary";
+import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDimensionReflowBanner from "@/components/room/RoomDimensionReflowBanner";
 import SeatBoundaryWarning from "@/components/room/SeatBoundaryWarning";
@@ -144,6 +145,7 @@ export default function RoomDesignerControlsPanel({
   abfuserRecommendation,
 }) {
   const [speakersOpen, setSpeakersOpen] = useState(false);
+  const bassResults = useSharedBassResults();
 
   // Live Compliance authority: project the same live RP22 analysis result that
   // feeds the seat HUD into the engineering-summary shape RP22CompliancePanel
@@ -155,11 +157,12 @@ export default function RoomDesignerControlsPanel({
   const liveComplianceSummary = useMemo(
     () => buildLiveComplianceSummary({
       analysisResult,
+      bassResults,
       seats: _seatingPositions,
       assumedP15Level: appState?.assumedP15Level,
       assumedP21Level: appState?.assumedP21Level,
     }),
-    [analysisResult, _seatingPositions, appState?.assumedP15Level, appState?.assumedP21Level],
+    [analysisResult, bassResults, _seatingPositions, appState?.assumedP15Level, appState?.assumedP21Level],
   );
 
   return (
