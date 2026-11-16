@@ -352,7 +352,8 @@ export default function RvRoomElementsLayer({
           <g
             key={String(dragId)}
             style={isDraggable ? { cursor: 'grab', pointerEvents: 'all' } : undefined}
-            onMouseDown={onDown}
+            onPointerDown={isSkylight ? onDown : undefined}
+            onMouseDown={isSkylight ? undefined : onDown}
           >
             {/* Larger invisible hit target for easier grabbing */}
             {isGenericEl && isDraggable && (
