@@ -32,6 +32,7 @@ import { buildComparisonRow } from "@/components/admin/speaker-db/model-first/rp
 import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization";
 import { ASSUMED_SENSITIVITY_BASIS, applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption";
 import { installedSpaceAssumptionForRow } from "@/components/utils/spl/installedSpaceAssumption";
+import { PEAK_ASSUMPTION_LABEL } from "@/components/utils/spl/peakPowerAssumption";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { selectComparisonLibraryRows } from "./competitorSpreadsheetImport.js";
 import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassification.js";
@@ -112,6 +113,9 @@ export function classifyComparisonRow(row) {
   if (assumedSensitivityBasis) assumptions.push(ASSUMED_SENSITIVITY_BASIS);
   const spaceAssumption = installedSpaceAssumptionForRow(record);
   if (spaceAssumption.applied) assumptions.push(spaceAssumption.note);
+  // The peak-to-continuous assumption is a controlled assumption and must be
+  // stated alongside the others, so the info panel shows it explicitly.
+  if (record.provisional_peak_assumed === true) assumptions.push(PEAK_ASSUMPTION_LABEL);
 
   const eligible = record.p12_p13_eligible === true;
   const gradedFromPublished = record.halfspace_published_max_continuous_spl_db_1m != null;
@@ -119,6 +123,8 @@ export function classifyComparisonRow(row) {
   let confidence = eligible ? record.data_confidence : "INSUFFICIENT";
   // A capability that rests on a treated basis is an estimate — never A or B.
   if (eligible && assumedSensitivityBasis && !gradedFromPublished) confidence = "C";
+  // A provisional peak-to-continuous estimate is always C (ADI estimate).
+  if (eligible && record.provisional_peak_assumed === true) confidence = "C";
 
   const classKey = confidence === "A" || confidence === "B" || confidence === "C" ? confidence : "D";
   return { record, classKey, assumptions, eligible };
@@ -207,7 +213,7 @@ export function buildCandidate({
     splEvidenceSource: record.spl_evidence_source || "",
     splEvidenceLabel: record.spl_evidence_label || "",
     splEvidenceStatement: record.spl_evidence_statement || "",
-    pillLabel: null,
+    pillLabel: record.provisional_peak_assumed === true ? "LIMITED DATA" : null,
     tone: klass.tone,
     meaning: klass.meaning,
     statusLabel,

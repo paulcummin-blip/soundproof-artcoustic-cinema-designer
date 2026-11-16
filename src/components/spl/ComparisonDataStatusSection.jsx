@@ -24,6 +24,7 @@
 
 import React from "react";
 import { DATA_ADEQUACY, classifyDataAdequacy } from "./dataAdequacyClassification";
+import { PROVISIONAL_EXPLANATION, PEAK_TO_CONTINUOUS_FACTOR } from "@/components/utils/spl/peakPowerAssumption";
 import DataQualityGuide from "./DataQualityGuide";
 
 const BRAND = {
@@ -129,6 +130,9 @@ function missingInputs(record) {
 }
 
 function resultMethodText(record) {
+  if (record?.provisional_peak_assumed === true) {
+    return "Provisional estimate, calculated from sensitivity and assumed continuous-equivalent power (50% of published peak).";
+  }
   const basis = String(record.capability_basis || "").trim();
   if (basis === "Published") return "Published continuous SPL figure";
   if (basis === "Calculated") return "Calculated from published sensitivity and amplifier power";
@@ -138,7 +142,20 @@ function resultMethodText(record) {
   return authority || NOT_PUBLISHED;
 }
 
+// Format a watt value for display in the provisional data rows.
+function wattRow(value) {
+  if (!hasValue(value)) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? `${Number(n.toFixed(1))} W` : `${value} W`;
+}
+
 function whyText(adequacy, record) {
+  // A provisional peak-to-continuous estimate is eligible (a P12/P13 level is
+  // produced) but stays LIMITED DATA. The explanation states the assumption
+  // rather than saying the calculation is unavailable.
+  if (record?.provisional_peak_assumed === true) {
+    return PROVISIONAL_EXPLANATION;
+  }
   if (adequacy.key === DATA_ADEQUACY.FULL.key) {
     return "Enough transparent manufacturer evidence for a like-for-like P12/P13 comparison on the same basis used for Artcoustic.";
   }
@@ -183,6 +200,7 @@ export default function ComparisonDataStatusSection({
   const assumptions = Array.isArray(candidate?.assumptions) ? candidate.assumptions : [];
 
   const manufacturerSpl = manufacturerStatedSplRow(record);
+  const isProvisional = record?.provisional_peak_assumed === true;
   const dataUsed = [
     ["Manufacturer", record.manufacturer || "—"],
     ["Model", record.model || "—"],
@@ -192,6 +210,16 @@ export default function ComparisonDataStatusSection({
     ["Power authority", powerAuthorityRow(record)],
     ["Continuous SPL (if published)", continuousSplRow(record)],
   ];
+  // For a provisional peak-assumed result, show the published peak rating and
+  // the assumed continuous-equivalent power as separate data rows so the
+  // figures behind the estimate are fully visible.
+  if (isProvisional) {
+    const peakW = wattRow(record.published_peak_power_w);
+    const assumedW = wattRow(record.assumed_continuous_power_w);
+    if (peakW) dataUsed.push(["Manufacturer peak power handling", peakW]);
+    if (assumedW) dataUsed.push(["Assumed continuous-equivalent power", assumedW]);
+    dataUsed.push(["Calculation assumption", `${PEAK_TO_CONTINUOUS_FACTOR * 100}% of published peak power`]);
+  }
   if (manufacturerSpl) {
     dataUsed.push(["Manufacturer maximum SPL", manufacturerSpl]);
   }

@@ -15,6 +15,7 @@ import {
   capEvidenceConfidence,
   resolveSplEvidenceSource,
 } from './splEvidenceSourceAuthority.js';
+import { assumedContinuousFromPeak, PEAK_ASSUMPTION_LABEL } from './peakPowerAssumption.js';
 
 export const FULL_TO_HALF_SPACE_DB = 6;
 
@@ -117,19 +118,29 @@ export function normalizeCompetitor(record) {
   const recAmpMin = num(record.recommended_amp_min_w);
   const recAmpMax = num(record.recommended_amp_max_w) ?? num(record.recommended_amplifier_power_w);
 
-  // Power authority. A published continuous/AES-style rating is preferred. Many
-  // manufacturers publish only a recommended amplifier range, so in that case the
-  // recommended amplifier maximum is the stated authority. Nothing is inferred and
-  // nothing is invented: an absent figure stays absent and the row stays ungradeable.
+  // Power authority hierarchy (highest priority first):
+  //   1. Published continuous / IEC / AES rating
+  //   2. Recommended amplifier maximum
+  //   3. 50% of published peak power (provisional — always LIMITED DATA)
+  // Nothing is invented: when none of the three is published the row stays
+  // ungradeable. The peak fallback is a provisional estimate and is never
+  // represented as manufacturer-published capability.
   const publishedRating = num(record.continuous_power_w);
   const ratingLabel = String(record.power_rating_type ?? '').trim();
   const powerFromRating = publishedRating > 0 ? publishedRating : null;
   const powerFromAmpRecommendation = recAmpMax > 0 ? recAmpMax : null;
-  const power = powerFromRating ?? powerFromAmpRecommendation;
+  const publishedPeak = num(record.peak_power_w);
+  const powerFromPeakAssumed = assumedContinuousFromPeak(publishedPeak);
+  const powerIsPeakAssumed = powerFromRating === null
+    && powerFromAmpRecommendation === null
+    && powerFromPeakAssumed !== null;
+  const power = powerFromRating ?? powerFromAmpRecommendation ?? powerFromPeakAssumed;
   const powerIsPublishedRating = powerFromRating !== null;
   const powerAuthority = powerIsPublishedRating
     ? (ratingLabel || 'Continuous')
-    : powerFromAmpRecommendation !== null ? 'Manufacturer recommended amplifier maximum' : null;
+    : powerFromAmpRecommendation !== null
+      ? 'Manufacturer recommended amplifier maximum'
+      : powerIsPeakAssumed ? PEAK_ASSUMPTION_LABEL : null;
 
   // Published SPL values get the max-SPL space correction applied once (independently)
   const continuous = rawContinuous !== null ? rawContinuous + maxSplBasis.correctionDb : null;
@@ -184,6 +195,9 @@ export function normalizeCompetitor(record) {
   // Capability resting on a recommended amplifier maximum is sound engineering but
   // is not a published power rating, so it can never reach confidence A.
   if (!powerIsPublishedRating && dataConfidence === 'A') dataConfidence = 'B';
+  // A provisional peak-assumed result is an estimate — never A or B. It is
+  // always held at C (ADI estimate) and the adequacy stays LIMITED DATA.
+  if (powerIsPeakAssumed) dataConfidence = 'C';
   // Evidence provenance: a manufacturer-calculated SPL, or a figure whose basis is
   // not stated, is never classified as measured capability.
   dataConfidence = capEvidenceConfidence(dataConfidence, evidenceSource.confidenceCap);
@@ -244,6 +258,13 @@ export function normalizeCompetitor(record) {
     normalized_continuous_power_w: powerFromRating,
     recommended_amp_min_w: recAmpMin,
     recommended_amp_max_w: recAmpMax,
+    // Provisional peak-to-continuous assumption: the published peak rating and
+    // the assumed continuous-equivalent power (50% of peak). The flag is true
+    // only when no continuous rating or recommended amplifier maximum was
+    // published, so a better-quality figure always takes precedence.
+    provisional_peak_assumed: powerIsPeakAssumed,
+    published_peak_power_w: powerIsPeakAssumed ? publishedPeak : null,
+    assumed_continuous_power_w: powerIsPeakAssumed ? power : null,
     calculated_max_continuous_spl_db_1m: rawCalculated,
     halfspace_published_max_continuous_spl_db_1m: continuous,
     halfspace_published_max_peak_spl_db_1m: peak,

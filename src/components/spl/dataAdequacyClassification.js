@@ -54,6 +54,11 @@ const hasValue = (value) => value !== null && value !== undefined && String(valu
 export function classifyDataAdequacy(record) {
   if (!record || record.p12_p13_eligible !== true) return DATA_ADEQUACY.INCOMPLETE;
 
+  // A provisional peak-to-continuous estimate is always LIMITED DATA, never
+  // GOOD or FULL, even though the row is eligible for a P12/P13 calculation.
+  // The estimate is useful but not a manufacturer-verified capability.
+  if (record.provisional_peak_assumed === true) return DATA_ADEQUACY.INCOMPLETE;
+
   // A defensible numerical result is possible. Now: is it FULL or GOOD?
   const publishedSpl = hasValue(record.halfspace_published_max_continuous_spl_db_1m);
   const spaceConfirmed = record.sensitivity_space_provenance !== "half_space_assumed"

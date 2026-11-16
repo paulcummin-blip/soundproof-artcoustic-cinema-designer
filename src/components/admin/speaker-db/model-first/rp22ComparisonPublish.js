@@ -12,6 +12,7 @@
 import { base44 } from "@/api/base44Client";
 import { sameCompetitorIdentity } from "@/components/utils/spl/manufacturerIdentity";
 import { sensitivityBasisAssumptionApplies } from "@/components/utils/spl/sensitivityBasisAssumption";
+import { assumedContinuousFromPeak, PEAK_ASSUMPTION_LABEL } from "@/components/utils/spl/peakPowerAssumption";
 
 // Fields without which the RP22 comparison cannot grade P12/P13 for the model.
 // Only the four essential inputs for a power-derived SPL calculation: sensitivity,
@@ -83,6 +84,15 @@ export function resolvePowerAuthority(spec) {
       source: "recommended_amp_max",
     };
   }
+  // Provisional fallback: assume continuous-equivalent power at 50% of the
+  // published peak rating. This is the last tier — a published continuous
+  // rating or recommended amplifier maximum always takes precedence. The
+  // result is a provisional estimate, never manufacturer-published capability.
+  const peak = resolvePeakPower(spec);
+  const assumed = assumedContinuousFromPeak(peak);
+  if (assumed !== null) {
+    return { value: assumed, label: PEAK_ASSUMPTION_LABEL, source: "peak_power_assumed" };
+  }
   return { value: null, label: "", source: null };
 }
 
@@ -151,6 +161,7 @@ export function buildComparisonRow({ product, specification, manufacturerName })
   const spec = specification || {};
   const product_ = product || {};
   const power = resolveContinuousPower(spec);
+  const powerAuthority = resolvePowerAuthority(spec);
   const space = SPACE_TO_BASIS[spec.measurement_space] || "";
   const low = present(spec.frequency_response_low_hz) ? spec.frequency_response_low_hz : null;
   const high = present(spec.frequency_response_high_hz) ? spec.frequency_response_high_hz : null;
@@ -174,6 +185,10 @@ export function buildComparisonRow({ product, specification, manufacturerName })
     continuous_power_w: power.value,
     power_rating_type: power.label,
     peak_power_w: resolvePeakPower(spec),
+    // The assumed continuous-equivalent power (50% of peak) when no continuous
+    // rating or recommended amplifier maximum is published. Null otherwise —
+    // the published continuous power or recommended amp max is the authority.
+    assumed_continuous_power_w: powerAuthority.source === "peak_power_assumed" ? powerAuthority.value : null,
     published_max_continuous_spl_db_1m: present(spec.max_continuous_spl_db) ? spec.max_continuous_spl_db : null,
     published_max_peak_spl_db_1m: present(spec.max_peak_spl_db) ? spec.max_peak_spl_db : null,
     // The manufacturer's own test-conditions text is the authority when present
