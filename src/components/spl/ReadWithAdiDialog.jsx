@@ -34,6 +34,7 @@ import {
   decideDefaults,
   displayValue,
   extractionToFound,
+  fieldLabelFor,
   isConflict,
   readSourceExtraction,
   sourceUrlOf,
@@ -303,7 +304,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                       return (
                         <tr key={key} style={{ borderTop: `1px solid ${BRAND.soft}` }}>
                           <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: BRAND.text, verticalAlign: "top" }}>
-                            {FIELD_LABEL[key]}
+                            {fieldLabelFor(key, info)}
                             {(key === "power_w" || key === "power_w_min") && f.basis && (
                               <div style={{ fontSize: 10, color: BRAND.hint, fontWeight: 400, marginTop: 2 }}>
                                 {f.category || (f.basis === "continuous" ? "Continuous rating" : "Recommended amplifier")}
@@ -322,7 +323,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                             )}
                             {conflict && (
                               <div style={{ fontSize: 10, color: BRAND.amber, marginTop: 3 }}>
-                                Differs from current — review before accepting.
+                                Conflicts with the saved value — accepting overwrites it.
                               </div>
                             )}
                             {f.quote && (
@@ -337,7 +338,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                               checked={checked}
                               onChange={() => toggle(key)}
                               disabled={saving}
-                              aria-label={`Use source value for ${FIELD_LABEL[key]}`}
+                              aria-label={`Use source value for ${fieldLabelFor(key, info)}`}
                             />
                           </td>
                         </tr>

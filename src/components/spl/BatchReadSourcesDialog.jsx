@@ -30,6 +30,7 @@ import {
   decideDefaults,
   displayValue,
   extractionToFound,
+  fieldLabelFor,
   isConflict,
   readSourceExtraction,
   sourceUrlOf,
@@ -303,14 +304,14 @@ export default function BatchReadSourcesDialog({ open, onClose, candidates, acto
                                   const conflict = isConflict(q.currentForm, key, q.info);
                                   return (
                                     <tr key={key} style={{ borderTop: `1px solid ${BRAND.soft}` }}>
-                                      <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 600, color: BRAND.text, verticalAlign: "top" }}>{FIELD_LABEL[key]}</td>
+                                      <td style={{ padding: "6px 8px", fontSize: 12, fontWeight: 600, color: BRAND.text, verticalAlign: "top" }}>{fieldLabelFor(key, q.info)}</td>
                                       <td style={{ padding: "6px 8px", fontSize: 12, color: conflict ? BRAND.amber : BRAND.subtext, verticalAlign: "top", fontWeight: conflict ? 600 : 400 }}>{displayValue(key, current)}</td>
                                       <td style={{ padding: "6px 8px", fontSize: 12, color: BRAND.text, verticalAlign: "top" }}>
                                         <div>{displayValue(key, f.value)}</div>
                                         {f.quote && <div style={{ fontSize: 10, color: BRAND.hint, marginTop: 3, fontStyle: "italic" }}>“{f.quote.slice(0, 120)}{f.quote.length > 120 ? "…" : ""}”</div>}
                                       </td>
                                       <td style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "top" }}>
-                                        <input type="checkbox" checked={!!q.decisions[key]} onChange={() => toggleRow(idx, key)} disabled={q.applied} aria-label={`Use source value for ${FIELD_LABEL[key]}`} />
+                                        <input type="checkbox" checked={!!q.decisions[key]} onChange={() => toggleRow(idx, key)} disabled={q.applied} aria-label={`Use source value for ${fieldLabelFor(key, q.info)}`} />
                                       </td>
                                     </tr>
                                   );

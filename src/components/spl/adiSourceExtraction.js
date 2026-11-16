@@ -30,6 +30,7 @@ export {
   extractionToFound,
   displayValue,
   decideDefaults,
+  fieldLabelFor,
   isConflict,
   buildSourceEvidence,
   mapMaxSplBasis,

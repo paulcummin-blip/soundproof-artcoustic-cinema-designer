@@ -285,18 +285,39 @@ export function displayValue(formKey, value) {
 }
 
 /**
- * Default decisions: accept a reported value only when the current field is
- * blank (a new field). Never default-accept ambiguous evidence and never
- * default-overwrite an existing value.
+ * Default decisions: auto-tick every successfully extracted, valid (reported)
+ * manufacturer specification when the Read Source results appear — including
+ * values that conflict with an existing saved value, which the admin can untick.
+ * Ambiguous / uncertain evidence is never auto-accepted. Nothing is saved
+ * until the admin clicks Save; these are only the default checkbox states.
  */
 export function decideDefaults(currentForm, info) {
   const initial = {};
   for (const key of ACCEPTANCE_FIELDS) {
     const f = info[key];
     if (!f) continue;
-    initial[key] = !hasValue(currentForm[key]) && f.status === "reported";
+    initial[key] = f.status === "reported";
   }
   return initial;
+}
+
+/**
+ * Dynamic label for a proposal field. The power_w field is the P12/P13
+ * calculation authority: its basis is "continuous" when the manufacturer
+ * published a continuous/RMS/IEC/AES rating, and "amplifier" when only a
+ * recommended amplifier maximum is available. The label must reflect what the
+ * value actually is so a continuous power rating is never shown as
+ * "Recommended amplifier max" — that label belongs to the separate power_w_amp
+ * field. Other fields use the static FIELD_LABEL.
+ */
+export function fieldLabelFor(key, info) {
+  if (key === "power_w") {
+    const basis = info?.power_w?.basis;
+    if (basis === "continuous") return "Continuous power handling (W)";
+    if (basis === "amplifier") return "Recommended amplifier max (W)";
+    return "Power handling (W)";
+  }
+  return FIELD_LABEL[key];
 }
 
 /** Whether a proposal field is a conflicting existing value (current non-blank). */
