@@ -65,6 +65,8 @@ export function rectsIntersect(a, b) {
 export function isInCeilingSpeaker(speaker, { heightM } = {}) {
   if (!speaker) return false;
   if (isOverheadRole(speaker.role)) return true;
+  // A high wall-mounted bed channel is not an in-ceiling installation.
+  if (/^(L|C|R|FL|FC|FR|SL|SR|LS|RS|SBL|SBR|LW|RW|FWL|FWR|SUB.*)$/i.test(String(speaker.role || ''))) return false;
   const z = Number(speaker?.position?.z);
   if (Number.isFinite(z) && Number.isFinite(Number(heightM))) {
     return z >= Number(heightM) - CEILING_Z_TOLERANCE_M;
