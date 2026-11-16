@@ -508,28 +508,32 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     </div>
                   </div>
 
-                  {/* Opening size — length × width */}
+                  {/* Opening size — Width (X-axis, left to right) × Length (Y-axis, front to back).
+                      Storage note: length_m holds the X-axis span and width_m holds the Y-axis
+                      span. The UI labels are deliberately swapped so "Width" controls the
+                      horizontal span and "Length" controls the front-to-back span, matching the
+                      room's own width/length convention without migrating stored geometry. */}
                   <div style={groupTitleStyle}>Opening Size (m)</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className={fieldLabelClassName}>Length (m)</Label>
+                      <Label className={fieldLabelClassName}>Width (m)</Label>
                       <StepperInput
                         value={Number(element?.length_m) || 3.5}
                         step={0.01}
                         min={0.1}
                         onChange={(val) => updateElement(element.id, 'length_m', Math.max(0.1, val))}
                       />
-                      <div style={helperTextStyle}>X-axis span (width direction)</div>
+                      <div style={helperTextStyle}>Left to right (X-axis)</div>
                     </div>
                     <div>
-                      <Label className={fieldLabelClassName}>Width (m)</Label>
+                      <Label className={fieldLabelClassName}>Length (m)</Label>
                       <StepperInput
                         value={Number(element?.width_m) || 2.32}
                         step={0.01}
                         min={0.1}
                         onChange={(val) => updateElement(element.id, 'width_m', Math.max(0.1, val))}
                       />
-                      <div style={helperTextStyle}>Y-axis span (depth direction)</div>
+                      <div style={helperTextStyle}>Front to back (Y-axis)</div>
                     </div>
                   </div>
                 </div>
