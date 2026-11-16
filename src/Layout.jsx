@@ -21,7 +21,8 @@ import {
   FileText,
   Presentation,
   Images,
-  Palette
+  Palette,
+  ArrowUpRight
 } from "lucide-react";
 
 import ApiBadge from "@/components/ui/ApiBadge";
@@ -440,21 +441,50 @@ export default function Layout({ children, currentPageName }) {
                 </div>
               )}
 
-                {/* Book a Demo — all authenticated users, independent of commercial state */}
+                {/* Visit our showroom — all authenticated users, independent of commercial state */}
                 <a
                   href="https://calendly.com/solutes-impish-0i/artcoustic-showroom"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block mx-3 mb-4 px-3 py-2 rounded-md text-sm text-center transition-all duration-200 hover:shadow-md hover:-translate-y-[1px]"
+                  className="group block mx-3 mb-4 rounded-md transition-all duration-200 hover:shadow-md hover:-translate-y-[1px] hover:bg-[#2A4434]"
                   style={{
                     background: '#213428',
                     color: '#FFFFFF',
                     fontFamily: 'Didact Gothic, sans-serif',
-                    fontWeight: 600,
-                    letterSpacing: '0.04em',
                   }}
                 >
-                  Book a Demo
+                  <div className="flex items-center justify-between gap-2 px-3 py-3">
+                    <div className="flex flex-col">
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          letterSpacing: '0.12em',
+                          textTransform: 'uppercase',
+                          color: '#C1B6AD',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        Visit our showroom
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 600,
+                          color: '#FFFFFF',
+                          letterSpacing: '0.02em',
+                          lineHeight: 1.3,
+                          marginTop: 2,
+                        }}
+                      >
+                        Experience Artcoustic
+                      </span>
+                    </div>
+                    <ArrowUpRight
+                      className="w-4 h-4 text-white transition-transform duration-200 group-hover:translate-x-[2px] group-hover:-translate-y-[2px]"
+                      strokeWidth={1.75}
+                    />
+                  </div>
                 </a>
                 </nav>
 
