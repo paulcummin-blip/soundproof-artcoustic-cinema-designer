@@ -777,6 +777,10 @@ export default function RvPlanCanvas({
               svgRef={svgRef} roomRect={roomRect} scale={scale}
               viewOffsetPx={viewOffsetPx} zoom={zoom} panX={panX} panY={panY}
               svgW={svgWSafe} svgH={svgHSafe}
+              widthM={widthM} lengthM={lengthM}
+              speakers={visiblePlanSpeakers}
+              seats={seatingPositions}
+              roomElements={roomElements}
             />
           )}
         </svg>
