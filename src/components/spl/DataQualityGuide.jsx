@@ -49,12 +49,12 @@ const CLASSIFICATIONS = [
   {
     key: "GOOD",
     label: "GOOD DATA",
-    text: "Sufficient manufacturer specifications are available to calculate a reasonable performance estimate. Some assumptions are necessary, so the comparison is less transparent than Full Data. Calculated performance uses published power handling or the maximum recommended amplifier power as an explicitly identified assumption.",
+    text: "Enough published information to calculate a fair performance estimate using reasonable engineering assumptions.",
   },
   {
     key: "LIMITED",
     label: "LIMITED DATA",
-    text: "The manufacturer has not published enough information for a reliable calculation. Performance may be estimated with greater uncertainty, or left ungraded where there is insufficient evidence. Sound Proof does not present an unsupported numerical guess as a defensible RP22 prediction.",
+    text: "Insufficient published information for a reliable prediction. Results may be uncertain or unavailable.",
   },
 ];
 
@@ -69,17 +69,17 @@ function ClassificationRow({ item, compact }) {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: compact ? "92px 1fr" : "110px 1fr",
+        gridTemplateColumns: compact ? "86px 1fr" : "100px 1fr",
         gap: 10,
-        padding: compact ? "5px 0" : "7px 0",
+        padding: compact ? "4px 0" : "6px 0",
         fontSize: compact ? 11 : 12,
-        lineHeight: 1.45,
+        lineHeight: 1.4,
         alignItems: "baseline",
       }}
     >
       <div
         style={{
-          fontSize: compact ? 10 : 10,
+          fontSize: 10,
           fontWeight: 700,
           letterSpacing: "0.06em",
           textTransform: "uppercase",
@@ -142,40 +142,18 @@ export default function DataQualityGuide({ variant = "section" }) {
     <div>
       <div
         style={{
-          fontSize: 15,
+          fontSize: 13,
           fontWeight: 700,
           color: BRAND.text,
-          marginBottom: 4,
+          marginBottom: 6,
         }}
       >
         Understanding data quality
       </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: BRAND.subtext,
-          lineHeight: 1.45,
-          marginBottom: 10,
-        }}
-      >
-        {SCOPE_NOTE}
-      </div>
 
-      <div
-        style={{
-          border: `1px solid ${BRAND.border}`,
-          borderRadius: 12,
-          padding: "8px 16px",
-          background: "#FFF",
-        }}
-      >
-        {CLASSIFICATIONS.map((item, idx) => (
-          <div
-            key={item.key}
-            style={{
-              borderTop: idx === 0 ? 0 : `1px solid ${BRAND.soft}`,
-            }}
-          >
+      <div style={{ display: "grid", gap: 0 }}>
+        {CLASSIFICATIONS.map((item) => (
+          <div key={item.key} style={{ borderTop: `1px solid ${BRAND.soft}` }}>
             <ClassificationRow item={item} compact={false} />
           </div>
         ))}
@@ -183,9 +161,9 @@ export default function DataQualityGuide({ variant = "section" }) {
 
       <div
         style={{
-          marginTop: 10,
+          marginTop: 8,
           fontSize: 11,
-          lineHeight: 1.5,
+          lineHeight: 1.45,
           color: BRAND.hint,
           fontStyle: "italic",
         }}
