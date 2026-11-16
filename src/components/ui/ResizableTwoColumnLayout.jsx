@@ -42,10 +42,39 @@ export default function ResizableTwoColumnLayout({
   paddingX = 16,
 }) {
   const containerRef = React.useRef(null);
+  const leftPanelRef = React.useRef(null);
+  const rightPanelRef = React.useRef(null);
   const [containerWidth, setContainerWidth] = React.useState(0);
   const [requestedLeftWidth, setRequestedLeftWidth] = React.useState(initialLeftWidth);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isHovering, setIsHovering] = React.useState(false);
+
+  // Linked vertical scroll via the centre grab handle. The handle is a
+  // temporary linked-scrolling control: dragging it applies the same vertical
+  // delta to both panels' own scroll containers, and each panel clamps
+  // independently at its own boundary. Independent scrolling (wheel/trackpad
+  // over a single panel) is untouched, and horizontal resizing through the
+  // divider rail remains independent.
+  const [isScrollDragging, setIsScrollDragging] = React.useState(false);
+  const [handleHover, setHandleHover] = React.useState(false);
+  const scrollDragStartY = React.useRef(0);
+  const scrollDragStartTops = React.useRef({ left: 0, right: 0 });
+
+  function findScrollContainer(root) {
+    if (!root) return null;
+    const queue = [root];
+    while (queue.length) {
+      const el = queue.shift();
+      if (!el || el.nodeType !== 1) continue;
+      const style = window.getComputedStyle(el);
+      const ov = style.overflowY;
+      if ((ov === "auto" || ov === "scroll") && el.scrollHeight > el.clientHeight + 1) {
+        return el;
+      }
+      for (const child of el.children) queue.push(child);
+    }
+    return null;
+  }
 
   const metrics = React.useMemo(
     () => computeSplitMetrics({
@@ -132,6 +161,52 @@ export default function ResizableTwoColumnLayout({
     };
   }, [isDragging, paddingX, minLeftWidth, minRightWidth, dividerWidth, gap]);
 
+  React.useEffect(() => {
+    if (!isScrollDragging) return undefined;
+
+    const handleScrollMouseMove = (event) => {
+      event.preventDefault();
+      const deltaY = event.clientY - scrollDragStartY.current;
+      const leftContainer = findScrollContainer(leftPanelRef.current);
+      const rightContainer = findScrollContainer(rightPanelRef.current);
+      // Apply the same delta to both; the browser clamps each to its own
+      // scroll boundary, so panels with different heights stop independently.
+      if (leftContainer) leftContainer.scrollTop = scrollDragStartTops.current.left + deltaY;
+      if (rightContainer) rightContainer.scrollTop = scrollDragStartTops.current.right + deltaY;
+    };
+
+    const handleScrollMouseUp = () => {
+      setIsScrollDragging(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", handleScrollMouseMove);
+    document.addEventListener("mouseup", handleScrollMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleScrollMouseMove);
+      document.removeEventListener("mouseup", handleScrollMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isScrollDragging]);
+
+  const handleScrollDragStart = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const leftContainer = findScrollContainer(leftPanelRef.current);
+    const rightContainer = findScrollContainer(rightPanelRef.current);
+    scrollDragStartY.current = event.clientY;
+    scrollDragStartTops.current = {
+      left: leftContainer ? leftContainer.scrollTop : 0,
+      right: rightContainer ? rightContainer.scrollTop : 0,
+    };
+    setIsScrollDragging(true);
+  };
+
   const dividerActive = isHovering || isDragging;
 
   // Deliberate responsive fallback: when the container is narrower than the
@@ -177,7 +252,7 @@ export default function ResizableTwoColumnLayout({
         minHeight: 0,
       }}
     >
-      <div style={{ minWidth: 0, minHeight: 0, overflow: "hidden" }}>
+      <div ref={leftPanelRef} style={{ minWidth: 0, minHeight: 0, overflow: "hidden" }}>
         {leftContent}
       </div>
 
@@ -228,11 +303,33 @@ export default function ResizableTwoColumnLayout({
             transition: "background 120ms ease, opacity 120ms ease",
           }}
         />
-        {/* Permanently visible grab handle, centred vertically. */}
-        <SplitDividerHandle active={dividerActive} />
+        {/* Permanently visible grab handle, centred vertically. The handle is
+            the linked vertical scroll control; it stops propagation so the
+            horizontal resize separator beneath it does not also engage. */}
+        <div
+          onMouseDown={handleScrollDragStart}
+          onMouseEnter={() => setHandleHover(true)}
+          onMouseLeave={() => setHandleHover(false)}
+          title="Drag to scroll both panels"
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 14,
+            height: 38,
+            cursor: isScrollDragging ? "grabbing" : "grab",
+            zIndex: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <SplitDividerHandle active={dividerActive || handleHover || isScrollDragging} />
+        </div>
       </div>
 
-      <div style={{ minWidth: 0, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div ref={rightPanelRef} style={{ minWidth: 0, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {rightContent}
       </div>
     </div>
