@@ -204,15 +204,15 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // has P14 pass === false, so include it in the p14Failed gating.
   const p14Failed = (isAuthoritative || isLimited) && contract?.productAnalysis?.parameters?.p14?.pass === false;
 
-  // Per-seat arrays are publication-gated AND suppressed while calculating.
-  // When a calculation is in progress, old results must NOT be presented as
-  // current — the pills and per-seat grids show "Calculating…" instead.
-  // Persistent visibility: during calculation, the last published result
-  // remains visible (greyed) rather than being replaced with "Calculating…".
-  // Only show "Calculating…" when there is NO published result (first-ever).
+  // Per-seat arrays are publication-gated AND suppressed while calculating
+  // or stale. When a calculation is in progress OR the previous result is
+  // stale (design changed), old results must NOT be presented as current:
+  // the pills and per-seat grids clear to "—" / "Calculating…" instead.
+  // The previous result is never displayed alongside the calculation
+  // message, and stale bass never influences the visible levels.
   const hasPublishedResult = isAuthoritative && !p14Failed;
   const isCalculatingWithPublished = isCalculating && hasPublishedResult;
-  const resultsVisible = hasPublishedResult;
+  const resultsVisible = hasPublishedResult && !isCalculating && !isStale;
   const publishedP19SeatAuthority = resultsVisible ? p19SeatAuthority : null;
   const perSeatP19Results = publishedP19SeatAuthority?.seats || [];
   const perSeatP20Results = resultsVisible ? (presentation.perSeatP20Results || []) : [];
@@ -234,8 +234,9 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
   // never overwrites the user's selected target. When the target is NOT
   // achievable, the pill shows strict FAIL + Available max — never a downgraded
   // level. A LIMITED contract also has P14 data (pass === false) and should
-  // display the same FAIL pill.
-  if (isAuthoritative || isLimited) {
+  // display the same FAIL pill. During calculation or when stale, the previous
+  // P14 value is cleared — it must never be presented as current.
+  if ((isAuthoritative || isLimited) && !isCalculating && !isStale) {
     const source = contract?.productAnalysis?.parameters?.p14;
     const selectedLevel = source?.selectedLevel ?? source?.level;
     const selectedTargetDb = source?.selectedTargetDb ?? source?.requestedTargetDb ?? source?.value;
@@ -308,10 +309,11 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       detail: explanationDetail || formatP18TargetBasisDetail(activeP18Basis),
       stale: isStale,
     };
-  } else if (p14Failed) {
+  } else if (p14Failed && !isCalculating && !isStale) {
     // P14 FAIL (or LIMITED) → P18 FAIL. Internally P18 was not evaluated because
     // the selected P14 operating target is unattainable; the dealer-facing
-    // pill shows strict FAIL, not "Not evaluated".
+    // pill shows strict FAIL, not "Not evaluated". Suppressed while calculating
+    // or stale so a previous fail never masquerades as current.
     pills.p18 = { label: "P18 Extension", resultText: "FAIL", text: "P18 Extension FAIL", level: "FAIL", detail: "P14 target not achieved", stale: isStale };
   } else {
     pills.p18 = { label: "P18 Extension", resultText: officialStateText(authorityStatus, isCalculating), text: `P18 Extension ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
@@ -337,7 +339,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     } else {
       pills.p19 = { label: "P19 Response Fit", resultText: "—", text: "P19 Response Fit —", level: "—", stale: isStale };
     }
-  } else if (p14Failed) {
+  } else if (p14Failed && !isCalculating && !isStale) {
     pills.p19 = { label: "P19 Response Fit", resultText: "FAIL", text: "P19 Response Fit FAIL", level: "FAIL", detail: "P14 target not achieved", stale: isStale };
   } else if (isCalculating && !hasPublishedResult) {
     pills.p19 = { label: "P19 Response Fit", resultText: "Calculating…", text: "P19 Response Fit Calculating…", level: "—" };
@@ -364,7 +366,7 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
       detail: null,
       stale: isStale,
     };
-  } else if (p14Failed) {
+  } else if (p14Failed && !isCalculating && !isStale) {
     pills.p20 = { label: "P20 Seat Consistency", resultText: "FAIL", text: "P20 Seat Consistency FAIL", level: "FAIL", detail: "P14 target not achieved", stale: isStale };
   } else if (isCalculating && !hasPublishedResult) {
     pills.p20 = { label: "P20 Seat Consistency", resultText: "Calculating…", text: "P20 Seat Consistency Calculating…", level: "—" };

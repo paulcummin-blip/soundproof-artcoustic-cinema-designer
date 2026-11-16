@@ -97,9 +97,9 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
     const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
 
-    // Default example skylight: 3.50 m (X) × 2.32 m (Y), centred on the ceiling.
-    const lenM = 3.50;
-    const widM = 2.32;
+    // Default example skylight: 3.50 m wide (X-axis) × 2.32 m deep (Y-axis), centred on the ceiling.
+    const lenM = 3.50;  // X-axis span (stored in length_m, shown as "Width")
+    const widM = 2.32;  // Y-axis span (stored in width_m, shown as "Length")
     const newId = makeId();
     newlyCreatedIdsRef.current.add(newId);
     const newElement = {

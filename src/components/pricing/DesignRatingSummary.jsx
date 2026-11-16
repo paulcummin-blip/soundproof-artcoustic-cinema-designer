@@ -203,7 +203,13 @@ export default function DesignRatingSummary({
 
   if (asdrUnavailable) return unavailableCard('Incomplete Design');
   if (p14TargetUnselected && !engineeringSummary) return unavailableCard('Incomplete Design');
-  if (bassPending && !engineeringSummary) return unavailableCard('Calculating bass analysis…');
+
+  // Bass pending (calculating or stale): the published engineering summary
+  // may still be the previous design's result. Never display its floors as
+  // current while bass authority is not ready — show "Calculating" until a
+  // fingerprint-matched result lands. A retained-from-refresh result is not
+  // pending, so the same-fingerprint retention path still shows normally.
+  if (bassPending) return unavailableCard('Calculating bass analysis…');
 
   // Stale-scope guard: the published summary was calculated from a different
   // seat-priority set than the current live one. Do not display its
