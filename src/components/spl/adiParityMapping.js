@@ -27,6 +27,7 @@ export const FIELD_LABEL = {
   power_w: "Recommended amplifier max (W)",
   power_w_amp: "Recommended amplifier max (W)",
   power_w_min: "Recommended amplifier min (W)",
+  peak_power_w: "Peak power handling (W)",
   frequency_response_low_hz: "Frequency response low (Hz)",
   frequency_response_high_hz: "Frequency response high (Hz)",
   frequency_response_tolerance_db: "Frequency response tolerance (dB)",
@@ -43,6 +44,7 @@ export const PROPOSAL_FIELDS = [
   "power_w",
   "power_w_amp",
   "power_w_min",
+  "peak_power_w",
   "frequency_response_low_hz",
   "frequency_response_high_hz",
   "frequency_response_tolerance_db",
@@ -252,6 +254,30 @@ export function extractionToFound(raw) {
       if (!found.power_w_min) found.power_w_min = byField.recommended_amp_min_w.value;
     }
   }
+  // Peak power handling — an independent published rating, kept separate from
+  // continuous and recommended amplifier power. The 50% peak-to-continuous
+  // fallback is a downstream calculation assumption, never saved as a
+  // manufacturer value. Only a REPORTED peak rating is proposed for acceptance;
+  // an ambiguous one stays advisory-only so no basis is invented.
+  const PEAK_SOURCES = [
+    { field: "power_handling_peak_w", label: "Power handling peak" },
+    { field: "peak_power_w", label: "Peak power" },
+  ];
+  const peak = PEAK_SOURCES.find(
+    (src) => byField[src.field] && byField[src.field].status === "reported",
+  );
+  if (peak) {
+    const entry = byField[peak.field];
+    found.peak_power_w = entry.value;
+    info.peak_power_w = {
+      value: entry.value,
+      rawValue: entry.value,
+      status: entry.status,
+      quote: entry.quote,
+      basis: "peak",
+      category: peak.label,
+    };
+  }
   // Advisory: a "Power handling" figure the manufacturer stated without a
   // continuous/RMS/IEC/AES/peak/recommended-amplifier qualifier. The wording is
   // preserved but NO basis is invented — it is not proposed as continuous or
@@ -286,7 +312,7 @@ export function displayValue(formKey, value) {
   if (formKey === "sensitivity_reference") return labelOf(SENSITIVITY_REFERENCES, value);
   if (formKey === "measurement_space") return labelOf(MEASUREMENT_SPACES, value);
   if (formKey === "max_spl_basis") return labelOf(SPL_BASES, value);
-  if (formKey === "power_w" || formKey === "power_w_amp" || formKey === "max_peak_spl_db") return `${value}`;
+  if (formKey === "power_w" || formKey === "power_w_amp" || formKey === "power_w_min" || formKey === "peak_power_w" || formKey === "max_peak_spl_db") return `${value}`;
   if (formKey === "frequency_response_low_hz") return `${value} Hz`;
   if (formKey === "frequency_response_high_hz") {
     const n = Number(value);

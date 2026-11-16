@@ -408,6 +408,10 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               }
               if (info.power_w_amp) displayed.add("Recommended amplifier max");
               if (info.power_w_min) displayed.add("Recommended amplifier min");
+              if (info.peak_power_w) {
+                displayed.add("Power handling peak");
+                displayed.add("Peak power");
+              }
               const extra = (info.power_advisories || []).filter((p) => !displayed.has(p.category));
               if (extra.length === 0) return null;
               return (

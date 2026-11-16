@@ -60,6 +60,7 @@ export function emptySpeakerForm() {
     power_w: "",
     power_w_amp: "",
     power_w_min: "",
+    peak_power_w: "",
     power_basis: "amplifier",
     frequency_response_low_hz: "",
     frequency_response_high_hz: "",
@@ -80,6 +81,7 @@ export function formFromRow(row) {
   const continuous = spec.power_handling_continuous_w ?? null;
   const ampMax = spec.recommended_amp_max_w ?? record.recommended_amp_max_w ?? null;
   const ampMin = spec.recommended_amp_min_w ?? record.recommended_amp_min_w ?? null;
+  const peak = spec.power_handling_peak_w ?? spec.peak_power_w ?? record.peak_power_w ?? null;
   const reference = REFERENCE_VALUES.has(spec.sensitivity_basis)
     ? spec.sensitivity_basis
     : (REFERENCE_VALUES.has(record.sensitivity_reference) ? record.sensitivity_reference : "unknown");
@@ -94,6 +96,7 @@ export function formFromRow(row) {
     power_w: hasValue(continuous) ? continuous : (hasValue(ampMax) ? ampMax : (record.continuous_power_w ?? "")),
     power_w_amp: hasValue(ampMax) ? ampMax : "",
     power_w_min: hasValue(ampMin) ? ampMin : "",
+    peak_power_w: hasValue(peak) ? peak : "",
     power_basis: hasValue(continuous) ? "continuous" : (hasValue(ampMax) || hasValue(record.continuous_power_w) ? "amplifier" : "amplifier"),
     frequency_response_low_hz: spec.frequency_response_low_hz ?? record.frequency_response_low_hz ?? "",
     frequency_response_high_hz: spec.frequency_response_high_hz ?? record.frequency_response_high_hz ?? "",
@@ -246,6 +249,17 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
   if (peakSpl !== null) {
     patch.max_peak_spl_db = peakSpl;
     authority.max_peak_spl_db = "Official Product Page";
+  }
+
+  // Peak power handling is saved independently of continuous and recommended
+  // amplifier power. It is the canonical RP22 peak-power field and feeds the
+  // 50% peak-to-continuous fallback when no stronger power authority exists.
+  // The assumed continuous-equivalent value is a downstream calculation, never
+  // written here as a manufacturer value.
+  const peakPower = numberOrNull(values.peak_power_w);
+  if (peakPower !== null) {
+    patch.power_handling_peak_w = peakPower;
+    authority.power_handling_peak_w = "Official Product Page";
   }
 
   return { patch, authority };

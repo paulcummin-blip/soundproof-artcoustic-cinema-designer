@@ -158,7 +158,7 @@ export function normalizeCompetitor(record) {
     sensitivity === null && continuous === null ? 'Missing sensitivity' : null,
     voltageDb === null && continuous === null ? 'Sensitivity reference or impedance needs confirmation' : null,
     power === null && continuous === null
-      ? 'Missing continuous/AES power and recommended amplifier maximum'
+      ? 'Missing continuous/AES power, recommended amplifier maximum and published peak power'
       : null,
   ].filter(Boolean);
 
