@@ -284,6 +284,8 @@ function RoomDesignerWithState() {
   const [localLiveImpactMode, setLocalLiveImpactMode] = React.useState("off");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
+  const [measureMode, setMeasureMode] = useState(false);
+  useEffect(() => { setMeasureMode(false); }, [resolvedProjectId, appState?.activeVersionId]);
   const [leftPanelView, setLeftPanelView] = useState('plan'); // 'plan' | 'front' | 'side'
   const [sideElevationWall, setSideElevationWall] = useState('right'); // 'left' | 'right'
   // Workspace view mode: 'split' (default) | 'plan' | 'technical'. Presentation only.
@@ -2115,7 +2117,7 @@ function RoomDesignerWithState() {
             {[['plan', 'PLAN VIEW'], ['front', 'FRONT ELEVATION'], ['side', 'SIDE ELEVATION'], ['isometric', 'ISOMETRIC VIEW']].map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setLeftPanelView(key)}
+                onClick={() => { setMeasureMode(false); setLeftPanelView(key); }}
                 style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 6, border: leftPanelView === key ? '1px solid #213428' : '1px solid transparent', background: leftPanelView === key ? '#213428' : 'transparent', color: leftPanelView === key ? '#fff' : '#625143', cursor: 'pointer', transition: 'all 0.15s' }}
               >
                 {label}
@@ -2125,6 +2127,8 @@ function RoomDesignerWithState() {
 
           {/* Plan toolbar — only shown in plan view */}
           {leftPanelView === 'plan' && <RoomDesignerPlanToolbar
+            measureMode={measureMode}
+            setMeasureMode={setMeasureMode}
             allowExtraSurrounds={allowExtraSurrounds}
             extraSurroundCount={appState?.extraSurroundCount}
             dolbyPreset={dolbyPreset}
@@ -2165,6 +2169,7 @@ function RoomDesignerWithState() {
                   return null;
                 })()}
                 {leftPanelView === 'plan' && <RoomVisualisation
+                  measureMode={measureMode}
                   ref={visualisationRef}
                   mlpPoint={mlpAnchorEffective}
                   analysisResult={analysisResult || {}}
