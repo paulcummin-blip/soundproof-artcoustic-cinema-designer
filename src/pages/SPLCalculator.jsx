@@ -17,6 +17,7 @@ import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
 import SpeakerInfo from "@/components/spl/SpeakerInfo";
 import ComparisonDataStatusSection from "@/components/spl/ComparisonDataStatusSection";
+import DataQualityGuide from "@/components/spl/DataQualityGuide";
 import CompetitorPriceManager from "@/components/spl/CompetitorPriceManager";
 
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
@@ -640,6 +641,10 @@ export default function SPLCalculatorPage() {
 
           <div style={{ marginTop: 12, fontSize: 11, color: BRAND.subtext, lineHeight: 1.5 }}>
             Sound Pressure Level at the Reference Seating Position is the recommended minimum long-term SPL according to AES75-2022 or ANSI-CTA-2034-A, Section 8. Additional speaker SPL capability should be considered at bass frequencies for bass contours and for positive EQ.
+          </div>
+
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${BRAND.border}` }}>
+            <DataQualityGuide variant="section" />
           </div>
         </div>
 

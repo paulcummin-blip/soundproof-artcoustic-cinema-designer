@@ -24,6 +24,7 @@
 
 import React from "react";
 import { DATA_ADEQUACY, classifyDataAdequacy } from "./dataAdequacyClassification";
+import DataQualityGuide from "./DataQualityGuide";
 
 const BRAND = {
   border: "#DCDBD6",
@@ -210,6 +211,11 @@ export default function ComparisonDataStatusSection({
           )}
         </div>
       )}
+
+      {/* 8. Understanding data quality — the same explanation shown in the
+            RP22 reference section, so the classifications are accessible
+            wherever data-quality status is displayed. */}
+      <DataQualityGuide variant="compact" />
     </div>
   );
 }
