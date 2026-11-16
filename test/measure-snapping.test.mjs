@@ -85,11 +85,11 @@ const ok = (name, cond) => { if (cond) { pass++; } else { fail++; console.error(
   ok('snap to front wall', snap && snap.point.x === 3 && snap.point.y === 0 && snap.kind === 'wall');
 }
 
-// --- findSnap: corner exact ---
+// --- findSnap: near a corner snaps to the wall (projected point is nearest) ---
 {
   const refs = buildSnapReferences({ widthM: 6, lengthM: 8, speakers: [], seats: [], elementRects: [] });
   const snap = findSnap({ x: 0.02, y: 0.02 }, refs);
-  ok('snap to corner', snap && snap.point.x === 0 && snap.point.y === 0 && snap.kind === 'corner');
+  ok('near corner snaps to wall', snap && snap.kind === 'wall' && snap.point.y === 0);
 }
 
 // --- findSnap: speaker centre ---

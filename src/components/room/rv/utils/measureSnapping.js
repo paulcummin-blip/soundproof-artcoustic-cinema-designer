@@ -5,7 +5,7 @@
 // state, and finds the nearest snap target for a room-metre point within a
 // fixed tolerance. No React, no imports beyond the shared skylight helper.
 
-import { skylightRectM } from './skylightGeometry';
+import { skylightRectM } from './skylightGeometry.js';
 
 // 5 cm in room metres — behaves consistently at every plan zoom because all
 // distances are measured in room coordinates, not screen pixels.
