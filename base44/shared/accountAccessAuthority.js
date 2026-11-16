@@ -174,7 +174,20 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // Null = no term set; the account is not subject to the 90-day expiry.
   // Separate from suspension: renewal may extend this date but never clears a
   // manual suspension.
-  if (account.status === 'active' && account.soundproof_access_expires_at) {
+  //
+  // TEMPORARY DISABLE (2026-11-16): enforcement of the 90-day expiry is paused
+  // until the authenticated Lovable renewal mechanism is implemented and
+  // tested. The stored expiry dates are preserved on every account record and
+  // untouched; only the access-blocking check below is bypassed. Explicit
+  // administrative suspension (account.status === 'suspended') remains enforced
+  // by the earlier check above. Re-enable by setting the flag to true once
+  // renewal is live.
+  const SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED = false;
+  if (
+    SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED
+    && account.status === 'active'
+    && account.soundproof_access_expires_at
+  ) {
     const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
     if (Number.isFinite(expiresAtMs) && expiresAtMs < Date.now()) {
       return { allowed: false, reason: 'ACCOUNT_EXPIRED', account };
