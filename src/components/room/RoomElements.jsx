@@ -162,6 +162,20 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     onChange([...(elements || []), sanitizeProjectorElement(newElement, roomDims)]);
   };
 
+  const changeSurface = (id, surface) => {
+    onChange(elements.map(el => {
+      if (el.id !== id) return el;
+      if (surface === 'ceiling') {
+        return { ...el, type: 'skylight', surface: 'ceiling',
+          x_m: Number(roomDims?.widthM ?? roomDims?.width ?? 0) / 2,
+          y_m: Number(roomDims?.lengthM ?? roomDims?.length ?? 0) / 2,
+          length_m: 3.5, width_m: 2.32 };
+      }
+      return { ...el, type: el.type === 'skylight' ? 'door' : el.type,
+        surface: 'wall', wall: surface };
+    }));
+  };
+
   const updateElement = (id, field, value) => {
     const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'height', 'z_position', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m', 'width_m']);
     let parsed = numberFields.has(field) ? parseFloat(value) : value;
@@ -452,16 +466,19 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     />
                   </div>
 
-                  {/* Surface (read-only) */}
                   <div>
                     <Label className={fieldLabelClassName}>Surface</Label>
-                    <Input
-                      type="text"
-                      value="Ceiling"
-                      readOnly
-                      className="bg-[#F9F8F6] border-[#DCDBD6] text-[#6B7280] cursor-not-allowed"
-                    />
-                    <div style={helperTextStyle}>Opening sits flush at ceiling height.</div>
+                    <Select value="ceiling" onValueChange={value => changeSurface(element.id, value)} modal={false}>
+                      <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]"><SelectValue /></SelectTrigger>
+                      <SelectContent position="popper" sideOffset={6} className="z-[70]">
+                        <SelectItem value="front">Front</SelectItem>
+                        <SelectItem value="rear">Rear</SelectItem>
+                        <SelectItem value="left">Left</SelectItem>
+                        <SelectItem value="right">Right</SelectItem>
+                        <SelectItem value="ceiling">Ceiling</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div style={helperTextStyle}>Ceiling height: {fmtM(roomDims?.heightM ?? roomDims?.height ?? 2.4)} m. No-go area for in-ceiling speakers; clashes are orange.</div>
                   </div>
 
                   {/* Opening centre — plan X / Y */}
@@ -522,10 +539,10 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                   {/* Placement: Wall + Length */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className={fieldLabelClassName}>Wall</Label>
+                      <Label className={fieldLabelClassName}>Surface</Label>
                       <Select
                         value={wall}
-                        onValueChange={(value) => updateElement(element.id, 'wall', value)}
+                        onValueChange={(value) => changeSurface(element.id, value)}
                         modal={false}
                       >
                         <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
@@ -536,6 +553,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                           <SelectItem value="rear">Rear</SelectItem>
                           <SelectItem value="left">Left</SelectItem>
                           <SelectItem value="right">Right</SelectItem>
+                          <SelectItem value="ceiling">Ceiling</SelectItem>
                         </SelectContent>
                       </Select>
                       <div style={helperTextStyle}>Screen is always on the Front wall.</div>
