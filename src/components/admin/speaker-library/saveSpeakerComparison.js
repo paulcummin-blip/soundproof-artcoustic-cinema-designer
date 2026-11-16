@@ -60,6 +60,9 @@ export function emptySpeakerForm() {
     power_w: "",
     power_w_min: "",
     power_basis: "amplifier",
+    frequency_response_low_hz: "",
+    frequency_response_high_hz: "",
+    frequency_response_tolerance_db: "",
     max_spl_db: "",
     max_peak_spl_db: "",
     max_spl_basis: "manufacturer unspecified",
@@ -90,6 +93,9 @@ export function formFromRow(row) {
     power_w: hasValue(continuous) ? continuous : (hasValue(ampMax) ? ampMax : (record.continuous_power_w ?? "")),
     power_w_min: hasValue(ampMin) ? ampMin : "",
     power_basis: hasValue(continuous) ? "continuous" : (hasValue(ampMax) || hasValue(record.continuous_power_w) ? "amplifier" : "amplifier"),
+    frequency_response_low_hz: spec.frequency_response_low_hz ?? record.frequency_response_low_hz ?? "",
+    frequency_response_high_hz: spec.frequency_response_high_hz ?? record.frequency_response_high_hz ?? "",
+    frequency_response_tolerance_db: spec.frequency_response_tolerance_db ?? record.frequency_response_tolerance_db ?? "",
     max_spl_db: spec.max_continuous_spl_db ?? record.published_max_continuous_spl_db_1m ?? "",
     max_peak_spl_db: spec.max_peak_spl_db ?? record.published_max_peak_spl_db_1m ?? "",
     max_spl_basis: SPL_BASIS_VALUES.has(spec.max_spl_basis) ? spec.max_spl_basis : "manufacturer unspecified",
@@ -157,6 +163,22 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
         authority.recommended_amp_min_w = "Official Product Page";
       }
     }
+  }
+
+  const freqLow = numberOrNull(values.frequency_response_low_hz);
+  if (freqLow !== null) {
+    patch.frequency_response_low_hz = freqLow;
+    authority.frequency_response_low_hz = "Official Product Page";
+  }
+  const freqHigh = numberOrNull(values.frequency_response_high_hz);
+  if (freqHigh !== null) {
+    patch.frequency_response_high_hz = freqHigh;
+    authority.frequency_response_high_hz = "Official Product Page";
+  }
+  const freqTol = numberOrNull(values.frequency_response_tolerance_db);
+  if (freqTol !== null) {
+    patch.frequency_response_tolerance_db = freqTol;
+    authority.frequency_response_tolerance_db = "Official Product Page";
   }
 
   const maxSpl = numberOrNull(values.max_spl_db);

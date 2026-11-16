@@ -26,6 +26,9 @@ export const FIELD_LABEL = {
   impedance_ohm: "Nominal impedance (Ω)",
   power_w: "Recommended amplifier max (W)",
   power_w_min: "Recommended amplifier min (W)",
+  frequency_response_low_hz: "Frequency response low (Hz)",
+  frequency_response_high_hz: "Frequency response high (Hz)",
+  frequency_response_tolerance_db: "Frequency response tolerance (dB)",
   max_spl_db: "Max continuous SPL (dB)",
   max_peak_spl_db: "Max peak SPL (dB)",
   max_spl_basis: "Max SPL basis",
@@ -38,6 +41,9 @@ export const PROPOSAL_FIELDS = [
   "impedance_ohm",
   "power_w",
   "power_w_min",
+  "frequency_response_low_hz",
+  "frequency_response_high_hz",
+  "frequency_response_tolerance_db",
   "max_spl_db",
   "max_peak_spl_db",
   "max_spl_basis",
@@ -48,6 +54,9 @@ const SPEC_TO_FORM = {
   sensitivity_db: "sensitivity_db",
   sensitivity_basis: "sensitivity_reference",
   nominal_impedance_ohm: "impedance_ohm",
+  frequency_response_low_hz: "frequency_response_low_hz",
+  frequency_response_high_hz: "frequency_response_high_hz",
+  frequency_response_tolerance_db: "frequency_response_tolerance_db",
   max_continuous_spl_db: "max_spl_db",
   max_peak_spl_db: "max_peak_spl_db",
   max_spl_basis: "max_spl_basis",
@@ -202,6 +211,13 @@ export function displayValue(formKey, value) {
   if (formKey === "measurement_space") return labelOf(MEASUREMENT_SPACES, value);
   if (formKey === "max_spl_basis") return labelOf(SPL_BASES, value);
   if (formKey === "power_w" || formKey === "max_peak_spl_db") return `${value}`;
+  if (formKey === "frequency_response_low_hz") return `${value} Hz`;
+  if (formKey === "frequency_response_high_hz") {
+    const n = Number(value);
+    if (Number.isFinite(n) && n >= 1000) return `${(n / 1000).toLocaleString("en-GB")} kHz`;
+    return `${value} Hz`;
+  }
+  if (formKey === "frequency_response_tolerance_db") return `±${value} dB`;
   return String(value);
 }
 
