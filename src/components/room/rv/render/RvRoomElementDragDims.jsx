@@ -42,6 +42,45 @@ export default function RvRoomElementDragDims({
 }) {
   if (!dragInfo || !dragInfo.visible) return null;
 
+  if (dragInfo.surface === 'ceiling') {
+    const r = dragInfo.rectM;
+    const cx = meterToCanvasX(r.x + r.w / 2);
+    const cy = meterToCanvasY(r.y + r.h / 2);
+    const left = meterToCanvasX(r.x);
+    const right = meterToCanvasX(r.x + r.w);
+    const front = meterToCanvasY(r.y);
+    const rear = meterToCanvasY(r.y + r.h);
+    const guides = [
+      { key: 'left', x1: meterToCanvasX(0), y1: cy, x2: left, y2: cy, distance: r.x },
+      { key: 'right', x1: right, y1: cy, x2: meterToCanvasX(widthM), y2: cy, distance: widthM - r.x - r.w },
+      { key: 'front', x1: cx, y1: meterToCanvasY(0), x2: cx, y2: front, distance: r.y, vertical: true },
+      { key: 'rear', x1: cx, y1: rear, x2: cx, y2: meterToCanvasY(lengthM), distance: lengthM - r.y - r.h, vertical: true },
+    ];
+    return (
+      <g data-layer="room-element-drag-dims" pointerEvents="none">
+        {guides.filter(g => g.distance > 0.005).map(g => (
+          <g key={g.key} data-clearance={g.key}>
+            <line x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}
+              stroke="#3E6B4F" strokeWidth={1} strokeDasharray="3,3" />
+            {[0, 1].map(end => {
+              const x = end ? g.x2 : g.x1;
+              const y = end ? g.y2 : g.y1;
+              return <line key={end} x1={x - (g.vertical ? 5 : 0)} y1={y - (g.vertical ? 0 : 5)}
+                x2={x + (g.vertical ? 5 : 0)} y2={y + (g.vertical ? 0 : 5)}
+                stroke="#3E6B4F" strokeWidth={1} />;
+            })}
+            <text x={clampTextX((g.x1 + g.x2) / 2 + (g.vertical ? 38 : 0), svgW)}
+              y={clampTextY((g.y1 + g.y2) / 2 - (g.vertical ? 0 : 10), svgH)}
+              textAnchor="middle" dominantBaseline="middle" fontSize={TEXT_SIZE}
+              fontWeight={600} fill="#213428" style={{ userSelect: 'none' }}>
+              {g.distance.toFixed(2)} m
+            </text>
+          </g>
+        ))}
+      </g>
+    );
+  }
+
   const { wall, posM, lengthM: elLen, distA, distB } = dragInfo;
 
   const px = (m) => m * scale;
