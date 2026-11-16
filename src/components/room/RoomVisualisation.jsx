@@ -40,6 +40,7 @@ import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+import { skylightRectM } from "@/components/room/rv/utils/skylightGeometry";
 import { arcPathForBand } from "@/components/room/rv/utils/arcPathForBand";
 import { buildLiveSpeakerPositionMap, applyLiveSpeakerPositions } from "@/components/room/rv/utils/liveSpeakerPositions";
 import { useProjectorThrowWarning } from "@/components/room/rv/hooks/useProjectorThrowWarning";
@@ -1287,7 +1288,7 @@ const byId = useEntitiesById({
   // to be computed here is what made a drag look like an activation of
   // Dimensions: dimensions are a completed-click result in Dimensions mode only.
 
-  // Room Element drag — wall-constrained movement, updates pos_m + drag info live
+  // Room Element drag — wall-constrained or ceiling X/Y movement, with live guides
   // Receives the canonical room-space target from the shared move handler: the
   // pointer was converted once and the grab offset applied once, upstream.
   const handleRoomElementDrag = useCallback((elementId, roomPos) => {
@@ -1296,6 +1297,26 @@ const byId = useEntitiesById({
       ? roomElements.find(re => String(re?.id) === String(elementId))
       : null;
     if (!el) return;
+    if (el.type === 'skylight') {
+      const rect = skylightRectM(el, { widthM, lengthM });
+      // Clamp the whole opening, preserving size. An oversized opening stays
+      // centred on that axis because it cannot fit without being resized.
+      const clampCentre = (value, span, roomSpan) => span > roomSpan
+        ? roomSpan / 2
+        : Math.max(span / 2, Math.min(roomSpan - span / 2, value));
+      const x = clampCentre(roomPos.x, rect.w, widthM);
+      const y = clampCentre(roomPos.y, rect.h, lengthM);
+      setRoomElementDragInfo({
+        visible: true, surface: 'ceiling',
+        rectM: { x: x - rect.w / 2, y: y - rect.h / 2, w: rect.w, h: rect.h },
+      });
+      onSetRoomElements(prev =>
+        (Array.isArray(prev) ? prev : []).map(re =>
+          String(re?.id) === String(elementId) ? { ...re, x_m: x, y_m: y } : re
+        )
+      );
+      return;
+    }
     const wall = String(el?.wall || 'front').toLowerCase();
     const isFrontRear = wall === 'front' || wall === 'rear';
     const elLen = Number(el?.length_m) || 0.9;
