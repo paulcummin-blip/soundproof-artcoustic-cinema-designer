@@ -176,7 +176,14 @@ export function buildComparisonRow({ product, specification, manufacturerName })
     peak_power_w: resolvePeakPower(spec),
     published_max_continuous_spl_db_1m: present(spec.max_continuous_spl_db) ? spec.max_continuous_spl_db : null,
     published_max_peak_spl_db_1m: present(spec.max_peak_spl_db) ? spec.max_peak_spl_db : null,
-    max_spl_test_conditions: present(spec.max_spl_basis) ? spec.max_spl_basis : "",
+    // The manufacturer's own test-conditions text is the authority when present
+    // (it may carry an unqualified max SPL statement that must NOT enter the
+    // continuous SPL field). When the spec has no test-conditions text, fall
+    // back to the declared max_spl_basis label so the evidence source resolver
+    // still receives the basis provenance.
+    max_spl_test_conditions: present(spec.max_spl_test_conditions)
+      ? spec.max_spl_test_conditions
+      : (present(spec.max_spl_basis) ? spec.max_spl_basis : ""),
     frequency_range: frequencyRange,
     usable_lf_minus6db_hz: toleranceSaysSix && low !== null ? low : null,
     horizontal_coverage_deg: present(spec.horizontal_dispersion_deg) ? spec.horizontal_dispersion_deg : null,

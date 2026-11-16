@@ -34,6 +34,8 @@ const BRAND = {
 };
 
 const NOT_PUBLISHED = "Not stated by manufacturer";
+const AWAITING_APPROVAL = "Awaiting approval";
+const NOT_REVIEWED = "Not yet reviewed";
 
 const hasValue = (value) =>
   value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
@@ -71,6 +73,22 @@ function continuousSplRow(record) {
   return textOrNull(record.published_max_continuous_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
 
+// A manufacturer-stated max SPL whose measurement basis was not explicitly
+// established is preserved in max_spl_test_conditions as advisory text (set
+// by buildSpecPatch when the basis is "manufacturer unspecified"). Surface it
+// as "Manufacturer maximum SPL" so the figure is visible without being
+// assigned to continuous or peak capability. Returns null when no such
+// advisory text exists, so the row is not rendered.
+function manufacturerStatedSplRow(record) {
+  if (hasValue(record.published_max_continuous_spl_db_1m)) return null;
+  const text = String(record.max_spl_test_conditions || "").trim();
+  if (!text) return null;
+  // Only surface when the text carries a dB figure — the basis label alone is
+  // not a manufacturer max SPL statement.
+  if (!/\d+\s*dB/i.test(text)) return null;
+  return text;
+}
+
 function peakSplRow(record) {
   return textOrNull(record.published_max_peak_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
@@ -87,7 +105,14 @@ function measurementBasisRow(record) {
 function maxSplBasisRow(record) {
   const hasPublishedSpl = hasValue(record.published_max_continuous_spl_db_1m)
     || hasValue(record.published_max_peak_spl_db_1m);
-  if (!hasPublishedSpl) return NOT_PUBLISHED;
+  if (!hasPublishedSpl) {
+    // When the manufacturer stated a max SPL but the basis was not established,
+    // the figure lives in max_spl_test_conditions as advisory text. Surface
+    // "Basis not stated" so the panel never implies the figure was measured.
+    const advisory = String(record.max_spl_test_conditions || "").trim();
+    if (/\d+\s*dB/i.test(advisory)) return "Basis not stated by manufacturer";
+    return NOT_PUBLISHED;
+  }
   const basis = String(record.max_spl_measurement_basis || "").trim();
   if (basis) return basis;
   // The manufacturer's own test-conditions text, if any.
@@ -157,6 +182,7 @@ export default function ComparisonDataStatusSection({
   const adequacy = candidate?.adequacy || classifyDataAdequacy(record);
   const assumptions = Array.isArray(candidate?.assumptions) ? candidate.assumptions : [];
 
+  const manufacturerSpl = manufacturerStatedSplRow(record);
   const dataUsed = [
     ["Manufacturer", record.manufacturer || "—"],
     ["Model", record.model || "—"],
@@ -165,10 +191,15 @@ export default function ComparisonDataStatusSection({
     ["Nominal impedance", impedanceRow(record)],
     ["Power authority", powerAuthorityRow(record)],
     ["Continuous SPL (if published)", continuousSplRow(record)],
+  ];
+  if (manufacturerSpl) {
+    dataUsed.push(["Manufacturer maximum SPL", manufacturerSpl]);
+  }
+  dataUsed.push(
     ["Peak SPL (if published)", peakSplRow(record)],
     ["Max SPL basis", maxSplBasisRow(record)],
     ["Measurement basis", measurementBasisRow(record)],
-  ];
+  );
 
   const missing = missingInputs(record);
   const showMissing = adequacy.key === DATA_ADEQUACY.INCOMPLETE.key && missing.length > 0;
@@ -184,7 +215,9 @@ export default function ComparisonDataStatusSection({
             specification values that are not yet dealer-visible. */}
       {candidate?.publicationState === 'draft' && (
         <div style={{ fontSize: 11, color: BRAND.hint, marginBottom: 8, lineHeight: 1.4 }}>
-          Saved on the specification but awaiting approval — not visible to dealers until approved and published.
+          {candidate?.approvalStatus === 'Awaiting Review'
+            ? `${AWAITING_APPROVAL} — submitted for review but not yet published. Not visible to dealers until approved and published.`
+            : `${NOT_REVIEWED} — saved on the specification but not yet submitted for approval. Not visible to dealers until approved and published.`}
         </div>
       )}
 

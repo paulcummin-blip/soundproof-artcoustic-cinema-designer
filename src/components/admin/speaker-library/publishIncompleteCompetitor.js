@@ -56,35 +56,50 @@ export async function publishIncompleteManualCompetitor({
     (row) => row.publish_source === "speaker_database",
   ) || null;
 
-  // Identity + source only. No technical acoustic fields, no approval, no
-  // capability. A Draft specification is saved but NOT published for dealer
-  // access: the row exists for library identity and price association, but
-  // dealers see nothing until the specification is explicitly approved and
-  // published through publishSpecificationToRp22. Admins inspect the saved
-  // values through the unpublished-spec candidate path (built from the current
-  // specification, not this identity row).
+  // Map ALL accepted manufacturer technical fields from the specification into
+  // the CompetitorSpeaker row — the same buildComparisonRow the eligible publish
+  // path uses — so the row is never identity-only. The specification is NOT
+  // approved and no P12/P13 capability is produced (normalizeCompetitor() yields
+  // p12_p13_eligible === false when the accepted fields are insufficient), but
+  // every accepted manufacturer value (sensitivity, impedance, max SPL, etc.)
+  // travels with the row so the information panel can display it.
+  //
+  // A Draft specification is saved but NOT published for dealer access: the row
+  // carries the technical data so admins can inspect it, but published=false
+  // means selectComparisonLibraryRows excludes it from the dealer dropdown.
+  const technicalRow = buildComparisonRow({
+    product: product || {},
+    specification: specification || {},
+    manufacturerName: identity.manufacturer,
+  });
+  // Strip publication-provenance fields that buildComparisonRow sets for the
+  // eligible publish path. This path is NOT an approved publish, so it must
+  // never write published, published_at or approval_status onto an existing
+  // row — the update preserves the existing publication state, and the create
+  // path sets them explicitly below.
+  const {
+    published: _published,
+    published_at: _publishedAt,
+    approval_status: _approvalStatus,
+    ...technicalFields
+  } = technicalRow;
   const sharedRecord = {
-    manufacturer: identity.manufacturer,
-    model: identity.model,
-    product_type: product?.category || "",
-    source_url: sourceUrl || product?.official_product_url || "",
-    datasheet_url: datasheetUrl || product?.official_pdf_url || "",
-    date_checked: new Date().toISOString().split("T")[0],
+    ...technicalFields,
     active: true,
     source_product_id: product?.id || null,
     source_specification_id: specification?.id || null,
     publish_source: "speaker_database",
-    evidence_source: "official",
-    secondary_evidence: null,
+    evidence_source: specification?.secondary_evidence ? "secondary" : "official",
+    secondary_evidence: specification?.secondary_evidence || null,
   };
 
   let competitorId;
   let created;
   if (existingDatabaseRow) {
-    // Update identity + source only. Preserve the existing published and
-    // approval state — this path never approves, unpublishes, or changes
-    // the approval status of a row. An already-approved published row keeps
-    // its dealer visibility; a Draft row remains admin-only.
+    // Update technical fields + source only. Preserve the existing published
+    // and approval state — this path never approves, unpublishes, or changes
+    // the approval status of a row. An already-approved published row keeps its
+    // dealer visibility; a Draft row remains admin-only.
     await base44.entities.CompetitorSpeaker.update(existingDatabaseRow.id, sharedRecord);
     competitorId = existingDatabaseRow.id;
     created = false;

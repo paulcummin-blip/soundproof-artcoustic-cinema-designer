@@ -216,10 +216,27 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
 
   const maxSpl = numberOrNull(values.max_spl_db);
   if (maxSpl !== null) {
-    patch.max_continuous_spl_db = maxSpl;
-    patch.max_spl_basis = SPL_BASIS_VALUES.has(values.max_spl_basis) ? values.max_spl_basis : "manufacturer unspecified";
-    authority.max_continuous_spl_db = "Official Product Page";
-    authority.max_spl_basis = "Official Product Page";
+    const resolvedBasis = SPL_BASIS_VALUES.has(values.max_spl_basis) ? values.max_spl_basis : "manufacturer unspecified";
+    // A manufacturer-stated max SPL whose measurement basis is NOT explicitly
+    // established ("manufacturer unspecified") must never be assigned to the
+    // continuous or peak SPL capability fields — it would make the row eligible
+    // for a P12/P13 calculation the evidence does not support. The figure is
+    // preserved as manufacturer-stated advisory text in max_spl_test_conditions
+    // so the information panel can display it without the engine treating it as
+    // published continuous capability. Only a basis the manufacturer explicitly
+    // stated (AES, IEC, continuous, peak, calculated) is written to
+    // max_continuous_spl_db.
+    if (resolvedBasis === "manufacturer unspecified" || resolvedBasis === "unknown") {
+      patch.max_spl_basis = resolvedBasis;
+      authority.max_spl_basis = "Official Product Page";
+      patch.max_spl_test_conditions = `Manufacturer states ${maxSpl} dB at 1 m; measurement basis not specified by manufacturer.`;
+      authority.max_spl_test_conditions = "Official Product Page";
+    } else {
+      patch.max_continuous_spl_db = maxSpl;
+      patch.max_spl_basis = resolvedBasis;
+      authority.max_continuous_spl_db = "Official Product Page";
+      authority.max_spl_basis = "Official Product Page";
+    }
   }
 
   // Peak SPL is kept separate from continuous — it is advisory evidence that

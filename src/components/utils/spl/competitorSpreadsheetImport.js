@@ -35,8 +35,12 @@ export async function applyCompetitorImport(plan, entity, batch) {
 // A Speaker Database row is dealer-visible only when its source specification
 // was Approved. Draft / Awaiting Review / Superseded / Archived snapshots are
 // admin-only — they must not become dealer-accessible simply because a
-// snapshot with published=true exists. Legacy rows with a blank
-// approval_status are grandfathered through.
+// snapshot with published=true exists. A Speaker Database row is only
+// dealer-visible when an administrator has explicitly approved it
+// (approval_status === 'Approved'). Rows with a blank, Draft or Awaiting
+// Review approval_status — including legacy identity-only snapshots — are
+// excluded from the dealer dropdown. Admins see those through the
+// unpublished-spec candidate path instead.
 export function selectComparisonLibraryRows(rows) {
   const byKey = new Map();
   const priority = r => r.publish_source === 'spreadsheet' ? 1 : 0;
@@ -44,7 +48,7 @@ export function selectComparisonLibraryRows(rows) {
     if (row.active === false || row.published !== true ||
         !['spreadsheet', 'speaker_database'].includes(row.publish_source)) continue;
     if (row.publish_source === 'speaker_database' &&
-        row.approval_status && row.approval_status !== 'Approved') continue;
+        row.approval_status !== 'Approved') continue;
     const key = competitorIdentityKey(row);
     const old = byKey.get(key);
     if (!old || priority(row) > priority(old) ||
