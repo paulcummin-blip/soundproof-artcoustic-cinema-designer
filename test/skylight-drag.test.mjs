@@ -83,6 +83,19 @@ test('actual start/move hooks preserve an off-centre grab at normal and zoomed/p
     close(h.elements[0].x_m,3.5);close(h.elements[0].y_m,4.7);
   }
 });
+test('plan rectangle starts a captured pointer drag while wall elements retain their existing mouse handler',()=>{
+  let received;
+  const tree=Layer({hasRoomRect:true,roomElements:[sky,wall],widthM:6,lengthM:8,heightM:2.8,
+    scale:100,meterToCanvasX:x=>x*100,meterToCanvasY:y=>y*100,
+    placedSpeakers:[],getSpeakerVisibility:()=>true,getCanonicalRole:x=>x,rolesForLayout:()=>[],
+    handleMouseDown:(...args)=>{received=args;}});
+  const [opening,door]=tree.props.children;
+  const ev={pointerId:17,preventDefault(){},stopPropagation(){}};
+  opening.props.onPointerDown(ev);
+  assert.deepEqual(received,[ev,'sky','roomElement']);
+  assert.equal(opening.props.onMouseDown,undefined);
+  assert.equal(typeof door.props.onMouseDown,'function');
+});
 test('all four edges clamp the complete opening, retain size and leave wall records untouched',()=>{
   const h=setup();
   for(const [x,y,ex,ey] of [[-10,-10,1.75,1.16],[99,99,4.25,6.84],[-10,99,1.75,6.84],[99,-10,4.25,1.16]]){
