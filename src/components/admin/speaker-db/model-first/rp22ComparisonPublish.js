@@ -13,6 +13,13 @@ import { base44 } from "@/api/base44Client";
 import { sameCompetitorIdentity } from "@/components/utils/spl/manufacturerIdentity";
 
 // Fields without which the RP22 comparison cannot grade P12/P13 for the model.
+// Only the four essential inputs for a power-derived SPL calculation: sensitivity,
+// sensitivity reference, impedance (for 2.83 V normalisation), and a usable power
+// authority. Max SPL and its basis are included but conditionally — they only
+// block when no calculable path exists. Measurement space, frequency response,
+// source URL, source date and evidence quality are NOT critical: they are
+// supporting metadata that improve the comparison but never block a GOOD DATA
+// calculation from sensitivity + power.
 export const RP22_CRITICAL_FIELDS = [
   { key: "sensitivity_db", label: "Sensitivity (dB)" },
   { key: "sensitivity_basis", label: "Sensitivity basis" },
@@ -20,12 +27,12 @@ export const RP22_CRITICAL_FIELDS = [
   { key: "power", label: "Continuous power handling (or recommended amplifier maximum)" },
   { key: "max_spl", label: "Max continuous SPL (published or calculable)" },
   { key: "max_spl_basis", label: "Max SPL basis" },
-  { key: "measurement_space", label: "Measurement space" },
 ];
 
 // Published values that improve the P12/P13 comparison but never block it.
-// Only parity-relevant fields — dispersion is intentionally absent: it is not
-// part of the P12/P13 comparison dataset.
+// Measurement space, frequency response and source provenance are advisory —
+// they remain visible as informational gaps but do not prevent a GOOD DATA
+// calculation. Only parity-relevant fields — dispersion is intentionally absent.
 const ADVISORY_FIELD_KEYS = [
   "minimum_impedance_ohm",
   "recommended_amp_min_w",
@@ -33,6 +40,7 @@ const ADVISORY_FIELD_KEYS = [
   "max_peak_spl_db",
   "frequency_response_low_hz",
   "frequency_response_high_hz",
+  "measurement_space",
 ];
 
 const SPACE_TO_BASIS = {
@@ -120,15 +128,6 @@ export function findRp22Gaps(specification) {
       // merely because the source did not state a max SPL basis.
       if (!present(spec.max_continuous_spl_db)) continue;
       if (!present(spec.max_spl_basis)) critical.push(field);
-      continue;
-    }
-    if (field.key === "measurement_space") {
-      // "unspecified" is a deliberate "Half Space — assumed" choice, not a missing
-      // field: it downgrades the data status to GOOD (via the normalisation's
-      // half_space_assumed provenance) but never blocks the comparison. Only a
-      // truly empty value counts as missing.
-      const space = spec.measurement_space;
-      if (space === null || space === undefined || String(space).trim() === "") critical.push(field);
       continue;
     }
     if (!present(spec[field.key])) critical.push(field);

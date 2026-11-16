@@ -59,8 +59,16 @@ export const READINESS_LEVELS = {
   },
 };
 
-// Critical = required before a P12/P13 comparison is defensible.
-// Useful  = improves the evidence but never blocks the comparison.
+// Critical = the four essential inputs for a defensible P12/P13 power-derived
+// SPL calculation: sensitivity, sensitivity reference, impedance (where needed
+// for 2.83 V normalisation), and a usable power authority (or published SPL).
+// These are the only fields that can block a GOOD DATA classification.
+//
+// Useful = improves the evidence but never blocks the P12/P13 calculation.
+// Frequency-response endpoints, measurement space, source URL, source date and
+// evidence quality are supporting metadata — they remain visible as
+// informational gaps but do not prevent a GOOD DATA calculation from
+// sensitivity + power.
 export const COMPARISON_FIELDS = [
   { key: "sensitivity_db", label: "Sensitivity", critical: true, resolve: (s) => present(s.sensitivity_db) },
   { key: "sensitivity_basis", label: "Sensitivity basis", critical: true, resolve: (s) => present(s.sensitivity_basis) },
@@ -74,30 +82,26 @@ export const COMPARISON_FIELDS = [
   {
     key: "frequency_response",
     label: "Frequency response / usable bandwidth",
-    critical: true,
+    critical: false,
     resolve: (s) => present(s.frequency_response_low_hz) || present(s.frequency_response_high_hz),
   },
   {
     key: "measurement_space",
     label: "Measurement space",
-    critical: true,
-    // "unspecified" is a deliberate "Half Space — assumed" choice, not a missing
-    // field: it downgrades the data status to GOOD (handled by the normalisation's
-    // half_space_assumed provenance) but never blocks the comparison. Only a truly
-    // empty value counts as missing.
+    critical: false,
     resolve: (s) => s.measurement_space !== null && s.measurement_space !== undefined && String(s.measurement_space).trim() !== "",
   },
   {
     key: "source_url",
     label: "Source URL",
-    critical: true,
+    critical: false,
     resolve: (s, p) => present(p?.official_product_url) || present(s.datasheet_url),
   },
-  { key: "source_date", label: "Source date", critical: true, resolve: (s) => present(s.source_date) },
+  { key: "source_date", label: "Source date", critical: false, resolve: (s) => present(s.source_date) },
   {
     key: "evidence_quality",
     label: "Evidence quality",
-    critical: true,
+    critical: false,
     resolve: (s) => present(s.evidence_quality) && s.evidence_quality !== "Unknown",
   },
   { key: "max_continuous_spl_db", label: "Max continuous SPL", critical: false, resolve: (s) => present(s.max_continuous_spl_db) },
