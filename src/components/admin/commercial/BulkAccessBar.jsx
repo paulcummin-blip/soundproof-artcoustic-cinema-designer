@@ -24,6 +24,7 @@ export default function BulkAccessBar({ selectedIds, onCleared, onCompleted }) {
   const [confirming, setConfirming] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   const count = selectedIds?.size || 0;
   if (count === 0 && !result) return null;
@@ -52,8 +53,6 @@ export default function BulkAccessBar({ selectedIds, onCleared, onCompleted }) {
       setLoading(false);
     }
   }
-
-  const [error, setError] = useState(null);
 
   return (
     <div style={{
