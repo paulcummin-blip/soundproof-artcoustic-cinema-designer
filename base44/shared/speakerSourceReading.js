@@ -181,7 +181,10 @@ export function normaliseNumber(literal) {
 /** Extract every numeric token from a text using normaliseNumber. */
 export function extractAllNumbers(text) {
   if (!text) return [];
-  const tokens = String(text).match(/-?\d[\d.,\s]*\d|-?\d/g) || [];
+  // The negative lookbehind (?<!\d) prevents a hyphen between two digits
+  // ("110-450") from being treated as a minus sign — a range-separator dash
+  // is never a negative-sign, so "110-450" yields [110, 450], not [110, -450].
+  const tokens = String(text).match(/(?<!\d)-?\d[\d.,\s]*\d|(?<!\d)-?\d/g) || [];
   const out = [];
   for (const token of tokens) {
     const n = normaliseNumber(token);
@@ -254,8 +257,110 @@ const PLAUSIBILITY_FLOORS = {
  * rather than saving an obviously wrong number. Never invoked for fields
  * without a floor (frequencies, SPL, etc. use the corrected parser directly).
  */
+function isPowerField(field) {
+  return /_w$/.test(field) || /power/i.test(field);
+}
+
+function isSplField(field) {
+  return /spl/i.test(field) || /_db$/.test(field);
+}
+
+/**
+ * Numbers that appear in the quote adjacent to a watt unit (W, watts), so a
+ * standard-identifier number like the 426 in "CTA 426-B" is never mistaken for
+ * a wattage. Range endpoints before the unit are included ("110-450 W" → 110,
+ * 450), but a number that only appears inside a standard identifier is not.
+ */
+function extractWattageNumbers(text) {
+  if (!text) return [];
+  const s = String(text).replace(/[–—]/g, '-');
+  const matches = [...s.matchAll(/(\d[\d.,\s]*\d|\d)\s*(?:-\s*(\d[\d.,\s]*\d|\d))?\s*(?:W|watts?|watt)\b/gi)];
+  const out = [];
+  for (const m of matches) {
+    const n1 = normaliseNumber(m[1]);
+    if (n1 !== null) out.push(n1);
+    if (m[2]) {
+      const n2 = normaliseNumber(m[2]);
+      if (n2 !== null) out.push(n2);
+    }
+  }
+  return out;
+}
+
+/**
+ * Numbers that appear in the quote adjacent to a decibel unit (dB), so a
+ * standard-identifier number like the 75 in "AES75" is never mistaken for an
+ * SPL figure. Range endpoints before the unit are included.
+ */
+function extractDecibelNumbers(text) {
+  if (!text) return [];
+  const s = String(text).replace(/[–—]/g, '-');
+  const matches = [...s.matchAll(/(\d[\d.,\s]*\d|\d)\s*(?:-\s*(\d[\d.,\s]*\d|\d))?\s*(?:dB|db)\b/gi)];
+  const out = [];
+  for (const m of matches) {
+    const n1 = normaliseNumber(m[1]);
+    if (n1 !== null) out.push(n1);
+    if (m[2]) {
+      const n2 = normaliseNumber(m[2]);
+      if (n2 !== null) out.push(n2);
+    }
+  }
+  return out;
+}
+
+/**
+ * Numbers that appear inside a specification standard identifier such as
+ * "CTA 426-B", "AES75", "IEC 60268-5" or "EN 60268-5". These are the names of
+ * measurement standards, never engineering values, so they must never be
+ * accepted as a wattage or SPL figure.
+ */
+function extractStandardIdentifierNumbers(text) {
+  if (!text) return [];
+  const s = String(text).replace(/[–—]/g, '-');
+  const matches = [...s.matchAll(/\b(?:CTA|AES|IEC|EN|ANSI|EIA|CEA|DIN|JIS|ISO|IEEE)[\s-]*\d+(?:-\w+)?/gi)];
+  const out = [];
+  for (const m of matches) {
+    const nums = [...m[0].matchAll(/\d+/g)].map((x) => Number(x[0]));
+    out.push(...nums);
+  }
+  return out;
+}
+
+/**
+ * Extraction-validation guard: reject a parsed value that is below its field's
+ * plausibility floor, and confirm the value can be reconstructed from its
+ * quoted evidence. A standard-identifier number (the 426 in "CTA 426-B", the
+ * 75 in "AES75") is never accepted as a power or SPL value — the actual
+ * engineering figure is recovered from the quote, and when none exists the
+ * field stays blank for manual review.
+ */
 function applyNumericGuard(field, numeric, rawText) {
   if (!Number.isFinite(numeric)) return null;
+
+  // Standard-identifier guard (power and SPL fields): never accept a number
+  // that only appears in the quote as part of a standard identifier such as
+  // CTA 426-B, AES75 or IEC 60268-5. Recover the actual engineering value from
+  // the quote; when none exists, reject so the field stays blank for review.
+  if (isPowerField(field) || isSplField(field)) {
+    const standardNums = extractStandardIdentifierNumbers(rawText);
+    if (standardNums.length > 0) {
+      const unitNums = isPowerField(field)
+        ? extractWattageNumbers(rawText)
+        : extractDecibelNumbers(rawText);
+      const closeStd = (a, b) => Math.abs(a - b) <= Math.max(1, Math.abs(a) * 0.001);
+      const isStandardOnly = standardNums.some((n) => closeStd(n, numeric))
+        && !unitNums.some((n) => closeStd(n, numeric));
+      if (isStandardOnly) {
+        const floor = PLAUSIBILITY_FLOORS[field];
+        const plausible = floor !== undefined
+          ? unitNums.filter((n) => n >= floor)
+          : unitNums.filter((n) => n > 0);
+        if (plausible.length > 0) return Math.max(...plausible);
+        return null;
+      }
+    }
+  }
+
   const floor = PLAUSIBILITY_FLOORS[field];
   if (floor === undefined) return numeric;
   const quoteNums = extractAllNumbers(rawText);
