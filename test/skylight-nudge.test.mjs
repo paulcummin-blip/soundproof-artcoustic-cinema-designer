@@ -61,8 +61,9 @@ test('isOverheadRole / isInCeilingSpeaker classification', () => {
   assert.ok(!isOverheadRole('L'));
   assert.ok(isInCeilingSpeaker({ role: 'TFL' }, { heightM: 2.4 }));
   assert.ok(!isInCeilingSpeaker({ role: 'L', position: { z: 1.2 } }, { heightM: 2.4 }));
-  // Non-overhead at ceiling height is still caught by the Z fallback.
-  assert.ok(isInCeilingSpeaker({ role: 'L', position: { z: 2.3 } }, { heightM: 2.4 }));
+  // High wall-mounted bed channels are excluded; custom ceiling units still use Z.
+  assert.ok(!isInCeilingSpeaker({ role: 'L', position: { z: 2.3 } }, { heightM: 2.4 }));
+  assert.ok(isInCeilingSpeaker({ role: 'CUSTOM', position: { z: 2.3 } }, { heightM: 2.4 }));
 });
 
 test('skylightClashingSpeakers reports in-ceiling overlap, ignores LCR', () => {
