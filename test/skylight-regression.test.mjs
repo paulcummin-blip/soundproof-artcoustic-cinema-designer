@@ -35,6 +35,6 @@ test('actual project serialize/hydrate retains skylight and legacy wall fields',
  const saved=JSON.parse(JSON.stringify(serializeProject({roomElements:elements,roomDims:{widthM:6,lengthM:6,heightM:2.8}})));
  assert.deepEqual(saved.room_elements,elements);
  let hydrated;
- hydrateProjectIntoAppState(saved,{setRoomElements:v=>{hydrated=v;}});
+ hydrateProjectIntoAppState(saved,{}, {setRoomElements:v=>{hydrated=v;}});
  assert.deepEqual(hydrated,elements);
 });
