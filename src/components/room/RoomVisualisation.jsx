@@ -2364,6 +2364,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
 
   return (
       <RvPlanCanvas
+        measureMode={!!props.measureMode && exportMode === 'default' && !props.isPrinting}
         svgRef={svgRef}
         planBoundsRef={planBoundsRef}
         rvWrapRef={rvWrapRef}
