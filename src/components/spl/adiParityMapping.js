@@ -142,7 +142,20 @@ export function extractionToFound(raw) {
     // value as max_spl_db (continuous) — leave the continuous field blank so the
     // data status reflects the uncertainty. The peak basis is still surfaced as
     // the max_spl_basis row so the admin can see the source said "peak".
-    if (formKey === "max_spl_db" && mapMaxSplBasis(byField.max_spl_basis?.value) === "peak") {
+    // An unqualified "Max SPL" statement (basis manufacturer unspecified) is
+    // treated the same way: the number and source wording are retained as an
+    // advisory note, but the value is never written to max_continuous_spl_db,
+    // because that field feeds the P12/P13 calculation and would manufacture an
+    // RP22 result from a figure whose duration and basis the source did not state.
+    const splBasisResolved = formKey === "max_spl_db" ? mapMaxSplBasis(byField.max_spl_basis?.value) : null;
+    if (formKey === "max_spl_db" && (splBasisResolved === "peak" || splBasisResolved === "manufacturer unspecified")) {
+      if (splBasisResolved === "manufacturer unspecified" && byField.max_continuous_spl_db) {
+        info.max_spl_unqualified_note = {
+          value: byField.max_continuous_spl_db.value,
+          quote: byField.max_continuous_spl_db.quote,
+          category: "Max SPL (basis not stated)",
+        };
+      }
       continue;
     }
     found[formKey] = val;

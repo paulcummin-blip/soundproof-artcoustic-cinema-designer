@@ -355,6 +355,25 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               </div>
             )}
 
+            {info.max_spl_unqualified_note && (
+              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.soft }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
+                  Max SPL — basis not stated
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
+                  {info.max_spl_unqualified_note.value} dB — {info.max_spl_unqualified_note.category}
+                </div>
+                {info.max_spl_unqualified_note.quote && (
+                  <div style={{ fontSize: 10, color: BRAND.hint, marginTop: 4, fontStyle: "italic" }}>
+                    “{info.max_spl_unqualified_note.quote.slice(0, 160)}{info.max_spl_unqualified_note.quote.length > 160 ? "…" : ""}”
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 4 }}>
+                  The source did not state whether this is a continuous or peak figure, or the measurement basis. The number and wording are retained here but never written as continuous SPL, so no RP22 result is manufactured from an unqualified claim.
+                </div>
+              </div>
+            )}
+
             {info.power_handling_note && (
               <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.soft }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>

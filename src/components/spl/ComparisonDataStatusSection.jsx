@@ -33,7 +33,7 @@ const BRAND = {
   hint: "#625143",
 };
 
-const NOT_PUBLISHED = "Not published";
+const NOT_PUBLISHED = "Not stated by manufacturer";
 
 const hasValue = (value) =>
   value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
@@ -179,6 +179,14 @@ export default function ComparisonDataStatusSection({
       <div style={{ fontSize: 12, fontWeight: 700, color: adequacy.tone, marginBottom: 4 }}>
         {adequacy.label}
       </div>
+
+      {/* 1b. Publication state — admin-only draft candidates carry saved
+            specification values that are not yet dealer-visible. */}
+      {candidate?.publicationState === 'draft' && (
+        <div style={{ fontSize: 11, color: BRAND.hint, marginBottom: 8, lineHeight: 1.4 }}>
+          Saved on the specification but awaiting approval — not visible to dealers until approved and published.
+        </div>
+      )}
 
       {/* 2. Why */}
       <div style={{ fontSize: 11, lineHeight: 1.45, color: BRAND.subtext, marginBottom: 8 }}>

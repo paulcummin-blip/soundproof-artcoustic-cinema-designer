@@ -212,6 +212,7 @@ export function buildCandidate({
     meaning: klass.meaning,
     statusLabel,
     published,
+    publicationState: published ? 'published' : 'draft',
     sourceLabel,
     assumptions,
     valuesUsed: valuesUsedText(withId),
@@ -343,7 +344,7 @@ export async function loadComparisonCandidates({ includeUnpublished = false } = 
       approvalStatus: specification?.approval_status || "Draft",
       published: false,
       priceRecordId: priceRow?.id || null,
-      sourceLabel: "Speaker Database",
+      sourceLabel: `Speaker Database · ${specification?.approval_status || "Draft"} (admin only)`,
       product,
     }));
   }

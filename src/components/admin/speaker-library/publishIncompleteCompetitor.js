@@ -56,9 +56,13 @@ export async function publishIncompleteManualCompetitor({
     (row) => row.publish_source === "speaker_database",
   ) || null;
 
-  // Identity + source + visibility only. No technical acoustic fields, no
-  // approval, no capability. On update this merges onto the existing row and
-  // preserves its retail price and any populated technical evidence.
+  // Identity + source only. No technical acoustic fields, no approval, no
+  // capability. A Draft specification is saved but NOT published for dealer
+  // access: the row exists for library identity and price association, but
+  // dealers see nothing until the specification is explicitly approved and
+  // published through publishSpecificationToRp22. Admins inspect the saved
+  // values through the unpublished-spec candidate path (built from the current
+  // specification, not this identity row).
   const sharedRecord = {
     manufacturer: identity.manufacturer,
     model: identity.model,
@@ -67,14 +71,9 @@ export async function publishIncompleteManualCompetitor({
     datasheet_url: datasheetUrl || product?.official_pdf_url || "",
     date_checked: new Date().toISOString().split("T")[0],
     active: true,
-    // Library visibility — the row is selectable in the comparison dropdown.
-    // This does NOT mean RP22-capable; capability is decided by
-    // normalizeCompetitor() from the (blank) technical fields.
     source_product_id: product?.id || null,
     source_specification_id: specification?.id || null,
     publish_source: "speaker_database",
-    published: true,
-    published_at: new Date().toISOString(),
     evidence_source: "official",
     secondary_evidence: null,
   };
@@ -82,12 +81,21 @@ export async function publishIncompleteManualCompetitor({
   let competitorId;
   let created;
   if (existingDatabaseRow) {
+    // Update identity + source only. Preserve the existing published and
+    // approval state — this path never approves, unpublishes, or changes
+    // the approval status of a row. An already-approved published row keeps
+    // its dealer visibility; a Draft row remains admin-only.
     await base44.entities.CompetitorSpeaker.update(existingDatabaseRow.id, sharedRecord);
     competitorId = existingDatabaseRow.id;
     created = false;
   } else {
     const createdRow = await base44.entities.CompetitorSpeaker.create({
       ...sharedRecord,
+      // A Draft specification is not dealer-visible. The row carries library
+      // identity so the speaker is selectable for admins, but published=false
+      // means selectComparisonLibraryRows excludes it from the dealer dropdown.
+      published: false,
+      published_at: new Date().toISOString(),
       approval_status: specification?.approval_status || "Draft",
       source_confidence: specification?.confidence || "",
       source_evidence_quality: specification?.evidence_quality || "",
