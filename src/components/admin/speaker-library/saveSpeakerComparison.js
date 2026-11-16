@@ -179,6 +179,19 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
         authority.recommended_amp_min_w = "Official Product Page";
       }
     }
+  } else if (powerAmp !== null) {
+    // The recommended amplifier maximum was accepted as the sole power
+    // authority (no continuous rating was stated, so power_w is empty).
+    // The Read Source proposal surfaces this as power_w_amp; buildSpecPatch
+    // must carry it into the patch so the live proposed-status calculation
+    // and the post-save comparison both see recommended_amp_max_w.
+    patch.recommended_amp_max_w = powerAmp;
+    authority.recommended_amp_max_w = "Official Product Page";
+    const powerMin = numberOrNull(values.power_w_min);
+    if (powerMin !== null) {
+      patch.recommended_amp_min_w = powerMin;
+      authority.recommended_amp_min_w = "Official Product Page";
+    }
   }
 
   const freqLow = numberOrNull(values.frequency_response_low_hz);
