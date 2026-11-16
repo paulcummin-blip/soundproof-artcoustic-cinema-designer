@@ -22,7 +22,7 @@
 // ---------------------------------------------------------------------------
 
 import { base44 } from "@/api/base44Client";
-import { findIdentityMatches } from "@/components/admin/speaker-db/model-first/rp22ComparisonPublish";
+import { buildComparisonRow, findIdentityMatches } from "@/components/admin/speaker-db/model-first/rp22ComparisonPublish";
 
 /**
  * Persist (or refresh) a shared INCOMPLETE CompetitorSpeaker row.
