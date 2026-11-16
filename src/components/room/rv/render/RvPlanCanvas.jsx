@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
+import RvMeasureLayer from "@/components/room/rv/render/RvMeasureLayer";
 import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
 import RvZoomGroup from "@/components/room/rv/render/RvZoomGroup";
@@ -29,6 +30,7 @@ import RvSubCoordinateGuide from "@/components/room/rv/render/RvSubCoordinateGui
 import { getSubRotationDeg } from "@/components/room/rv/utils/subWallOrientation";
 
 export default function RvPlanCanvas({
+  measureMode = false,
   svgRef,
   planBoundsRef,
   rvWrapRef,
@@ -770,12 +772,19 @@ export default function RvPlanCanvas({
             </g>
             </>
           )}
+          {measureMode && roomRect && Number.isFinite(scale) && (
+            <RvMeasureLayer
+              svgRef={svgRef} roomRect={roomRect} scale={scale}
+              viewOffsetPx={viewOffsetPx} zoom={zoom} panX={panX} panY={panY}
+              svgW={svgWSafe} svgH={svgHSafe}
+            />
+          )}
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
         <RvSeatHudLayer
           exportMode={exportMode}
-          tooltipData={tooltipData}
+          tooltipData={measureMode ? null : tooltipData}
           effectiveHoveredSeat={effectiveHoveredSeat}
           hudPosition={hudPosition}
           hudDynamicStyle={hudDynamicStyle}
@@ -789,7 +798,7 @@ export default function RvPlanCanvas({
 
         {/* SPEAKER INFORMATION CARD — anchored to the icon, clamped inside the canvas */}
         <SpeakerInfoTooltip
-          visible={speakerTooltip?.visible}
+          visible={!measureMode && speakerTooltip?.visible}
           title={speakerTooltip?.title}
           lines={speakerTooltip?.lines}
           anchor={speakerTooltip?.anchor}
@@ -798,7 +807,7 @@ export default function RvPlanCanvas({
         />
 
         {/* UNIVERSAL DRAG RP22/RP23 IMPACT CARD */}
-        {dragImpact?.cardVisible && (
+        {!measureMode && dragImpact?.cardVisible && (
           <SeatingDragImpactCard
             baseline={dragImpact.baseline}
             live={dragImpact.live}
