@@ -29,6 +29,7 @@ import RvPlanCanvas from "@/components/room/rv/render/RvPlanCanvas";
 import { useSubwooferDraftResetSignal } from "@/components/room/bass/bda/subwooferDraftResetStore";
 import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
 import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
+import { useOverheadSkylightNoGo } from "@/components/hooks/useOverheadSkylightNoGo";
 import PlanMessages from "@/components/room/PlanMessages";
 import SvgDefs from "@/components/room/SvgDefs";
 import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
@@ -39,6 +40,7 @@ import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+import { arcPathForBand } from "@/components/room/rv/utils/arcPathForBand";
 import { buildLiveSpeakerPositionMap, applyLiveSpeakerPositions } from "@/components/room/rv/utils/liveSpeakerPositions";
 import { useProjectorThrowWarning } from "@/components/room/rv/hooks/useProjectorThrowWarning";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
@@ -1985,6 +1987,21 @@ const byId = useEntitiesById({
     if (needsFix) onSetSpeakers(next);
   }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
 
+  // Active no-go enforcement for ceiling skylights: nudges any auto-placed
+  // in-ceiling (overhead) speaker that lands inside a skylight opening out of
+  // it. Manual (positionSource === 'user') overheads and all wall elements are
+  // left untouched, so existing placement behaviour is preserved.
+  useOverheadSkylightNoGo({
+    placedSpeakers,
+    onSetSpeakers,
+    roomElements,
+    widthM,
+    lengthM,
+    heightM,
+    getModelDimsM,
+    isAnyDraggingRef,
+  });
+
   // [B44] DISABLED: SL/SR auto-adjust removed — was a no-op (early return).
   // SBL/SBR auto-adjust (disabled) removed — was a no-op (early return) and only added noise/size.
 
@@ -2115,23 +2132,6 @@ const byId = useEntitiesById({
   const overheadCount = Array.isArray(placedSpeakers)
     ? placedSpeakers.filter(s => rvIsOverheadRole(s?.role)).length
     : 0;
-
-  const arcPathForBand = useCallback((seatX, seatY, radiusM, minDeg, maxDeg, toPxFn) => {
-    const a0 = Number(minDeg);
-    const a1 = Number(maxDeg);
-    if (!Number.isFinite(a0) || !Number.isFinite(a1) || a1 <= a0) return null;
-    const steps = 24;
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = a0 + (i * (a1 - a0) / steps);
-      const rad = (t * Math.PI) / 180;
-      const dx = Math.sin(rad) * radiusM;
-      const dy = -Math.cos(rad) * radiusM;
-      const [cx, cy] = toPxFn(seatX + dx, seatY + dy);
-      pts.push(`${i === 0 ? 'M' : 'L'}${cx},${cy}`);
-    }
-    return pts.join(' ');
-  }, []);
 
   // Memoize individual zone components with unique IDs
   const ZoneComponents = useZoneComponents({

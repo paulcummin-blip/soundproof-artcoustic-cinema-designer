@@ -95,3 +95,77 @@ export function skylightClashingSpeakers(speakers, skylRect, { heightM, getModel
   }
   return out;
 }
+
+/**
+ * Push every in-ceiling (overhead) speaker whose plan footprint overlaps any
+ * skylight opening out of it, along the minimum-translation axis. Speakers the
+ * designer has manually positioned (positionSource === 'user') are left in place
+ * so manual placement is never silently overridden. Returns { changed, speakers }
+ * where `changed` is true only when at least one speaker was moved, so the caller
+ * can avoid a redundant write. Positions are clamped to the room interior.
+ *
+ * Pure & side-effect free — safe to unit-test without React.
+ */
+export function nudgeOverheadsOutOfSkylights(speakers, skylights, opts = {}) {
+  if (!Array.isArray(speakers)) return { changed: false, speakers: [] };
+  if (!Array.isArray(skylights) || skylights.length === 0) {
+    return { changed: false, speakers };
+  }
+  const {
+    widthM,
+    lengthM,
+    heightM,
+    getModelDimsM,
+    marginM = 0.05,
+    respectUserLocked = true,
+  } = opts;
+
+  const rects = skylights
+    .map((el) => skylightRectM(el, { widthM, lengthM }))
+    .filter((r) => r.w > 0 && r.h > 0);
+  if (rects.length === 0) return { changed: false, speakers };
+
+  const xMax = Number(widthM) || 0;
+  const yMax = Number(lengthM) || 0;
+
+  let changed = false;
+  const next = speakers.map((sp) => {
+    if (!isInCeilingSpeaker(sp, { heightM })) return sp;
+    if (respectUserLocked && sp?.positionSource === 'user') return sp;
+
+    const x = Number(sp?.position?.x);
+    const y = Number(sp?.position?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return sp;
+
+    const dims = getModelDimsM?.(sp.model) || {};
+    const hw = Math.max(0.005, (Number(dims.widthM) || 0.2) / 2);
+    const hd = Math.max(0.005, (Number(dims.depthM) || 0.2) / 2);
+
+    let nx = x;
+    let ny = y;
+    for (const r of rects) {
+      const aabb = { x: nx - hw, y: ny - hd, w: hw * 2, h: hd * 2 };
+      if (!rectsIntersect(r, aabb)) continue;
+      // Minimum-translation separation along the shallowest overlap axis.
+      const overlapL = aabb.x + aabb.w - r.x;          // push −X
+      const overlapR = r.x + r.w - aabb.x;             // push +X
+      const overlapT = aabb.y + aabb.h - r.y;          // push −Y
+      const overlapB = r.y + r.h - aabb.y;             // push +Y
+      const min = Math.min(overlapL, overlapR, overlapT, overlapB);
+      if (min === overlapL) nx -= overlapL + marginM;
+      else if (min === overlapR) nx += overlapR + marginM;
+      else if (min === overlapT) ny -= overlapT + marginM;
+      else ny += overlapB + marginM;
+      changed = true;
+    }
+
+    // Clamp to room interior (keep the full cabinet inside the room).
+    nx = Math.max(hw, Math.min(xMax - hw, nx));
+    ny = Math.max(hd, Math.min(yMax - hd, ny));
+
+    if (nx === x && ny === y) return sp;
+    return { ...sp, position: { ...sp.position, x: nx, y: ny } };
+  });
+
+  return { changed, speakers: next };
+}
