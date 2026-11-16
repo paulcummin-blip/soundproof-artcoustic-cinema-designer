@@ -10,6 +10,7 @@ import { resolveContinuousPower } from "./rp22ComparisonPublish.js";
 import SecondaryEvidenceButton from "../secondaryEvidence/SecondaryEvidenceButton.jsx";
 import { evidenceRowNote, evidenceStatement, isTrustedEvidence } from "../secondaryEvidence/secondaryEvidencePolicy.js";
 import { installedSpaceAssumptionForSpecification, spaceSourceLabel } from "@/components/utils/spl/installedSpaceAssumption.js";
+import ExtractionEvidencePanel from "./ExtractionEvidencePanel.jsx";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -37,6 +38,7 @@ export default function StepSpecReview({
   gaps,
   issues,
   ambiguousFields,
+  extractionEvidence,
   saving,
   message,
   onSaveDraft,
@@ -99,6 +101,8 @@ export default function StepSpecReview({
           The source stated these values ambiguously, so they were filled in but flagged: {ambiguousFields.join(", ")}.
         </Panel>
       )}
+
+      <ExtractionEvidencePanel extractionEvidence={extractionEvidence} />
 
       {issues.length > 0 && (
         <Panel title={`Data quality (${issues.length})`} tone="warn">

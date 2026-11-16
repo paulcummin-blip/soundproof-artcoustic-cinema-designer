@@ -113,6 +113,12 @@ export function findRp22Gaps(specification) {
       continue;
     }
     if (field.key === "max_spl_basis") {
+      // The basis describes a manufacturer-published max SPL figure. When the
+      // capability is calculated (no published SPL), the basis is not
+      // applicable — a calculated figure carries its own provenance, not a
+      // manufacturer-stated basis. Do not block a GOOD DATA calculated row
+      // merely because the source did not state a max SPL basis.
+      if (!present(spec.max_continuous_spl_db)) continue;
       if (!present(spec.max_spl_basis)) critical.push(field);
       continue;
     }

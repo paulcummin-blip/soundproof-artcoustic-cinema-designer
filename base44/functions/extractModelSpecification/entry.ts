@@ -27,6 +27,7 @@ const ALLOWED_FIELDS = [
   'sensitivity_db', 'sensitivity_basis', 'nominal_impedance_ohm', 'minimum_impedance_ohm',
   'recommended_amp_min_w', 'recommended_amp_max_w', 'long_term_iec_power_w', 'rated_iec_power_w',
   'aes_power_w', 'peak_power_w', 'power_handling_continuous_w', 'power_handling_peak_w',
+  'program_power_w',
   'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance',
   'frequency_response_tolerance_db', 'max_continuous_spl_db', 'max_peak_spl_db', 'max_spl_basis',
   'measurement_space',
@@ -38,6 +39,7 @@ const NUMERIC_FIELDS = new Set([
   'sensitivity_db', 'nominal_impedance_ohm', 'minimum_impedance_ohm',
   'recommended_amp_min_w', 'recommended_amp_max_w', 'long_term_iec_power_w', 'rated_iec_power_w',
   'aes_power_w', 'peak_power_w', 'power_handling_continuous_w', 'power_handling_peak_w',
+  'program_power_w',
   'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance_db',
   'max_continuous_spl_db', 'max_peak_spl_db',
 ]);
@@ -97,7 +99,7 @@ function rulesFor(manufacturerName, model) {
       `P12/P13 FIELD CHECKLIST. Search the source explicitly for each of these concepts and their common aliases. Do not rely on a single pass noticing whichever fields happen to be prominent — look for every concept listed, then return what you found:
   1. SENSITIVITY — aliases: "Sensitivity", "Efficiency", "SPL @ 1W/1m", "SPL @ 2.83V/1m", "dB / 1W / 1m", "dB / 2.83V / 1m"
   2. IMPEDANCE — aliases: "Nominal impedance", "Impedance", "Minimum impedance"
-  3. POWER HANDLING — aliases: "Power Handling", "Continuous Power", "RMS Power", "AES Power", "IEC Power", "Long Term Power", "Rated Power", "Recommended Amplifier Power", "Amplifier Power"
+  3. POWER HANDLING — aliases: "Power Handling", "Continuous Power", "RMS Power", "AES Power", "IEC Power", "Long Term Power", "Rated Power", "Recommended Amplifier Power", "Amplifier Power", "Programme Power", "Program Power", "Maximum Input Power", "Maximum Input"
   4. SPL — aliases: "Continuous SPL", "RMS SPL", "Maximum SPL", "Max SPL", "Peak SPL", "Peak Output"
   5. MEASUREMENT BASIS — aliases: "Half Space", "Full Space", "2π / 2pi", "4π / 4pi", "1 metre / 1 meter", measurement or test standard
 Process the COMPLETE specification table before returning. Do not stop after the first few matched values — read every row of a spec table.`,
@@ -115,7 +117,9 @@ Process the COMPLETE specification table before returning. Do not stop after the
       `  - long_term_iec_power_w / rated_iec_power_w = an IEC long-term or rated continuous figure labelled "IEC".`,
       `  - aes_power_w = an AES continuous figure labelled "AES".`,
       `  - recommended_amp_min_w and recommended_amp_max_w = the MINIMUM and MAXIMUM of a stated RECOMMENDED AMPLIFIER RANGE — e.g. "Recommended amplifier: 25-150 W" → recommended_amp_min_w 25, recommended_amp_max_w 150. When only one amplifier figure is stated, use it for recommended_amp_max_w and leave recommended_amp_min_w blank. Preserve BOTH endpoints of the range, copied exactly as stated (e.g. "500W – 1,000W" → recommended_amp_min_w 500, recommended_amp_max_w 1000).`,
-      `  - peak_power_w / power_handling_peak_w = a peak / short-term / maximum figure explicitly labelled "peak".`,
+      `  - peak_power_w / power_handling_peak_w = a peak / short-term / maximum figure explicitly labelled "peak".
+  - program_power_w = a "Programme Power" or "Program Power" figure stated separately from the continuous/RMS rating. Programme power is a distinct, higher rating and is NEVER substituted for the continuous figure — record it only in program_power_w and leave power_handling_continuous_w blank when the source states only a programme figure.`,
+      `  - program_power_w = a "Programme Power" or "Program Power" figure, stated separately from the continuous/RMS rating. Programme power is a distinct, higher rating and is NEVER substituted for the continuous figure — record it only in program_power_w.`,
       `POWER HANDLING IS NEVER RECOMMENDED AMPLIFIER. A line labelled "Power Handling" is the speaker's own power rating — never a recommended amplifier range, even when it states a minimum and maximum. Only "Recommended amplifier" or "Amplifier power" wording maps to recommended_amp_min_w / recommended_amp_max_w. "Power Handling: 5 Watts minimum; 150 Watts maximum" → power_handling_continuous_w = 150, status "reported", raw_text preserves the full range. "Power Handling (RMS): 5 watts minimum; 150 watts maximum" → same: power_handling_continuous_w = 150, status "reported". A "Recommended amplifier power" range is recommended_amp_max_w, never a continuous rating.`,
       `For max SPL, distinguish the basis the manufacturer states. "Max SPL" or "Peak SPL" is NOT "continuous" — when the source labels a figure peak or maximum short-term, record max_peak_spl_db and set max_spl_basis to "peak". Only use max_continuous_spl_db when the source genuinely establishes a continuous/rated basis.`,
       `SPL CONTINUOUS vs PEAK MUST BE SPLIT. Manufacturers often state one combined figure such as "123 dB (Cont.) / 135 dB (Peak)", "Max SPL: 123 dB continuous / 135 dB peak" or "Measured Data 123 dB (Cont.) / 135 dB (Peak)". When the source states BOTH a continuous and a peak SPL, record BOTH fields: max_continuous_spl_db = the continuous figure (123) and max_peak_spl_db = the peak figure (135), and set max_spl_basis to "continuous" (the continuous figure is the graded capability). Never collapse the two into one field, and never drop the continuous figure because a peak figure also appears.`,

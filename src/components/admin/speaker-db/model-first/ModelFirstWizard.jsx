@@ -54,6 +54,7 @@ export default function ModelFirstWizard() {
   const [searchError, setSearchError] = useState("");
   const [searched, setSearched] = useState(false);
   const [ambiguousFields, setAmbiguousFields] = useState([]);
+  const [extractionEvidence, setExtractionEvidence] = useState(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [publishResult, setPublishResult] = useState(null);
@@ -163,13 +164,14 @@ export default function ModelFirstWizard() {
         ...specification,
         ...merged.patch,
         field_authority: { ...(specification?.field_authority || {}), ...merged.authority },
+        adi_source_evidence: merged.sourceEvidence,
       };
 
       await saveSpecEdits({
         productId: product.id,
         specId: specification.id,
         oldSpec: specification,
-        newSpec: { ...specification, ...merged.patch, field_authority: nextSpec.field_authority },
+        newSpec: { ...specification, ...merged.patch, field_authority: nextSpec.field_authority, adi_source_evidence: merged.sourceEvidence },
         changeReason: "Manufacturer Specification Update",
       });
       lastSavedSpec.current = nextSpec;
@@ -180,6 +182,15 @@ export default function ModelFirstWizard() {
 
       setSpecification(nextSpec);
       setAmbiguousFields(merged.ambiguousFields);
+      setExtractionEvidence({
+        reported: data.reported || [],
+        ambiguous: data.ambiguous || [],
+        not_found: data.not_found || [],
+        potential_unmapped: data.potential_unmapped || [],
+        source_url: data.source_url || "",
+        source_read: data.source_read,
+        model_confirmed: data.model_confirmed,
+      });
       setStep(2);
       setMessage(
         `${data.reported?.length || 0} value${(data.reported?.length || 0) === 1 ? "" : "s"} extracted from the official source. `
@@ -341,6 +352,7 @@ export default function ModelFirstWizard() {
           gaps={readiness.gaps}
           issues={issues}
           ambiguousFields={ambiguousFields}
+          extractionEvidence={extractionEvidence}
           saving={busy}
           message={message}
           onSaveDraft={() => persist("draft")}

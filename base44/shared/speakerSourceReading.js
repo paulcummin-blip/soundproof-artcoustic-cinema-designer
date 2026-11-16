@@ -200,6 +200,17 @@ export function parseRangeEndpoints(literal) {
   if (!s) return null;
   // Normalise en/em dashes to a hyphen.
   const norm = s.replace(/[–—]/g, '-');
+
+  // Verbal "minimum / maximum" form: "5 watts minimum; 70 watts maximum" or
+  // "5W min, 70W max". The number precedes each keyword. Semicolons, commas
+  // and newlines between the two halves are tolerated.
+  const minMaxMatch = norm.match(/(-?\d[\d.,\s]*\d|-?\d)[\s\S]{0,40}?\b(?:minimum|min)\b[\s\S]{0,80}?(-?\d[\d.,\s]*\d|-?\d)[\s\S]{0,40}?\b(?:maximum|max)\b/i);
+  if (minMaxMatch) {
+    const lo = normaliseNumber(minMaxMatch[1]);
+    const hi = normaliseNumber(minMaxMatch[2]);
+    if (lo !== null && hi !== null) return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
+  }
+
   // Capture the NUMBER immediately before and after the separator, not the
   // whole prefix — an unrelated figure earlier in the sentence (e.g. "8Ω" in
   // "...into 8Ω ... 500W – 1,000W") must not become the range minimum. Unit
@@ -280,15 +291,20 @@ export function coerceSpecValue(field, value, rawText, { numericFields, enums })
 
   const isMinField = /_min_w$/.test(field);
   const isMaxField = /_max_w$/.test(field);
+  // power_handling_continuous_w holds the manufacturer's stated maximum power
+  // handling. When the source expresses it as a range ("5 W minimum; 70 W
+  // maximum"), the MAXIMUM endpoint is the continuous figure; the minimum is
+  // advisory and preserved only in the raw_text evidence.
+  const isContinuousPower = field === 'power_handling_continuous_w';
   // A stated range is split into its endpoints: the min field takes the low end,
-  // the max field takes the high end.
+  // the max field (and continuous power handling) takes the high end.
   const range = parseRangeEndpoints(raw) || parseRangeEndpoints(rawText);
   if (range) {
     if (isMinField) {
       const guarded = applyNumericGuard(field, range.min, rawText);
       if (guarded !== null) return guarded;
     }
-    if (isMaxField) {
+    if (isMaxField || isContinuousPower) {
       const guarded = applyNumericGuard(field, range.max, rawText);
       if (guarded !== null) return guarded;
     }

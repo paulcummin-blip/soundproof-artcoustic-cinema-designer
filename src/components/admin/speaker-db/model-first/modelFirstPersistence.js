@@ -118,13 +118,32 @@ export function mergeExtractionIntoSpec(specification, extraction) {
     if (ambiguous) ambiguousFields.push(key);
   };
 
-  for (const entry of extraction?.reported || []) apply(entry, false);
-  for (const entry of extraction?.ambiguous || []) apply(entry, true);
+  // Build the per-field source-evidence audit object (adi_source_evidence),
+  // preserving the exact source quotation and status for every field the
+  // extraction reported or flagged ambiguous. This travels with the
+  // specification so the review screen and later audits can show exactly what
+  // ADI read and from where.
+  const evidenceFields = {};
+  const buildEvidence = (entry, status) => {
+    const key = entry.field;
+    if (!ALL_SPEC_FIELDS.some((f) => f.key === key)) return;
+    if (entry.value === "" || entry.value === null) return;
+    evidenceFields[key] = {
+      quote: String(entry.raw_text || "").trim(),
+      status,
+      basis: extraction?.source_type || "Official Product Page",
+    };
+  };
+  for (const entry of extraction?.reported || []) buildEvidence(entry, "reported");
+  for (const entry of extraction?.ambiguous || []) buildEvidence(entry, "ambiguous");
 
-  if (extraction?.source_date) patch.source_date = extraction.source_date;
-  if (extraction?.source_url) patch.datasheet_url = extraction.source_url;
+  const sourceEvidence = {
+    source_url: extraction?.source_url || "",
+    source_date: extraction?.source_date || "",
+    fields: evidenceFields,
+  };
 
-  return { patch, authority, ambiguousFields, conflicts };
+  return { patch, authority, ambiguousFields, conflicts, sourceEvidence };
 }
 
 /**
