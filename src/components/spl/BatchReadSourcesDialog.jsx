@@ -23,7 +23,7 @@ import { classifyDataAdequacy } from "@/components/spl/dataAdequacyClassificatio
 import { saveSpeakerComparison } from "@/components/admin/speaker-library/saveSpeakerComparison";
 import {
   FIELD_LABEL,
-  PROPOSAL_FIELDS,
+  ACCEPTANCE_FIELDS,
   buildSourceEvidence,
   candidateToFormRow,
   currentFormFor,
@@ -50,7 +50,7 @@ function buildQueueEntry(candidate, data, error) {
     return { candidate, currentForm, readOk: false, readError: error?.message || "Source could not be read.", raw: null, info: {}, found: {}, proposalFields: [], decisions: {}, hasConflict: false };
   }
   const { found, info } = extractionToFound(data);
-  const proposalFields = PROPOSAL_FIELDS.filter((key) => info[key]);
+  const proposalFields = ACCEPTANCE_FIELDS.filter((key) => info[key]);
   const hasConflict = proposalFields.some((key) => isConflict(currentForm, key, info));
   return {
     candidate, currentForm,

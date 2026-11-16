@@ -26,6 +26,7 @@ import {
 export {
   FIELD_LABEL,
   PROPOSAL_FIELDS,
+  ACCEPTANCE_FIELDS,
   extractionToFound,
   displayValue,
   decideDefaults,

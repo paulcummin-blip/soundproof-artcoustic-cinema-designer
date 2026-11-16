@@ -52,6 +52,18 @@ export const PROPOSAL_FIELDS = [
   "measurement_space",
 ];
 
+// The P12/P13 acceptance subset: the fields the Read Source review surface
+// shows as checkable rows and may auto-save. Frequency response is extracted
+// for the detailed specification review but is not a P12/P13 SPL input, so it
+// is never offered for acceptance here and is never auto-saved through this
+// flow. The full PROPOSAL_FIELDS list above remains the extraction inventory.
+export const ACCEPTANCE_FIELDS = PROPOSAL_FIELDS.filter(
+  (key) =>
+    key !== "frequency_response_low_hz" &&
+    key !== "frequency_response_high_hz" &&
+    key !== "frequency_response_tolerance_db",
+);
+
 const SPEC_TO_FORM = {
   sensitivity_db: "sensitivity_db",
   sensitivity_basis: "sensitivity_reference",
@@ -279,7 +291,7 @@ export function displayValue(formKey, value) {
  */
 export function decideDefaults(currentForm, info) {
   const initial = {};
-  for (const key of PROPOSAL_FIELDS) {
+  for (const key of ACCEPTANCE_FIELDS) {
     const f = info[key];
     if (!f) continue;
     initial[key] = !hasValue(currentForm[key]) && f.status === "reported";

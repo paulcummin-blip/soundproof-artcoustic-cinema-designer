@@ -27,7 +27,7 @@ import { Loader2, Sparkles, ExternalLink } from "lucide-react";
 import { saveSpeakerComparison, assessSpeakerForm } from "@/components/admin/speaker-library/saveSpeakerComparison";
 import {
   FIELD_LABEL,
-  PROPOSAL_FIELDS,
+  ACCEPTANCE_FIELDS,
   buildSourceEvidence,
   candidateToFormRow,
   currentFormFor,
@@ -98,7 +98,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
   const { found, info } = useMemo(() => (raw ? extractionToFound(raw) : { found: {}, info: {} }), [raw]);
 
   const proposalFields = useMemo(
-    () => PROPOSAL_FIELDS.filter((key) => info[key]),
+    () => ACCEPTANCE_FIELDS.filter((key) => info[key]),
     [info],
   );
 
@@ -151,15 +151,6 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     }
     return { ...currentForm, ...overrides };
   }, [currentForm, decisions, info]);
-
-  // Frequency-response contradiction flag: when both endpoints are present,
-  // the high endpoint must be greater than the low endpoint. A stored 24 Hz
-  // high with a 49 Hz low is contradictory and must be flagged for correction.
-  const freqContradiction = useMemo(() => {
-    const low = Number(mergedForm.frequency_response_low_hz);
-    const high = Number(mergedForm.frequency_response_high_hz);
-    return Number.isFinite(low) && Number.isFinite(high) && high <= low;
-  }, [mergedForm.frequency_response_low_hz, mergedForm.frequency_response_high_hz]);
 
   // Proposed comparison status, assessed from the stored specification +
   // every currently checked proposed source value + the form's controlled
@@ -235,8 +226,7 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
             <Sparkles size={16} /> Read source — {candidate?.manufacturer || ""} {candidate?.model || ""}
           </DialogTitle>
           <DialogDescription style={{ color: BRAND.subtext }}>
-            ADI reads the linked manufacturer source and proposes only P12/P13 values it states explicitly.
-            Nothing is overwritten — you choose which values to use.
+            ADI reads the manufacturer's published specifications and identifies the values needed to calculate RP22 speaker capability. Review and select which values to accept.
           </DialogDescription>
         </DialogHeader>
 
@@ -379,32 +369,50 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               </div>
             )}
 
-            {info.power_advisories && info.power_advisories.length > 0 && (
-              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.soft }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
-                  All published power specifications
-                </div>
-                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 2, marginBottom: 6 }}>
-                  Every power figure the manufacturer published, retained independently. The calculation authority hierarchy selects the value for P12/P13; the others remain visible for review.
-                </div>
-                {info.power_advisories.map((p, i) => (
-                  <div key={i} style={{ fontSize: 12, color: BRAND.text, marginTop: 4, display: "flex", gap: 8, alignItems: "baseline" }}>
-                    <span style={{ fontWeight: 600, minWidth: 180 }}>{p.category}</span>
-                    <span>{p.value} W</span>
-                    <span style={{ fontSize: 10, color: p.status === "ambiguous" ? BRAND.amber : BRAND.hint }}>{p.status}</span>
+            {(() => {
+              // Only surface power categories the acceptance table does not
+              // already show. The table displays the selected continuous
+              // authority (power_w), the recommended amplifier max (power_w_amp)
+              // and the recommended amplifier min (power_w_min); any advisory
+              // matching one of those categories duplicates a table row and is
+              // hidden here. Additional categories (programme, peak, a second
+              // continuous source, etc.) remain so the admin can see every
+              // distinct power figure the manufacturer published.
+              const displayed = new Set();
+              if (info.power_w && info.power_w.basis === "continuous" && info.power_w.category) {
+                displayed.add(info.power_w.category);
+              }
+              if (info.power_w_amp) displayed.add("Recommended amplifier max");
+              if (info.power_w_min) displayed.add("Recommended amplifier min");
+              const extra = (info.power_advisories || []).filter((p) => !displayed.has(p.category));
+              if (extra.length === 0) return null;
+              return (
+                <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.soft }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
+                    Additional published power specifications
                   </div>
-                ))}
-                {info.power_advisories.some((p) => p.quote) && (
-                  <div style={{ marginTop: 6, borderTop: `1px solid ${BRAND.border}`, paddingTop: 6 }}>
-                    {info.power_advisories.filter((p) => p.quote).map((p, i) => (
-                      <div key={i} style={{ fontSize: 10, color: BRAND.hint, marginTop: 2, fontStyle: "italic" }}>
-                        <strong>{p.category}:</strong> “{p.quote.slice(0, 120)}{p.quote.length > 120 ? "…" : ""}”
-                      </div>
-                    ))}
+                  <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 2, marginBottom: 6 }}>
+                    Further power categories the manufacturer published beyond the rating shown above. The calculation authority hierarchy selects the value for P12/P13; these remain visible for review.
                   </div>
-                )}
-              </div>
-            )}
+                  {extra.map((p, i) => (
+                    <div key={i} style={{ fontSize: 12, color: BRAND.text, marginTop: 4, display: "flex", gap: 8, alignItems: "baseline" }}>
+                      <span style={{ fontWeight: 600, minWidth: 180 }}>{p.category}</span>
+                      <span>{p.value} W</span>
+                      <span style={{ fontSize: 10, color: p.status === "ambiguous" ? BRAND.amber : BRAND.hint }}>{p.status}</span>
+                    </div>
+                  ))}
+                  {extra.some((p) => p.quote) && (
+                    <div style={{ marginTop: 6, borderTop: `1px solid ${BRAND.border}`, paddingTop: 6 }}>
+                      {extra.filter((p) => p.quote).map((p, i) => (
+                        <div key={i} style={{ fontSize: 10, color: BRAND.hint, marginTop: 2, fontStyle: "italic" }}>
+                          <strong>{p.category}:</strong> “{p.quote.slice(0, 120)}{p.quote.length > 120 ? "…" : ""}”
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {info.potential_unmapped && info.potential_unmapped.length > 0 && (
               <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.amber}55`, borderRadius: 10, background: `${BRAND.amber}0a` }}>
@@ -423,17 +431,6 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                 ))}
                 <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 4 }}>
                   ADI noticed this P12/P13-relevant specification in the source but could not map it to a field. Review the source and enter the value manually if needed.
-                </div>
-              </div>
-            )}
-
-            {freqContradiction && (
-              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.red}55`, borderRadius: 10, background: `${BRAND.red}0a` }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.red }}>
-                  Frequency response contradiction
-                </div>
-                <div style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
-                  The high endpoint ({mergedForm.frequency_response_high_hz} Hz) is not greater than the low endpoint ({mergedForm.frequency_response_low_hz} Hz). The high value may have lost its kHz unit during extraction. Accept the source value to correct it.
                 </div>
               </div>
             )}
