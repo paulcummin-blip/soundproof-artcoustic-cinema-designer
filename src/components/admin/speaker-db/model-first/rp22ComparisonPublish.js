@@ -231,6 +231,32 @@ export async function findIdentityMatches({ manufacturer, model }) {
 }
 
 /**
+ * Refresh the CompetitorSpeaker snapshot for this product ONLY when one
+ * already exists. Unlike publishSpecificationToRp22, this does NOT create a
+ * new row — the first publish remains an explicit action (ProductRowActions or
+ * the Model-First wizard). Used by approveSpecification so that re-approval of
+ * an already-published product refreshes its snapshot through the same shared
+ * field-mapping logic, without exposing unpublished or draft specifications.
+ *
+ * @returns {object} { republished: boolean, competitorId?: string }
+ */
+export async function republishExistingComparisonRow({ product, specification, manufacturerName, actorName }) {
+  const identity = {
+    manufacturer: manufacturerName || product?.manufacturer_name || "",
+    model: product?.model || "",
+  };
+  if (!identity.manufacturer || !identity.model) {
+    return { republished: false, reason: "identity incomplete" };
+  }
+  const identityMatches = await findIdentityMatches(identity);
+  const existing = identityMatches.find((row) => row.publish_source === "speaker_database") || null;
+  if (!existing) return { republished: false, reason: "no existing published row" };
+
+  const result = await publishSpecificationToRp22({ product, specification, manufacturerName, actorName });
+  return { republished: true, competitorId: result.competitorId };
+}
+
+/**
  * Create or UPDATE the comparison row for this manufacturer + model.
  * An existing row keeps its identity (its id, retail price and manual fields);
  * a second publish never creates a duplicate. Where an approved Speaker Database

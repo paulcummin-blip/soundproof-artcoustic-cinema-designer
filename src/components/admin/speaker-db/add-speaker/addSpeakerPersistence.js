@@ -15,6 +15,7 @@
 
 import { base44 } from "@/api/base44Client";
 import { validateDraftSpec } from "./addSpeakerValidation.js";
+import { republishExistingComparisonRow } from "../model-first/rp22ComparisonPublish.js";
 
 /**
  * Save specification field edits and log each change to SpeakerChangeHistory.
@@ -173,6 +174,29 @@ export async function approveSpecification({ productId, specId, reviewerName }) 
     change_type: "Manual Edit",
     change_reason: "Status Change",
   });
+
+  // ── Refresh the published CompetitorSpeaker snapshot if one already exists
+  // Approval is the explicit sign-off. If this product was already published,
+  // the published snapshot is refreshed through the same shared field-mapping
+  // logic so dealers see the newly-approved values. This never creates a new
+  // CompetitorSpeaker — the first publish remains an explicit action.
+  // Draft and unapproved specifications are never exposed: republish only runs
+  // after the spec is Approved, and only when a published row already exists.
+  try {
+    const product = await base44.entities.SpeakerProduct.get(productId);
+    const spec = await base44.entities.SpeakerSpecification.get(specId);
+    if (product && spec) {
+      await republishExistingComparisonRow({
+        product,
+        specification: spec,
+        manufacturerName: product.manufacturer_name || "",
+        actorName: reviewerName || "Admin",
+      });
+    }
+  } catch {
+    // Non-fatal — the approval itself has already been written. A stale
+    // published row can be corrected by an explicit re-publish action.
+  }
 
   return { approved: true };
 }

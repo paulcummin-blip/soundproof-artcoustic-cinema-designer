@@ -31,6 +31,7 @@ import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
 import AdminAddSpeaker from './pages/AdminAddSpeaker';
 import AdminModelFirstSpeaker from './pages/AdminModelFirstSpeaker';
 import AdminSpeakerLibraryUpdate from './pages/AdminSpeakerLibraryUpdate';
+import AdminSpeakerPublicationReconciliation from './pages/AdminSpeakerPublicationReconciliation';
 import RP22ClientReport from './pages/RP22ClientReport';
 import DesignReviewPage from './pages/DesignReviewPage';
 import ProposalCentre from './pages/ProposalCentre';
@@ -166,6 +167,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/speaker-database/add-speaker" element={<AccessGate masterAdmin><AdminAddSpeaker /></AccessGate>} />
         <Route path="/admin/speaker-database/model-first" element={<AccessGate masterAdmin><AdminModelFirstSpeaker /></AccessGate>} />
         <Route path="/admin/speaker-library-update" element={<AccessGate masterAdmin><Navigate to="/SPLCalculator" replace /></AccessGate>} />
+        <Route path="/admin/speaker-publication-reconciliation" element={<AccessGate masterAdmin><AdminSpeakerPublicationReconciliation /></AccessGate>} />
         <Route path="/admin/audit-log" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Audit Log" description="Track changes made across the platform." /></AccessGate>} />
         <Route path="/admin/billing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Billing" description="Subscription plans and payment configuration." /></AccessGate>} />
         <Route path="*" element={<PageNotFound />} />

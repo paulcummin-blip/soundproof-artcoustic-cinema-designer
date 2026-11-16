@@ -263,6 +263,24 @@ export default function SPLCalculatorPage() {
 
   useEffect(() => { loadCompetitors(); }, [loadCompetitors]);
 
+  // Refresh published comparison data when the calculator becomes visible
+  // again (tab switch back, or returning from another page), so an update an
+  // administrator published elsewhere is reflected without a full reload.
+  // Selection, distance, amplifier power and RP22 target basis are state and
+  // are preserved — loadCompetitors only replaces candidateRows and trims
+  // selectedCompetitorIds to those still present.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") loadCompetitors();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onVisibility);
+    };
+  }, [loadCompetitors]);
+
   const artcousticVisible = useMemo(() => {
     const merged = new Map();
     const add = (item, capability) => {
