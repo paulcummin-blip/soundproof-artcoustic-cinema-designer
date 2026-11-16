@@ -77,6 +77,17 @@ export function isInCeilingSpeaker(speaker, { heightM } = {}) {
  * given skylight rectangle. Each entry carries the speaker and its plan AABB
  * so the caller can draw a clash marker at the speaker position.
  */
+// Match the ceiling-facing footprint; cabinet depth is vertical for a
+// flush-mounted speaker. Round units use their face diameter in both axes.
+export function ceilingSpeakerFootprintM(speaker, getModelDimsM) {
+  const dims = getModelDimsM?.(speaker?.model) || {};
+  const positive = (n, fallback) => Number(n) > 0 ? Number(n) : fallback;
+  const round = dims.round === true || (dims.diameterM && dims.round !== false);
+  const w = round ? positive(dims.diameterM, positive(dims.widthM, 0.27)) : positive(dims.widthM, 0.27);
+  const h = round ? w : positive(dims.heightM, positive(dims.depthM, 0.27));
+  return { w, h };
+}
+
 export function skylightClashingSpeakers(speakers, skylRect, { heightM, getModelDimsM } = {}) {
   if (!Array.isArray(speakers) || !skylRect) return [];
   const out = [];
@@ -85,9 +96,7 @@ export function skylightClashingSpeakers(speakers, skylRect, { heightM, getModel
     const x = Number(sp?.position?.x);
     const y = Number(sp?.position?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const dims = getModelDimsM?.(sp.model) || {};
-    const w = Math.max(0.01, Number(dims.widthM) || 0.2);
-    const d = Math.max(0.01, Number(dims.depthM) || 0.2);
+    const { w, h: d } = ceilingSpeakerFootprintM(sp, getModelDimsM);
     const aabb = { x: x - w / 2, y: y - d / 2, w, h: d };
     if (rectsIntersect(skylRect, aabb)) {
       out.push({ speaker: sp, aabb, x, y });
@@ -137,34 +146,34 @@ export function nudgeOverheadsOutOfSkylights(speakers, skylights, opts = {}) {
     const y = Number(sp?.position?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return sp;
 
-    const dims = getModelDimsM?.(sp.model) || {};
-    const hw = Math.max(0.005, (Number(dims.widthM) || 0.2) / 2);
-    const hd = Math.max(0.005, (Number(dims.depthM) || 0.2) / 2);
-
-    let nx = x;
-    let ny = y;
+    const { w, h } = ceilingSpeakerFootprintM(sp, getModelDimsM);
+    const hw = w / 2;
+    const hd = h / 2;
+    const fits = (cx, cy) =>
+      cx >= hw && cx <= xMax - hw && cy >= hd && cy <= yMax - hd &&
+      rects.every(r => !rectsIntersect(r, { x: cx - hw, y: cy - hd, w, h }));
+    // Do not alter clear speakers. Search all opening boundaries at once so
+    // separating from one skylight cannot push a speaker into another.
+    if (fits(x, y)) return sp;
+    if (!rects.some(r => rectsIntersect(r, { x: x - hw, y: y - hd, w, h }))) return sp;
+    const xs = new Set([x, hw, xMax - hw]);
+    const ys = new Set([y, hd, yMax - hd]);
     for (const r of rects) {
-      const aabb = { x: nx - hw, y: ny - hd, w: hw * 2, h: hd * 2 };
-      if (!rectsIntersect(r, aabb)) continue;
-      // Minimum-translation separation along the shallowest overlap axis.
-      const overlapL = aabb.x + aabb.w - r.x;          // push −X
-      const overlapR = r.x + r.w - aabb.x;             // push +X
-      const overlapT = aabb.y + aabb.h - r.y;          // push −Y
-      const overlapB = r.y + r.h - aabb.y;             // push +Y
-      const min = Math.min(overlapL, overlapR, overlapT, overlapB);
-      if (min === overlapL) nx -= overlapL + marginM;
-      else if (min === overlapR) nx += overlapR + marginM;
-      else if (min === overlapT) ny -= overlapT + marginM;
-      else ny += overlapB + marginM;
-      changed = true;
+      xs.add(r.x - hw - marginM); xs.add(r.x + r.w + hw + marginM);
+      ys.add(r.y - hd - marginM); ys.add(r.y + r.h + hd + marginM);
     }
-
-    // Clamp to room interior (keep the full cabinet inside the room).
-    nx = Math.max(hw, Math.min(xMax - hw, nx));
-    ny = Math.max(hd, Math.min(yMax - hd, ny));
-
-    if (nx === x && ny === y) return sp;
-    return { ...sp, position: { ...sp.position, x: nx, y: ny } };
+    let best = null;
+    let distance = Infinity;
+    for (const cx of xs) for (const cy of ys) {
+      if (!fits(cx, cy)) continue;
+      const d2 = (cx - x) ** 2 + (cy - y) ** 2;
+      if (d2 < distance) { best = { x: cx, y: cy }; distance = d2; }
+    }
+    // No feasible position: preserve the design and its orange clash warning.
+    // In particular, never claim a change and trigger another React update.
+    if (!best || distance < 1e-12) return sp;
+    changed = true;
+    return { ...sp, position: { ...sp.position, ...best } };
   });
 
   return { changed, speakers: next };
