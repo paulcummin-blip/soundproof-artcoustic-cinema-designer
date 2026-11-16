@@ -2,6 +2,8 @@ import React, { useState, useMemo } from "react";
 import { computeLastActivity } from "@/lib/commercial/commercialOverview";
 import GroupPromotionArea from "@/components/admin/promotions/GroupPromotionArea";
 import AccountGroupActions from "@/components/admin/accounts/AccountGroupActions";
+import AccessStatusAction from "@/components/admin/commercial/AccessStatusAction";
+import BulkAccessBar from "@/components/admin/commercial/BulkAccessBar";
 import {
   isEffective,
   promotionBelongsToGroup,
@@ -179,6 +181,28 @@ export default function AccountGroupSection({
   onAccountsChanged = null,
 }) {
   const count = accounts?.length || 0;
+  const isPremiumPartners = groupKey === "premiumPartners";
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (prev.size === (accounts?.length || 0)) return new Set();
+      return new Set((accounts || []).map((a) => a.id));
+    });
+  };
+
+  const handleAccessChanged = (updatedAccount) => {
+    onAccountsChanged?.();
+  };
 
   const [sortKey, setSortKey] = useState("dealer");
   const [sortDir, setSortDir] = useState("asc");
@@ -238,7 +262,9 @@ export default function AccountGroupSection({
 
   // Wider Projects (0.9fr) and Last Activity (1.3fr) with explicit padding
   // for clear visual separation between the two columns.
-  const commercialGrid = "1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.9fr 0.8fr 1.3fr 0.7fr 70px";
+  const commercialGrid = isPremiumPartners
+    ? "36px 1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.9fr 0.8fr 1.3fr 0.7fr 70px"
+    : "1.8fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 0.9fr 0.8fr 1.3fr 0.7fr 70px";
   const simpleGrid = "2fr 1fr 1fr 1fr 70px";
 
   // Explicit padding to create breathing room between Projects and Last Activity
@@ -293,6 +319,14 @@ export default function AccountGroupSection({
         />
       )}
 
+      {isPremiumPartners && (
+        <BulkAccessBar
+          selectedIds={selectedIds}
+          onCleared={() => setSelectedIds(new Set())}
+          onCompleted={() => onAccountsChanged?.()}
+        />
+      )}
+
       {count === 0 ? (
         <div style={{
           padding: "24px 20px", textAlign: "center",
@@ -318,6 +352,16 @@ export default function AccountGroupSection({
               letterSpacing: "0.05em", textTransform: "uppercase",
               minWidth: 1240,
             }}>
+              {isPremiumPartners && (
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === count && count > 0}
+                    onChange={toggleSelectAll}
+                    style={{ cursor: "pointer" }}
+                  />
+                </div>
+              )}
               {COLUMNS.map((col, idx) => {
                 const isProjects = col.key === "projects";
                 const isLastActivity = col.key === "lastActivity";
@@ -376,6 +420,16 @@ export default function AccountGroupSection({
                     onMouseEnter={e => e.currentTarget.style.background = "rgb(248 248 247)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
+                    {isPremiumPartners && (
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(acc.id)}
+                          onChange={() => toggleSelect(acc.id)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      </div>
+                    )}
                     <div style={{ fontWeight: 600, fontSize: 13, color: BRAND.text, display: "flex", alignItems: "center", gap: 6 }}>
                       <span>{acc.name || "—"}</span>
                       {targetedPromoAccountIds.has(acc.id) && (
@@ -416,7 +470,9 @@ export default function AccountGroupSection({
                       {formatDate(lastActivity)}
                     </div>
                     <div>
-                      <StatusPill value={acc.status} />
+                      {isPremiumPartners
+                        ? <AccessStatusAction account={acc} onChanged={handleAccessChanged} />
+                        : <StatusPill value={acc.status} />}
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <a

@@ -303,6 +303,7 @@ export default function AdminAccountsPage() {
             promotionUsage={promotionUsage}
             allAccounts={accounts}
             onPromotionsChanged={handlePromotionsChanged}
+            onAccountsChanged={handleAccountsChanged}
           />
 
           <AccountGroupSection

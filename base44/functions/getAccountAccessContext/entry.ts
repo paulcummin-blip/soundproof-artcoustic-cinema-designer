@@ -14,7 +14,11 @@ export default async function(req) {
       ? 200
       : context.reason === 'ACCOUNT_SUSPENDED'
         ? 423
-        : 403;
+        : context.reason === 'ACCOUNT_NOT_ACTIVATED'
+          ? 403
+          : context.reason === 'ACCOUNT_EXPIRED'
+            ? 403
+            : 403;
     return Response.json(context, { status });
   } catch (error) {
     return Response.json({

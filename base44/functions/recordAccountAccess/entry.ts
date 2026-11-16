@@ -7,8 +7,12 @@ import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
  * - Admin users: no-op (always retain access).
  * - No account_id: no-op (user not linked to an organisation).
  * - Account status "suspended": returns suspended — NO update, NO auto-reactivation.
- * - Account status "inactive": transitions to "active" + sets last_access_at.
- * - Account status "active": updates last_access_at only.
+ * - Account status "inactive": returns not_activated — NO update, NO auto-activation.
+ *   An inactive account must NEVER be enabled by login. Only the
+ *   manageSoundProofAccess backend function (called by an administrator) may
+ *   set an account to active.
+ * - Account status "active" but expired: returns expired — NO update.
+ * - Account status "active" and not expired: updates last_access_at only.
  *
  * This function uses the service role to bypass Account RLS (only admins can
  * update Account records via the client SDK; dealer users cannot update their
@@ -30,6 +34,12 @@ export default async function(req) {
     if (!accessContext.allowed) {
       if (accessContext.reason === 'ACCOUNT_SUSPENDED') {
         return Response.json({ status: 'suspended' });
+      }
+      if (accessContext.reason === 'ACCOUNT_NOT_ACTIVATED') {
+        return Response.json({ status: 'not_activated' });
+      }
+      if (accessContext.reason === 'ACCOUNT_EXPIRED') {
+        return Response.json({ status: 'expired' });
       }
       return Response.json({ status: 'forbidden' }, { status: 403 });
     }
@@ -53,13 +63,17 @@ export default async function(req) {
       return Response.json({ status: 'suspended' });
     }
 
-    // INACTIVE → transition to ACTIVE + set last_access_at.
+    // INACTIVE — do NOT auto-activate. Only an administrator may enable.
     if (account.status === 'inactive') {
-      await base44.asServiceRole.entities.Account.update(accountId, {
-        status: 'active',
-        last_access_at: now,
-      });
-      return Response.json({ status: 'active', transitioned: true });
+      return Response.json({ status: 'not_activated' });
+    }
+
+    // EXPIRED — account is active but the 90-day term has passed.
+    if (account.status === 'active' && account.soundproof_access_expires_at) {
+      const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
+      if (Number.isFinite(expiresAtMs) && expiresAtMs < Date.now()) {
+        return Response.json({ status: 'expired' });
+      }
     }
 
     // ACTIVE — update last_access_at only.

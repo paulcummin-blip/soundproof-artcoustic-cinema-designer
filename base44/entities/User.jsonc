@@ -172,6 +172,18 @@
     "license_billing_notes": {
       "type": "string",
       "description": "Future billing field \u2014 internal billing notes. Not used anywhere yet."
+    },
+    "soundproof_access_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Server-maintained RLS enforcement flag for Sound Proof access. Set true when an administrator enables the linked account; set false on suspension or expiry. Checked by RLS on protected dealer entities alongside account ownership. Master admins bypass this check via the admin RLS branch. Backend-managed \u2014 only manageSoundProofAccess (service role) writes this.",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     }
   }
 }

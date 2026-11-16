@@ -189,6 +189,22 @@ export async function resolveAccountAccessReadOnly({
     return { allowed: false, reason: 'ACCOUNT_SUSPENDED', account };
   }
 
+  // An inactive account has NOT been explicitly enabled by an administrator.
+  // The read-only path mirrors the shared resolver: login, invitation
+  // acceptance, legacy linking and Portal SSO must never auto-enable it.
+  if (account.status === 'inactive') {
+    return { allowed: false, reason: 'ACCOUNT_NOT_ACTIVATED', account };
+  }
+
+  // 90-day Sound Proof access expiry (mirrors the shared resolver). Applies
+  // only to dealer accounts that have an explicit expiry set. Null = no term.
+  if (account.status === 'active' && account.soundproof_access_expires_at) {
+    const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
+    if (Number.isFinite(expiresAtMs) && expiresAtMs < Date.now()) {
+      return { allowed: false, reason: 'ACCOUNT_EXPIRED', account };
+    }
+  }
+
   // The same pilot gate, read and decided by portalSessionGateRead.js.
   const portalAccess = await readPilotPortalAccess(base44, login, account, {
     entities,

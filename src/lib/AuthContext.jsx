@@ -166,7 +166,10 @@ export const AuthProvider = ({ children }) => {
         setUser(currentUser);
         setIsAuthenticated(false);
         setAuthError({
-          type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
+          type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended'
+            : reason === 'ACCOUNT_NOT_ACTIVATED' ? 'account_not_activated'
+            : reason === 'ACCOUNT_EXPIRED' ? 'account_expired'
+            : 'access_denied',
           reason,
           identity: currentUser?.email || null,
           message: payload?.message || 'This login is not linked to an active Sound Proof account.'
@@ -180,7 +183,10 @@ export const AuthProvider = ({ children }) => {
         setUser(currentUser);
         setIsAuthenticated(false);
         setAuthError({
-          type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
+          type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended'
+            : reason === 'ACCOUNT_NOT_ACTIVATED' ? 'account_not_activated'
+            : reason === 'ACCOUNT_EXPIRED' ? 'account_expired'
+            : 'access_denied',
           reason,
           identity: currentUser?.email || null,
           message: accessContext?.message || 'This login is not linked to an active Sound Proof account.'
@@ -195,16 +201,38 @@ export const AuthProvider = ({ children }) => {
         access_context: accessContext,
       };
 
-      // Preserve the existing first-login account activation/access record.
-      // Permission resolution above remains the authority for this session.
+      // Record access for the authenticated dealer. This no longer auto-activates
+      // inactive accounts; it only records last_access_at for active, non-expired
+      // accounts and returns the account's access state.
       if (effectiveUser.role !== 'admin') {
         try {
           const res = await base44.functions.invoke('recordAccountAccess', {});
-          if (res?.data?.status === 'suspended') {
+          const accessStatus = res?.data?.status;
+          if (accessStatus === 'suspended') {
             setUser(effectiveUser);
             setAuthError({
               type: 'account_suspended',
               message: 'Sound Proof access suspended'
+            });
+            setIsAuthenticated(false);
+            setIsLoadingAuth(false);
+            return;
+          }
+          if (accessStatus === 'not_activated') {
+            setUser(effectiveUser);
+            setAuthError({
+              type: 'account_not_activated',
+              message: 'Sound Proof access has not been enabled'
+            });
+            setIsAuthenticated(false);
+            setIsLoadingAuth(false);
+            return;
+          }
+          if (accessStatus === 'expired') {
+            setUser(effectiveUser);
+            setAuthError({
+              type: 'account_expired',
+              message: 'Sound Proof access has expired'
             });
             setIsAuthenticated(false);
             setIsLoadingAuth(false);

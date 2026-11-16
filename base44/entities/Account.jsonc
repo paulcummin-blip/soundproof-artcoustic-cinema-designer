@@ -15,7 +15,7 @@
         "suspended"
       ],
       "default": "active",
-      "description": "Account status"
+      "description": "Account status. inactive = Not Activated (administrator has not enabled Sound Proof access). active = Enabled (administrator has explicitly activated the account). suspended = Suspended (administrator has suspended access). Only the manageSoundProofAccess backend function may change this for Premium Partner accounts; login, invitation acceptance, legacy linking and Portal SSO must never auto-enable an inactive account."
     },
     "contact_email": {
       "type": "string",
@@ -69,6 +69,12 @@
       "type": "number",
       "default": 0,
       "description": "Number of projects linked to this account"
+    },
+    "soundproof_access_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "Sound Proof access expiry timestamp. Set by explicit administrator activation to now + 90 days. When this time has passed the dealer sees a Renew Access screen. Null = no term set (account has not been activated through the new enable flow, or is not subject to the 90-day term). Separate from administrator suspension: renewal may extend this date but never clears a manual suspension."
     }
   },
   "required": [

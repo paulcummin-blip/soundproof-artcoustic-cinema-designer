@@ -10,6 +10,8 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AccountSuspendedScreen from '@/components/AccountSuspendedScreen';
+import AccountNotActivatedScreen from '@/components/AccountNotActivatedScreen';
+import AccountExpiredScreen from '@/components/AccountExpiredScreen';
 import AdminAccounts from './pages/AdminAccounts';
 import AdminAccountAccess from './pages/AdminAccountAccess';
 import AccountDashboard from './pages/AccountDashboard';
@@ -91,6 +93,10 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'account_suspended') {
       return <AccountSuspendedScreen />;
+    } else if (authError.type === 'account_not_activated') {
+      return <AccountNotActivatedScreen />;
+    } else if (authError.type === 'account_expired') {
+      return <AccountExpiredScreen />;
     } else if (authError.type === 'access_denied') {
       return (
         <AccessDeniedScreen

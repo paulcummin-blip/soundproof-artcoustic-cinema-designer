@@ -161,6 +161,26 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'ACCOUNT_SUSPENDED', account };
   }
 
+  // An inactive account has NOT been explicitly enabled by an administrator.
+  // Login, invitation acceptance, legacy linking and Portal SSO must never
+  // auto-enable it. Only the manageSoundProofAccess backend function (called
+  // by an administrator) may set an account to active.
+  if (account.status === 'inactive') {
+    return { allowed: false, reason: 'ACCOUNT_NOT_ACTIVATED', account };
+  }
+
+  // 90-day Sound Proof access expiry. Applies only to dealer accounts that
+  // have an explicit expiry set (administrator activation starts the term).
+  // Null = no term set; the account is not subject to the 90-day expiry.
+  // Separate from suspension: renewal may extend this date but never clears a
+  // manual suspension.
+  if (account.status === 'active' && account.soundproof_access_expires_at) {
+    const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
+    if (Number.isFinite(expiresAtMs) && expiresAtMs < Date.now()) {
+      return { allowed: false, reason: 'ACCOUNT_EXPIRED', account };
+    }
+  }
+
   // The iCubed pilot is fail-closed on every server-side authority call.
   // A Base44 session, account membership, matching email or editable URL is
   // never enough: the verified Supabase subject and live portal session must

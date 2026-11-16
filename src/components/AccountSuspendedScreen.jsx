@@ -46,7 +46,7 @@ export default function AccountSuspendedScreen() {
           Sound Proof access suspended
         </h1>
         <p style={{ margin: 0, fontSize: 14, color: BRAND.subtext, lineHeight: 1.5, marginBottom: 24 }}>
-          Please contact Sound Proof for assistance.
+           Please contact Artcoustic.
         </p>
         <button
           onClick={() => logout(true)}
