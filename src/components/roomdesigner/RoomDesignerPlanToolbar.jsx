@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { ChevronDown, Crosshair } from "lucide-react";
+import { ChevronDown, Crosshair, Ruler } from "lucide-react";
 import { setMlpGrab } from "@/components/state/mlpGrabStore";
 import { getSeatInfoMode, setSeatInfoMode as persistSeatInfoMode, subscribeSeatInfoMode } from "@/components/state/seatInfoModeStore";
 import SeatInfoModeToggle from "@/components/roomdesigner/SeatInfoModeToggle";
@@ -23,6 +23,8 @@ export default function RoomDesignerPlanToolbar({
   setLiveImpactMode,
   seatingPositions = [],
   onMoveRsp,
+  measureMode = false,
+  setMeasureMode,
 }) {
   const seatInfoMode = useSyncExternalStore(subscribeSeatInfoMode, getSeatInfoMode, getSeatInfoMode);
   const [rspMenuOpen, setRspMenuOpen] = useState(false);
@@ -195,6 +197,27 @@ export default function RoomDesignerPlanToolbar({
             </p>
           </PopoverContent>
         </Popover>
+
+        <button
+          type="button"
+          aria-label="Measure"
+          aria-pressed={measureMode}
+          title={measureMode ? 'Turn off Measure and clear the tape' : 'Measure between two points on the plan'}
+          onClick={() => {
+            setMlpGrab(false);
+            setRspMenuOpen(false);
+            setMeasureMode?.(!measureMode);
+          }}
+          className="inline-flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs font-semibold"
+          style={{
+            borderColor: measureMode ? '#3E6B4F' : '#DCDBD6',
+            background: measureMode ? '#213428' : '#FFFFFF',
+            color: measureMode ? '#FFFFFF' : '#213428',
+          }}
+        >
+          <Ruler size={14} aria-hidden="true" />
+          Measure
+        </button>
 
       {/* Live Impact dropdown */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
