@@ -434,7 +434,7 @@ export default function RvPlanCanvas({
             {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && <RvDolbyZones hasRoomRect={hasRoomRect} overlaysForRendering={overlaysForRendering} mlp={mlp} toPx={toPx} widthM={widthM} lengthM={lengthM} dolbyLayout={dolbyLayout} getDolbyZoneSpecs={getDolbyZoneSpecs} arcPathForBand={arcPathForBand} />}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
-            <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} handleMouseDown={handleMouseDown} />
+            <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} heightM={heightM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} handleMouseDown={handleMouseDown} />
 
             {/* Room Element drag dimension lines moved outside RvZoomGroup — see below */}
 

@@ -262,6 +262,31 @@ export function buildRoomElementMeshData({ roomElements, roomDims }) {
   for (const el of roomElements) {
     if (!el || el?.type === "projector") continue; // projector handled separately
     const type = el?.type || "element";
+
+    // Ceiling skylight: a thin opening flush at ceiling height.
+    if (type === "skylight") {
+      const lengthM = NUM(el?.length_m, 3.5);
+      const widthM = NUM(el?.width_m, 2.32);
+      const cx = NUM(el?.x_m, roomDims?.widthM ? roomDims.widthM / 2 : 0);
+      const cy = NUM(el?.y_m, roomDims?.lengthM ? roomDims.lengthM / 2 : 0);
+      const roomH = NUM(roomDims?.heightM, 2.8);
+      const thin = 0.04; // flat slab representing the opening
+      out.push({
+        kind: "roomElement",
+        type,
+        wall: "ceiling",
+        label: el?.label || el?.name || "Skylight",
+        x: cx,
+        y: cy,
+        zBottom: roomH - thin,
+        zTop: roomH,
+        widthM: lengthM,
+        depthM: widthM,
+        heightM: thin,
+      });
+      continue;
+    }
+
     const wallRaw = String(el?.wall || el?.side || "front").toLowerCase();
     const wall = wallRaw === "back" ? "rear" : wallRaw;
 

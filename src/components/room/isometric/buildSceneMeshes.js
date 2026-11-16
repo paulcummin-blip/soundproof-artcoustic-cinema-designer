@@ -37,6 +37,8 @@ const SUB_EDGE = 0x2E241D;
 const PROJECTOR_COLOR = 0x3E4349;
 const ELEMENT_FILL = 0xC7C3BB;
 const ELEMENT_EDGE = 0x9B9890;
+const SKYLIGHT_FILL = 0x5B8FA8;
+const SKYLIGHT_EDGE = 0x2E5A6E;
 
 // renderOrder bands — opaque first (0), then transparent surfaces in a strict
 // hierarchy. Each overlapping transparent pair gets a DISTINCT band so Three.js
@@ -252,7 +254,10 @@ export function buildSubwooferMesh(sub) {
 // Room element (door/window): a translucent box from zBottom to zTop. depthWrite
 // OFF + renderOrder so transparent openings never flicker against the walls.
 export function buildRoomElementMesh(el) {
-  const mesh = opaqueBox(el.widthM, el.heightM, el.depthM, ELEMENT_FILL, ELEMENT_EDGE);
+  const isSkylight = el?.type === "skylight" || el?.wall === "ceiling";
+  const fill = isSkylight ? SKYLIGHT_FILL : ELEMENT_FILL;
+  const edge = isSkylight ? SKYLIGHT_EDGE : ELEMENT_EDGE;
+  const mesh = opaqueBox(el.widthM, el.heightM, el.depthM, fill, edge);
   mesh.position.set(el.x, (el.zBottom + el.zTop) / 2, el.y);
   mesh.material.transparent = true;
   mesh.material.opacity = 0.35;

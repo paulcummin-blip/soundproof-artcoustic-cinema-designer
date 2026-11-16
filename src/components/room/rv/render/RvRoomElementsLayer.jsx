@@ -1,12 +1,17 @@
 "use client";
 
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
+import {
+  skylightRectM,
+  skylightClashingSpeakers,
+} from "@/components/room/rv/utils/skylightGeometry";
 
 export default function RvRoomElementsLayer({
   hasRoomRect,
   roomElements,
   widthM,
   lengthM,
+  heightM,
   scale,
   meterToCanvasX,
   meterToCanvasY,
@@ -45,6 +50,20 @@ export default function RvRoomElementsLayer({
         __offsetM: 0,          // unused for projector; lensY is used below
         __lensY: lensY,        // carry lensY so rectM.y can be computed correctly
         __label: label,
+      };
+    }
+
+    // --- SKYLIGHT: ceiling-mounted, plan X/Y + opening size ---
+    if (el?.type === 'skylight') {
+      const skylRect = skylightRectM(el, { widthM, lengthM });
+      return {
+        ...el,
+        surface: 'ceiling',
+        __lengthM: skylRect.w,
+        __widthM: skylRect.h,
+        __cx: skylRect.x + skylRect.w / 2,
+        __cy: skylRect.y + skylRect.h / 2,
+        __label: String(el?.label || '').trim(),
       };
     }
 
@@ -193,7 +212,11 @@ export default function RvRoomElementsLayer({
 
         let rectM = { x: 0, y: 0, w: 0, h: 0 };
 
-        if (e.wall === 'front') {
+        if (element?.type === 'skylight') {
+          // Ceiling skylight: rectangle centred at (cx, cy) in plan space.
+          const W = Math.max(0.01, Number(e.__widthM) || 0);
+          rectM = { x: Number(e.__cx) - L / 2, y: Number(e.__cy) - W / 2, w: L, h: W };
+        } else if (e.wall === 'front') {
           rectM = { x: p, y: offset, w: L, h: T };
         } else if (e.wall === 'rear') {
           // Projector: consume shared resolver for body-front Y (centred on lensY)
@@ -210,14 +233,6 @@ export default function RvRoomElementsLayer({
         } else if (e.wall === 'right') {
           rectM = { x: widthM - T - offset, y: p, w: T, h: L };
         }
-
-        const WARN_M = 0.05;
-        const warnRectM = {
-          x: rectM.x - WARN_M,
-          y: rectM.y - WARN_M,
-          w: rectM.w + 2 * WARN_M,
-          h: rectM.h + 2 * WARN_M,
-        };
 
         const intersects = (a, b) =>
           a.x < b.x + b.w &&
@@ -238,18 +253,47 @@ export default function RvRoomElementsLayer({
           return { x: x - w / 2, y: y - d / 2, w, h: d };
         };
 
-        const isNearSpeaker = speakersForCollision
-          .map(getSpeakerAabbM)
-          .filter(Boolean)
-          .some((aabb) => intersects(warnRectM, aabb));
+        const isSkylight = element?.type === 'skylight';
+
+        // Skylights only clash with in-ceiling (overhead) speakers whose plan
+        // footprint overlaps the opening. Wall elements keep their existing
+        // proximity-based warning against all renderable speakers.
+        const skylightClashes = isSkylight
+          ? skylightClashingSpeakers(speakersForCollision, rectM, { heightM, getModelDimsM })
+          : [];
+
+        const isNearSpeaker = isSkylight
+          ? skylightClashes.length > 0
+          : (() => {
+              const WARN_M = 0.05;
+              const warnRectM = {
+                x: rectM.x - WARN_M,
+                y: rectM.y - WARN_M,
+                w: rectM.w + 2 * WARN_M,
+                h: rectM.h + 2 * WARN_M,
+              };
+              return speakersForCollision
+                .map(getSpeakerAabbM)
+                .filter(Boolean)
+                .some((aabb) => intersects(warnRectM, aabb));
+            })();
 
         const NORMAL_FILL = 'rgba(220,219,214,0.45)';
         const NORMAL_STROKE = 'rgba(27,26,26,0.55)';
         const WARN_FILL = 'rgba(199,106,27,0.28)';
         const WARN_STROKE = '#C76A1B';
+        // Skylights read as ceiling openings: a lighter, sky-tinted fill with a
+        // dashed outline so they are never confused with solid wall elements.
+        const SKYLIGHT_FILL = 'rgba(91,143,168,0.18)';
+        const SKYLIGHT_STROKE = 'rgba(46,90,110,0.7)';
 
-        const fill = isNearSpeaker ? WARN_FILL : NORMAL_FILL;
-        const stroke = isNearSpeaker ? WARN_STROKE : NORMAL_STROKE;
+        const fill = isSkylight
+          ? (isNearSpeaker ? WARN_FILL : SKYLIGHT_FILL)
+          : (isNearSpeaker ? WARN_FILL : NORMAL_FILL);
+        const stroke = isSkylight
+          ? (isNearSpeaker ? WARN_STROKE : SKYLIGHT_STROKE)
+          : (isNearSpeaker ? WARN_STROKE : NORMAL_STROKE);
+        const strokeDash = isSkylight ? '6 4' : undefined;
 
         // Label: 0.10m from the element body, centred on the element
         let labelXM, labelYM, labelRotate = 0;
@@ -259,6 +303,10 @@ export default function RvRoomElementsLayer({
           labelXM = rectM.x - LABEL_INSET_M;
           labelYM = rectM.y + rectM.h / 2;
           labelRotate = -90;
+        } else if (element?.type === 'skylight') {
+          // Skylight: label centred on the opening.
+          labelXM = rectM.x + rectM.w / 2;
+          labelYM = rectM.y + rectM.h / 2;
         } else if (e.wall === 'front') {
           labelXM = rectM.x + rectM.w / 2;
           labelYM = LABEL_INSET_M;
@@ -326,9 +374,27 @@ export default function RvRoomElementsLayer({
               fill={fill}
               stroke={stroke}
               strokeWidth={2}
+              strokeDasharray={strokeDash}
               vectorEffect="non-scaling-stroke"
               pointerEvents={isDraggable ? 'all' : 'none'}
             />
+            {/* Orange clash markers on in-ceiling speakers overlapping this skylight */}
+            {isSkylight && skylightClashes.map(({ x, y, aabb }) => {
+              const rPx = Math.max(4, Math.min(aabb.w, aabb.h) * scale * 0.6);
+              return (
+                <circle
+                  key={`clash-${String(dragId)}-${x}-${y}`}
+                  cx={meterToCanvasX(x)}
+                  cy={meterToCanvasY(y)}
+                  r={rPx}
+                  fill="rgba(199,106,27,0.30)"
+                  stroke="#C76A1B"
+                  strokeWidth={2}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+              );
+            })}
           <text
               x={labelXpx}
               y={labelYpx}

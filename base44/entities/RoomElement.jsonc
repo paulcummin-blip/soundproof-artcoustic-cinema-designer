@@ -13,9 +13,19 @@
         "window",
         "fireplace",
         "built_in",
-        "projector"
+        "projector",
+        "skylight"
       ],
       "description": "Type of room element"
+    },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "wall",
+        "ceiling"
+      ],
+      "default": "wall",
+      "description": "Which room surface the element is mounted on. 'wall' (default) for wall-mounted elements (door, window, projector, etc.) whose position is described by the wall field. 'ceiling' for ceiling-mounted elements (skylight) whose position is described by x_m/y_m centre coordinates in the plan."
     },
     "wall": {
       "type": "string",
@@ -76,14 +86,26 @@
     "body_depth_m": {
       "type": "number",
       "description": "Projector body depth in meters (Y-axis, front to back)"
+    },
+    "x_m": {
+      "type": "number",
+      "description": "Ceiling-mounted element centre X position in room space (meters, along the width axis). Used by skylights."
+    },
+    "y_m": {
+      "type": "number",
+      "description": "Ceiling-mounted element centre Y position in room space (meters, along the length axis). Used by skylights."
+    },
+    "length_m": {
+      "type": "number",
+      "description": "Element length in meters. For wall elements this is the along-wall span; for a ceiling skylight this is the X-axis (width) span of the opening."
+    },
+    "width_m": {
+      "type": "number",
+      "description": "Ceiling skylight Y-axis (depth) span of the opening in meters."
     }
   },
   "required": [
     "project_id",
-    "type",
-    "wall",
-    "width",
-    "height",
-    "x_position"
+    "type"
   ]
 }

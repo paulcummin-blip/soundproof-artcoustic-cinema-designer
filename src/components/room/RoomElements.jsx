@@ -92,6 +92,32 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     onChange([...(elements || []), newElement]);
   };
 
+  const addSkylight = () => {
+    const elementCount = (elements || []).length;
+    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+    const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+
+    // Default example skylight: 3.50 m (X) × 2.32 m (Y), centred on the ceiling.
+    const lenM = 3.50;
+    const widM = 2.32;
+    const newId = makeId();
+    newlyCreatedIdsRef.current.add(newId);
+    const newElement = {
+      id: newId,
+      type: 'skylight',
+      surface: 'ceiling',
+      label: `Skylight ${elementCount + 1}`,
+      // Centre coordinates in plan space
+      x_m: roomW > 0 ? roomW / 2 : 0,
+      y_m: roomL > 0 ? roomL / 2 : 0,
+      // X-axis (width) span and Y-axis (depth) span of the opening
+      length_m: lenM,
+      width_m: widM,
+    };
+
+    onChange([...(elements || []), newElement]);
+  };
+
   const addProjector = () => {
     const elementCount = (elements || []).length;
 
@@ -137,7 +163,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
   };
 
   const updateElement = (id, field, value) => {
-    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'height', 'z_position', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m']);
+    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'height', 'z_position', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m', 'x_lens_m', 'y_lens_m', 'z_lens_m', 'body_width_m', 'body_height_m', 'body_depth_m', 'width_m']);
     let parsed = numberFields.has(field) ? parseFloat(value) : value;
 
     const next = (elements || []).map(el => {
@@ -184,12 +210,16 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     if (t === 'window') return 'Window';
     if (t === 'column') return 'Column';
     if (t === 'opening') return 'Opening';
+    if (t === 'skylight') return 'Skylight';
     return 'Element';
   };
 
   const buildSummary = (element) => {
     if (element?.type === 'projector') {
       return `X ${fmtM(element?.x_lens_m, '—')} · Y ${fmtM(element?.y_lens_m, '—')} · Z ${fmtM(element?.z_lens_m, '—')} m`;
+    }
+    if (element?.type === 'skylight') {
+      return `Ceiling · ${fmtM(element?.length_m, '—')} × ${fmtM(element?.width_m, '—')} m`;
     }
     return `${wallLabel(element?.wall)} wall · ${fmtM(element?.length_m, '—')} m`;
   };
@@ -228,6 +258,19 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
 
         <button
           type="button"
+          onClick={addSkylight}
+          className="group flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-all duration-150 border-[#DCDBD6] bg-white hover:bg-[#F9F8F6] hover:border-[#7A9B8C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          aria-label="Create Skylight"
+          title="Add ceiling skylight"
+        >
+          <span className="text-xs font-semibold" style={{ color: '#213428', letterSpacing: 0.3 }}>
+            CREATE SKYLIGHT
+          </span>
+          <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#213428' }} />
+        </button>
+
+        <button
+          type="button"
           onClick={addProjector}
           className="group flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-all duration-150 border-[#DCDBD6] bg-white hover:bg-[#F9F8F6] hover:border-[#7A9B8C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428] focus-visible:ring-offset-1 active:translate-y-[1px]"
           aria-label="Create Projector"
@@ -252,7 +295,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                 borderColor: '#DCDBD6',
                 background: '#FFFFFF',
                 borderLeftWidth: 3,
-                borderLeftColor: element?.type === 'projector' ? '#7A9B8C' : '#C4B5A8',
+                borderLeftColor: element?.type === 'projector' ? '#7A9B8C' : element?.type === 'skylight' ? '#5B8FA8' : '#C4B5A8',
               }}
             >
               <div
@@ -260,7 +303,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                 onClick={() => toggleCollapsed(element.id)}
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-sm font-medium shrink-0" style={{ color: element?.type === 'projector' ? '#213428' : '#625143' }}>
+                  <span className="text-sm font-medium shrink-0" style={{ color: element?.type === 'projector' ? '#213428' : element?.type === 'skylight' ? '#2E5A6E' : '#625143' }}>
                     {element?.label || typeLabel(element?.type)}
                   </span>
                   {isCollapsed(element.id) && (
@@ -394,6 +437,85 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     </div>
                   </div>
                 </>
+              ) : element?.type === 'skylight' ? (
+                /* SKYLIGHT layout — ceiling-mounted, plan X/Y + opening size */
+                <div className="space-y-3">
+                  {/* Label */}
+                  <div>
+                    <Label className={fieldLabelClassName}>Label</Label>
+                    <Input
+                      type="text"
+                      value={element?.label ?? ''}
+                      onChange={(e) => updateElement(element.id, 'label', e.target.value)}
+                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      placeholder="Skylight"
+                    />
+                  </div>
+
+                  {/* Surface (read-only) */}
+                  <div>
+                    <Label className={fieldLabelClassName}>Surface</Label>
+                    <Input
+                      type="text"
+                      value="Ceiling"
+                      readOnly
+                      className="bg-[#F9F8F6] border-[#DCDBD6] text-[#6B7280] cursor-not-allowed"
+                    />
+                    <div style={helperTextStyle}>Opening sits flush at ceiling height.</div>
+                  </div>
+
+                  {/* Opening centre — plan X / Y */}
+                  <div style={groupTitleStyle}>Opening Centre (m)</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className={fieldLabelClassName}>Centre X (m)</Label>
+                      <StepperInput
+                        value={Number(element?.x_m) || 0}
+                        step={0.01}
+                        min={0}
+                        max={Math.max(0, (Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0))}
+                        onChange={(val) => updateElement(element.id, 'x_m', val)}
+                      />
+                      <div style={helperTextStyle}>From left wall</div>
+                    </div>
+                    <div>
+                      <Label className={fieldLabelClassName}>Centre Y (m)</Label>
+                      <StepperInput
+                        value={Number(element?.y_m) || 0}
+                        step={0.01}
+                        min={0}
+                        max={Math.max(0, (Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0))}
+                        onChange={(val) => updateElement(element.id, 'y_m', val)}
+                      />
+                      <div style={helperTextStyle}>From front wall</div>
+                    </div>
+                  </div>
+
+                  {/* Opening size — length × width */}
+                  <div style={groupTitleStyle}>Opening Size (m)</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className={fieldLabelClassName}>Length (m)</Label>
+                      <StepperInput
+                        value={Number(element?.length_m) || 3.5}
+                        step={0.01}
+                        min={0.1}
+                        onChange={(val) => updateElement(element.id, 'length_m', Math.max(0.1, val))}
+                      />
+                      <div style={helperTextStyle}>X-axis span (width direction)</div>
+                    </div>
+                    <div>
+                      <Label className={fieldLabelClassName}>Width (m)</Label>
+                      <StepperInput
+                        value={Number(element?.width_m) || 2.32}
+                        step={0.01}
+                        min={0.1}
+                        onChange={(val) => updateElement(element.id, 'width_m', Math.max(0.1, val))}
+                      />
+                      <div style={helperTextStyle}>Y-axis span (depth direction)</div>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 /* NON-PROJECTOR layout */
                 <div className="space-y-3">
