@@ -58,6 +58,7 @@ export function emptySpeakerForm() {
     sensitivity_reference: "2.83V/1m",
     impedance_ohm: "",
     power_w: "",
+    power_w_amp: "",
     power_w_min: "",
     power_basis: "amplifier",
     frequency_response_low_hz: "",
@@ -91,6 +92,7 @@ export function formFromRow(row) {
     sensitivity_reference: reference,
     impedance_ohm: spec.nominal_impedance_ohm ?? record.rated_impedance_ohm ?? "",
     power_w: hasValue(continuous) ? continuous : (hasValue(ampMax) ? ampMax : (record.continuous_power_w ?? "")),
+    power_w_amp: hasValue(ampMax) ? ampMax : "",
     power_w_min: hasValue(ampMin) ? ampMin : "",
     power_basis: hasValue(continuous) ? "continuous" : (hasValue(ampMax) || hasValue(record.continuous_power_w) ? "amplifier" : "amplifier"),
     frequency_response_low_hz: spec.frequency_response_low_hz ?? record.frequency_response_low_hz ?? "",
@@ -144,6 +146,7 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
   }
 
   const power = numberOrNull(values.power_w);
+  const powerAmp = numberOrNull(values.power_w_amp);
   if (power !== null) {
     // The administrator states which kind of figure this is. A recommended
     // amplifier maximum is never written as a continuous speaker rating, and an
@@ -151,6 +154,19 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
     if (values.power_basis === "continuous") {
       patch.power_handling_continuous_w = power;
       authority.power_handling_continuous_w = "Official Product Page";
+      // When a separate recommended amplifier maximum was also accepted, write
+      // it to its own field so both power authorities survive — the continuous
+      // rating drives the calculation, the amplifier max is retained as
+      // published evidence.
+      if (powerAmp !== null && powerAmp !== power) {
+        patch.recommended_amp_max_w = powerAmp;
+        authority.recommended_amp_max_w = "Official Product Page";
+        const powerMin = numberOrNull(values.power_w_min);
+        if (powerMin !== null) {
+          patch.recommended_amp_min_w = powerMin;
+          authority.recommended_amp_min_w = "Official Product Page";
+        }
+      }
     } else {
       patch.recommended_amp_max_w = power;
       authority.recommended_amp_max_w = "Official Product Page";

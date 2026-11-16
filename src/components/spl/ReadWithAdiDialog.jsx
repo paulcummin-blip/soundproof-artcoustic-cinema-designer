@@ -152,6 +152,15 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     return { ...currentForm, ...overrides };
   }, [currentForm, decisions, info]);
 
+  // Frequency-response contradiction flag: when both endpoints are present,
+  // the high endpoint must be greater than the low endpoint. A stored 24 Hz
+  // high with a 49 Hz low is contradictory and must be flagged for correction.
+  const freqContradiction = useMemo(() => {
+    const low = Number(mergedForm.frequency_response_low_hz);
+    const high = Number(mergedForm.frequency_response_high_hz);
+    return Number.isFinite(low) && Number.isFinite(high) && high <= low;
+  }, [mergedForm.frequency_response_low_hz, mergedForm.frequency_response_high_hz]);
+
   // Proposed comparison status, assessed from the stored specification +
   // every currently checked proposed source value + the form's controlled
   // defaults. Recomputes live as the admin checks or unchecks fields, so the
@@ -177,6 +186,11 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
       }
       return next;
     });
+  };
+
+  const toNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
   };
 
   const apply = async () => {
@@ -347,6 +361,33 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               </div>
             )}
 
+            {info.power_advisories && info.power_advisories.length > 0 && (
+              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.soft }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.hint }}>
+                  All published power specifications
+                </div>
+                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 2, marginBottom: 6 }}>
+                  Every power figure the manufacturer published, retained independently. The calculation authority hierarchy selects the value for P12/P13; the others remain visible for review.
+                </div>
+                {info.power_advisories.map((p, i) => (
+                  <div key={i} style={{ fontSize: 12, color: BRAND.text, marginTop: 4, display: "flex", gap: 8, alignItems: "baseline" }}>
+                    <span style={{ fontWeight: 600, minWidth: 180 }}>{p.category}</span>
+                    <span>{p.value} W</span>
+                    <span style={{ fontSize: 10, color: p.status === "ambiguous" ? BRAND.amber : BRAND.hint }}>{p.status}</span>
+                  </div>
+                ))}
+                {info.power_advisories.some((p) => p.quote) && (
+                  <div style={{ marginTop: 6, borderTop: `1px solid ${BRAND.border}`, paddingTop: 6 }}>
+                    {info.power_advisories.filter((p) => p.quote).map((p, i) => (
+                      <div key={i} style={{ fontSize: 10, color: BRAND.hint, marginTop: 2, fontStyle: "italic" }}>
+                        <strong>{p.category}:</strong> “{p.quote.slice(0, 120)}{p.quote.length > 120 ? "…" : ""}”
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {info.potential_unmapped && info.potential_unmapped.length > 0 && (
               <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.amber}55`, borderRadius: 10, background: `${BRAND.amber}0a` }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.amber }}>
@@ -364,6 +405,17 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
                 ))}
                 <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 4 }}>
                   ADI noticed this P12/P13-relevant specification in the source but could not map it to a field. Review the source and enter the value manually if needed.
+                </div>
+              </div>
+            )}
+
+            {freqContradiction && (
+              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.red}55`, borderRadius: 10, background: `${BRAND.red}0a` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.red }}>
+                  Frequency response contradiction
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
+                  The high endpoint ({mergedForm.frequency_response_high_hz} Hz) is not greater than the low endpoint ({mergedForm.frequency_response_low_hz} Hz). The high value may have lost its kHz unit during extraction. Accept the source value to correct it.
                 </div>
               </div>
             )}

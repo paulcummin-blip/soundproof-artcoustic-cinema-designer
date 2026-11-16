@@ -316,12 +316,26 @@ export function coerceSpecValue(field, value, rawText, { numericFields, enums })
   // kHz applies only to THIS field's own figure, never to a neighbour in the
   // same sentence (the low end "20 Hz" must not become 20000 because "20 kHz"
   // appears elsewhere in a "20 Hz – 20 kHz" range). Check the field's own value
-  // text only.
+  // text first, then the raw_text evidence for a kHz unit adjacent to this
+  // exact figure — the LLM often strips the unit from the value field, returning
+  // just "24" while the raw_text says "24 kHz".
+  //
+  // The rawText fallback is restricted to the HIGH endpoint only: low
+  // frequencies are always in Hz, so a low-end value matching a kHz figure in
+  // the raw text is cross-contamination from the high end of the same range
+  // (e.g. "20Hz – 20kHz" must not convert the 20 Hz low end to 20000).
   if (/_hz$/.test(field) && numeric < 1000) {
     const own = raw.toLowerCase();
     const khz = [...own.matchAll(/(\d+(?:[.,]\d+)?)\s*k\s*hz/gi)]
       .map((match) => Number(match[1].replace(',', '.')));
     if (khz.some((v) => v === numeric)) return Math.round(numeric * 1000);
+    // Fallback for the high endpoint only: scan the raw_text evidence for
+    // this figure immediately before "kHz".
+    if (field === 'frequency_response_high_hz') {
+      const quote = String(rawText || '').toLowerCase();
+      const adjacent = new RegExp(`\\b${numeric.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*k\\s*hz`, 'i');
+      if (adjacent.test(quote)) return Math.round(numeric * 1000);
+    }
   }
 
   const guarded = applyNumericGuard(field, numeric, rawText);

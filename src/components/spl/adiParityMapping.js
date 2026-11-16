@@ -25,6 +25,7 @@ export const FIELD_LABEL = {
   sensitivity_reference: "Sensitivity reference",
   impedance_ohm: "Nominal impedance (Ω)",
   power_w: "Recommended amplifier max (W)",
+  power_w_amp: "Recommended amplifier max (W)",
   power_w_min: "Recommended amplifier min (W)",
   frequency_response_low_hz: "Frequency response low (Hz)",
   frequency_response_high_hz: "Frequency response high (Hz)",
@@ -40,6 +41,7 @@ export const PROPOSAL_FIELDS = [
   "sensitivity_reference",
   "impedance_ohm",
   "power_w",
+  "power_w_amp",
   "power_w_min",
   "frequency_response_low_hz",
   "frequency_response_high_hz",
@@ -95,11 +97,24 @@ function labelOf(optionList, value) {
  */
 export function extractionToFound(raw) {
   const byField = {};
-  for (const item of [...(raw?.reported || []), ...(raw?.ambiguous || [])]) {
+  // The backend separates items into reported/ambiguous arrays but does not
+  // stamp a status field on each item — the status is implicit from which
+  // array it came from. Set it explicitly so downstream checks
+  // (status === "reported") work correctly.
+  for (const item of (raw?.reported || [])) {
     if (!item || !item.field) continue;
     byField[item.field] = {
       value: item.value,
-      status: item.status,
+      status: "reported",
+      quote: String(item.raw_text || "").trim(),
+    };
+  }
+  for (const item of (raw?.ambiguous || [])) {
+    if (!item || !item.field) continue;
+    if (byField[item.field]) continue; // reported takes precedence
+    byField[item.field] = {
+      value: item.value,
+      status: "ambiguous",
       quote: String(item.raw_text || "").trim(),
     };
   }
@@ -132,6 +147,34 @@ export function extractionToFound(raw) {
     { field: "rated_iec_power_w", label: "Rated IEC" },
     { field: "aes_power_w", label: "AES" },
   ];
+  // Every manufacturer-published power specification is surfaced independently
+  // as an advisory row (info.power_advisories) so none disappears from the
+  // review, even when a higher-priority authority is selected for the P12/P13
+  // calculation. The calculation authority hierarchy below selects the value
+  // the engine uses (continuous > recommended amplifier max), but the other
+  // categories remain visible with their source quotations.
+  const ALL_POWER_SOURCES = [
+    ...CONTINUOUS_SOURCES,
+    { field: "recommended_amp_min_w", label: "Recommended amplifier min" },
+    { field: "recommended_amp_max_w", label: "Recommended amplifier max" },
+    { field: "program_power_w", label: "Programme power" },
+    { field: "peak_power_w", label: "Peak power" },
+    { field: "power_handling_peak_w", label: "Power handling peak" },
+  ];
+  info.power_advisories = [];
+  for (const src of ALL_POWER_SOURCES) {
+    const entry = byField[src.field];
+    if (!entry) continue;
+    info.power_advisories.push({
+      field: src.field,
+      value: entry.value,
+      status: entry.status,
+      quote: entry.quote,
+      category: src.label,
+    });
+  }
+  if (info.power_advisories.length === 0) delete info.power_advisories;
+
   // Only a REPORTED continuous-source rating is classified as continuous power.
   // An ambiguous "Power handling" figure is surfaced separately as an advisory
   // (info.power_handling_note) preserving the manufacturer wording — it is NOT
@@ -151,10 +194,18 @@ export function extractionToFound(raw) {
       basis: "continuous",
       category: continuous.label,
     };
-  } else if (byField.recommended_amp_max_w && byField.recommended_amp_max_w.status === "reported") {
-    found.power_w = byField.recommended_amp_max_w.value;
-    found.power_basis = "amplifier";
-    info.power_w = {
+  }
+  // Recommended amplifier maximum is an independent authority — it is ALWAYS
+  // surfaced when reported, even when a continuous rating also exists, so the
+  // admin sees every published power figure. The calculation hierarchy prefers
+  // continuous for the P12/P13 value (set above), but the recommended amplifier
+  // range never disappears from the review.
+  if (byField.recommended_amp_max_w && byField.recommended_amp_max_w.status === "reported") {
+    if (!found.power_w) {
+      found.power_w = byField.recommended_amp_max_w.value;
+      found.power_basis = "amplifier";
+    }
+    info.power_w_amp = {
       value: byField.recommended_amp_max_w.value,
       rawValue: byField.recommended_amp_max_w.value,
       status: byField.recommended_amp_max_w.status,
@@ -162,10 +213,7 @@ export function extractionToFound(raw) {
       basis: "amplifier",
       category: "Recommended amplifier max",
     };
-    // Preserve the recommended amplifier range minimum when the source states
-    // it, so both endpoints of a range like "500W – 1,000W" are proposed.
     if (byField.recommended_amp_min_w) {
-      found.power_w_min = byField.recommended_amp_min_w.value;
       info.power_w_min = {
         value: byField.recommended_amp_min_w.value,
         rawValue: byField.recommended_amp_min_w.value,
@@ -174,6 +222,9 @@ export function extractionToFound(raw) {
         basis: "amplifier",
         category: "Recommended amplifier min",
       };
+      // Only set found.power_w_min when no continuous power was selected —
+      // otherwise it remains an advisory-only row.
+      if (!found.power_w_min) found.power_w_min = byField.recommended_amp_min_w.value;
     }
   }
   // Advisory: a "Power handling" figure the manufacturer stated without a
@@ -210,7 +261,7 @@ export function displayValue(formKey, value) {
   if (formKey === "sensitivity_reference") return labelOf(SENSITIVITY_REFERENCES, value);
   if (formKey === "measurement_space") return labelOf(MEASUREMENT_SPACES, value);
   if (formKey === "max_spl_basis") return labelOf(SPL_BASES, value);
-  if (formKey === "power_w" || formKey === "max_peak_spl_db") return `${value}`;
+  if (formKey === "power_w" || formKey === "power_w_amp" || formKey === "max_peak_spl_db") return `${value}`;
   if (formKey === "frequency_response_low_hz") return `${value} Hz`;
   if (formKey === "frequency_response_high_hz") {
     const n = Number(value);
