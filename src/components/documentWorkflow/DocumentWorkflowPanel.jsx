@@ -5,17 +5,16 @@
  * shown in the Room Designer header, replacing the standalone Project Report
  * and Speaker Design buttons.
  *
- *   1a — Create Technical Report
- *        Reuses the existing Project Report generation and export process.
- *        Automatically creates the matching Speaker Design PDF.
+ * Compact layout (layout-only refinement — no logic change):
  *
- *   1b — Create Speaker Design PDF
- *        Can run independently. Reuses the existing ensureSpeakerDesignForVersion
- *        deduplicating authority.
- *
- *   2  — Create Client Proposal
- *        Available only when 1a and 1b have both completed and their PDFs are
- *        stored for the selected version. Opens the existing Proposal Centre.
+ *   1a + 1b  — a two-column row. Each step is a single line: numbered badge,
+ *              name, coloured status badge, and the relevant action (Create /
+ *              Update / Retry) aligned to the right. Explanatory sublabel text
+ *              is shown only while the document is NOT yet created, so a
+ *              finished workflow collapses to one line per step.
+ *   2         — a compact full-width row with its status badge and Open /
+ *              New / Create / Retry actions aligned to the right.
+ *   Images    — a compact row with the actual image count and Manage / Upload.
  *
  * Each step shows one of: Ready to Create, Creating…, Created, Not Available,
  * Outdated, Failed. A document is Created only when its stored file exists
@@ -33,11 +32,11 @@ import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel } from './docume
 import { useProjectImageCount } from './useProjectImageCount';
 
 function StepIcon({ state, icon: Icon, notAvailable = false }) {
-  if (state === WORKFLOW_STATE.READY) return <Check className="w-3.5 h-3.5" style={{ color: '#2E7D4F' }} />;
-  if (state === WORKFLOW_STATE.GENERATING) return <Clock className="w-3.5 h-3.5 animate-pulse" style={{ color: '#625143' }} />;
-  if (state === WORKFLOW_STATE.FAILED) return <AlertCircle className="w-3.5 h-3.5" style={{ color: '#B23A3A' }} />;
-  if (state === WORKFLOW_STATE.OUTDATED) return <AlertCircle className="w-3.5 h-3.5" style={{ color: '#B37A2B' }} />;
-  return <Icon className="w-3.5 h-3.5" style={{ color: notAvailable ? '#A39A88' : '#1565C0' }} />;
+  if (state === WORKFLOW_STATE.READY) return <Check className="w-3 h-3" style={{ color: '#2E7D4F' }} />;
+  if (state === WORKFLOW_STATE.GENERATING) return <Clock className="w-3 h-3 animate-pulse" style={{ color: '#625143' }} />;
+  if (state === WORKFLOW_STATE.FAILED) return <AlertCircle className="w-3 h-3" style={{ color: '#B23A3A' }} />;
+  if (state === WORKFLOW_STATE.OUTDATED) return <AlertCircle className="w-3 h-3" style={{ color: '#B37A2B' }} />;
+  return <Icon className="w-3 h-3" style={{ color: notAvailable ? '#A39A88' : '#1565C0' }} />;
 }
 
 function stateBadgeClass(state, notAvailable = false) {
@@ -56,50 +55,52 @@ function stateBadgeClass(state, notAvailable = false) {
 
 function WorkflowStep({ number, label, sublabel, state, stateLabel, reason, canAct, onAct, actLabel, icon }) {
   const badgeClass = stateBadgeClass(state);
+  // Explanatory text is only useful before the document exists: hide it once
+  // the step is Created so a finished workflow collapses to a single line.
+  const showSublabel = state !== WORKFLOW_STATE.READY && Boolean(sublabel);
+  const notAvailable = state === WORKFLOW_STATE.NOT_CREATED && !canAct;
   return (
-    <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
-      <div className="flex items-center gap-1.5">
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold" style={{ background: '#213428', color: '#FFFFFF' }}>
+    <div className="rounded-lg border border-[#E2DED7] bg-white px-2.5 py-1.5 flex flex-col gap-0.5 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0" style={{ background: state === WORKFLOW_STATE.READY ? '#2E7D4F' : '#213428', color: '#FFFFFF' }}>
           {number}
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A]">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A] truncate">{label}</span>
+        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badgeClass} shrink-0`}>
+          <StepIcon state={state} icon={icon} notAvailable={notAvailable} />
+          {stateLabel}
+        </div>
+        <div className="flex-1" />
+        {canAct && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
+            onClick={onAct}
+          >
+            {state === WORKFLOW_STATE.FAILED && <RefreshCw className="w-3 h-3 mr-1" />}
+            {actLabel}
+            {state !== WORKFLOW_STATE.FAILED && <ChevronRight className="w-3 h-3 ml-1" />}
+          </Button>
+        )}
       </div>
-      {sublabel && (
-        <p className="text-[10px] text-[#8B8378] leading-snug">{sublabel}</p>
+      {showSublabel && (
+        <p className="text-[10px] text-[#8B8378] leading-snug pl-5">{sublabel}</p>
       )}
-      <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badgeClass}`} style={{ width: 'fit-content' }}>
-        <StepIcon state={state} icon={icon} />
-        {stateLabel}
-      </div>
       {reason && state === WORKFLOW_STATE.FAILED && (
-        <p className="text-[10px] text-[#B23A3A] leading-snug">{reason}</p>
-      )}
-      {canAct && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-0.5 h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]"
-          onClick={onAct}
-        >
-          {actLabel}
-          <ChevronRight className="w-3 h-3 ml-1" />
-        </Button>
+        <p className="text-[10px] text-[#B23A3A] leading-snug pl-5">{reason}</p>
       )}
     </div>
   );
 }
 
 /**
- * ProposalStep — Step 2 (Client Proposal).
+ * ProposalStep — Step 2 (Client Proposal), always a compact full-width row.
  *
- * When 1a and 1b are Created but no proposal PDF exists, this renders as a
- * prominent "Create Client Proposal" card so the next action is obvious.
- *
- * When a proposal PDF already exists, it shows a green Created indicator with
- * an "Open Client Proposal" action and a secondary "New proposal" option.
- *
- * When 1a or 1b is missing, it shows "Not Available" with the missing
- * prerequisite named and no creation button.
+ * Status badge on the left with the step number and label; Open / New / Create
+ * / Retry actions aligned to the right. A missing-prerequisites note is shown
+ * only when the step is unavailable, so a created proposal collapses to one
+ * line.
  */
 function ProposalStep({
   state,
@@ -116,52 +117,34 @@ function ProposalStep({
   const isOutdated = state === WORKFLOW_STATE.OUTDATED;
   const isFailed = state === WORKFLOW_STATE.FAILED;
 
-  // Prominent "Ready to Create" — the obvious next action.
-  if (isReadyToCreate) {
-    return (
-      <div className="rounded-lg border-2 px-4 py-3" style={{ borderColor: '#213428', background: '#FFFFFF' }}>
-        <div className="flex items-start gap-3">
-          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold shrink-0 mt-0.5" style={{ background: '#213428', color: '#FFFFFF' }}>
-            2
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold" style={{ color: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}>
-              Create Client Proposal
-            </div>
-            <p className="text-[11px] text-[#625143] mt-1 leading-snug">
-              Your design documents are ready. Create the proposal to present to your client.
-            </p>
-            <button
-              type="button"
-              onClick={onCreate}
-              disabled={disabled}
-              className="inline-flex items-center gap-1.5 mt-2.5 px-3.5 py-2 rounded-md text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: '#213428', color: '#FFFFFF' }}
-            >
-              Create Client Proposal
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const badgeClass = stateBadgeClass(state, isUnavailable);
+
   return (
-    <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2.5">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold" style={{ background: isCreated ? '#2E7D4F' : '#213428', color: '#FFFFFF' }}>
+    <div className="rounded-lg border border-[#E2DED7] bg-white px-2.5 py-1.5 flex flex-col gap-0.5">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0" style={{ background: isCreated ? '#2E7D4F' : '#213428', color: '#FFFFFF' }}>
           2
         </span>
         <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A]">Client Proposal</span>
-        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badgeClass}`} style={{ width: 'fit-content' }}>
+        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badgeClass} shrink-0`}>
           <StepIcon state={state} icon={Presentation} notAvailable={isUnavailable} />
           {stateLabel}
         </div>
         <div className="flex-1" />
+        {isReadyToCreate && (
+          <Button
+            size="sm"
+            className="h-7 px-2.5 text-[11px] font-semibold border-0 shrink-0"
+            style={{ background: '#213428', color: '#FFFFFF' }}
+            onClick={onCreate}
+            disabled={disabled}
+          >
+            Create Client Proposal
+            <ArrowRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        )}
         {isCreated && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button size="sm" className="h-7 px-2.5 text-[11px] font-medium border-0" style={{ background: '#213428', color: '#FFFFFF' }} onClick={onOpen}>
               Open Client Proposal
             </Button>
@@ -172,32 +155,29 @@ function ProposalStep({
           </div>
         )}
         {isOutdated && (
-          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]" onClick={onOpen}>
+          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0" onClick={onOpen}>
             Open
             <ChevronRight className="w-3 h-3 ml-1" />
           </Button>
         )}
         {isFailed && (
-          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]" onClick={onCreate}>
+          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0" onClick={onCreate}>
             <RefreshCw className="w-3 h-3 mr-1" />
             Retry
           </Button>
         )}
       </div>
       {isUnavailable && missingPrerequisites.length > 0 && (
-        <p className="text-[10px] text-[#A39A88] mt-1.5 leading-snug">
+        <p className="text-[10px] text-[#A39A88] leading-snug pl-5">
           Requires {missingPrerequisites.join(' and ')} to be created first.
         </p>
-      )}
-      {isCreated && (
-        <p className="text-[10px] text-[#8B8378] mt-1 leading-snug">Stored PDF available in Project Assets.</p>
       )}
     </div>
   );
 }
 
 /**
- * UploadedImagesStep — a compact entry showing the project's uploaded image
+ * UploadedImagesStep — a compact row showing the project's uploaded image
  * count and a "Manage / Upload Images" action that opens the Project Library
  * Images tab for the current project. Not a document stage: image uploads are
  * never a prerequisite for creating reports or proposals.
@@ -210,10 +190,10 @@ function UploadedImagesStep({ count, loading, onManage }) {
       : count === 0
         ? 'No images uploaded yet'
         : count === 1
-          ? 'Currently 1 image available'
-          : `Currently ${count} images available`;
+          ? '1 image'
+          : `${count} images`;
   return (
-    <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2 flex items-center gap-2 flex-wrap">
+    <div className="rounded-lg border border-[#E2DED7] bg-white px-2.5 py-1.5 flex items-center gap-1.5 min-w-0">
       <ImageIcon className="w-3.5 h-3.5 shrink-0" style={{ color: '#213428' }} />
       <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A]">Uploaded Images</span>
       {countText && (
@@ -223,7 +203,7 @@ function UploadedImagesStep({ count, loading, onManage }) {
       <Button
         size="sm"
         variant="outline"
-        className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]"
+        className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
         onClick={onManage}
       >
         Manage / Upload Images
@@ -299,9 +279,12 @@ export default function DocumentWorkflowPanel({
   const sdLabel = resolveStepDisplayLabel(WORKFLOW_STEP.SPEAKER_DESIGN, sdState);
   const cpLabel = resolveStepDisplayLabel(WORKFLOW_STEP.CLIENT_PROPOSAL, cpState, proposalAvailable);
 
+  const trCanAct = !disabled && (trState === WORKFLOW_STATE.NOT_CREATED || trState === WORKFLOW_STATE.OUTDATED || trState === WORKFLOW_STATE.FAILED);
+  const sdCanAct = !disabled && (sdState === WORKFLOW_STATE.NOT_CREATED || sdState === WORKFLOW_STATE.OUTDATED || sdState === WORKFLOW_STATE.FAILED);
+
   return (
-    <div className="rounded-lg border border-[#E2DED7] bg-[#FBFAF8] px-3 py-2.5 space-y-2.5">
-      <div className="flex items-stretch gap-4">
+    <div className="space-y-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         <WorkflowStep
           number="1a"
           label="Technical Report"
@@ -309,12 +292,11 @@ export default function DocumentWorkflowPanel({
           state={trState}
           stateLabel={trLabel}
           reason={technicalReport.reason}
-          canAct={!disabled && (trState === WORKFLOW_STATE.NOT_CREATED || trState === WORKFLOW_STATE.OUTDATED || trState === WORKFLOW_STATE.FAILED)}
+          canAct={trCanAct}
           actLabel={trState === WORKFLOW_STATE.OUTDATED ? 'Update' : trState === WORKFLOW_STATE.FAILED ? 'Retry' : 'Create'}
           icon={FileText}
           onAct={openReport}
         />
-        <div className="w-px bg-[#E2DED7]" />
         <WorkflowStep
           number="1b"
           label="Speaker Design"
@@ -322,7 +304,7 @@ export default function DocumentWorkflowPanel({
           state={sdState}
           stateLabel={sdLabel}
           reason={speakerDesign.reason}
-          canAct={!disabled && (sdState === WORKFLOW_STATE.NOT_CREATED || sdState === WORKFLOW_STATE.OUTDATED || sdState === WORKFLOW_STATE.FAILED)}
+          canAct={sdCanAct}
           actLabel={sdState === WORKFLOW_STATE.OUTDATED ? 'Update' : sdState === WORKFLOW_STATE.FAILED ? 'Retry' : 'Create'}
           icon={Speaker}
           onAct={createSpeakerDesign}
