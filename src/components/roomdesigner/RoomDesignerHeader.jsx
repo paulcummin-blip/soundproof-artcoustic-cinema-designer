@@ -1,21 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, ExternalLink, FileText } from "lucide-react";
+import { RotateCcw, ExternalLink } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
-import { useAppState } from "@/components/AppStateProvider";
-import { systemFormat } from "@/shared/systemFormat";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
 import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
-import CurrentSpeakerDesignButton from "@/components/roomdesigner/CurrentSpeakerDesignButton";
-import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speakerDesignRows";
-import { layoutVisibilityFilter } from "@/components/report/reportProductsSelected";
 import { REPORT_ROUTE } from "@/components/report/reportLibraryContext";
 import { REPORT_UPDATE_PARAM } from "@/components/report/reportActionIntent";
-import ProjectReportButton from "@/components/roomdesigner/reportReadiness/ProjectReportButton";
 
-import { useProjectReportReadiness } from "@/components/roomdesigner/reportReadiness/useProjectReportReadiness";
 import DocumentWorkflowPanel from "@/components/documentWorkflow/DocumentWorkflowPanel";
 import { useDocumentWorkflowStatus } from "@/components/documentWorkflow/useDocumentWorkflowStatus";
 import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
@@ -75,52 +68,6 @@ export default function RoomDesignerHeader({
 
   const projectCadProjectName = identity?.name || loadState?.name || null;
 
-  // The current speaker design of the version on screen, read from the live
-  // design through the report's own product authority — the same visibility rule,
-  // registry model names, dual-centre cabinet rule and subwoofer derivation the
-  // report's equipment list uses. Read-only presentation: this view never writes
-  // to the design.
-  const appState = useAppState();
-  const dolbyLayout = appState?.dolbyLayout || "5.1";
-  const sevenBedLayoutType = appState?.sevenBedLayoutType;
-  const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
-  const speakerDesign = React.useMemo(
-    () => ({
-      // The Speaker Design schedule states the design's own system format:
-      // bed channels . ACTIVE subwoofers . overhead channels, from the one
-      // client-facing format authority. The codec's .1 LFE identity is untouched.
-      layout: systemFormat({
-        layout: dolbyLayout,
-        subwooferInstances: appState?.subwooferInstances,
-        frontSubsCfg: appState?.frontSubsCfg,
-        rearSubsCfg: appState?.rearSubsCfg,
-      }) || dolbyLayout,
-      ...buildSpeakerDesignRows({
-        placedSpeakers,
-        frontSubsCfg: appState?.frontSubsCfg || null,
-        rearSubsCfg: appState?.rearSubsCfg || null,
-        subwooferInstances: appState?.subwooferInstances,
-        // The version's own saved display identity and screen construction, so
-        // the front stage's placement note is stated from the design's real
-        // geometry rather than from a generic description of a screen.
-        screen: appState?.screen || null,
-        isVisible:
-          appState?.getSpeakerVisibility ||
-          layoutVisibilityFilter(dolbyLayout, sevenBedLayoutType),
-      }),
-    }),
-    [
-      placedSpeakers,
-      appState?.frontSubsCfg,
-      appState?.rearSubsCfg,
-      appState?.subwooferInstances,
-      appState?.screen,
-      appState?.getSpeakerVisibility,
-      dolbyLayout,
-      sevenBedLayoutType,
-    ]
-  );
-
   // The version the report area opens for: the version being edited — the same
   // version the Project CAD export names — never another version's saved report.
   const reportVersionId = activeVersionRecord?.id || activeVersionId || null;
@@ -145,24 +92,12 @@ export default function RoomDesignerHeader({
     }
   };
 
-  // ONE direct report action: the consolidated Project Report for the active
-  // project and the version on screen. Its verdict is composed from the same
-  // canonical readiness and saved-report authorities the report page reads, so
-  // the button can never disagree with the report it opens.
-  const reportReadiness = useProjectReportReadiness({
-    projectId: effectiveProjectId,
-    versionId: reportVersionId,
-    hydrating: loadState?.phase !== "loaded",
-    priceData,
-  });
   const handleProjectReportClick = () => openReport(REPORT_ROUTE.VISUAL);
-  const handleProjectReportUpdate = () => openReport(REPORT_ROUTE.VISUAL, { updateReport: true });
 
-  // v2 coordinated document workflow: new projects show the DocumentWorkflowPanel
-  // instead of the standalone Project Report and Speaker Design buttons. Legacy
-  // projects keep the existing buttons unchanged.
-  const documentWorkflow = identity?.documentWorkflow || 'legacy';
-  const isV2Workflow = documentWorkflow === 'v2';
+  // Coordinated document workflow: all projects show the DocumentWorkflowPanel.
+  // The document_workflow marker remains for compatibility but no longer gates
+  // the interface — legacy projects use the same panel, populated from their
+  // existing stored records without migration or regeneration.
   const workflowStatus = useDocumentWorkflowStatus({
     projectId: effectiveProjectId,
     versionId: reportVersionId,
@@ -198,44 +133,16 @@ export default function RoomDesignerHeader({
             disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
           />
 
-          {isV2Workflow ? (
-            <DocumentWorkflowPanel
-              projectId={effectiveProjectId}
-              versionId={reportVersionId}
-              projectName={projectCadProjectName}
-              versionName={projectCadVersionName}
-              engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
-              workflowStatus={workflowStatus}
-              disabled={loadState?.phase !== "loaded"}
-              onOpenReport={handleProjectReportClick}
-            />
-          ) : (
-            <>
-              {/* Read-only design review: the speakers this version is specified
-                  with, stated exactly as the report's equipment list states them. */}
-              <CurrentSpeakerDesignButton
-                speakerDesign={speakerDesign}
-                projectName={projectCadProjectName}
-                dealerName={identity?.dealerName || null}
-                clientName={identity?.clientName || null}
-                projectReference={identity?.projectReference || null}
-                versionName={projectCadVersionName}
-                versionNumber={activeVersionRecord?.version_number || null}
-                updatedDate={activeVersionRecord?.updated_date || null}
-                disabled={loadState?.phase !== "loaded"}
-              />
-
-              {/* ONE report action: the consolidated Project Report. Its own state
-                  names what it can do — open, wait, or update. No dropdown, no
-                  separate report choices. */}
-              <ProjectReportButton
-                readiness={reportReadiness}
-                disabled={!effectiveProjectId}
-                onOpen={handleProjectReportClick}
-                onUpdate={handleProjectReportUpdate}
-              />
-            </>
-          )}
+          <DocumentWorkflowPanel
+            projectId={effectiveProjectId}
+            versionId={reportVersionId}
+            projectName={projectCadProjectName}
+            versionName={projectCadVersionName}
+            engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
+            workflowStatus={workflowStatus}
+            disabled={loadState?.phase !== "loaded"}
+            onOpenReport={handleProjectReportClick}
+          />
         </div>
       </div>
       {/* The prominent version identity block: project, client and reference,
@@ -254,7 +161,7 @@ export default function RoomDesignerHeader({
         />
       )}
 
-      {isV2Workflow && effectiveProjectId && (
+      {effectiveProjectId && (
         <div className="mt-2">
           <ProjectAssetsSection
             projectId={effectiveProjectId}

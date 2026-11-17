@@ -514,11 +514,9 @@ export default function ProjectCardPrototype({
           </div>
         </div>
 
-        {/* Project Assets — v2 projects only. Legacy projects keep their
-            existing Project Library access unchanged. */}
-        {p.documentWorkflow === 'v2' && (
-          <ProjectAssetsSection projectId={p.id} projectName={p.name} compact />
-        )}
+        {/* Project Assets — available for all projects, populated from existing
+            stored records without migration or regeneration. */}
+        <ProjectAssetsSection projectId={p.id} projectName={p.name} compact />
       </div>
     </div>
   );
