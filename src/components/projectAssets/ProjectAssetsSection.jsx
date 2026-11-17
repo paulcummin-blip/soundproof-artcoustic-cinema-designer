@@ -237,7 +237,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                     key={record.id}
                     icon={FileText}
                     name={record.filename || record.title || 'Document'}
-                    sub={`${documentTypeLabel(record.document_type)}${dateStr ? ' · ' + dateStr : ''}`}
+                    sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
                     onDownload={downloadSingle(record, 'document.pdf')}
                   />
                 );
@@ -271,7 +271,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                       key={record.id}
                       icon={FileText}
                       name={record.filename || record.title || 'Document'}
-                      sub={`${documentTypeLabel(record.document_type)}${dateStr ? ' · ' + dateStr : ''}`}
+                      sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
                       onDownload={downloadSingle(record, 'document.pdf')}
                     />
                   );
@@ -316,7 +316,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                         key={record.id}
                         icon={FileText}
                         name={record.filename || record.title || 'Document'}
-                        sub={`${documentTypeLabel(record.document_type)}${dateStr ? ' · ' + dateStr : ''}`}
+                        sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
                         onDownload={downloadSingle(record, 'document.pdf')}
                       />
                     );
