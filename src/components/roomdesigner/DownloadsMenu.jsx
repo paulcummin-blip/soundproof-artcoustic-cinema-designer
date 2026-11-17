@@ -34,7 +34,7 @@ export default function DownloadsMenu({
           className="inline-flex items-center gap-1.5 rounded-md border border-[#DCDBD6] bg-white px-3 py-1.5 text-xs font-semibold text-[#213428] hover:bg-[#F4F3F0] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
         >
           <Download className="w-3.5 h-3.5" />
-          Downloads
+          CAD Downloads
           <ChevronDown className="w-3 h-3" />
         </button>
       </PopoverTrigger>
