@@ -143,6 +143,9 @@ const CAPTURE_OVERRIDES = `
   html, body { margin: 0; padding: 0; background: #FFFFFF; }
   .print-only, .client-report-print-only, .proposal-print-portal, .client-report-print-root { display: block !important; }
   .client-report-screen-only, .screen-only, .no-print { display: none !important; }
+  /* html2canvas mounts its clone iframe as a body child. The proposal print
+     rule hides body children; hiding this iframe collapses every page to zero. */
+  body.proposal-export-mode > iframe.html2canvas-container { display: block !important; }
 `;
 
 function createCaptureFrame(documentHtml, frameWidthMm = CONTENT_WIDTH_MM) {
@@ -509,6 +512,11 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     });
 
     signal.throwIfAborted();
+    if (proposalRoot && pageRasters.some((raster) => !raster)) {
+      const failure = new Error('The proposal PDF could not be captured page-for-page. No incomplete copy was stored.');
+      failure.captureDiagnostics = { operation: 'proposal_incomplete_capture', resilience };
+      throw failure;
+    }
     let pageCount = 0;
     for (let index = 0; index < pageRasters.length; index += 1) {
       const raster = pageRasters[index];
