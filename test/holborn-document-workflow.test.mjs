@@ -25,6 +25,11 @@ test('A different version, comparison, absent fingerprint or absent file cannot 
   file('proposal',{source_fingerprints:{}})
  ]) assert.notEqual(status([record]).clientProposal.state,'ready');
 });
+test('A text-only fallback or incomplete proposal is not Ready', () => {
+ for (const overrides of [{rendering:'text_vector'}, {preview_status:'partial'}]) {
+  assert.notEqual(status([file('system_design_summary',overrides)]).clientProposal.state,'ready');
+ }
+});
 test('Historical stale files do not hide a matching current PDF', () => {
  assert.equal(status([file('proposal',{source_fingerprints:{engineeringFingerprint:'old'}}),file('proposal')]).clientProposal.state,'ready');
 });
