@@ -335,6 +335,7 @@ export async function storeIssuedDocument({ identity, snapshot, attemptKind = 'i
     attemptKind,
   });
 
+  notifyIssuedExportStored(record?.project_id || issued.projectId);
   return { record, pendingKey };
 }
 
