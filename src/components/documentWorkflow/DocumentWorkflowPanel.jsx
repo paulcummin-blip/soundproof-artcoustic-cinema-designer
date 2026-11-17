@@ -25,11 +25,12 @@
  * panel is not rendered).
  */
 import React from 'react';
-import { FileText, Speaker, Presentation, Check, Clock, AlertCircle, RefreshCw, ChevronRight, ArrowRight } from 'lucide-react';
+import { FileText, Speaker, Presentation, Check, Clock, AlertCircle, RefreshCw, ChevronRight, ArrowRight, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { REPORT_ROUTE } from '@/components/report/reportLibraryContext';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
 import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel } from './documentWorkflowStatus';
+import { useProjectImageCount } from './useProjectImageCount';
 
 function StepIcon({ state, icon: Icon, notAvailable = false }) {
   if (state === WORKFLOW_STATE.READY) return <Check className="w-3.5 h-3.5" style={{ color: '#2E7D4F' }} />;
@@ -195,6 +196,43 @@ function ProposalStep({
   );
 }
 
+/**
+ * UploadedImagesStep — a compact entry showing the project's uploaded image
+ * count and a "Manage / Upload Images" action that opens the Project Library
+ * Images tab for the current project. Not a document stage: image uploads are
+ * never a prerequisite for creating reports or proposals.
+ */
+function UploadedImagesStep({ count, loading, onManage }) {
+  const countText = loading
+    ? 'Loading…'
+    : count == null
+      ? ''
+      : count === 0
+        ? 'No images uploaded yet'
+        : count === 1
+          ? 'Currently 1 image available'
+          : `Currently ${count} images available`;
+  return (
+    <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2 flex items-center gap-2 flex-wrap">
+      <ImageIcon className="w-3.5 h-3.5 shrink-0" style={{ color: '#213428' }} />
+      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A]">Uploaded Images</span>
+      {countText && (
+        <span className="text-[11px] text-[#625143]">{countText}</span>
+      )}
+      <div className="flex-1" />
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]"
+        onClick={onManage}
+      >
+        Manage / Upload Images
+        <ChevronRight className="w-3 h-3 ml-1" />
+      </Button>
+    </div>
+  );
+}
+
 export default function DocumentWorkflowPanel({
   projectId,
   versionId,
@@ -206,6 +244,7 @@ export default function DocumentWorkflowPanel({
   onOpenReport,
 }) {
   const { technicalReport, speakerDesign, clientProposal, proposalAvailable } = workflowStatus;
+  const { count: imageCount, loading: imageCountLoading } = useProjectImageCount(projectId);
 
   const openReport = () => {
     if (disabled || !projectId || !versionId) return;
@@ -232,6 +271,11 @@ export default function DocumentWorkflowPanel({
     const params = new URLSearchParams();
     if (versionId) params.set('versionId', versionId);
     window.location.assign(`/ProposalCentre?${params.toString()}`);
+  };
+
+  const openImageLibrary = () => {
+    if (!projectId) return;
+    window.location.assign('/ProjectProposalAssets?tab=images');
   };
 
   const createSpeakerDesign = () => {
@@ -292,6 +336,11 @@ export default function DocumentWorkflowPanel({
         missingPrerequisites={missingPrerequisites}
         onCreate={openProposalWizard}
         onOpen={openProposalLibrary}
+      />
+      <UploadedImagesStep
+        count={imageCount}
+        loading={imageCountLoading}
+        onManage={openImageLibrary}
       />
     </div>
   );
