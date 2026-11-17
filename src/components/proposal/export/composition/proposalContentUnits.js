@@ -102,7 +102,12 @@ export function proposalContentUnits(page, measureUnits) {
     // A gallery is measured photograph by photograph, so a sheet carries only the
     // photographs that actually fit on it — including within a supporting row.
     const gallery = node.matches(GALLERY) || node.matches(GALLERY_ROW);
-    if (!force && !prose && !gallery && measureUnits([unit]).fits) return [unit];
+    // A copy-and-image row is an indivisible editorial unit (its CSS already says
+    // break-inside: avoid): where the row itself fits a sheet it is kept whole,
+    // even when the composition around it is being broken up, so the photograph
+    // stays beside the copy it illustrates instead of dropping below it.
+    const mediaRow = node.matches('.pp-media-row');
+    if ((mediaRow || (!force && !prose && !gallery)) && measureUnits([unit]).fits) return [unit];
     // A photograph is indivisible: it is fitted, or moved, as one block with its caption.
     if (node.matches('p,li,figcaption,figure') || !node.childNodes.length) return [unit];
     return [...node.childNodes].flatMap((child) => collect(child, [...ancestors, node],

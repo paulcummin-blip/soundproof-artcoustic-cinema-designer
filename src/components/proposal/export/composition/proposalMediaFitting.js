@@ -136,6 +136,19 @@ export function reserveMediaUnit(unit, prefix, measureUnits) {
   if (imageRoleOf(unit?.node) === IMAGE_PRESENTATION.FULL_WIDTH) {
     if (measureUnits([...prefix, unit]).fits) return true;
     if (measureUnits([unit]).fits) return false;
+    // The block the photograph sits in does not fit beside its copy and does not
+    // fit alone either — usually because the copy around it is long, not because
+    // the photograph is too tall. A FULL WIDTH photograph is never reduced in
+    // WIDTH to make that copy fit: its width is the full content width and its
+    // height follows its own proportions, so reducing the height would narrow
+    // the photograph, which is exactly what its presentation forbids. Where the
+    // photograph itself fits a sheet at the full content width, REFUSE — the
+    // partition breaks the block and the copy moves, while the photograph keeps
+    // the full content width. Only a photograph genuinely taller than a whole
+    // printable sheet is reduced, and only as far as it takes to print at all.
+    const photograph = unitPhotograph(unit);
+    const photoHeightMm = (photograph?.getBoundingClientRect?.()?.height || 0) / PX_PER_MM;
+    if (photoHeightMm && photoHeightMm <= measureUnits([]).availableMm) return false;
   }
   return fitMediaUnit(unit, prefix, measureUnits, {
     floorMm: mediaFloorMm(unit?.node, budgetMm),
