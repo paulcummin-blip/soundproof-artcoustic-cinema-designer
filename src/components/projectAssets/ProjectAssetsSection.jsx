@@ -17,7 +17,7 @@
  *
  * Read-only: this section never creates, modifies or deletes any document.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Download, FileText, Image as ImageIcon, Package, Loader2 } from 'lucide-react';
 import { useProjectWorkflowAssets } from './useProjectWorkflowAssets';
 import { downloadProjectAssetsZip } from './downloadProjectAssetsZip';
@@ -117,6 +117,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [requested, setRequested] = useState(false);
+  const [downloadPending, setDownloadPending] = useState(false);
   // Cards must not fan out three requests for every project on page load.
   const { exports, images, versions, loading, loaded, error, refresh } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested });
 
@@ -159,7 +160,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     + images.filter((i) => i?.file_url).length;
 
   const handleDownloadAll = async () => {
-    if (!loaded || error) { setRequested(true); setOpen(true); if (error) refresh(); return; }
+    if (!loaded || error) { setDownloadPending(true); setRequested(true); setOpen(true); if (error) refresh(); return; }
     if (zipping || totalAssets === 0) return;
     setZipping(true);
     try {
@@ -171,6 +172,12 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
       setZipping(false);
     }
   };
+
+  useEffect(() => {
+    if (!downloadPending || loading) return;
+    if (error) { setDownloadPending(false); return; }
+    if (loaded) { setDownloadPending(false); void handleDownloadAll(); }
+  }, [downloadPending, loading, loaded, error]);
 
   const labelClass = compact
     ? 'text-[11px] font-semibold uppercase tracking-[0.08em] text-[#625143]'
