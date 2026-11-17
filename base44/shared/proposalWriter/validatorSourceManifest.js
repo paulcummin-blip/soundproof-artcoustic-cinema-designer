@@ -16,7 +16,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': '9a38b2ca8a27b6fae3e775794e2300d7d2d93e3fada7e690959b1eb61b5efd93',
+  'base44/shared/proposalWriter/writerContractSchema.js': '8a43176be9b47411a941c8af2911d2214a1af24a4027b4e38a2515cbe0642751',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
@@ -46,7 +46,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
   'base44/shared/proposalWriter/writerOptionEvidenceSummary.js': '7b503c07645b7437940de705ec809f4da5ddbccaf0c6d5b7212c516589c79524',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '2a63b088af08500a5ae5e3e46f4c9a4bdcd43958c71ee7d10984951e2ee56b13',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': 'abf11fad05bb0e16a7c25998774e2dfac4369ee97b89c27b342be4656af063ff',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
   'base44/shared/proposalWriter/writerDesignContext.js': '66509c693e58db98774ce8abd345de2c4d3199f2a2e67c5f42d0d3fe835ab70f',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',

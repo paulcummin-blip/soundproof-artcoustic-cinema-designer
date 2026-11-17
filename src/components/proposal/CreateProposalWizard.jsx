@@ -8,6 +8,7 @@ import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
 import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
 import useCanonicalProjectVersions from '@/components/proposal/wizard/useCanonicalProjectVersions';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
+import { validateSteeringBrief } from '@/components/proposal/wizard/steeringBriefValidation';
 import ClarificationStep from '@/components/proposal/wizard/ClarificationStep';
 import GenerateStep, { GENERATION_PHASE } from '@/components/proposal/wizard/GenerateStep';
 import { confirmProposalSectionsSaved } from '@/components/proposal/wizard/proposalHandoffAuthority';
@@ -29,7 +30,7 @@ const STEPS = [
   { key: 'project', label: 'Project' },
   { key: 'type', label: 'Type' },
   { key: 'versions', label: 'Versions' },
-  { key: 'brief', label: 'Context' },
+  { key: 'brief', label: 'Steering Brief' },
   { key: 'clarify', label: 'Clarify' },
   { key: 'generate', label: 'Generate' },
 ];
@@ -596,6 +597,12 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     ? selectedVersionIds.length >= (typeDef?.minVersions || 2)
     : selectedVersionIds.length === 1;
 
+  // The Steering Brief is required before a new proposal can be generated: a
+  // modest, substantive check (not a word count) ensures some real project
+  // context has been entered. A regeneration carries the original brief, so a
+  // previously meaningful brief stays valid.
+  const briefValidation = validateSteeringBrief(clientBrief);
+
   const canProceed = [
     !!selectedProjectId, // step 0
     !!proposalType, // step 1
@@ -603,7 +610,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     // documents while the designer selects, and Next is unavailable until they
     // are current.
     versionsValid, // step 2
-    true, // step 3 — client brief is optional
+    briefValidation.valid, // step 3 — a meaningful Steering Brief is required
     true, // step 4 — clarifications are optional: answer, pass, or continue unanswered
   ];
 
@@ -779,7 +786,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
                 : selectedVersionIds.map((versionId, index) => `Version ${index + 1}`)}
             />
             <ReviewRow
-              label="Design Context"
+              label="Steering Brief"
               value={clientBrief ? `${clientBrief.slice(0, 60)}${clientBrief.length > 60 ? '…' : ''}` : '—'}
             />
             <ReviewRow

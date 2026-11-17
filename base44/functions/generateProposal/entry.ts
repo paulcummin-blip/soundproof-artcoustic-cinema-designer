@@ -423,6 +423,11 @@ export default async function(req) {
       // The Stage 1 ADI project interpretation is saved with the report, so the
       // design story a report was written from can be audited later.
       metadata: {
+        // This proposal was created under the Steering Brief workflow, so the
+        // editorial coverage gate applies to it: it may not be issued or sent to
+        // the client until its copy meaningfully addresses the designer's brief.
+        // Existing proposals predate this flag and are never blocked by it.
+        brief_coverage_required: true,
         project_interpretation: primaryInterpretation,
         // The designer's narrative steer, kept with the proposal it shaped: the
         // subjects to weigh and the subjects kept out of the client-facing

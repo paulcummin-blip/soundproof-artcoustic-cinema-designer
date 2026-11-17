@@ -218,7 +218,7 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   });
 
   it('is the natural-writing generation, with the contract unchanged', () => {
-    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-28');
+    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-29');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
     // The natural language refinement reaches the prompt the writer is really
     // called with, so the refinement is not merely documented.

@@ -238,5 +238,5 @@ test('the engineering the copy is written from is unchanged', () => {
     true,
     'every section still carries the claim-grounding rule',
   );
-  assert.equal(writerInput.prompt_version, 'proposal-writer-prompt-28');
+  assert.equal(writerInput.prompt_version, 'proposal-writer-prompt-29');
 });

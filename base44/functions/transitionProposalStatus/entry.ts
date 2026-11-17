@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { validateTransition, normaliseStatus, computeRestoreStatus } from '../../shared/proposalLifecycleAuthority.ts';
 import { readCompleteDocument } from '../../shared/proposalEdit/readCompleteDocument.js';
+import { briefCoverageGate } from '../../shared/proposalWriter/proposalBriefCoverageGate.js';
 
 /**
  * Server-authoritative proposal lifecycle transition.
@@ -56,6 +57,20 @@ export default async function(req) {
     if (['reviewed', 'issued', 'accepted', 'sent'].includes(normaliseStatus(target_status))) {
       const validation = await readCompleteDocument(base44.entities, proposal);
       if (!validation.valid) return Response.json({ error: validation.blocked_reason, validation }, { status: 409 });
+    }
+
+    // The Steering Brief coverage gate: a proposal created under the new
+    // workflow may not be issued, accepted or sent to the client until its copy
+    // meaningfully addresses the designer's brief. The check runs against the
+    // proposal's own brief and its current section text, so a designer who
+    // edits the copy to address a gap does not have to regenerate to clear it.
+    // 'reviewed' is an internal milestone and is left open so the designer can
+    // move the proposal through review while the copy is still being finished.
+    if (['issued', 'accepted', 'sent'].includes(normaliseStatus(target_status))) {
+      const gate = briefCoverageGate(proposal, sections);
+      if (gate.blocked) {
+        return Response.json({ error: gate.reason, brief_coverage: gate }, { status: 409 });
+      }
     }
 
     const update = { status: target_status };
