@@ -119,6 +119,10 @@ export default async function(req) {
       notes: body.notes || '',
       acoustic_treatment_enabled: body.acoustic_treatment_enabled ?? false,
       room_dimensions_edited: !!suppliedDims,
+      // New projects are stamped with the coordinated document workflow (v2).
+      // Existing projects retain 'legacy' (the entity default) and are never
+      // migrated. This is a permanent marker stamped once at creation.
+      document_workflow: 'v2',
     };
 
     // ── 3a. Admin bypass: unrestricted internal/support use ──
