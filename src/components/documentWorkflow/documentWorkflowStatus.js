@@ -43,6 +43,42 @@ export const WORKFLOW_STATE_LABEL = Object.freeze({
   [WORKFLOW_STATE.OUTDATED]: 'Outdated',
 });
 
+/**
+ * User-facing display labels in the coordinated-workflow vocabulary.
+ * These replace the older short labels on the dealer-facing panel:
+ *   - "Ready to Create" — prerequisites satisfied, PDF not generated yet.
+ *   - "Creating…" — generation in progress.
+ *   - "Created" — a complete PDF exists in Project Assets.
+ *   - "Failed" — generation failed, Retry available.
+ *   - "Outdated" — an existing PDF no longer matches the current design.
+ * "Not Available" (below) is shown when a step's prerequisites are missing.
+ */
+export const WORKFLOW_DISPLAY_LABEL = Object.freeze({
+  [WORKFLOW_STATE.NOT_CREATED]: 'Ready to Create',
+  [WORKFLOW_STATE.GENERATING]: 'Creating…',
+  [WORKFLOW_STATE.READY]: 'Created',
+  [WORKFLOW_STATE.FAILED]: 'Failed',
+  [WORKFLOW_STATE.OUTDATED]: 'Outdated',
+});
+
+/** Label shown when a step's prerequisites are not satisfied. */
+export const NOT_AVAILABLE_LABEL = 'Not Available';
+
+/**
+ * Resolve the user-facing display label for a workflow step. Step 2 (Client
+ * Proposal) shows "Not Available" instead of "Ready to Create" when its
+ * prerequisites (1a and 1b Created) are not met, so the dealer is never told
+ * Step 2 is ready before its source documents exist.
+ */
+export function resolveStepDisplayLabel(stepKey, state, proposalAvailable = false) {
+  if (stepKey === WORKFLOW_STEP.CLIENT_PROPOSAL && state === WORKFLOW_STATE.NOT_CREATED) {
+    return proposalAvailable
+      ? WORKFLOW_DISPLAY_LABEL[WORKFLOW_STATE.NOT_CREATED]
+      : NOT_AVAILABLE_LABEL;
+  }
+  return WORKFLOW_DISPLAY_LABEL[state] || WORKFLOW_DISPLAY_LABEL[WORKFLOW_STATE.NOT_CREATED];
+}
+
 /** The document_type values the workflow tracks. */
 const TECHNICAL_REPORT_TYPE = 'project';
 const SPEAKER_DESIGN_TYPE = 'speaker_design';

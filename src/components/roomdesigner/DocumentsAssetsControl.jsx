@@ -19,7 +19,7 @@
  * are arranged in the header.
  */
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, FileText, Check, Lock } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Check, Lock, Plus } from "lucide-react";
 import DocumentWorkflowPanel from "@/components/documentWorkflow/DocumentWorkflowPanel";
 import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
 import { WORKFLOW_STATE } from "@/components/documentWorkflow/documentWorkflowStatus";
@@ -39,13 +39,13 @@ function buildSummary(workflowStatus) {
 
   let text;
   if (generating) {
-    text = "Generating…";
+    text = "Creating…";
   } else if (readyCount === 0) {
     text = "No documents yet";
   } else if (readyCount === steps.length) {
-    text = "Documents ready";
+    text = "All documents created";
   } else {
-    text = `${readyCount} of ${steps.length} ready`;
+    text = `${readyCount} of ${steps.length} created`;
   }
 
   const hasFailed = steps.some((s) => s?.state === WORKFLOW_STATE.FAILED);
@@ -57,8 +57,8 @@ function buildSummary(workflowStatus) {
   }
 
   const proposalStored = clientProposal?.state === WORKFLOW_STATE.READY;
-  const proposalLabel = proposalStored ? "Proposal PDF ready" : proposalAvailable ? "Proposal available to create" : "Proposal locked";
-  const proposalState = proposalStored || proposalAvailable ? "available" : "locked";
+  const proposalLabel = proposalStored ? "Proposal created" : proposalAvailable ? "Ready to create" : "Not available";
+  const proposalState = proposalStored ? "created" : proposalAvailable ? "ready" : "locked";
 
   return { text, proposalLabel, proposalState };
 }
@@ -67,7 +67,8 @@ function ProposalPill({ state, label }) {
   if (!label) return null;
   const styles = {
     locked: { bg: "#F5F4F0", color: "#8B8378", border: "#E2DED7", icon: Lock },
-    available: { bg: "#E8F5EC", color: "#2E7D4F", border: "#C8E6D0", icon: Check },
+    ready: { bg: "#E3F2FD", color: "#1565C0", border: "#BBDEFB", icon: Plus },
+    created: { bg: "#E8F5EC", color: "#2E7D4F", border: "#C8E6D0", icon: Check },
   };
   const s = styles[state] || styles.locked;
   const Icon = s.icon;
