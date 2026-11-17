@@ -29,11 +29,11 @@ import { WORKFLOW_STATE } from "@/components/documentWorkflow/documentWorkflowSt
  * Returns { text, proposalLabel, proposalState }.
  */
 function buildSummary(workflowStatus) {
-  if (!workflowStatus) {
+  if (!workflowStatus || workflowStatus.loading) {
     return { text: "Loading…", proposalLabel: null, proposalState: "loading" };
   }
-  const { technicalReport, speakerDesign, proposalAvailable } = workflowStatus;
-  const steps = [technicalReport, speakerDesign];
+  const { technicalReport, speakerDesign, clientProposal, proposalAvailable } = workflowStatus;
+  const steps = [technicalReport, speakerDesign, clientProposal];
   const readyCount = steps.filter((s) => s?.state === WORKFLOW_STATE.READY).length;
   const generating = steps.some((s) => s?.state === WORKFLOW_STATE.GENERATING);
 
@@ -56,8 +56,9 @@ function buildSummary(workflowStatus) {
     text += " · Outdated";
   }
 
-  const proposalLabel = proposalAvailable ? "Proposal ready" : "Proposal locked";
-  const proposalState = proposalAvailable ? "available" : "locked";
+  const proposalStored = clientProposal?.state === WORKFLOW_STATE.READY;
+  const proposalLabel = proposalStored ? "Proposal PDF ready" : proposalAvailable ? "Proposal available to create" : "Proposal locked";
+  const proposalState = proposalStored || proposalAvailable ? "available" : "locked";
 
   return { text, proposalLabel, proposalState };
 }
