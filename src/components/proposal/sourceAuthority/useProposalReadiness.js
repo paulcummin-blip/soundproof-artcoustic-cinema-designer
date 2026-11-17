@@ -91,17 +91,28 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
 
   // A Speaker Design generation starting or finishing changes the checklist
   // cell from "Not generated" to "Preparing…" and back. This is a lightweight
-  // OVERLAY on the existing rows — it does NOT re-run the full readiness read,
-  // so the Project Report cell and the gate's loading state stay stable while
-  // the Speaker Design is being prepared. A full re-read runs only when a
-  // document is actually stored (via subscribeReportSourceStored below), which
-  // is the only time the ProjectAssetExport records change. Without this
-  // separation, every begin/complete event cancelled the in-flight read and
-  // restarted it with loading=true, leaving the card stuck on "Updating
-  // project documents…" even though the Project Report was already Current.
+  // OVERLAY on the existing rows — it does NOT re-run the full readiness read
+  // while a generation is IN FLIGHT, so the Project Report cell and the gate's
+  // loading state stay stable while the Speaker Design is being prepared.
+  //
+  // When generation FINISHES (nothing still preparing), a full re-read IS
+  // triggered so the cell's status is restored from the stored records. A
+  // successful generation stores a record and calls notifyReportSourceStored
+  // (which also bumps the token), but a FAILED or BLOCKED attempt stores
+  // nothing and sends no signal — without this re-read the cell stays stuck
+  // on CHECKING with the preparing overlay never cleared, which was the
+  // confirmed defect.
   useEffect(() => {
     if (!projectId) return undefined;
     return subscribeSpeakerDesignGenerationStatus(() => {
+      // When every selected version has stopped preparing, trigger a full
+      // re-read to restore the accurate cell status from stored records.
+      const anyPreparing = (ids || []).some((vid) =>
+        isPreparingSpeakerDesign(projectId, vid));
+      if (!anyPreparing) {
+        setRefreshToken((value) => value + 1);
+      }
+
       setRows((currentRows) => {
         if (!Array.isArray(currentRows) || currentRows.length === 0) return currentRows;
         return currentRows.map((row) => {
@@ -123,10 +134,16 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
               reason: null,
               error: null,
             };
-          } else if (generationError && !speakerDesign.current) {
-            nextSpeakerDesign = { ...speakerDesign, error: generationError };
-          } else if (!preparing && !generationError) {
-            nextSpeakerDesign = { ...speakerDesign, error: null };
+          } else {
+            // Generation finished: always clear checking so the cell is not
+            // stuck on "Preparing…". The error from a failed attempt remains
+            // available. The full re-read (triggered above) restores the
+            // accurate state/status/current from stored records.
+            nextSpeakerDesign = {
+              ...speakerDesign,
+              checking: false,
+              error: generationError || null,
+            };
           }
 
           return {
@@ -139,7 +156,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         });
       });
     });
-  }, [projectId]);
+  }, [projectId, idsKey]);
 
   useEffect(() => {
     let cancelled = false;
