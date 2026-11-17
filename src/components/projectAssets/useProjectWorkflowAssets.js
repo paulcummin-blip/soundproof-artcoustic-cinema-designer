@@ -22,6 +22,9 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    setExports([]); setImages([]); setVersions([]); setLoaded(false); setError(null);
+  }, [projectId]);
   useEffect(() => subscribeIssuedExportStored((id) => {
     if (id === projectId) setRevision((n) => n + 1);
   }), [projectId]);
