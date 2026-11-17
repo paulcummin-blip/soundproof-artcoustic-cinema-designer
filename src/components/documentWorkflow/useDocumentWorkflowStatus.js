@@ -23,6 +23,8 @@ import {
   subscribeSpeakerDesignGenerationStatus,
 } from '@/components/report/speakerDesign/speakerDesignGenerationStatus';
 import { resolveWorkflowStatus } from './documentWorkflowStatus';
+import { subscribeIssuedExportStored } from '@/components/library/issuedExportSignal';
+import { subscribeReportSourceStored } from '@/components/proposal/sourceAuthority/reportSourceSignal';
 
 const asItems = (page) => (Array.isArray(page) ? page : (page?.items || []));
 
@@ -78,6 +80,15 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
   useEffect(() => {
     return subscribeSpeakerDesignGenerationStatus(() => setTick((t) => t + 1));
   }, []);
+
+  useEffect(() => {
+    const refresh = () => setTick((t) => t + 1);
+    const offExport = subscribeIssuedExportStored((id) => { if (id === projectId) refresh(); });
+    const offSource = subscribeReportSourceStored((entry) => {
+      if (entry.projectId === projectId && (!entry.versionId || entry.versionId === versionId)) refresh();
+    });
+    return () => { offExport(); offSource(); };
+  }, [projectId, versionId]);
 
   const speakerDesignGenerating = isPreparingSpeakerDesign(projectId, versionId);
   const speakerDesignError = getSpeakerDesignGenerationError(projectId, versionId);
