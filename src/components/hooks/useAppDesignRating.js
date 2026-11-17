@@ -397,7 +397,7 @@ export function useAppDesignRating({
       console.warn('[useAppDesignRating] Failed to compute rating:', e);
       return null;
     }
-  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, retainedFromRefresh, p19SeatAuthority]);
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, minimumSystemMet, appState?.assumedP15Level, appState?.assumedP21Level, appState?.roomDimsIntegrity, retainedFromRefresh, p19SeatAuthority]);
 
   // Capture bass-specific inputs when bass is authoritative, for same-fingerprint
   // retention during a temporary bass refresh. Only bass parameters
