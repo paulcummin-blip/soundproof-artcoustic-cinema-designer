@@ -14,12 +14,14 @@ import { subscribeIssuedExportStored } from '@/components/library/issuedExportSi
 
 const asItems = (page) => (Array.isArray(page) ? page : (page?.items || []));
 
-export function useProjectWorkflowAssets({ projectId = null } = {}) {
+export function useProjectWorkflowAssets({ projectId = null, enabled = true } = {}) {
   const [exports, setExports] = useState([]);
   const [images, setImages] = useState([]);
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
+  const [error, setError] = useState(null);
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => subscribeIssuedExportStored((id) => {
     if (id === projectId) setRevision((n) => n + 1);
   }), [projectId]);
@@ -32,8 +34,10 @@ export function useProjectWorkflowAssets({ projectId = null } = {}) {
       setLoading(false);
       return;
     }
+    if (!enabled) return;
     let cancelled = false;
     setLoading(true);
+    setError(null);
     (async () => {
       try {
         const [exportPage, imagePage, versionPage] = await Promise.all([
@@ -51,22 +55,21 @@ export function useProjectWorkflowAssets({ projectId = null } = {}) {
           setExports(asItems(exportPage));
           setImages(asItems(imagePage));
           setVersions(asItems(versionPage));
+          setLoaded(true);
         }
       } catch (err) {
         console.warn('[useProjectWorkflowAssets] read failed:', err);
         if (!cancelled) {
-          setExports([]);
-          setImages([]);
-          setVersions([]);
+          setError('Stored assets could not be loaded. Please retry.');
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [projectId, revision]);
+  }, [projectId, revision, enabled]);
 
-  return { exports, images, versions, loading };
+  return { exports, images, versions, loading, loaded, error, refresh: () => setRevision((n) => n + 1) };
 }
 
 export default useProjectWorkflowAssets;
