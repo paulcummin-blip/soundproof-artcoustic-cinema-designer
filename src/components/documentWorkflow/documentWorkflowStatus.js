@@ -136,7 +136,18 @@ export function resolveWorkflowStatus({
   const proposalAvailable =
     technicalReport.state === WORKFLOW_STATE.READY
     && speakerDesign.state === WORKFLOW_STATE.READY;
-  return { technicalReport, speakerDesign, proposalAvailable };
+  const proposalExports = exports.filter((record) =>
+    ['proposal', 'system_design_summary'].includes(record?.document_type)
+    && (!record.selected_version_ids?.length ||
+      (record.selected_version_ids.length === 1 && record.selected_version_ids[0] === versionId))
+  ).map((record) => ({ ...record, document_type: 'proposal' }));
+  const clientProposal = resolveWorkflowStepState({
+    exports: proposalExports,
+    versionId,
+    documentType: 'proposal',
+    engineeringFingerprint,
+  });
+  return { technicalReport, speakerDesign, clientProposal, proposalAvailable };
 }
 
 /** Whether a project record uses the v2 coordinated workflow. */
