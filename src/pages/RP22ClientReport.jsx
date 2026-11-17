@@ -72,6 +72,7 @@ import {
   isometricReportStatus,
   isometricReportError,
   requestIsometricRetry,
+  clearIsometricReportReadiness,
 } from '@/components/report/isometric/isometricReportReadinessStore';
 import IsometricReportImage from '@/components/report/isometric/IsometricReportImage';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
@@ -173,6 +174,11 @@ export default function RP22ClientReport() {
   const isometricCaptureFailed = isometricCaptureStatus === 'failed';
   const handleRetryIsometric = useCallback(() => {
     requestIsometricRetry(isometricReadinessKey);
+  }, [isometricReadinessKey]);
+  // Clear isometric readiness when the project or version changes, so a stale
+  // image from a previous project is never reused.
+  React.useEffect(() => {
+    return () => { clearIsometricReportReadiness(); };
   }, [isometricReadinessKey]);
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
