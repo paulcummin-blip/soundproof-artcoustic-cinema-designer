@@ -190,7 +190,11 @@ export function composeSpeakerDesignPages(doc, { contentHeightMm = SPEAKER_DESIG
       heading,
       head,
       rows,
-      headHeightMm: elementHeightMm(heading, pxToMm) + elementHeightMm(head, pxToMm),
+      // Include the group's spacing and table borders on every continued portion.
+      headHeightMm: Math.max(
+        elementHeightMm(heading, pxToMm) + elementHeightMm(head, pxToMm),
+        elementHeightMm(section, pxToMm) - rows.reduce((sum, row) => sum + elementHeightMm(row, pxToMm), 0),
+      ),
       rowHeightsMm: rows.map((row) => elementHeightMm(row, pxToMm)),
     };
   });
