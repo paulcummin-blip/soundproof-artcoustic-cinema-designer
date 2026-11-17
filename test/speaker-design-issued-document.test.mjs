@@ -89,7 +89,7 @@ test('the schedule is its own document type, listed with the reports', () => {
   assert.equal(composition.pageFrame.heightMm, 265);
   // The composed frames become the pages; before they exist the schedule itself
   // is the single page.
-  assert.equal(composition.pageSelector, '.speaker-design-page, .speaker-design-schedule');
+  assert.equal(composition.pageSelector, '.speaker-design-page, .speaker-design-schedule:not([data-speaker-design-paged="true"])');
   assert.equal(composition.pageComposer, ISSUED_DOCUMENT_PAGE_COMPOSER.SPEAKER_DESIGN);
 });
 
