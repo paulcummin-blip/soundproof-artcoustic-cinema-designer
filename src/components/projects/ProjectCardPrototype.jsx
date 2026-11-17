@@ -6,6 +6,7 @@ import OpenVersionDropdown from "@/components/versions/OpenVersionDropdown";
 import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 import { dolbySystemLabel } from "@/shared/systemFormat";
 import AdminAccountBanner from "@/components/projects/AdminAccountBanner";
+import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
 
 // Refined prototype card — lighter, calmer, more architectural.
 // Only used for the "Bass Test" project to assess the design before rollout.
@@ -512,6 +513,12 @@ export default function ProjectCardPrototype({
             </button>
           </div>
         </div>
+
+        {/* Project Assets — v2 projects only. Legacy projects keep their
+            existing Project Library access unchanged. */}
+        {p.documentWorkflow === 'v2' && (
+          <ProjectAssetsSection projectId={p.id} projectName={p.name} compact />
+        )}
       </div>
     </div>
   );

@@ -16,6 +16,9 @@ import { REPORT_UPDATE_PARAM } from "@/components/report/reportActionIntent";
 import ProjectReportButton from "@/components/roomdesigner/reportReadiness/ProjectReportButton";
 
 import { useProjectReportReadiness } from "@/components/roomdesigner/reportReadiness/useProjectReportReadiness";
+import DocumentWorkflowPanel from "@/components/documentWorkflow/DocumentWorkflowPanel";
+import { useDocumentWorkflowStatus } from "@/components/documentWorkflow/useDocumentWorkflowStatus";
+import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -155,6 +158,16 @@ export default function RoomDesignerHeader({
   const handleProjectReportClick = () => openReport(REPORT_ROUTE.VISUAL);
   const handleProjectReportUpdate = () => openReport(REPORT_ROUTE.VISUAL, { updateReport: true });
 
+  // v2 coordinated document workflow: new projects show the DocumentWorkflowPanel
+  // instead of the standalone Project Report and Speaker Design buttons. Legacy
+  // projects keep the existing buttons unchanged.
+  const documentWorkflow = identity?.documentWorkflow || 'legacy';
+  const isV2Workflow = documentWorkflow === 'v2';
+  const workflowStatus = useDocumentWorkflowStatus({
+    projectId: effectiveProjectId,
+    versionId: reportVersionId,
+  });
+
   const handleProductCadFilesClick = () => {
     window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
   };
@@ -185,29 +198,44 @@ export default function RoomDesignerHeader({
             disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
           />
 
-          {/* Read-only design review: the speakers this version is specified
-              with, stated exactly as the report's equipment list states them. */}
-          <CurrentSpeakerDesignButton
-            speakerDesign={speakerDesign}
-            projectName={projectCadProjectName}
-            dealerName={identity?.dealerName || null}
-            clientName={identity?.clientName || null}
-            projectReference={identity?.projectReference || null}
-            versionName={projectCadVersionName}
-            versionNumber={activeVersionRecord?.version_number || null}
-            updatedDate={activeVersionRecord?.updated_date || null}
-            disabled={loadState?.phase !== "loaded"}
-          />
+          {isV2Workflow ? (
+            <DocumentWorkflowPanel
+              projectId={effectiveProjectId}
+              versionId={reportVersionId}
+              projectName={projectCadProjectName}
+              versionName={projectCadVersionName}
+              engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
+              workflowStatus={workflowStatus}
+              disabled={loadState?.phase !== "loaded"}
+              onOpenReport={handleProjectReportClick}
+            />
+          ) : (
+            <>
+              {/* Read-only design review: the speakers this version is specified
+                  with, stated exactly as the report's equipment list states them. */}
+              <CurrentSpeakerDesignButton
+                speakerDesign={speakerDesign}
+                projectName={projectCadProjectName}
+                dealerName={identity?.dealerName || null}
+                clientName={identity?.clientName || null}
+                projectReference={identity?.projectReference || null}
+                versionName={projectCadVersionName}
+                versionNumber={activeVersionRecord?.version_number || null}
+                updatedDate={activeVersionRecord?.updated_date || null}
+                disabled={loadState?.phase !== "loaded"}
+              />
 
-          {/* ONE report action: the consolidated Project Report. Its own state
-              names what it can do — open, wait, or update. No dropdown, no
-              separate report choices. */}
-          <ProjectReportButton
-            readiness={reportReadiness}
-            disabled={!effectiveProjectId}
-            onOpen={handleProjectReportClick}
-            onUpdate={handleProjectReportUpdate}
-          />
+              {/* ONE report action: the consolidated Project Report. Its own state
+                  names what it can do — open, wait, or update. No dropdown, no
+                  separate report choices. */}
+              <ProjectReportButton
+                readiness={reportReadiness}
+                disabled={!effectiveProjectId}
+                onOpen={handleProjectReportClick}
+                onUpdate={handleProjectReportUpdate}
+              />
+            </>
+          )}
         </div>
       </div>
       {/* The prominent version identity block: project, client and reference,
@@ -224,6 +252,16 @@ export default function RoomDesignerHeader({
           onSaveProject={handleSaveProject}
           disabled={loadState?.phase !== "loaded"}
         />
+      )}
+
+      {isV2Workflow && effectiveProjectId && (
+        <div className="mt-2">
+          <ProjectAssetsSection
+            projectId={effectiveProjectId}
+            projectName={projectCadProjectName}
+            compact
+          />
+        </div>
       )}
 
       <div className="mt-2 text-xs flex items-center gap-4 flex-wrap">

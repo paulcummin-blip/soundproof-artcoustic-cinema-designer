@@ -52,6 +52,7 @@ export default function ProjectHydrationProvider({ children }) {
           dealerName: project.dealer_name || null,
           accountId: project.account_id || null,
           activeVersionId: project.active_version_id || null,
+          documentWorkflow: project.document_workflow || 'legacy',
         });
 
         if (!project.dealer_name && project.account_id) {

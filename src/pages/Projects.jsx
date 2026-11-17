@@ -281,6 +281,7 @@ export default function ProjectsPage() {
                   : Date.now(),
                 lifecycleStatus: p.lifecycle_status || "Draft",
                 lastAgeReviewedAt: p.last_age_reviewed_at || null,
+                documentWorkflow: rawP.document_workflow || 'legacy',
                 spl_config: (() => { return safeJson(p.spl_config) || {}; })(),
                 p12_mode: (() => { const c = safeJson(p.spl_config) || {}; return c.p12_mode || null; })(),
                 p12_level: (() => { const c = safeJson(p.spl_config) || {}; return c.p12_level ?? null; })(),
@@ -497,6 +498,7 @@ export default function ProjectsPage() {
       createdAt: new Date(newProject.created_date).getTime(),
       lifecycleStatus: newProject.lifecycle_status || "Draft",
       lastAgeReviewedAt: newProject.last_age_reviewed_at || null,
+      documentWorkflow: newProject.document_workflow || 'legacy',
       lcrModel: null, surroundModel: null, heightModel: null,
       subModel: null, subCount: null, screenSizeInches: null, seats: null,
     };
@@ -585,6 +587,7 @@ export default function ProjectsPage() {
           createdAt: new Date(newProject.created_date).getTime(),
           lifecycleStatus: newProject.lifecycle_status || "Draft",
           lastAgeReviewedAt: newProject.last_age_reviewed_at || null,
+          documentWorkflow: newProject.document_workflow || 'legacy',
           lcrModel: null,
           surroundModel: null,
           heightModel: null,
