@@ -138,6 +138,8 @@ export function resolveWorkflowStatus({
     && speakerDesign.state === WORKFLOW_STATE.READY;
   const proposalExports = exports.filter((record) =>
     ['proposal', 'system_design_summary'].includes(record?.document_type)
+    && record?.rendering !== 'text_vector'
+    && record?.preview_status !== 'partial'
     && (!record.selected_version_ids?.length ||
       (record.selected_version_ids.length === 1 && record.selected_version_ids[0] === versionId))
   ).map((record) => ({ ...record, document_type: 'proposal' }));
