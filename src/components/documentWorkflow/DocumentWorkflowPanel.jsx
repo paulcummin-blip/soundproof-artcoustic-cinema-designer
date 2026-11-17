@@ -60,7 +60,7 @@ function WorkflowStep({ number, label, sublabel, state, stateLabel, reason, canA
   const showSublabel = state !== WORKFLOW_STATE.READY && Boolean(sublabel);
   const notAvailable = state === WORKFLOW_STATE.NOT_CREATED && !canAct;
   return (
-    <div className="rounded-lg border border-[#E2DED7] bg-white px-2.5 py-1.5 flex flex-col gap-0.5 min-w-0">
+    <div className="flex flex-col gap-0.5 min-w-0 py-0.5">
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0" style={{ background: state === WORKFLOW_STATE.READY ? '#2E7D4F' : '#213428', color: '#FFFFFF' }}>
           {number}

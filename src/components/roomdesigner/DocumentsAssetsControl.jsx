@@ -19,7 +19,7 @@
  * are arranged in the header.
  */
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, FileText, Check, Lock, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText } from "lucide-react";
 import DocumentWorkflowPanel from "@/components/documentWorkflow/DocumentWorkflowPanel";
 import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
 import { WORKFLOW_STATE } from "@/components/documentWorkflow/documentWorkflowStatus";
@@ -32,7 +32,7 @@ function buildSummary(workflowStatus) {
   if (!workflowStatus || workflowStatus.loading) {
     return { text: "Loading…", proposalLabel: null, proposalState: "loading" };
   }
-  const { technicalReport, speakerDesign, clientProposal, proposalAvailable } = workflowStatus;
+  const { technicalReport, speakerDesign, clientProposal } = workflowStatus;
   const steps = [technicalReport, speakerDesign, clientProposal];
   const readyCount = steps.filter((s) => s?.state === WORKFLOW_STATE.READY).length;
   const generating = steps.some((s) => s?.state === WORKFLOW_STATE.GENERATING);
@@ -56,38 +56,7 @@ function buildSummary(workflowStatus) {
     text += " · Outdated";
   }
 
-  const proposalStored = clientProposal?.state === WORKFLOW_STATE.READY;
-  const proposalLabel = proposalStored ? "Proposal created" : proposalAvailable ? "Ready to create" : "Not available";
-  const proposalState = proposalStored ? "created" : proposalAvailable ? "ready" : "locked";
-
-  return { text, proposalLabel, proposalState };
-}
-
-function ProposalPill({ state, label }) {
-  if (!label) return null;
-  const styles = {
-    locked: { bg: "#F5F4F0", color: "#8B8378", border: "#E2DED7", icon: Lock },
-    ready: { bg: "#E3F2FD", color: "#1565C0", border: "#BBDEFB", icon: Plus },
-    created: { bg: "#E8F5EC", color: "#2E7D4F", border: "#C8E6D0", icon: Check },
-  };
-  const s = styles[state] || styles.locked;
-  const Icon = s.icon;
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 shrink-0"
-      style={{
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.04em",
-      }}
-    >
-      <Icon className="w-2.5 h-2.5" />
-      {label}
-    </span>
-  );
+  return { text };
 }
 
 export default function DocumentsAssetsControl({
@@ -123,7 +92,6 @@ export default function DocumentsAssetsControl({
             </span>
             <span className="text-[11px] text-[#8B8378] truncate">{summary.text}</span>
           </span>
-          <ProposalPill state={summary.proposalState} label={summary.proposalLabel} />
         </button>
 
         {open && (
@@ -142,6 +110,7 @@ export default function DocumentsAssetsControl({
               projectId={projectId}
               projectName={projectName}
               compact
+              alwaysLoad
             />
           </div>
         )}

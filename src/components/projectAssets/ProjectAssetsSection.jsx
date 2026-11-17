@@ -113,13 +113,13 @@ function AssetRow({ icon: Icon, name, sub, onDownload }) {
   );
 }
 
-export default function ProjectAssetsSection({ projectId, projectName, compact = false }) {
+export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false }) {
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [requested, setRequested] = useState(false);
   const [downloadPending, setDownloadPending] = useState(false);
   // Cards must not fan out three requests for every project on page load.
-  const { exports, images, versions, loading, loaded, error, refresh } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested });
+  const { exports, images, versions, loading, loaded, error, refresh } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested || alwaysLoad });
 
   const versionNameById = new Map();
   for (const v of versions) {
@@ -195,7 +195,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#625143' }} />
             : <ChevronRight className="w-3.5 h-3.5" style={{ color: '#625143' }} />}
           <Package className="w-3.5 h-3.5" style={{ color: '#213428' }} />
-          <span className={labelClass}>Project Assets{loaded && !error ? ` (${totalAssets})` : loading && requested ? ' (…)': ''}</span>
+          <span className={labelClass}>Project Assets{loaded && !error ? ` (${totalAssets})` : loading && (requested || alwaysLoad) ? ' (…)': ''}</span>
         </span>
         <span
           role="button"
