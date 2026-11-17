@@ -19,7 +19,7 @@ import {
   resolveProposalSourceState,
 } from '@/components/proposal/library/proposalSourceState';
 
-const LAYER_ONE_REPORT_TYPES = ['visual', 'technical'];
+const LAYER_ONE_REPORT_TYPES = ['project'];
 
 const asItems = (result) => (Array.isArray(result) ? result : (result?.items || []));
 
@@ -34,7 +34,8 @@ export async function resolveProposalExportSource(proposal) {
     selectedVersionIds: versionIds,
     versionId: versionIds.length === 1 ? versionIds[0] : null,
     sourceFingerprints: {
-      engineeringFingerprint: proposal?.engineering_snapshot?.engineeringFingerprint || null,
+      engineeringFingerprint: proposal?.engineering_snapshot?.identity?.engineeringFingerprint
+        || proposal?.engineering_snapshot?.engineeringFingerprint || null,
     },
     sourceStatusAtExport: 'current',
   };
@@ -78,6 +79,14 @@ export async function resolveProposalExportSource(proposal) {
     versionsById,
     savedReportsByVersionId,
   });
+
+  // A current report cannot make an older proposal current. Compare the
+  // proposal's frozen fingerprint, never stamp it with the latest version's.
+  if (versionIds.length === 1 && sourceState.state === 'current') {
+    const frozen = base.sourceFingerprints.engineeringFingerprint;
+    const current = versionsById.get(versionIds[0])?.published_fingerprint;
+    if (!frozen || frozen !== current) sourceState.state = 'source_changed';
+  }
 
   return {
     ...base,
