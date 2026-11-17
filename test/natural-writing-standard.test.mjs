@@ -36,6 +36,7 @@ import {
   NATURAL_RECOMMENDATION_RULE,
   NATURAL_REPETITION_RULE,
   NATURAL_SELECTION_RULE,
+  NATURAL_QUALITATIVE_ACCURACY_RULE,
   NATURAL_SENTENCE_RULE,
   NATURAL_VOICE_RULE,
   NATURAL_WRITING_REFERENCE_PASSAGES,
@@ -134,11 +135,12 @@ describe('A. The standard the proposal is written to', () => {
   });
 
   it('states the natural language refinement: a few things, said aloud, principles explained', () => {
-    // SELECTION: a few aspects developed properly, never an equipment list.
-    expect(NATURAL_SELECTION_RULE).toMatch(/three or four aspects that matter most in this particular cinema/);
-    expect(NATURAL_SELECTION_RULE).toMatch(/never an equipment list/);
-    expect(NATURAL_SELECTION_RULE).toMatch(/This copy is a brief overview/);
-    expect(NATURAL_SELECTION_RULE).toMatch(/the specifications are stated in the Project Summary and in the evidence pages beside this copy/);
+    // SELECTION: material project intent takes priority over optional ranked
+    // strengths, while the narrative stays selective and concise.
+    expect(NATURAL_SELECTION_RULE).toMatch(/MATERIAL PROJECT INTENT FIRST/);
+    expect(NATURAL_SELECTION_RULE).toMatch(/before selecting optional engineering highlights/);
+    expect(NATURAL_SELECTION_RULE).toMatch(/never displace or weaken an explicit client objective/);
+    expect(NATURAL_SELECTION_RULE).toMatch(/Keep the narrative selective and concise/);
 
     // THE REGISTER: the standard states the principle and the approved passages
     // show it. No sentence is ever displayed in order to be avoided, so the
@@ -216,11 +218,11 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   });
 
   it('is the natural-writing generation, with the contract unchanged', () => {
-    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-27');
+    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-28');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
     // The natural language refinement reaches the prompt the writer is really
     // called with, so the refinement is not merely documented.
-    for (const rule of [NATURAL_SELECTION_RULE, NATURAL_ALOUD_RULE, NATURAL_PRINCIPLE_EXPLANATION_RULE]) {
+    for (const rule of [NATURAL_SELECTION_RULE, NATURAL_ALOUD_RULE, NATURAL_PRINCIPLE_EXPLANATION_RULE, NATURAL_QUALITATIVE_ACCURACY_RULE]) {
       expect(prompt).toContain(rule);
     }
     // The prompt carries the input it was built from, so a historical input is

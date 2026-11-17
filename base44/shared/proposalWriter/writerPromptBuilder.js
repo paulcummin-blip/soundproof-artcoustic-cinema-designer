@@ -47,6 +47,7 @@ import {
   NATURAL_ALOUD_RULE,
   NATURAL_MEASURED_LANGUAGE_RULE,
   NATURAL_PARAMETER_REFERENCE_RULE,
+  NATURAL_QUALITATIVE_ACCURACY_RULE,
   NATURAL_PRINCIPLE_EXPLANATION_RULE,
   NATURAL_RECORDED_REASON_RULE,
   NATURAL_RECOMMENDATION_RULE,
@@ -331,7 +332,7 @@ export function buildWriterPrompt({ input, briefRevision = null, correction = nu
     'DESIGN JUDGEMENT: design_interpretation carries a design_philosophy block: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage approach, the bass approach, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits this brief. Explain that reasoning where it is recorded, and never invent a reason, a priority, a budget or a decision it does not record. The best design is the one that most effectively satisfies the brief while balancing performance, practicality, aesthetics and cost, so a result below the highest available level is a legitimate design decision rather than a failure. Never present the highest available level as the objective regardless of cost or practical consequence.',
     ...(!isDesignIntent ? [
       'WHY THIS SPECIFICATION CARRIES THE JUDGEMENT: it is the strongest expression of professional design judgement in the document. It explains why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. It reads as considered professional judgement from an experienced cinema designer, never as a list of products.',
-      'VALUE ENGINEERING STAYS INTERNAL Reasoning: where the interpretation records that the design already takes an improvement without substantial additional expenditure, say what it gives the client in this room. Where an opportunity remains a design choice, say nothing about it. This proposal describes the finished design, so an opportunity is never written as an instruction to change the design, a next step, a future correction or an upgrade path.',
+      'VALUE AND SPECIFICATION DISCUSSION: never volunteer an unsolicited upgrade, invent an alternative specification, or promise a speculative performance improvement, and never write an opportunity as an instruction to change the finished design, a next step, a future correction or an upgrade path. Where the designer\'s brief explicitly asks about performance levels, specification choices or financial considerations, explain that requested subject in the section it belongs to, using only alternatives, trade-offs and considerations the frozen evidence or the design interpretation states. General explanation of a performance level and the practical or financial considerations involved is allowed when the brief requests it; a specific claim that a proposed alternative achieves a particular performance result still requires supporting evidence, cited from the allowed claims. Never invent prices, savings, alternative specifications, engineering outcomes or designer motivations.',
     ] : []),
     recommendationAuthority,
     '',
@@ -366,6 +367,7 @@ export function buildWriterPrompt({ input, briefRevision = null, correction = nu
     // is written in, and the one thing it never supplies for a decision whose
     // reason the brief does not record.
     NATURAL_MEASURED_LANGUAGE_RULE,
+    NATURAL_QUALITATIVE_ACCURACY_RULE,
     NATURAL_PARAMETER_REFERENCE_RULE,
     NATURAL_RECORDED_REASON_RULE,
     // THE APPROVED REFERENCE PASSAGES: the standard shown at its best, carried as

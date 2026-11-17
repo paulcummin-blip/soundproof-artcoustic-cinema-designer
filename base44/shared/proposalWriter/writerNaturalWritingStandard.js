@@ -65,11 +65,13 @@ export const NATURAL_RECOMMENDATION_RULE = 'DESIGN TEAM\'S OWN JUDGEMENT: where 
 export const NATURAL_REPETITION_RULE = 'REPETITION ACROSS THE DOCUMENT: review the proposal as ONE document. Design Summary explains the cinema being recommended; Design Overview explains how the system is arranged; Why This Specification explains the professional decisions behind it; Spatial Resolution explains directional sound and the immersion; Dynamic Range explains the capability and its significance; Timbre Matching explains tonal consistency; Overall Design closes on the design intent. Never repeatedly describe the same benefit, never carry the same strengths through the document in the same words, and never restate the opening summary at the end. A repeated idea is acceptable only where it adds a genuinely different aspect of the design.';
 
 /**
- * SELECT, DO NOT MENTION EVERYTHING. The natural language refinement, first half:
- * the copy is a brief explanation of a design, so it develops a few aspects
- * properly instead of touching every result the analysis produced.
+ * MATERIAL PROJECT INTENT FIRST. The brief's explicit objectives are the
+ * proposal's central story; the ranked engineering strengths choose which
+ * optional technical achievements deserve emphasis around them, never instead
+ * of them. The selective, concise register is preserved: only supported,
+ * material objectives become copy, and unrequested secondary points stay out.
  */
-export const NATURAL_SELECTION_RULE = 'THREE OR FOUR THINGS, NOT EVERYTHING: find the three or four aspects that matter most in this particular cinema and develop those properly, in your own words. This copy is a brief overview of the design and what it is for, never an equipment list and never a tour of everything the analysis measured: the specifications are stated in the Project Summary and in the evidence pages beside this copy, so they are not restated here. Where the evidence offers more strengths than the copy can carry, choose the ones this room and this brief actually need and say nothing about the rest. A short piece that explains the right three things well reads better than a longer one that mentions everything briefly.';
+export const NATURAL_SELECTION_RULE = 'MATERIAL PROJECT INTENT FIRST: before selecting optional engineering highlights, identify the material objectives in the designer\'s brief, the project\'s stated purpose, its intended use, the practical requirements that matter to the client, and any requested commercial or performance-level considerations. Address each supported objective in the section responsible for it, even when it is not among the highest-ranked engineering strengths. The ranked strength stories choose which additional technical achievements deserve emphasis; they never displace or weaken an explicit client objective. Keep the narrative selective and concise: omit unrequested secondary points, do not turn every minor brief detail into copy, and never repeat the same idea across sections. A short proposal that explains the right things well, starting with what the client asked for, reads better than a longer one that mentions everything briefly.';
 
 /**
  * THE SAY-IT-ALOUD RULE. The natural language refinement, second half: the
@@ -138,6 +140,15 @@ export const NATURAL_PRINCIPLE_EXPLANATION_RULE = 'EXPLAIN AN ESTABLISHED PRINCI
  * finished copy read as though a machine wrote it.
  */
 export const NATURAL_MEASURED_LANGUAGE_RULE = 'MEASURED VOCABULARY, NOT SUPERLATIVES: the evidence is the strongest thing this copy has, so state what the design does and let the result carry the emphasis. Do not reach for a superlative where a plain word is true: write strong, close, consistent, useful or clear, and where a result exists write the result itself (the extension frequency, the achieved Performance Level, the seat-to-seat consistency). Avoid repeating exceptional, remarkably, great, powerful, considerable, cinema-scale, huge, effortless or seamless: one strong word in a document is emphasis, three is a habit the client can hear. Never stack two of them in one sentence, never use a superlative in place of a figure the evidence already supplies, and never let a word imply more than the level it describes states.';
+
+/**
+ * QUALITATIVE CLAIMS STAY WITHIN THE EVIDENCE. A qualitative performance
+ * description must not overstate or contradict the frozen evidence for the same
+ * characteristic, speaker group or seating scope. This is a general evidence-to-
+ * language rule, not a restriction on any one parameter: it applies wherever a
+ * strong word rides on a weaker, mixed or differently-scoped result.
+ */
+export const NATURAL_QUALITATIVE_ACCURACY_RULE = 'QUALITATIVE CLAIMS STAY WITHIN THE EVIDENCE: a qualitative performance description must not overstate or contradict the frozen evidence for the same characteristic, speaker group or seating scope. A result for one parameter, group, row or seat is never read as a result for a different one: excellent front-wide positioning under one parameter does not establish excellent horizontal surround spacing under another, a strong result at the primary seats does not automatically apply to the secondary seats, a Level 4 result for one parameter does not establish Level 4 performance for the complete system, and mixed or lower results are described at their correct scope rather than averaged into unsupported praise. State a design principle or an arrangement plainly where no result carries it, and never let a strong word for one characteristic ride on a weaker or mixed result for that same characteristic. Keep every existing claim-grounding and scope rule: this governs how evidence is read into language, never what may be claimed without a cited claim ID.';
 
 /**
  * THE RECORDED REASON RULE. The copy carries the design reasons the brief and the
