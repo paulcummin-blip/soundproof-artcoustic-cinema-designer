@@ -33,6 +33,7 @@ import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNor
 import { P4_SCREEN_CHANNELS, p4ChannelSplDb } from "@/components/utils/rp22/p4ScreenChannelAuthority";
 import { p7WholeDegrees } from "@/components/utils/rp22/p7DisplayAuthority";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { resolveParamThresholds } from "@/components/report/technical/roomParameterLevelAuthority";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
@@ -419,6 +420,11 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
   // (highest) approved usable -6 dB limit across enabled subs, since a multi-sub
   // system cannot be boosted below the worst sub's usable LF limit.
   const appState = useAppState();
+  // P12/P13 target basis — the SAME selected modes the speaker controls and
+  // Design Rating authority use. The engine must grade with these, not with
+  // hardcoded Recommended thresholds, so every surface agrees.
+  const p12Mode = appState?.p12Mode === 'recommended' ? 'recommended' : 'minimum';
+  const p13Mode = appState?.splConfig?.p13Mode === 'recommended' ? 'recommended' : 'minimum';
   const subwoofers = appState?.subwoofers ?? null;
   const instanceStatus = appState?.subwooferInstancesStatus ?? INSTANCE_STATUS.UNINITIALISED;
   const bassAnalysisBlocked = instanceStatus === INSTANCE_STATUS.ERROR || instanceStatus === INSTANCE_STATUS.UNINITIALISED;
@@ -781,20 +787,24 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (isNum(lSpl) && isNum(cSpl) && isNum(rSpl)) {
           const minSplRaw = Math.min(lSpl, cSpl, rSpl);
           const minSpl = resolveRp22DesignValue(12, minSplRaw); // 1 dB favourable ceil
-          
-          let level12 = 1;
-          if (minSpl >= 111) level12 = 4;
-          else if (minSpl >= 108) level12 = 3;
-          else if (minSpl >= 105) level12 = 2;
-          else if (minSpl >= 102) level12 = 1;
-          
+
+          // Grade using the SAME mode-aware canonical threshold authority as
+          // the speaker controls and Design Rating — never hardcoded thresholds.
+          const p12Thresholds = resolveParamThresholds({ id: 12 }, p12Mode, null, null);
+          let level12 = 0;
+          if (minSpl >= p12Thresholds.L4) level12 = 4;
+          else if (minSpl >= p12Thresholds.L3) level12 = 3;
+          else if (minSpl >= p12Thresholds.L2) level12 = 2;
+          else if (minSpl >= p12Thresholds.L1) level12 = 1;
+
           p12Result = {
             title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
-            level: `L${level12}`,
+            level: level12 > 0 ? `L${level12}` : null,
             value: minSpl,
             formatted: formatSplDisplay(minSpl),
             unit: p12CatalogEntry?.unit || "dB SPL (C)",
-            status: "ok"
+            status: "ok",
+            targetBasis: p12Mode,
           };
         }
       }
@@ -864,21 +874,24 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             .filter(g => Math.abs(g.spl - minSplRaw) < 0.001) // Match within 0.001 dB
             .sort((a, b) => a.priority - b.priority)[0]; // Lowest priority wins
           
-          // P13 thresholds (Recommended: 99/102/105/108) - use rounded value
-          let level13 = 1;
-          if (minSpl >= 108) level13 = 4;
-          else if (minSpl >= 105) level13 = 3;
-          else if (minSpl >= 102) level13 = 2;
-          else if (minSpl >= 99) level13 = 1;
-          
+          // Grade using the SAME mode-aware canonical threshold authority as
+          // the speaker controls and Design Rating — never hardcoded thresholds.
+          const p13Thresholds = resolveParamThresholds({ id: 13 }, null, p13Mode, null);
+          let level13 = 0;
+          if (minSpl >= p13Thresholds.L4) level13 = 4;
+          else if (minSpl >= p13Thresholds.L3) level13 = 3;
+          else if (minSpl >= p13Thresholds.L2) level13 = 2;
+          else if (minSpl >= p13Thresholds.L1) level13 = 1;
+
           p13Result = {
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
-            level: `L${level13}`,
+            level: level13 > 0 ? `L${level13}` : null,
             value: minSpl,
             formatted: `${formatSplDisplay(minSpl)} (${limitingGroup.label})`,
             unit: p13CatalogEntry?.unit || "dB SPL (C)",
             limitingGroup: limitingGroup.label,
-            status: "ok"
+            status: "ok",
+            targetBasis: p13Mode,
           };
         }
       }
@@ -1993,6 +2006,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     designEqUsableLfHz,
     designEqSystemLimits.activeSubs,
     bassAnalysisBlocked,
+    p12Mode,
+    p13Mode,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };

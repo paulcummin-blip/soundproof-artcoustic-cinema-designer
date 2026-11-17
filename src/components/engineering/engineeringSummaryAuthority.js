@@ -104,6 +104,7 @@ function buildCanonicalRoomResults(parameters, publishedResults) {
       status: parameter.state || existing.status || null,
       value: parameter.state === "scored" ? (parameter.rawValue ?? existing.value ?? null) : null,
       level: parameter.state === "scored" ? normalizeLevel(parameter.level) : null,
+      targetBasis: parameter.mode || existing.targetBasis || null,
     };
   }
   return canonical;

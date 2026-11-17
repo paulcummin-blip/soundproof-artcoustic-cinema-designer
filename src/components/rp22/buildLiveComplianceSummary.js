@@ -179,6 +179,7 @@ export function buildLiveComplianceSummary({ analysisResult, bassResults = null,
       ...metric,
       level: liveLevel(metric),
       formatted: firstStatedPrimitive([metric.formatted, metric.hudLabel, metric.value], "—"),
+      targetBasis: metric.targetBasis || null,
     };
   }
 
