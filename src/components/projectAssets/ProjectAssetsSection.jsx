@@ -116,7 +116,9 @@ function AssetRow({ icon: Icon, name, sub, onDownload }) {
 export default function ProjectAssetsSection({ projectId, projectName, compact = false }) {
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
-  const { exports, images, versions, loading } = useProjectWorkflowAssets({ projectId });
+  const [requested, setRequested] = useState(false);
+  // Cards must not fan out three requests for every project on page load.
+  const { exports, images, versions, loading, loaded, error, refresh } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested });
 
   const versionNameById = new Map();
   for (const v of versions) {
@@ -157,6 +159,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     + images.filter((i) => i?.file_url).length;
 
   const handleDownloadAll = async () => {
+    if (!loaded || error) { setRequested(true); setOpen(true); if (error) refresh(); return; }
     if (zipping || totalAssets === 0) return;
     setZipping(true);
     try {
@@ -177,7 +180,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     <div className="border border-[#E2DED7] rounded-lg bg-[#FBFAF8]">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setRequested(true); setOpen((v) => !v); if (error) refresh(); }}
         className="flex items-center justify-between w-full px-3 py-2 transition-colors hover:bg-[#F5F4F0]"
       >
         <span className="flex items-center gap-2">
@@ -185,7 +188,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#625143' }} />
             : <ChevronRight className="w-3.5 h-3.5" style={{ color: '#625143' }} />}
           <Package className="w-3.5 h-3.5" style={{ color: '#213428' }} />
-          <span className={labelClass}>Project Assets ({totalAssets})</span>
+          <span className={labelClass}>Project Assets{loaded && !error ? ` (${totalAssets})` : loading && requested ? ' (…)': ''}</span>
         </span>
         <span
           role="button"
@@ -207,7 +210,12 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
               Loading assets…
             </div>
           )}
-          {!loading && totalAssets === 0 && (
+          {!loading && error && (
+            <div className="py-3 text-xs text-[#8B8378]" role="alert">
+              {error} <button type="button" onClick={refresh} className="underline">Retry</button>
+            </div>
+          )}
+          {!loading && !error && loaded && totalAssets === 0 && (
             <p className="py-3 text-xs text-[#8B8378]">No stored assets yet. Export documents and they will appear here.</p>
           )}
 
