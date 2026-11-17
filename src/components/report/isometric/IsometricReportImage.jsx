@@ -36,7 +36,9 @@ import { computeReportIsometricCamera } from "./reportIsometricFraming";
 import {
   setIsometricReportReady,
   setIsometricReportFailed,
+  setIsometricReportDataUrl,
   isometricRetryNonce,
+  isometricReportStatus,
   subscribeIsometricReportReady,
 } from "./isometricReportReadinessStore";
 
@@ -69,6 +71,9 @@ function disposeScene(scene) {
  * @param {function|null} [props.getSpeakerVisibility]
  * @param {string} props.readinessKey - "projectId::versionId" for the gate
  * @param {function} [props.onReady] - called with the PNG data URL when ready
+ * @param {boolean} [props.skipIfReady] - if true, skip capture when the store
+ *   already shows 'ready' for this key (used by the display-page instance when a
+ *   standalone capture has already produced the image).
  */
 export default function IsometricReportImage({
   appState,
@@ -82,6 +87,7 @@ export default function IsometricReportImage({
   getSpeakerVisibility = null,
   readinessKey = null,
   onReady = null,
+  skipIfReady = false,
 }) {
   const [dataUrl, setDataUrl] = useState(null);
   const onReadyRef = useRef(onReady);
@@ -114,6 +120,14 @@ export default function IsometricReportImage({
     let disposed = false;
     let renderer = null;
     let scene = null;
+
+    // If a standalone capture has already produced an image for this key, skip
+    // the re-capture — the display page reads the dataUrl from the store.
+    if (skipIfReady && isometricReportStatus(readinessKey) === 'ready') {
+      // eslint-disable-next-line no-console
+      console.info(LOG_PREFIX, readinessKey, "skipped — store already ready");
+      return () => {};
+    }
 
     // eslint-disable-next-line no-console
     console.info(LOG_PREFIX, readinessKey, "capture started", { gen, designKeyPreview: designKey?.slice(0, 80) });
@@ -238,6 +252,7 @@ export default function IsometricReportImage({
       // Stage 7: set readiness — only if this is still the current generation
       if (!disposed && renderGenRef.current === gen) {
         setDataUrl(url);
+        setIsometricReportDataUrl(readinessKey, url);
         setIsometricReportReady(readinessKey, true);
         onReadyRef.current?.(url);
         // eslint-disable-next-line no-console

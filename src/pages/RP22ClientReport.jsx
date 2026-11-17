@@ -73,6 +73,7 @@ import {
   isometricReportError,
   requestIsometricRetry,
 } from '@/components/report/isometric/isometricReportReadinessStore';
+import IsometricReportImage from '@/components/report/isometric/IsometricReportImage';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportUpdatingNotice from "@/components/report/ReportUpdatingNotice";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
@@ -1211,6 +1212,26 @@ export default function RP22ClientReport() {
             Sound Proof page. Nothing about those pages is edited, re-sectioned,
             split apart or given a competing presentation. */}
         {reportFullyReady && orderedPages.length > 0 && <TechnicalReportDocument p19Graph={p19Graph} completedBassAuthority={completedBassAuthority} forceCurrentPublication={updateRequested} />}
+        {/* Standalone isometric image capture: starts as soon as the report data
+            is ready (reportReady), not waiting for the full report (reportFullyReady)
+            or the Technical Report to mount. The image is stored in the shared
+            readiness store and read by IsometricReportPage inside the Technical
+            Report, so the PDF export gate opens earlier and the isometric image
+            is never the reason the report stays on "Building Report". */}
+        {reportReady && isometricReadinessKey && (
+          <IsometricReportImage
+            appState={appState}
+            stableDimensions={{ width: roomDims?.widthM, length: roomDims?.lengthM, height: roomDims?.heightM }}
+            placedSpeakers={placedSpeakers}
+            seatingPositions={seatingPositions}
+            mlpPoint={rsp ? { x: rsp.x, y: rsp.y } : null}
+            screen={screen}
+            roomElements={appState?.roomElements || []}
+            dolbyLayout={appState?.dolbyLayout || appState?.dolbyConfig || '5.1'}
+            getSpeakerVisibility={appState?.getSpeakerVisibility || null}
+            readinessKey={isometricReadinessKey}
+          />
+        )}
         {exportError && (
           <div className="client-report-screen-only" style={{
             marginTop: 16,

@@ -13,7 +13,7 @@
 
 const listeners = new Set();
 
-// key -> { status: 'pending' | 'ready' | 'failed', error: string | null }
+// key -> { status: 'pending' | 'ready' | 'failed', error: string | null, dataUrl: string | null }
 const statusMap = new Map();
 
 // key -> number (incremented by requestIsometricRetry to force a re-capture)
@@ -33,7 +33,7 @@ export function setIsometricReportReady(key, ready) {
   const current = statusMap.get(key);
   if (ready) {
     if (current?.status !== 'ready') {
-      statusMap.set(key, { status: 'ready', error: null });
+      statusMap.set(key, { status: 'ready', error: null, dataUrl: current?.dataUrl || null });
       emit();
     }
   } else {
@@ -56,7 +56,21 @@ export function setIsometricReportFailed(key, error) {
   const msg = String(error?.message || error || 'Isometric image capture failed');
   const current = statusMap.get(key);
   if (current?.status !== 'failed' || current?.error !== msg) {
-    statusMap.set(key, { status: 'failed', error: msg });
+    statusMap.set(key, { status: 'failed', error: msg, dataUrl: null });
+    emit();
+  }
+}
+
+/**
+ * Store the captured PNG data URL for one key. Called by IsometricReportImage
+ * after a successful capture so the display page can read it from the store
+ * instead of needing its own capture.
+ */
+export function setIsometricReportDataUrl(key, dataUrl) {
+  if (!key) return;
+  const current = statusMap.get(key);
+  if (current?.dataUrl !== dataUrl) {
+    statusMap.set(key, { ...current, status: current?.status || 'pending', error: current?.error || null, dataUrl });
     emit();
   }
 }
@@ -67,7 +81,7 @@ export function setIsometricReportFailed(key, error) {
  */
 export function requestIsometricRetry(key) {
   if (!key) return;
-  statusMap.set(key, { status: 'pending', error: null });
+  statusMap.set(key, { status: 'pending', error: null, dataUrl: null });
   retryCounters.set(key, (retryCounters.get(key) || 0) + 1);
   emit();
 }
@@ -94,6 +108,12 @@ export function isometricReportError(key) {
 export function isometricRetryNonce(key) {
   if (!key) return 0;
   return retryCounters.get(key) || 0;
+}
+
+/** The captured PNG data URL for one key, or null if not yet captured. */
+export function isometricReportDataUrl(key) {
+  if (!key) return null;
+  return statusMap.get(key)?.dataUrl || null;
 }
 
 /** Subscribe to readiness/failure/retry changes (useSyncExternalStore compatible). */
