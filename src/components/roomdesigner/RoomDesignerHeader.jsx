@@ -1,22 +1,16 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, ExternalLink } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
-import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
 import { REPORT_ROUTE } from "@/components/report/reportLibraryContext";
 import { REPORT_UPDATE_PARAM } from "@/components/report/reportActionIntent";
 
-import DocumentWorkflowPanel from "@/components/documentWorkflow/DocumentWorkflowPanel";
+import DocumentsAssetsControl from "@/components/roomdesigner/DocumentsAssetsControl";
+import DownloadsMenu from "@/components/roomdesigner/DownloadsMenu";
 import { useDocumentWorkflowStatus } from "@/components/documentWorkflow/useDocumentWorkflowStatus";
-import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
-
-// External resource — Artcoustic product CAD files (Dropbox folder).
-// Opens in a new tab; not a primary project action.
-const PRODUCT_CAD_FILES_URL =
-  "https://www.dropbox.com/scl/fo/uh8061fp2gcua4qya4vsl/AIB6tiWKiYJ1kmc1bkav8Ag?rlkey=13gap6ajvpnlgjs74u8jopctq&st=c8f27qoy&dl=0";
 
 export default function RoomDesignerHeader({
   loadState,
@@ -103,50 +97,12 @@ export default function RoomDesignerHeader({
     versionId: reportVersionId,
   });
 
-  const handleProductCadFilesClick = () => {
-    window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
-  };
+  const isLoaded = loadState?.phase === "loaded";
+  const hasError = loadState?.phase === "error";
 
   return (
-    <header className="p-4 bg-white border-b border-[#DCDBD6] flex-shrink-0">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#1B1A1A] font-header">Cinema Designer</h1>
-
-        <div className="flex items-center" style={{ gap: '12px' }}>
-          {/* Resource link — secondary/light treatment, opens new tab */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="font-medium whitespace-nowrap"
-            onClick={handleProductCadFilesClick}
-            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-          >
-            <ExternalLink className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
-            Product CAD Files
-          </Button>
-
-          {/* Project CAD drawing — the active design version, exported with the
-              existing shared cadExport utilities. */}
-          <ProjectCadExportButton
-            projectName={projectCadProjectName}
-            versionName={projectCadVersionName}
-            disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
-          />
-
-          <DocumentWorkflowPanel
-            projectId={effectiveProjectId}
-            versionId={reportVersionId}
-            projectName={projectCadProjectName}
-            versionName={projectCadVersionName}
-            engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
-            workflowStatus={workflowStatus}
-            disabled={loadState?.phase !== "loaded"}
-            onOpenReport={handleProjectReportClick}
-          />
-        </div>
-      </div>
-      {/* The prominent version identity block: project, client and reference,
-          the version being edited, and the switcher that opens another one. */}
+    <header className="px-4 pt-2 pb-2 bg-white border-b border-[#DCDBD6] flex-shrink-0">
+      {/* Row 1: Project identity + active version + save status + version switcher */}
       {effectiveProjectId && (
         <RoomDesignerVersionBar
           projectId={effectiveProjectId}
@@ -157,33 +113,54 @@ export default function RoomDesignerHeader({
           versionApi={versionApi}
           autosaveStatus={autosaveStatus}
           onSaveProject={handleSaveProject}
-          disabled={loadState?.phase !== "loaded"}
+          disabled={!isLoaded}
         />
       )}
 
+      {/* Loading state when no project is open yet */}
+      {loadState?.phase === "loading" && !effectiveProjectId && (
+        <div className="py-3 text-xs text-[#8B8378]">Loading project…</div>
+      )}
+
+      {/* Row 2: Documents & Assets (collapsible) + Downloads menu */}
       {effectiveProjectId && (
-        <div className="mt-2">
-          <ProjectAssetsSection
+        <div className="mt-2 flex items-start gap-3 flex-wrap">
+          <DocumentsAssetsControl
             projectId={effectiveProjectId}
+            versionId={reportVersionId}
             projectName={projectCadProjectName}
-            compact
+            versionName={projectCadVersionName}
+            engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
+            workflowStatus={workflowStatus}
+            disabled={!isLoaded}
+            onOpenReport={handleProjectReportClick}
+          />
+          <DownloadsMenu
+            projectName={projectCadProjectName}
+            versionName={projectCadVersionName}
+            disabled={!isLoaded}
           />
         </div>
       )}
 
-      <div className="mt-2 text-xs flex items-center gap-4 flex-wrap">
-          {/* A valid project is always present — project-mode statuses only */}
-          {loadState.phase === "loading" && <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div>}
-          {loadState.phase === "loaded" && <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div>}
-          {loadState.phase === "error" && <div className="text-xs text-red-600 inline-flex items-center gap-2"> Error: {loadState.error} <Button size="xs" variant="outline" className="ml-2 h-6 px-2" onClick={() => {const ctrl = new AbortController();reloadProject(ctrl.signal);}}><RotateCcw className="w-3 h-3 mr-1" /> Retry</Button> </div>}
-          {autosaveStatus === "saving" && <span className="text-gray-500 font-medium">Saving...</span>}
-          {autosaveStatus === "saved" && <span className="text-green-700 font-medium">Saved</span>}
-          {autosaveStatus === "dirty" && <span className="text-amber-600 font-medium">Pending changes...</span>}
-          {autosaveStatus === "hydrating" && <span>Loading project data...</span>}
-          {projectIdState && (
-            <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
-          )}
-      </div>
+      {/* Error state — actionable, inline only when an error occurs */}
+      {hasError && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-[#B23A3A]">
+          <span>Error: {loadState.error}</span>
+          <Button
+            size="xs"
+            variant="outline"
+            className="h-6 px-2"
+            onClick={() => {
+              const ctrl = new AbortController();
+              reloadProject(ctrl.signal);
+            }}
+          >
+            <RotateCcw className="w-3 h-3 mr-1" />
+            Retry
+          </Button>
+        </div>
+      )}
     </header>
   );
 }

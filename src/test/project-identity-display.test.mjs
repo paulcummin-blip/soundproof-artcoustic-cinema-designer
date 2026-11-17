@@ -232,15 +232,20 @@ describe('ROOM DESIGNER HEADER SHOWS IDENTITY', () => {
   it('renders the identity line from the canonical identity', () => {
     const header = read('components/roomdesigner/RoomDesignerHeader.jsx');
     expect(header).toMatch(/useCanonicalProject/);
-    expect(header).toMatch(/<ProjectIdentityLine/);
-    expect(header).toMatch(/projectName=\{identity\.name\}/);
-    expect(header).toMatch(/client=\{identity\.clientName\}/);
-    expect(header).toMatch(/reference=\{identity\.projectReference\}/);
+    // The header delegates identity display to the version bar, which renders
+    // ProjectIdentityLine with the identity fields the header passes through.
+    const bar = read('components/versions/RoomDesignerVersionBar.jsx');
+    expect(bar).toMatch(/<ProjectIdentityLine/);
+    expect(bar).toMatch(/showProject/);
+    expect(bar).toMatch(/projectName=\{projectName\}/);
+    expect(header).toMatch(/projectName=\{identity\?\.name/);
+    expect(header).toMatch(/clientName=\{identity\?\.clientName/);
+    expect(header).toMatch(/projectReference=\{identity\?\.projectReference/);
   });
 
   it('states the project on the header, which has no project heading', () => {
-    const header = read('components/roomdesigner/RoomDesignerHeader.jsx');
-    expect(header).toMatch(/showProject/);
+    const bar = read('components/versions/RoomDesignerVersionBar.jsx');
+    expect(bar).toMatch(/showProject/);
   });
 
   it('renders no dealer field in the header', () => {
@@ -250,8 +255,8 @@ describe('ROOM DESIGNER HEADER SHOWS IDENTITY', () => {
   });
 
   it('keeps the editable version field as the single version display', () => {
-    const header = read('components/roomdesigner/RoomDesignerHeader.jsx');
-    expect(header).toMatch(/<VersionNameField projectId=\{effectiveProjectId\} \/>/);
+    const bar = read('components/versions/RoomDesignerVersionBar.jsx');
+    expect(bar).toMatch(/<ActiveVersionCard/);
     const line = read('components/projects/ProjectIdentityLine.jsx');
     expect(line).toMatch(/showVersion = false/);
   });

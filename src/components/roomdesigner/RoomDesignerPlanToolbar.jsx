@@ -1,7 +1,103 @@
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { ChevronDown, Crosshair, Ruler } from "lucide-react";
+import { ChevronDown, Crosshair, Layers, Ruler } from "lucide-react";
+
+/**
+ * OverlaysPopover
+ * ---------------
+ * A compact popover that groups the less frequently used Plan View display
+ * toggles (LCR, Side/Rear Surrounds, Overheads, Dolby Zones, Front Wides)
+ * behind a single button, keeping the main toolbar uncluttered.
+ *
+ * The overlay switches and their relevance filtering are identical to the
+ * previous inline grid — only the presentation changes.
+ */
+function OverlaysPopover({
+  overlayRelevance,
+  overlays,
+  setOverlays,
+  enableFrontWides,
+  setEnableFrontWides,
+}) {
+  const [open, setOpen] = useState(false);
+
+  const overlayItems = [
+    { key: 'LCR', label: 'LCR' },
+    { key: 'SIDE_SURROUND', label: 'Side Surrounds' },
+    { key: 'REAR_SURROUND', label: 'Rear Surrounds' },
+    { key: 'OVERHEADS_2', label: 'Overheads .2' },
+    { key: 'OVERHEADS_4', label: 'Overheads .4' },
+    { key: 'OVERHEADS_6', label: 'Overheads .6' },
+    { key: 'enableDolbyZones', label: 'Dolby Zones' },
+  ].filter(({ key }) => overlayRelevance?.[key] !== false);
+
+  const activeCount = overlayItems.filter(({ key }) => !!overlays?.[key]).length
+    + (overlayRelevance?.FRONT_WIDES && enableFrontWides ? 1 : 0);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded border border-[#DCDBD6] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#213428] hover:bg-[#F4F3F0] whitespace-nowrap"
+        >
+          <Layers size={14} aria-hidden="true" />
+          Overlays
+          {activeCount > 0 && (
+            <span
+              className="inline-flex items-center justify-center rounded-full"
+              style={{
+                minWidth: 16,
+                height: 16,
+                padding: '0 4px',
+                fontSize: 9,
+                fontWeight: 700,
+                background: '#213428',
+                color: '#FFFFFF',
+              }}
+            >
+              {activeCount}
+            </span>
+          )}
+          <ChevronDown size={12} aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={6} className="w-56 p-3 border-[#DCDBD6]">
+        <div className="space-y-2.5">
+          {overlayItems.map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <label htmlFor={`overlay-pop-${key}`} style={{ fontSize: 12, color: '#3E4349', cursor: 'pointer' }}>
+                {label}
+              </label>
+              <Switch
+                id={`overlay-pop-${key}`}
+                checked={!!overlays?.[key]}
+                onCheckedChange={() => {
+                  setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+                }}
+              />
+            </div>
+          ))}
+          {overlayRelevance?.FRONT_WIDES && (
+            <div className="flex items-center justify-between gap-3 border-t border-[#E2DED7] pt-2.5">
+              <label htmlFor="overlay-pop-front-wides" style={{ fontSize: 12, color: '#3E4349', cursor: 'pointer' }}>
+                Front Wides
+              </label>
+              <Switch
+                id="overlay-pop-front-wides"
+                checked={!!enableFrontWides}
+                onCheckedChange={(checked) => {
+                  setEnableFrontWides(checked);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 import { setMlpGrab } from "@/components/state/mlpGrabStore";
 import { getSeatInfoMode, setSeatInfoMode as persistSeatInfoMode, subscribeSeatInfoMode } from "@/components/state/seatInfoModeStore";
 import SeatInfoModeToggle from "@/components/roomdesigner/SeatInfoModeToggle";
@@ -80,13 +176,13 @@ export default function RoomDesignerPlanToolbar({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <strong
           style={{
-            fontSize: 40,
+            fontSize: 22,
             fontWeight: 700,
             color: "#213428",
             display: "flex",
             alignItems: "center",
             height: "100%",
-            marginLeft: "12px"
+            marginLeft: "4px"
           }}>
 
           {/* The design's system format, from the one client-facing format
@@ -103,54 +199,24 @@ export default function RoomDesignerPlanToolbar({
 
       </div>
 
-      {/* PLAN TOOLS — dynamic list, only show relevant items */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: 12, alignItems: 'center' }}>
-        {[
-        { key: 'LCR', label: 'LCR' },
-        { key: 'SIDE_SURROUND', label: 'Side Surrounds' },
-        { key: 'REAR_SURROUND', label: 'Rear Surrounds' },
-        { key: 'OVERHEADS_2', label: 'Overheads .2' },
-        { key: 'OVERHEADS_4', label: 'Overheads .4' },
-        { key: 'OVERHEADS_6', label: 'Overheads .6' },
-        { key: 'enableDolbyZones', label: 'Dolby Zones' }].
-
-        filter(({ key }) => overlayRelevance[key] !== false).
-        map(({ key, label }) =>
-        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <label htmlFor={`overlay-top-${key}`} style={{ fontSize: 12, color: '#3E4349' }}>{label}</label>
-              <Switch
-            id={`overlay-top-${key}`}
-            checked={!!overlays?.[key]}
-            onCheckedChange={() => {
-              setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
-            }} />
-
-            </div>
-        )}
-
-        {overlayRelevance.FRONT_WIDES &&
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label htmlFor="overlay-top-front-wides" style={{ fontSize: 12, color: '#3E4349' }}>Front Wides</label>
-            <Switch
-            id="overlay-top-front-wides"
-            checked={!!enableFrontWides}
-            onCheckedChange={(checked) => {
-              setEnableFrontWides(checked);
-            }} />
-
-          </div>
-        }
-      </div>
-      
+      {/* Overlays popover — compact control for less frequently used display toggles */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+        <OverlaysPopover
+          overlayRelevance={overlayRelevance}
+          overlays={overlays}
+          setOverlays={setOverlays}
+          enableFrontWides={enableFrontWides}
+          setEnableFrontWides={setEnableFrontWides}
+        />
+
         {/* Seat click mode — what clicking a seat on the plan does */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            borderRight: '1px solid #DCDBD6',
-            paddingRight: 12,
+            borderLeft: '1px solid #DCDBD6',
+            paddingLeft: 12,
           }}
         >
           <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Seat click</span>

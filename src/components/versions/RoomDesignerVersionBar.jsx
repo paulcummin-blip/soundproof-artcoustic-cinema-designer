@@ -25,6 +25,36 @@ const BRAND = {
   card: '#FBFAF8',
 };
 
+/**
+ * A small inline save-state indicator. Shows a coloured dot and short text
+ * next to the active version so the designer can see the save state at a
+ * glance without a separate status row.
+ */
+function SaveStatusIndicator({ status = 'idle' }) {
+  const map = {
+    saving: { dot: '#B7791F', text: 'Saving…', color: '#8A6A21' },
+    saved: { dot: '#2E7D4F', text: 'Saved', color: '#2E7D4F' },
+    dirty: { dot: '#B7791F', text: 'Unsaved', color: '#8A6A21' },
+    hydrating: { dot: '#8B8378', text: 'Loading…', color: '#8B8378' },
+    idle: null,
+  };
+  const s = map[status] || map.idle;
+  if (!s) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 shrink-0"
+      style={{ fontSize: 11, fontWeight: 600, color: s.color, fontFamily: 'Didact Gothic, sans-serif' }}
+    >
+      <span
+        className="inline-block rounded-full"
+        style={{ width: 7, height: 7, background: s.dot }}
+        aria-hidden="true"
+      />
+      {s.text}
+    </span>
+  );
+}
+
 export default function RoomDesignerVersionBar({
   projectId = null,
   projectName = null,
@@ -70,14 +100,12 @@ export default function RoomDesignerVersionBar({
   }, [location.state, activeVersionId]);
 
   return (
-    <div className="mt-3 flex flex-wrap items-stretch gap-3">
-      <div
-        className="min-w-[220px] flex-1 rounded-lg px-3 py-2.5"
-        style={{ background: BRAND.card, border: `1px solid ${BRAND.border}` }}
-      >
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Project identity — inline, no card wrapper */}
+      <div className="min-w-0 flex-1">
         <ProjectIdentityLine
           showProject
-          orientation="stacked"
+          orientation="inline"
           projectName={projectName}
           client={clientName}
           reference={projectReference}
@@ -86,7 +114,8 @@ export default function RoomDesignerVersionBar({
         />
       </div>
 
-      <div className="min-w-[280px] flex-1">
+      {/* Active version — compact card */}
+      <div className="min-w-[200px]" style={{ flexShrink: 2 }}>
         <ActiveVersionCard
           versionName={activeVersion?.version_name || null}
           updatedAt={formatLibraryDate(activeVersion?.updated_date || activeVersion?.created_date)}
@@ -96,10 +125,15 @@ export default function RoomDesignerVersionBar({
           autoEdit={autoEdit}
           onAutoEditHandled={() => setAutoEdit(false)}
           onRename={(name) => versionApi?.renameVersion?.(activeVersionId, name)}
+          compact
         />
       </div>
 
-      <div className="flex items-start">
+      {/* Save status indicator */}
+      <SaveStatusIndicator status={autosaveStatus} />
+
+      {/* Version switcher */}
+      <div className="flex items-center shrink-0">
         <VersionSwitcher
           projectId={projectId}
           versionApi={versionApi}

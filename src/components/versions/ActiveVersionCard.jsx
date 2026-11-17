@@ -36,6 +36,7 @@ export default function ActiveVersionCard({
   autoEdit = false,
   onAutoEditHandled = null,
   onRename = null,
+  compact = false,
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
@@ -72,28 +73,34 @@ export default function ActiveVersionCard({
     setEditing(true);
   };
 
+  const cardPadding = compact ? 'px-2.5 py-1.5' : 'px-3 py-2.5';
+  const nameFontSize = compact ? 15 : 20;
+  const nameLineHeight = compact ? 1.2 : 1.15;
+
   return (
     <div
-      className="flex items-stretch gap-3 rounded-lg px-3 py-2.5"
+      className={`flex items-stretch gap-2 rounded-lg ${cardPadding}`}
       style={{
         background: '#FFFFFF',
         border: `1px solid ${BRAND.border}`,
         borderLeft: `4px solid ${isCurrent ? BRAND.green : BRAND.accent}`,
-        boxShadow: '0 1px 2px rgba(27, 26, 26, 0.06)',
+        boxShadow: compact ? 'none' : '0 1px 2px rgba(27, 26, 26, 0.06)',
       }}
     >
       <div className="min-w-0 flex-1">
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: BRAND.subtext,
-          }}
-        >
-          Active Version
-        </div>
+        {!compact && (
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: BRAND.subtext,
+            }}
+          >
+            Active Version
+          </div>
+        )}
 
         {editing ? (
           <input
@@ -112,12 +119,12 @@ export default function ActiveVersionCard({
                 setEditing(false);
               }
             }}
-            className="mt-1 w-full rounded px-2 py-1 outline-none"
+            className={`${compact ? '' : 'mt-1'} w-full rounded px-2 py-1 outline-none`}
             style={{
               border: `1px solid ${BRAND.green}`,
               color: BRAND.text,
               fontFamily: 'Didact Gothic, sans-serif',
-              fontSize: 18,
+              fontSize: nameFontSize,
               fontWeight: 700,
               background: '#FFFFFF',
             }}
@@ -127,25 +134,25 @@ export default function ActiveVersionCard({
             type="button"
             onClick={startEditing}
             disabled={disabled || loading}
-            className="mt-0.5 flex items-center gap-2 text-left disabled:cursor-default"
+            className={`${compact ? '' : 'mt-0.5'} flex items-center gap-2 text-left disabled:cursor-default`}
             title={loading ? 'Loading version…' : 'Click to rename this version'}
           >
             <span
               style={{
-                fontSize: 20,
+                fontSize: nameFontSize,
                 fontWeight: 700,
-                lineHeight: 1.15,
+                lineHeight: nameLineHeight,
                 color: loading ? BRAND.subtext : BRAND.text,
                 fontFamily: 'Didact Gothic, sans-serif',
               }}
             >
-              {loading ? 'Loading version…' : (name || 'Untitled version')}
+              {loading ? 'Loading…' : (name || 'Untitled version')}
             </span>
-            {!loading && name && <Edit2 className="w-3.5 h-3.5 opacity-40" />}
+            {!loading && name && <Edit2 className={compact ? 'w-3 h-3 opacity-40' : 'w-3.5 h-3.5 opacity-40'} />}
           </button>
         )}
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <div className={`${compact ? 'mt-0.5' : 'mt-1.5'} flex flex-wrap items-center gap-2`}>
           <span
             className="rounded-full px-2 py-0.5"
             style={{
@@ -160,7 +167,7 @@ export default function ActiveVersionCard({
           >
             {badge.label}
           </span>
-          {updatedAt && (
+          {!compact && updatedAt && (
             <span style={{ fontSize: 11, color: BRAND.subtext }}>
               Updated {updatedAt}
             </span>

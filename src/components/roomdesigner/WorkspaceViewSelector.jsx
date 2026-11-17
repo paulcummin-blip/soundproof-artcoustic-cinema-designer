@@ -20,7 +20,7 @@ export default function WorkspaceViewSelector({ viewMode, onViewModeChange }) {
         flexWrap: "wrap",
         alignItems: "center",
         gap: 10,
-        padding: "8px 16px",
+        padding: "4px 16px",
         borderBottom: "1px solid #DCDBD6",
         background: "#FAFAF8",
         flex: "0 0 auto",
