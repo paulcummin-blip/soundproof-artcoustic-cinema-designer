@@ -94,7 +94,8 @@ export default function DocumentWorkflowPanel({
   disabled = false,
   onOpenReport,
 }) {
-  const { technicalReport, speakerDesign, proposalAvailable } = workflowStatus;
+  const { technicalReport, speakerDesign, clientProposal, proposalAvailable } = workflowStatus;
+  const proposalStored = clientProposal?.state === WORKFLOW_STATE.READY;
 
   const openReport = () => {
     if (disabled || !projectId || !versionId) return;
@@ -159,9 +160,9 @@ export default function DocumentWorkflowPanel({
       <WorkflowStep
         number="2"
         label="Client Proposal"
-        sublabel={proposalAvailable ? 'Both documents are ready' : 'Available when 1a and 1b are ready'}
-        state={proposalAvailable ? WORKFLOW_STATE.READY : WORKFLOW_STATE.NOT_CREATED}
-        stateLabel={proposalAvailable ? 'Available' : 'Locked'}
+        sublabel={proposalStored ? 'Stored PDF available in Project Assets' : proposalAvailable ? 'Both source documents are ready' : 'Available when 1a and 1b are ready'}
+        state={clientProposal?.state || WORKFLOW_STATE.NOT_CREATED}
+        stateLabel={proposalStored ? 'Ready' : clientProposal?.state === WORKFLOW_STATE.OUTDATED ? 'Outdated' : proposalAvailable ? 'Available to create' : 'Locked'}
         canAct={!disabled && proposalAvailable}
         actLabel="Open"
         icon={Presentation}
