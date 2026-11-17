@@ -158,7 +158,7 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
   // schedule itself is the single frame, so a document is never left unpaged.
   [ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN]: Object.freeze({
     nodeSelector: '.speaker-design-schedule',
-    pageSelector: '.speaker-design-page, .speaker-design-schedule',
+    pageSelector: '.speaker-design-page, .speaker-design-schedule:not([data-speaker-design-paged="true"])',
     bodyClass: 'speaker-design-export-mode',
     pageFrame: SPEAKER_DESIGN_PAGE_FRAME,
     pageComposer: ISSUED_DOCUMENT_PAGE_COMPOSER.SPEAKER_DESIGN,
