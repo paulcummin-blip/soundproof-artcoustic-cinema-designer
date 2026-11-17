@@ -26,6 +26,7 @@ import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils
 import { manualSizeFromPersisted } from "@/components/models/screen/manualScreenConfig";
 import { resolvePresetBackupGeometry } from "@/components/models/screen/resolveEffectiveScreen";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
+import { resolveRoomDimsIntegrity } from "@/components/utils/roomDimensionsIntegrity";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -131,6 +132,14 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       nextHeightM = Number(p?.room_height) || 2.4;
     }
     appState.setRoomDims({ widthM: nextWidthM, lengthM: nextLengthM, heightM: nextHeightM });
+  }
+
+  // 1b) ROOM DIMS INTEGRITY — track whether valid dimensions were actually
+  // loaded from the saved Project record vs. silently substituted defaults.
+  // An established project with missing/invalid stored dimensions must not
+  // present generic 4.5 × 6.0 × 2.4 m defaults as confirmed saved geometry.
+  if (typeof appState?.setRoomDimsIntegrity === "function") {
+    appState.setRoomDimsIntegrity(resolveRoomDimsIntegrity(p));
   }
 
   // 1b) ROOM ORIENTATION — per-version. mergedP carries the version's own

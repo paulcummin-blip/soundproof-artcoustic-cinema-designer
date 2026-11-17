@@ -29,6 +29,7 @@ import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr
 import { resolveP14TargetSelectionState } from '@/components/room/bass/p14TargetSelectionState';
 import { isDesignRatingPublishable } from '@/components/state/designRatingPublicationAuthority';
 import { resolveAssumedParameterResult } from '@/components/utils/assumedParameterAuthority';
+import { roomDimsIntegrityBlocksCalculation } from '@/components/utils/roomDimensionsIntegrity';
 
 // Map numeric RP22 parameter IDs to the string keys expected by buildDesignRatingInput
 const SEAT_PARAM_KEY_MAP = {
@@ -312,6 +313,10 @@ export function useAppDesignRating({
 
   const roomRating = useMemo(() => {
     if (!minimumSystemMet) return null;
+    // Room dimensions integrity gate — an established project with missing or
+    // invalid saved dimensions must not produce an authoritative RP22 rating
+    // on silently substituted default geometry.
+    if (roomDimsIntegrityBlocksCalculation(appState?.roomDimsIntegrity)) return null;
     try {
       const input = buildDesignRatingInput({
         seats,
@@ -437,17 +442,19 @@ export function useAppDesignRating({
   if (!effectiveRating) return null;
 
   const isP14TargetUnselected = bassReadiness.reason === 'p14-target-not-selected';
+  const isRoomDimsMissing = roomDimsIntegrityBlocksCalculation(appState?.roomDimsIntegrity);
 
   // Single publication readiness authority. One predicate decides whether a
   // numeric Design Rating may be published. Consumers (RoomDesigner publish
   // effect, sidebar, reports) read this flag instead of duplicating readiness
   // logic. A partial numeric rating is never published while bass authority
-  // is provisional.
+  // is provisional or room dimensions are unverified.
   const isPublishable = isDesignRatingPublishable({
     minimumSystemMet,
     bassReadiness,
     retainedFromRefresh,
     isP14TargetUnselected,
+    isRoomDimsMissing,
   });
 
   return {
@@ -455,6 +462,7 @@ export function useAppDesignRating({
     bassReadiness,
     isPendingBass: !bassReadiness.ready && !retainedFromRefresh && !isP14TargetUnselected,
     isP14TargetUnselected,
+    isRoomDimsMissing,
     retainedFromRefresh,
     isPublishable,
   };

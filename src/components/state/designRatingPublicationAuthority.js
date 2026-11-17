@@ -39,6 +39,7 @@
  * @param {Object}  params.bassReadiness          - From resolveBassReadiness
  * @param {boolean} params.retainedFromRefresh    - Same-fingerprint retained bass active
  * @param {boolean} params.isP14TargetUnselected  - P14 target not chosen (distinct state)
+ * @param {boolean} params.isRoomDimsMissing     - Established project missing/invalid saved dimensions
  * @returns {boolean}
  */
 export function isDesignRatingPublishable({
@@ -46,9 +47,11 @@ export function isDesignRatingPublishable({
   bassReadiness,
   retainedFromRefresh = false,
   isP14TargetUnselected = false,
+  isRoomDimsMissing = false,
 }) {
   if (!minimumSystemMet) return false;
   if (isP14TargetUnselected) return false;
+  if (isRoomDimsMissing) return false;
   if (!bassReadiness) return false;
 
   // A. Live ready (authoritative, no-applicable-bass, blocked, error)

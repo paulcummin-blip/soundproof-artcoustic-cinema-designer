@@ -10,7 +10,7 @@ import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/component
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import buildEngineeringPublicationDesignState from "@/components/roomdesigner/utils/buildEngineeringPublicationDesignState";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, publishRoomDimsMissingIndicator, clearRoomDimsMissingIndicator, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
@@ -1995,6 +1995,22 @@ function RoomDesignerWithState() {
       clearAsdrUnavailableIndicator(indicatorProjectId);
     };
   }, [resolvedProjectId, projectIdState, minimumSystemMet]);
+
+  // Publish a lightweight room-dimensions-missing indicator (NOT a rating) so
+  // the sidebar can show "Room dimensions required" when an established
+  // project has missing or invalid saved dimensions. The integrity flag is
+  // set during hydration and cleared when the designer edits a dimension.
+  React.useEffect(() => {
+    const indicatorProjectId = resolvedProjectId || projectIdState || null;
+    if (!indicatorProjectId) return;
+    publishRoomDimsMissingIndicator(
+      indicatorProjectId,
+      appDesignRating?.isRoomDimsMissing === true,
+    );
+    return () => {
+      clearRoomDimsMissingIndicator(indicatorProjectId);
+    };
+  }, [resolvedProjectId, projectIdState, appDesignRating?.isRoomDimsMissing]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {

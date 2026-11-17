@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ChevronRight
 } from "lucide-react";
+import { readRoomDimsMissingIndicator } from "@/components/state/designReviewHandoff";
 
 import ApiBadge from "@/components/ui/ApiBadge";
 import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
@@ -103,6 +104,7 @@ export default function Layout({ children, currentPageName }) {
   const [asdrUnavailable, setAsdrUnavailable] = React.useState(false);
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
   const [staleScope, setStaleScope] = React.useState(false);
+  const [roomDimsMissing, setRoomDimsMissing] = React.useState(false);
 
   // Only the Workspace navigation links are collapsible (the rest of the sidebar
   // keeps its full width and content). The mobile overlay drawer is separate.
@@ -211,6 +213,7 @@ export default function Layout({ children, currentPageName }) {
       }
       setBassPending(readBassPendingIndicator(activeProjectId));
       setP14TargetUnselected(readP14TargetUnselectedIndicator(activeProjectId));
+      setRoomDimsMissing(readRoomDimsMissingIndicator(activeProjectId));
       const unavailable = readAsdrUnavailableIndicator(activeProjectId);
       setAsdrUnavailable(unavailable);
       if (unavailable) {
@@ -594,6 +597,7 @@ export default function Layout({ children, currentPageName }) {
                   asdrUnavailable={asdrUnavailable}
                   p14TargetUnselected={p14TargetUnselected}
                   staleScope={staleScope}
+                  roomDimsMissing={roomDimsMissing}
                 />
               </div>
             )}

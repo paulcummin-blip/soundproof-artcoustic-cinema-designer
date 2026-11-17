@@ -182,6 +182,39 @@ export function clearAsdrUnavailableIndicator(projectId) {
   }
 }
 
+const ROOM_DIMS_MISSING_KEY = "__ROOM_DESIGNER_ROOM_DIMS_MISSING__";
+
+/**
+ * Lightweight room-dimensions-missing indicator (NOT a rating). Published to
+ * a separate window property so the sidebar can show "Room dimensions
+ * required" when an established project has missing or invalid saved
+ * dimensions, without publishing any rating to __ROOM_DESIGNER_ASDR__.
+ */
+export function publishRoomDimsMissingIndicator(projectId, missing) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  window[ROOM_DIMS_MISSING_KEY] = { projectId: pid, missing: missing === true, ts: Date.now() };
+}
+
+export function readRoomDimsMissingIndicator(projectId) {
+  if (typeof window === "undefined") return false;
+  const pid = normaliseProjectId(projectId);
+  const indicator = window[ROOM_DIMS_MISSING_KEY];
+  if (!indicator || normaliseProjectId(indicator.projectId) !== pid) return false;
+  return indicator.missing === true;
+}
+
+export function clearRoomDimsMissingIndicator(projectId) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  if (!pid) return;
+  const indicator = window[ROOM_DIMS_MISSING_KEY];
+  if (indicator && normaliseProjectId(indicator.projectId) === pid) {
+    window[ROOM_DIMS_MISSING_KEY] = { projectId: pid, missing: false, ts: Date.now() };
+  }
+}
+
 // ── Version-scoped engineering publication ───────────────────────────────
 
 /**

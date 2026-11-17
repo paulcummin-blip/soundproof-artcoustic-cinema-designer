@@ -169,6 +169,7 @@ export default function DesignRatingSummary({
   asdrUnavailable = false,
   p14TargetUnselected = false,
   staleScope = false,
+  roomDimsMissing = false,
 }) {
   // Completion state for the four Design Rating sections, read from the ONE
   // canonical engineering completeness authority — the same terminal contract
@@ -202,6 +203,7 @@ export default function DesignRatingSummary({
   );
 
   if (asdrUnavailable) return unavailableCard('Incomplete Design');
+  if (roomDimsMissing) return unavailableCard('Room dimensions required');
   if (p14TargetUnselected && !engineeringSummary) return unavailableCard('Incomplete Design');
 
   // Bass pending (calculating or stale): the published engineering summary

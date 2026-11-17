@@ -1,11 +1,12 @@
 import React from "react";
-import { RotateCw } from "lucide-react";
+import { RotateCw, AlertTriangle } from "lucide-react";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/components/AppStateProvider";
 import PlanDisplayToggle from "@/components/room/PlanDisplayToggle";
 import { useRotateRoom } from "@/components/room/useRotateRoom";
 import RotateRoomConfirmDialog from "@/components/room/RotateRoomConfirmDialog";
+import { roomDimsIntegrityMessage, roomDimsIntegrityBlocksCalculation } from "@/components/utils/roomDimensionsIntegrity";
 
 const roundToCm = (num) => {
   if (!Number.isFinite(num)) return null;
@@ -32,9 +33,11 @@ const formatDimension = (value) => {
 };
 
 export default function RoomDimensions({ disabled, speakerPositionsView, onSpeakerPositionsViewChange, speakerPositionsDisabled = false }) {
-  const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM, overlays, setOverlays } = useAppState();
+  const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM, overlays, setOverlays, roomDimsIntegrity } = useAppState();
   const rotateRoom = useRotateRoom();
   const [rotateConfirmOpen, setRotateConfirmOpen] = React.useState(false);
+  const integrityMessage = roomDimsIntegrityMessage(roomDimsIntegrity);
+  const dimsBlocked = roomDimsIntegrityBlocksCalculation(roomDimsIntegrity);
 
   const [draftDims, setDraftDims] = React.useState(() => ({
     width: formatDimension(roomDims?.widthM),
@@ -143,6 +146,36 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
 
   return (
     <div className="space-y-5">
+      {/* Room dimensions integrity warning — shown when an established project
+          has missing or invalid stored dimensions. Defaults must not be
+          presented as confirmed saved geometry. */}
+      {dimsBlocked && integrityMessage && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            gap: 8,
+            alignItems: 'flex-start',
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: '1px solid #E5A85A',
+            background: '#FBF3E5',
+            color: '#7A4F1A',
+            fontSize: 12,
+            lineHeight: 1.4,
+          }}
+        >
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#B8761E' }} />
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>Room dimensions required</div>
+            <div>{integrityMessage}</div>
+            <div style={{ marginTop: 4, fontWeight: 500 }}>
+              Enter the correct dimensions below and save to enable RP22 calculations.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Room Size group — three compact equal-width columns */}
       <div>
         <div style={groupTitleStyle}>Room Size</div>

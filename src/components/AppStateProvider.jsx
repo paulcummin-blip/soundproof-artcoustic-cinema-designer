@@ -19,6 +19,7 @@ import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionStat
 import { applyManualOverrideToScreen } from "@/components/models/screen/resolveEffectiveScreen";
 import { sameCentreCabinetAim } from "@/components/utils/dualCentrePairAuthority";
 import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
+import { resolveRoomDimsIntegrity, ROOM_DIMS_INTEGRITY } from "@/components/utils/roomDimensionsIntegrity";
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
@@ -304,6 +305,20 @@ function useDesignerState() {
   // the old centreline for projector/sub recentering heuristics.
   const roomDimsRef = useRef(roomDims);
   useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
+
+  // Room dimensions integrity — tracks whether valid dimensions were actually
+  // loaded from the saved Project record vs. silently substituted defaults.
+  // Set during hydration; cleared when the designer edits a dimension so the
+  // new value can drive RP22 calculation and the next save persists it.
+  const [roomDimsIntegrity, _setRoomDimsIntegrity] = useState(
+    () => ({ status: ROOM_DIMS_INTEGRITY.VALID, missingFields: [] })
+  );
+  const setRoomDimsIntegrity = useCallback((value) => {
+    _setRoomDimsIntegrity(value || { status: ROOM_DIMS_INTEGRITY.VALID, missingFields: [] });
+  }, []);
+  const clearRoomDimsIntegrity = useCallback(() => {
+    _setRoomDimsIntegrity({ status: ROOM_DIMS_INTEGRITY.VALID, missingFields: [] });
+  }, []);
 
   const [dimensions, setDimensions] = useState({}); 
 
@@ -646,8 +661,9 @@ function useDesignerState() {
     if (Math.abs((prev?.widthM ?? 0) - newVal) < 0.001) return;
     prevRoomDimsRef.current = { ...prev };
     setRoomDims(d => ({ ...d, widthM: newVal }));
+    clearRoomDimsIntegrity();
     markLayoutRefreshPending();
-  }, [markLayoutRefreshPending]);
+  }, [markLayoutRefreshPending, clearRoomDimsIntegrity]);
 
   const setRoomLengthM = useCallback((v) => {
     const newVal = Number(v);
@@ -656,8 +672,9 @@ function useDesignerState() {
     if (Math.abs((prev?.lengthM ?? 0) - newVal) < 0.001) return;
     prevRoomDimsRef.current = { ...prev };
     setRoomDims(d => ({ ...d, lengthM: newVal }));
+    clearRoomDimsIntegrity();
     markLayoutRefreshPending();
-  }, [markLayoutRefreshPending]);
+  }, [markLayoutRefreshPending, clearRoomDimsIntegrity]);
 
   const setRoomHeightM = useCallback((v) => {
     const newVal = Number(v);
@@ -666,8 +683,9 @@ function useDesignerState() {
     if (Math.abs((prev?.heightM ?? 0) - newVal) < 0.001) return;
     prevRoomDimsRef.current = { ...prev };
     setRoomDims(d => ({ ...d, heightM: newVal }));
+    clearRoomDimsIntegrity();
     markLayoutRefreshPending();
-  }, [markLayoutRefreshPending]);
+  }, [markLayoutRefreshPending, clearRoomDimsIntegrity]);
 
   const [seatMetricsById, setSeatMetricsById] = useState(() => (
     (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
@@ -1851,6 +1869,9 @@ function useDesignerState() {
       length: 6.0,
       height: 2.4
     });
+    // A deliberate reset starts fresh — integrity is valid (defaults are
+    // acceptable for a new/unconfigured project).
+    clearRoomDimsIntegrity();
 
     // Screen
     setScreen({
@@ -2118,8 +2139,9 @@ function useDesignerState() {
 
   const value = useMemo(() => {
     return {
-    dimensions, setDimensions, 
+    dimensions, setDimensions,
     roomDims, setRoomDims,
+    roomDimsIntegrity, setRoomDimsIntegrity,
     roomOrientation, setRoomOrientation,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
     screen, setScreen, screenHeight, setScreenHeight,
@@ -2250,8 +2272,9 @@ function useDesignerState() {
   }, [
     dimensions, setDimensions,
     roomDims, setRoomDims,
+    roomDimsIntegrity, setRoomDimsIntegrity,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
-    screen, setScreen, 
+    screen, setScreen,
     screenHeight, setScreenHeight,
     screenWall, setScreenWall, dolbyConfig, setDolbyConfig, 
     dolbyLayout, setDolbyLayout,
