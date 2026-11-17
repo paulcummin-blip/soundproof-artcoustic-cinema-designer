@@ -129,6 +129,8 @@ export default function RoomDesignerHeader({
             projectId={effectiveProjectId}
             versionId={reportVersionId}
             projectName={projectCadProjectName}
+            clientName={identity?.clientName || null}
+            projectReference={identity?.projectReference || null}
             versionName={projectCadVersionName}
             engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
             workflowStatus={workflowStatus}

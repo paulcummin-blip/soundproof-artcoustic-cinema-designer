@@ -28,7 +28,7 @@ import { composeSpeakerDesignPages } from '@/components/report/speakerDesign/spe
  * The schedule's document token. It is the SAME shared report filename authority
  * the Project Report names itself with, so the schedule and the report it
  * accompanies are written in one format:
- *   Sound Proof Speaker Design - <Project Name> - <Version Name>
+ *   Sound Proof Speaker Design - <Project Name> - <Client Name> - <Project Reference> - <Version Name>
  */
 export const SPEAKER_DESIGN_PDF_TYPE = REPORT_PDF_TYPE.SPEAKER_DESIGN;
 
@@ -51,12 +51,12 @@ export const SPEAKER_DESIGN_EXPORT_MESSAGES = Object.freeze({
  * type token, so the schedule states the same project identity as the Project
  * Report it accompanies:
  *
- *   Sound Proof Speaker Design - <Project Name> - <Version Name>
+ *   Sound Proof Speaker Design - <Project Name> - <Client Name> - <Project Reference> - <Version Name>
  *
- * The dealer, client name and project reference are passed for export logging
- * only: a filename states the document, the project and the design version, and
- * nothing else. Only segments that hold a value are written, and every segment
- * is sanitised by that one authority.
+ * Only segments that hold a value are written (empty optional segments are
+ * omitted, and a segment identical to the one before it is written once), and
+ * every segment is sanitised by that one authority. The dealer name is used for
+ * export logging only and is never written into the name.
  *
  * @returns {string}
  */

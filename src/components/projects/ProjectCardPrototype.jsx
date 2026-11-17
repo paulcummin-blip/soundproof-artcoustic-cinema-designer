@@ -516,7 +516,7 @@ export default function ProjectCardPrototype({
 
         {/* Project Assets — available for all projects, populated from existing
             stored records without migration or regeneration. */}
-        <ProjectAssetsSection projectId={p.id} projectName={p.name} compact />
+        <ProjectAssetsSection projectId={p.id} projectName={p.name} compact project={p} />
       </div>
     </div>
   );

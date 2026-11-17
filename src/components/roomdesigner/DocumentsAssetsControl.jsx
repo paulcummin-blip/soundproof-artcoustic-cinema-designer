@@ -63,6 +63,8 @@ export default function DocumentsAssetsControl({
   projectId,
   versionId,
   projectName,
+  clientName = null,
+  projectReference = null,
   versionName,
   engineeringFingerprint,
   workflowStatus,
@@ -111,6 +113,7 @@ export default function DocumentsAssetsControl({
               projectName={projectName}
               compact
               alwaysLoad
+              project={{ name: projectName, client_name: clientName, project_reference: projectReference }}
             />
           </div>
         )}

@@ -21,6 +21,7 @@
  */
 import JSZip from 'jszip';
 import { base44 } from '@/api/base44Client';
+import { standardFilenameForExportRecord } from './standardAssetFilename';
 
 const MANIFEST_FILENAME = 'MANIFEST.txt';
 
@@ -59,7 +60,7 @@ async function fetchBlob(url) {
  * @param {Array}  params.versions — ProjectVersion records
  * @returns {Promise<{ok: boolean, skipped: Array, downloaded: number}>}
  */
-export async function downloadProjectAssetsZip({ projectName, exports = [], images = [], versions = [] }) {
+export async function downloadProjectAssetsZip({ projectName, exports = [], images = [], versions = [], project = null } = {}) {
   const zip = new JSZip();
   const rootName = sanitizeName(projectName);
   const root = zip.folder(rootName);
@@ -110,7 +111,7 @@ export async function downloadProjectAssetsZip({ projectName, exports = [], imag
     const folder = versionName
       ? root.folder(sanitizeName(versionName))
       : root.folder('Project-wide');
-    await addFile(folder, record?.filename || `${record?.document_type || 'document'}.pdf`, url);
+    await addFile(folder, standardFilenameForExportRecord(record, project, versionNameById), url);
   }
 
   // Uploaded images grouped by scope (project or version)

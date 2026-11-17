@@ -7,20 +7,21 @@
  * their own filenames.
  *
  * Required format:
- *   Sound Proof <Document Type> - <Project Name> - <Version>
+ *   Sound Proof <Document Type> - <Project Name> - <Client Name> - <Project Reference> - <Version>
  *
  * Examples:
- *   Sound Proof Speaker Design - Barton Solutions - Original Design
- *   Sound Proof Project Report - Barton Solutions - Original Design
- *   Sound Proof Proposal - Barton Solutions - Original Design
+ *   Sound Proof Speaker Design - Barton Solutions - Lords Hall - AC-2026-014 - Original Design
+ *   Sound Proof Technical Report - Barton Solutions - Lords Hall - AC-2026-014 - Original Design
+ *   Sound Proof Client Proposal - Barton Solutions - Lords Hall - AC-2026-014 - Original Design
  *
- * A filename states the document and the design it documents, and nothing else:
- * the project name and the design version are enough to identify the file. The
- * dealer/account name, the client name and the project reference are deliberately
- * NOT part of it, the product name ("Artcoustic Cinema Designer") is never
- * written, and the document type is stated once — a name never repeats
- * "Sound Proof" or the document type. Callers still pass `details`; the identity
- * those fields carry is used for export logging, never for the name.
+ * A filename states the document and the design it documents. The project name,
+ * client name, project reference and design version identify the file; the
+ * dealer/account name is NOT part of it, the product name ("Artcoustic Cinema
+ * Designer") is never written, and the document type is stated once — a name
+ * never repeats "Sound Proof" or the document type. Empty optional segments are
+ * omitted rather than showing empty hyphens, and a segment identical to the one
+ * before it is written once. Callers still pass `details`; the identity those
+ * fields carry beyond the named segments is used for export logging.
  *
  * The design version is ALWAYS stated when a version is supplied: a project can
  * hold several versions and Proposal Centre compares them, so an exported report
@@ -66,8 +67,8 @@ export const REPORT_PDF_TYPE = Object.freeze({
   /** The Current Speaker Design schedule exported beside the Project Report. */
   SPEAKER_DESIGN: "Speaker Design",
   VISUAL: "Visual",
-  TECHNICAL: "Technical",
-  PROPOSAL: "Proposal",
+  TECHNICAL: "Technical Report",
+  PROPOSAL: "Client Proposal",
   SYSTEM_DESIGN_SUMMARY: "System Design Summary",
   SYSTEM_DESIGN_COMPARISON: "System Design Comparison",
 });
@@ -169,6 +170,8 @@ export function buildReportFilename(reportType, projectName, version, details = 
   const segments = [type ? `${BRAND} ${type}` : BRAND];
 
   appendSegment(segments, sanitiseProjectName(projectName));
+  appendSegment(segments, details?.clientName);
+  appendSegment(segments, details?.projectReference);
   appendSegment(segments, buildVersionSegment(version));
   // A proposal document states the design versions it was built from, in place of
   // the report's own single design version. See buildProposalVersionSegment.

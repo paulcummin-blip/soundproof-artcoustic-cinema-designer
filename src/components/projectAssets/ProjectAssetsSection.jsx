@@ -23,6 +23,7 @@ import { useProjectWorkflowAssets } from './useProjectWorkflowAssets';
 import { downloadProjectAssetsZip } from './downloadProjectAssetsZip';
 import { resolveIssuedDocumentUrl } from '@/components/library/issuedDocument/issuedDocumentActions';
 import { ISSUED_DOCUMENT_LABEL, ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
+import { standardFilenameForExportRecord } from './standardAssetFilename';
 
 /** Human-friendly label for a document type, falling back to the raw value. */
 function documentTypeLabel(documentType) {
@@ -52,7 +53,7 @@ function resolveVersionId(record) {
   return null;
 }
 
-function downloadSingle(record, fallbackName) {
+function downloadSingle(record, fallbackName, downloadName) {
   return async () => {
     try {
       const url = await resolveIssuedDocumentUrl(record);
@@ -62,7 +63,7 @@ function downloadSingle(record, fallbackName) {
       const objectUrl = URL.createObjectURL(await response.blob());
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = record?.filename || fallbackName || 'document.pdf';
+      anchor.download = downloadName || record?.filename || fallbackName || 'document.pdf';
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -113,7 +114,7 @@ function AssetRow({ icon: Icon, name, sub, onDownload }) {
   );
 }
 
-export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false }) {
+export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false, project = null }) {
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [requested, setRequested] = useState(false);
@@ -164,7 +165,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     if (zipping || totalAssets === 0) return;
     setZipping(true);
     try {
-      await downloadProjectAssetsZip({ projectName, exports, images, versions });
+      await downloadProjectAssetsZip({ projectName, exports, images, versions, project });
     } catch (err) {
       console.error('[ProjectAssetsSection] ZIP failed:', err);
       alert('Could not build the asset ZIP. Please try again.');
@@ -236,9 +237,9 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                   <AssetRow
                     key={record.id}
                     icon={FileText}
-                    name={record.filename || record.title || 'Document'}
+                    name={standardFilenameForExportRecord(record, project, versionNameById)}
                     sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                    onDownload={downloadSingle(record, 'document.pdf')}
+                    onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
                   />
                 );
               })}
@@ -270,9 +271,9 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                     <AssetRow
                       key={record.id}
                       icon={FileText}
-                      name={record.filename || record.title || 'Document'}
+                      name={standardFilenameForExportRecord(record, project, versionNameById)}
                       sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                      onDownload={downloadSingle(record, 'document.pdf')}
+                      onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
                     />
                   );
                 })}
@@ -315,9 +316,9 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                       <AssetRow
                         key={record.id}
                         icon={FileText}
-                        name={record.filename || record.title || 'Document'}
+                        name={standardFilenameForExportRecord(record, project, versionNameById)}
                         sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                        onDownload={downloadSingle(record, 'document.pdf')}
+                        onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
                       />
                     );
                   })}
