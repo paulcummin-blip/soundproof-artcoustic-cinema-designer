@@ -69,6 +69,9 @@ import useFrozenReportBass from '@/components/report/useFrozenReportBass';
 import {
   subscribeIsometricReportReady,
   isometricReportReady,
+  isometricReportStatus,
+  isometricReportError,
+  requestIsometricRetry,
 } from '@/components/report/isometric/isometricReportReadinessStore';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportUpdatingNotice from "@/components/report/ReportUpdatingNotice";
@@ -153,6 +156,23 @@ export default function RP22ClientReport() {
     () => isometricReportReady(isometricReadinessKey),
     () => false,
   );
+  // Isometric capture failure: when the report-only WebGL render throws, the
+  // store carries the error so the UI can show it and offer Retry instead of
+  // spinning on "PDF not ready" forever.
+  const isometricCaptureStatus = useSyncExternalStore(
+    subscribeIsometricReportReady,
+    () => isometricReportStatus(isometricReadinessKey),
+    () => 'pending',
+  );
+  const isometricCaptureError = useSyncExternalStore(
+    subscribeIsometricReportReady,
+    () => isometricReportError(isometricReadinessKey),
+    () => null,
+  );
+  const isometricCaptureFailed = isometricCaptureStatus === 'failed';
+  const handleRetryIsometric = useCallback(() => {
+    requestIsometricRetry(isometricReadinessKey);
+  }, [isometricReadinessKey]);
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
   const appState = authority.reportApp;
@@ -1034,7 +1054,36 @@ export default function RP22ClientReport() {
             {exporting ? "Preparing Project Report…" : "Download Project Report (PDF)"}
           </Button>
         </div>
-        {reportReady && !exportIntegrity.ready && !exporting && (
+        {reportReady && isometricCaptureFailed && !exporting && (
+          <div className="client-report-screen-only" style={{
+            padding: "8px 32px",
+            fontSize: 12,
+            color: "#4A230F",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}>
+            <span>Isometric image could not be generated: {isometricCaptureError}</span>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleRetryIsometric}
+              style={{
+                fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+                backgroundColor: "#213428",
+                border: "1px solid #213428",
+                color: "#FFFFFF",
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              Retry Image
+            </Button>
+          </div>
+        )}
+        {reportReady && !exportIntegrity.ready && !exporting && !isometricCaptureFailed && (
           <div className="client-report-screen-only" style={{
             padding: "4px 32px 0",
             fontSize: 12,
