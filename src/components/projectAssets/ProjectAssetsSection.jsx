@@ -3,21 +3,54 @@
  * --------------------
  * A collapsible section listing all stored assets for one project, grouped by
  * design version. Shown on project cards (Projects page) and in the Room
- * Designer header for v2 projects.
+ * Designer header (Documents & Assets control).
  *
- * Only assets that actually exist are listed. Each asset has an individual
- * download link. A "Download All Assets" action builds a ZIP from the stored
- * files — nothing is regenerated on demand.
+ * Assets include every issued PDF type:
+ *   - Technical Report (project / technical / visual)
+ *   - Speaker Design
+ *   - Client Proposal (proposal / comparison / system_design_summary)
+ *   - Uploaded project images and design drawings
+ *
+ * Only assets that actually exist (with a file_uri or file_url) are listed.
+ * Each asset has an individual download link. A "Download All" action builds a
+ * ZIP from the stored files — nothing is regenerated on demand.
  *
  * Read-only: this section never creates, modifies or deletes any document.
  */
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Download, FileText, Image, Package, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileText, Image as ImageIcon, Package, Loader2 } from 'lucide-react';
 import { useProjectWorkflowAssets } from './useProjectWorkflowAssets';
 import { downloadProjectAssetsZip } from './downloadProjectAssetsZip';
 import { resolveIssuedDocumentUrl } from '@/components/library/issuedDocument/issuedDocumentActions';
+import { ISSUED_DOCUMENT_LABEL, ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
 
-const asItems = (page) => (Array.isArray(page) ? page : (page?.items || []));
+/** Human-friendly label for a document type, falling back to the raw value. */
+function documentTypeLabel(documentType) {
+  return ISSUED_DOCUMENT_LABEL[documentType] || documentType || 'Document';
+}
+
+/** Short date string for a revision subtitle. */
+function formatExportDate(isoString) {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Resolve the version id a document belongs to.
+ * Returns null for multi-version documents (comparisons) — those are project-wide.
+ */
+function resolveVersionId(record) {
+  if (record?.version_id) return record.version_id;
+  const selected = Array.isArray(record?.selected_version_ids) ? record.selected_version_ids : [];
+  if (selected.length === 1) return selected[0];
+  // Multi-version comparison or no version → project-wide
+  return null;
+}
 
 function downloadSingle(record, fallbackName) {
   return async () => {
@@ -91,14 +124,14 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     versionNameById.set(v?.id, name);
   }
 
-  // Group exports by version
+  // Group exports by version. Multi-version documents (comparisons with more
+  // than one selected_version_id) are project-wide — they don't belong to one
+  // exact design version.
   const exportsByVersion = new Map();
   const projectWideExports = [];
   for (const record of exports) {
     if (!record?.file_uri && !record?.file_url) continue;
-    const versionId = record?.version_id
-      || (Array.isArray(record?.selected_version_ids) && record.selected_version_ids[0])
-      || null;
+    const versionId = resolveVersionId(record);
     if (versionId) {
       if (!exportsByVersion.has(versionId)) exportsByVersion.set(versionId, []);
       exportsByVersion.get(versionId).push(record);
@@ -120,7 +153,8 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     }
   }
 
-  const totalAssets = exports.length + images.filter((i) => i?.file_url).length;
+  const totalAssets = exports.filter((e) => e?.file_uri || e?.file_url).length
+    + images.filter((i) => i?.file_url).length;
 
   const handleDownloadAll = async () => {
     if (zipping || totalAssets === 0) return;
@@ -135,7 +169,9 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
     }
   };
 
-  const labelClass = compact ? 'text-[11px] font-semibold uppercase tracking-[0.08em] text-[#625143]' : 'text-xs font-semibold uppercase tracking-[0.1em] text-[#625143]';
+  const labelClass = compact
+    ? 'text-[11px] font-semibold uppercase tracking-[0.08em] text-[#625143]'
+    : 'text-xs font-semibold uppercase tracking-[0.1em] text-[#625143]';
 
   return (
     <div className="border border-[#E2DED7] rounded-lg bg-[#FBFAF8]">
@@ -172,26 +208,29 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             </div>
           )}
           {!loading && totalAssets === 0 && (
-            <p className="py-3 text-xs text-[#8B8378]">No stored assets yet. Create documents and they will appear here.</p>
+            <p className="py-3 text-xs text-[#8B8378]">No stored assets yet. Export documents and they will appear here.</p>
           )}
 
-          {/* Project-wide assets */}
+          {/* Project-wide assets (multi-version comparisons + project-wide images) */}
           {!loading && (projectWideExports.length > 0 || projectWideImages.length > 0) && (
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A79E8C] mb-1">Project-wide</div>
-              {projectWideExports.map((record) => (
-                <AssetRow
-                  key={record.id}
-                  icon={FileText}
-                  name={record.filename || record.title || 'Document'}
-                  sub={record.document_type}
-                  onDownload={downloadSingle(record, 'document.pdf')}
-                />
-              ))}
+              {projectWideExports.map((record) => {
+                const dateStr = formatExportDate(record?.exported_at);
+                return (
+                  <AssetRow
+                    key={record.id}
+                    icon={FileText}
+                    name={record.filename || record.title || 'Document'}
+                    sub={`${documentTypeLabel(record.document_type)}${dateStr ? ' · ' + dateStr : ''}`}
+                    onDownload={downloadSingle(record, 'document.pdf')}
+                  />
+                );
+              })}
               {projectWideImages.map((record) => (
                 <AssetRow
                   key={record.id}
-                  icon={Image}
+                  icon={ImageIcon}
                   name={record.caption || record.slot || 'Image'}
                   sub="Project image"
                   onDownload={downloadImage(record.file_url, record.caption || 'image')}
@@ -210,19 +249,22 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             return (
               <div key={versionId}>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A79E8C] mb-1">{versionName}</div>
-                {versionExports.map((record) => (
-                  <AssetRow
-                    key={record.id}
-                    icon={FileText}
-                    name={record.filename || record.title || 'Document'}
-                    sub={record.document_type}
-                    onDownload={downloadSingle(record, 'document.pdf')}
-                  />
-                ))}
+                {versionExports.map((record) => {
+                  const dateStr = formatExportDate(record?.exported_at);
+                  return (
+                    <AssetRow
+                      key={record.id}
+                      icon={FileText}
+                      name={record.filename || record.title || 'Document'}
+                      sub={`${documentTypeLabel(record.document_type)}${dateStr ? ' · ' + dateStr : ''}`}
+                      onDownload={downloadSingle(record, 'document.pdf')}
+                    />
+                  );
+                })}
                 {versionImages.map((record) => (
                   <AssetRow
                     key={record.id}
-                    icon={Image}
+                    icon={ImageIcon}
                     name={record.caption || record.slot || 'Image'}
                     sub="Version image"
                     onDownload={downloadImage(record.file_url, record.caption || 'image')}
@@ -231,6 +273,52 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
               </div>
             );
           })}
+
+          {/* Assets for versions that no longer have a ProjectVersion record (deleted version) */}
+          {!loading && (() => {
+            const knownVersionIds = new Set(versions.map((v) => v.id));
+            const orphanVersionIds = new Set();
+            for (const versionId of exportsByVersion.keys()) {
+              if (!knownVersionIds.has(versionId)) orphanVersionIds.add(versionId);
+            }
+            for (const versionId of imagesByVersion.keys()) {
+              if (!knownVersionIds.has(versionId)) orphanVersionIds.add(versionId);
+            }
+            if (orphanVersionIds.size === 0) return null;
+            return Array.from(orphanVersionIds).map((versionId) => {
+              const versionExports = exportsByVersion.get(versionId) || [];
+              const versionImages = imagesByVersion.get(versionId) || [];
+              if (versionExports.length === 0 && versionImages.length === 0) return null;
+              return (
+                <div key={versionId}>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A79E8C] mb-1">
+                    Version (deleted)
+                  </div>
+                  {versionExports.map((record) => {
+                    const dateStr = formatExportDate(record?.exported_at);
+                    return (
+                      <AssetRow
+                        key={record.id}
+                        icon={FileText}
+                        name={record.filename || record.title || 'Document'}
+                        sub={`${documentTypeLabel(record.document_type)}${dateStr ? ' · ' + dateStr : ''}`}
+                        onDownload={downloadSingle(record, 'document.pdf')}
+                      />
+                    );
+                  })}
+                  {versionImages.map((record) => (
+                    <AssetRow
+                      key={record.id}
+                      icon={ImageIcon}
+                      name={record.caption || record.slot || 'Image'}
+                      sub="Version image"
+                      onDownload={downloadImage(record.file_url, record.caption || 'image')}
+                    />
+                  ))}
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
     </div>

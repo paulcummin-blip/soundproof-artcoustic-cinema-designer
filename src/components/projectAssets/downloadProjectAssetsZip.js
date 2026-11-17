@@ -102,9 +102,10 @@ export async function downloadProjectAssetsZip({ projectName, exports = [], imag
       skipped.push({ filename: record?.filename || record?.title || 'unknown', reason: 'could not sign file' });
       continue;
     }
-    const versionId = record?.version_id
-      || (Array.isArray(record?.selected_version_ids) && record.selected_version_ids[0])
-      || null;
+    // Multi-version documents (comparisons with more than one selected version)
+    // are project-wide — they don't belong to one exact design version.
+    const selected = Array.isArray(record?.selected_version_ids) ? record.selected_version_ids : [];
+    const versionId = record?.version_id || (selected.length === 1 ? selected[0] : null);
     const versionName = versionId ? (versionNameById.get(versionId) || `Version ${versionId.slice(0, 8)}`) : null;
     const folder = versionName
       ? root.folder(sanitizeName(versionName))
