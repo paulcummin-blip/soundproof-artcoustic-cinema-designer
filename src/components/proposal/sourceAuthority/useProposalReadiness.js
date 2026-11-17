@@ -90,12 +90,54 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
   }, [projectId]);
 
   // A Speaker Design generation starting or finishing changes the checklist
-  // cell from "Not generated" to "Preparing…" and back, so the readiness read
-  // re-runs the moment the shared status store moves.
+  // cell from "Not generated" to "Preparing…" and back. This is a lightweight
+  // OVERLAY on the existing rows — it does NOT re-run the full readiness read,
+  // so the Project Report cell and the gate's loading state stay stable while
+  // the Speaker Design is being prepared. A full re-read runs only when a
+  // document is actually stored (via subscribeReportSourceStored below), which
+  // is the only time the ProjectAssetExport records change. Without this
+  // separation, every begin/complete event cancelled the in-flight read and
+  // restarted it with loading=true, leaving the card stuck on "Updating
+  // project documents…" even though the Project Report was already Current.
   useEffect(() => {
     if (!projectId) return undefined;
     return subscribeSpeakerDesignGenerationStatus(() => {
-      setRefreshToken((value) => value + 1);
+      setRows((currentRows) => {
+        if (!Array.isArray(currentRows) || currentRows.length === 0) return currentRows;
+        return currentRows.map((row) => {
+          const versionId = row?.versionId || null;
+          if (!versionId) return row;
+          const preparing = isPreparingSpeakerDesign(projectId, versionId);
+          const generationError = getSpeakerDesignGenerationError(projectId, versionId);
+          const speakerDesign = row?.speakerDesign || row?.cells?.speaker_design || null;
+          if (!speakerDesign) return row;
+
+          let nextSpeakerDesign = speakerDesign;
+          if (preparing) {
+            nextSpeakerDesign = {
+              ...speakerDesign,
+              state: READINESS_STATE.CHECKING,
+              status: 'Preparing…',
+              checking: true,
+              current: false,
+              reason: null,
+              error: null,
+            };
+          } else if (generationError && !speakerDesign.current) {
+            nextSpeakerDesign = { ...speakerDesign, error: generationError };
+          } else if (!preparing && !generationError) {
+            nextSpeakerDesign = { ...speakerDesign, error: null };
+          }
+
+          return {
+            ...row,
+            speakerDesign: nextSpeakerDesign,
+            cells: { ...row.cells, speaker_design: nextSpeakerDesign },
+            speakerDesignPreparing: preparing,
+            speakerDesignError: preparing ? null : (generationError || null),
+          };
+        });
+      });
     });
   }, [projectId]);
 
