@@ -97,6 +97,7 @@ export default function DocumentWorkflowPanel({
     if (!projectId) return;
     const params = new URLSearchParams();
     params.set('create', '1');
+    params.set('projectId', projectId);
     if (versionId) params.set('versionId', versionId);
     window.location.assign(`/ProposalCentre?${params.toString()}`);
   };
