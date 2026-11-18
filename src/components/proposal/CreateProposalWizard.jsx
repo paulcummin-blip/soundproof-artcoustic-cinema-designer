@@ -596,15 +596,25 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // The latest generate, for the preparation step's automatic continuation.
   generateRef.current = handleGenerate;
 
+  const proposalIdentity = selectedProjectId ? (
+        <div className="mb-8 border-l-4 border-[#213428] pl-4" aria-label="Proposal project">
+          <div className="text-xs uppercase tracking-widest text-[#625143]">Creating proposal for</div>
+          <div className="text-lg text-[#1B1A1A]">{selectedProject?.name || 'Identifying project…'}</div>
+          {selectedProject && <div className="text-sm text-[#625143]">Client: {selectedProject.client_name || 'Not recorded'} · Reference: {selectedProject.project_reference || 'Not recorded'}</div>}
+          <div className="text-sm text-[#625143]">Version: {selectedVersionIds.map((id) => canonicalVersions.find((v) => v.id === id)?.version_name || 'Identifying version…').join(', ') || 'Not selected'}</div>
+          {restoredDraft?.projectId === selectedProjectId && <div className="text-xs text-[#625143] mt-1">Resumed proposal draft for this project.</div>}
+        </div>
+  ) : null;
+
   // ── Preparing screen — Sound Proof's own work, one line, one action ──
   if (preparing) {
-    return <ProposalPreparationPanel preparation={panelPreparation} onRetryRead={retryReadiness} />;
+    return <div>{proposalIdentity}<ProposalPreparationPanel preparation={panelPreparation} onRetryRead={retryReadiness} /></div>;
   }
 
   // ── Generating screen ──
   if (generating) {
     return (
-      <GenerateStep
+      <div>{proposalIdentity}<GenerateStep
         phase={generationPhase || GENERATION_PHASE.PREPARING}
         error={error}
         onRetry={handleGenerate}
@@ -612,7 +622,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           setGenerating(false);
           setGenerationPhase(null);
         }}
-      />
+      /></div>
     );
   }
 
@@ -719,15 +729,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         </p>
       )}
 
-      {selectedProjectId && (
-        <div className="mb-8 border-l-4 border-[#213428] pl-4" aria-label="Proposal project">
-          <div className="text-xs uppercase tracking-widest text-[#625143]">Creating proposal for</div>
-          <div className="text-lg text-[#1B1A1A]">{selectedProject?.name || 'Identifying project…'}</div>
-          {selectedProject && <div className="text-sm text-[#625143]">Client: {selectedProject.client_name || 'Not recorded'} · Reference: {selectedProject.project_reference || 'Not recorded'}</div>}
-          <div className="text-sm text-[#625143]">Version: {selectedVersionIds.map((id) => canonicalVersions.find((v) => v.id === id)?.version_name || 'Identifying version…').join(', ') || 'Not selected'}</div>
-          {restoredDraft?.projectId === selectedProjectId && <div className="text-xs text-[#625143] mt-1">Resumed proposal draft for this project.</div>}
-        </div>
-      )}
+      {proposalIdentity}
       <WizardStepper steps={STEPS} currentStep={step} />
 
       {/* Step 0 — Select Project */}
