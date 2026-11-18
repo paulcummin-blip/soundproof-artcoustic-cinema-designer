@@ -29,7 +29,7 @@ export function clientIntentCoverage(item, sections) {
       && /financial|cost|budget|invest|expenditure/i.test(t)
       && /client|customer|visitor/i.test(t) && /discuss|choice|choos|consider|consult|explain/i.test(t));
   if (!rules.length) return null;
-  const matched = rules.map(rule => ({rule, evidence: passages.find(p => rule.test(p.passage))}));
+  const matched = rules.map(rule => ({rule, evidence: passages.find(p => /\b(?:is|are|allows?|supports?|serves?|provides?|conceals?|hides?|keeps?|gives?|uses?|offers?|helps?|makes?|follows?|can|will|would|lets?|creates?|forms?|combines?|explains?)\b/i.test(p.passage) && rule.test(p.passage))}));
   return { complete: matched.every(m => m.evidence), missing: matched.filter(m => !m.evidence).map(m => m.rule.label),
     evidence: matched.filter(m => m.evidence).map(m => m.evidence) };
 }

@@ -140,7 +140,7 @@ test('the heading parser recovers writer drafts from a publication body', () => 
 });
 
 // ── Scenario 4: A broken heading structure falls back gracefully ──────────
-test('a manually edited body with broken headings falls back to the copy', () => {
+test('a manually edited body with broken headings is refused by the parser', () => {
   // The designer removed the <h2> headings from the opening section.
   const brokenBody = '<p>This opening section has no headings anymore.</p>';
   const fingerprint = sectionApprovalFingerprint({
