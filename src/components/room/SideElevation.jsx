@@ -24,6 +24,7 @@ import {
 } from "@/components/utils/dualCentreSideProjection";
 import SideViewCentreCabinets from "@/components/room/dualCentre/SideViewCentreCabinets";
 import SideViewSubwoofers from "@/components/room/sideview/SideViewSubwoofers";
+import { sideProjectionForSpeaker } from "@/components/room/sideview/sideElevationOrientationProjection";
 import AcousticCentreDim from "@/components/room/sideview/AcousticCentreDim";
 import { SURROUND_DRAG_AXES, useSideSpeakerDrag } from "@/components/room/sideview/useSideSpeakerDrag";
 import {
@@ -110,6 +111,7 @@ export default function SideElevation({
   onSeatRowDragCommit = null,
 }) {
   const roomL = Number(dimensions?.lengthM ?? dimensions?.length) || 6.0;
+  const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
   // --- Canonical resolvers: single source of truth for active speakers + projector ---
@@ -263,6 +265,7 @@ export default function SideElevation({
         model: String(s.model || ""),
         y: s.position.y,
         z: s.position.z,
+        speaker: s,
       }));
   }, [resolvedSpeakers, wall]);
 
@@ -304,11 +307,11 @@ export default function SideElevation({
         existing.roles.push(String(s.role).toUpperCase());
         existing.model = existing.model || s.model;
       } else {
-        groups.push({ z, roles: [String(s.role).toUpperCase()], model: s.model || '' });
+        groups.push({ z, roles: [String(s.role).toUpperCase()], model: s.model || '', speaker: s });
       }
     });
     return groups;
-  }, [resolvedSpeakers]);
+  }, [resolvedSpeakers, wall]);
 
   // Hatch count for floor line
   const hatchCount = Math.floor(drawW / 14) + 1;
@@ -909,13 +912,26 @@ export default function SideElevation({
           {rearWallGroups.map((grp, i) => {
             const meta = getSpeakerModelMeta(grp.model) || {};
             const spkDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.082;
+            const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
             const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
             const grpRole = grp.roles[0] || '';
             const isDraggableGrp = !!onSideSpeakerMoved && grp.roles.some(r => ['SBL','SBR'].includes(r));
             const grpDraft = liveDrag && grp.roles.includes(String(liveDrag.role || '').toUpperCase()) ? liveDrag : null;
             const effectiveGrpZ = Number.isFinite(grpDraft?.z) ? grpDraft.z : grp.z;
-            const frontX = rx(roomL - spkDepthM); // front face of speaker
-            const backX  = rx(roomL);             // rear wall
+            // Project the cabinet into the side-elevation plane using the SAME
+            // effective yaw the Plan View uses, so the drawn outline matches the
+            // rotated plan-view icon. The render centre Y is wall-derived
+            // (rearWallY), matching the Plan View — the stored position is the
+            // wall anchor, not the acoustic centre, for rear-wall speakers.
+            const grpProj = sideProjectionForSpeaker({
+              speaker: grp.speaker, mlp: mlpPoint,
+              roomWidthM: roomW, roomLengthM: roomL,
+              cabinetWidthM: spkWidthM, cabinetDepthM: spkDepthM, appState,
+            });
+            const grpCentreY = grpProj.renderCentreY;
+            const grpHalfD   = grpProj.projectedHalfDepthM;
+            const frontX = rx(grpCentreY - grpHalfD); // front face of cabinet
+            const backX  = rx(grpCentreY + grpHalfD); // rear of cabinet
             const svgW   = Math.max(3, backX - frontX);
             const svgTop  = rz(effectiveGrpZ + spkHeightM / 2);
             const svgBot  = rz(effectiveGrpZ - spkHeightM / 2);
@@ -1181,6 +1197,7 @@ export default function SideElevation({
             const meta = getSpeakerModelMeta(spk.model) || {};
             const spkHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.27;
             const spkWidthM  = Number(meta.widthM)  > 0 ? Number(meta.widthM)  : 0.18;
+            const spkDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.082;
 
             const roleUp = String(spk.role || '').toUpperCase();
             const isDraggable = !!onSideSpeakerMoved && isDraggableSideRole(roleUp);
@@ -1191,11 +1208,21 @@ export default function SideElevation({
             const draft = liveDrag && liveDrag.role === roleUp ? liveDrag : null;
             const effectiveZ = Number.isFinite(draft?.z) ? draft.z : spk.z;
             const effectiveY = Number.isFinite(draft?.y) ? draft.y : spk.y;
+            // Project the cabinet into the side-elevation plane using the SAME
+            // effective yaw the Plan View uses. The along-Y extent is the rotated
+            // cabinet's projection onto the room-depth axis; the centre Y stays
+            // at the stored position (the Plan View uses position.y for
+            // side-wall speakers), so both views show the same installation.
+            const sideProj = sideProjectionForSpeaker({
+              speaker: spk.speaker, mlp: mlpPoint,
+              roomWidthM: roomW, roomLengthM: roomL,
+              cabinetWidthM: spkWidthM, cabinetDepthM: spkDepthM, appState,
+            });
             const spkX   = rx(effectiveY);
             const svgTop = rz(effectiveZ + spkHeightM / 2);
             const svgBot = rz(effectiveZ - spkHeightM / 2);
             const svgH   = Math.max(3, svgBot - svgTop);
-            const svgW   = Math.max(3, (spkWidthM / roomL) * drawW);
+            const svgW   = Math.max(3, (sideProj.projectedDepthM / roomL) * drawW);
             const ix     = spkX - svgW / 2;
 
             const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
