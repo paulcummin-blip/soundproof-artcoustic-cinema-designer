@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
+import useProposalEntryContext from '@/components/proposal/wizard/useProposalEntryContext';
 import { hasResumableDraft } from '@/components/proposal/wizard/proposalWizardDraft';
 import ProposalLibraryTab from '@/components/proposal/library/ProposalLibraryTab';
 import { Plus, ChevronLeft } from 'lucide-react';
@@ -41,6 +42,7 @@ export default function ProposalCentre() {
   // asked for continues by itself.
   const [showWizard, setShowWizard] = useState(() => searchParams.get('create') === '1' || hasResumableDraft());
   const [regenerateFrom, setRegenerateFrom] = useState(null);
+  const entryContext = useProposalEntryContext(searchParams.get('projectId'), searchParams.get('versionId')); 
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
   // A URL asking for a tab that is no longer offered is redirected to the
@@ -78,11 +80,16 @@ export default function ProposalCentre() {
             <ChevronLeft className="w-3.5 h-3.5" />
             Proposal Centre
           </button>
-          <CreateProposalWizard
+          {!regenerateFrom && entryContext.loading ? <p role="status">Identifying proposal project…</p>
+            : !regenerateFrom && entryContext.error ? <p role="alert">{entryContext.error}</p>
+            : <CreateProposalWizard
+            key={regenerateFrom?.id || `${entryContext.projectId || ''}|${entryContext.versionId || ''}`}
+            initialProjectId={entryContext.projectId || null}
+            initialVersionId={entryContext.versionId || null}
             onCreated={handleCreated}
             onCancel={() => { setShowWizard(false); setRegenerateFrom(null); }}
             regenerateFrom={regenerateFrom}
-          />
+          />}
         </div>
       </div>
     );
