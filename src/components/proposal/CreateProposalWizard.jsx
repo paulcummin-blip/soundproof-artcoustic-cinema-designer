@@ -52,7 +52,7 @@ const STEPS = [
  * The wizard is project-agnostic. The Proposal Editor becomes a
  * publishing tool that loads by proposal ID, not by active project.
  */
-export default function CreateProposalWizard({ onCreated, onCancel, regenerateFrom = null }) {
+export default function CreateProposalWizard({ onCreated, onCancel, regenerateFrom = null, initialProjectId = null, initialVersionId = null }) {
   const { user } = useAuth();
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
@@ -65,21 +65,32 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // A proposal the designer stepped away from — to record an assessment, or to
   // bring a Project Report up to date — comes back exactly as they left it, and a
   // Generate they had already asked for continues on its own when it can.
-  const [restoredDraft] = useState(() => (regenerateFrom ? null : readWizardDraft()));
-  const [step, setStep] = useState(regenerateFrom ? 2 : (restoredDraft?.step ?? 0));
-  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || restoredDraft?.projectId || null);
-  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || restoredDraft?.proposalType || null);
+  const [restoredDraft] = useState(() => (regenerateFrom ? null : readWizardDraft({ projectId: initialProjectId, versionId: initialVersionId })));
+  const [step, setStep] = useState(regenerateFrom ? 2 : (restoredDraft?.step ?? (initialVersionId ? 2 : 0)));
+  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || restoredDraft?.projectId || initialProjectId || null);
+  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || restoredDraft?.proposalType || (initialVersionId ? 'system_summary' : null));
   const [selectedVersionIds, setSelectedVersionIds] = useState(() => {
     if (!regenerateFrom) {
       return Array.isArray(restoredDraft?.selectedVersionIds)
         ? restoredDraft.selectedVersionIds.filter(Boolean)
-        : [];
+        : (initialVersionId ? [initialVersionId] : []);
     }
     const selected = Array.isArray(regenerateFrom.selected_version_ids)
       ? regenerateFrom.selected_version_ids.filter(Boolean)
       : [];
     return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
   });
+  const [projectIdentity, setProjectIdentity] = useState(null);
+  const selectedProject = projectIdentity?.id === selectedProjectId ? projectIdentity : null;
+  useEffect(() => {
+    let cancelled = false;
+    setProjectIdentity(null);
+    if (selectedProjectId) base44.entities.Project.filter({ id: selectedProjectId }).then((page) => {
+      const rows = Array.isArray(page) ? page : (page?.items || []);
+      if (!cancelled) setProjectIdentity(rows.find((row) => row.id === selectedProjectId) || null);
+    }).catch(() => { if (!cancelled) setProjectIdentity(null); });
+    return () => { cancelled = true; };
+  }, [selectedProjectId]);
   const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || restoredDraft?.clientBrief || '');
   // ── ADI clarifications ──
   // The questions ADI asks about a design decision the evidence records no reason
@@ -306,10 +317,17 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   });
 
   const handleSelectProject = useCallback((projectId) => {
+    if (projectId === selectedProjectId) return;
+    markGenerationStarted();
     setSelectedProjectId(projectId);
     setSelectedVersionIds([]);
+    setClientBrief('');
+    setClarificationAnswers({});
+    setClarifications([]);
+    setExplainedQuestions([]);
+    setError(null);
     creationRequestIdRef.current = null;
-  }, []);
+  }, [selectedProjectId, markGenerationStarted]);
 
   const handleSelectType = useCallback((type) => {
     setProposalType(type);
@@ -319,6 +337,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   const handleSelectVersions = useCallback((versionIds) => {
     setSelectedVersionIds(versionIds);
+    setClarificationAnswers({});
+    setClarifications([]);
+    setExplainedQuestions([]);
     creationRequestIdRef.current = null;
   }, []);
 
@@ -465,6 +486,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
+    if (!selectedProject) { setError('The proposal project could not be identified. Return to the Project step and select it again.'); return; }
     const briefCheck = validateSteeringBrief(clientBrief);
     if (!briefCheck.valid) { setError(briefCheck.reason); return; }
     // Source authority: no current Project Report, no proposal. ONE authority
@@ -622,6 +644,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // a condition that is not actually blocking.
   const generateBlockReason = (() => {
     if (!canProceed[0]) return 'Choose a project to generate a proposal for.';
+    if (!selectedProject) return 'Identifying the proposal project. If this does not complete, return to the Project step and select it again.';
     if (!canProceed[1]) return 'Choose the report type to generate.';
     if (!canProceed[2]) {
       const minimum = selectedType?.minVersions || 1;
@@ -657,10 +680,14 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // What the clarifications step collected, in the review list's own words. A
   // passed question is shown as passed: it is never counted as an answer.
   const clarificationSummary = (() => {
-    const answered = clarificationPayload.filter((entry) => entry.status === 'answered').length;
+    const answered = clarificationPayload.filter((entry) => entry.status === 'answered' && !['learned_design_knowledge', 'carried_from_previous_proposal'].includes(entry.source)).length;
+    const understood = clarificationPayload.filter((entry) => entry.status === 'answered' && entry.source === 'learned_design_knowledge').length;
+    const carried = clarificationPayload.filter((entry) => entry.status === 'answered' && entry.source === 'carried_from_previous_proposal').length;
     const passed = clarificationPayload.filter((entry) => entry.status === 'passed').length;
     const parts = [
-      answered > 0 ? `${answered} answered` : null,
+      `${answered} answered by you`,
+      understood > 0 ? `${understood} from ADI understanding` : null,
+      carried > 0 ? `${carried} carried from the previous proposal` : null,
       passed > 0 ? `${passed} passed` : null,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : 'None';
@@ -692,6 +719,15 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         </p>
       )}
 
+      {selectedProjectId && (
+        <div className="mb-8 border-l-4 border-[#213428] pl-4" aria-label="Proposal project">
+          <div className="text-xs uppercase tracking-widest text-[#625143]">Creating proposal for</div>
+          <div className="text-lg text-[#1B1A1A]">{selectedProject?.name || 'Identifying project…'}</div>
+          {selectedProject && <div className="text-sm text-[#625143]">Client: {selectedProject.client_name || 'Not recorded'} · Reference: {selectedProject.project_reference || 'Not recorded'}</div>}
+          <div className="text-sm text-[#625143]">Version: {selectedVersionIds.map((id) => canonicalVersions.find((v) => v.id === id)?.version_name || 'Identifying version…').join(', ') || 'Not selected'}</div>
+          {restoredDraft?.projectId === selectedProjectId && <div className="text-xs text-[#625143] mt-1">Resumed proposal draft for this project.</div>}
+        </div>
+      )}
       <WizardStepper steps={STEPS} currentStep={step} />
 
       {/* Step 0 — Select Project */}
@@ -777,7 +813,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
             speakerDesignErrors={speakerDesignErrors}
           />
           <div className="mb-10">
-            <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
+            <ReviewRow label="Project" value={selectedProject?.name || 'Identifying project…'} />
+            <ReviewRow label="Client" value={selectedProject?.client_name || 'Not recorded'} />
+            <ReviewRow label="Reference" value={selectedProject?.project_reference || 'Not recorded'} />
             <ReviewRow
               label="Report Type"
               value={typeDef?.label || '—'}
@@ -891,7 +929,7 @@ function ReviewRow({ label, value, last }) {
     <div className={`flex items-center justify-between py-3 ${last ? '' : 'border-b border-[#E5E1D8]'}`}>
       <span className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]">{label}</span>
       <span
-        className="text-sm text-[#1B1A1A] capitalize"
+        className="text-sm text-[#1B1A1A] text-right"
         style={{ fontFamily: 'Didact Gothic, sans-serif' }}
       >
         {value}
