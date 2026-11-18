@@ -268,13 +268,17 @@ export async function attemptRecoveryRetry({
   let newDispatched = false;
   let dispatchRequestId = null;
   let dispatchFingerprint = null;
-  // Capture the publication job identity BEFORE dispatch. After the wait, a
-  // CHANGED currentJobFingerprint proves a new publication landed — even when a
-  // fast cached result started AND finished between polls (calculationInProgress
+  // Capture the publication receipt identity BEFORE dispatch. The contract's
+  // job.calculationId is the per-calculation manual request identity (unique per
+  // publication, even when the fingerprint is identical for a same-design
+  // re-calculation); fall back to currentJobFingerprint when absent. After the
+  // wait, a CHANGED receipt proves a new publication landed — even when a fast
+  // cached result started AND finished between polls (calculationInProgress
   // never observed true). An UNCHANGED pre-dispatch authority is never accepted.
-  let preDispatchJobFingerprint = null;
+  const publicationReceiptOf = (s) => s?.completedBassAuthority?.contract?.job?.calculationId
+    || s?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
+  let preDispatchPublicationReceipt = publicationReceiptOf(initial);
   if (!calcInProgressAtEntry) {
-    preDispatchJobFingerprint = initial?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
     const dispatch = initial.onCalculate();
     if (dispatch && dispatch.action === "blocked") {
       return {
@@ -301,8 +305,6 @@ export async function attemptRecoveryRetry({
         originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
-  } else {
-    preDispatchJobFingerprint = initial?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
   }
 
   const start = Date.now();
@@ -380,13 +382,12 @@ export async function attemptRecoveryRetry({
     const inProgress = state?.calculationInProgress === true;
     if (inProgress) newRequestObserved = true;
 
-    // Job changed: the publication job's currentJobFingerprint advanced from
-    // the pre-dispatch value, proving a new publication landed — EVEN when a
-    // fast cached result started and finished between polls and
-    // calculationInProgress was never observed true. An UNCHANGED pre-dispatch
-    // authority is never accepted.
-    const jobFp = state?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
-    const jobChanged = jobFp !== preDispatchJobFingerprint;
+    // Job changed: the publication receipt (calculationId, falling back to
+    // currentJobFingerprint) advanced from the pre-dispatch value, proving a new
+    // publication landed — EVEN when a fast cached result started and finished
+    // between polls and calculationInProgress was never observed true. An
+    // UNCHANGED pre-dispatch authority is never accepted.
+    const jobChanged = publicationReceiptOf(state) !== preDispatchPublicationReceipt;
 
     // Once the request has settled (!inProgress) and the publication job
     // advanced, classify the outcome. This covers both the observed-running

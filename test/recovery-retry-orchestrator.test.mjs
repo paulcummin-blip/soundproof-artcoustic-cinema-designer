@@ -23,7 +23,7 @@ import {
 // isStructurallyCompleteBassContract (version + metricSchemaVersion +
 // selectedCandidate/Id + matching fingerprints). The recovery orchestrator now
 // imports that validator, so every authoritative fixture must be complete.
-function buildContract(cacheKey, { status = "complete" } = {}) {
+function buildContract(cacheKey, { status = "complete", calculationId = "calc-" + cacheKey } = {}) {
   return {
     version: BASS_ANALYSIS_CONTRACT_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
@@ -32,6 +32,7 @@ function buildContract(cacheKey, { status = "complete" } = {}) {
     job: {
       status,
       metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
+      calculationId,
       resultFingerprint: cacheKey,
       currentJobFingerprint: cacheKey,
     },
@@ -79,8 +80,8 @@ function makeOwner({
     calculationOutcome: initialInProgress ? "preparing" : initialOutcome,
     terminalMessage: initialInProgress ? null : initialTerminalMessage,
     completedBassAuthority: initialAuthoritative
-      ? buildAuthority(cacheKey)
-      : { authorityStatus: "UPDATING", contract: { job: { status: "updating", currentJobFingerprint: null } } },
+      ? buildAuthority(cacheKey, { calculationId: "calc-initial" })
+      : { authorityStatus: "UPDATING", contract: { job: { status: "updating", currentJobFingerprint: null, calculationId: null } } },
   };
   const sharedRef = { current: state };
   let seq = 0;
@@ -105,7 +106,7 @@ function makeOwner({
         if (newOutcome === "success") {
           state.calculationOutcome = "success";
           state.terminalMessage = null;
-          state.completedBassAuthority = buildAuthority(state.cacheKey);
+          state.completedBassAuthority = buildAuthority(state.cacheKey, { calculationId: `calc-new-${seq}` });
         } else {
           state.calculationOutcome = newOutcome;
           state.terminalMessage = `New calculation ${newOutcome}: simulated failure`;
