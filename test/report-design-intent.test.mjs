@@ -141,11 +141,11 @@ describe('the Design Intent brief', () => {
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/NEVER REPEAT THE SUMMARY ABOVE THIS BLOCK/);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/only where it helps explain why the design works/i);
     // Spatial resolution, timbre and dynamic range are made specific.
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/name the loudspeaker layers and channels THIS design actually has/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/name a layer, channel or product only where needed to explain a distinctive relationship/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/close tonal consistency/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/excellent tonal consistency/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/only where the authoritative evidence supports it/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/the whole system's capability/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/published capability of each relevant layer at its assessed position/i);
     // The bass is stated from the published extension, and no gain is invented.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/predicted low-frequency response/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never invent room gain/i);
