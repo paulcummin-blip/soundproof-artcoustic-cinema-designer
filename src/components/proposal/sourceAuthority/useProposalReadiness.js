@@ -171,32 +171,42 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
     setLoading(true);
     setError(null);
 
+    const traceRead = (operation, promise) => {
+      console.info('[Proposal readiness trace]', operation, 'started');
+      return Promise.resolve(promise).then(value => {
+        console.info('[Proposal readiness trace]', operation, 'resolved');
+        return value;
+      }, error => {
+        console.info('[Proposal readiness trace]', operation, 'failed', error?.message);
+        throw error;
+      });
+    };
     (async () => {
       try {
         const [projectRecords, versionRecords, snapshotPage, durableReads, cacheRecords, speakerDesignPage] = await Promise.all([
           // The project's own active-version pointer is the first authority the
           // shared canonical selection rule reads.
-          base44.entities.Project.filter({ id: projectId }),
-          base44.entities.ProjectVersion.filter({ project_id: projectId }),
-          base44.entities.ReportSnapshot.filter(
+          traceRead('Project', base44.entities.Project.filter({ id: projectId })),
+          traceRead('ProjectVersion', base44.entities.ProjectVersion.filter({ project_id: projectId })),
+          traceRead('ReportSnapshot', base44.entities.ReportSnapshot.filter(
             { project_id: projectId, version_id: { $in: ids } },
             { sort: '-generated_at', limit: 200 },
-          ),
+          )),
           // The durable published-engineering read, one per selected version,
           // shared with every other consumer of the authority (session-cached).
-          Promise.all(ids.map((versionId) => fetchDurablePublication(projectId, versionId))),
+          Promise.all(ids.map((versionId) => traceRead('Published engineering ' + versionId, fetchDurablePublication(projectId, versionId)))),
           // The version's completed calculation authority — the calculated
           // engineering result a Technical Report is generated from. Read
           // through the same session-cached project read the report path uses.
-          Promise.all(ids.map((versionId) => readProjectAnalysisCacheRecord(projectId, versionId))),
+          Promise.all(ids.map((versionId) => traceRead('Calculation cache ' + versionId, readProjectAnalysisCacheRecord(projectId, versionId)))),
           // The version's stored Speaker Design PDF — the equipment checklist the
           // Project Report export already writes to Project Library beside the
           // report. Read from the records that exist: no second store is created
           // and reading exports nothing.
-          base44.entities.ProjectAssetExport.filter(
+          traceRead('Speaker Design export', base44.entities.ProjectAssetExport.filter(
             { project_id: projectId, document_type: 'speaker_design', version_id: { $in: ids } },
             { sort: '-exported_at', limit: 200 },
-          ),
+          )),
         ]);
         if (cancelled) return;
 
@@ -258,9 +268,9 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         const readFrozenPublication = (versionId, fingerprint) => {
           const key = `${versionId}::${fingerprint}`;
           if (!frozenPublicationReads.has(key)) {
-            frozenPublicationReads.set(key, fetchDurablePublication(projectId, versionId, {
+            frozenPublicationReads.set(key, traceRead('Frozen publication ' + fingerprint, fetchDurablePublication(projectId, versionId, {
               engineeringFingerprint: fingerprint,
-            }));
+            })));
           }
           return frozenPublicationReads.get(key);
         };
