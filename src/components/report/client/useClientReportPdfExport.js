@@ -85,8 +85,8 @@ export function useClientReportPdfExport({
   dealerName = null,
   clientName = null,
   projectReference = null,
-  // When supplied, an issued copy of the exported PDF is stored in the project
-  // library in the background. The export itself is unchanged.
+  // The issued PDF must be stored and registered before the print/download
+  // workflow proceeds. A browser download alone is not document creation.
   issuedDocument = null,
   // The version's Current Speaker Design, when this report carries one. Exporting
   // the report exports the schedule with it, against the SAME version, so the
@@ -144,7 +144,7 @@ export function useClientReportPdfExport({
   }, [cleanup]);
 
   const handleExport = useCallback(async () => {
-    if (exporting || printingRef.current) return;
+    if (exporting || printingRef.current || publication.status === 'storing') return;
     if (activePageCount === 0) return;
 
     const title = buildProjectReportTitle(
@@ -203,29 +203,36 @@ export function useClientReportPdfExport({
     lastExportRef.current = { reportIdentity, reportSnapshot, speakerDesignParams };
     setPublication({ status: "storing", failed: [] });
 
-    // Fire both storages in parallel. The print below runs alongside them; the
-    // publication promise is awaited after the print so the designer is never
-    // blocked, but the publication is only complete once both documents land.
+    // Store both documents before opening the print dialog. The shell was opened
+    // synchronously above to retain the user's gesture, but a browser download
+    // must never get ahead of durable creation and asset registration.
     const publicationPromise = storeProjectReportPublication({
       reportIdentity,
       reportSnapshot,
       speakerDesignParams,
       projectId: issuedDocument?.projectId || null,
-      versionId: null,
-    }).catch(() => ({ stored: [], failed: [], complete: false }));
+      versionId: issuedDocument?.versionId || null,
+    }).catch((error) => ({
+      stored: [],
+      failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: error?.message || 'The Technical Report could not be stored.' }],
+      complete: false,
+    }));
 
-    // The publication state follows the storage outcome: both documents must
-    // land before it reads complete. The print runs alongside the storage and
-    // is never blocked by it.
-    publicationPromise.then((outcome) => {
+    const outcome = await publicationPromise;
       if (outcome.complete) {
         setPublication({ status: "complete", failed: [] });
       } else if (outcome.failed.length > 0) {
         setPublication({ status: "incomplete", failed: outcome.failed });
       } else {
-        setPublication({ status: "idle", failed: [] });
+        setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
       }
-    });
+    if (!outcome.complete) {
+      setError('Document creation is incomplete. Retry storage before downloading the report.');
+      closeReportPrintWindow(printWindowRef.current);
+      printWindowRef.current = null;
+      cleanup();
+      return;
+    }
 
     try {
       // 1. Wait for fonts
@@ -299,7 +306,7 @@ export function useClientReportPdfExport({
       printWindowRef.current = null;
       cleanup();
     }
-  }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, speakerDesignCompanion, cleanup]);
+  }, [exporting, publication.status, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, speakerDesignCompanion, cleanup]);
 
   retryExportRef.current = handleExport;
 

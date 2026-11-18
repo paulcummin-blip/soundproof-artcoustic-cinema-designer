@@ -42,7 +42,7 @@ export default function ProposalCentre() {
   // asked for continues by itself.
   const [showWizard, setShowWizard] = useState(() => searchParams.get('create') === '1' || hasResumableDraft());
   const [regenerateFrom, setRegenerateFrom] = useState(null);
-  const entryContext = useProposalEntryContext(searchParams.get('projectId'), searchParams.get('versionId')); 
+  const entryContext = useProposalEntryContext(searchParams.get('projectId'), searchParams.get('versionId'));
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
   // A URL asking for a tab that is no longer offered is redirected to the

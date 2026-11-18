@@ -153,6 +153,10 @@ export async function storeProjectReportPublication({
   projectId = null,
   versionId = null,
 } = {}) {
+  // A companion alone is never a completed Technical Report publication.
+  if (!reportIdentity?.documentType || !reportSnapshot?.nodeHtml) {
+    return { stored: [], failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report composition is missing. Reopen the report and try again.' }], complete: false };
+  }
   const tasks = [];
 
   if (reportIdentity?.documentType && reportSnapshot?.nodeHtml) {
