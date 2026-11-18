@@ -4,14 +4,16 @@ import { attemptRecoveryRetry, isAuthoritativeForFingerprint, POST_APPLY_FAILURE
 import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 
 // Structurally-complete contract (satisfies the ESTABLISHED validator the
-// orchestrator now imports).
-function completeContract(cacheKey, { currentJobFingerprint = cacheKey } = {}) {
+// orchestrator now imports). Uses the REAL production receipt: job.calculationId
+// is never populated (null), job.completedAtMs is the receipt the orchestrator
+// uses.
+function completeContract(cacheKey, { currentJobFingerprint = cacheKey, completedAtMs = 1000 } = {}) {
   return {
     version: BASS_ANALYSIS_CONTRACT_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
     selectedCandidate: { perSeatP20Results: [{ seatId: "seat-1", variationDbRaw: 3, level: "L3" }] },
     selectedCandidateId: "cand-" + cacheKey,
-    job: { status: "complete", metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, calculationId: "calc-" + cacheKey, resultFingerprint: cacheKey, currentJobFingerprint },
+    job: { status: "complete", metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, calculationId: null, completedAtMs, resultFingerprint: cacheKey, currentJobFingerprint },
   };
 }
 
