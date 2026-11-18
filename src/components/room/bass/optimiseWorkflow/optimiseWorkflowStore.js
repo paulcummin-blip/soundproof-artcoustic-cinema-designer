@@ -105,6 +105,37 @@ export function setCancelled(projectId, versionId) {
   });
 }
 
+/**
+ * Merge-only recovery-complete transition for post-apply recalculation
+ * failures. Preserves the original run's autoApplied, recommendations and
+ * noImprovementsFound — recovery only retried the calculation, it did not
+ * re-run the search or apply anything new. Records the original error in a
+ * recoveryHistory diagnostic array so the recovery is traceable without
+ * affecting the completed UI state. Never clears or resets those fields.
+ */
+export function setRecoveryComplete(projectId, versionId, originalError = null) {
+  const current = getOptimiseWorkflowState(projectId, versionId);
+  const recoveryEntry = {
+    originalError: originalError || current.error || null,
+    recoveredAt: new Date().toISOString(),
+  };
+  return publish(projectId, versionId, {
+    status: "complete",
+    error: null,
+    completedAtMs: Date.now(),
+    // PRESERVED from the original completed run — recovery did not change
+    // any of these.
+    autoApplied: current.autoApplied,
+    recommendations: current.recommendations,
+    noImprovementsFound: current.noImprovementsFound,
+    // Diagnostic history: append, never overwrite.
+    recoveryHistory: [
+      ...(Array.isArray(current.recoveryHistory) ? current.recoveryHistory : []),
+      recoveryEntry,
+    ],
+  });
+}
+
 export function resetWorkflow(projectId, versionId) {
   return publish(projectId, versionId, emptyState(projectId, versionId));
 }

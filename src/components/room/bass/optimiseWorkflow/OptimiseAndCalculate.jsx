@@ -47,6 +47,7 @@ import {
   setWorkflowError,
   setCancelled,
   resetWorkflow,
+  setRecoveryComplete,
 } from "./optimiseWorkflowStore";
 import {
   runOptimisation,
@@ -116,6 +117,7 @@ import AdiOptimiserResults from "./AdiOptimiserResults.jsx";
 import { useLeverApplyActions } from "./useLeverApplyActions.js";
 import { mergeAppliedLeverRecords } from "../optimiserPlan/optimiserApplyProvenance.js";
 import { buildElectronicApplyDecision } from "./electronicApplyDecision.js";
+import { attemptRecoveryRetry } from "./recoveryRetry.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -223,6 +225,11 @@ export default function OptimiseAndCalculate({
   // handler can retry only the calculation/publication for post-apply failures
   // (recalculating / publishing) rather than resetting the whole workflow.
   const lastErrorPhaseRef = useRef(null);
+  // Diagnostics from the electronic verify step: the failed phase, whether
+  // settings/result matched, and the expected/actual fingerprints. Written by
+  // performElectronicUpdate.verify, read by the catch block so the terminal
+  // trace records the true failure cause instead of a stale "history-save".
+  const verifyDiagnosticsRef = useRef(null);
   // Optimisation Plan runs are evidence-only and tracked separately from the
   // full auto-applying workflow, so the two never share a busy flag.
   // (Owned by useRunOptimisationPlan below.)
@@ -316,9 +323,27 @@ export default function OptimiseAndCalculate({
         const state=sharedRef.current;
         const expected=restoring?receipt.beforeResult:receipt.expectedResult;
         const tuning=restoring?receipt.beforeEffectiveTuning:receipt.expectedEffectiveTuning;
-        if(!Array.isArray(tuning)||!tuning.length)return false;
-        if(!recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning}) ||
-           !recommendationResultMatches(state.completedBassAuthority,expected))return false;
+        if(!Array.isArray(tuning)||!tuning.length){
+          verifyDiagnosticsRef.current={
+            phase:"recalculating",settingsMatch:null,resultMatch:null,
+            expectedFingerprint:expected?.resultFingerprint||null,
+            actualFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+            pinnedCacheKey:preCommitCacheKey,actualCacheKey:state?.cacheKey||null,
+            reason:"missing-tuning"};
+          return false;
+        }
+        const settingsMatch=recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning});
+        const resultMatch=recommendationResultMatches(state.completedBassAuthority,expected);
+        if(!settingsMatch||!resultMatch){
+          verifyDiagnosticsRef.current={
+            phase:"recalculating",settingsMatch,resultMatch,
+            expectedFingerprint:expected?.resultFingerprint||null,
+            actualFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+            pinnedCacheKey:preCommitCacheKey,actualCacheKey:state?.cacheKey||null,
+            reason:!settingsMatch?"settings-mismatch":"result-mismatch"};
+          return false;
+        }
+        verifyDiagnosticsRef.current=null;
         return {fingerprint:state.cacheKey,levels:resultLevels(extractAuthorityForComparison(state.completedBassAuthority))};
       };
       return executeElectronicTransaction({before,after,receipt,persist:io.persist,readback:io.readback,commit,verify,guard});
@@ -1201,6 +1226,12 @@ export default function OptimiseAndCalculate({
         ? message : "Unexpected exception.";
       recordIssue(traceStage, errorClass + ": " + safeMessage, "exception");
       const reason = err?.message || "Optimisation failed.";
+      // Record verify diagnostics (expected/actual identities, mismatch type)
+      // in the terminal trace so the true failure cause is observable. The
+      // firstIssue is preserved (never overwritten); diagnostics are separate.
+      if (verifyDiagnosticsRef.current) {
+        trace.verifyDiagnostics = verifyDiagnosticsRef.current;
+      }
       if (optimiserCompleted) {
         // FAILURE CLASSIFICATION BY PHASE: the optimiser completed and its plan
         // is saved. The error is from a LATER lifecycle event, and its label must
@@ -1256,6 +1287,7 @@ export default function OptimiseAndCalculate({
           publicationError: reason,
         });
         setWorkflowError(projectId, versionId, err.message);
+        lastErrorPhaseRef.current = null;
       }
     } finally {
       console.info("[Bass ADI terminal trace]", JSON.stringify(trace));
@@ -1313,25 +1345,24 @@ export default function OptimiseAndCalculate({
     setRecoveryBusy(true);
     phaseRef.current = "recalculating";
     setRecalculating(projectId, versionId);
+    const originalError = workflowState.error || null;
     try {
-      const live = sharedRef.current;
-      if (typeof live?.onCalculate !== "function") {
-        throw new Error("Bass calculation is not ready. Reload the project and try again.");
+      const result = await attemptRecoveryRetry({
+        lastErrorPhase: lastErrorPhaseRef.current,
+        sharedRef,
+        phaseRef,
+        pinnedProjectId: projectId,
+        pinnedVersionId: versionId,
+      });
+      if (result.action === "success") {
+        // Merge-only recovery complete: preserves autoApplied, recommendations
+        // and noImprovementsFound from the original run. Never resets. The
+        // original error is recorded in recoveryHistory for diagnostics.
+        setRecoveryComplete(projectId, versionId, originalError);
+        lastErrorPhaseRef.current = null;
+      } else if (result.action === "failed") {
+        setWorkflowError(projectId, versionId, result.reason);
       }
-      live.onCalculate();
-      const published = await waitForCurrentPublication(sharedRef, phaseRef);
-      if (!published) {
-        throw new Error("The recalculated bass result could not be published. The saved plan is intact; settings are unchanged.");
-      }
-      const state = sharedRef.current;
-      if (!hasPublishedCurrentDesign(state)) {
-        throw new Error("The published bass result does not match the current design. The saved plan is intact; settings are unchanged.");
-      }
-      // Recovery successful: the current design has an authoritative published
-      // result. Clear the workflow error — the results panel reads the saved
-      // plan and the published bass authority. No search, no auto-apply.
-      resetWorkflow(projectId, versionId);
-      lastErrorPhaseRef.current = null;
     } catch (err) {
       setWorkflowError(projectId, versionId,
         err?.message || "Recovery failed. The saved plan is intact; settings are unchanged.");
@@ -1339,7 +1370,7 @@ export default function OptimiseAndCalculate({
       setRecoveryBusy(false);
       phaseRef.current = "idle";
     }
-  }, [projectId, versionId, recoveryBusy, handleReset]);
+  }, [projectId, versionId, recoveryBusy, handleReset, workflowState.error]);
 
   // Update Bass Performance — resets any terminal state from a previous
   // cancelled/failed run, then starts the full optimise-and-calculate
