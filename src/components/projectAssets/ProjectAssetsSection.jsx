@@ -196,14 +196,19 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#625143' }} />
             : <ChevronRight className="w-3.5 h-3.5" style={{ color: '#625143' }} />}
           <Package className="w-3.5 h-3.5" style={{ color: '#213428' }} />
-          <span className={labelClass}>Project Assets{loaded && !error ? ` (${totalAssets})` : loading && (requested || alwaysLoad) ? ' (…)': ''}</span>
+          <span className={labelClass}>Project Assets{loaded && !error ? ` (${totalAssets})` : loading && (requested || alwaysLoad) ? ' (…)' : ''}</span>
         </span>
         <span
           role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); handleDownloadAll(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleDownloadAll(); } }}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7] transition-colors cursor-pointer"
+          tabIndex={loaded && !error && totalAssets > 0 ? 0 : -1}
+          onClick={(e) => { e.stopPropagation(); if (loaded && !error && totalAssets > 0) handleDownloadAll(); }}
+          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && loaded && !error && totalAssets > 0) { e.stopPropagation(); handleDownloadAll(); } }}
+          aria-disabled={!(loaded && !error && totalAssets > 0)}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
+            loaded && !error && totalAssets > 0
+              ? 'border-[#DCDBD6] text-[#3E4349] bg-white hover:bg-[#F8F8F7] cursor-pointer'
+              : 'border-[#E8E5DF] text-[#A39A88] bg-[#F5F4F0] cursor-not-allowed'
+          }`}
         >
           {zipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
           {zipping ? 'Zipping…' : 'Download All'}

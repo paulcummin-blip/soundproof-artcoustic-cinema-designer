@@ -2,18 +2,18 @@
  * DocumentWorkflowPanel
  * ---------------------
  * The coordinated document workflow for v2 projects: three numbered steps
- * shown in the Room Designer header, replacing the standalone Project Report
- * and Speaker Design buttons.
+ * shown in the Room Designer header.
  *
- * Compact layout (layout-only refinement — no logic change):
+ * Layout (visual hierarchy refinement — no logic change):
  *
- *   1a + 1b  — a two-column row. Each step is a single line: numbered badge,
- *              name, coloured status badge, and the relevant action (Create /
- *              Update / Retry) aligned to the right. Explanatory sublabel text
- *              is shown only while the document is NOT yet created, so a
- *              finished workflow collapses to one line per step.
- *   2         — a compact full-width row with its status badge and Open /
- *              New / Create / Retry actions aligned to the right.
+ *   1a + 1b  — a two-column row of compact document cards. Each card carries
+ *              its own status badge and a prominent Create / Update / Retry
+ *              action sitting directly under the document it creates.
+ *              Technical Report is the primary (solid dark-green) action;
+ *              Speaker Design is the secondary (outlined dark-green) action.
+ *   2         — a full-width card. Not Available until 1a and 1b are Created,
+ *              then Create Client Proposal becomes the prominent action.
+ *              Once Created, collapses to a compact status row with Open.
  *   Images    — a compact row with the actual image count and Manage / Upload.
  *
  * Each step shows one of: Ready to Create, Creating…, Created, Not Available,
@@ -24,189 +24,44 @@
  * panel is not rendered).
  */
 import React from 'react';
-import { FileText, Speaker, Presentation, Check, Clock, AlertCircle, RefreshCw, ChevronRight, ArrowRight, Image as ImageIcon } from 'lucide-react';
+import { FileText, Speaker, Presentation, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { REPORT_ROUTE } from '@/components/report/reportLibraryContext';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
-import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel } from './documentWorkflowStatus';
+import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel, NOT_AVAILABLE_LABEL } from './documentWorkflowStatus';
 import { useProjectImageCount } from './useProjectImageCount';
-
-function StepIcon({ state, icon: Icon, notAvailable = false }) {
-  if (state === WORKFLOW_STATE.READY) return <Check className="w-3 h-3" style={{ color: '#2E7D4F' }} />;
-  if (state === WORKFLOW_STATE.GENERATING) return <Clock className="w-3 h-3 animate-pulse" style={{ color: '#625143' }} />;
-  if (state === WORKFLOW_STATE.FAILED) return <AlertCircle className="w-3 h-3" style={{ color: '#B23A3A' }} />;
-  if (state === WORKFLOW_STATE.OUTDATED) return <AlertCircle className="w-3 h-3" style={{ color: '#B37A2B' }} />;
-  return <Icon className="w-3 h-3" style={{ color: notAvailable ? '#A39A88' : '#1565C0' }} />;
-}
-
-function stateBadgeClass(state, notAvailable = false) {
-  switch (state) {
-    case WORKFLOW_STATE.READY: return 'bg-[#E8F5EC] text-[#2E7D4F] border-[#C8E6D0]';
-    case WORKFLOW_STATE.GENERATING: return 'bg-[#F5F4F0] text-[#625143] border-[#E2DED7]';
-    case WORKFLOW_STATE.FAILED: return 'bg-[#FDECEC] text-[#B23A3A] border-[#F5C8C8]';
-    case WORKFLOW_STATE.OUTDATED: return 'bg-[#FFF3E0] text-[#B37A2B] border-[#FFE0B2]';
-    case WORKFLOW_STATE.NOT_CREATED:
-      return notAvailable
-        ? 'bg-[#F5F4F0] text-[#A39A88] border-[#E8E5DF]'
-        : 'bg-[#E3F2FD] text-[#1565C0] border-[#BBDEFB]';
-    default: return 'bg-[#F5F4F0] text-[#8B8378] border-[#E2DED7]';
-  }
-}
-
-function WorkflowStep({ number, label, sublabel, state, stateLabel, reason, canAct, onAct, actLabel, icon }) {
-  const badgeClass = stateBadgeClass(state);
-  // Explanatory text is only useful before the document exists: hide it once
-  // the step is Created so a finished workflow collapses to a single line.
-  const showSublabel = state !== WORKFLOW_STATE.READY && Boolean(sublabel);
-  const notAvailable = state === WORKFLOW_STATE.NOT_CREATED && !canAct;
-  return (
-    <div className="flex flex-col gap-0.5 min-w-0 py-0.5">
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0" style={{ background: state === WORKFLOW_STATE.READY ? '#2E7D4F' : '#213428', color: '#FFFFFF' }}>
-          {number}
-        </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A] truncate">{label}</span>
-        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badgeClass} shrink-0`}>
-          <StepIcon state={state} icon={icon} notAvailable={notAvailable} />
-          {stateLabel}
-        </div>
-        <div className="flex-1" />
-        {canAct && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
-            onClick={onAct}
-          >
-            {state === WORKFLOW_STATE.FAILED && <RefreshCw className="w-3 h-3 mr-1" />}
-            {actLabel}
-            {state !== WORKFLOW_STATE.FAILED && <ChevronRight className="w-3 h-3 ml-1" />}
-          </Button>
-        )}
-      </div>
-      {showSublabel && (
-        <p className="text-[10px] text-[#8B8378] leading-snug pl-5">{sublabel}</p>
-      )}
-      {reason && state === WORKFLOW_STATE.FAILED && (
-        <p className="text-[10px] text-[#B23A3A] leading-snug pl-5">{reason}</p>
-      )}
-    </div>
-  );
-}
+import DocumentCard from './DocumentCard';
 
 /**
- * ProposalStep — Step 2 (Client Proposal), always a compact full-width row.
- *
- * Status badge on the left with the step number and label; Open / New / Create
- * / Retry actions aligned to the right. A missing-prerequisites note is shown
- * only when the step is unavailable, so a created proposal collapses to one
- * line.
+ * UploadedImagesRow — a compact row showing the project's uploaded image
+ * count and a "Manage / Upload Images" action. Not a document stage.
  */
-function ProposalStep({
-  state,
-  stateLabel,
-  proposalAvailable,
-  disabled,
-  missingPrerequisites,
-  onCreate,
-  onOpen,
-}) {
-  const isReadyToCreate = state === WORKFLOW_STATE.NOT_CREATED && proposalAvailable;
-  const isCreated = state === WORKFLOW_STATE.READY;
-  const isUnavailable = state === WORKFLOW_STATE.NOT_CREATED && !proposalAvailable;
-  const isOutdated = state === WORKFLOW_STATE.OUTDATED;
-  const isFailed = state === WORKFLOW_STATE.FAILED;
-
-  const badgeClass = stateBadgeClass(state, isUnavailable);
-
-  return (
-    <div className="rounded-lg border border-[#E2DED7] bg-white px-2.5 py-1.5 flex flex-col gap-0.5">
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0" style={{ background: isCreated ? '#2E7D4F' : '#213428', color: '#FFFFFF' }}>
-          2
-        </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A]">Client Proposal</span>
-        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badgeClass} shrink-0`}>
-          <StepIcon state={state} icon={Presentation} notAvailable={isUnavailable} />
-          {stateLabel}
-        </div>
-        <div className="flex-1" />
-        {isReadyToCreate && (
-          <Button
-            size="sm"
-            className="h-7 px-2.5 text-[11px] font-semibold border-0 shrink-0"
-            style={{ background: '#213428', color: '#FFFFFF' }}
-            onClick={onCreate}
-            disabled={disabled}
-          >
-            Create Client Proposal
-            <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
-        )}
-        {isCreated && (
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" className="h-7 px-2.5 text-[11px] font-medium border-0" style={{ background: '#213428', color: '#FFFFFF' }} onClick={onOpen}>
-              Open Client Proposal
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]" onClick={onCreate}>
-              New proposal
-              <ChevronRight className="w-3 h-3 ml-1" />
-            </Button>
-          </div>
-        )}
-        {isOutdated && (
-          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0" onClick={onOpen}>
-            Open
-            <ChevronRight className="w-3 h-3 ml-1" />
-          </Button>
-        )}
-        {isFailed && (
-          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0" onClick={onCreate}>
-            <RefreshCw className="w-3 h-3 mr-1" />
-            Retry
-          </Button>
-        )}
-      </div>
-      {isUnavailable && missingPrerequisites.length > 0 && (
-        <p className="text-[10px] text-[#A39A88] leading-snug pl-5">
-          Requires {missingPrerequisites.join(' and ')} to be created first.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * UploadedImagesStep — a compact row showing the project's uploaded image
- * count and a "Manage / Upload Images" action that opens the Project Library
- * Images tab for the current project. Not a document stage: image uploads are
- * never a prerequisite for creating reports or proposals.
- */
-function UploadedImagesStep({ count, loading, onManage }) {
+function UploadedImagesRow({ count, loading, onManage }) {
   const countText = loading
     ? 'Loading…'
     : count == null
       ? ''
       : count === 0
-        ? 'No images uploaded yet'
+        ? 'No images yet'
         : count === 1
           ? '1 image'
           : `${count} images`;
   return (
-    <div className="rounded-lg border border-[#E2DED7] bg-white px-2.5 py-1.5 flex items-center gap-1.5 min-w-0">
-      <ImageIcon className="w-3.5 h-3.5 shrink-0" style={{ color: '#213428' }} />
+    <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2 flex items-center gap-2 min-w-0">
+      <ImageIcon className="w-4 h-4 shrink-0" style={{ color: '#213428' }} />
       <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A]">Uploaded Images</span>
       {countText && (
-        <span className="text-[11px] text-[#625143]">{countText}</span>
+        <span className="text-[11px] text-[#625143] truncate">{countText}</span>
       )}
       <div className="flex-1" />
       <Button
+        type="button"
         size="sm"
         variant="outline"
-        className="h-7 px-2.5 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
+        className="h-7 px-3 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
         onClick={onManage}
       >
-        Manage / Upload Images
+        Manage Images
         <ChevronRight className="w-3 h-3 ml-1" />
       </Button>
     </div>
@@ -281,45 +136,68 @@ export default function DocumentWorkflowPanel({
 
   const trCanAct = !disabled && (trState === WORKFLOW_STATE.NOT_CREATED || trState === WORKFLOW_STATE.OUTDATED || trState === WORKFLOW_STATE.FAILED);
   const sdCanAct = !disabled && (sdState === WORKFLOW_STATE.NOT_CREATED || sdState === WORKFLOW_STATE.OUTDATED || sdState === WORKFLOW_STATE.FAILED);
+  const cpCanAct = !disabled && proposalAvailable && (cpState === WORKFLOW_STATE.NOT_CREATED || cpState === WORKFLOW_STATE.OUTDATED || cpState === WORKFLOW_STATE.FAILED);
+
+  const trActLabel = trState === WORKFLOW_STATE.OUTDATED ? 'Update Technical Report' : trState === WORKFLOW_STATE.FAILED ? 'Retry Technical Report' : 'Create Technical Report';
+  const sdActLabel = sdState === WORKFLOW_STATE.OUTDATED ? 'Update Speaker Design' : sdState === WORKFLOW_STATE.FAILED ? 'Retry Speaker Design' : 'Create Speaker Design';
+  const cpActLabel = cpState === WORKFLOW_STATE.OUTDATED ? 'Update Client Proposal' : cpState === WORKFLOW_STATE.FAILED ? 'Retry Client Proposal' : 'Create Client Proposal';
+
+  const cpIsCreated = cpState === WORKFLOW_STATE.READY;
+  const cpIsUnavailable = cpState === WORKFLOW_STATE.NOT_CREATED && !proposalAvailable;
+  const cpReason = cpIsUnavailable && missingPrerequisites.length > 0
+    ? `Available once the ${missingPrerequisites.join(' and ')} have been created.`
+    : null;
 
   return (
-    <div className="space-y-1.5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-        <WorkflowStep
+    <div className="space-y-2.5 max-w-[760px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <DocumentCard
           number="1a"
           label="Technical Report"
-          sublabel="Creates the Project Report and matching Speaker Design PDF"
+          description="Creates the Project Report and matching Speaker Design PDF"
+          icon={FileText}
           state={trState}
           stateLabel={trLabel}
           reason={technicalReport.reason}
           canAct={trCanAct}
-          actLabel={trState === WORKFLOW_STATE.OUTDATED ? 'Update' : trState === WORKFLOW_STATE.FAILED ? 'Retry' : 'Create'}
-          icon={FileText}
+          actLabel={trActLabel}
           onAct={openReport}
+          onOpen={openReport}
+          openLabel="Open"
+          primary
         />
-        <WorkflowStep
+        <DocumentCard
           number="1b"
           label="Speaker Design"
-          sublabel="Can run independently. Reuses existing generation."
+          description="Can run independently. Reuses existing generation."
+          icon={Speaker}
           state={sdState}
           stateLabel={sdLabel}
           reason={speakerDesign.reason}
           canAct={sdCanAct}
-          actLabel={sdState === WORKFLOW_STATE.OUTDATED ? 'Update' : sdState === WORKFLOW_STATE.FAILED ? 'Retry' : 'Create'}
-          icon={Speaker}
+          actLabel={sdActLabel}
           onAct={createSpeakerDesign}
         />
       </div>
-      <ProposalStep
+
+      <DocumentCard
+        number="2"
+        label="Client Proposal"
+        icon={Presentation}
         state={cpState}
         stateLabel={cpLabel}
-        proposalAvailable={proposalAvailable}
-        disabled={disabled}
-        missingPrerequisites={missingPrerequisites}
-        onCreate={openProposalWizard}
+        reason={cpReason}
+        canAct={cpCanAct}
+        actLabel={cpActLabel}
+        onAct={openProposalWizard}
         onOpen={openProposalLibrary}
+        openLabel="Open Client Proposal"
+        primary={proposalAvailable && !cpIsCreated}
+        onSecondary={cpIsCreated ? openProposalWizard : null}
+        secondaryLabel={cpIsCreated ? 'New proposal' : null}
       />
-      <UploadedImagesStep
+
+      <UploadedImagesRow
         count={imageCount}
         loading={imageCountLoading}
         onManage={openImageLibrary}
