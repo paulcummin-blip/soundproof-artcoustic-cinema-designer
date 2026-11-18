@@ -674,12 +674,13 @@ test("recovery: authoritative electronics mismatch during wait fails", async () 
 //      authority.
 // ---------------------------------------------------------------------------
 test("recovery: fast cached result between polls is accepted via advanced completedAtMs", async () => {
-  // Authoritative result present at entry (pre-dispatch authority). onCalculate
-  // publishes a new authoritative result for the SAME pinned cacheKey without
-  // ever setting calculationInProgress true (fast cache hit between polls).
-  // resultFingerprint/currentJobFingerprint are IDENTICAL before and after; only
-  // completedAtMs advances (the real production receipt).
-  const owner = makeOwner({ initialOutcome: "rejected", initialTerminalMessage: "orig" });
+  // Authoritative result present at entry (pre-dispatch authority) with an old
+  // terminal. onCalculate publishes a NEW authoritative result for the SAME
+  // pinned cacheKey without ever setting calculationInProgress true (fast cache
+  // hit between polls). resultFingerprint/currentJobFingerprint are IDENTICAL
+  // before and after (same-design re-calc); only completedAtMs advances (the
+  // real production receipt).
+  const owner = makeOwner({ initialAuthoritative: true, initialOutcome: "rejected", initialTerminalMessage: "orig" });
   const preDispatch = owner.sharedRef.current.completedBassAuthority?.contract?.job?.completedAtMs ?? null;
   const preFp = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
   owner.sharedRef.current.onCalculate = () => {
