@@ -26,7 +26,7 @@ function storage() {
 }
 
 /** The draft the designer left behind, or null when there is none. */
-export function readWizardDraft() {
+export function readWizardDraft({ projectId = null, versionId = null } = {}) {
   const store = storage();
   if (!store) return null;
   try {
@@ -35,6 +35,8 @@ export function readWizardDraft() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
     if (!parsed.projectId) return null;
+    if (projectId && parsed.projectId !== projectId) return null;
+    if (versionId && !parsed.selectedVersionIds?.includes(versionId)) return null;
     return parsed;
   } catch {
     return null;
