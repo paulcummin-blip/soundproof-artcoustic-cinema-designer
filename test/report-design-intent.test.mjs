@@ -143,8 +143,8 @@ describe('the Design Intent brief', () => {
     // Spatial resolution, timbre and dynamic range are made specific.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/name a layer, channel or product only where needed to explain a distinctive relationship/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/close tonal consistency/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/excellent tonal consistency/i);
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/only where the authoritative evidence supports it/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/one scoped sentence describing tonal consistency/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/within the groups the evidence assessed/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/published capability of each relevant layer at its assessed position/i);
     // The bass is stated from the published extension, and no gain is invented.
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/predicted low-frequency response/i);
