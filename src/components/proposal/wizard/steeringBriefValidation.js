@@ -58,6 +58,10 @@ export function validateSteeringBrief(text) {
     };
   }
   const tokens = tokensOf(value);
+  const generic = new Set('nice cinema home theatre theater good great excellent amazing fantastic sound audio lovely pictures picture comfortable seating seats beautiful best high quality system room client wants want needs'.split(' '));
+  if (tokens.every(token => generic.has(token))) {
+    return { valid: false, reason: 'Add a project-specific detail: how this room will be used, a client priority, or a design decision to explain.' };
+  }
   const distinct = new Set(tokens);
   if (tokens.length < MIN_TOKENS || distinct.size < MIN_DISTINCT) {
     return {
