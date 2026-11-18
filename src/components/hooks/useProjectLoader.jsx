@@ -21,6 +21,7 @@ import {
   beginDesignHydration,
   completeDesignHydration,
   failDesignHydration,
+  getProjectHydration,
 } from "@/components/state/projectHydrationStore";
 import { checkDestructiveSave } from "@/components/state/destructiveSaveTripwire";
 import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
@@ -133,15 +134,6 @@ appState, // Pass appState directly for setters
   // Opening and hydration are read-only. Autosave is armed only after a user
   // interaction occurs after the current project has finished loading.
   const autosaveUserArmedRef = useRef(false);
-
-  // Refs that always track the latest appState hydration flags. loadProject is
-  // a useCallback whose closure can capture a stale appState; these refs let it
-  // read the CURRENT isProjectHydrationReady / activeVersionId at call time so
-  // it can detect that ProjectDesignHydrator already hydrated this project.
-  const isProjectHydrationReadyRef = useRef(false);
-  isProjectHydrationReadyRef.current = !!appState?.isProjectHydrationReady;
-  const activeVersionIdFromAppStateRef = useRef(null);
-  activeVersionIdFromAppStateRef.current = appState?.activeVersionId ?? null;
 
   // Active Project ID — resolved from URL params / props. Declared early so
   // hooks below (e.g. useAppliedCalibrationAuthority) can reference it
