@@ -795,10 +795,12 @@ test("recovery: rejected request with unchanged old authority fails via newReque
   assert.equal(result.outcome, "rejected", "the NEW terminal outcome is reported");
   assert.match(result.reason, /New calculation rejected/);
   assert.equal(result.originalOutcome, "rejected");
-  // The old authority's completedAtMs is UNCHANGED — yet the orchestrator
+  // The publication receipt did NOT advance to a fresh finite value (the start
+  // phase reset completedAtMs to null, and the rejection left it null — the old
+  // authority job was not replaced with a new publication). Yet the orchestrator
   // failed promptly because newRequestObserved was true.
   const postCompletedAtMs = owner.sharedRef.current.completedBassAuthority?.contract?.job?.completedAtMs ?? null;
-  assert.equal(postCompletedAtMs, preCompletedAtMs, "completedAtMs unchanged (job not replaced)");
+  assert.equal(Number.isFinite(postCompletedAtMs) && postCompletedAtMs !== preCompletedAtMs, false, "completedAtMs did not advance to a fresh finite value");
 });
 
 // ---------------------------------------------------------------------------
