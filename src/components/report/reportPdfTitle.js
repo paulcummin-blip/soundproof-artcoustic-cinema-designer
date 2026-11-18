@@ -63,7 +63,8 @@ const FALLBACK_PROJECT = "Untitled Project";
  * a Proposal, or the internal Technical Report.
  */
 export const REPORT_PDF_TYPE = Object.freeze({
-  PROJECT_REPORT: "Project Report",
+  // The consolidated project document is labelled Technical Report in Documents & Assets.
+  PROJECT_REPORT: "Technical Report",
   /** The Current Speaker Design schedule exported beside the Project Report. */
   SPEAKER_DESIGN: "Speaker Design",
   VISUAL: "Visual",
