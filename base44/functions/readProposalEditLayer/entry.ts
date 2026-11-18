@@ -232,7 +232,7 @@ export default async function(req) {
       // deferred behind an explicit, off-by-default rollout setting until the
       // coverage checker is reliable. The existing evidence and approval gates
       // remain the sole authorities for issue/send.
-      const briefSections = storedSections
+      const briefSections = (documentValidation.document_sections || storedSections)
         .filter((s) => s && typeof s === 'object' && s.body && s.is_enabled !== false)
         .map((s) => ({ section: s.section_type, text: s.body || '' }));
       layer.brief_coverage = briefCoverageGate(proposal, briefSections, { hard_enforcement: false });
