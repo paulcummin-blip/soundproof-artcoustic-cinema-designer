@@ -382,49 +382,35 @@ test("executeElectronicTransaction: intervening change restores prior settings",
   let live = clone(before);
   const events = [];
   const receipt = { runId: "run2", before, after };
-  // For the restore verify, the owner must advance to a restored key and
-  // publish the before settings/result. Re-configure the owner on restore.
   const applyVerify = makeVerify(owner, { preCommitCacheKey });
+  // Restore verify: reconfigure the owner to advance from the before key to a
+  // restored key and publish the before settings, then run the same helper.
+  const restoreVerify = async () => {
+    owner.sharedRef.current.cacheKey = "cal:v1:before";
+    owner.readLiveSettings = () => clone(before);
+    setTimeout(() => { owner.sharedRef.current.cacheKey = "cal:v1:restore"; }, 10);
+    const r = await verifyRecalculationScheduling({
+      sharedRef: owner.sharedRef,
+      phaseRef: owner.phaseRef,
+      readLiveSettings: owner.readLiveSettings,
+      targetSettings: before,
+      preCommitCacheKey: "cal:v1:before",
+      waitForPublication: waitForPublication(owner),
+      sleep: realSleep,
+      settlePollMs: 5,
+      cachePollMs: 5,
+    });
+    if (!r.ok) return false;
+    if (!recommendationSettingsMatch(owner.sharedRef.current.authoritative, { crossover: before.crossover, tuning: beforeTuning })) return false;
+    return { fingerprint: r.dispatchFingerprint, levels: { p19: 4 } };
+  };
   const io = {
     guard: () => true,
     persist: async (settings, r) => { events.push("save:" + r.status); saved = { ...clone(settings), receipt: clone(r) }; },
     readback: async () => clone(saved),
     commit: (settings, r) => { events.push("commit:" + r.status); live = clone(settings); },
-    verify: async (settings, isRestore) => {
-      if (isRestore) {
-        // Switch the owner to restore-mode advancement.
-        owner.sharedRef.current.cacheKey = "cal:v1:before";
-        setTimeout(() => { owner.sharedRef.current.cacheKey = "cal:v1:restore"; }, 10);
-        setTimeout(() => { owner.readLiveSettings = () => clone(before); }, 5);
-        // Publish the before settings on the next dispatch.
-        const restoreResult = await verifyRecalculationScheduling({
-          sharedRef: owner.sharedRef,
-          phaseRef: owner.phaseRef,
-          readLiveSettings: () => clone(before),
-          targetSettings: before,
-          preCommitCacheKey: "cal:v1:before",
-          waitForPublication: waitForPublication(owner),
-          sleep: realSleep,
-          settlePollMs: 5,
-          cachePollMs: 5,
-        });
-        return result(okFallbackRestore(result, owner));
-      }
-      return applyVerify(settings);
-    },
+    verify: async (settings, isRestore) => (isRestore ? restoreVerify() : applyVerify(settings)),
   };
-  function result(r, o) {
-    return r.ok && recommendationSettingsMatch(o.sharedRef.current.authoritative, { crossover: before.crossover, tuning: beforeTuning })
-      ? { fingerprint: r.dispatchFingerprint, levels: { p19: 4 } }
-      : false;
-  }
-  function okFallbackRestore(r, o) {
-    // Restore verify need not reproduce a candidate; a successful scheduling
-    // with matching before-settings is sufficient.
-    return r.ok && recommendationSettingsMatch(o.sharedRef.current.authoritative, { crossover: before.crossover, tuning: beforeTuning })
-      ? { fingerprint: r.dispatchFingerprint, levels: { p19: 4 } }
-      : false;
-  }
   await assert.rejects(() => executeElectronicTransaction({ ...io, before, after, receipt }));
   assert.deepEqual(saved.instances, before.instances, "saved restored to before");
   assert.deepEqual(saved.crossover, before.crossover);
