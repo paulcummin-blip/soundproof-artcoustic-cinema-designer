@@ -1,3 +1,4 @@
+import { clientIntentCoverage } from './clientIntentCoverage.js';
 /**
  * writerClientBriefCoverage.js (shared)
  * -------------------------------------
@@ -501,7 +502,7 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     const { requires } = requirementsOf(item, subjects);
     const missing = requires.filter((requirement) => !figureStated(requirement, prose));
 
-    const supported = (supportedTerms.length > 0 || subjects.length > 0) && missingParameters.length === 0;
+    let supported = (supportedTerms.length > 0 || subjects.length > 0) && missingParameters.length === 0;
     const subjectReached = matchedSubjects.length > 0 || matchedTerms.length > 0;
 
     // THE MEANING TEST. Coverage is the explanation the copy carries, read from the
@@ -538,7 +539,7 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     // writer omission. No revision can answer it without contradicting the frozen
     // evidence, so it is never returned to the writer: it is flagged for the
     // designer, and the brief stays incomplete until they settle it.
-    const figureConflict = missing.some((requirement) => requirement.figure
+    let figureConflict = missing.some((requirement) => requirement.figure
       && !evidenceText.includes(String(requirement.figure).toLowerCase()));
 
     let status = BRIEF_ITEM_STATUS.UNSUPPORTED;
@@ -584,6 +585,15 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
         status = BRIEF_ITEM_STATUS.ADDRESSED;
         reason = null;
       }
+    }
+
+    const intent = clientIntentCoverage(item, sections);
+    if (intent && missingParameters.length === 0) {
+      supported = true;
+      figureConflict = false;
+      status = intent.complete ? BRIEF_ITEM_STATUS.ADDRESSED : BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED;
+      reason = intent.complete ? null : intent.missing.join(' ');
+      evidence.splice(0, evidence.length, ...intent.evidence);
     }
 
     const requiredExplanation = [
