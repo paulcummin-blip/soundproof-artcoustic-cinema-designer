@@ -143,7 +143,7 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // and keep the P12 screen-stage difference distinct from P13/P16 using "screen
 // stage" (two words) rather than a hyphenated form. No section identity, word
 // limit, figure, level, product, claim-grounding or validation rule changed.
-const CURRENT = 'proposal-writer-prompt-28';
+const CURRENT = 'proposal-writer-prompt-30';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
