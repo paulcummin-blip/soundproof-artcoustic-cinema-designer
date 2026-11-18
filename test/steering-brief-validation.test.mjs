@@ -59,9 +59,21 @@ test('the coverage gate blocks a workflow proposal whose copy ignores a supporte
   const sections = [
     { section_type: 'system_design_summary', body: 'The projector provides a large image for film nights. The loudspeakers are arranged around the seating.' },
   ];
-  const gate = briefCoverageGate(proposal, sections);
+  // Hard enforcement is off by default; pass it explicitly to test blocking.
+  const gate = briefCoverageGate(proposal, sections, { hard_enforcement: true });
   assert.equal(gate.applies, true);
   assert.equal(gate.blocked, true);
   assert.ok(gate.reason && gate.reason.length > 0);
   assert.ok(Array.isArray(gate.outstanding) && gate.outstanding.length > 0);
+});
+
+test('the coverage gate reports outstanding items without blocking when hard enforcement is off', () => {
+  const proposal = { client_brief: 'Explain the everyday TV viewing alongside the projector, and the concealed front subwoofers.', metadata: { brief_coverage_required: true } };
+  const sections = [
+    { section_type: 'system_design_summary', body: 'The projector provides a large image for film nights. The loudspeakers are arranged around the seating.' },
+  ];
+  const gate = briefCoverageGate(proposal, sections);
+  assert.equal(gate.applies, true);
+  assert.equal(gate.blocked, false, 'hard enforcement is off by default');
+  assert.ok(Array.isArray(gate.outstanding) && gate.outstanding.length > 0, 'outstanding items are still reported');
 });

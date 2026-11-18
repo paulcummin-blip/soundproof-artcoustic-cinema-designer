@@ -64,7 +64,12 @@ export const INTERPRETATION_RULE =
 export const EDITORIAL_BRIEF_RULE =
   'these are the designer\'s own instructions and are never copy: they explain what to emphasise and what needs '
   + 'explaining, they never change a figure, a level, a product or a claim, and no note, instruction, filename or '
-  + 'caption from them appears in the draft';
+  + 'caption from them appears in the draft. Where material_objectives is supplied, each entry is a substantive '
+  + 'request the client or designer made, with the section it belongs to: address every one in the copy you write, '
+  + 'in the section it names, using only the evidence the pack allows. An objective is addressed when the copy '
+  + 'reaches its subject and states the matter it asks for — not when a related word appears elsewhere. The '
+  + 'evidence authority is unchanged: a material objective never overrides a figure, a level, a product or a '
+  + 'claim, and an objective no source supports is never invented.';
 
 /** The priority of the frozen evidence over any brief or interpretation. */
 export const EVIDENCE_PRIORITY_RULE =
