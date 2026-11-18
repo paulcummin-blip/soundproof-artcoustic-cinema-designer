@@ -15,11 +15,14 @@
  * for a project that has been calculated.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { runReadinessRead } from '@/components/proposal/sourceAuthority/proposalReadDeadline';
 import {
   readProjectRecord,
   readProjectVersionRecord,
+  invalidateProjectRead,
+  invalidateProjectVersionRead,
 } from '@/components/state/projectReadCache';
 import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
@@ -27,6 +30,7 @@ import { useEngineeringSnapshot } from './useEngineeringSnapshot';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 
 export function useVersionedEngineeringSnapshot(projectId, versionId, options = {}) {
+  const [readAttempt, setReadAttempt] = useState(0);
   const [loading, setLoading] = useState(!!projectId);
   const [error, setError] = useState(null);
   const [project, setProject] = useState(null);
@@ -56,14 +60,14 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     setError(null);
     (async () => {
       try {
-        const nextProject = await readProjectRecord(projectId);
+        const nextProject = await runReadinessRead('project details', () => readProjectRecord(projectId));
         if (cancelled) return;
         if (!nextProject) throw new Error('Project not found.');
 
         const targetVersionId = versionId || nextProject.active_version_id || null;
         let nextVersion = null;
         if (targetVersionId) {
-          nextVersion = await readProjectVersionRecord(targetVersionId);
+          nextVersion = await runReadinessRead('selected design version', () => readProjectVersionRecord(targetVersionId));
           if (cancelled) return;
         }
 
@@ -108,7 +112,7 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     })();
 
     return () => { cancelled = true; };
-  }, [projectId, versionId]);
+  }, [projectId, versionId, readAttempt]);
 
   const effectiveVersionId = versionId || version?.id || project?.active_version_id || null;
   const mergedProject = useMemo(
@@ -133,19 +137,26 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     assessmentModes: options.assessmentModes,
   });
 
+  const retry = useCallback(() => {
+    invalidateProjectRead(projectId);
+    if (versionId) invalidateProjectVersionRead(versionId);
+    authority.retry();
+    setReadAttempt(value => value + 1);
+  }, [projectId, versionId, authority.retry]);
+
   const finalError = authority.readFailed
     ? (authority.readError || 'Saved engineering results could not be read.')
     : error || snapshotResult.error;
   return {
     snapshot: snapshotResult.snapshot,
-    loading: loading || authority.loading || snapshotResult.loading,
+    loading: !finalError && (loading || authority.loading || snapshotResult.loading),
     error: finalError,
     project,
     version,
     authorityState: authority.state,
     authoritySource: authority.source,
-    readFailed: authority.readFailed,
-    retry: authority.retry,
+    readFailed: authority.readFailed || !!error,
+    retry,
     isReady: !loading && !authority.loading && !!snapshotResult.snapshot && !finalError,
   };
 }

@@ -28,16 +28,18 @@
  * @returns {{ rows, gate, loading, error }}
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   buildDurableSnapshot,
   extractEngineeringSummary,
   fetchDurablePublication,
+  invalidateDurablePublicationRead,
 } from '@/components/engineering/versionedEngineeringAuthority';
 import { currentSourceFingerprints } from '@/components/report/reportSnapshotAuthority';
 import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
-import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
+import { readProjectAnalysisCacheRecord, invalidateProjectRead, invalidateProjectVersionRead, invalidateProjectAnalysisCacheRead } from '@/components/state/projectReadCache';
+import { runReadinessRead } from './proposalReadDeadline';
 import { subscribeReportSourceStored } from './reportSourceSignal';
 import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
 import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
@@ -79,7 +81,22 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
    * offers. The wizard's retry action is this, and nothing else: the read that
    * decides the table and the Generate button is a single read.
    */
-  const retry = useCallback(() => setRefreshToken((value) => value + 1), []);
+  const frozenReads = useRef(new Map());
+  const retry = useCallback(() => {
+    invalidateProjectRead(projectId);
+    for (const versionId of ids) {
+      invalidateProjectVersionRead(versionId);
+      invalidateProjectAnalysisCacheRead(projectId, versionId);
+      invalidateDurablePublicationRead(projectId, versionId);
+    }
+    for (const [key, source] of frozenReads.current) {
+      if (source.projectId === projectId) {
+        invalidateDurablePublicationRead(source.projectId, source.versionId, source.fingerprint);
+        frozenReads.current.delete(key);
+      }
+    }
+    setRefreshToken((value) => value + 1);
+  }, [projectId, idsKey]);
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -171,39 +188,29 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
     setLoading(true);
     setError(null);
 
-    const traceRead = (operation, promise) => {
-      console.info('[Proposal readiness trace]', operation, 'started');
-      return Promise.resolve(promise).then(value => {
-        console.info('[Proposal readiness trace]', operation, 'resolved');
-        return value;
-      }, error => {
-        console.info('[Proposal readiness trace]', operation, 'failed', error?.message);
-        throw error;
-      });
-    };
     (async () => {
       try {
         const [projectRecords, versionRecords, snapshotPage, durableReads, cacheRecords, speakerDesignPage] = await Promise.all([
           // The project's own active-version pointer is the first authority the
           // shared canonical selection rule reads.
-          traceRead('Project', base44.entities.Project.filter({ id: projectId })),
-          traceRead('ProjectVersion', base44.entities.ProjectVersion.filter({ project_id: projectId })),
-          traceRead('ReportSnapshot', base44.entities.ReportSnapshot.filter(
+          runReadinessRead('project details', () => base44.entities.Project.filter({ id: projectId })),
+          runReadinessRead('design versions', () => base44.entities.ProjectVersion.filter({ project_id: projectId })),
+          runReadinessRead('Project Report snapshot', () => base44.entities.ReportSnapshot.filter(
             { project_id: projectId, version_id: { $in: ids } },
             { sort: '-generated_at', limit: 200 },
           )),
           // The durable published-engineering read, one per selected version,
           // shared with every other consumer of the authority (session-cached).
-          Promise.all(ids.map((versionId) => traceRead('Published engineering ' + versionId, fetchDurablePublication(projectId, versionId)))),
+          Promise.all(ids.map((versionId) => runReadinessRead('published engineering', () => fetchDurablePublication(projectId, versionId)))),
           // The version's completed calculation authority — the calculated
           // engineering result a Technical Report is generated from. Read
           // through the same session-cached project read the report path uses.
-          Promise.all(ids.map((versionId) => traceRead('Calculation cache ' + versionId, readProjectAnalysisCacheRecord(projectId, versionId)))),
+          Promise.all(ids.map((versionId) => runReadinessRead('completed calculation cache', () => readProjectAnalysisCacheRecord(projectId, versionId)))),
           // The version's stored Speaker Design PDF — the equipment checklist the
           // Project Report export already writes to Project Library beside the
           // report. Read from the records that exist: no second store is created
           // and reading exports nothing.
-          traceRead('Speaker Design export', base44.entities.ProjectAssetExport.filter(
+          runReadinessRead('Speaker Design export', () => base44.entities.ProjectAssetExport.filter(
             { project_id: projectId, document_type: 'speaker_design', version_id: { $in: ids } },
             { sort: '-exported_at', limit: 200 },
           )),
@@ -268,7 +275,8 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         const readFrozenPublication = (versionId, fingerprint) => {
           const key = `${versionId}::${fingerprint}`;
           if (!frozenPublicationReads.has(key)) {
-            frozenPublicationReads.set(key, traceRead('Frozen publication ' + fingerprint, fetchDurablePublication(projectId, versionId, {
+            frozenReads.current.set(`${projectId}::${key}`, { projectId, versionId, fingerprint });
+            frozenPublicationReads.set(key, runReadinessRead('frozen engineering publication', () => fetchDurablePublication(projectId, versionId, {
               engineeringFingerprint: fingerprint,
             })));
           }

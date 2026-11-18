@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { runReadinessRead } from '@/components/proposal/sourceAuthority/proposalReadDeadline';
 import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
 
 const EMPTY = { versions: [], collisions: [], loading: false, error: null };
@@ -23,6 +24,8 @@ const EMPTY = { versions: [], collisions: [], loading: false, error: null };
  * @returns {{versions: Array, collisions: Array, loading: boolean, error: any}}
  */
 export default function useCanonicalProjectVersions(projectId) {
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt(value => value + 1), []);
   const [state, setState] = useState(EMPTY);
 
   useEffect(() => {
@@ -36,8 +39,8 @@ export default function useCanonicalProjectVersions(projectId) {
     (async () => {
       try {
         const [versionRecords, projectRecords] = await Promise.all([
-          base44.entities.ProjectVersion.filter({ project_id: projectId }),
-          base44.entities.Project.filter({ id: projectId }),
+          runReadinessRead('design versions', () => base44.entities.ProjectVersion.filter({ project_id: projectId })),
+          runReadinessRead('project details', () => base44.entities.Project.filter({ id: projectId })),
         ]);
         if (cancelled) return;
         const canonical = selectCanonicalVersions({
@@ -61,7 +64,7 @@ export default function useCanonicalProjectVersions(projectId) {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, attempt]);
 
-  return state;
+  return { ...state, retry };
 }
