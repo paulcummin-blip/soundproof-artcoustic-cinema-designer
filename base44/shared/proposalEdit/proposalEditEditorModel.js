@@ -318,6 +318,10 @@ export function resolveEditorLayer({
     message: null,
     generation: { generation_id: generation.generation_id },
     generation_status: generationStatusOf(generation, generations),
+    // The proposal mode the copy was written under, exposed so a caller that
+    // needs to recover writer-section drafts from stored document bodies can
+    // parse the headings correctly (single vs comparison headings differ).
+    proposal_mode: proposalMode,
     fields: editableSectionFields(copy.copy, proposalMode),
     copy: { source: copy.source, sections: copy.copy },
     export_source: copy.source,

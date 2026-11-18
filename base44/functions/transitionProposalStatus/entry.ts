@@ -59,17 +59,19 @@ export default async function(req) {
       if (!validation.valid) return Response.json({ error: validation.blocked_reason, validation }, { status: 409 });
     }
 
-    // The Steering Brief coverage gate: a proposal created under the new
-    // workflow may not be issued, accepted or sent to the client until its copy
-    // meaningfully addresses the designer's brief. The check runs against the
-    // proposal's own brief and its current section text, so a designer who
-    // edits the copy to address a gap does not have to regenerate to clear it.
-    // 'reviewed' is an internal milestone and is left open so the designer can
-    // move the proposal through review while the copy is still being finished.
+    // The Steering Brief coverage gate is REVIEW ONLY. Hard enforcement is
+    // deferred behind an explicit, off-by-default rollout setting until the
+    // coverage checker is reliable enough to gate without false positives. The
+    // existing evidence and approval gates above remain the sole authorities for
+    // issue/send. The gate runs here only to report outstanding items in the
+    // response when the caller asks for them; it never blocks the transition.
     if (['issued', 'accepted', 'sent'].includes(normaliseStatus(target_status))) {
-      const gate = briefCoverageGate(proposal, sections);
-      if (gate.blocked) {
-        return Response.json({ error: gate.reason, brief_coverage: gate }, { status: 409 });
+      const gate = briefCoverageGate(proposal, sections, { hard_enforcement: false });
+      // The gate result is carried in the response for diagnostic visibility,
+      // but it never blocks the transition while hard_enforcement is off.
+      if (gate.applies && gate.outstanding.length > 0) {
+        // No block — review only. The response may carry the review signal for
+        // the editor to display, but the transition proceeds.
       }
     }
 

@@ -1,11 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
-import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditorModel.js';
+import { resolveEditorLayer, EDITOR_MODE } from '../../shared/proposalEdit/proposalEditEditorModel.js';
 import { resolveProposalReview } from '../../shared/proposalEdit/proposalReviewAuthority.js';
 import { readCompleteDocument, readProposalRecords } from '../../shared/proposalEdit/readCompleteDocument.js';
 import { resolveSectionApproval } from '../../shared/proposalApproval/sectionApprovalAuthority.js';
 import { authorizeProposalExport } from '../../shared/proposalEdit/proposalExportAuthorization.js';
 import { briefCoverageGate } from '../../shared/proposalWriter/proposalBriefCoverageGate.js';
+import { resolvePublicationBodies } from '../../shared/proposalEdit/publicationCopyAuthority.js';
+import {
+  composeWriterSectionBodies,
+  writerDraftsFromProposalSectionBody,
+} from '../../shared/proposalWriter/writerSectionMapping.js';
 import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 
 /**
@@ -37,6 +42,27 @@ import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } fro
  * the designer's own wording, where they have approved it as it stands, and the
  * validated generation or edit copy everywhere else. The history is read exactly
  * as it always was — it simply no longer overrides copy the designer has approved.
+ *
+ * The editor fields are seeded from the PUBLICATION bodies — the approved stored
+ * body where the designer has approved one, and the validated generation/edit
+ * copy everywhere else — so "Edit copy" opens the text the client actually reads.
+ * The mapping from document section types (system_design_summary) to writer
+ * contract IDs (decision_summary, what_stays_same, what_changes) is handled by
+ * the shared section mapping module, which parses the structured <h2> headings
+ * the validated copy was published under. Latest valid edits are never replaced
+ * by stale raw ProposalSection bodies: only an APPROVED stored body overrides the
+ * validated copy.
+ *
+ * The Steering Brief coverage check is a REVIEW SURFACE only. It reports
+ * outstanding brief items with plain dealer-facing section labels, but it never
+ * blocks issue/send or changes the readiness, gate, export-blocked reason or
+ * status label. Hard enforcement is deferred behind an explicit, off-by-default
+ * rollout setting until the coverage checker is reliable enough to gate without
+ * false positives. The existing evidence and approval gates remain the sole
+ * authorities.
+ *
+ * This function is PURE: it reads records and returns a model. It never writes,
+ * updates, creates or deletes any record.
  */
 export default async function(req) {
   try {
@@ -93,47 +119,101 @@ export default async function(req) {
       // Capture the raw stored section rows before they are removed from the
       // validation object. They are the single source of truth for the text the
       // designer saved (manual revisions included), used below to seed the
-      // editor fields and to run the Steering Brief coverage check.
+      // editor fields via the publication body mapping and to run the Steering
+      // Brief coverage check.
       const storedSections: Array<{ section_type: string; body: string; is_enabled?: boolean }> =
         Array.isArray(documentValidation.sections) ? documentValidation.sections : [];
       delete documentValidation.sections;
-      // ── FIX 1: seed the editor fields from the stored section bodies ──
-      // The "Edit copy" panel reads layer.fields, which the editor model built
-      // from the generation/edit layer (the GPT output or the latest valid edit).
-      // But the designer's manual revisions are saved into ProposalSection.body
-      // through the inline editor, and the main preview publishes those bodies.
-      // Without this re-seed, "Edit copy" opens the older GPT wording instead of
-      // the current approved text. The stored body is the single source of truth:
-      // generation writes it, the inline editor writes it, and the publication
-      // authority reads it. The editor model's copy is provenance.
-      const storedBodies = new Map<string, string>();
-      for (const section of storedSections) {
-        if (section?.section_type && typeof section.body === 'string' && section.body.trim()) {
-          storedBodies.set(section.section_type, section.body);
+
+      // ── Seed the editor fields from the PUBLICATION bodies ──
+      // The editor fields use writer contract IDs (decision_summary,
+      // what_stays_same, what_changes, etc.), but the stored sections use
+      // document section types (system_design_summary, etc.). The mapping is
+      // handled by the shared section mapping module: composeWriterSectionBodies
+      // converts the validated copy (writer sections) into document section HTML,
+      // resolvePublicationBodies selects the approved stored body where the
+      // designer has approved one (and the validated copy everywhere else), and
+      // writerDraftsFromProposalSectionBody parses the publication body back into
+      // writer-section drafts using the structured <h2> headings the validated
+      // copy was published under.
+      //
+      // Only an APPROVED stored body overrides the validated copy, so latest
+      // valid edits are never replaced by stale raw ProposalSection bodies. The
+      // editor opens the text the client actually reads.
+      if (layer.mode === EDITOR_MODE.EDIT_LAYER && Array.isArray(layer.export_sections)) {
+        const proposalMode = layer.proposal_mode || 'comparison';
+        // Convert the validated copy (writer sections with plain text) to
+        // document section HTML bodies, keyed by document section type.
+        const composed = composeWriterSectionBodies({
+          output: { sections: layer.export_sections },
+          mode: proposalMode,
+        });
+        const copyBodies = new Map<string, string>();
+        for (const entry of composed.bodies || []) {
+          if (entry?.section_type && typeof entry.html === 'string' && entry.html.trim()) {
+            copyBodies.set(entry.section_type, entry.html);
+          }
+        }
+        // Resolve the publication bodies: approved stored body where the
+        // designer has approved one, and the validated copy everywhere else.
+        const { bodies: publicationBodies } = resolvePublicationBodies({
+          sections: storedSections,
+          copyBodies,
+          proposalType: proposal.proposal_type || null,
+        });
+        // Recover writer-section drafts from each publication body. The
+        // structured heading parser splits the opening section (which carries
+        // three writer sections) back into its parts. Where the parser throws
+        // (headings missing or reordered by a manual edit), fall back to the
+        // validated copy for that section — the editor is never broken by a
+        // stored body that no longer matches the expected structure.
+        const writerDrafts = new Map<string, string>();
+        for (const [sectionType, pubBody] of publicationBodies.entries()) {
+          if (typeof pubBody !== 'string' || !pubBody.trim()) continue;
+          try {
+            const drafts = writerDraftsFromProposalSectionBody({
+              sectionType,
+              body: pubBody,
+              mode: proposalMode,
+            });
+            for (const [writerSectionId, text] of Object.entries(drafts)) {
+              if (typeof text === 'string' && text.trim()) {
+                writerDrafts.set(writerSectionId, text);
+              }
+            }
+          } catch {
+            // The stored body's structure does not match the expected heading
+            // layout (manual edit changed or removed headings). Fall back to
+            // the validated copy for this section — do not break the editor.
+          }
+        }
+        // Seed the editor fields, export_sections and copy.sections from the
+        // recovered writer drafts. Where no publication body was recovered for
+        // a writer section, the existing validated copy is kept unchanged.
+        if (writerDrafts.size > 0) {
+          const reseed = (entry: { section: string; text: string; [k: string]: unknown }) => {
+            const text = writerDrafts.get(entry.section);
+            return typeof text === 'string' && text.trim()
+              ? { ...entry, text }
+              : entry;
+          };
+          if (Array.isArray(layer.fields)) {
+            layer.fields = layer.fields.map((field: { section: string; text: string; present?: boolean }) => {
+              const text = writerDrafts.get(field.section);
+              return typeof text === 'string' && text.trim()
+                ? { ...field, text, present: true }
+                : field;
+            });
+          }
+          if (Array.isArray(layer.export_sections)) {
+            layer.export_sections = layer.export_sections.map(reseed);
+          }
+          if (layer.copy?.sections && Array.isArray(layer.copy.sections)) {
+            layer.copy.sections = layer.copy.sections.map(reseed);
+          }
         }
       }
-      if (storedBodies.size > 0) {
-        const reseed = (entry: { section: string; text: string; [k: string]: unknown }) => {
-          const body = storedBodies.get(entry.section);
-          return typeof body === 'string' && body.trim()
-            ? { ...entry, text: body }
-            : entry;
-        };
-        if (Array.isArray(layer.fields)) {
-          layer.fields = layer.fields.map((field: { section: string; text: string; present?: boolean }) => {
-            const body = storedBodies.get(field.section);
-            return typeof body === 'string' && body.trim()
-              ? { ...field, text: body, present: true }
-              : field;
-          });
-        }
-        if (Array.isArray(layer.export_sections)) {
-          layer.export_sections = layer.export_sections.map(reseed);
-        }
-        if (layer.copy?.sections && Array.isArray(layer.copy.sections)) {
-          layer.copy.sections = layer.copy.sections.map(reseed);
-        }
-      }
+
       layer.approval = approval;
       layer.document_validation = documentValidation;
       // What still needs a human, classified for the editor: the document's own
@@ -143,30 +223,22 @@ export default async function(req) {
       // sentence is the one the plain-language authority already states for that
       // rejection, and no validation outcome is decided here.
       layer.review = resolveProposalReview({ validation: documentValidation, fields: layer.fields });
-      // ── FIX 3: run the Steering Brief coverage check and make omissions
-      // visible during review. The proposal may not be shown as Ready to issue
-      // while material brief requirements remain unresolved. The check runs
-      // against the proposal's own brief and its current section text, so a
-      // designer who edits the copy to address a gap does not have to regenerate
-      // to clear it. Hard enforcement (blocking issue/send) remains in
-      // transitionProposalStatus; this is the review surface.
+
+      // ── Steering Brief coverage: REVIEW SURFACE ONLY ──
+      // The check runs against the proposal's own brief and its current section
+      // text, so a designer who edits the copy to address a gap sees the review
+      // update without having to regenerate. It is carried as a review signal
+      // (layer.brief_coverage) with plain dealer-facing section labels, but it
+      // NEVER changes layer.ready, layer.gate.issuable,
+      // layer.export_blocked_reason or layer.status_label. Hard enforcement is
+      // deferred behind an explicit, off-by-default rollout setting until the
+      // coverage checker is reliable. The existing evidence and approval gates
+      // remain the sole authorities for issue/send.
       const briefSections = storedSections
         .filter((s) => s && typeof s === 'object' && s.body && s.is_enabled !== false)
         .map((s) => ({ section: s.section_type, text: s.body || '' }));
-      const briefGate = briefCoverageGate(proposal, briefSections);
-      layer.brief_coverage = briefGate;
-      const documentValid = documentValidation.valid;
-      const briefClear = !briefGate.applies || !briefGate.blocked;
-      layer.ready = documentValid && briefClear;
-      layer.gate = { ...layer.gate, issuable: documentValid && briefClear };
-      layer.export_blocked_reason = briefClear
-        ? documentValidation.blocked_reason
-        : (briefGate.reason || documentValidation.blocked_reason);
-      layer.status_label = (!documentValid)
-        ? 'Needs review'
-        : (!briefClear
-          ? 'Brief coverage incomplete'
-          : 'Ready to issue');
+      layer.brief_coverage = briefCoverageGate(proposal, briefSections, { hard_enforcement: false });
+
       if (body.action === 'export') {
         // Enforcement of the approval rule, server-side, where no client can skip
         // it: nothing carrying the generated copy is issued before a person has

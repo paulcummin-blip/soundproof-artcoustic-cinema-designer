@@ -41,6 +41,7 @@ import {
 import { buildClarificationAnswers } from '../proposalClarification/clarificationAnswers.js';
 import { buildRp22DesignContext } from '../rp22DesignContext.js';
 import { readCapabilityFields } from '../parameterCapabilityFields.js';
+import { briefItems, briefItemSubjects, SUBJECT_WRITER_SECTION } from './writerClientBriefCoverage.js';
 
 // The designer's own answers to ADI's clarification questions are clarification
 // authority, read from the proposal they were stored with. Re-exported so a caller
@@ -453,11 +454,42 @@ export function buildComparisonReading({ proposal = null } = {}) {
  * the narrative brief are read from the proposal; the approved designer notes are
  * supplied by the caller, which reads them from the proposal's own sections.
  * Every entry is an instruction, and none of it is ever printed.
+ *
+ * The brief also carries `material_objectives`: the explicit, substantive
+ * requests parsed from the client brief and narrative brief, each with the
+ * section it belongs to. The writer is told to address each one in the copy it
+ * writes, within the evidence the pack allows. This is not a new authority: it
+ * is the same brief, made explicit so the writer cannot silently drop a
+ * material instruction the way a raw text block allows. The engineering
+ * validator and evidence authority are unchanged.
  */
 export function buildEditorialBrief({ proposal = null, dealerNotes = null } = {}) {
   const clientBrief = asText(proposal?.client_brief);
   const narrativeBrief = asText(proposal?.narrative_brief);
   const notes = asText(dealerNotes) || asText(proposal?.metadata?.dealer_notes);
+  const brief = { client_brief: clientBrief, narrative_brief: narrativeBrief, designer_notes: notes };
+  // Parse the material objectives from the brief so the writer has an explicit
+  // list of what to address, rather than a raw text block it can skim. Each
+  // objective carries the section it belongs to, so the writer knows where to
+  // weave it in. This is the same brief, made explicit — not a new authority.
+  let materialObjectives = [];
+  try {
+    const items = briefItems(brief);
+    materialObjectives = items
+      .map((item) => {
+        const subjects = briefItemSubjects(item);
+        const sectionKey = subjects.length > 0 ? (SUBJECT_WRITER_SECTION[subjects[0]] || null) : null;
+        return {
+          instruction: item,
+          subjects,
+          section: sectionKey,
+        };
+      })
+      .filter((entry) => entry.section !== null);
+  } catch {
+    // If the coverage module cannot parse the brief, the raw text is still
+    // carried — the writer is never left without the brief.
+  }
   return {
     rule: EDITORIAL_BRIEF_RULE,
     priority: EVIDENCE_PRIORITY_RULE,
@@ -465,6 +497,7 @@ export function buildEditorialBrief({ proposal = null, dealerNotes = null } = {}
     client_brief: clientBrief,
     narrative_brief: narrativeBrief,
     designer_notes: notes,
+    material_objectives: materialObjectives,
   };
 }
 

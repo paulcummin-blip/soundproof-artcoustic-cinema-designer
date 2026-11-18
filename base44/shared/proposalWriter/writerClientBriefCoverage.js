@@ -125,7 +125,7 @@ const GENERIC_TERMS = new Set([
    writerBriefReasoning.js beside this audit. */
 
 /** Which writer section an item's subject belongs to, so a gap is returned to the right place. */
-const SUBJECT_WRITER_SECTION = Object.freeze({
+export const SUBJECT_WRITER_SECTION = Object.freeze({
   front_wides: 'spatial_resolution',
   overheads: 'spatial_resolution',
   viewing: 'what_stays_same',
@@ -325,6 +325,40 @@ function figureStated(requirement, prose) {
   return requirement.figure ? prose.includes(requirement.figure) : true;
 }
 
+/**
+ * Generic filler entries that carry no material project instruction. A brief
+ * that consists entirely of praise adjectives and comfort words — "a nice
+ * cinema with excellent sound, lovely pictures and comfortable seating" — has
+ * no subject, no figure, no decision and no question. It is not a Steering
+ * Brief: it is a sentiment, and the coverage check treats it as empty so the
+ * gate does not pass a proposal whose brief says nothing.
+ */
+const FILLER_WORDS = new Set([
+  'nice', 'lovely', 'beautiful', 'great', 'wonderful', 'amazing', 'excellent',
+  'superb', 'fantastic', 'brilliant', 'good', 'best', 'perfect', 'ideal',
+  'sound', 'audio', 'picture', 'pictures', 'image', 'images', 'seating',
+  'comfortable', 'cinema', 'room', 'experience', 'quality', 'performance',
+  'immersion', 'immersive', 'enjoyment', 'entertainment',
+]);
+
+/**
+ * Whether a brief item is a generic filler entry with no material instruction.
+ * A filler item is one whose every content word (after removing stopwords) is a
+ * praise adjective or a comfort word. Such an item carries no subject, no
+ * figure, no decision and no question, so it is not a substantive request and
+ * the coverage check treats it as empty.
+ */
+function isFillerItem(item) {
+  const words = String(item || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9.\s-]/g, ' ')
+    .split(/\s+/)
+    .map((w) => w.replace(/^[./-]+|[./-]+$/g, ''))
+    .filter((w) => w.length >= 4 && !STOPWORDS.has(w));
+  if (words.length === 0) return true;
+  return words.every((w) => FILLER_WORDS.has(w));
+}
+
 /** The substantive requests the brief states, in the order it states them. */
 export function briefItems(brief) {
   const sources = [brief?.client_brief, brief?.narrative_brief, brief?.designer_notes];
@@ -337,7 +371,15 @@ export function briefItems(brief) {
     // A decimal figure (9.1.6, 2.35:1) is never read as a sentence end.
     for (const raw of source.split(/[\n\r•·;]+|\.\s+(?=[A-Z])/)) {
       const item = raw.trim().replace(/^[-*\s]+/, '').replace(/[.\s]+$/, '');
-      if (item.length >= 4) items.push(item);
+      if (item.length < 4) continue;
+      // A generic filler entry ("a nice cinema with excellent sound, lovely
+      // pictures and comfortable seating") carries no material instruction and
+      // is silently dropped so the coverage check never passes on a brief that
+      // says nothing. This is not a rejection of a genuine brief: a real
+      // instruction always carries at least one word that is neither a stopword
+      // nor a praise adjective.
+      if (isFillerItem(item)) continue;
+      items.push(item);
     }
   }
   return items;
