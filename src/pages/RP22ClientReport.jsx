@@ -697,7 +697,7 @@ export default function RP22ClientReport() {
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
-  const { exporting, error: exportError, handleExport: rawHandleExport } = useClientReportPdfExport({
+  const { exporting, error: exportError, handleExport: rawHandleExport, publication, retryMissing } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
     // other identity segment: the filename never depends on the report's frozen
@@ -786,9 +786,9 @@ export default function RP22ClientReport() {
   const reportFullyReady = reportReady && (adiComplete || savedNarrativeAccepted);
   // Every export entry point must wait for both the narrative and drawings.
   const handleExport = useCallback(() => {
-    if (!reportFullyReady || !exportIntegrity.ready) return;
+    if (!reportFullyReady || !exportIntegrity.ready || publication.status === 'storing') return;
     return rawHandleExport();
-  }, [reportFullyReady, exportIntegrity.ready, rawHandleExport]);
+  }, [reportFullyReady, exportIntegrity.ready, publication.status, rawHandleExport]);
   const generationFailed = readiness.state === REPORT_STATE.FAILED || adiFailed;
   // The overlay stage: "writing" once ADI is generating; "building" otherwise.
   const overlayStage = adiRunning ? 'writing' : 'building';
@@ -1040,7 +1040,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportFullyReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED || !exportIntegrity.ready}
+            disabled={!reportFullyReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || publication.status === 'storing' || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED || !exportIntegrity.ready}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
@@ -1096,6 +1096,19 @@ export default function RP22ClientReport() {
           </div>
         )}
       </div>
+
+      {publication.status !== 'idle' && (
+        <div className="client-report-screen-only" role="status" style={{ padding: '12px 32px', background: '#F8F8F7', color: '#213428' }}>
+          {publication.status === 'storing' && 'Saving report to Documents & Assets…'}
+          {publication.status === 'complete' && 'Report saved to Documents & Assets.'}
+          {publication.status === 'incomplete' && publication.failed.map((failure) => (
+            <div key={failure.key} style={{ marginBottom: 8 }}>
+              <span>Document could not be stored: {failure.error} </span>
+              <Button type="button" size="sm" onClick={() => retryMissing(failure.key)}>Retry storage</Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Body — active pages drive both screen and print ── */}
       <div className="client-report-body" style={{
