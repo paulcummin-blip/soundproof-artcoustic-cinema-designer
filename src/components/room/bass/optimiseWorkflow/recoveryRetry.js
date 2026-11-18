@@ -1,3 +1,5 @@
+import { isStructurallyCompleteBassContract } from "@/components/room/bass/completedBassResultPersistence";
+
 /**
  * recoveryRetry.js
  * -----------------
@@ -69,22 +71,14 @@ export const TERMINAL_FAILURE_OUTCOMES = new Set([
 ]);
 
 /**
- * Structural completeness check for a completed bass contract, mirroring the
- * established publication authority's isStructurallyCompleteBassContract. A
- * contract that is not structurally complete must never be accepted as an
- * authoritative result for recovery — it is either still in flight or a
- * stale/different contract. Implemented locally (rather than imported from
- * the persistence module) so the orchestrator stays testable without
- * mounting the full React app and its transitive imports.
+ * Structural completeness check for a completed bass contract. This is the
+ * ESTABLISHED publication authority's isStructurallyCompleteBassContract —
+ * imported, not re-implemented — so the orchestrator can never relax the
+ * version/metric-schema and selectedCandidate/Id requirements that a parallel
+ * local definition would silently drop. Re-exported under the legacy name so
+ * existing callers/tests import the real validator.
  */
-export function contractStructurallyComplete(contract) {
-  const status = contract?.job?.status;
-  if (!["ready", "complete"].includes(status)) return false;
-  const job = contract?.job || {};
-  if (!job.resultFingerprint) return false;
-  if (!job.currentJobFingerprint) return false;
-  return job.resultFingerprint === job.currentJobFingerprint;
-}
+export const contractStructurallyComplete = isStructurallyCompleteBassContract;
 
 /**
  * Check whether the completed bass authority is AUTHORITATIVE, structurally
@@ -135,6 +129,14 @@ export function isAuthoritativeForFingerprint(shared, fingerprint) {
  *   settings + crossover signature) from the live electronic ref. Verified at
  *   entry and every poll so a lagging cache identity cannot accept old results
  *   after settings change.
+ * @param {Function} [args.authoritativeElectronicsMatchLive] () => boolean.
+ *   Real check that the shared authoritative bass context has ingested the
+ *   CURRENT live electronic settings (crossover + per-source tuning derived
+ *   from the live subwoofer instances via the existing helpers). Pinning a live
+ *   settings signature plus a possibly-lagging cacheKey does not prove they
+ *   correspond: the authoritative electronics must match the actual current
+ *   live settings before any reuse or dispatch, and throughout the wait. A
+ *   mismatch fails with actionable settling feedback and preserves the plan.
  * @param {number} [args.sleepMs=100]       Poll interval.
  * @param {number} [args.timeoutMs=30000]   Maximum wait (no extension beyond existing).
  * @param {number} [args.dispatchGraceMs=3000] Time to wait for a queued dispatch
@@ -159,6 +161,7 @@ export async function attemptRecoveryRetry({
   sharedRef,
   phaseRef,
   readLiveIdentity,
+  authoritativeElectronicsMatchLive,
   sleepMs = 100,
   timeoutMs = 30000,
   dispatchGraceMs = 3000,
@@ -219,14 +222,37 @@ export async function attemptRecoveryRetry({
 
   const calcInProgressAtEntry = initial?.calculationInProgress === true;
 
+  // AUTHORITATIVE ELECTRONICS vs LIVE SETTINGS: pinning a live settings
+  // signature plus a possibly-lagging cacheKey does not prove they correspond.
+  // The shared authoritative bass context must have ingested the CURRENT live
+  // electronic settings (crossover + per-source tuning) before any reuse or
+  // dispatch, and throughout the wait. A mismatch fails with actionable
+  // settling feedback and preserves the plan. The caller supplies the real
+  // check (recommendationSettingsMatch against the live-derived tuning); when
+  // not supplied (legacy tests) it is treated as satisfied.
+  const authElectronicsOk = () => typeof authoritativeElectronicsMatchLive !== "function"
+    || authoritativeElectronicsMatchLive();
+  const authElectronicsDiag = () => ({});
+
   // EXPLICIT REUSE: if the pinned design already has an authoritative published
   // result, confirm it without launching another calculation — but ONLY when
-  // no other calculation is active AND no old terminal failure is present. An
-  // old terminal prohibits stale-authority reuse: the orchestrator must run a
-  // fresh calculation instead of accepting the pre-existing result.
-  if (!calcInProgressAtEntry && !hadOldTerminal
+  // no other calculation is active, no old terminal failure is present, AND the
+  // authoritative electronics match the current live settings. An old terminal
+  // prohibits stale-authority reuse: the orchestrator must run a fresh
+  // calculation instead of accepting the pre-existing result.
+  if (!calcInProgressAtEntry && !hadOldTerminal && authElectronicsOk()
       && isAuthoritativeForFingerprint(initial, pinnedCacheKey)) {
     return { action: "success", reused: true, pinned };
+  }
+  if (!authElectronicsOk()) {
+    return {
+      action: "failed",
+      reason: "The bass analysis has not settled on the current electronic settings. The saved plan is intact; retry when the settings have settled.",
+      pinned,
+      ...authElectronicsDiag(),
+      originalOutcome: hadOldTerminal ? originalOutcome : null,
+      originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+    };
   }
 
   // Helper: original-terminal diagnostics to attach to every terminal return so
@@ -242,7 +268,13 @@ export async function attemptRecoveryRetry({
   let newDispatched = false;
   let dispatchRequestId = null;
   let dispatchFingerprint = null;
+  // Capture the publication job identity BEFORE dispatch. After the wait, a
+  // CHANGED currentJobFingerprint proves a new publication landed — even when a
+  // fast cached result started AND finished between polls (calculationInProgress
+  // never observed true). An UNCHANGED pre-dispatch authority is never accepted.
+  let preDispatchJobFingerprint = null;
   if (!calcInProgressAtEntry) {
+    preDispatchJobFingerprint = initial?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
     const dispatch = initial.onCalculate();
     if (dispatch && dispatch.action === "blocked") {
       return {
@@ -269,6 +301,8 @@ export async function attemptRecoveryRetry({
         originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
+  } else {
+    preDispatchJobFingerprint = initial?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
   }
 
   const start = Date.now();
@@ -330,14 +364,35 @@ export async function attemptRecoveryRetry({
       };
     }
 
+    // Authoritative electronics must continue to match the current live
+    // settings throughout the wait; a lagging authoritative context is not a
+    // valid result for the pinned design.
+    if (!authElectronicsOk()) {
+      return {
+        action: "failed",
+        reason: "The bass analysis has not settled on the current electronic settings. The saved plan is intact; retry when the settings have settled.",
+        pinned,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+      };
+    }
+
     const inProgress = state?.calculationInProgress === true;
     if (inProgress) newRequestObserved = true;
 
-    // Once the new request was observed running and has now settled, a terminal
-    // outcome is the NEW request's failure — return it promptly. While the new
-    // request is still running, the outcome is the phase (not terminal), so the
-    // lingering OLD terminal is never mistaken for the new failure.
-    if (newRequestObserved && !inProgress) {
+    // Job changed: the publication job's currentJobFingerprint advanced from
+    // the pre-dispatch value, proving a new publication landed — EVEN when a
+    // fast cached result started and finished between polls and
+    // calculationInProgress was never observed true. An UNCHANGED pre-dispatch
+    // authority is never accepted.
+    const jobFp = state?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
+    const jobChanged = jobFp !== preDispatchJobFingerprint;
+
+    // Once the request has settled (!inProgress) and the publication job
+    // advanced, classify the outcome. This covers both the observed-running
+    // path (newRequestObserved) and the fast-cached-result race (jobChanged
+    // with newRequestObserved still false).
+    if (!inProgress && jobChanged) {
       const outcome = state?.calculationOutcome || null;
       if (TERMINAL_FAILURE_OUTCOMES.has(outcome)) {
         return {
@@ -353,13 +408,24 @@ export async function attemptRecoveryRetry({
       if (isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
         return { action: "success", reused: false, pinned, ...originalDiag };
       }
+      // The job advanced but the published result does not match the pinned
+      // design — a different design's result landed. Do not accept it.
+      return {
+        action: "failed",
+        reason: "The recalculated bass result does not match the current design. The saved plan is intact; retry when the design is settled.",
+        pinned,
+        actualCacheKey: state?.cacheKey || null,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+      };
     }
 
-    // A dispatched request that never made calculationInProgress true within
-    // the grace is a no-op dispatch (e.g. canCalculate flipped false right
-    // after entry). Do not wait out the full timeout for a request that never
-    // started.
-    if (newDispatched && !newRequestObserved
+    // A dispatched request that never advanced the publication job and never
+    // made calculationInProgress true within the grace is a no-op dispatch
+    // (e.g. canCalculate flipped false right after entry). Do not wait out the
+    // full timeout for a request that never started. A job that DID advance is
+    // not a no-op even if inProgress was never observed.
+    if (newDispatched && !newRequestObserved && !jobChanged
         && Date.now() - start > dispatchGraceMs) {
       return {
         action: "failed",

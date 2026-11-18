@@ -14,6 +14,33 @@ import {
   appendRecoveryFailure,
   resetWorkflow,
 } from "../src/components/room/bass/optimiseWorkflow/optimiseWorkflowStore.js";
+import {
+  BASS_ANALYSIS_CONTRACT_VERSION,
+  RP22_BASS_METRIC_SCHEMA_VERSION,
+} from "@/lib/bassAuthorityVersion";
+
+// Build a structurally-complete contract that satisfies the ESTABLISHED
+// isStructurallyCompleteBassContract (version + metricSchemaVersion +
+// selectedCandidate/Id + matching fingerprints). The recovery orchestrator now
+// imports that validator, so every authoritative fixture must be complete.
+function buildContract(cacheKey, { status = "complete" } = {}) {
+  return {
+    version: BASS_ANALYSIS_CONTRACT_VERSION,
+    metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
+    selectedCandidate: { perSeatP20Results: [{ seatId: "seat-1", variationDbRaw: 3, level: "L3" }] },
+    selectedCandidateId: "cand-" + cacheKey,
+    job: {
+      status,
+      metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
+      resultFingerprint: cacheKey,
+      currentJobFingerprint: cacheKey,
+    },
+  };
+}
+
+function buildAuthority(cacheKey, opts) {
+  return { authorityStatus: "AUTHORITATIVE", contract: buildContract(cacheKey, opts) };
+}
 
 // ---------------------------------------------------------------------------
 // Bass-owner lifecycle simulator.
@@ -52,17 +79,8 @@ function makeOwner({
     calculationOutcome: initialInProgress ? "preparing" : initialOutcome,
     terminalMessage: initialInProgress ? null : initialTerminalMessage,
     completedBassAuthority: initialAuthoritative
-      ? {
-          authorityStatus: "AUTHORITATIVE",
-          contract: {
-            job: {
-              status: "complete",
-              resultFingerprint: cacheKey,
-              currentJobFingerprint: cacheKey,
-            },
-          },
-        }
-      : { authorityStatus: "UPDATING", contract: { job: { status: "updating" } } },
+      ? buildAuthority(cacheKey)
+      : { authorityStatus: "UPDATING", contract: { job: { status: "updating", currentJobFingerprint: null } } },
   };
   const sharedRef = { current: state };
   let seq = 0;
@@ -87,16 +105,7 @@ function makeOwner({
         if (newOutcome === "success") {
           state.calculationOutcome = "success";
           state.terminalMessage = null;
-          state.completedBassAuthority = {
-            authorityStatus: "AUTHORITATIVE",
-            contract: {
-              job: {
-                status: "complete",
-                resultFingerprint: state.cacheKey,
-                currentJobFingerprint: state.cacheKey,
-              },
-            },
-          };
+          state.completedBassAuthority = buildAuthority(state.cacheKey);
         } else {
           state.calculationOutcome = newOutcome;
           state.terminalMessage = `New calculation ${newOutcome}: simulated failure`;
@@ -532,10 +541,7 @@ test("recovery: only onCalculate called, no search/apply", async () => {
       const s = owner.sharedRef.current;
       s.calculationInProgress = false;
       s.calculationOutcome = "success";
-      s.completedBassAuthority = {
-        authorityStatus: "AUTHORITATIVE",
-        contract: { job: { status: "complete", resultFingerprint: s.cacheKey, currentJobFingerprint: s.cacheKey } },
-      };
+      s.completedBassAuthority = buildAuthority(s.cacheKey);
     }
   }, 5);
   owner.sharedRef.current.runOptimisation = () => calls.push("search");
@@ -574,31 +580,130 @@ test("recovery: orchestrator does not mutate settings or plan fields", async () 
 });
 
 // ---------------------------------------------------------------------------
+// 15a. AUTHORITATIVE ELECTRONICS vs LIVE SETTINGS: at entry, the authoritative
+//      bass context has NOT ingested the current live electronic settings (a
+//      lagging authoritative). Reuse AND dispatch are refused with actionable
+//      settling feedback; the plan is preserved.
+// ---------------------------------------------------------------------------
+test("recovery: authoritative electronics not settled at entry fails with settling feedback", async () => {
+  let matchCalls = 0;
+  const owner = makeOwner({ initialOutcome: "rejected", initialTerminalMessage: "orig", newOutcome: "success" });
+  const id = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    authoritativeElectronicsMatchLive: () => { matchCalls += 1; return false; },
+    sleepMs: 5, timeoutMs: 200, sleep: realSleep,
+  });
+  assert.equal(result.action, "failed");
+  assert.match(result.reason, /not settled on the current electronic settings/);
+  assert.equal(result.originalOutcome, "rejected", "old diagnostics preserved");
+  assert.ok(matchCalls >= 1, "authoritative-electronics check ran at entry");
+});
+
+test("recovery: authoritative electronics mismatch during wait fails", async () => {
+  let matchCalls = 0;
+  const owner = makeOwner({ initialOutcome: "rejected", initialTerminalMessage: "orig", newOutcome: "success", startAfterTicks: 2, resolveAfterTicks: 8 });
+  const id = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    authoritativeElectronicsMatchLive: () => { matchCalls += 1; return matchCalls < 3; },
+    sleepMs: 5, timeoutMs: 5000, sleep: realSleep,
+  });
+  assert.equal(result.action, "failed");
+  assert.match(result.reason, /not settled on the current electronic settings/);
+  assert.ok(matchCalls >= 3, "mismatch detected during the wait");
+});
+
+// ---------------------------------------------------------------------------
+// 15b. FAST CACHED RESULT RACE: a fast cached result starts AND finishes
+//      between 100ms polls — calculationInProgress is never observed true.
+//      Relying solely on observed inProgress would give a false "could not
+//      start". The orchestrator detects the CHANGED publication job
+//      (currentJobFingerprint advanced from the pre-dispatch value) and accepts
+//      the authoritative result; it never accepts the unchanged pre-dispatch
+//      authority.
+// ---------------------------------------------------------------------------
+test("recovery: fast cached result between polls is accepted via changed job fingerprint", async () => {
+  // Authoritative result present at entry (pre-dispatch authority). onCalculate
+  // publishes a new authoritative result for the SAME pinned cacheKey without
+  // ever setting calculationInProgress true (fast cache hit between polls).
+  const owner = makeOwner({ initialOutcome: "rejected", initialTerminalMessage: "orig" });
+  const preDispatch = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
+  owner.sharedRef.current.onCalculate = () => {
+    // Fast: publish immediately, no inProgress phase ever observed.
+    setTimeout(() => {
+      owner.sharedRef.current.calculationInProgress = false;
+      owner.sharedRef.current.calculationOutcome = "success";
+      owner.sharedRef.current.terminalMessage = null;
+      owner.sharedRef.current.completedBassAuthority = buildAuthority(owner.sharedRef.current.cacheKey);
+    }, 6);
+    return { action: "queued", requestId: "r1", fingerprint: owner.sharedRef.current.cacheKey };
+  };
+  const id = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    sleepMs: 50, timeoutMs: 5000, sleep: realSleep,
+  });
+  assert.equal(result.action, "success", "fast cached result accepted via changed job fingerprint");
+  assert.equal(result.reused, false);
+  const postJob = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
+  assert.notEqual(postJob, preDispatch, "the publication job advanced from the pre-dispatch value");
+  assert.equal(postJob, "cal:v1:design");
+});
+
+test("recovery: unchanged pre-dispatch authority is never accepted (no job change)", async () => {
+  // onCalculate is a no-op: it never starts a calculation and never publishes a
+  // new job. The pre-dispatch authority stays unchanged. The orchestrator must
+  // NOT accept it; it fails with "could not be started" after the grace.
+  const owner = makeOwner({ initialOutcome: "rejected", initialTerminalMessage: "orig" });
+  owner.sharedRef.current.onCalculate = () => ({ action: "queued", requestId: "r1", fingerprint: owner.sharedRef.current.cacheKey });
+  const id = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    sleepMs: 5, timeoutMs: 5000, dispatchGraceMs: 40, sleep: realSleep,
+  });
+  assert.equal(result.action, "failed");
+  assert.match(result.reason, /could not be started/);
+});
+
+// ---------------------------------------------------------------------------
 // 16. isAuthoritativeForFingerprint / contractStructurallyComplete.
 // ---------------------------------------------------------------------------
-test("contractStructurallyComplete requires ready/complete + matching fingerprints", () => {
+// contractStructurallyComplete is the ESTABLISHED isStructurallyCompleteBassContract
+// (imported, not a relaxed parallel definition): it requires version +
+// metricSchemaVersion (contract AND job) + selectedCandidate/Id + matching
+// fingerprints. A minimal contract missing those fields is NOT complete.
+test("contractStructurallyComplete is the established validator (version/metricSchema/selectedCandidate required)", () => {
+  assert.equal(contractStructurallyComplete(buildContract("fp")), true);
+  assert.equal(contractStructurallyComplete(buildContract("fp", { status: "ready" })), true);
+  // Minimal contract missing version/metricSchemaVersion/selectedCandidate -> not complete.
   assert.equal(contractStructurallyComplete({
     job: { status: "complete", resultFingerprint: "fp", currentJobFingerprint: "fp" },
-  }), true);
-  assert.equal(contractStructurallyComplete({
-    job: { status: "ready", resultFingerprint: "fp", currentJobFingerprint: "fp" },
-  }), true);
+  }), false, "missing version/metricSchemaVersion/selectedCandidate rejected");
   assert.equal(contractStructurallyComplete({
     job: { status: "updating", resultFingerprint: "fp", currentJobFingerprint: "fp" },
   }), false);
   assert.equal(contractStructurallyComplete({
-    job: { status: "complete", resultFingerprint: "fp", currentJobFingerprint: "other" },
+    ...buildContract("fp"),
+    job: { status: "complete", metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, resultFingerprint: "fp", currentJobFingerprint: "other" },
   }), false, "mismatched currentJobFingerprint is not complete");
   assert.equal(contractStructurallyComplete({ job: { status: "complete" } }), false);
 });
 
 test("isAuthoritativeForFingerprint requires authoritative + structural + matching fingerprints", () => {
-  const ok = {
-    completedBassAuthority: {
-      authorityStatus: "AUTHORITATIVE",
-      contract: { job: { status: "complete", resultFingerprint: "fp-A", currentJobFingerprint: "fp-A" } },
-    },
-  };
+  const ok = { completedBassAuthority: buildAuthority("fp-A") };
   assert.equal(isAuthoritativeForFingerprint(ok, "fp-A"), true);
   assert.equal(isAuthoritativeForFingerprint(ok, "fp-B"), false);
   assert.equal(isAuthoritativeForFingerprint({ ...ok, completedBassAuthority: { ...ok.completedBassAuthority, authorityStatus: "UPDATING" } }, "fp-A"), false);
@@ -606,7 +711,7 @@ test("isAuthoritativeForFingerprint requires authoritative + structural + matchi
   const stale = {
     completedBassAuthority: {
       authorityStatus: "AUTHORITATIVE",
-      contract: { job: { status: "complete", resultFingerprint: "fp-A", currentJobFingerprint: "fp-X" } },
+      contract: { ...buildContract("fp-A"), job: { status: "complete", metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, resultFingerprint: "fp-A", currentJobFingerprint: "fp-X" } },
     },
   };
   assert.equal(isAuthoritativeForFingerprint(stale, "fp-A"), false, "stale currentJobFingerprint rejected");

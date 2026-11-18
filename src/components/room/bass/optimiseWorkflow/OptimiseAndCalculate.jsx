@@ -1373,6 +1373,18 @@ export default function OptimiseAndCalculate({
             settingsSignature: stable({ instances: live.subwooferInstances, crossover: live.appState?.splConfig?.crossover }),
           };
         },
+        // The shared authoritative bass context must have ingested the CURRENT
+        // live electronic settings before any reuse or dispatch: a live settings
+        // signature plus a lagging cacheKey does not prove they correspond.
+        authoritativeElectronicsMatchLive: () => {
+          const live = liveElectronicRef.current;
+          const state = sharedRef.current;
+          if (!live || !state?.authoritative) return false;
+          const liveTuning = (live.subwooferInstances || [])
+            .filter(s => s.enabled !== false)
+            .map(s => ({ sourceId: s.id, delayMs: s.delayMs, gainDb: s.gainDb, phaseControlDeg: s.phaseControlDeg, polarity: s.polarity }));
+          return recommendationSettingsMatch(state.authoritative, { crossover: live.appState?.splConfig?.crossover, tuning: liveTuning });
+        },
       });
       if (result.action === "success") {
         // Merge-only recovery complete: preserves autoApplied, recommendations
