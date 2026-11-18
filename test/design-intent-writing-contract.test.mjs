@@ -152,7 +152,7 @@ describe('C. The final Design Intent language rules reach the prompt', () => {
     expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/timbre matching/i);
     expect(DESIGN_INTENT_CONTENT_BRIEF).toMatch(/dynamic range/i);
     expect(DESIGN_INTENT_REQUIREMENT).toContain(
-      'substantial headroom from the screen channels at the reference position and useful reserve from the surround and overhead speakers',
+      'Use substantial headroom or useful reserve only when the published evidence supports that strength',
     );
     // No literal sentence frames remain.
     expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/APPROVED SENTENCE FRAMES/);
