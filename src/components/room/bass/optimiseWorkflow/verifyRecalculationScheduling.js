@@ -3,25 +3,52 @@
  * --------------------------------
  * Production identity/settings-wait-and-publication scheduling helper used by
  * performElectronicUpdate.verify. Extracted so the scheduling logic — settings
- * settle wait, cacheKey advancement wait, onCalculate dispatch, publication
- * wait — is testable without mounting the full React component or re-implement
- * the physics/verification match logic.
+ * settle wait, cacheKey advancement wait, authoritative-settings confirmation,
+ * onCalculate dispatch, publication wait, pinned-fingerprint verification — is
+ * testable without mounting the full React component or re-implementing the
+ * physics/verification match logic.
  *
- * The dispatch fingerprint is captured AT DISPATCH (the cacheKey at the moment
- * onCalculate is called), not at completion, so a stale-scheduling bug where
- * onCalculate is called before the cacheKey has advanced is detectable: the
- * dispatch fingerprint would equal the pre-commit key.
+ * PER-COMMIT preCommitCacheKey: the caller captures the cacheKey immediately
+ * before EACH commit (apply commit and restore commit) and passes that key to
+ * the corresponding verify. A single key captured once before the whole
+ * transaction is the BASELINE; using it for the restore verify would wait for
+ * baseline !== baseline forever, or dispatch on the still-applied candidate
+ * key before the rollback settles. Each verify waits for the bass owner to
+ * advance its cacheKey past the key that was current immediately before THIS
+ * commit.
  *
- * The cacheKey advancement wait applies to BOTH apply and restore paths. A
- * stale restored-design handler must never be scheduled: waiting for the
- * cacheKey to advance past the pre-commit value before calling onCalculate
- * guarantees the bass analysis owner has registered the restored settings.
+ * IDENTITY GUARD: an injected identityGuard() is called EVERY wait poll. It
+ * checks io.current() and the project/version still match, so a project
+ * switch, version switch or closed persistence session aborts the wait
+ * promptly instead of accepting a result for a different design.
  *
- * The publication wait is delegated to an injected waitForPublication function
- * so this helper has no dependency on the production trace/capture machinery.
- * The settings match and result match checks are performed by the CALLER using
- * the real recommendationSettingsMatch / recommendationResultMatches functions,
- * so this helper never duplicates that logic.
+ * AUTHORITATIVE SETTINGS: an injected authoritativeSettingsMatch() — built by
+ * the caller from receipt.expectedEffectiveTuning / beforeEffectiveTuning and
+ * the target crossover — must return true BEFORE dispatch. This requires the
+ * authoritative bass context to have ingested the committed tuning, so an
+ * arbitrary geometry/cache advance cannot masquerade as the requested
+ * electronic change. The helper never duplicates recommendationSettingsMatch;
+ * the caller supplies the real one.
+ *
+ * NO-OP: when the caller declares the commit a no-op (before === after), the
+ * helper confirms the EXISTING published result is current for the current
+ * cacheKey and returns without dispatching or waiting for advancement. A no-op
+ * must never wait for a cacheKey that will not advance.
+ *
+ * DISPATCH FINGERPRINT: captured AT DISPATCH (the cacheKey at the moment
+ * onCalculate is called). After publication, the result fingerprint, the
+ * currentJob fingerprint AND the live cacheKey must ALL equal the dispatch
+ * fingerprint; a result that belongs to a different design is rejected. A
+ * stale-scheduling bug (onCalculate called before the cacheKey advanced) is
+ * detectable: the dispatch fingerprint would equal the pre-commit key.
+ *
+ * EXPLICIT FAILURES: canCalculate false, a null cacheKey, a blocked dispatch,
+ * an authoritative-settings mismatch and a publication fingerprint mismatch
+ * each return a distinct structured reason — the helper never falls through
+ * to dispatch after a timeout without classifying. The publication wait is
+ * delegated to an injected waitForPublication; a throw from it is converted to
+ * a structured failure (identity-changed-during-publication vs
+ * publication-failed), never re-thrown.
  */
 import { settingsEqual } from "./electronicApplication.js";
 
@@ -31,15 +58,19 @@ import { settingsEqual } from "./electronicApplication.js";
  * @param {Object} args.phaseRef             Ref used for cancel detection.
  * @param {Function} args.readLiveSettings   () => { instances, crossover } — live settings.
  * @param {Object} args.targetSettings       Committed settings to settle to.
- * @param {string} args.preCommitCacheKey    cacheKey captured before the electronic commit.
- * @param {Function} args.waitForPublication async (sharedRef, phaseRef) => boolean.
+ * @param {string} args.preCommitCacheKey    cacheKey captured immediately before THIS commit.
+ * @param {Function} [args.identityGuard]    () => boolean — io.current + project/version guard.
+ * @param {Function} [args.authoritativeSettingsMatch] () => boolean — real recommendationSettingsMatch
+ *   against shared.authoritative for the target tuning; required before dispatch.
+ * @param {boolean} [args.noOp=false]        True when the commit changes nothing (before === after).
+ * @param {Function} args.waitForPublication async (sharedRef, phaseRef) => boolean | throws.
  * @param {Function} [args.sleep]            Injectable sleep for tests.
  * @param {number} [args.settleTimeoutMs]
  * @param {number} [args.cacheAdvanceTimeoutMs]
  * @param {number} [args.settlePollMs]
  * @param {number} [args.cachePollMs]
  *
- * @returns {Promise<{ok: boolean, reason?: string, dispatchFingerprint?: string|null, resolvedCacheKey?: string|null}>}
+ * @returns {Promise<{ok: boolean, reason?: string, dispatchFingerprint?: string|null, resolvedCacheKey?: string|null, noOp?: boolean, resultFingerprint?: string|null, currentJobFingerprint?: string|null, currentCacheKey?: string|null, error?: string}>}
  */
 export async function verifyRecalculationScheduling({
   sharedRef,
@@ -47,6 +78,9 @@ export async function verifyRecalculationScheduling({
   readLiveSettings,
   targetSettings,
   preCommitCacheKey,
+  identityGuard,
+  authoritativeSettingsMatch,
+  noOp = false,
   waitForPublication,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   settleTimeoutMs = 15000,
@@ -54,55 +88,132 @@ export async function verifyRecalculationScheduling({
   settlePollMs = 50,
   cachePollMs = 100,
 }) {
-  // 1. Wait for the live settings to settle to the committed target.
+  const cancelled = () => phaseRef?.current === "cancelled";
+  const identityOk = () => typeof identityGuard !== "function" || identityGuard();
+  const authOk = () => typeof authoritativeSettingsMatch !== "function" || authoritativeSettingsMatch();
+
+  // 1. Wait for the live settings to settle to the committed target. The
+  //    identity guard runs every poll so a project/version change or a closed
+  //    persistence session aborts the settle wait promptly.
   const settleStart = Date.now();
   while (Date.now() - settleStart < settleTimeoutMs) {
-    if (phaseRef?.current === "cancelled") return { ok: false, reason: "cancelled" };
+    if (cancelled()) return { ok: false, reason: "cancelled" };
+    if (!identityOk()) return { ok: false, reason: "identity-changed" };
     if (settingsEqual(readLiveSettings(), targetSettings)) break;
     await sleep(settlePollMs);
   }
+  if (cancelled()) return { ok: false, reason: "cancelled" };
+  if (!identityOk()) return { ok: false, reason: "identity-changed" };
   if (!settingsEqual(readLiveSettings(), targetSettings)) {
     return { ok: false, reason: "settings-not-settled" };
   }
 
-  // 2. Wait for the bass analysis owner to advance its cacheKey from the
-  //    pre-commit value before calling onCalculate. Calling onCalculate with a
-  //    stale cacheKey queues the previous design and leaves the newly applied
-  //    settings permanently stale. Applies to restore too: a stale
-  //    restored-design handler must never be scheduled.
-  const cacheStart = Date.now();
-  while (Date.now() - cacheStart < cacheAdvanceTimeoutMs) {
-    if (phaseRef?.current === "cancelled") return { ok: false, reason: "cancelled" };
-    const probe = sharedRef.current;
-    if (probe?.cacheKey && probe.cacheKey !== preCommitCacheKey && probe?.canCalculate === true) break;
-    await sleep(cachePollMs);
-  }
-  if (sharedRef.current?.cacheKey === preCommitCacheKey) {
-    return { ok: false, reason: "cacheKey-not-advanced" };
+  // 2. No-op commit (before === after): the design did not change, so the
+  //    cacheKey will not advance. Confirm the EXISTING published result is
+  //    current for the current cacheKey and return without dispatching. If the
+  //    existing result is not current (stale), fall through to a real
+  //    calculation rather than accepting a stale publication.
+  if (noOp) {
+    const cur = sharedRef.current?.cacheKey || null;
+    if (!cur) return { ok: false, reason: "no-cache-key" };
+    const job = sharedRef.current?.completedBassAuthority?.contract?.job || {};
+    if (job.resultFingerprint === cur && job.currentJobFingerprint === cur) {
+      return { ok: true, dispatchFingerprint: cur, resolvedCacheKey: cur, noOp: true };
+    }
+    // Existing publication is not current for the no-op key: calculate.
   }
 
-  // 3. Capture the dispatch fingerprint AT DISPATCH — the cacheKey at the
+  // 3. Wait for the bass owner to advance its cacheKey past the per-commit
+  //    pre-commit value, with canCalculate true AND the authoritative settings
+  //    ingested (real recommendationSettingsMatch). Calling onCalculate with a
+  //    stale cacheKey queues the previous design; dispatching before the
+  //    authoritative tuning settled would let a geometry/cache advance
+  //    masquerade as the requested electronic change.
+  const cacheStart = Date.now();
+  while (Date.now() - cacheStart < cacheAdvanceTimeoutMs) {
+    if (cancelled()) return { ok: false, reason: "cancelled" };
+    if (!identityOk()) return { ok: false, reason: "identity-changed" };
+    const probe = sharedRef.current;
+    const key = probe?.cacheKey || null;
+    if (key && key !== preCommitCacheKey && probe?.canCalculate === true && authOk()) break;
+    await sleep(cachePollMs);
+  }
+  if (cancelled()) return { ok: false, reason: "cancelled" };
+  if (!identityOk()) return { ok: false, reason: "identity-changed" };
+
+  // Explicit failure classification — never fall through to dispatch after a
+  // timeout without a precise reason. Each condition is checked in order.
+  const probe = sharedRef.current;
+  const advancedKey = probe?.cacheKey || null;
+  if (!advancedKey) return { ok: false, reason: "no-cache-key" };
+  if (advancedKey === preCommitCacheKey) return { ok: false, reason: "cacheKey-not-advanced" };
+  if (probe?.canCalculate !== true) return { ok: false, reason: "cannot-calculate" };
+  if (!authOk()) return { ok: false, reason: "authoritative-settings-mismatch" };
+
+  // 4. Capture the dispatch fingerprint AT DISPATCH — the cacheKey at the
   //    moment onCalculate is called — so a stale-scheduling bug (onCalculate
   //    called before the cacheKey advanced) is detectable: the dispatch
   //    fingerprint would equal the pre-commit key.
-  const dispatchFingerprint = sharedRef.current?.cacheKey || null;
+  const dispatchFingerprint = advancedKey;
 
-  // 4. Call onCalculate for the advanced design.
+  // 5. Dispatch onCalculate. A blocked dispatch, a missing onCalculate, a
+  //    dispatch error or a dispatch fingerprint that disagrees with the pinned
+  //    cacheKey is an explicit structured failure.
   const live = sharedRef.current;
   if (typeof live?.onCalculate !== "function") {
     return { ok: false, reason: "no-onCalculate", dispatchFingerprint };
   }
-  live.onCalculate();
+  let dispatch = null;
+  try {
+    dispatch = live.onCalculate();
+  } catch (e) {
+    return { ok: false, reason: "dispatch-error", dispatchFingerprint, error: e?.message };
+  }
+  if (dispatch && dispatch.action === "blocked") {
+    return { ok: false, reason: "dispatch-blocked", dispatchFingerprint };
+  }
+  if (dispatch && dispatch.fingerprint && dispatch.fingerprint !== dispatchFingerprint) {
+    return { ok: false, reason: "dispatch-fingerprint-mismatch", dispatchFingerprint, actualFingerprint: dispatch.fingerprint };
+  }
 
-  // 5. Wait for publication (delegated to the injected waitForPublication).
-  const published = await waitForPublication(sharedRef, phaseRef);
+  // 6. Publication wait. A throw from the injected waitForPublication is
+  //    converted to a structured failure: if the identity changed during the
+  //    wait, report that (do not attribute a different design's terminal
+  //    failure to this verify); otherwise report publication-failed with the
+  //    terminal message.
+  let published;
+  try {
+    published = await waitForPublication(sharedRef, phaseRef);
+  } catch (e) {
+    if (!identityOk()) return { ok: false, reason: "identity-changed-during-publication", dispatchFingerprint, error: e?.message };
+    return { ok: false, reason: "publication-failed", dispatchFingerprint, error: e?.message };
+  }
+  if (cancelled()) return { ok: false, reason: "cancelled", dispatchFingerprint };
   if (!published) return { ok: false, reason: "publication-timeout", dispatchFingerprint };
+  if (!identityOk()) return { ok: false, reason: "identity-changed-during-publication", dispatchFingerprint };
 
-  return {
-    ok: true,
-    dispatchFingerprint,
-    resolvedCacheKey: sharedRef.current?.cacheKey || null,
-  };
+  // 7. Pin the dispatch fingerprint: the published result fingerprint, the
+  //    currentJob fingerprint AND the live cacheKey must ALL equal the
+  //    dispatch fingerprint. A result that belongs to a different design —
+  //    including a mutable-newdesign that landed during the wait — is rejected.
+  const job = sharedRef.current?.completedBassAuthority?.contract?.job || {};
+  const resultFingerprint = job.resultFingerprint || null;
+  const currentJobFingerprint = job.currentJobFingerprint || null;
+  const currentCacheKey = sharedRef.current?.cacheKey || null;
+  if (resultFingerprint !== dispatchFingerprint
+      || currentJobFingerprint !== dispatchFingerprint
+      || currentCacheKey !== dispatchFingerprint) {
+    return {
+      ok: false,
+      reason: "publication-fingerprint-mismatch",
+      dispatchFingerprint,
+      resultFingerprint,
+      currentJobFingerprint,
+      currentCacheKey,
+    };
+  }
+
+  return { ok: true, dispatchFingerprint, resolvedCacheKey: currentCacheKey };
 }
 
 export default verifyRecalculationScheduling;
