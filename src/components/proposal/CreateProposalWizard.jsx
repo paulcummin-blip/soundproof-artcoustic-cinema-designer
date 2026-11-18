@@ -65,7 +65,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // A proposal the designer stepped away from — to record an assessment, or to
   // bring a Project Report up to date — comes back exactly as they left it, and a
   // Generate they had already asked for continues on its own when it can.
-  const [restoredDraft] = useState(() => (regenerateFrom ? null : readWizardDraft({ projectId: initialProjectId, versionId: initialVersionId })));
+  // A draft is restored only when an entry project is resolved. Without one
+  // (sidebar entry with no active project) the wizard starts at the project-
+  // selection step and a stale session draft for another project is never
+  // silently resumed.
+  const [restoredDraft] = useState(() => (regenerateFrom || !initialProjectId ? null : readWizardDraft({ projectId: initialProjectId, versionId: initialVersionId })));
   const [step, setStep] = useState(regenerateFrom ? 2 : (restoredDraft?.step ?? (initialVersionId ? 2 : 0)));
   const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || restoredDraft?.projectId || initialProjectId || null);
   const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || restoredDraft?.proposalType || (initialVersionId ? 'system_summary' : null));

@@ -112,7 +112,7 @@ export default function ProposalEditStatusBanner({ layer, children = null, maste
             </ul>
           )}
 
-          {layer.brief_coverage?.outstanding?.length > 0 && (
+          {masterAdmin && layer.brief_coverage?.outstanding?.length > 0 && (
             <div role="status">
               <p style={TEXT}>Review these Steering Brief requirements in the current proposal:</p>
               <ul style={{ ...TEXT, paddingLeft: 18 }}>

@@ -42,7 +42,7 @@ export function useProposalPreparation({
   runGenerate = null,
 } = {}) {
   const [preparing, setPreparing] = useState(false);
-  const pendingGenerateRef = useRef(readWizardDraft({ projectId, versionId: selectedVersionIds[0] || null })?.pendingGenerate === true);
+  const pendingGenerateRef = useRef(projectId ? (readWizardDraft({ projectId, versionId: selectedVersionIds[0] || null })?.pendingGenerate === true) : false);
   const autoResumeRef = useRef(false);
 
   const preparation = useMemo(() => resolvePreparation({

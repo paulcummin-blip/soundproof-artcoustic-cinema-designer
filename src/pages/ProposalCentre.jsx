@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
 import useProposalEntryContext from '@/components/proposal/wizard/useProposalEntryContext';
-import { hasResumableDraft } from '@/components/proposal/wizard/proposalWizardDraft';
+import { useActiveProjectId } from '@/components/state/project-session';
 import ProposalLibraryTab from '@/components/proposal/library/ProposalLibraryTab';
 import { Plus, ChevronLeft } from 'lucide-react';
 
@@ -31,18 +31,34 @@ import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typog
 export default function ProposalCentre() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // The wizard can also be opened from another page — the Project Library's
-  // readiness banner links to ?create=1 — so the flag is read from the URL as
-  // well as from the Create Proposal button below.
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => normaliseTab(searchParams.get('tab')));
-  // A proposal the designer stepped away from — to record an assessment or to bring
-  // a Project Report up to date — reopens where they left it: their project, type,
-  // versions, brief, answers and step all return, and the Generate they had already
-  // asked for continues by itself.
-  const [showWizard, setShowWizard] = useState(() => searchParams.get('create') === '1' || hasResumableDraft());
+
+  // The entry context decides which project the wizard opens for. An explicit
+  // Cinema Designer link (create=1 with projectId/versionId) wins; a sidebar
+  // entry (no URL parameters) resolves to the active workspace project; an
+  // "Open Client Proposal" link (versionId without create) opens the library.
+  const urlProjectId = searchParams.get('projectId');
+  const urlVersionId = searchParams.get('versionId');
+  const isCreateEntry = searchParams.get('create') === '1';
+  const isSidebarEntry = !isCreateEntry && !urlProjectId && !urlVersionId;
+
+  const activeProjectId = useActiveProjectId();
+  // The project the wizard opens for: the URL project, then the active workspace
+  // project, then nothing. A stale session draft never supplies a project of its
+  // own, so it can never pull the wizard into a different project.
+  const entryProjectId = urlProjectId || activeProjectId || null;
+  const entryVersionId = urlVersionId || null;
+
+  // The wizard opens for a Cinema Designer create link or a sidebar entry. A
+  // sidebar entry with an active project opens for that project; with no active
+  // project it opens at the normal project-selection step. A draft is restored
+  // only when it matches the entry project (and version, where supplied) — the
+  // wizard's own read filters by these IDs, so a draft for another project is
+  // never silently resumed.
+  const [showWizard, setShowWizard] = useState(() => isCreateEntry || isSidebarEntry);
   const [regenerateFrom, setRegenerateFrom] = useState(null);
-  const entryContext = useProposalEntryContext(searchParams.get('projectId'), searchParams.get('versionId'));
+  const entryContext = useProposalEntryContext(entryProjectId, entryVersionId);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
   // A URL asking for a tab that is no longer offered is redirected to the
