@@ -145,7 +145,7 @@ export default function ProposalEditFields({
         }}
         >
           {!lastSave.ok && (lastSave.message || 'The edit could not be saved.')}
-          {lastSave.ok && lastSave.valid && `Edit ${lastSave.editNumber ?? ''} saved and validated. Ready to issue.`}
+          {lastSave.ok && lastSave.valid && `Edit ${lastSave.editNumber ?? ''} saved and validated. Check the proposal review status above.`}
           {lastSave.ok && !lastSave.valid && `Edit ${lastSave.editNumber ?? ''} saved. Needs review before it can be issued.`}
         </p>
       )}

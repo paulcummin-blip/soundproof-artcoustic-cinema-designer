@@ -112,6 +112,17 @@ export default function ProposalEditStatusBanner({ layer, children = null, maste
             </ul>
           )}
 
+          {layer.brief_coverage?.outstanding?.length > 0 && (
+            <div role="status">
+              <p style={TEXT}>Review these Steering Brief requirements in the current proposal:</p>
+              <ul style={{ ...TEXT, paddingLeft: 18 }}>
+                {layer.brief_coverage.outstanding.map((item, index) => (
+                  <li key={index}>{item.item}</li>
+                ))}
+              </ul>
+              <p style={TEXT}>Edit the relevant section below to address each requirement. This brief check is advisory while it is being validated.</p>
+            </div>
+          )}
           {children}
         </div>
       </div>

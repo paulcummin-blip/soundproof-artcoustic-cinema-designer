@@ -168,7 +168,7 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
         onGenerated={refresh}
       />
 
-      {showCopy && layer.mode === 'edit_layer' && (
+      {showCopy && layer.mode === 'edit_layer' && !layer.editor_source_error && (
         <>
           <ProposalEditFields
             fields={layer.fields}
@@ -187,6 +187,8 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
           />
         </>
       )}
+
+      {showCopy && layer.editor_source_error && <div role="alert" style={STRIP}>{layer.editor_source_error}</div>}
 
       {layer.mode === 'no_valid_generation' && (
         <div style={{ ...STRIP, background: '#FFFFFF' }}>

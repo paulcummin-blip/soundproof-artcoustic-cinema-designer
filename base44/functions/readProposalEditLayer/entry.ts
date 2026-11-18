@@ -182,9 +182,7 @@ export default async function(req) {
               }
             }
           } catch {
-            // The stored body's structure does not match the expected heading
-            // layout (manual edit changed or removed headings). Fall back to
-            // the validated copy for this section — do not break the editor.
+            layer.editor_source_error = 'The saved wording has a different heading structure. Edit the current section in the document below; the copy editor cannot safely split it into fields.';
           }
         }
         // Seed the editor fields, export_sections and copy.sections from the
@@ -238,6 +236,12 @@ export default async function(req) {
         .filter((s) => s && typeof s === 'object' && s.body && s.is_enabled !== false)
         .map((s) => ({ section: s.section_type, text: s.body || '' }));
       layer.brief_coverage = briefCoverageGate(proposal, briefSections, { hard_enforcement: false });
+      layer.ready = documentValidation.valid && !layer.brief_coverage.outstanding.length;
+      layer.status_label = layer.brief_coverage.outstanding.length
+        ? 'Steering Brief needs review'
+        : (documentValidation.valid ? 'Ready to issue' : 'Needs review');
+      layer.export_blocked_reason = documentValidation.blocked_reason;
+      if (layer.editor_source_error) layer.fields = [];
 
       if (body.action === 'export') {
         // Enforcement of the approval rule, server-side, where no client can skip
