@@ -60,7 +60,7 @@ export function isZeroSizePageFailure(error) {
  *   decides whether a document exists: the caller holds the PDF, and a
  *   composition with no painted sheet still returns.
  */
-export async function collectPageRasters({ pages, rasterPage, rasterAll = null }) {
+export async function collectPageRasters({ pages, rasterPage, rasterAll = null, signal = null }) {
   const list = Array.isArray(pages) ? pages : [];
   const rasters = new Array(list.length).fill(null);
   const diagnostics = {
@@ -76,6 +76,7 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null }
   const unresolved = [];
 
   for (let index = 0; index < list.length; index += 1) {
+    signal?.throwIfAborted();
     try {
       const raster = await rasterPage(list[index], index);
       if (!raster?.dataUrl) {
@@ -87,6 +88,7 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null }
       rasters[index] = raster;
       if (Number.isFinite(raster.scale)) diagnostics.scales.push({ page: index + 1, scale: raster.scale });
     } catch (error) {
+      signal?.throwIfAborted();
       // A page that measures nothing is not a failed page — it paints nothing, so
       // it is left out of the stored copy and said so.
       if (isZeroSizePageFailure(error)) {
@@ -97,6 +99,7 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null }
     }
   }
 
+  signal?.throwIfAborted();
   if (unresolved.length > 0 && typeof rasterAll === 'function') {
     diagnostics.fallback = RESILIENCE_OPERATION.FALLBACK;
     let all = null;
