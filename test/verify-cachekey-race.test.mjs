@@ -112,13 +112,13 @@ function makeOwner({
   initialAuthority = null,
   dispatchBlocked = false,
 }) {
-  const authSettleTo = authoritativeSettleTo || buildAuthoritativeSettings(settleTo.instances || settleTo.instances, settleTo.crossover);
+  const authSettleTo = authoritativeSettleTo || buildAuthoritativeSettings(settleTo.instances, settleTo.crossover);
   const pubSettings = publishSettings || authSettleTo;
   const state = {
     cacheKey: preCommitCacheKey,
     canCalculate,
     completedBassAuthority: initialAuthority || { authorityStatus: "UPDATING", contract: { job: { status: "updating" } } },
-    authoritative: clone(initialAuthority ? buildAuthoritativeSettings(beforeInstances, beforeCrossover) : buildAuthoritativeSettings(beforeInstances, beforeCrossover)),
+    authoritative: buildAuthoritativeSettings(beforeInstances, beforeCrossover),
     onCalculate: null,
   };
   let liveSettings = clone(before);
