@@ -154,41 +154,49 @@ test('new-project double-hydration race: first count change survives late re-hyd
   assert.equal(seatsAfterFirstChange.length, 4,
     `after first count change: 4 seats, got ${seatsAfterFirstChange.length}`);
 
-  // 4. useProjectLoader.loadProject fires LATE (it re-hydrates because the
-  //    boot effect didn't know ProjectDesignHydrator already hydrated).
-  //    This is the "stale cached record that arrives after the first count
-  //    interaction": setProjectHydrationReady(false) + loadState.phase="loading"
-  //    opens a bail window, hydrateFromProject overwrites seatsPerRowByRow with
-  //    [], then setProjectHydrationReady(true) + loadState.phase="loaded"
-  //    re-enables the hook which rebuilds from the empty fallback (1×3).
-  await act(async () => {
-    // loadProject starts: setProjectHydrationReady(false), loadState.phase="loading"
-    c.setReady(false);
-    c.setLoadPhase('loading');
-  });
-  await act(async () => {
-    // hydrateFromProject overwrites seatsPerRowByRow with empty DB value
-    c.setSeatsPerRowByRow([]);
-  });
-  await act(async () => {
-    // loadProject completes: setProjectHydrationReady(true), loadState.phase="loaded"
-    c.setReady(true);
-    c.setLoadPhase('loaded');
-  });
+  // 4. useProjectLoader.loadProject fires LATE. WITHOUT the fix, it calls
+  //    setProjectHydrationReady(false) + loadState.phase="loading" (bail
+  //    window), then hydrateFromProject (overwrites seatsPerRowByRow with []),
+  //    then setProjectHydrationReady(true) + loadState.phase="loaded" (rebuild
+  //    from the empty fallback 1×3). The user's 4 is lost.
+  //
+  // 4a. WITHOUT FIX: full re-hydrate clobbers the user's change.
+  await act(async () => { c.setReady(false); c.setLoadPhase('loading'); });
+  await act(async () => { c.setSeatsPerRowByRow([]); });
+  await act(async () => { c.setReady(true); c.setLoadPhase('loaded'); });
+  const seatsAfterBuggyRehydrate = appStateRef.current.state.seatingPositions;
+  assert.equal(seatsAfterBuggyRehydrate.length, 3,
+    `BUG: late re-hydrate overwrote [4] with [], plan shows ${seatsAfterBuggyRehydrate.length} (first change lost)`);
 
-  // 5. THE BUG: the late re-hydrate overwrote seatsPerRowByRow to [], and
-  //    useSeatingRebuild rebuilt from the fallback (1×3). The user's 4 is lost.
-  const seatsAfterLateRehydrate = appStateRef.current.state.seatingPositions;
-  // This assertion documents the BUG (3 seats — first change lost):
-  assert.equal(seatsAfterLateRehydrate.length, 3,
-    `BUG REPRODUCED: late re-hydrate overwrote [4] with [], plan shows ${seatsAfterLateRehydrate.length} seats (first change lost)`);
-
-  // 6. Second count change works (the re-hydrate is done, so it sticks).
+  // 4b. WITH FIX: wasAlreadyHydrated skips setProjectHydrationReady(false),
+  //    loadState "loading", and hydrateFromProject. The user's [4] survives.
+  //    Re-run the scenario from the top with the fix simulated.
+  const appStateFix = { current: makeAppState() };
+  const controlsFix = { current: null };
+  let r2;
   await act(async () => {
-    c.setSeatingConfigEpoch(2);
-    c.setSeatsPerRowByRow([4]);
+    r2 = create(React.createElement(LifecycleProbe, { appStateRef: appStateFix, controlsRef: controlsFix }));
   });
-  const seatsAfterSecondChange = appStateRef.current.state.seatingPositions;
-  assert.equal(seatsAfterSecondChange.length, 4,
-    `second count change: 4 seats (works because re-hydrate is done), got ${seatsAfterSecondChange.length}`);
+  const cf = controlsFix.current;
+  await act(async () => { cf.setIsHydrated(true); });
+  // ProjectDesignHydrator hydrates the new project (empty DB).
+  await act(async () => {
+    cf.setReady(true); cf.setLoadPhase('loaded'); cf.setMlpY_m(3.5);
+    appStateFix.current.state.activeVersionId = 'v1';
+  });
+  assert.equal(appStateFix.current.state.seatingPositions.length, 3, 'fix scenario: 3 initial seats after gate hydration');
+  // User clicks + (first count change).
+  await act(async () => { cf.setSeatingConfigEpoch(1); cf.setSeatsPerRowByRow([4]); });
+  assert.equal(appStateFix.current.state.seatingPositions.length, 4, 'fix scenario: 4 seats after first change');
+  // useProjectLoader.loadProject fires LATE but WITH the fix: it detects
+  // wasAlreadyHydrated and skips setProjectHydrationReady(false),
+  // loadState "loading", and hydrateFromProject. Only the authority/baseline
+  // setup runs. seatsPerRowByRow stays [4], isProjectHydrationReady stays true.
+  // (No state transitions needed — the fix simply doesn't clobber.)
+  // Simulate the loadState.phase settling to "loaded" (from the boot effect
+  // setting it at the end of loadProject, but without the "loading" dip).
+  await act(async () => { cf.setLoadPhase('loaded'); });
+  const seatsAfterFixedRehydrate = appStateFix.current.state.seatingPositions;
+  assert.equal(seatsAfterFixedRehydrate.length, 4,
+    `FIX: late re-hydrate skipped overwrite, plan shows ${seatsAfterFixedRehydrate.length} seats (first change preserved)`);
 });

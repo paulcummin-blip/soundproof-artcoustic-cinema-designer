@@ -134,6 +134,15 @@ appState, // Pass appState directly for setters
   // interaction occurs after the current project has finished loading.
   const autosaveUserArmedRef = useRef(false);
 
+  // Refs that always track the latest appState hydration flags. loadProject is
+  // a useCallback whose closure can capture a stale appState; these refs let it
+  // read the CURRENT isProjectHydrationReady / activeVersionId at call time so
+  // it can detect that ProjectDesignHydrator already hydrated this project.
+  const isProjectHydrationReadyRef = useRef(false);
+  isProjectHydrationReadyRef.current = !!appState?.isProjectHydrationReady;
+  const activeVersionIdFromAppStateRef = useRef(null);
+  activeVersionIdFromAppStateRef.current = appState?.activeVersionId ?? null;
+
   // Active Project ID — resolved from URL params / props. Declared early so
   // hooks below (e.g. useAppliedCalibrationAuthority) can reference it
   // without hitting a temporal-dead-zone error.
@@ -312,10 +321,22 @@ appState, // Pass appState directly for setters
   );
 
 
-  const loadProject = useCallback(async (signal, idOverride) => {
+  const loadProject = useCallback(async (signal, idOverride, forceRefresh = false) => {
     const id = idOverride || activeProjectId || projectIdState;
     if (!id) return;
-    appState?.setProjectHydrationReady?.(false);
+    // Detect that ProjectDesignHydrator (in the ProjectGate loading shell) has
+    // ALREADY hydrated this project. In that case, skip the state-overwriting
+    // steps (setProjectHydrationReady(false), loadState "loading",
+    // hydrateFromProject) so a user change made between gate-release and this
+    // boot re-load is not clobbered by the empty-DB fallback. The network read,
+    // authority/baseline setup, and commercial authority still run. A manual
+    // reload (reloadProject) passes forceRefresh=true to force a full re-hydrate.
+    const wasAlreadyHydrated = !forceRefresh
+      && isProjectHydrationReadyRef.current === true
+      && !!activeVersionIdFromAppStateRef.current;
+    if (!wasAlreadyHydrated) {
+      appState?.setProjectHydrationReady?.(false);
+    }
     hydrationAuthorityRef.current = createAuthority(id, loadGenerationRef.current);
     // Commercial hydration restarts with the project: no commercial write is
     // permitted until the priced selections below have loaded, and edits
@@ -327,10 +348,12 @@ appState, // Pass appState directly for setters
     });
     setActiveCommercialAuthority(commercialAuthorityRef.current);
     clearCommercialEdits();
-    setLoadState({ phase: "loading", error: null, name: null });
-    // Publish the canonical hydration state so no surface renders this project's
-    // placeholder data while the saved design state is still loading.
-    beginDesignHydration(id);
+    if (!wasAlreadyHydrated) {
+      setLoadState({ phase: "loading", error: null, name: null });
+      // Publish the canonical hydration state so no surface renders this project's
+      // placeholder data while the saved design state is still loading.
+      beginDesignHydration(id);
+    }
     try {
       // AbortController signal is not directly supported by the SDK, but the operation is fast.
       const project = await readProjectRecord(id);
@@ -365,7 +388,12 @@ appState, // Pass appState directly for setters
         console.error('[RD] Version load failed, falling back to project-only hydration:', versionErr);
       }
 
-      hydrateFromProject(mergedP);
+      // Skip the state overwrite when ProjectDesignHydrator already hydrated —
+      // hydrateFromProject would clobber any user change made during the boot
+      // re-load window (e.g. the first seat-count change on a new project).
+      if (!wasAlreadyHydrated) {
+        hydrateFromProject(mergedP);
+      }
       setProjectNameState(mergedP?.name || "Project"); // Update internal projectName state
       // Capture the loaded room_dimensions_edited flag so the autosave path
       // never resets it to false. Defaults to false for pre-feature projects.
@@ -578,7 +606,7 @@ appState, // Pass appState directly for setters
   const reloadProject = useCallback((signal) => {
     // No project? nothing to reload.
     if (!projectIdState) return;
-    return loadProject(signal);
+    return loadProject(signal, null, true);
   }, [projectIdState, loadProject]);
 
   const handleProjectCreated = useCallback((id) => {
