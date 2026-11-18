@@ -706,24 +706,19 @@ test("verify scheduling: settings reverted during cache wait returns settings-re
   const owner = makeOwner({
     preCommitCacheKey: "cal:v1:before",
     advanceTo: "cal:v1:after",
-    settleTo: after,
-    settleMs: 5,
-    advanceMs: 40, // cacheKey advances late, so the revert happens during the wait
+    neverSettle: true,
+    neverAdvance: true,
   });
-  let reverted = false;
+  // Enter the helper with committed target settings. Its first sleep is then
+  // necessarily in the cache wait; revert there without racing wall-clock timers.
+  owner.setLiveSettings(after);
   const result = await verifyRecalculationScheduling({
     sharedRef: owner.sharedRef, phaseRef: owner.phaseRef, readLiveSettings: owner.readLiveSettings,
     targetSettings: after, preCommitCacheKey: "cal:v1:before",
     identityGuard: () => true,
     authoritativeSettingsMatch: () => true,
     waitForPublication: waitForPublication(owner),
-    sleep: async (ms) => {
-      // After settings settle (after ~5ms) but before the cacheKey advances
-      // (~40ms), revert the live settings back to before at ~15ms.
-      await realSleep(10);
-      if (!reverted) { owner.setLiveSettings(before); reverted = true; }
-      await realSleep(Math.max(0, ms - 10));
-    },
+    sleep: async () => { owner.setLiveSettings(before); },
     settlePollMs: 5, cachePollMs: 5, settleTimeoutMs: 2000, cacheAdvanceTimeoutMs: 2000,
   });
   assert.equal(result.ok, false);
