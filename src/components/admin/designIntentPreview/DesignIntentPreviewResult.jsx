@@ -181,6 +181,7 @@ export default function DesignIntentPreviewResult({ data }) {
         />
         <Row label="Prompt fingerprint matches current" value={prompt.matches_current === true ? 'PASS' : 'FAIL'} />
         <Row label="Prompt version this build defines" value={prompt.current} />
+        <Row label="Design Intent brief revision" value={prompt.brief_version} />
         <Row label="Prompt fingerprint" value={prompt.fingerprint} />
         <Row label="Writer input fingerprint" value={generation.input_fingerprint} />
         <Row label="Contract version" value={generation.contract_version} />
