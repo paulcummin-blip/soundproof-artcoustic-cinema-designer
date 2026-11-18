@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { verifyRecalculationScheduling } from "../src/components/room/bass/optimiseWorkflow/verifyRecalculationScheduling.js";
 import { executeElectronicTransaction, settingsEqual, clone, stable } from "../src/components/room/bass/optimiseWorkflow/electronicApplication.js";
 import { recommendationSettingsMatch, recommendationResultMatches } from "../src/components/room/bass/optimiseWorkflow/crossoverApplicationVerification.js";
+import { BASS_ANALYSIS_CONTRACT_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 
 // ---------------------------------------------------------------------------
 // Verify the cacheKey scheduling race via the REAL verifyRecalculationScheduling
@@ -53,7 +54,10 @@ function buildAuthority(key, { p19Var = 0, p20Var = 3, p14Db = 117, p18Hz = 20, 
   return {
     authorityStatus: "AUTHORITATIVE",
     contract: {
-      job: { status: "complete", resultFingerprint: key, currentJobFingerprint: key },
+      version: BASS_ANALYSIS_CONTRACT_VERSION,
+      metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
+      selectedCandidateId: "cand-" + key,
+      job: { status: "complete", metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, resultFingerprint: key, currentJobFingerprint: key },
       selectedCandidate: {
         perSeatP20Results: [{ seatId: "seat-1", variationDbRaw: seatVar, level: "L3" }],
         achievedP18FrequencyHz: p18Hz,

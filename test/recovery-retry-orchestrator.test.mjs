@@ -166,8 +166,9 @@ function makeIdentity({
   projectId = "proj-1",
   versionId = "ver-1",
   settingsSignature = "sig-1",
+  physicalContextSignature = null,
 } = {}) {
-  const identity = { projectId, versionId, settingsSignature };
+  const identity = { projectId, versionId, settingsSignature, physicalContextSignature };
   return {
     read: () => ({ ...identity }),
     set: (patch) => Object.assign(identity, patch),
@@ -724,6 +725,111 @@ test("recovery: unchanged pre-dispatch authority is never accepted (no job chang
   });
   assert.equal(result.action, "failed");
   assert.match(result.reason, /could not be started/);
+});
+
+// ---------------------------------------------------------------------------
+// 15c. PRODUCTION-REALISTIC same-design re-calculation: job.calculationId is
+//      NEVER populated (null before AND after), and resultFingerprint/
+//      currentJobFingerprint are IDENTICAL before and after (the store sets
+//      both to the fingerprint). Only completedAtMs advances. Before the fix
+//      (which used calculationId/currentJobFingerprint as the receipt), this
+//      timed out after success because the receipt never changed. Now the
+//      real completedAtMs receipt detects the new publication and succeeds.
+// ---------------------------------------------------------------------------
+test("recovery: real same-design re-calc succeeds via completedAtMs (calculationId null, same fingerprint)", async () => {
+  const owner = makeOwner({
+    initialOutcome: "rejected",
+    initialTerminalMessage: "orig",
+    newOutcome: "success",
+    startAfterTicks: 1,
+    resolveAfterTicks: 3,
+  });
+  // Assert the production reality: calculationId is null before and after.
+  assert.equal(owner.sharedRef.current.completedBassAuthority?.contract?.job?.calculationId, null, "calculationId null at entry");
+  const id = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    sleepMs: 5, timeoutMs: 5000, sleep: realSleep,
+  });
+  assert.equal(result.action, "success");
+  assert.equal(result.reused, false);
+  // Same fingerprint before and after — completedAtMs is what proved the new publication.
+  const postJob = owner.sharedRef.current.completedBassAuthority?.contract?.job || {};
+  assert.equal(postJob.calculationId, null, "calculationId still null after success");
+  assert.equal(postJob.resultFingerprint, "cal:v1:design");
+  assert.equal(postJob.currentJobFingerprint, "cal:v1:design");
+  assert.ok(Number.isFinite(postJob.completedAtMs) && postJob.completedAtMs > 0, "completedAtMs populated on success");
+});
+
+// ---------------------------------------------------------------------------
+// 15d. NEW rejection that does NOT replace the completedBassAuthority job
+//      (completedAtMs unchanged, old authority contract stays). The
+//      orchestrator must STILL fail promptly via newRequestObserved (the new
+//      request was observed running and settled with a terminal outcome), even
+//      though the publication receipt did not advance.
+// ---------------------------------------------------------------------------
+test("recovery: rejected request with unchanged old authority fails via newRequestObserved", async () => {
+  const owner = makeOwner({
+    initialAuthoritative: true, // old authority present (finite completedAtMs)
+    initialOutcome: "rejected",
+    initialTerminalMessage: "orig rejected",
+    newOutcome: "rejected",
+    newRejectionKeepsOldAuthority: true, // rejection does NOT replace the job
+    startAfterTicks: 1,
+    resolveAfterTicks: 3,
+  });
+  const preCompletedAtMs = owner.sharedRef.current.completedBassAuthority?.contract?.job?.completedAtMs ?? null;
+  const id = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    sleepMs: 5, timeoutMs: 5000, sleep: realSleep,
+  });
+  assert.equal(result.action, "failed");
+  assert.equal(result.outcome, "rejected", "the NEW terminal outcome is reported");
+  assert.match(result.reason, /New calculation rejected/);
+  assert.equal(result.originalOutcome, "rejected");
+  // The old authority's completedAtMs is UNCHANGED — yet the orchestrator
+  // failed promptly because newRequestObserved was true.
+  const postCompletedAtMs = owner.sharedRef.current.completedBassAuthority?.contract?.job?.completedAtMs ?? null;
+  assert.equal(postCompletedAtMs, preCompletedAtMs, "completedAtMs unchanged (job not replaced)");
+});
+
+// ---------------------------------------------------------------------------
+// 15e. PHYSICAL-CONTEXT change during recovery: a geometry/seating/RSP edit
+//      that changed the physical design before the bass owner's cacheKey
+//      recomputed is detected via the physicalContextSignature in the live
+//      identity, so an old result cannot be accepted after such an edit.
+// ---------------------------------------------------------------------------
+test("recovery: physicalContext change during recovery is rejected", async () => {
+  const owner = makeOwner({
+    initialOutcome: "rejected",
+    initialTerminalMessage: "orig",
+    newOutcome: "success",
+    startAfterTicks: 2,
+    resolveAfterTicks: 8,
+  });
+  const id = makeIdentity({ physicalContextSignature: "phys-1" });
+  let ticks = 0;
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: "recalculating",
+    sharedRef: owner.sharedRef,
+    phaseRef: makePhase(),
+    readLiveIdentity: id.read,
+    sleepMs: 5, timeoutMs: 5000, sleep: async (ms) => {
+      ticks += 1;
+      if (ticks === 2) id.set({ physicalContextSignature: "phys-2" });
+      await realSleep(ms);
+    },
+  });
+  assert.equal(result.action, "failed");
+  assert.match(result.reason, /room, seating or RSP changed during recovery/);
+  assert.equal(result.actualPhysicalContextSignature, "phys-2");
 });
 
 // ---------------------------------------------------------------------------
