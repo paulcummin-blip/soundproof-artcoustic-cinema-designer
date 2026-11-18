@@ -741,11 +741,7 @@ export default function RP22ClientReport() {
   // runs one last time immediately before PDF generation — so a race between
   // readiness and the click, or any path that bypasses the disabled check,
   // still refuses to print an incomplete report.
-  const narrativeReady = autoIntentStatus === AUTO_INTENT.COMPLETE || savedReport.saved?.payload?.design_intent?.status === 'accepted';
-  const handleExport = useCallback(() => {
-    if (!reportReady || !narrativeReady || !exportIntegrity.ready) return;
-    return rawHandleExport();
-  }, [reportReady, narrativeReady, exportIntegrity.ready, rawHandleExport]);
+
 
   // A failed export resolves the report to the canonical Failed state.
   const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed || !!savedReport.error;
@@ -795,6 +791,10 @@ export default function RP22ClientReport() {
   // the ADI narrative is accepted — either just generated or reused from the
   // saved snapshot.
   const reportFullyReady = reportReady && (adiComplete || savedNarrativeAccepted);
+  const handleExport = useCallback(() => {
+    if (!reportFullyReady || !exportIntegrity.ready) return;
+    return rawHandleExport();
+  }, [reportFullyReady, exportIntegrity.ready, rawHandleExport]);
   const generationFailed = readiness.state === REPORT_STATE.FAILED || adiFailed;
   // The overlay stage: "writing" once ADI is generating; "building" otherwise.
   const overlayStage = adiRunning ? 'writing' : 'building';
