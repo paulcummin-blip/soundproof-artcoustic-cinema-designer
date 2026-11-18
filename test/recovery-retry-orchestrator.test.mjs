@@ -23,7 +23,19 @@ import {
 // isStructurallyCompleteBassContract (version + metricSchemaVersion +
 // selectedCandidate/Id + matching fingerprints). The recovery orchestrator now
 // imports that validator, so every authoritative fixture must be complete.
-function buildContract(cacheKey, { status = "complete", calculationId = "calc-" + cacheKey } = {}) {
+//
+// PRODUCTION-REALISTIC RECEIPT: job.calculationId is NEVER populated in
+// production (the contract factory defaults it to null and no store/adapter
+// writes it), so it is kept null here. job.completedAtMs is the REAL
+// publication receipt the orchestrator uses: the bass background store always
+// populates it on every terminal state (fresh complete, cache-hit, error,
+// cancelled) with this.now(), and the adapter copies it into the contract job;
+// it is null only while a request is queued/calculating. For a same-design
+// re-calculation resultFingerprint AND currentJobFingerprint are IDENTICAL
+// before and after (the store sets both to the fingerprint), so detecting "a
+// new publication landed" relies on completedAtMs advancing — never the
+// fingerprints.
+function buildContract(cacheKey, { status = "complete", completedAtMs = null } = {}) {
   return {
     version: BASS_ANALYSIS_CONTRACT_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
@@ -32,7 +44,8 @@ function buildContract(cacheKey, { status = "complete", calculationId = "calc-" 
     job: {
       status,
       metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
-      calculationId,
+      calculationId: null, // never populated in production
+      completedAtMs, // real publication receipt: null while queued/calculating
       resultFingerprint: cacheKey,
       currentJobFingerprint: cacheKey,
     },
@@ -73,15 +86,28 @@ function makeOwner({
   tickMs = 5,
   // outcome of the NEW dispatched calculation: "success" | "rejected" | "error" | "timeout"
   newOutcome = "success",
+  // When true, a NEW rejection does NOT replace the completedBassAuthority job
+  // (completedAtMs unchanged) — models the production case where a rejected
+  // request leaves the old authority contract in place but sets a terminal
+  // outcome. The orchestrator must still fail promptly via newRequestObserved.
+  newRejectionKeepsOldAuthority = false,
 } = {}) {
+  // PRODUCTION-REALISTIC completedAtMs lifecycle: an authoritative result
+  // present at entry carries a finite completedAtMs (the prior publication
+  // timestamp); a non-authoritative (UPDATING) state carries null. On a new
+  // request: while queued/calculating, completedAtMs is null; on a fresh
+  // complete it becomes a NEW finite value; on a cache-hit it becomes a new
+  // finite value; on a terminal failure it MAY or MAY NOT replace the job
+  // (newRejectionKeepsOldAuthority).
+  let completedAtMsSeq = 1000;
   const state = {
     cacheKey,
     calculationInProgress: initialInProgress,
     calculationOutcome: initialInProgress ? "preparing" : initialOutcome,
     terminalMessage: initialInProgress ? null : initialTerminalMessage,
     completedBassAuthority: initialAuthoritative
-      ? buildAuthority(cacheKey, { calculationId: "calc-initial" })
-      : { authorityStatus: "UPDATING", contract: { job: { status: "updating", currentJobFingerprint: null, calculationId: null } } },
+      ? buildAuthority(cacheKey, { completedAtMs: completedAtMsSeq })
+      : { authorityStatus: "UPDATING", contract: { job: { status: "updating", currentJobFingerprint: null, calculationId: null, completedAtMs: null } } },
   };
   const sharedRef = { current: state };
   let seq = 0;
@@ -95,10 +121,14 @@ function makeOwner({
     const interval = setInterval(() => {
       ticks += 1;
       if (ticks >= startAfterTicks && !state.calculationInProgress) {
-        // New request starts running — masks any old terminal.
+        // New request starts running — masks any old terminal. The store
+        // resets completedAtMs to null while queued/calculating.
         state.calculationInProgress = true;
         state.calculationOutcome = "preparing";
         state.terminalMessage = null;
+        if (state.completedBassAuthority?.contract?.job) {
+          state.completedBassAuthority.contract.job.completedAtMs = null;
+        }
       }
       if (ticks >= resolveAfterTicks) {
         clearInterval(interval);
@@ -106,11 +136,23 @@ function makeOwner({
         if (newOutcome === "success") {
           state.calculationOutcome = "success";
           state.terminalMessage = null;
-          state.completedBassAuthority = buildAuthority(state.cacheKey, { calculationId: `calc-new-${seq}` });
+          // Fresh complete: completedAtMs advances to a NEW finite value. The
+          // resultFingerprint/currentJobFingerprint are IDENTICAL to the pinned
+          // cacheKey (same-design re-calculation) — only completedAtMs proves a
+          // new publication landed.
+          completedAtMsSeq += 1000;
+          state.completedBassAuthority = buildAuthority(state.cacheKey, { completedAtMs: completedAtMsSeq });
         } else {
           state.calculationOutcome = newOutcome;
           state.terminalMessage = `New calculation ${newOutcome}: simulated failure`;
-          // No authoritative contract on failure.
+          // A rejection MAY not replace the completedBassAuthority job at all
+          // (completedAtMs unchanged, old authority contract stays). The
+          // orchestrator must still fail promptly via newRequestObserved.
+          if (!newRejectionKeepsOldAuthority) {
+            // No authoritative contract on failure (UPDATING with null receipt).
+            state.completedBassAuthority = { authorityStatus: "UPDATING", contract: { job: { status: "error", currentJobFingerprint: null, calculationId: null, completedAtMs: null } } };
+          }
+          // else: leave the old completedBassAuthority untouched.
         }
       }
     }, tickMs);
@@ -630,19 +672,22 @@ test("recovery: authoritative electronics mismatch during wait fails", async () 
 //      the authoritative result; it never accepts the unchanged pre-dispatch
 //      authority.
 // ---------------------------------------------------------------------------
-test("recovery: fast cached result between polls is accepted via changed job fingerprint", async () => {
+test("recovery: fast cached result between polls is accepted via advanced completedAtMs", async () => {
   // Authoritative result present at entry (pre-dispatch authority). onCalculate
   // publishes a new authoritative result for the SAME pinned cacheKey without
   // ever setting calculationInProgress true (fast cache hit between polls).
+  // resultFingerprint/currentJobFingerprint are IDENTICAL before and after; only
+  // completedAtMs advances (the real production receipt).
   const owner = makeOwner({ initialOutcome: "rejected", initialTerminalMessage: "orig" });
-  const preDispatch = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
+  const preDispatch = owner.sharedRef.current.completedBassAuthority?.contract?.job?.completedAtMs ?? null;
+  const preFp = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
   owner.sharedRef.current.onCalculate = () => {
     // Fast: publish immediately, no inProgress phase ever observed.
     setTimeout(() => {
       owner.sharedRef.current.calculationInProgress = false;
       owner.sharedRef.current.calculationOutcome = "success";
       owner.sharedRef.current.terminalMessage = null;
-      owner.sharedRef.current.completedBassAuthority = buildAuthority(owner.sharedRef.current.cacheKey);
+      owner.sharedRef.current.completedBassAuthority = buildAuthority(owner.sharedRef.current.cacheKey, { completedAtMs: 5000 });
     }, 6);
     return { action: "queued", requestId: "r1", fingerprint: owner.sharedRef.current.cacheKey };
   };
@@ -654,11 +699,13 @@ test("recovery: fast cached result between polls is accepted via changed job fin
     readLiveIdentity: id.read,
     sleepMs: 50, timeoutMs: 5000, sleep: realSleep,
   });
-  assert.equal(result.action, "success", "fast cached result accepted via changed job fingerprint");
+  assert.equal(result.action, "success", "fast cached result accepted via advanced completedAtMs");
   assert.equal(result.reused, false);
-  const postJob = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
-  assert.notEqual(postJob, preDispatch, "the publication job advanced from the pre-dispatch value");
-  assert.equal(postJob, "cal:v1:design");
+  const postFp = owner.sharedRef.current.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
+  assert.equal(postFp, preFp, "fingerprint is IDENTICAL before and after (same-design re-calc)");
+  const postCompletedAtMs = owner.sharedRef.current.completedBassAuthority?.contract?.job?.completedAtMs ?? null;
+  assert.notEqual(postCompletedAtMs, preDispatch, "completedAtMs advanced from the pre-dispatch value");
+  assert.equal(postCompletedAtMs, 5000);
 });
 
 test("recovery: unchanged pre-dispatch authority is never accepted (no job change)", async () => {
