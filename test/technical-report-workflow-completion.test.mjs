@@ -97,3 +97,36 @@ test('Duplicate/missing/wrong-version files cannot create false readiness; final
   for(const patch of [{version_id:'v2'},{file_uri:null},{source_fingerprints:{engineeringFingerprint:'old'}}])
     assert.equal(status([speaker,file('project',patch),file('project',patch)]).proposalAvailable,false);
 });
+
+test('Storage retry registers the held PDF without recapturing or uploading it', async () => {
+  let captures=0,retries=0;
+  const mod=await loadModule('src/components/report/projectReport/storeProjectReportPublication.js', {
+    '@/components/library/issuedDocument/recordIssuedExport':{
+      storeIssuedDocument:async()=>{captures++;},
+      retryIssuedExportStorage:async key=>{retries++;assert.equal(key,'p1|project|Audit.pdf');return {ok:true};}
+    },
+    '@/components/library/issuedDocument/pendingIssuedExportStore':{
+      clearPendingExport(){},
+      pendingExportKey:x=>[x.projectId,x.documentType,x.filename].join('|'),
+      peekPendingExport:()=>({blob:{},issued:{versionId:'v1'},fileUri:'existing-private-pdf'})
+    },
+    '@/components/report/speakerDesign/ensureSpeakerDesignForVersion':{ensureSpeakerDesignForVersion:async()=>({status:'stored'})},
+    '@/components/library/issuedDocument/exportStorageFailure':{asExportStorageError:e=>e,buildExportStorageDiagnostic:x=>x},
+    '@/components/library/issuedDocument/exportStorageDiagnosticLog':{writeExportStorageDiagnostic(){}},
+    '@/components/proposal/sourceAuthority/reportSourceSignal':{notifyReportSourceStored(){}}
+  });
+  const result=await mod.retryPublicationDocument({key:'project_report',reportIdentity:{projectId:'p1',versionId:'v1',documentType:'project',filename:'Audit'},reportSnapshot:{nodeHtml:'fixture'}});
+  assert.equal(result.ok,true);assert.equal(captures,0);assert.equal(retries,1);
+});
+test('An old version-only entry resolves its actual project; mismatched links fail closed', async () => {
+  for (const projectId of [null,'wrong-project']) {
+    let resolved;
+    const mod=await loadModule('src/components/proposal/wizard/useProposalEntryContext.js', {
+      react:{useState:()=>[null,x=>{resolved=x;}],useEffect:fn=>fn()},
+      '@/api/base44Client':{base44:{entities:{ProjectVersion:{filter:async()=>[{id:'v1',project_id:'doran'}]}}}}
+    });
+    mod.default(projectId,'v1');await new Promise(r=>setImmediate(r));
+    if(projectId) assert.match(resolved.error,/does not belong/);
+    else { assert.equal(resolved.projectId,'doran');assert.equal(resolved.versionId,'v1');}
+  }
+});
