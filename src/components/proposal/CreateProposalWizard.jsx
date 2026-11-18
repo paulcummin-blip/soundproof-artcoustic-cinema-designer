@@ -152,6 +152,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     versions: canonicalVersions,
     collisions: versionCollisions,
     loading: versionsLoading,
+    error: versionsError,
+    retry: retryVersions,
   } = useCanonicalProjectVersions(selectedProjectId);
   const canonicalVersionCount = canonicalVersions.length;
 
@@ -188,6 +190,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     loading: snapshotLoading,
     error: snapshotError,
     version: selectedVersion,
+    readFailed: snapshotReadFailed,
+    retry: retrySnapshot,
   } = useVersionedEngineeringSnapshot(selectedProjectId, snapshotVersionId);
 
   // ── Comparison-mode Client Brief examples ──
@@ -252,6 +256,12 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     });
     return map;
   }, [readinessRows]);
+  const retryDocumentReadiness = useCallback(() => {
+    retryReadiness();
+    retrySnapshot();
+    retryVersions();
+  }, [retryReadiness, retrySnapshot, retryVersions]);
+  const readinessReadError = readinessError || (snapshotReadFailed ? snapshotError : null) || versionsError?.message || null;
   const selectedType = getProposalType(proposalType);
   const baseReadiness = resolveProposalReadinessGate({
     rows: readinessRows,
@@ -265,12 +275,14 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   const proposalDataReady = !snapshotLoading && !!engineeringSnapshot && !snapshotError;
   const readiness = {
     ...baseReadiness,
-    checking: baseReadiness.checking || snapshotLoading,
-    ready: baseReadiness.ready && proposalDataReady,
-    message: baseReadiness.ready && !proposalDataReady && !snapshotLoading
+    checking: !readinessReadError && (baseReadiness.checking || snapshotLoading),
+    readError: readinessReadError,
+    available: baseReadiness.available || !!readinessReadError,
+    ready: !readinessReadError && baseReadiness.ready && proposalDataReady,
+    message: readinessReadError || (baseReadiness.ready && !proposalDataReady && !snapshotLoading
       ? (snapshotError || 'Complete every project assessment before generating reports or proposals.')
-      : baseReadiness.message,
-    detail: baseReadiness.ready && !proposalDataReady && !snapshotLoading
+      : baseReadiness.message),
+    detail: readinessReadError ? 'Retry the document check. Existing reports and drawings will be reused.' : baseReadiness.ready && !proposalDataReady && !snapshotLoading
       ? 'Open this version in Room Designer, finish the remaining calculations, then regenerate the reports.'
       : baseReadiness.detail,
   };
@@ -612,7 +624,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   // ── Preparing screen — Sound Proof's own work, one line, one action ──
   if (preparing) {
-    return <div>{proposalIdentity}<ProposalPreparationPanel preparation={panelPreparation} onRetryRead={retryReadiness} /></div>;
+    return <div>{proposalIdentity}<ProposalPreparationPanel preparation={panelPreparation} onRetryRead={retryDocumentReadiness} /></div>;
   }
 
   // ── Generating screen ──
@@ -764,6 +776,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           versions={canonicalVersions}
           collisions={versionCollisions}
           loading={versionsLoading}
+          readError={readinessReadError}
+          onRetryRead={retryDocumentReadiness}
           onGenerateSpeakerDesign={handleGenerateSpeakerDesign}
           generatingVersionIds={speakerDesignPreparingIds}
           preparingVersionIds={speakerDesignPreparingIds}
@@ -811,7 +825,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
             gate={readiness}
             projectId={selectedProjectId}
             className="mb-8"
-            onRetry={readinessError ? retryReadiness : null}
+            onRetry={readinessReadError ? retryDocumentReadiness : null}
             detailed
             onGenerateSpeakerDesign={handleGenerateSpeakerDesign}
             generatingVersionIds={speakerDesignPreparingIds}

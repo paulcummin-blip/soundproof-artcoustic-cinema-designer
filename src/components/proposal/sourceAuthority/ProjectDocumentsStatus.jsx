@@ -210,6 +210,7 @@ function VersionBlock({
 
 export default function ProjectDocumentsStatus({
   gate,
+  onRetry = null,
   projectId = null,
   className = '',
   onGenerateSpeakerDesign = null,
@@ -219,6 +220,16 @@ export default function ProjectDocumentsStatus({
 }) {
   const rows = Array.isArray(gate?.rows) ? gate.rows : [];
   const checking = gate?.checking === true;
+
+  if (gate?.readError) {
+    return (
+      <section className={`mt-8 bg-white p-6 ${className}`} data-project-documents-status="read_failed">
+        <h3 className="text-sm font-semibold">Project documents could not be checked</h3>
+        <p role="alert" className="text-sm mt-2">{gate.readError}</p>
+        {onRetry && <button type="button" className="mt-4 px-4 py-2 border border-[#213428] text-sm" onClick={onRetry}>Retry document check</button>}
+      </section>
+    );
+  }
 
   // Nothing selected yet: the card states nothing.
   if (!checking && rows.length === 0) return null;

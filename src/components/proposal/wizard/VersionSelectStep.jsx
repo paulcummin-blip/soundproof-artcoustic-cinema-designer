@@ -28,6 +28,8 @@ export default function VersionSelectStep({
   versions = [],
   collisions = [],
   loading = false,
+  readError = null,
+  onRetryRead = null,
   onGenerateSpeakerDesign = null,
   generatingVersionIds = null,
   preparingVersionIds = null,
@@ -54,6 +56,10 @@ export default function VersionSelectStep({
         <Loader2 className="w-6 h-6 text-[#625143] animate-spin" />
       </div>
     );
+  }
+
+  if (readError && versions.length === 0) {
+    return <div role="alert"><p>{readError}</p><button type="button" onClick={onRetryRead}>Retry document check</button></div>;
   }
 
   if (versions.length === 0) {
@@ -125,6 +131,7 @@ export default function VersionSelectStep({
           only, and this card is where the designer sees it. */}
       <VersionReadinessTable
         gate={readiness}
+        onRetry={onRetryRead}
         projectId={projectId}
         onGenerateSpeakerDesign={onGenerateSpeakerDesign}
         generatingVersionIds={generatingVersionIds}

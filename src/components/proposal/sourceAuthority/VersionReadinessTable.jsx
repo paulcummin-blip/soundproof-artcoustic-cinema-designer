@@ -214,6 +214,7 @@ export default function VersionReadinessTable({
     return (
       <ProjectDocumentsStatus
         gate={gate}
+        onRetry={onRetry}
         projectId={projectId}
         className={className}
         onGenerateSpeakerDesign={onGenerateSpeakerDesign}
