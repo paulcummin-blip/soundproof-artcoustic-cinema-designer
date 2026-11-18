@@ -317,15 +317,18 @@ appState, // Pass appState directly for setters
     const id = idOverride || activeProjectId || projectIdState;
     if (!id) return;
     // Detect that ProjectDesignHydrator (in the ProjectGate loading shell) has
-    // ALREADY hydrated this project. In that case, skip the state-overwriting
-    // steps (setProjectHydrationReady(false), loadState "loading",
-    // hydrateFromProject) so a user change made between gate-release and this
-    // boot re-load is not clobbered by the empty-DB fallback. The network read,
-    // authority/baseline setup, and commercial authority still run. A manual
-    // reload (reloadProject) passes forceRefresh=true to force a full re-hydrate.
+    // ALREADY hydrated THIS EXACT project. Read the canonical store (not a
+    // readiness boolean + any versionId) so the check is identity-exact: the
+    // store's projectId must match, design must be "loaded", and there must be
+    // no error. This covers a brand-new project whose V1 version has not been
+    // created yet (activeVersionId is legitimately null in that case).
+    // A manual reload (reloadProject) passes forceRefresh=true to force a full
+    // re-hydrate regardless.
+    const canonical = getProjectHydration();
     const wasAlreadyHydrated = !forceRefresh
-      && isProjectHydrationReadyRef.current === true
-      && !!activeVersionIdFromAppStateRef.current;
+      && canonical.projectId === id
+      && canonical.design === "loaded"
+      && !canonical.error;
     if (!wasAlreadyHydrated) {
       appState?.setProjectHydrationReady?.(false);
     }
