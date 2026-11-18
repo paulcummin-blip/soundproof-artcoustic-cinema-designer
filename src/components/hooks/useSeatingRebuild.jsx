@@ -93,6 +93,18 @@ export function useSeatingRebuild({
     const userHasChangedSeatingSinceLoad =
       seatingConfigEpoch !== (seatingLoadedEpochRef?.current ?? 0);
 
+    if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+      console.log('[SEAT-DIAG] rebuild effect fired', {
+        epoch: seatingConfigEpoch,
+        loadedEpoch: seatingLoadedEpochRef?.current ?? 0,
+        userHasChangedSeatingSinceLoad,
+        seatsPerRowByRow: _seatsPerRowByRow,
+        currentSeatsCount: currentSeats.length,
+        phase: loadState?.phase,
+        hasProjectId,
+      });
+    }
+
     const isScratch = loadState?.phase === "scratch" && !hasProjectId;
 
     // Pre-compute rowsAlreadyMatchCurrentCenters (needed by both the initial boot guard and the early-return guard)
@@ -239,6 +251,11 @@ export function useSeatingRebuild({
       !(appState?.roomReflowEpoch > 0) &&
       !roomDimsChanged
     ) {
+      if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+        console.log('[SEAT-DIAG] PRESERVATION GUARD returned early (seats preserved)', {
+          epoch: seatingConfigEpoch, currentSeatsCount: currentSeats.length,
+        });
+      }
       // Seed tracking refs so that when the user does make a genuine change,
       // deltas are measured correctly from the stable loaded state.
       const _seedVisibleWidthM = resolveVisibleWidthInches(appState?.screen) * 0.0254;
@@ -395,6 +412,11 @@ export function useSeatingRebuild({
       !seatingReferenceChanged &&
       !roomDimsChanged
     ) {
+      if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+        console.log('[SEAT-DIAG] SECOND PRESERVATION GUARD returned early', {
+          epoch: seatingConfigEpoch, currentSeatsCount: currentSeats.length,
+        });
+      }
       return;
     }
 
@@ -456,9 +478,19 @@ export function useSeatingRebuild({
           }
           centers = clamped;
         } else {
+          if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+            console.log('[SEAT-DIAG] centers buildRowCenters wrong length, returning', {
+              rowsNeeded, generatedLength: Array.isArray(generated) ? generated.length : 'null',
+            });
+          }
           return;
         }
       } else {
+        if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+          console.log('[SEAT-DIAG] centers not finite or setter missing, returning', {
+            mlpY, hasSetRowCentersM: typeof appState?.setRowCentersM === 'function',
+          });
+        }
         return;
       }
     }
@@ -507,7 +539,19 @@ export function useSeatingRebuild({
 
     // 5) Commit to app state. Priority is independent of the acoustic RSP
     // and is preserved per-seat via resolveSeatPriority(prev) above.
-    setSeats((prev) => (seatsEqualWithin1mm(prev, seats) ? prev : seats));
+    if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+      console.log('[SEAT-DIAG] rebuild building seats', {
+        list, builtCount: seats.length, currentSeatsCount: currentSeats.length,
+        regenerateAll, centers,
+      });
+    }
+    setSeats((prev) => {
+      const equal = seatsEqualWithin1mm(prev, seats);
+      if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+        console.log('[SEAT-DIAG] setSeats', { prevCount: prev.length, nextCount: seats.length, equal, willWrite: !equal });
+      }
+      return equal ? prev : seats;
+    });
 
     // Update seatingBlockOffset ref so next render can detect further changes
     prevSeatingBlockOffsetRef.current = liveRow1AbsoluteY;

@@ -1486,6 +1486,14 @@ function RoomDesignerWithState() {
     // If the seating tab is locked, do nothing
     if (_isFrozen && _isFrozen('seating')) return;
 
+    if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+      console.log('[SEAT-DIAG] handleGenerateSeating', {
+        overrides, currentEpoch: seatingConfigEpoch,
+        currentSeatsPerRowByRow: _seatsPerRowByRow,
+        currentSeatingPositions: _seatingPositions?.length,
+      });
+    }
+
     // Bump epoch to mark user-driven change
     setSeatingConfigEpoch((n) => n + 1);
 
@@ -1590,6 +1598,11 @@ function RoomDesignerWithState() {
     if (!flagsChanged) return;
 
     const seatsWithFlags = prev.map(s => ({ ...s, isPrimary: s.id === closestId }));
+    if (typeof window !== 'undefined' && window.__SEAT_DIAG) {
+      console.log('[SEAT-DIAG] Normalise isPrimary WRITING', {
+        prevCount: prev.length, closestId, writingCount: seatsWithFlags.length,
+      });
+    }
     (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
   }, [_seatingPositions, mlpAnchorEffective, appState?.setSeatingPositions, loadState?.phase]);
 
