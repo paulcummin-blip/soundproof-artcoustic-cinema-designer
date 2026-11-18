@@ -465,6 +465,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
+    const briefCheck = validateSteeringBrief(clientBrief);
+    if (!briefCheck.valid) { setError(briefCheck.reason); return; }
     // Source authority: no current Project Report, no proposal. ONE authority
     // decides this, so the button can never disagree with the panel above it.
     if (!readiness.ready) {
@@ -627,6 +629,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         ? `Select at least ${minimum} versions to compare.`
         : 'Select the version this proposal is for.';
     }
+    if (!briefValidation.valid) return briefValidation.reason;
     if (readinessLoading || snapshotLoading) return 'Checking the selected versions…';
     if (selectedVersionIds.length > 1 && selectedVersionsLoading) return 'Reading the selected versions…';
     // Every selected version is judged by its own readiness — ONE authority,
