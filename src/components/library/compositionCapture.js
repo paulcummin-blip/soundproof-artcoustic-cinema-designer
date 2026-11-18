@@ -494,15 +494,21 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     });
     const { rasters: pageRasters, diagnostics: resilience } = await collectPageRasters({
       pages,
+      signal,
       rasterPage: async (page, index) => {
         const scale = scaleOf(page);
         const { canvas, dataUrl } = await rasterisePage(page, {
           pageNumber: index + 1,
+          pageSelector,
           scale,
           windowWidth: viewport.width,
           windowHeight: viewport.height,
         });
-        return { dataUrl, width: canvas.width, height: canvas.height, scale };
+        const raster = { dataUrl, width: canvas.width, height: canvas.height, scale };
+        // The encoded PNG is retained; release its GPU/bitmap allocation now.
+        canvas.width = 0;
+        canvas.height = 0;
+        return raster;
       },
       rasterAll: () => rasteriseCompositionPages(pageContainer, pages, {
         scale: scaleOf(pageContainer || pages[0]),
@@ -512,8 +518,8 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     });
 
     signal.throwIfAborted();
-    if (proposalRoot && pageRasters.some((raster) => !raster)) {
-      const failure = new Error('The proposal PDF could not be captured page-for-page. No incomplete copy was stored.');
+    if ((proposalRoot || bodyClass === 'client-report-printing') && pageRasters.some((raster) => !raster)) {
+      const failure = new Error('The PDF could not be captured page-for-page. No incomplete copy was stored.');
       failure.captureDiagnostics = { operation: 'proposal_incomplete_capture', resilience };
       throw failure;
     }
