@@ -96,7 +96,7 @@ export function captureViewport(frame, pages = []) {
 }
 
 /** One page rasterised on its own. Throws a pageCaptureFailure when it cannot be. */
-export function rasterisePage(element, { pageNumber, scale, windowWidth, windowHeight }) {
+export function rasterisePage(element, { pageNumber, scale, windowWidth, windowHeight, pageSelector = null }) {
   return capturePagePng(element, pageNumber, {
     backgroundColor: '#FFFFFF',
     scale,
@@ -106,6 +106,12 @@ export function rasterisePage(element, { pageNumber, scale, windowWidth, windowH
     windowHeight,
     scrollX: 0,
     scrollY: 0,
+    // Keep the page's context, but do not clone every other sheet for each
+    // raster. A long report otherwise multiplies its image/memory cost.
+    ignoreElements: pageSelector ? (node) => (
+      node !== element && node.matches?.(pageSelector)
+      && !node.contains(element) && !element.contains(node)
+    ) : undefined,
   });
 }
 
