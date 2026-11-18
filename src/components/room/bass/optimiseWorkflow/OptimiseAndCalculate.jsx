@@ -1402,6 +1402,22 @@ export default function OptimiseAndCalculate({
     }
   }, [projectId, versionId, recoveryBusy, handleReset, workflowState.error]);
 
+  // ── Timeout Retry routing ──
+  // A timeout after the optimiser completed (post-apply recalculation/
+  // publication phase recorded in lastErrorPhaseRef) must retry only the
+  // calculation/publication via the recovery handler, never reset — the saved
+  // plan and (possibly restored) settings are intact. A non-post-apply timeout
+  // (an initial calculation timeout with no applied plan) keeps the existing
+  // reset semantics.
+  const handleTimeoutRetry = useCallback(() => {
+    const phase = lastErrorPhaseRef.current;
+    if (phase === "recalculating" || phase === "publishing") {
+      handleRecoveryRetry();
+    } else {
+      handleReset();
+    }
+  }, [handleRecoveryRetry, handleReset]);
+
   // Update Bass Performance — resets any terminal state from a previous
   // cancelled/failed run, then starts the full optimise-and-calculate
   // workflow. The previous published result remains visible until the
@@ -1696,8 +1712,8 @@ export default function OptimiseAndCalculate({
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-[#4A230F]">{BASS_LIFECYCLE_COPY[BASS_LIFECYCLE_STATE.TIMED_OUT]}</p>
           <div className="mt-2 flex gap-3">
-            <button type="button" onClick={handleReset} className="text-[11px] font-semibold text-[#4A230F] underline underline-offset-2">
-              Retry
+            <button type="button" onClick={handleTimeoutRetry} disabled={recoveryBusy} className="text-[11px] font-semibold text-[#4A230F] underline underline-offset-2 disabled:opacity-50">
+              {recoveryBusy ? "Retrying…" : "Retry"}
             </button>
             <button type="button" onClick={handleReset} className="text-[11px] text-[#4A230F] underline underline-offset-2">
               Clear

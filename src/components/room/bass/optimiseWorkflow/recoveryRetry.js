@@ -22,20 +22,28 @@
  * has advanced (the cacheKey is recomputed asynchronously), so a lagging
  * cache identity cannot accept old results after settings change.
  *
- * PROMPT REJECTION: a terminal failure outcome (error/rejected/timeout/
- * cancelled/stale) on the current calculation is returned immediately with
- * the original terminalMessage — the orchestrator never waits out its own
- * timeout for a request that already failed. A completed authority is never
- * reused when another calculation is active or the current request failed.
+ * OLD vs NEW TERMINAL: a terminal failure outcome (error/rejected/timeout/
+ * cancelled/stale) present at entry is the ORIGINAL failed calculation's
+ * outcome (calculationInProgress is false). It is NOT an immediate failure —
+ * that would make Retry incapable of retrying the original failed calculation.
+ * The orchestrator dispatches a FRESH onCalculate and observes the new
+ * request's lifecycle: the old terminal is masked once the new request makes
+ * calculationInProgress true, and only a terminal that appears AFTER the new
+ * request was observed running is treated as the NEW failure. The old
+ * terminal's diagnostics are preserved on the returned result
+ * (originalOutcome/originalTerminalMessage) so the caller never loses the
+ * original reason. A blocked dispatch (canCalculate false) is a failure.
  *
  * EXPLICIT REUSE: if the pinned design already has an authoritative published
  * result at attempt start (e.g. the settings were restored to the baseline
  * and the baseline result is already current), the orchestrator confirms
  * that explicitly WITHOUT launching another calculation — but only when no
- * other calculation is active and no terminal failure is present. The
- * returned `reused: true` tells the caller the existing result was confirmed,
- * not that a new calculation ran. The caller must never present this as the
- * candidate having been applied.
+ * other calculation is active AND no old terminal failure is present. An old
+ * terminal prohibits stale-authority reuse: a fresh calculation is run
+ * instead. The returned `reused: true` tells the caller the existing result
+ * was confirmed, not that a new calculation ran. The caller must never
+ * present this as the candidate having been applied. Old authority is never
+ * accepted before the new request is observed running and has settled.
  *
  * SUCCESS is marked only when the authoritative published result is
  * structurally complete, its resultFingerprint AND currentJobFingerprint both
@@ -101,6 +109,23 @@ export function isAuthoritativeForFingerprint(shared, fingerprint) {
 /**
  * Attempt a targeted recovery retry.
  *
+ * OLD vs NEW TERMINAL: an old terminal outcome (error/rejected/timeout/
+ * cancelled/stale) from the ORIGINAL failed calculation is present at entry
+ * when `calculationInProgress` is false. It must NOT cause an immediate
+ * failure — that would make Retry incapable of retrying the original failed
+ * calculation. Instead the orchestrator dispatches a FRESH onCalculate and
+ * observes the new request's lifecycle: the old terminal is masked once the
+ * new request makes `calculationInProgress` true, and only a terminal that
+ * appears AFTER the new request was observed running is treated as the NEW
+ * failure. The old terminal's diagnostics are preserved on the returned
+ * result so the caller never loses the original reason.
+ *
+ * OLD AUTHORITY: a previously published authoritative result that matches the
+ * pinned cacheKey may still be present at entry (it predates the apply, or is
+ * from the same design). It is NEVER accepted before the new request completes:
+ * acceptance requires that the new request was observed running
+ * (`newRequestObserved`) and has now settled (`!calculationInProgress`).
+ *
  * @param {Object} args
  * @param {string} args.lastErrorPhase      Phase recorded at the original failure.
  * @param {Object} args.sharedRef           Ref to the latest shared bass context.
@@ -112,17 +137,22 @@ export function isAuthoritativeForFingerprint(shared, fingerprint) {
  *   after settings change.
  * @param {number} [args.sleepMs=100]       Poll interval.
  * @param {number} [args.timeoutMs=30000]   Maximum wait (no extension beyond existing).
+ * @param {number} [args.dispatchGraceMs=3000] Time to wait for a queued dispatch
+ *   to actually make `calculationInProgress` true before treating it as a
+ *   no-op dispatch.
  * @param {Function} [args.sleep]            Injectable sleep for tests.
  *
- * @returns {Promise<{action: string, reason?: string, reused?: boolean, pinned?: Object, outcome?: string, actualCacheKey?: string, actualIdentity?: Object, actualSettingsSignature?: string}>}
+ * @returns {Promise<{action: string, reason?: string, reused?: boolean, pinned?: Object, outcome?: string, originalOutcome?: string, originalTerminalMessage?: string, actualCacheKey?: string, actualIdentity?: Object, actualSettingsSignature?: string}>}
  *   "fallback-reset" — not a post-apply failure; caller should reset.
  *   "success"        — pinned design's bass result is published and matches.
  *                     reused=true if an existing result was confirmed without
  *                     launching a new calculation.
  *   "failed"         — recovery failed; caller preserves the error with reason.
- *                     `outcome` carries the terminal calculation outcome when
- *                     the failure was a prompt rejection. `pinned` carries the
- *                     pinned identity for diagnostics.
+ *                     `outcome` carries the NEW terminal calculation outcome
+ *                     when the failure was the new request's terminal.
+ *                     `originalOutcome`/`originalTerminalMessage` preserve the
+ *                     OLD terminal diagnostics. `pinned` carries the pinned
+ *                     identity for diagnostics.
  */
 export async function attemptRecoveryRetry({
   lastErrorPhase,
@@ -131,6 +161,7 @@ export async function attemptRecoveryRetry({
   readLiveIdentity,
   sleepMs = 100,
   timeoutMs = 30000,
+  dispatchGraceMs = 3000,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
 }) {
   if (!POST_APPLY_FAILURE_PHASES.has(lastErrorPhase)) {
@@ -178,38 +209,73 @@ export async function attemptRecoveryRetry({
     cacheKey: pinnedCacheKey,
   };
 
-  // PROMPT REJECTION: a terminal failure outcome on the current calculation is
-  // returned immediately — do not wait out the orchestrator's own timeout for a
-  // request that already failed.
-  const initialOutcome = initial?.calculationOutcome || null;
-  if (TERMINAL_FAILURE_OUTCOMES.has(initialOutcome)) {
-    return {
-      action: "failed",
-      reason: initial?.terminalMessage
-        || `The bass calculation failed (${initialOutcome}). The saved plan is intact; settings are unchanged.`,
-      pinned,
-      outcome: initialOutcome,
-    };
-  }
+  // Preserve the OLD terminal diagnostics BEFORE any dispatch. These are the
+  // original failed calculation's reason; they are returned on a NEW failure so
+  // the caller never loses the original reason. A terminal at entry is NOT an
+  // immediate failure — it is the reason we are retrying.
+  const originalOutcome = initial?.calculationOutcome || null;
+  const originalTerminalMessage = initial?.terminalMessage || null;
+  const hadOldTerminal = TERMINAL_FAILURE_OUTCOMES.has(originalOutcome);
+
+  const calcInProgressAtEntry = initial?.calculationInProgress === true;
 
   // EXPLICIT REUSE: if the pinned design already has an authoritative published
   // result, confirm it without launching another calculation — but ONLY when
-  // no other calculation is active and no terminal failure is present. A
-  // completed authority is never reused when another calculation is active or
-  // the current request failed/was rejected.
-  const anotherCalcActive = initial?.calculationInProgress === true;
-  if (!anotherCalcActive && isAuthoritativeForFingerprint(initial, pinnedCacheKey)) {
+  // no other calculation is active AND no old terminal failure is present. An
+  // old terminal prohibits stale-authority reuse: the orchestrator must run a
+  // fresh calculation instead of accepting the pre-existing result.
+  if (!calcInProgressAtEntry && !hadOldTerminal
+      && isAuthoritativeForFingerprint(initial, pinnedCacheKey)) {
     return { action: "success", reused: true, pinned };
   }
 
-  // If another calculation is already in progress for this design, do NOT
-  // launch a duplicate — wait for it. Otherwise launch the calculation for the
-  // pinned design.
-  if (!anotherCalcActive) {
-    initial.onCalculate();
+  // Helper: original-terminal diagnostics to attach to every terminal return so
+  // the caller never loses the original failed calculation's reason, whether the
+  // retry succeeded or failed.
+  const originalDiag = hadOldTerminal
+    ? { originalOutcome, originalTerminalMessage }
+    : {};
+
+  // Dispatch a fresh calculation unless one is already running for this design.
+  // If a calculation is already in progress at entry, wait for it (its terminal
+  // is the NEW terminal, since an in-progress request masks any old terminal).
+  let newDispatched = false;
+  let dispatchRequestId = null;
+  let dispatchFingerprint = null;
+  if (!calcInProgressAtEntry) {
+    const dispatch = initial.onCalculate();
+    if (dispatch && dispatch.action === "blocked") {
+      return {
+        action: "failed",
+        reason: "Bass calculation is not ready (blocked). Reload the project and try again.",
+        pinned,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+      };
+    }
+    newDispatched = true;
+    dispatchRequestId = dispatch?.requestId || null;
+    dispatchFingerprint = dispatch?.fingerprint || null;
+    // If onCalculate returned a fingerprint that disagrees with the pinned
+    // cacheKey, the design changed at the dispatch instant — do not wait for a
+    // result that belongs to a different design.
+    if (dispatchFingerprint && dispatchFingerprint !== pinned.cacheKey) {
+      return {
+        action: "failed",
+        reason: "The design changed at recovery dispatch. The saved plan is intact; retry when the design is settled.",
+        pinned,
+        actualCacheKey: dispatchFingerprint,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+      };
+    }
   }
 
   const start = Date.now();
+  // newRequestObserved: the dispatched (or already-running) request was seen
+  // running (calculationInProgress === true). Old authority is never accepted
+  // before the new request is observed running.
+  let newRequestObserved = calcInProgressAtEntry;
   while (true) {
     await sleep(sleepMs);
 
@@ -218,6 +284,8 @@ export async function attemptRecoveryRetry({
         action: "failed",
         reason: "Recovery was cancelled. The saved plan is intact; settings are unchanged.",
         pinned,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
 
@@ -231,6 +299,8 @@ export async function attemptRecoveryRetry({
         reason: "The project or version changed during recovery. The saved plan is intact; retry when the design is settled.",
         pinned,
         actualIdentity: liveIdentity,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
     if (pinned.settingsSignature && liveIdentity.settingsSignature
@@ -240,6 +310,8 @@ export async function attemptRecoveryRetry({
         reason: "The subwoofer settings changed during recovery. The saved plan is intact; retry when the design is settled.",
         pinned,
         actualSettingsSignature: liveIdentity.settingsSignature,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
 
@@ -253,24 +325,49 @@ export async function attemptRecoveryRetry({
         reason: "The design changed during recovery. The saved plan is intact; retry when the design is settled.",
         pinned,
         actualCacheKey: state.cacheKey,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
 
-    // PROMPT REJECTION: a terminal failure outcome during the wait is returned
-    // immediately with the original terminalMessage.
-    const outcome = state?.calculationOutcome || null;
-    if (TERMINAL_FAILURE_OUTCOMES.has(outcome)) {
+    const inProgress = state?.calculationInProgress === true;
+    if (inProgress) newRequestObserved = true;
+
+    // Once the new request was observed running and has now settled, a terminal
+    // outcome is the NEW request's failure — return it promptly. While the new
+    // request is still running, the outcome is the phase (not terminal), so the
+    // lingering OLD terminal is never mistaken for the new failure.
+    if (newRequestObserved && !inProgress) {
+      const outcome = state?.calculationOutcome || null;
+      if (TERMINAL_FAILURE_OUTCOMES.has(outcome)) {
+        return {
+          action: "failed",
+          reason: state?.terminalMessage
+            || `The bass calculation failed (${outcome}). The saved plan is intact; settings are unchanged.`,
+          pinned,
+          outcome,
+          originalOutcome: hadOldTerminal ? originalOutcome : null,
+          originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+        };
+      }
+      if (isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
+        return { action: "success", reused: false, pinned, ...originalDiag };
+      }
+    }
+
+    // A dispatched request that never made calculationInProgress true within
+    // the grace is a no-op dispatch (e.g. canCalculate flipped false right
+    // after entry). Do not wait out the full timeout for a request that never
+    // started.
+    if (newDispatched && !newRequestObserved
+        && Date.now() - start > dispatchGraceMs) {
       return {
         action: "failed",
-        reason: state?.terminalMessage
-          || `The bass calculation failed (${outcome}). The saved plan is intact; settings are unchanged.`,
+        reason: "The bass calculation could not be started. Reload the project and try again.",
         pinned,
-        outcome,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
-    }
-
-    if (isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
-      return { action: "success", reused: false, pinned };
     }
 
     if (Date.now() - start > timeoutMs) {
@@ -278,6 +375,8 @@ export async function attemptRecoveryRetry({
         action: "failed",
         reason: "The recalculated bass result could not be published within the expected time. The saved plan is intact; settings are unchanged.",
         pinned,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
     }
   }
