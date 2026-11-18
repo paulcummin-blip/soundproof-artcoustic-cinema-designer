@@ -28,6 +28,8 @@ import { FileText, Speaker, Presentation, ChevronRight, Image as ImageIcon } fro
 import { Button } from '@/components/ui/button';
 import { REPORT_ROUTE } from '@/components/report/reportLibraryContext';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
+import { openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
+import { REPORT_AUTOPRINT_PARAM, REPORT_UPDATE_PARAM } from '@/components/report/reportActionIntent';
 import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel, NOT_AVAILABLE_LABEL } from './documentWorkflowStatus';
 import { useProjectImageCount } from './useProjectImageCount';
 import DocumentCard from './DocumentCard';
@@ -81,19 +83,43 @@ export default function DocumentWorkflowPanel({
   const { technicalReport, speakerDesign, clientProposal, proposalAvailable } = workflowStatus;
   const { count: imageCount, loading: imageCountLoading } = useProjectImageCount(projectId);
 
-  const openReport = () => {
-    if (disabled || !projectId || !versionId) return;
-    if (onOpenReport) {
-      onOpenReport();
-    } else {
-      const params = new URLSearchParams();
-      params.set('projectId', projectId);
-      if (versionId) params.set('versionId', versionId);
-      window.location.assign(`${REPORT_ROUTE.VISUAL}?${params.toString()}`);
+  const openStoredPdf = async (record) => {
+    if (!record) return;
+    try {
+      await openIssuedDocument(record);
+    } catch (error) {
+      console.error('[DocumentWorkflowPanel] Open stored PDF failed:', error);
+      alert(error?.message || 'This document could not be opened.');
     }
   };
 
-  const openProposalWizard = () => {
+  const navigateToReportRenderer = (options = {}) => {
+    if (disabled || !projectId || !versionId) return;
+    const params = new URLSearchParams();
+    params.set('projectId', projectId);
+    if (versionId) params.set('versionId', versionId);
+    if (options.updateReport) params.set(REPORT_UPDATE_PARAM, '1');
+    if (options.autoPrint) params.set(REPORT_AUTOPRINT_PARAM, '1');
+    window.location.assign(`${REPORT_ROUTE.VISUAL}?${params.toString()}`);
+  };
+
+  const handleTechnicalReportAct = () => {
+    navigateToReportRenderer({
+      updateReport: trState === WORKFLOW_STATE.OUTDATED,
+      autoPrint: true,
+    });
+  };
+
+  const handleSpeakerDesignAct = () => {
+    if (disabled || !projectId || !versionId) return;
+    void ensureSpeakerDesignForVersion({
+      projectId,
+      versionId,
+      engineeringFingerprint: engineeringFingerprint || null,
+    });
+  };
+
+  const handleClientProposalAct = () => {
     if (!projectId) return;
     const params = new URLSearchParams();
     params.set('create', '1');
@@ -102,7 +128,7 @@ export default function DocumentWorkflowPanel({
     window.location.assign(`/ProposalCentre?${params.toString()}`);
   };
 
-  const openProposalLibrary = () => {
+  const openProposalCentre = () => {
     if (!projectId) return;
     const params = new URLSearchParams();
     if (versionId) params.set('versionId', versionId);
@@ -112,15 +138,6 @@ export default function DocumentWorkflowPanel({
   const openImageLibrary = () => {
     if (!projectId) return;
     window.location.assign('/ProjectProposalAssets?tab=images');
-  };
-
-  const createSpeakerDesign = () => {
-    if (disabled || !projectId || !versionId) return;
-    void ensureSpeakerDesignForVersion({
-      projectId,
-      versionId,
-      engineeringFingerprint: engineeringFingerprint || null,
-    });
   };
 
   const trState = technicalReport.state;
@@ -162,9 +179,11 @@ export default function DocumentWorkflowPanel({
           reason={technicalReport.reason}
           canAct={trCanAct}
           actLabel={trActLabel}
-          onAct={openReport}
-          onOpen={openReport}
+          onAct={handleTechnicalReportAct}
+          onOpen={technicalReport.record ? () => openStoredPdf(technicalReport.record) : null}
           openLabel="Open"
+          onSecondary={trState === WORKFLOW_STATE.READY ? handleTechnicalReportAct : null}
+          secondaryLabel={trState === WORKFLOW_STATE.READY ? 'Create New' : null}
           primary
         />
         <DocumentCard
@@ -177,7 +196,9 @@ export default function DocumentWorkflowPanel({
           reason={speakerDesign.reason}
           canAct={sdCanAct}
           actLabel={sdActLabel}
-          onAct={createSpeakerDesign}
+          onAct={handleSpeakerDesignAct}
+          onOpen={speakerDesign.record ? () => openStoredPdf(speakerDesign.record) : null}
+          openLabel="Open"
         />
       </div>
 
@@ -190,12 +211,12 @@ export default function DocumentWorkflowPanel({
         reason={cpReason}
         canAct={cpCanAct}
         actLabel={cpActLabel}
-        onAct={openProposalWizard}
-        onOpen={openProposalLibrary}
-        openLabel="Open Client Proposal"
+        onAct={handleClientProposalAct}
+        onOpen={clientProposal.record ? () => openStoredPdf(clientProposal.record) : null}
+        openLabel="Open"
         primary={proposalAvailable && !cpIsCreated}
-        onSecondary={cpIsCreated ? openProposalWizard : null}
-        secondaryLabel={cpIsCreated ? 'New proposal' : null}
+        onSecondary={cpIsCreated ? openProposalCentre : null}
+        secondaryLabel={cpIsCreated ? 'Proposal Centre' : null}
       />
 
       <UploadedImagesRow

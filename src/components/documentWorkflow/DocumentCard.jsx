@@ -18,7 +18,7 @@
  *   • Outdated / Failed       → badge + Update / Retry action.
  */
 import React from 'react';
-import { ArrowRight, Check, Clock, AlertCircle, RefreshCw, ChevronRight, FileText } from 'lucide-react';
+import { ArrowRight, Check, Clock, AlertCircle, RefreshCw, ChevronRight, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WORKFLOW_STATE } from './documentWorkflowStatus';
 
@@ -159,6 +159,20 @@ export default function DocumentCard({
       )}
       {reason && state === WORKFLOW_STATE.FAILED && (
         <p className="text-[10px] text-[#B23A3A] leading-snug">{reason}</p>
+      )}
+      {state === WORKFLOW_STATE.OUTDATED && (
+        <p className="text-[10px] text-[#B37A2B] leading-snug">The saved PDF is from an earlier design.</p>
+      )}
+      {onOpen && (state === WORKFLOW_STATE.OUTDATED || state === WORKFLOW_STATE.FAILED) && (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="w-full h-8 text-[12px] font-medium border border-[#DCDBD6] text-[#213428] bg-white hover:bg-[#F8F8F7] rounded-md inline-flex items-center justify-center gap-1.5"
+          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          {openLabel}
+        </button>
       )}
       {canAct ? (
         <CreateAction label={actLabel} state={state} primary={primary} onAct={onAct} />

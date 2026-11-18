@@ -60,6 +60,7 @@ import {
   REPORT_UPDATE_PARAM,
 } from '@/components/report/reportActionIntent';
 import LiveReportRow from './LiveReportRow';
+import { openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
 import ExportedDocumentRow from './ExportedDocumentRow';
 import LibraryArchiveSection from './LibraryArchiveSection';
 import LibraryProposalReadinessBanner from './LibraryProposalReadinessBanner';
@@ -146,6 +147,7 @@ export default function ProjectLibraryReportsSection({
   /** Create an updated report: the report page updates it from the current design. */
   const updateVersionReport = (reportType, versionId) => openVersionReport(reportType, versionId, {
     [REPORT_UPDATE_PARAM]: '1',
+    [REPORT_AUTOPRINT_PARAM]: '1',
   });
 
   /** The places the readiness banner sends the designer. */
@@ -170,7 +172,7 @@ export default function ProjectLibraryReportsSection({
       return;
     }
     openVersionReport(action.reportType, action.versionId, action.kind === 'update'
-      ? { [REPORT_UPDATE_PARAM]: '1' }
+      ? { [REPORT_UPDATE_PARAM]: '1', [REPORT_AUTOPRINT_PARAM]: '1' }
       : null);
   };
 
@@ -213,6 +215,20 @@ export default function ProjectLibraryReportsSection({
         const issued = selectLatestExports(
           reportExports.filter(({ record }) => (record.version_id || null) === version.id),
         );
+        const issuedByType = new Map(
+          issued.map(({ record }) => [record.document_type, record]),
+        );
+        const openStoredReportPdf = (reportType, versionId) => {
+          const record = issuedByType.get(reportType);
+          if (record) {
+            void openIssuedDocument(record).catch((error) => {
+              console.error('[ProjectLibrary] Open stored report PDF failed:', error);
+              alert(error?.message || 'This document could not be opened.');
+            });
+          } else {
+            openVersionReport(reportType, versionId);
+          }
+        };
 
         // Each issued PDF judged against the version as it stands now: a file the
         // design still matches is a CURRENT file, anything else is archived.
@@ -282,11 +298,11 @@ export default function ProjectLibraryReportsSection({
                     note={liveReportNote({ cell, hasReport })}
                     explanation={currentFileExplanation(reportType)}
                     hasReport={hasReport}
-                    onOpen={() => openVersionReport(reportType, version.id)}
-                    onOpenSaved={() => openVersionReport(reportType, version.id)}
+                    onOpen={() => openStoredReportPdf(reportType, version.id)}
+                    onOpenSaved={() => openStoredReportPdf(reportType, version.id)}
                     onCreateUpdated={() => updateVersionReport(reportType, version.id)}
                     onExportPdf={() => exportVersionReport(reportType, version.id)}
-                    onGenerate={() => openVersionReport(reportType, version.id)}
+                    onGenerate={() => openVersionReport(reportType, version.id, { [REPORT_AUTOPRINT_PARAM]: '1' })}
                   />
                 );
               })}
