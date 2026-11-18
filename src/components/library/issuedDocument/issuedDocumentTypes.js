@@ -124,13 +124,21 @@ const SPEAKER_DESIGN_PAGE_FRAME = Object.freeze({
  *   page, its content and its design. A report page frame is fixed-height and
  *   must fit exactly, so a report is never re-paginated.
  */
+const TECHNICAL_REPORT_PAGES = [
+  '.rp22-report .report-page-block',
+  '.rp22-report .tech-param-page',
+  '.rp22-report .rp22-param-page',
+  '.rp22-report .rp22-bass-graph-page',
+].join(', ');
+
 export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
   // The consolidated Project Report prints from the same mounted composition the
   // Project Report route renders — the same node, the same page frames and the
   // same export body class.
   [ISSUED_DOCUMENT_TYPE.PROJECT]: Object.freeze({
     nodeSelector: '.client-report-root',
-    pageSelector: '.client-report-page',
+    // The appended technical document is part of this same printed PDF.
+    pageSelector: `.client-report-page, ${TECHNICAL_REPORT_PAGES}`,
     bodyClass: 'client-report-printing',
   }),
   [ISSUED_DOCUMENT_TYPE.VISUAL]: Object.freeze({
@@ -140,12 +148,7 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
   }),
   [ISSUED_DOCUMENT_TYPE.TECHNICAL]: Object.freeze({
     nodeSelector: '.print-only.print-keep-layout',
-    pageSelector: [
-      '.rp22-report .report-page-block',
-      '.rp22-report .tech-param-page',
-      '.rp22-report .rp22-param-page',
-      '.rp22-report .rp22-bass-graph-page',
-    ].join(', '),
+    pageSelector: TECHNICAL_REPORT_PAGES,
     bodyClass: '',
   }),
   // The schedule is not a mounted page of the app: its node is built from the
