@@ -741,10 +741,11 @@ export default function RP22ClientReport() {
   // runs one last time immediately before PDF generation — so a race between
   // readiness and the click, or any path that bypasses the disabled check,
   // still refuses to print an incomplete report.
+  const narrativeReady = autoIntentStatus === AUTO_INTENT.COMPLETE || savedReport.saved?.payload?.design_intent?.status === 'accepted';
   const handleExport = useCallback(() => {
-    if (!exportIntegrity.ready) return;
+    if (!reportReady || !narrativeReady || !exportIntegrity.ready) return;
     return rawHandleExport();
-  }, [exportIntegrity.ready, rawHandleExport]);
+  }, [reportReady, narrativeReady, exportIntegrity.ready, rawHandleExport]);
 
   // A failed export resolves the report to the canonical Failed state.
   const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed || !!savedReport.error;
@@ -879,7 +880,7 @@ export default function RP22ClientReport() {
   // publication.
   useReportActionIntent({
     requested: reportIntent.exportPdf,
-    ready: reportReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
+    ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
     onRun: handleExport,
   });
   useReportActionIntent({
@@ -1045,7 +1046,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED || !exportIntegrity.ready}
+            disabled={!reportFullyReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED || !exportIntegrity.ready}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
