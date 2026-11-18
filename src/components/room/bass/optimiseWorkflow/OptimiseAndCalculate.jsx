@@ -1454,7 +1454,7 @@ export default function OptimiseAndCalculate({
       setRecoveryBusy(false);
       phaseRef.current = "idle";
     }
-  }, [projectId, versionId, recoveryBusy, handleReset, workflowState.error]);
+  }, [projectId, versionId, recoveryBusy, handleReset, workflowState.error, workflowState.failurePhase]);
 
   // ── Timeout Retry routing ──
   // A timeout after the optimiser completed (post-apply recalculation/
@@ -1464,13 +1464,13 @@ export default function OptimiseAndCalculate({
   // (an initial calculation timeout with no applied plan) keeps the existing
   // reset semantics.
   const handleTimeoutRetry = useCallback(() => {
-    const phase = lastErrorPhaseRef.current;
+    const phase = lastErrorPhaseRef.current || workflowState.failurePhase || null;
     if (phase === "recalculating" || phase === "publishing") {
       handleRecoveryRetry();
     } else {
       handleReset();
     }
-  }, [handleRecoveryRetry, handleReset]);
+  }, [handleRecoveryRetry, handleReset, workflowState.failurePhase]);
 
   // Update Bass Performance — resets any terminal state from a previous
   // cancelled/failed run, then starts the full optimise-and-calculate
