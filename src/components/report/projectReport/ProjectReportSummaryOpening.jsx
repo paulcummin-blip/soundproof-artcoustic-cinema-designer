@@ -28,6 +28,9 @@ export default function ProjectReportSummaryOpening({
   sentence = null,
   print = false,
   heading = 'Design Intent',
+  // An optional action rendered beside the heading on screen only — used by the
+  // deliberate Regenerate Design Intent control. Never rendered in print.
+  headingAction = null,
 }) {
   if (!sentence) return null;
 
@@ -42,13 +45,23 @@ export default function ProjectReportSummaryOpening({
       {heading && (
         <>
           <div style={{
-            fontFamily: FONT_HEADING,
-            fontSize: print ? 7.5 : 10,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: LABEL,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
           }}>
-            {heading}
+            <div style={{
+              fontFamily: FONT_HEADING,
+              fontSize: print ? 7.5 : 10,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: LABEL,
+            }}>
+              {heading}
+            </div>
+            {!print && headingAction && (
+              <div style={{ flexShrink: 0 }}>{headingAction}</div>
+            )}
           </div>
           <div style={{
             height: 1,

@@ -728,6 +728,9 @@ export function useProjectReportPages({
           autoIntentStatus={autoIntentStatus}
           autoIntentReason={autoIntentReason}
           onRetryAutoIntent={onRetryAutoIntent}
+          projectId={projectId}
+          versionId={versionId}
+          hasAcceptedNarrative={savedDesignIntent?.status === 'accepted'}
         />
       ),
     };

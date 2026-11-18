@@ -35,6 +35,8 @@ import React from 'react';
 import ProjectReportSummaryOpening from '@/components/report/projectReport/ProjectReportSummaryOpening';
 import ProjectReportOpeningBlock from '@/components/report/projectReport/ProjectReportOpeningBlock';
 import ProjectReportFactsGrid from '@/components/report/projectReport/ProjectReportFactsGrid';
+import RegenerateDesignIntentControl from '@/components/report/projectReport/RegenerateDesignIntentControl';
+import { useRegenerateDesignIntent } from '@/components/report/projectReport/useRegenerateDesignIntent';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
 import { AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
 import {
@@ -127,8 +129,18 @@ export default function ProjectReportDesignSummary({
   autoIntentStatus = null,
   autoIntentReason = null,
   onRetryAutoIntent = null,
+  // The deliberate Regenerate Design Intent action. Available only when the
+  // Project Report already contains an accepted narrative; screen only.
+  projectId = null,
+  versionId = null,
+  hasAcceptedNarrative = false,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
+
+  // The deliberate Regenerate Design Intent flow. The action sits beside the
+  // Design Intent heading; the comparison dialog commits only the reviewed
+  // narrative and leaves every other report field untouched.
+  const regenerate = useRegenerateDesignIntent({ projectId, versionId, hasAcceptedNarrative });
 
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -208,7 +220,25 @@ export default function ProjectReportDesignSummary({
           marginTop: print ? '6mm' : 20,
           marginBottom: print ? '6mm' : 20,
         }}>
-          <ProjectReportSummaryOpening sentence={summaryOpening} print={print} />
+          <ProjectReportSummaryOpening
+            sentence={summaryOpening}
+            print={print}
+            headingAction={!print ? (
+              <RegenerateDesignIntentControl
+                status={regenerate.status}
+                hasAcceptedNarrative={regenerate.hasAcceptedNarrative}
+                isBusy={regenerate.isBusy}
+                isReviewing={regenerate.isReviewing}
+                newText={regenerate.newText}
+                error={regenerate.error}
+                existingText={summaryOpening}
+                onGenerate={regenerate.generate}
+                onKeepExisting={regenerate.keepExisting}
+                onCommit={regenerate.commit}
+                onDismissError={regenerate.dismissError}
+              />
+            ) : null}
+          />
         </div>
       )}
 
