@@ -28,6 +28,7 @@ import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenc
 import { writerGeometryBlock } from './reportGeometryContext.js';
 import { writerVisualBlock } from './reportVisualContext.js';
 import {
+  DESIGN_INTENT_BRIEF_VERSION,
   DESIGN_INTENT_SCOPE_RULE,
   DESIGN_INTENT_SECTION,
   DESIGN_INTENT_WORD_LIMIT,
@@ -93,6 +94,7 @@ export function buildDesignIntentWriterInput({
     // report's Design Intent, and nothing else in the draft.
     design_intent_scope: {
       report: reportLabel,
+      brief_version: DESIGN_INTENT_BRIEF_VERSION,
       section: DESIGN_INTENT_SECTION,
       rule: DESIGN_INTENT_SCOPE_RULE,
     },
