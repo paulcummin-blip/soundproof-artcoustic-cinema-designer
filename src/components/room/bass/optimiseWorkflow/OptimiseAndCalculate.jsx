@@ -370,7 +370,19 @@ export default function OptimiseAndCalculate({
         beforeEffectiveTuning:receipt.expectedEffectiveTuning,expectedEffectiveTuning:receipt.beforeEffectiveTuning,
         beforeLevels:receipt.afterLevels,changes:changedSettings(receipt.after,receipt.before)});
       setComplete(projectId,versionId,{},null,false);
-    }catch(error){setWorkflowError(projectId,versionId,error.message);}
+    }catch(error){
+      // A restore failure during the recalculate/verify phase is a post-apply
+      // recalculation/publication failure for the restored design: record the
+      // recalculating phase so Retry routes to the recovery orchestrator
+      // (which re-dispatches the calculation) instead of falling back to
+      // handleReset, which would recreate the defect. phaseRef is "recalculating"
+      // only when verify was running (performElectronicUpdate sets it before
+      // the recalc); a pre-recalc persistence/guard failure leaves it
+      // "applying" and is not routed to recovery.
+      const isVerifyFailure = phaseRef.current === "recalculating";
+      if (isVerifyFailure) lastErrorPhaseRef.current = "recalculating";
+      setWorkflowError(projectId, versionId, error.message, isVerifyFailure ? "recalculating" : null);
+    }
     finally{phaseRef.current="idle";}
   };
 
@@ -1283,11 +1295,15 @@ export default function OptimiseAndCalculate({
             publicationError: reason,
           }).catch(() => null);
         }
-        setWorkflowError(projectId, versionId, userMessage);
+        setWorkflowError(projectId, versionId, userMessage, phase);
         // Record the failure phase so the targeted Retry handler can
         // distinguish a post-apply recalculation/publication failure (which
         // should retry only the calculation) from a genuine optimiser failure
-        // (which should reset). Cleared on successful recovery.
+        // (which should reset). Cleared on successful recovery. Stored in the
+        // durable workflow store too, so it survives component unmount: a
+        // post-apply error then navigate-away/back resets the component-local
+        // ref to null and would otherwise fall back to handleReset, recreating
+        // the defect.
         lastErrorPhaseRef.current = phase;
       } else {
         // ── GENUINE OPTIMISER FAILURE (before completion) ──
@@ -1348,7 +1364,12 @@ export default function OptimiseAndCalculate({
   // nothing about a candidate being applied.
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const handleRecoveryRetry = useCallback(async () => {
-    const phase = lastErrorPhaseRef.current;
+    // Resolve the failure phase from the component-local ref OR the durable
+    // workflow store. A post-apply error then navigate-away/back resets the
+    // component-local ref to null; the durable store's failurePhase (written
+    // with setWorkflowError) survives the unmount so Retry still routes to the
+    // recovery orchestrator instead of falling back to handleReset.
+    const phase = lastErrorPhaseRef.current || workflowState.failurePhase || null;
     if (phase !== "recalculating" && phase !== "publishing") {
       // Not a post-apply recalculation failure — fall back to the existing reset.
       handleReset();
@@ -1367,10 +1388,20 @@ export default function OptimiseAndCalculate({
         readLiveIdentity: () => {
           const live = liveElectronicRef.current;
           if (!live) return null;
+          // Physical-context signature from electronicContextFromUi(live) via
+          // physicalContext: catches a geometry/seating/RSP edit that changed
+          // the physical design before the bass owner's cacheKey recomputed,
+          // so an old result cannot be accepted after such an edit.
+          let physicalContextSignature = null;
+          try {
+            const ctx = electronicContextFromUi(live);
+            physicalContextSignature = ctx ? stable(physicalContext(ctx)) : null;
+          } catch { physicalContextSignature = null; }
           return {
             projectId: live.projectId || null,
             versionId: live.versionId || null,
             settingsSignature: stable({ instances: live.subwooferInstances, crossover: live.appState?.splConfig?.crossover }),
+            physicalContextSignature,
           };
         },
         // The shared authoritative bass context must have ingested the CURRENT

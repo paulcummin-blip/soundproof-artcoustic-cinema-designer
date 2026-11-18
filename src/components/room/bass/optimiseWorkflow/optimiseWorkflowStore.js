@@ -30,6 +30,13 @@ function emptyState(projectId, versionId) {
     recommendations: null,
     // Whether the V2 optimisation found no improvements at all.
     noImprovementsFound: false,
+    // The workflow phase the run failed in, for post-apply recovery routing.
+    // Survives component unmount (unlike a component-local lastErrorPhaseRef)
+    // so a post-apply error then navigate-away/back still routes Retry to the
+    // recovery orchestrator instead of falling back to handleReset (which
+    // would recreate the defect). Null for genuine pre-completion errors and
+    // after a real reset or successful recovery.
+    failurePhase: null,
   };
 }
 
@@ -61,6 +68,7 @@ export function startWorkflow(projectId, versionId) {
     autoApplied: null,
     recommendations: null,
     noImprovementsFound: false,
+    failurePhase: null,
   });
 }
 
@@ -90,11 +98,15 @@ export function setComplete(projectId, versionId, autoApplied, recommendations, 
   });
 }
 
-export function setWorkflowError(projectId, versionId, error) {
+export function setWorkflowError(projectId, versionId, error, failurePhase = null) {
   return publish(projectId, versionId, {
     status: "error",
     error: error || "Optimisation could not be completed.",
     completedAtMs: Date.now(),
+    // Record the failure phase so the targeted Retry handler can distinguish a
+    // post-apply recalculation/publication failure (route to recovery) from a
+    // genuine optimiser failure (route to reset). Survives component unmount.
+    failurePhase: failurePhase || null,
   });
 }
 
@@ -128,6 +140,9 @@ export function setRecoveryComplete(projectId, versionId, originalError = null) 
     autoApplied: current.autoApplied,
     recommendations: current.recommendations,
     noImprovementsFound: current.noImprovementsFound,
+    // Recovery succeeded: clear the failure phase so a later Retry no longer
+    // routes to recovery.
+    failurePhase: null,
     // Diagnostic history: append, never overwrite.
     recoveryHistory: [
       ...(Array.isArray(current.recoveryHistory) ? current.recoveryHistory : []),
@@ -167,6 +182,9 @@ export function appendRecoveryFailure(projectId, versionId, {
     autoApplied: current.autoApplied,
     recommendations: current.recommendations,
     noImprovementsFound: current.noImprovementsFound,
+    // Preserve the failure phase through failed recovery attempts so a later
+    // Retry still routes to the recovery orchestrator.
+    failurePhase: current.failurePhase || null,
     // Diagnostic history: append, never overwrite.
     recoveryHistory: [
       ...(Array.isArray(current.recoveryHistory) ? current.recoveryHistory : []),

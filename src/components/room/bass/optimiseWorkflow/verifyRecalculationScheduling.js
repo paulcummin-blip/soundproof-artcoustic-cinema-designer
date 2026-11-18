@@ -32,8 +32,23 @@
  *
  * NO-OP: when the caller declares the commit a no-op (before === after), the
  * helper confirms the EXISTING published result is current for the current
- * cacheKey and returns without dispatching or waiting for advancement. A no-op
- * must never wait for a cacheKey that will not advance.
+ * cacheKey (using the ESTABLISHED authority validation — structural
+ * completeness + AUTHORITATIVE status + matching job fingerprints — plus
+ * no active calculation, authoritative-settings match, and settings still
+ * equal to the target; matching job keys alone are insufficient) and returns
+ * without dispatching or waiting for advancement. When the existing
+ * publication is stale or missing, the no-op BYPASSES the cache-advancement
+ * requirement and DISPATCHES on the current unchanged key (the design did not
+ * change, so the cacheKey will not advance) rather than timing out with
+ * cacheKey-not-advanced. A no-op must never wait for a cacheKey that will not
+ * advance.
+ *
+ * SETTINGS RECHECK: settingsEqual(readLiveSettings(), targetSettings) is
+ * rechecked EVERY poll during the cache-advancement wait AND after the
+ * publication wait. A user edit back to receipt.before passes the caller's
+ * outer before||after commit guard (it equals before) while the cacheKey may
+ * lag, so without this recheck the helper would dispatch on a stale advanced
+ * key for a design whose live settings no longer match the target.
  *
  * DISPATCH FINGERPRINT: captured AT DISPATCH (the cacheKey at the moment
  * onCalculate is called). After publication, the result fingerprint, the
@@ -51,6 +66,7 @@
  * publication-failed), never re-thrown.
  */
 import { settingsEqual } from "./electronicApplication.js";
+import { isStructurallyCompleteBassContract as contractStructurallyComplete } from "@/components/room/bass/completedBassResultPersistence";
 
 /**
  * @param {Object} args
@@ -110,17 +126,34 @@ export async function verifyRecalculationScheduling({
 
   // 2. No-op commit (before === after): the design did not change, so the
   //    cacheKey will not advance. Confirm the EXISTING published result is
-  //    current for the current cacheKey and return without dispatching. If the
-  //    existing result is not current (stale), fall through to a real
-  //    calculation rather than accepting a stale publication.
+  //    current for the current cacheKey using the ESTABLISHED authority
+  //    validation (structural completeness + AUTHORITATIVE status + matching
+  //    job fingerprints) PLUS no active calculation, authoritative-settings
+  //    match, and settings still equal to the target. Matching job keys alone
+  //    are insufficient. If the existing publication is reusable, return
+  //    without dispatching. If it is stale or missing, BYPASS the
+  //    cache-advancement requirement and DISPATCH on the current unchanged
+  //    key (the design did not change, so the cacheKey will not advance)
+  //    rather than timing out with cacheKey-not-advanced.
+  let noOpDispatch = false;
+  let noOpDispatchKey = null;
   if (noOp) {
     const cur = sharedRef.current?.cacheKey || null;
     if (!cur) return { ok: false, reason: "no-cache-key" };
-    const job = sharedRef.current?.completedBassAuthority?.contract?.job || {};
-    if (job.resultFingerprint === cur && job.currentJobFingerprint === cur) {
+    const authority = sharedRef.current?.completedBassAuthority || null;
+    const job = authority?.contract?.job || {};
+    const noActiveCalc = sharedRef.current?.calculationInProgress !== true;
+    const settingsStillTarget = settingsEqual(readLiveSettings(), targetSettings);
+    if (noActiveCalc && authOk() && settingsStillTarget
+        && authority?.authorityStatus === "AUTHORITATIVE"
+        && contractStructurallyComplete(authority?.contract)
+        && job.resultFingerprint === cur && job.currentJobFingerprint === cur) {
       return { ok: true, dispatchFingerprint: cur, resolvedCacheKey: cur, noOp: true };
     }
-    // Existing publication is not current for the no-op key: calculate.
+    // Existing publication is stale/missing for the no-op key: dispatch on the
+    // current unchanged key, bypassing the cache-advancement requirement.
+    noOpDispatch = true;
+    noOpDispatchKey = cur;
   }
 
   // 3. Wait for the bass owner to advance its cacheKey past the per-commit
@@ -128,27 +161,57 @@ export async function verifyRecalculationScheduling({
   //    ingested (real recommendationSettingsMatch). Calling onCalculate with a
   //    stale cacheKey queues the previous design; dispatching before the
   //    authoritative tuning settled would let a geometry/cache advance
-  //    masquerade as the requested electronic change.
-  const cacheStart = Date.now();
-  while (Date.now() - cacheStart < cacheAdvanceTimeoutMs) {
+  //    masquerade as the requested electronic change. A no-op dispatch skips
+  //    this wait (the cacheKey will not advance) and dispatches on the current
+  //    unchanged key. settingsEqual is rechecked EVERY poll: a user edit back
+  //    to receipt.before passes the caller's outer before||after commit guard
+  //    while the cacheKey may lag, so without this recheck the helper would
+  //    dispatch on a stale advanced key for a design whose live settings no
+  //    longer match the target.
+  let advancedKey = null;
+  if (noOpDispatch) {
+    // Bypass the advancement wait. Still require canCalculate, authOk and
+    // settings still target before dispatching on the unchanged key.
+    const noopStart = Date.now();
+    while (Date.now() - noopStart < cacheAdvanceTimeoutMs) {
+      if (cancelled()) return { ok: false, reason: "cancelled" };
+      if (!identityOk()) return { ok: false, reason: "identity-changed" };
+      if (!settingsEqual(readLiveSettings(), targetSettings)) return { ok: false, reason: "settings-reverted" };
+      const probe = sharedRef.current;
+      if (probe?.canCalculate === true && authOk()) break;
+      await sleep(cachePollMs);
+    }
     if (cancelled()) return { ok: false, reason: "cancelled" };
     if (!identityOk()) return { ok: false, reason: "identity-changed" };
     const probe = sharedRef.current;
-    const key = probe?.cacheKey || null;
-    if (key && key !== preCommitCacheKey && probe?.canCalculate === true && authOk()) break;
-    await sleep(cachePollMs);
-  }
-  if (cancelled()) return { ok: false, reason: "cancelled" };
-  if (!identityOk()) return { ok: false, reason: "identity-changed" };
+    advancedKey = noOpDispatchKey;
+    if (probe?.canCalculate !== true) return { ok: false, reason: "cannot-calculate" };
+    if (!authOk()) return { ok: false, reason: "authoritative-settings-mismatch" };
+    if (!settingsEqual(readLiveSettings(), targetSettings)) return { ok: false, reason: "settings-reverted" };
+  } else {
+    const cacheStart = Date.now();
+    while (Date.now() - cacheStart < cacheAdvanceTimeoutMs) {
+      if (cancelled()) return { ok: false, reason: "cancelled" };
+      if (!identityOk()) return { ok: false, reason: "identity-changed" };
+      if (!settingsEqual(readLiveSettings(), targetSettings)) return { ok: false, reason: "settings-reverted" };
+      const probe = sharedRef.current;
+      const key = probe?.cacheKey || null;
+      if (key && key !== preCommitCacheKey && probe?.canCalculate === true && authOk()) break;
+      await sleep(cachePollMs);
+    }
+    if (cancelled()) return { ok: false, reason: "cancelled" };
+    if (!identityOk()) return { ok: false, reason: "identity-changed" };
 
-  // Explicit failure classification — never fall through to dispatch after a
-  // timeout without a precise reason. Each condition is checked in order.
-  const probe = sharedRef.current;
-  const advancedKey = probe?.cacheKey || null;
-  if (!advancedKey) return { ok: false, reason: "no-cache-key" };
-  if (advancedKey === preCommitCacheKey) return { ok: false, reason: "cacheKey-not-advanced" };
-  if (probe?.canCalculate !== true) return { ok: false, reason: "cannot-calculate" };
-  if (!authOk()) return { ok: false, reason: "authoritative-settings-mismatch" };
+    // Explicit failure classification — never fall through to dispatch after a
+    // timeout without a precise reason. Each condition is checked in order.
+    const probe = sharedRef.current;
+    advancedKey = probe?.cacheKey || null;
+    if (!advancedKey) return { ok: false, reason: "no-cache-key" };
+    if (advancedKey === preCommitCacheKey) return { ok: false, reason: "cacheKey-not-advanced" };
+    if (probe?.canCalculate !== true) return { ok: false, reason: "cannot-calculate" };
+    if (!authOk()) return { ok: false, reason: "authoritative-settings-mismatch" };
+    if (!settingsEqual(readLiveSettings(), targetSettings)) return { ok: false, reason: "settings-reverted" };
+  }
 
   // 4. Capture the dispatch fingerprint AT DISPATCH — the cacheKey at the
   //    moment onCalculate is called — so a stale-scheduling bug (onCalculate
@@ -191,6 +254,13 @@ export async function verifyRecalculationScheduling({
   if (cancelled()) return { ok: false, reason: "cancelled", dispatchFingerprint };
   if (!published) return { ok: false, reason: "publication-timeout", dispatchFingerprint };
   if (!identityOk()) return { ok: false, reason: "identity-changed-during-publication", dispatchFingerprint };
+  // Recheck settings AFTER publication: a user edit back to receipt.before
+  // during the publication wait passes the caller's outer before||after commit
+  // guard while the key may lag, so a result published for the target must not
+  // be accepted once the live settings no longer match the target.
+  if (!settingsEqual(readLiveSettings(), targetSettings)) {
+    return { ok: false, reason: "settings-reverted", dispatchFingerprint };
+  }
 
   // 7. Pin the dispatch fingerprint: the published result fingerprint, the
   //    currentJob fingerprint AND the live cacheKey must ALL equal the

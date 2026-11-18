@@ -15,14 +15,28 @@ import { isStructurallyCompleteBassContract } from "@/components/room/bass/compl
  * mutates the saved plan, recommendation evidence or run history.
  *
  * IDENTITY PINNING: the orchestrator captures a REQUIRED live identity
- * (project id, version id, settings signature) plus the cacheKey at the start
- * of the attempt via a readLiveIdentity callback. During the wait it rejects
- * any identity change — if the user switches project, version, subwoofer
- * settings or crossover mid-retry, the wait does NOT accept a result that
- * belongs to a different design. The settings signature catches an edit that
- * has changed the live subwoofers/crossover BEFORE the bass owner's cacheKey
- * has advanced (the cacheKey is recomputed asynchronously), so a lagging
- * cache identity cannot accept old results after settings change.
+ * (project id, version id, settings signature, AND a physical-context
+ * signature derived from electronicContextFromUi(live) via physicalContext)
+ * plus the cacheKey at the start of the attempt via a readLiveIdentity
+ * callback. During the wait it rejects any identity change — if the user
+ * switches project, version, subwoofer settings, crossover, OR edits
+ * geometry/seating/RSP before the bass owner's cacheKey has advanced, the wait
+ * does NOT accept a result that belongs to a different design. The settings
+ * signature catches an electronic edit; the physical-context signature catches
+ * a geometry/seat/RSP edit that changed the physical design before the
+ * cacheKey recomputed.
+ *
+ * PRODUCTION PUBLICATION RECEIPT: the orchestrator uses job.completedAtMs as
+ * the real publication receipt. The bass background store ALWAYS populates
+ * completedAtMs on every terminal state (fresh complete, cache-hit, error,
+ * cancelled) with this.now(), and the adapter copies it into the contract job.
+ * It is null ONLY while a request is queued/calculating. job.calculationId is
+ * NEVER populated in production (the contract factory defaults it to null and
+ * no store/adapter writes it), so it cannot be used as a receipt. For a
+ * same-design re-calculation the resultFingerprint AND currentJobFingerprint
+ * are IDENTICAL before and after (the store sets both to the fingerprint), so
+ * detecting "a new publication landed" requires completedAtMs to have advanced
+ * from the pre-dispatch value — never the fingerprint.
  *
  * OLD vs NEW TERMINAL: a terminal failure outcome (error/rejected/timeout/
  * cancelled/stale) present at entry is the ORIGINAL failed calculation's
@@ -47,11 +61,20 @@ import { isStructurallyCompleteBassContract } from "@/components/room/bass/compl
  * present this as the candidate having been applied. Old authority is never
  * accepted before the new request is observed running and has settled.
  *
- * SUCCESS is marked only when the authoritative published result is
- * structurally complete, its resultFingerprint AND currentJobFingerprint both
- * match the PINNED cacheKey. A previously completed result for a different
- * design is never accepted, and a structurally incomplete or stale contract
- * is rejected by the established publication authority.
+ * SUCCESS is marked only when completedAtMs ADVANCED from the pre-dispatch
+ * value (a newly populated matching receipt — proving a new publication
+ * landed, never the unchanged pre-dispatch authority) AND the authoritative
+ * published result is structurally complete with resultFingerprint AND
+ * currentJobFingerprint both matching the PINNED cacheKey. A previously
+ * completed result for a different design is never accepted, and a structurally
+ * incomplete or stale contract is rejected by the established publication
+ * authority.
+ *
+ * NEW REJECTION may not replace the completedBassAuthority job at all: when
+ * the new request was observed running (newRequestObserved) and has now
+ * settled (!calculationInProgress) with a terminal outcome, the orchestrator
+ * fails PROMPTLY on that terminal even if the publication receipt
+ * (completedAtMs) is unchanged.
  */
 
 /** Workflow phases that qualify for a targeted recovery retry. */
@@ -79,6 +102,19 @@ export const TERMINAL_FAILURE_OUTCOMES = new Set([
  * existing callers/tests import the real validator.
  */
 export const contractStructurallyComplete = isStructurallyCompleteBassContract;
+
+/**
+ * The REAL production publication receipt: job.completedAtMs. The bass
+ * background store always populates it on every terminal state (fresh
+ * complete, cache-hit, error, cancelled) with this.now(), and the adapter
+ * copies it into the contract job; it is null only while a request is
+ * queued/calculating. job.calculationId is never populated in production, so
+ * it is deliberately NOT used. Returns null for a missing/empty value.
+ */
+function completedAtMsOf(state) {
+  const v = state?.completedBassAuthority?.contract?.job?.completedAtMs;
+  return Number.isFinite(v) ? v : null;
+}
 
 /**
  * Check whether the completed bass authority is AUTHORITATIVE, structurally
@@ -117,18 +153,21 @@ export function isAuthoritativeForFingerprint(shared, fingerprint) {
  * OLD AUTHORITY: a previously published authoritative result that matches the
  * pinned cacheKey may still be present at entry (it predates the apply, or is
  * from the same design). It is NEVER accepted before the new request completes:
- * acceptance requires that the new request was observed running
- * (`newRequestObserved`) and has now settled (`!calculationInProgress`).
+ * acceptance requires that completedAtMs ADVANCED from the pre-dispatch value
+ * (a newly populated matching receipt), never the unchanged pre-dispatch
+ * authority.
  *
  * @param {Object} args
  * @param {string} args.lastErrorPhase      Phase recorded at the original failure.
  * @param {Object} args.sharedRef           Ref to the latest shared bass context.
  * @param {Object} args.phaseRef            Ref used for cancel detection.
- * @param {Function} args.readLiveIdentity  REQUIRED: () => { projectId, versionId, settingsSignature }
+ * @param {Function} args.readLiveIdentity  REQUIRED: () => { projectId, versionId, settingsSignature, physicalContextSignature? }
  *   Reads the authoritative live identity (project, version, actual subwoofer
- *   settings + crossover signature) from the live electronic ref. Verified at
- *   entry and every poll so a lagging cache identity cannot accept old results
- *   after settings change.
+ *   settings + crossover signature, AND a physical-context signature derived
+ *   from electronicContextFromUi(live) via physicalContext) from the live
+ *   electronic ref. Verified at entry and every poll so a lagging cache
+ *   identity cannot accept old results after settings OR geometry/seating/RSP
+ *   change.
  * @param {Function} [args.authoritativeElectronicsMatchLive] () => boolean.
  *   Real check that the shared authoritative bass context has ingested the
  *   CURRENT live electronic settings (crossover + per-source tuning derived
@@ -144,7 +183,7 @@ export function isAuthoritativeForFingerprint(shared, fingerprint) {
  *   no-op dispatch.
  * @param {Function} [args.sleep]            Injectable sleep for tests.
  *
- * @returns {Promise<{action: string, reason?: string, reused?: boolean, pinned?: Object, outcome?: string, originalOutcome?: string, originalTerminalMessage?: string, actualCacheKey?: string, actualIdentity?: Object, actualSettingsSignature?: string}>}
+ * @returns {Promise<{action: string, reason?: string, reused?: boolean, pinned?: Object, outcome?: string, originalOutcome?: string, originalTerminalMessage?: string, actualCacheKey?: string, actualIdentity?: Object, actualSettingsSignature?: string, actualPhysicalContextSignature?: string}>}
  *   "fallback-reset" — not a post-apply failure; caller should reset.
  *   "success"        — pinned design's bass result is published and matches.
  *                     reused=true if an existing result was confirmed without
@@ -196,8 +235,10 @@ export async function attemptRecoveryRetry({
   }
 
   // Read and pin the authoritative live identity (project, version, settings
-  // signature). The settings signature catches an edit that has changed the
-  // live subwoofers/crossover BEFORE the bass owner's cacheKey has advanced.
+  // signature, AND physical-context signature). The settings signature catches
+  // an electronic edit; the physical-context signature catches a geometry/
+  // seating/RSP edit that changed the physical design before the bass owner's
+  // cacheKey recomputed.
   const initialIdentity = readLiveIdentity();
   if (!initialIdentity || !initialIdentity.projectId || !initialIdentity.versionId) {
     return {
@@ -209,6 +250,7 @@ export async function attemptRecoveryRetry({
     projectId: initialIdentity.projectId,
     versionId: initialIdentity.versionId,
     settingsSignature: initialIdentity.settingsSignature || null,
+    physicalContextSignature: initialIdentity.physicalContextSignature || null,
     cacheKey: pinnedCacheKey,
   };
 
@@ -232,7 +274,6 @@ export async function attemptRecoveryRetry({
   // not supplied (legacy tests) it is treated as satisfied.
   const authElectronicsOk = () => typeof authoritativeElectronicsMatchLive !== "function"
     || authoritativeElectronicsMatchLive();
-  const authElectronicsDiag = () => ({});
 
   // EXPLICIT REUSE: if the pinned design already has an authoritative published
   // result, confirm it without launching another calculation — but ONLY when
@@ -249,7 +290,6 @@ export async function attemptRecoveryRetry({
       action: "failed",
       reason: "The bass analysis has not settled on the current electronic settings. The saved plan is intact; retry when the settings have settled.",
       pinned,
-      ...authElectronicsDiag(),
       originalOutcome: hadOldTerminal ? originalOutcome : null,
       originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
     };
@@ -268,16 +308,18 @@ export async function attemptRecoveryRetry({
   let newDispatched = false;
   let dispatchRequestId = null;
   let dispatchFingerprint = null;
-  // Capture the publication receipt identity BEFORE dispatch. The contract's
-  // job.calculationId is the per-calculation manual request identity (unique per
-  // publication, even when the fingerprint is identical for a same-design
-  // re-calculation); fall back to currentJobFingerprint when absent. After the
-  // wait, a CHANGED receipt proves a new publication landed — even when a fast
-  // cached result started AND finished between polls (calculationInProgress
-  // never observed true). An UNCHANGED pre-dispatch authority is never accepted.
-  const publicationReceiptOf = (s) => s?.completedBassAuthority?.contract?.job?.calculationId
-    || s?.completedBassAuthority?.contract?.job?.currentJobFingerprint || null;
-  let preDispatchPublicationReceipt = publicationReceiptOf(initial);
+  // Capture the REAL publication receipt (job.completedAtMs) BEFORE dispatch.
+  // The bass background store always populates completedAtMs on every terminal
+  // state (fresh complete, cache-hit, error, cancelled) with this.now(), and
+  // the adapter copies it into the contract job; it is null only while a request
+  // is queued/calculating. After the wait, an ADVANCED completedAtMs proves a
+  // new publication landed — even when a fast cached result started AND finished
+  // between polls (calculationInProgress never observed true) AND for a
+  // same-design re-calculation where resultFingerprint/currentJobFingerprint are
+  // IDENTICAL before and after. job.calculationId is never populated in
+  // production, so it is deliberately NOT used. An UNCHANGED pre-dispatch
+  // authority is never accepted.
+  const preDispatchCompletedAtMs = completedAtMsOf(initial);
   if (!calcInProgressAtEntry) {
     const dispatch = initial.onCalculate();
     if (dispatch && dispatch.action === "blocked") {
@@ -325,8 +367,9 @@ export async function attemptRecoveryRetry({
       };
     }
 
-    // Verify the authoritative live identity at every poll. A project, version
-    // or settings change mid-retry means the pinned design is no longer current.
+    // Verify the authoritative live identity at every poll. A project, version,
+    // settings OR physical-context change mid-retry means the pinned design is
+    // no longer current.
     const liveIdentity = readLiveIdentity();
     if (!liveIdentity || liveIdentity.projectId !== pinned.projectId
         || liveIdentity.versionId !== pinned.versionId) {
@@ -346,6 +389,19 @@ export async function attemptRecoveryRetry({
         reason: "The subwoofer settings changed during recovery. The saved plan is intact; retry when the design is settled.",
         pinned,
         actualSettingsSignature: liveIdentity.settingsSignature,
+        originalOutcome: hadOldTerminal ? originalOutcome : null,
+        originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+      };
+    }
+    // Physical-context signature: catches a geometry/seating/RSP edit that
+    // changed the physical design before the bass owner's cacheKey recomputed.
+    if (pinned.physicalContextSignature && liveIdentity.physicalContextSignature
+        && liveIdentity.physicalContextSignature !== pinned.physicalContextSignature) {
+      return {
+        action: "failed",
+        reason: "The room, seating or RSP changed during recovery. The saved plan is intact; retry when the design is settled.",
+        pinned,
+        actualPhysicalContextSignature: liveIdentity.physicalContextSignature,
         originalOutcome: hadOldTerminal ? originalOutcome : null,
         originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
@@ -382,21 +438,26 @@ export async function attemptRecoveryRetry({
     const inProgress = state?.calculationInProgress === true;
     if (inProgress) newRequestObserved = true;
 
-    // Job changed: the publication receipt (calculationId, falling back to
-    // currentJobFingerprint) advanced from the pre-dispatch value, proving a new
-    // publication landed — EVEN when a fast cached result started and finished
-    // between polls and calculationInProgress was never observed true. An
-    // UNCHANGED pre-dispatch authority is never accepted.
-    const jobChanged = publicationReceiptOf(state) !== preDispatchPublicationReceipt;
+    // Publication receipt advanced: completedAtMs moved from the pre-dispatch
+    // value to a NEW finite value, proving a new publication/terminal landed —
+    // EVEN when a fast cached result started and finished between polls and
+    // calculationInProgress was never observed true, AND for a same-design
+    // re-calculation where resultFingerprint/currentJobFingerprint are identical
+    // before and after. An UNCHANGED pre-dispatch authority is never accepted.
+    const currentCompletedAtMs = completedAtMsOf(state);
+    const completedAtMsChanged = currentCompletedAtMs !== null
+      && currentCompletedAtMs !== preDispatchCompletedAtMs;
 
     // Once the request has settled (!inProgress), classify the outcome. Two
     // independent signals prove a new request occurred: newRequestObserved (we
-    // saw calculationInProgress true) and jobChanged (the publication receipt
-    // advanced). Terminal-failure detection uses EITHER, because a failed
-    // calculation may not advance the publication receipt. Success acceptance
-    // REQUIRES jobChanged so an unchanged pre-dispatch authority is never
-    // accepted.
-    if (!inProgress && (newRequestObserved || jobChanged)) {
+    // saw calculationInProgress true) and completedAtMsChanged (the real
+    // publication receipt advanced). Terminal-failure detection uses EITHER,
+    // because a rejected request may not replace the completedBassAuthority
+    // job at all (completedAtMs unchanged) but newRequestObserved still proves
+    // the new request ran and settled with a terminal. Success acceptance
+    // REQUIRES completedAtMsChanged so an unchanged pre-dispatch authority is
+    // never accepted.
+    if (!inProgress && (newRequestObserved || completedAtMsChanged)) {
       const outcome = state?.calculationOutcome || null;
       if (TERMINAL_FAILURE_OUTCOMES.has(outcome)) {
         return {
@@ -409,12 +470,13 @@ export async function attemptRecoveryRetry({
           originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
         };
       }
-      if (jobChanged && isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
+      if (completedAtMsChanged && isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
         return { action: "success", reused: false, pinned, ...originalDiag };
       }
-      if (jobChanged) {
-        // The publication job advanced but the published result does not match
-        // the pinned design — a different design's result landed. Do not accept.
+      if (completedAtMsChanged) {
+        // The publication receipt advanced but the published result does not
+        // match the pinned design — a different design's result landed, or the
+        // result is not authoritative/complete. Do not accept.
         return {
           action: "failed",
           reason: "The recalculated bass result does not match the current design. The saved plan is intact; retry when the design is settled.",
@@ -424,7 +486,7 @@ export async function attemptRecoveryRetry({
           originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
         };
       }
-      // newRequestObserved but no new publication: the new request ran and
+      // newRequestObserved but completedAtMs unchanged: the new request ran and
       // settled without publishing a result.
       return {
         action: "failed",
@@ -435,12 +497,12 @@ export async function attemptRecoveryRetry({
       };
     }
 
-    // A dispatched request that never advanced the publication job and never
+    // A dispatched request that never advanced the publication receipt and never
     // made calculationInProgress true within the grace is a no-op dispatch
     // (e.g. canCalculate flipped false right after entry). Do not wait out the
-    // full timeout for a request that never started. A job that DID advance is
-    // not a no-op even if inProgress was never observed.
-    if (newDispatched && !newRequestObserved && !jobChanged
+    // full timeout for a request that never started. A receipt that DID advance
+    // is not a no-op even if inProgress was never observed.
+    if (newDispatched && !newRequestObserved && !completedAtMsChanged
         && Date.now() - start > dispatchGraceMs) {
       return {
         action: "failed",
