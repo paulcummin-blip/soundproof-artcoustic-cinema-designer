@@ -736,13 +736,6 @@ export default function RP22ClientReport() {
     speakerDesignCompanion,
   });
 
-  // Final pre-export integrity guard. The button's disabled state and the
-  // autoPrint ready condition already check exportIntegrity.ready, but this
-  // runs one last time immediately before PDF generation — so a race between
-  // readiness and the click, or any path that bypasses the disabled check,
-  // still refuses to print an incomplete report.
-
-
   // A failed export resolves the report to the canonical Failed state.
   const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed || !!savedReport.error;
   const readiness = authorityReadFailed
@@ -791,6 +784,7 @@ export default function RP22ClientReport() {
   // the ADI narrative is accepted — either just generated or reused from the
   // saved snapshot.
   const reportFullyReady = reportReady && (adiComplete || savedNarrativeAccepted);
+  // Every export entry point must wait for both the narrative and drawings.
   const handleExport = useCallback(() => {
     if (!reportFullyReady || !exportIntegrity.ready) return;
     return rawHandleExport();
