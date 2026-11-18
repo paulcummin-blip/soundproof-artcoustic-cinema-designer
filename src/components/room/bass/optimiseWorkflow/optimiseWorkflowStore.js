@@ -136,6 +136,45 @@ export function setRecoveryComplete(projectId, versionId, originalError = null) 
   });
 }
 
+/**
+ * Append a recovery FAILURE to the recoveryHistory diagnostic array without
+ * resetting the completed run's autoApplied, recommendations or
+ * noImprovementsFound. The run stays in error status (the recovery did not
+ * succeed), but the original error and the failure reason/diagnostics are
+ * preserved so a failed recovery attempt is traceable — not only a successful
+ * one. Never clears or resets those fields; never mutates the saved plan or
+ * run history.
+ */
+export function appendRecoveryFailure(projectId, versionId, {
+  originalError = null,
+  failureReason = null,
+  diagnostics = null,
+} = {}) {
+  const current = getOptimiseWorkflowState(projectId, versionId);
+  const failureEntry = {
+    type: "failure",
+    originalError: originalError || current.error || null,
+    failureReason: failureReason || null,
+    diagnostics: diagnostics || null,
+    failedAt: new Date().toISOString(),
+  };
+  return publish(projectId, versionId, {
+    status: "error",
+    error: failureReason || current.error || "Recovery failed. The saved plan is intact; settings are unchanged.",
+    completedAtMs: Date.now(),
+    // PRESERVED from the original completed run — a failed recovery did not
+    // change any of these.
+    autoApplied: current.autoApplied,
+    recommendations: current.recommendations,
+    noImprovementsFound: current.noImprovementsFound,
+    // Diagnostic history: append, never overwrite.
+    recoveryHistory: [
+      ...(Array.isArray(current.recoveryHistory) ? current.recoveryHistory : []),
+      failureEntry,
+    ],
+  });
+}
+
 export function resetWorkflow(projectId, versionId) {
   return publish(projectId, versionId, emptyState(projectId, versionId));
 }

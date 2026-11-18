@@ -48,6 +48,7 @@ import {
   setCancelled,
   resetWorkflow,
   setRecoveryComplete,
+  appendRecoveryFailure,
 } from "./optimiseWorkflowStore";
 import {
   runOptimisation,
@@ -118,6 +119,7 @@ import { useLeverApplyActions } from "./useLeverApplyActions.js";
 import { mergeAppliedLeverRecords } from "../optimiserPlan/optimiserApplyProvenance.js";
 import { buildElectronicApplyDecision } from "./electronicApplyDecision.js";
 import { attemptRecoveryRetry } from "./recoveryRetry.js";
+import { verifyRecalculationScheduling } from "./verifyRecalculationScheduling.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -291,44 +293,50 @@ export default function OptimiseAndCalculate({
       };
       const verify=async(settings,restoring=false)=>{
         phaseRef.current="recalculating";setRecalculating(projectId,versionId);
-        const start=Date.now();
-        // Wait for the complete state update and its new calculation identity.
-        while(Date.now()-start<15000){
-          if(!io.current())return false;
-          const live=liveElectronicRef.current;
-          if(settingsEqual({instances:live.subwooferInstances,crossover:live.appState?.splConfig?.crossover},settings))break;
-          await sleep(50);
+        // Delegated scheduling: settings settle wait, cacheKey advancement wait
+        // (applies to BOTH apply and restore — a stale restored-design handler
+        // must never be scheduled), onCalculate dispatch with the dispatch
+        // fingerprint captured AT DISPATCH, then publication wait. The match
+        // checks below use the real recommendationSettingsMatch /
+        // recommendationResultMatches — this helper never duplicates them.
+        const scheduling=await verifyRecalculationScheduling({
+          sharedRef,phaseRef,
+          readLiveSettings:()=>{const live=liveElectronicRef.current;return{instances:live?.subwooferInstances,crossover:live?.appState?.splConfig?.crossover};},
+          targetSettings:settings,
+          preCommitCacheKey,
+          waitForPublication:(ref,phRef)=>waitForCurrentPublication(ref,phRef),
+        });
+        if(!scheduling.ok){
+          verifyDiagnosticsRef.current={
+            phase:"recalculating",schedulingReason:scheduling.reason,
+            preCommitCacheKey,
+            targetCacheKey:null,
+            dispatchFingerprint:scheduling.dispatchFingerprint||null,
+            actualCacheKey:sharedRef.current?.cacheKey||null,
+            actualResultFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+            actualCurrentJobFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
+          };
+          return false;
         }
-        const currentSettings=liveElectronicRef.current;
-        if(!settingsEqual({instances:currentSettings.subwooferInstances,crossover:currentSettings.appState?.splConfig?.crossover},settings))return false;
-        // Wait for the bass analysis owner to advance its cacheKey to match the
-        // committed settings before triggering the calculation. Calling
-        // onCalculate with a stale cacheKey queues the previous design and
-        // leaves the newly applied settings permanently stale. Skipped on
-        // restore (the restore-path verify is best-effort only).
-        if(!restoring){
-          const cacheStart=Date.now();
-          while(Date.now()-cacheStart<15000){
-            if(!io.current())return false;
-            const probe=sharedRef.current;
-            if(probe?.cacheKey && probe.cacheKey!==preCommitCacheKey && probe?.canCalculate===true)break;
-            await sleep(100);
-          }
-          if(sharedRef.current?.cacheKey===preCommitCacheKey)return false;
-        }
-        const live=sharedRef.current;
-        if(typeof live?.onCalculate!=="function")return false;
-        live.onCalculate();
-        if(!(await waitForCurrentPublication(sharedRef,phaseRef)))return false;
         const state=sharedRef.current;
         const expected=restoring?receipt.beforeResult:receipt.expectedResult;
         const tuning=restoring?receipt.beforeEffectiveTuning:receipt.expectedEffectiveTuning;
+        // Record the pre-commit key separately from the actual target cache key
+        // used for onCalculate (the dispatch fingerprint), and the actual
+        // published result/currentJob fingerprints. Do not mislabel the
+        // comparisonReceipt's baseline as an expected post-apply fingerprint —
+        // comparisonReceipt has no resultFingerprint field, so the expected
+        // fingerprint IS the target cache key the calculation was dispatched
+        // against.
+        const targetCacheKey=scheduling.dispatchFingerprint||state?.cacheKey||null;
         if(!Array.isArray(tuning)||!tuning.length){
           verifyDiagnosticsRef.current={
             phase:"recalculating",settingsMatch:null,resultMatch:null,
-            expectedFingerprint:expected?.resultFingerprint||null,
-            actualFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
-            pinnedCacheKey:preCommitCacheKey,actualCacheKey:state?.cacheKey||null,
+            preCommitCacheKey,
+            targetCacheKey,
+            actualCacheKey:state?.cacheKey||null,
+            actualResultFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+            actualCurrentJobFingerprint:state?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
             reason:"missing-tuning"};
           return false;
         }
@@ -337,9 +345,11 @@ export default function OptimiseAndCalculate({
         if(!settingsMatch||!resultMatch){
           verifyDiagnosticsRef.current={
             phase:"recalculating",settingsMatch,resultMatch,
-            expectedFingerprint:expected?.resultFingerprint||null,
-            actualFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
-            pinnedCacheKey:preCommitCacheKey,actualCacheKey:state?.cacheKey||null,
+            preCommitCacheKey,
+            targetCacheKey,
+            actualCacheKey:state?.cacheKey||null,
+            actualResultFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+            actualCurrentJobFingerprint:state?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
             reason:!settingsMatch?"settings-mismatch":"result-mismatch"};
           return false;
         }
@@ -1351,8 +1361,15 @@ export default function OptimiseAndCalculate({
         lastErrorPhase: lastErrorPhaseRef.current,
         sharedRef,
         phaseRef,
-        pinnedProjectId: projectId,
-        pinnedVersionId: versionId,
+        readLiveIdentity: () => {
+          const live = liveElectronicRef.current;
+          if (!live) return null;
+          return {
+            projectId: live.projectId || null,
+            versionId: live.versionId || null,
+            settingsSignature: stable({ instances: live.subwooferInstances, crossover: live.appState?.splConfig?.crossover }),
+          };
+        },
       });
       if (result.action === "success") {
         // Merge-only recovery complete: preserves autoApplied, recommendations
@@ -1361,7 +1378,20 @@ export default function OptimiseAndCalculate({
         setRecoveryComplete(projectId, versionId, originalError);
         lastErrorPhaseRef.current = null;
       } else if (result.action === "failed") {
-        setWorkflowError(projectId, versionId, result.reason);
+        // Preserve the original error and append failure diagnostics to
+        // recoveryHistory — a failed recovery attempt is traceable too, not
+        // only a successful one. Never resets autoApplied/recommendations.
+        appendRecoveryFailure(projectId, versionId, {
+          originalError,
+          failureReason: result.reason,
+          diagnostics: {
+            pinned: result.pinned || null,
+            outcome: result.outcome || null,
+            actualCacheKey: result.actualCacheKey || null,
+            actualIdentity: result.actualIdentity || null,
+            actualSettingsSignature: result.actualSettingsSignature || null,
+          },
+        });
       }
     } catch (err) {
       setWorkflowError(projectId, versionId,
