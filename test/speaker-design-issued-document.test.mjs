@@ -196,7 +196,8 @@ test('the report export stores the report and the schedule together, from the sa
 
   // The publication is awaited before it is treated as complete, so a storage
   // failure surfaces instead of being swallowed by the print path.
-  assert.match(EXPORT_HOOK, /\.catch\(\(\) => \(\{ stored: \[\], failed: \[\], complete: false \}\)\)/);
+  assert.match(EXPORT_HOOK, /const outcome = await publicationPromise/);
+  assert.match(EXPORT_HOOK, /failed: \[\{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error:/);
 });
 
 test('the report page builds the schedule from the report’s own frozen design', () => {

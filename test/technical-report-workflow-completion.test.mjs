@@ -67,8 +67,8 @@ test('Reported partial storage failure never counts as creation', async () => {
 test('A companion without a Technical Report composition cannot complete publication', async () => {
   let calls=0;
   const mod=await loadModule('src/components/report/projectReport/storeProjectReportPublication.js', {
-    '@/components/library/issuedDocument/recordIssuedExport':{storeIssuedDocument:async()=>{calls++;}},
-    '@/components/library/issuedDocument/pendingIssuedExportStore':{clearPendingExport(){}},
+    '@/components/library/issuedDocument/recordIssuedExport':{storeIssuedDocument:async()=>{calls++;},retryIssuedExportStorage:async()=>({ok:true})},
+    '@/components/library/issuedDocument/pendingIssuedExportStore':{clearPendingExport(){},pendingExportKey:()=>'',peekPendingExport:()=>null},
     '@/components/report/speakerDesign/ensureSpeakerDesignForVersion':{ensureSpeakerDesignForVersion:async()=>{calls++;return {status:'stored'};}},
     '@/components/library/issuedDocument/exportStorageFailure':{asExportStorageError:e=>e,buildExportStorageDiagnostic:x=>x},
     '@/components/library/issuedDocument/exportStorageDiagnosticLog':{writeExportStorageDiagnostic(){}},

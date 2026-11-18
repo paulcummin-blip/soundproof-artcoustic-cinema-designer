@@ -219,13 +219,13 @@ export function useClientReportPdfExport({
     }));
 
     const outcome = await publicationPromise;
-      if (outcome.complete) {
-        setPublication({ status: "complete", failed: [] });
-      } else if (outcome.failed.length > 0) {
-        setPublication({ status: "incomplete", failed: outcome.failed });
-      } else {
-        setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
-      }
+    if (outcome.complete) {
+      setPublication({ status: "complete", failed: [] });
+    } else if (outcome.failed.length > 0) {
+      setPublication({ status: "incomplete", failed: outcome.failed });
+    } else {
+      setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
+    }
     if (!outcome.complete) {
       setError('Document creation is incomplete. Retry storage before downloading the report.');
       closeReportPrintWindow(printWindowRef.current);

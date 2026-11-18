@@ -20,8 +20,9 @@
 
 import {
   storeIssuedDocument,
+  retryIssuedExportStorage,
 } from '@/components/library/issuedDocument/recordIssuedExport';
-import { clearPendingExport } from '@/components/library/issuedDocument/pendingIssuedExportStore';
+import { pendingExportKey, peekPendingExport, clearPendingExport } from '@/components/library/issuedDocument/pendingIssuedExportStore';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
 import {
   asExportStorageError,
@@ -208,6 +209,13 @@ export async function retryPublicationDocument({
   if (key === PUBLICATION_DOCUMENT.PROJECT_REPORT) {
     if (!reportIdentity?.documentType || !reportSnapshot?.nodeHtml) {
       return { ok: false, error: 'The Project Report composition is no longer available.' };
+    }
+    const filename = reportIdentity.filename?.endsWith('.pdf') ? reportIdentity.filename : `${reportIdentity.filename || 'export'}.pdf`;
+    const key = pendingExportKey({ projectId: reportIdentity.projectId, documentType: reportIdentity.documentType, filename });
+    const held = peekPendingExport(key);
+    if (held?.blob && held.issued?.versionId === reportIdentity.versionId) {
+      const result = await retryIssuedExportStorage(key);
+      return { ok: result.ok, error: result.ok ? undefined : result.reason };
     }
     return storeReportDocument({ identity: reportIdentity, snapshot: reportSnapshot });
   }
