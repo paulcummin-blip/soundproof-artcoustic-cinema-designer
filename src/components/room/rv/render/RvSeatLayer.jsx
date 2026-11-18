@@ -1,5 +1,6 @@
 import React from "react";
 import RvSeatRowLabels from "@/components/room/rv/render/RvSeatRowLabels";
+import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
 const sameSeat = (a, b) => a != null && b != null && String(a) === String(b);
 
@@ -78,6 +79,9 @@ export default function RvSeatLayer({
         const isPinned = hudPinnedSeatId === seat.id;
         const isSelected = sameSeat(selectedSeatId, seat.id);
         const isDimensional = sameSeat(dimensionSeatId, seat.id);
+        // Primary seats use a thicker, bolder outline (~3px); Secondary seats
+        // keep the current thin outline. The outline colour is unchanged.
+        const isPrimary = resolveSeatPriority(seat) === PRIMARY;
 
         const hitTargetProps = hasSeatGesture
           ? {
@@ -142,7 +146,7 @@ export default function RvSeatLayer({
               fill={isSelected ? 'rgba(33,52,40,0.10)' : 'rgba(0,0,0,0)'}
               pointerEvents="none"
               stroke={isSelected ? '#213428' : '#4A230F'}
-              strokeWidth={isPinned || isSelected ? 2 : 1}
+              strokeWidth={isPrimary ? 3 : (isPinned || isSelected ? 2 : 1)}
               strokeDasharray={isPinned ? '4 2' : 'none'}
               aria-label="Seat — hover for RP23 and P1 analysis"
             />
