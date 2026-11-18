@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   attemptRecoveryRetry,
+  resolveRecoveryFailurePhase,
   isAuthoritativeForFingerprint,
   contractStructurallyComplete,
   POST_APPLY_FAILURE_PHASES,
@@ -956,4 +957,37 @@ test("setRecoveryComplete does not reset autoApplied (unlike resetWorkflow)", ()
   const reset = getOptimiseWorkflowState(projectId, versionId);
   assert.equal(reset.autoApplied, null, "resetWorkflow clears autoApplied");
   assert.equal(reset.recommendations, null);
+});
+
+test("navigation: stored post-apply phase routes a remounted Retry to real recovery", async () => {
+  const projectId = "navigation-recovery", versionId = "v1";
+  setWorkflowError(projectId, versionId, "original verification failure", "recalculating");
+  const phase = resolveRecoveryFailurePhase(getOptimiseWorkflowState(projectId, versionId), null);
+  assert.equal(phase, "recalculating");
+  const owner = makeOwner({ initialOutcome: "rejected" });
+  const identity = makeIdentity();
+  const result = await attemptRecoveryRetry({
+    lastErrorPhase: phase,
+    sharedRef: owner.sharedRef,
+    phaseRef: { current: "recalculating" },
+    readLiveIdentity: identity.read,
+    authoritativeElectronicsMatchLive: () => true,
+    sleepMs: 5, timeoutMs: 500,
+  });
+  assert.equal(result.action, "success");
+  assert.equal(result.reused, false);
+  setRecoveryComplete(projectId, versionId, "original verification failure");
+  assert.equal(getOptimiseWorkflowState(projectId, versionId).failurePhase, null);
+  resetWorkflow(projectId, versionId);
+});
+
+test("navigation: failed recovery retains its phase; genuine failures and reset do not", () => {
+  const projectId = "navigation-failure", versionId = "v1";
+  setWorkflowError(projectId, versionId, "original verification failure", "publishing");
+  appendRecoveryFailure(projectId, versionId, { originalError: "original verification failure", failureReason: "timeout" });
+  assert.equal(resolveRecoveryFailurePhase(getOptimiseWorkflowState(projectId, versionId), null), "publishing");
+  setWorkflowError(projectId, versionId, "search failed");
+  assert.equal(resolveRecoveryFailurePhase(getOptimiseWorkflowState(projectId, versionId), null), null);
+  resetWorkflow(projectId, versionId);
+  assert.equal(getOptimiseWorkflowState(projectId, versionId).failurePhase, null);
 });

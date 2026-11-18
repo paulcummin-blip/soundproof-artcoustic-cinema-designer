@@ -119,7 +119,7 @@ import AdiOptimiserResults from "./AdiOptimiserResults.jsx";
 import { useLeverApplyActions } from "./useLeverApplyActions.js";
 import { mergeAppliedLeverRecords } from "../optimiserPlan/optimiserApplyProvenance.js";
 import { buildElectronicApplyDecision } from "./electronicApplyDecision.js";
-import { attemptRecoveryRetry } from "./recoveryRetry.js";
+import { attemptRecoveryRetry, resolveRecoveryFailurePhase } from "./recoveryRetry.js";
 import { verifyRecalculationScheduling } from "./verifyRecalculationScheduling.js";
 
 const SLEEP_MS = 100;
@@ -331,7 +331,7 @@ export default function OptimiseAndCalculate({
           actualCurrentJobFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null};
           if(restoring)restoringDiagnosticsRef.current=rec;else verifyDiagnosticsRef.current=rec;};
         if(!scheduling.ok){
-          writeDiag({schedulingReason:scheduling.reason,targetCacheKey:null,
+          writeDiag({schedulingReason:scheduling.reason,targetCacheKey:scheduling.dispatchFingerprint||null,
             dispatchFingerprint:scheduling.dispatchFingerprint||null,
             resultFingerprint:scheduling.resultFingerprint||null,
             currentJobFingerprint:scheduling.currentJobFingerprint||null,
@@ -484,6 +484,8 @@ export default function OptimiseAndCalculate({
     if (bassActionDisabled || !hasCanonicalInstances) return;
 
     runningRef.current = true;
+    verifyDiagnosticsRef.current = null;
+    restoringDiagnosticsRef.current = null;
     phaseRef.current = "calculating";
     startWorkflow(projectId, versionId);
 
@@ -1370,7 +1372,7 @@ export default function OptimiseAndCalculate({
     // component-local ref to null; the durable store's failurePhase (written
     // with setWorkflowError) survives the unmount so Retry still routes to the
     // recovery orchestrator instead of falling back to handleReset.
-    const phase = lastErrorPhaseRef.current || workflowState.failurePhase || null;
+    const phase = resolveRecoveryFailurePhase(workflowState, lastErrorPhaseRef.current);
     if (phase !== "recalculating" && phase !== "publishing") {
       // Not a post-apply recalculation failure — fall back to the existing reset.
       handleReset();
@@ -1383,7 +1385,7 @@ export default function OptimiseAndCalculate({
     const originalError = workflowState.error || null;
     try {
       const result = await attemptRecoveryRetry({
-        lastErrorPhase: lastErrorPhaseRef.current,
+        lastErrorPhase: phase,
         sharedRef,
         phaseRef,
         readLiveIdentity: () => {
@@ -1449,8 +1451,7 @@ export default function OptimiseAndCalculate({
         failureReason: err?.message || "Recovery failed. The saved plan is intact; settings are unchanged.",
         diagnostics: { exception: true },
       });
-      setWorkflowError(projectId, versionId,
-        err?.message || "Recovery failed. The saved plan is intact; settings are unchanged.");
+
     } finally {
       setRecoveryBusy(false);
       phaseRef.current = "idle";
@@ -1465,7 +1466,7 @@ export default function OptimiseAndCalculate({
   // (an initial calculation timeout with no applied plan) keeps the existing
   // reset semantics.
   const handleTimeoutRetry = useCallback(() => {
-    const phase = lastErrorPhaseRef.current || workflowState.failurePhase || null;
+    const phase = resolveRecoveryFailurePhase(workflowState, lastErrorPhaseRef.current);
     if (phase === "recalculating" || phase === "publishing") {
       handleRecoveryRetry();
     } else {

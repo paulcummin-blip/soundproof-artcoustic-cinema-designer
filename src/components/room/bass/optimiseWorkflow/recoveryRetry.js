@@ -80,6 +80,11 @@ import { isStructurallyCompleteBassContract } from "@/components/room/bass/compl
 /** Workflow phases that qualify for a targeted recovery retry. */
 export const POST_APPLY_FAILURE_PHASES = new Set(["recalculating", "publishing"]);
 
+// Workflow errors survive component navigation; a component ref may not.
+export function resolveRecoveryFailurePhase(workflowState, localPhase = null) {
+  return workflowState?.failurePhase || localPhase || null;
+}
+
 /**
  * Terminal calculation outcomes that mean the current request has already
  * failed. The orchestrator returns these promptly instead of waiting out
