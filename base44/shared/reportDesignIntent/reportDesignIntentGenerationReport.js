@@ -57,6 +57,7 @@ export function designIntentPromptIdentity(writerInput = null) {
 
   return {
     version,
+    brief_version: writerInput?.design_intent_scope?.brief_version || null,
     current: WRITER_PROMPT_VERSION,
     // A match means the input the writer was given carries the prompt version this
     // build of the app defines, so the attempt ran under the current prompt.
