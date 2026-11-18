@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useSyncExternalStore } from "react";
 import { Info, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { WIDTH_PRESETS } from "@/components/data/screenSizes"; // Keep this impo
 import { useAppState } from "@/components/AppStateProvider";
 import RoomVisualisation from "./RoomVisualisation";
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
+import { subscribeSeatDragLive, getSeatDragLive } from "@/components/state/seatDragLiveStore";
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import ManualSizeInput from "./ManualSizeInput";
@@ -35,6 +36,15 @@ export default function ScreenConfiguration(props) {
   const screenFrontPlaneM = Number(appState?.screenFrontPlaneM ?? 0);
   // Also extracting placedSpeakers and subwoofers as they are used by RoomVisualisation
   const { placedSpeakers, subwoofers } = appState || {};
+
+  // Live draft seat positions during a longitudinal seat/row drag, published by
+  // the Room Visualisation drag handler. Same source the Seating Layout
+  // Viewing Angle Analysis reads, so Live Metrics and that panel stay in sync
+  // throughout the drag instead of only on pointer release. Pure geometry only
+  // — no bass / RP22 / ASDR recalculation and no persistent save is triggered.
+  const liveDrag = useSyncExternalStore(subscribeSeatDragLive, getSeatDragLive);
+  const liveSeats = (liveDrag?.active && Array.isArray(liveDrag?.seats)) ? liveDrag.seats : null;
+  const effectiveSeatingPositions = liveSeats || seatingPositions;
 
   // Debounced input handling
   const [inputBuffer, setInputBuffer] = React.useState({});
@@ -65,13 +75,16 @@ export default function ScreenConfiguration(props) {
 
   const borderThicknessM = Number(screenData.borderThicknessM) || 0.08;
 
-  // Compute per-row live metrics source data
+  // Compute per-row live metrics source data. Uses effectiveSeatingPositions so
+  // the table updates continuously during a seat drag (same live source as the
+  // Seating Layout Viewing Angle Analysis) and matches the committed positions
+  // on release.
   const seatingRowsLive = useMemo(() => {
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return [];
+    if (!Array.isArray(effectiveSeatingPositions) || effectiveSeatingPositions.length === 0) return [];
 
     const rowsMap = new Map();
 
-    seatingPositions.forEach((seat) => {
+    effectiveSeatingPositions.forEach((seat) => {
       const rowNumber = Number(seat?.rowNumber);
       const x = Number(seat?.x);
       const y = Number(seat?.y);
@@ -110,7 +123,7 @@ export default function ScreenConfiguration(props) {
         };
       })
       .sort((a, b) => a.rowNumber - b.rowNumber);
-  }, [seatingPositions]);
+  }, [effectiveSeatingPositions]);
 
   // Compute viewable dimensions
   const viewableDimensions = useMemo(() => {
