@@ -96,17 +96,17 @@ function downloadImage(url, caption) {
 
 function AssetRow({ icon: Icon, name, sub, onDownload }) {
   return (
-    <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[#F8F8F7] transition-colors">
+    <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[#F8F8F7] transition-colors min-w-0">
       <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: '#8B8378' }} />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium text-[#1B1A1A] truncate">{name}</div>
-        {sub && <div className="text-[10px] text-[#8B8378] truncate">{sub}</div>}
+      <div className="min-w-0 max-w-[calc(100%-3rem)]">
+        <div className="text-xs font-medium text-[#1B1A1A] truncate" title={name}>{name}</div>
+        {sub && <div className="text-[10px] text-[#8B8378] truncate" title={sub}>{sub}</div>}
       </div>
       <button
         type="button"
         onClick={onDownload}
         className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-[#E2DED7] transition-colors shrink-0"
-        title="Download"
+        title={`Download ${name}`}
       >
         <Download className="w-3 h-3" style={{ color: '#625143' }} />
       </button>
@@ -114,8 +114,8 @@ function AssetRow({ icon: Icon, name, sub, onDownload }) {
   );
 }
 
-export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false, project = null }) {
-  const [open, setOpen] = useState(false);
+export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false, defaultOpen = false, project = null }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [zipping, setZipping] = useState(false);
   const [requested, setRequested] = useState(false);
   const [downloadPending, setDownloadPending] = useState(false);

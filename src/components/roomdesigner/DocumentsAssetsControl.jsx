@@ -118,24 +118,27 @@ export default function DocumentsAssetsControl({
         </button>
 
         {open && (
-          <div className="px-3.5 pb-3.5 pt-2.5 border-t border-[#E2DED7] space-y-3.5">
-            <DocumentWorkflowPanel
-              projectId={projectId}
-              versionId={versionId}
-              projectName={projectName}
-              versionName={versionName}
-              engineeringFingerprint={engineeringFingerprint}
-              workflowStatus={workflowStatus}
-              disabled={disabled}
-              onOpenReport={onOpenReport}
-            />
-            <ProjectAssetsSection
-              projectId={projectId}
-              projectName={projectName}
-              compact
-              alwaysLoad
-              project={{ name: projectName, client_name: clientName, project_reference: projectReference }}
-            />
+          <div className="px-3.5 pb-3.5 pt-2.5 border-t border-[#E2DED7]">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] gap-3.5 items-start">
+              <DocumentWorkflowPanel
+                projectId={projectId}
+                versionId={versionId}
+                projectName={projectName}
+                versionName={versionName}
+                engineeringFingerprint={engineeringFingerprint}
+                workflowStatus={workflowStatus}
+                disabled={disabled}
+                onOpenReport={onOpenReport}
+              />
+              <ProjectAssetsSection
+                projectId={projectId}
+                projectName={projectName}
+                compact
+                alwaysLoad
+                defaultOpen
+                project={{ name: projectName, client_name: clientName, project_reference: projectReference }}
+              />
+            </div>
           </div>
         )}
       </div>

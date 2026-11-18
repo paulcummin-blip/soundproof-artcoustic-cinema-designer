@@ -149,7 +149,7 @@ export default function DocumentWorkflowPanel({
     : null;
 
   return (
-    <div className="space-y-2.5 max-w-[760px]">
+    <div className="space-y-2.5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <DocumentCard
           number="1a"
