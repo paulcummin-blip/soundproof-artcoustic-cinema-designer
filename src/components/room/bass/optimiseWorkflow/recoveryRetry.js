@@ -389,11 +389,14 @@ export async function attemptRecoveryRetry({
     // UNCHANGED pre-dispatch authority is never accepted.
     const jobChanged = publicationReceiptOf(state) !== preDispatchPublicationReceipt;
 
-    // Once the request has settled (!inProgress) and the publication job
-    // advanced, classify the outcome. This covers both the observed-running
-    // path (newRequestObserved) and the fast-cached-result race (jobChanged
-    // with newRequestObserved still false).
-    if (!inProgress && jobChanged) {
+    // Once the request has settled (!inProgress), classify the outcome. Two
+    // independent signals prove a new request occurred: newRequestObserved (we
+    // saw calculationInProgress true) and jobChanged (the publication receipt
+    // advanced). Terminal-failure detection uses EITHER, because a failed
+    // calculation may not advance the publication receipt. Success acceptance
+    // REQUIRES jobChanged so an unchanged pre-dispatch authority is never
+    // accepted.
+    if (!inProgress && (newRequestObserved || jobChanged)) {
       const outcome = state?.calculationOutcome || null;
       if (TERMINAL_FAILURE_OUTCOMES.has(outcome)) {
         return {
@@ -406,16 +409,27 @@ export async function attemptRecoveryRetry({
           originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
         };
       }
-      if (isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
+      if (jobChanged && isAuthoritativeForFingerprint(state, pinned.cacheKey)) {
         return { action: "success", reused: false, pinned, ...originalDiag };
       }
-      // The job advanced but the published result does not match the pinned
-      // design — a different design's result landed. Do not accept it.
+      if (jobChanged) {
+        // The publication job advanced but the published result does not match
+        // the pinned design — a different design's result landed. Do not accept.
+        return {
+          action: "failed",
+          reason: "The recalculated bass result does not match the current design. The saved plan is intact; retry when the design is settled.",
+          pinned,
+          actualCacheKey: state?.cacheKey || null,
+          originalOutcome: hadOldTerminal ? originalOutcome : null,
+          originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
+        };
+      }
+      // newRequestObserved but no new publication: the new request ran and
+      // settled without publishing a result.
       return {
         action: "failed",
-        reason: "The recalculated bass result does not match the current design. The saved plan is intact; retry when the design is settled.",
+        reason: "The bass calculation finished without publishing a result. The saved plan is intact; retry the update.",
         pinned,
-        actualCacheKey: state?.cacheKey || null,
         originalOutcome: hadOldTerminal ? originalOutcome : null,
         originalTerminalMessage: hadOldTerminal ? originalTerminalMessage : null,
       };
