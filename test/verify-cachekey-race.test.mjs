@@ -661,3 +661,111 @@ test("matchers: recommendationResultMatches matching and mismatching", () => {
   assert.equal(recommendationResultMatches(mismatch, expectedResult), false);
   assert.equal(recommendationResultMatches(null, expectedResult), false);
 });
+
+// ---------------------------------------------------------------------------
+// 18. NO-OP with STALE/MISSING publication: the helper BYPASSES the
+//     cache-advancement requirement and DISPATCHES on the current unchanged
+//     key (the design did not change, so the cacheKey will not advance) rather
+//     than timing out with cacheKey-not-advanced. onCalculate IS called.
+// ---------------------------------------------------------------------------
+test("verify scheduling: no-op with stale publication dispatches on the unchanged key", async () => {
+  // No existing authoritative publication (UPDATING), noOp commit, cacheKey
+  // never advances. The helper must dispatch on "cal:noop" and succeed.
+  const owner = makeOwner({
+    preCommitCacheKey: "cal:noop",
+    advanceTo: "cal:noop-should-not-advance",
+    settleTo: before, // before === after for a no-op
+    authoritativeSettleTo: buildAuthoritativeSettings(beforeInstances, beforeCrossover),
+    publishSettings: buildAuthoritativeSettings(beforeInstances, beforeCrossover),
+    initialAuthority: { authorityStatus: "UPDATING", contract: { job: { status: "updating" } } },
+    neverAdvance: true,
+  });
+  const noOpBefore = { instances: clone(beforeInstances), crossover: clone(beforeCrossover) };
+  const result = await verifyRecalculationScheduling({
+    sharedRef: owner.sharedRef, phaseRef: owner.phaseRef, readLiveSettings: owner.readLiveSettings,
+    targetSettings: noOpBefore, preCommitCacheKey: "cal:noop",
+    identityGuard: () => true,
+    authoritativeSettingsMatch: () => recommendationSettingsMatch(owner.sharedRef.current?.authoritative, { crossover: before.crossover, tuning: beforeTuning }),
+    noOp: true,
+    waitForPublication: waitForPublication(owner), sleep: realSleep,
+    settlePollMs: 5, cachePollMs: 5, settleTimeoutMs: 2000, cacheAdvanceTimeoutMs: 2000,
+  });
+  assert.equal(result.ok, true, "no-op with stale publication must dispatch and succeed");
+  assert.equal(result.dispatchFingerprint, "cal:noop", "dispatched on the unchanged key");
+  assert.equal(owner.getOnCalculateCalls(), 1, "onCalculate must be called for a no-op with stale publication");
+});
+
+// ---------------------------------------------------------------------------
+// 19. SETTINGS REVERTED during the cache-advancement wait: a user edit back to
+//     receipt.before passes the caller's outer before||after commit guard while
+//     the cacheKey may lag. settingsEqual is rechecked every poll, so the helper
+//     returns "settings-reverted" instead of dispatching on a stale advanced
+//     key for a design whose live settings no longer match the target.
+// ---------------------------------------------------------------------------
+test("verify scheduling: settings reverted during cache wait returns settings-reverted", async () => {
+  const owner = makeOwner({
+    preCommitCacheKey: "cal:v1:before",
+    advanceTo: "cal:v1:after",
+    settleTo: after,
+    settleMs: 5,
+    advanceMs: 40, // cacheKey advances late, so the revert happens during the wait
+  });
+  let reverted = false;
+  const result = await verifyRecalculationScheduling({
+    sharedRef: owner.sharedRef, phaseRef: owner.phaseRef, readLiveSettings: owner.readLiveSettings,
+    targetSettings: after, preCommitCacheKey: "cal:v1:before",
+    identityGuard: () => true,
+    authoritativeSettingsMatch: () => true,
+    waitForPublication: waitForPublication(owner),
+    sleep: async (ms) => {
+      // After settings settle (after ~5ms) but before the cacheKey advances
+      // (~40ms), revert the live settings back to before at ~15ms.
+      await realSleep(10);
+      if (!reverted) { owner.setLiveSettings(before); reverted = true; }
+      await realSleep(Math.max(0, ms - 10));
+    },
+    settlePollMs: 5, cachePollMs: 5, settleTimeoutMs: 2000, cacheAdvanceTimeoutMs: 2000,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "settings-reverted");
+  assert.equal(owner.getOnCalculateCalls(), 0, "onCalculate must not be called after settings reverted");
+});
+
+// ---------------------------------------------------------------------------
+// 20. SETTINGS REVERTED during the publication wait: after dispatch, the live
+//     settings revert to before. The post-publication settingsEqual recheck
+//     returns "settings-reverted" instead of accepting a result whose live
+//     settings no longer match the target.
+// ---------------------------------------------------------------------------
+test("verify scheduling: settings reverted during publication wait returns settings-reverted", async () => {
+  const owner = makeOwner({
+    preCommitCacheKey: "cal:v1:before",
+    advanceTo: "cal:v1:after",
+    settleTo: after,
+    settleMs: 5,
+    advanceMs: 10,
+    calcMs: 20,
+  });
+  const result = await verifyRecalculationScheduling({
+    sharedRef: owner.sharedRef, phaseRef: owner.phaseRef, readLiveSettings: owner.readLiveSettings,
+    targetSettings: after, preCommitCacheKey: "cal:v1:before",
+    identityGuard: () => true,
+    authoritativeSettingsMatch: () => recommendationSettingsMatch(owner.sharedRef.current?.authoritative, { crossover: after.crossover, tuning: afterTuning }),
+    waitForPublication: async (sharedRef, phaseRef) => {
+      // Publication lands, then the live settings revert to before.
+      await realSleep(25);
+      // ensure the calc published
+      const df = owner.getDispatchFingerprint();
+      const job = sharedRef.current?.completedBassAuthority?.contract?.job;
+      if (df && job?.status === "complete" && job?.resultFingerprint === df) {
+        owner.setLiveSettings(before);
+        return true;
+      }
+      return false;
+    },
+    sleep: realSleep, settlePollMs: 5, cachePollMs: 5,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "settings-reverted");
+  assert.equal(result.dispatchFingerprint, "cal:v1:after");
+});
