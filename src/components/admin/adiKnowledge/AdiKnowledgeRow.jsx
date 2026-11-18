@@ -77,6 +77,13 @@ export default function AdiKnowledgeRow({ record = null, records = [], busy = nu
         </div>
       )}
 
+      {record.engineering_basis && (
+        <div className="mt-3 rounded-md border border-[#E5E1D8] bg-[#F6F4EF] p-3 text-[11px] leading-relaxed text-[#625143]">
+          <span className="font-semibold text-[#213428]">Engineering basis:</span> {record.engineering_basis}
+          {record.approved_by && <span className="ml-1">· Approved by {record.approved_by}</span>}
+        </div>
+      )}
+
       {editing ? (
         <div className="mt-3">
           <textarea
@@ -113,7 +120,14 @@ export default function AdiKnowledgeRow({ record = null, records = [], busy = nu
         <button
           type="button"
           disabled={isBusy}
-          onClick={() => onAction?.('approve', { id: record.id })}
+          onClick={async () => {
+            const basis = window.prompt(
+              'State the engineering or RP22 basis for approving this principle. It is recorded with the approval and required before the principle may be used.',
+              record.engineering_basis || '',
+            );
+            if (!basis || !basis.trim()) return;
+            await onAction?.('approve', { id: record.id, basis: basis.trim() });
+          }}
           className="inline-flex items-center gap-1 rounded-md border border-[#213428] bg-white px-3 py-1.5 text-xs font-semibold text-[#213428] disabled:opacity-50"
         >
           <CheckCircle2 className="h-3.5 w-3.5" /> Approve

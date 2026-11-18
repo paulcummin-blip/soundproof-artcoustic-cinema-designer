@@ -83,8 +83,11 @@ export const CONFIDENCE_BAND = Object.freeze({
  * THE PROMOTION RULE. One answer is never global knowledge.
  *   1 matching project   → candidate
  *   2 matching projects  → strengthened candidate
- *   3 matching projects  → learned ADI rationale
+ *   3 matching projects  → strengthened candidate ready for administrator review
+ *   admin approval       → learned ADI rationale
  * Projects, not answers: the same designer answering twice on one project teaches nothing new.
+ * Repetition increases confidence that a topic deserves review; it never proves the
+ * answer is correct, so LEARNED is reached only by an explicit administrator approval.
  */
 export const PROMOTION_RULE = Object.freeze({
   STRENGTHEN_PROJECTS: 2,
@@ -194,17 +197,24 @@ export function confidenceForProjects(projects, { approved = false, contested = 
   const count = Number(projects);
   const seen = Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
   if (contested) return 0.3;
+  // Without admin approval, repetition strengthens the case for review but never
+  // reaches the high band: the matter is never used to suppress a question or
+  // influence a proposal until an administrator has validated it.
   let score = 0.25;
-  if (seen >= PROMOTION_RULE.HIGH_CONFIDENCE_AT) score = 0.8 + Math.min(0.15, (seen - PROMOTION_RULE.LEARN_PROJECTS) * 0.05);
-  else if (seen >= PROMOTION_RULE.MODERATE_CONFIDENCE_AT) score = 0.55;
+  if (seen >= PROMOTION_RULE.STRENGTHEN_PROJECTS) score = 0.55;
   return approved ? Math.max(score, 0.85) : score;
 }
 
-/** The status a record has earned from agreeing projects, before any admin decision. */
+/**
+ * The status a record has earned from agreeing projects, before any admin decision.
+ * Repetition strengthens a candidate but never establishes a principle on its own:
+ * LEARNED is reserved for an explicit administrator approval, so three matching
+ * projects produce a strengthened candidate ready for review, not learned knowledge.
+ */
 export function statusForProjects(projects) {
   const seen = Number(projects);
   if (!Number.isFinite(seen) || seen < PROMOTION_RULE.STRENGTHEN_PROJECTS) return KNOWLEDGE_STATUS.CANDIDATE;
-  return seen >= PROMOTION_RULE.LEARN_PROJECTS ? KNOWLEDGE_STATUS.LEARNED : KNOWLEDGE_STATUS.STRENGTHENED;
+  return KNOWLEDGE_STATUS.STRENGTHENED;
 }
 
 /** The overhead positions a count implies: the layout the reason is about. */
@@ -228,6 +238,7 @@ export function buildDesignCondition({
   rows = null,
   overheads = null,
   subwoofers = null,
+  subwooferArrangement = null,
   treatmentPanels = null,
   treatmentProduct = null,
 } = {}) {
@@ -255,6 +266,11 @@ export function buildDesignCondition({
     /\b(\d+|one|two|three|four|five|six)[- ]subwoofer\b/i,
     /\b(\d+|one|two|three|four|five|six)\s+subwoofers?\b/i,
   ]);
+  // The physical arrangement of the subwoofers (e.g. 'front_rear', 'distributed'),
+  // supplied by the caller where the design states it. A count alone is not enough
+  // to distinguish one four-subwoofer arrangement from another, so the arrangement
+  // is part of the condition when it is known.
+  const arrangement = asText(String(subwooferArrangement || '')) || null;
   const panels = countValue(treatmentPanels) ?? read([
     /\b(\d+|one|two|three|four|five|six)\s+[a-z]+\s+panels?\b/i,
     /\b(\d+|one|two|three|four|five|six)\s+panels?\b/i,
@@ -271,6 +287,7 @@ export function buildDesignCondition({
     overhead_layout: overheadCount === null ? null : `.${overheadCount}`,
     overhead_positions: overheadCount === null ? null : overheadPositions(overheadCount),
     subwoofers: subwooferTotal,
+    subwoofer_arrangement: subwooferTotal === null ? null : arrangement,
     treatment_panels: panels,
     treatment_product: panels === null ? null : product,
   };
@@ -288,7 +305,12 @@ export function conditionStatements(condition = {}) {
     out.push(`${countWord(condition.overheads)} overhead speaker${Number(condition.overheads) === 1 ? '' : 's'}`);
     if (condition.overhead_positions) out.push(`${condition.overhead_positions} overhead layout`);
   }
-  if (condition.subwoofers) out.push(`${countWord(condition.subwoofers)} subwoofers`);
+  if (condition.subwoofers) {
+    const arrangementSuffix = condition.subwoofer_arrangement
+      ? ` (${condition.subwoofer_arrangement} arrangement)`
+      : '';
+    out.push(`${countWord(condition.subwoofers)} subwoofers${arrangementSuffix}`);
+  }
   if (condition.treatment_panels) {
     out.push(`${countWord(condition.treatment_panels)} ${condition.treatment_product || 'acoustic treatment'} panels`);
   }
@@ -301,12 +323,16 @@ export function conditionStatements(condition = {}) {
  * learned as a reason for a four-row .4 layout.
  */
 export function conditionKey(condition = {}) {
-  return [
+  // The arrangement segment is included only when it is stated, so records saved
+  // before the arrangement was captured keep their original key and are not orphaned.
+  const segments = [
     `rows=${condition.rows ?? '-'}`,
     `oh=${condition.overheads ?? '-'}`,
     `subs=${condition.subwoofers ?? '-'}`,
-    `panels=${condition.treatment_panels ?? '-'}`,
-  ].join('|');
+  ];
+  if (condition.subwoofer_arrangement) segments.push(`arr=${condition.subwoofer_arrangement}`);
+  segments.push(`panels=${condition.treatment_panels ?? '-'}`);
+  return segments.join('|');
 }
 
 /** The condition as it reads inside a canonical rationale. */
@@ -319,9 +345,10 @@ export function conditionPhrase(condition = {}, topic = null) {
         ? `${cinema} using a ${condition.overhead_layout} overhead layout`
         : cinema;
     case KNOWLEDGE_TOPIC.SUBWOOFER_ARRANGEMENT:
-      return condition.subwoofers
-        ? `${cinema} with ${countWord(condition.subwoofers)} subwoofers`
-        : cinema;
+      if (!condition.subwoofers) return cinema;
+      return condition.subwoofer_arrangement
+        ? `${cinema} with ${countWord(condition.subwoofers)} subwoofers in a ${condition.subwoofer_arrangement} arrangement`
+        : `${cinema} with ${countWord(condition.subwoofers)} subwoofers`;
     case KNOWLEDGE_TOPIC.ACOUSTIC_TREATMENT:
       return condition.treatment_panels
         ? `${cinema} with ${countWord(condition.treatment_panels)} acoustic panels`
@@ -374,10 +401,11 @@ const CONCEPT_CLAUSE = Object.freeze({
     processor_capability: 'work within the processor\'s own channel capability',
   }),
   [KNOWLEDGE_TOPIC.SUBWOOFER_ARRANGEMENT]: Object.freeze({
-    front_rear_symmetry: 'place the sources front and rear so the room is driven more evenly',
-    seat_to_seat_consistency: 'even out the seat-to-seat bass rather than favour one row',
-    room_mode_control: 'spread the sources so fewer room modes dominate one position',
+    front_rear_symmetry: 'place the sources so the room is driven more evenly, where the placement and room geometry support it',
+    seat_to_seat_consistency: 'even out the seat-to-seat bass rather than favour one row, depending on placement and integration',
+    room_mode_control: 'spread the sources so fewer room modes dominate one position, subject to placement and room dimensions',
     acoustic_load: 'share the output across cabinets so each works comfortably',
+    distributed_modal_benefit: 'improve modal behaviour and seat-to-seat consistency when the subwoofers are appropriately distributed, placed and integrated with the room',
   }),
   [KNOWLEDGE_TOPIC.SEATING_PRIORITY]: Object.freeze({
     sightline: 'hold a clear sightline to the screen from the priority row',

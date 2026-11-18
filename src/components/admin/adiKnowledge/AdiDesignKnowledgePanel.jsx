@@ -35,9 +35,11 @@ export default function AdiDesignKnowledgePanel() {
       </div>
       <p className="mb-4 text-xs leading-relaxed text-[#625143]">
         Reasons designers have given for the same design decision in separate projects. One answer is a
-        candidate, two matching answers strengthen it, and three make it learned knowledge that ADI no longer
-        asks about. A later answer that disagrees reduces confidence and returns it to the question. This is
-        design understanding only: it never changes a figure, a level, a product or a result.
+        candidate, two matching answers strengthen it, and three make it a strengthened candidate ready for
+        review. A matter becomes learned knowledge only when an administrator validates it with a stated
+        engineering basis, and only learned knowledge is used to answer a question instead of asking the
+        designer again. A later answer that disagrees reduces confidence and returns it to the question. This
+        is design understanding only: it never changes a figure, a level, a product or a result.
       </p>
 
       {error && (

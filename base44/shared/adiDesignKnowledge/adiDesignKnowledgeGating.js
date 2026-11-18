@@ -56,7 +56,7 @@ function asText(value) {
  */
 const CONDITION_FIELDS = Object.freeze([
   'rows', 'overheads', 'overhead_layout', 'overhead_positions',
-  'subwoofers', 'treatment_panels', 'treatment_product',
+  'subwoofers', 'subwoofer_arrangement', 'treatment_panels', 'treatment_product',
 ]);
 
 export function normaliseCondition(condition = {}) {
@@ -142,7 +142,7 @@ export function matchingKnowledge({ items = [], topic = null, condition = {} } =
   return (Array.isArray(items) ? items : [])
     .filter((item) => item
       && String(item.topic || '') === String(topic || '')
-      && item.status !== KNOWLEDGE_STATUS.DISABLED
+      && item.status === KNOWLEDGE_STATUS.LEARNED
       && item.contested !== true
       && conditionCovers(item.condition || {}, condition))
     .map((item) => ({

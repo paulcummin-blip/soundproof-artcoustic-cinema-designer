@@ -60,6 +60,7 @@ export const CURATION_REFUSAL = Object.freeze({
   TARGET_NOT_FOUND: 'merge_target_not_found',
   SAME_RECORD: 'merge_target_is_the_same_record',
   EMPTY_WORDING: 'edited_wording_is_empty',
+  MISSING_BASIS: 'approval_requires_engineering_basis',
   UNKNOWN_ACTION: 'unknown_curation_action',
 });
 
@@ -167,10 +168,17 @@ export function applyAdminAction({
   }
 
   if (action === CURATION_ACTION.APPROVE) {
+    // A principle may only be promoted to learned knowledge with a stated engineering
+    // or RP22 basis: repetition strengthens the case for review, it never proves the
+    // answer. The basis is recorded so the validation decision is auditable.
+    const basis = asText(value?.basis) || asText(value);
+    const existingBasis = asText(target.engineering_basis);
+    if (!basis && !existingBasis) return refuse(CURATION_REFUSAL.MISSING_BASIS);
     const approved = standing({
       ...target,
       approved_by: who,
       approved_at: now || null,
+      engineering_basis: basis || existingBasis,
       contested: false,
       contested_answer: null,
       // An approval settles the disagreement and empties the raw wording, exactly as

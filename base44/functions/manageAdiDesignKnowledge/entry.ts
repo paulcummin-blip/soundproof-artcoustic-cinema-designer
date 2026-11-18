@@ -63,10 +63,21 @@ export default async function (req) {
     const now = new Date().toISOString();
 
     if (action === 'capture') {
+      // The project a capture is made for must be one the requesting user may access:
+      // a project ID from the browser is never trusted without an authorisation check,
+      // so a dealer cannot write knowledge against another dealer's project.
+      const captureProjectId = String(payload?.projectId || '').trim() || null;
+      if (captureProjectId) {
+        const project = await base44.asServiceRole.entities.Project.get(captureProjectId).catch(() => null);
+        const userAccountId = user?.data?.account_id || null;
+        if (!project || (user.role !== 'admin' && project.account_id !== userAccountId)) {
+          return Response.json({ error: 'Forbidden', reason: 'project_not_accessible' }, { status: 403 });
+        }
+      }
       const built = learningCandidateFromAnswer({
         question: payload?.question || null,
         answer: payload?.answer ?? null,
-        identity: { projectId: payload?.projectId || null, userId: user.id },
+        identity: { projectId: captureProjectId, userId: user.id },
         condition: payload?.condition || null,
         now,
       });
@@ -142,7 +153,7 @@ export default async function (req) {
         items,
         id: payload?.id || payload?.knowledge_key || null,
         action,
-        value: payload?.value ?? null,
+        value: payload?.basis ?? payload?.value ?? null,
         intoId: payload?.intoId || null,
         admin: { name: user.full_name || user.email },
         now,

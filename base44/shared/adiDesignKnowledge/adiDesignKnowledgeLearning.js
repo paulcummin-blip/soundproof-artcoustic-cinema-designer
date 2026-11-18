@@ -106,8 +106,16 @@ export function learningCandidateFromAnswer({
   if (!topic) return { learnable: false, reason: UNLEARNABLE_REASON.NO_ANSWER, candidate: null };
   if (!verdict.learnable) return { learnable: false, reason: verdict.reason, candidate: null };
 
+  // The condition object travels in snake_case (subwoofer_arrangement), while
+  // buildDesignCondition reads camelCase params, so the arrangement is mapped
+  // here — without it a four-subwoofer distributed arrangement would share a key
+  // with every other four-subwoofer arrangement.
   const designCondition = condition
-    ? buildDesignCondition({ ...condition, question })
+    ? buildDesignCondition({
+        ...condition,
+        subwooferArrangement: condition.subwoofer_arrangement ?? condition.subwooferArrangement ?? null,
+        question,
+      })
     : buildDesignCondition({ question });
   const concepts = conceptsOf(text, topic);
 
