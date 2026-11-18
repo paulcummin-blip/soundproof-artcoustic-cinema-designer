@@ -24,6 +24,7 @@
  */
 
 import { jsPDF } from 'jspdf';
+import { inlineSvgCaptureImages } from './inlineSvgCaptureImages';
 import { waitForCapturePaint, withCaptureDeadline } from './captureTiming';
 import { pageCaptureFailure } from '@/components/library/capturePagePng';
 import {
@@ -400,6 +401,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     signal.throwIfAborted();
 
     const scope = frame.contentDocument;
+    if (bodyClass === 'client-report-printing') await inlineSvgCaptureImages(scope, signal);
 
     // A content-driven composition pages itself with the SAME composer the
     // printed document used, so the stored copy holds the pages that were
