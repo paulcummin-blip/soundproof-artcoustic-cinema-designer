@@ -18,7 +18,7 @@
  * Read-only: this section never creates, modifies or deletes any document.
  */
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, FileText, Image as ImageIcon, Package, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, ExternalLink, FileText, Image as ImageIcon, Package, Loader2 } from 'lucide-react';
 import { useProjectWorkflowAssets } from './useProjectWorkflowAssets';
 import { downloadProjectAssetsZip } from './downloadProjectAssetsZip';
 import { resolveIssuedDocumentUrl } from '@/components/library/issuedDocument/issuedDocumentActions';
@@ -74,6 +74,25 @@ function downloadSingle(record, fallbackName, downloadName) {
   };
 }
 
+function openSingle(record) {
+  return async () => {
+    try {
+      const url = await resolveIssuedDocumentUrl(record);
+      if (!url) { alert('This document is no longer available in storage.'); return; }
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      alert('This document could not be opened.');
+    }
+  };
+}
+
+function openImage(url) {
+  return () => {
+    if (!url) { alert('This image is no longer available.'); return; }
+    window.open(url, '_blank', 'noopener');
+  };
+}
+
 function downloadImage(url, caption) {
   return async () => {
     try {
@@ -94,19 +113,36 @@ function downloadImage(url, caption) {
   };
 }
 
-function AssetRow({ icon: Icon, name, sub, onDownload }) {
+function AssetRow({ icon: Icon, name, sub, onOpen, onDownload, canOpen = true }) {
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[#F8F8F7] transition-colors min-w-0">
       <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: '#8B8378' }} />
-      <div className="min-w-0 max-w-[calc(100%-3rem)]">
-        <div className="text-xs font-medium text-[#1B1A1A] truncate" title={name}>{name}</div>
-        {sub && <div className="text-[10px] text-[#8B8378] truncate" title={sub}>{sub}</div>}
-      </div>
+      <button
+        type="button"
+        onClick={canOpen ? onOpen : undefined}
+        disabled={!canOpen}
+        className="min-w-0 max-w-[calc(100%-5rem)] text-left disabled:cursor-default"
+        title={canOpen ? `Open ${name}` : name}
+      >
+        <span className={`block text-xs font-medium text-[#1B1A1A] truncate ${canOpen ? 'hover:underline' : ''}`} title={name}>{name}</span>
+        {sub && <span className="block text-[10px] text-[#8B8378] truncate" title={sub}>{sub}</span>}
+      </button>
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!canOpen}
+        className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-[#E2DED7] transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+        title="Open"
+        aria-label="Open"
+      >
+        <ExternalLink className="w-3 h-3" style={{ color: '#625143' }} />
+      </button>
       <button
         type="button"
         onClick={onDownload}
         className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-[#E2DED7] transition-colors shrink-0"
-        title={`Download ${name}`}
+        title="Download"
+        aria-label="Download"
       >
         <Download className="w-3 h-3" style={{ color: '#625143' }} />
       </button>
@@ -244,6 +280,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                     icon={FileText}
                     name={standardFilenameForExportRecord(record, project, versionNameById)}
                     sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
+                    onOpen={openSingle(record)}
                     onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
                   />
                 );
@@ -278,7 +315,8 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                       icon={FileText}
                       name={standardFilenameForExportRecord(record, project, versionNameById)}
                       sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                      onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
+                      onOpen={openSingle(record)}
+                    onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
                     />
                   );
                 })}
@@ -288,6 +326,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                     icon={ImageIcon}
                     name={record.caption || record.slot || 'Image'}
                     sub="Version image"
+                    onOpen={openImage(record.file_url)}
                     onDownload={downloadImage(record.file_url, record.caption || 'image')}
                   />
                 ))}
@@ -323,7 +362,8 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                         icon={FileText}
                         name={standardFilenameForExportRecord(record, project, versionNameById)}
                         sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                        onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
+                        onOpen={openSingle(record)}
+                    onDownload={downloadSingle(record, 'document.pdf', standardFilenameForExportRecord(record, project, versionNameById))}
                       />
                     );
                   })}
@@ -333,7 +373,8 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                       icon={ImageIcon}
                       name={record.caption || record.slot || 'Image'}
                       sub="Version image"
-                      onDownload={downloadImage(record.file_url, record.caption || 'image')}
+                      onOpen={openImage(record.file_url)}
+                    onDownload={downloadImage(record.file_url, record.caption || 'image')}
                     />
                   ))}
                 </div>
