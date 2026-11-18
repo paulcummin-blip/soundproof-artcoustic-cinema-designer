@@ -232,6 +232,10 @@ export default function OptimiseAndCalculate({
   // performElectronicUpdate.verify, read by the catch block so the terminal
   // trace records the true failure cause instead of a stale "history-save".
   const verifyDiagnosticsRef = useRef(null);
+  // Separate diagnostics for the RESTORE verify. A successful restore verify
+  // must never erase the failed-apply diagnostics the catch block records, so
+  // restore writes to this ref and the catch block reads both.
+  const restoringDiagnosticsRef = useRef(null);
   // Optimisation Plan runs are evidence-only and tracked separately from the
   // full auto-applying workflow, so the two never share a busy flag.
   // (Owned by useRunOptimisationPlan below.)
@@ -264,13 +268,14 @@ export default function OptimiseAndCalculate({
     frontSubsCfg,rearSubsCfg,amplifierPowerPerSubW:resolvedAmplifierPowerPerSubW};
   const performElectronicUpdate=async receipt=>{
     const before=receipt.before,after=receipt.after;
-    // Capture the cacheKey BEFORE the electronic transaction commits any
-    // settings. The verify step waits for the bass analysis owner to advance
-    // its cacheKey past this value before triggering onCalculate — calling
-    // onCalculate with a stale cacheKey queues the previous design and leaves
-    // the newly applied settings permanently stale. (Mirrors
-    // handlePhysicalRecalculate's fingerprint-advancement wait.)
-    const preCommitCacheKey=sharedRef.current?.cacheKey||null;
+    // PER-COMMIT preCommitCacheKey: the cacheKey is captured immediately before
+    // EACH commit (apply and restore) inside commit(), not once before the
+    // transaction. A single key captured once is the BASELINE; using it for the
+    // restore verify would wait for baseline !== baseline forever, or dispatch
+    // on the still-applied candidate key before the rollback settles. Each verify
+    // waits for the bass owner to advance past the key captured before ITS
+    // commit. (Mirrors handlePhysicalRecalculate's fingerprint-advancement wait.)
+    const preCommitKeyRef={current:sharedRef.current?.cacheKey||null};
     return withElectronicPersistence(projectId,versionId,async io=>{
       if(!settingsEqual(await io.readback(),before))throw new Error("The saved starting settings changed. Run ADI again.");
       const guard=()=>{
@@ -286,6 +291,9 @@ export default function OptimiseAndCalculate({
         if(!io.current())return;
         const liveSettings={instances:liveElectronicRef.current.subwooferInstances,crossover:liveElectronicRef.current.appState?.splConfig?.crossover};
         if(!settingsEqual(liveSettings,before) && !settingsEqual(liveSettings,after))return;
+        // Capture the cacheKey immediately before the React state mutation so
+        // the corresponding verify waits for the advance caused by THIS commit.
+        preCommitKeyRef.current=sharedRef.current?.cacheKey||null;
         unstable_batchedUpdates(()=>{
           commitInstances(settings.instances);
           liveElectronicRef.current.appState.updateGlobalSpl({crossover:settings.crossover,bassAdiReceipt:record});
@@ -293,67 +301,59 @@ export default function OptimiseAndCalculate({
       };
       const verify=async(settings,restoring=false)=>{
         phaseRef.current="recalculating";setRecalculating(projectId,versionId);
+        const expected=restoring?receipt.beforeResult:receipt.expectedResult;
+        const tuning=restoring?receipt.beforeEffectiveTuning:receipt.expectedEffectiveTuning;
+        const preCommitCacheKey=preCommitKeyRef.current;
         // Delegated scheduling: settings settle wait, cacheKey advancement wait
         // (applies to BOTH apply and restore — a stale restored-design handler
-        // must never be scheduled), onCalculate dispatch with the dispatch
-        // fingerprint captured AT DISPATCH, then publication wait. The match
-        // checks below use the real recommendationSettingsMatch /
-        // recommendationResultMatches — this helper never duplicates them.
+        // must never be scheduled), authoritative-settings confirmation before
+        // dispatch (real recommendationSettingsMatch so a geometry/cache advance
+        // cannot masquerade as the requested electronic change), onCalculate
+        // dispatch with the fingerprint captured AT DISPATCH, then publication
+        // wait with pinned result/currentJob/cacheKey match. The identity guard
+        // (io.current + project/version) runs every wait poll. Per-commit
+        // preCommitCacheKey: commit() captured the key immediately before THIS
+        // commit, so restore waits past the applied key, not the baseline.
         const scheduling=await verifyRecalculationScheduling({
           sharedRef,phaseRef,
           readLiveSettings:()=>{const live=liveElectronicRef.current;return{instances:live?.subwooferInstances,crossover:live?.appState?.splConfig?.crossover};},
           targetSettings:settings,
           preCommitCacheKey,
+          identityGuard:()=>{const live=liveElectronicRef.current;return !!live && live.projectId===projectId && live.versionId===versionId && !!io.current();},
+          authoritativeSettingsMatch:()=>recommendationSettingsMatch(sharedRef.current?.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning}),
+          noOp:settingsEqual(before,after),
           waitForPublication:(ref,phRef)=>waitForCurrentPublication(ref,phRef),
         });
+        const writeDiag=(d)=>{const rec={phase:"recalculating",...d,preCommitCacheKey,
+          actualCacheKey:sharedRef.current?.cacheKey||null,
+          actualResultFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+          actualCurrentJobFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null};
+          if(restoring)restoringDiagnosticsRef.current=rec;else verifyDiagnosticsRef.current=rec;};
         if(!scheduling.ok){
-          verifyDiagnosticsRef.current={
-            phase:"recalculating",schedulingReason:scheduling.reason,
-            preCommitCacheKey,
-            targetCacheKey:null,
+          writeDiag({schedulingReason:scheduling.reason,targetCacheKey:null,
             dispatchFingerprint:scheduling.dispatchFingerprint||null,
-            actualCacheKey:sharedRef.current?.cacheKey||null,
-            actualResultFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
-            actualCurrentJobFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
-          };
+            resultFingerprint:scheduling.resultFingerprint||null,
+            currentJobFingerprint:scheduling.currentJobFingerprint||null,
+            currentCacheKey:scheduling.currentCacheKey||null,
+            error:scheduling.error||null});
           return false;
         }
         const state=sharedRef.current;
-        const expected=restoring?receipt.beforeResult:receipt.expectedResult;
-        const tuning=restoring?receipt.beforeEffectiveTuning:receipt.expectedEffectiveTuning;
-        // Record the pre-commit key separately from the actual target cache key
-        // used for onCalculate (the dispatch fingerprint), and the actual
-        // published result/currentJob fingerprints. Do not mislabel the
-        // comparisonReceipt's baseline as an expected post-apply fingerprint —
-        // comparisonReceipt has no resultFingerprint field, so the expected
-        // fingerprint IS the target cache key the calculation was dispatched
-        // against.
         const targetCacheKey=scheduling.dispatchFingerprint||state?.cacheKey||null;
         if(!Array.isArray(tuning)||!tuning.length){
-          verifyDiagnosticsRef.current={
-            phase:"recalculating",settingsMatch:null,resultMatch:null,
-            preCommitCacheKey,
-            targetCacheKey,
-            actualCacheKey:state?.cacheKey||null,
-            actualResultFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
-            actualCurrentJobFingerprint:state?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
-            reason:"missing-tuning"};
+          writeDiag({settingsMatch:null,resultMatch:null,targetCacheKey,reason:"missing-tuning"});
           return false;
         }
         const settingsMatch=recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning});
         const resultMatch=recommendationResultMatches(state.completedBassAuthority,expected);
         if(!settingsMatch||!resultMatch){
-          verifyDiagnosticsRef.current={
-            phase:"recalculating",settingsMatch,resultMatch,
-            preCommitCacheKey,
-            targetCacheKey,
-            actualCacheKey:state?.cacheKey||null,
-            actualResultFingerprint:state?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
-            actualCurrentJobFingerprint:state?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
-            reason:!settingsMatch?"settings-mismatch":"result-mismatch"};
+          writeDiag({settingsMatch,resultMatch,targetCacheKey,
+            reason:!settingsMatch?"settings-mismatch":"result-mismatch"});
           return false;
         }
-        verifyDiagnosticsRef.current=null;
+        // A successful restore verify must NEVER erase the failed-apply
+        // diagnostics the catch block reads — restore writes its own ref.
+        if(restoring)restoringDiagnosticsRef.current=null;else verifyDiagnosticsRef.current=null;
         return {fingerprint:state.cacheKey,levels:resultLevels(extractAuthorityForComparison(state.completedBassAuthority))};
       };
       return executeElectronicTransaction({before,after,receipt,persist:io.persist,readback:io.readback,commit,verify,guard});
@@ -1242,6 +1242,9 @@ export default function OptimiseAndCalculate({
       if (verifyDiagnosticsRef.current) {
         trace.verifyDiagnostics = verifyDiagnosticsRef.current;
       }
+      if (restoringDiagnosticsRef.current) {
+        trace.restoringDiagnostics = restoringDiagnosticsRef.current;
+      }
       if (optimiserCompleted) {
         // FAILURE CLASSIFICATION BY PHASE: the optimiser completed and its plan
         // is saved. The error is from a LATER lifecycle event, and its label must
@@ -1394,6 +1397,14 @@ export default function OptimiseAndCalculate({
         });
       }
     } catch (err) {
+      // An exception from the recovery orchestrator itself is a traceable
+      // failure too: append it to recoveryHistory with the original error so
+      // it is never lost, alongside the user-facing message.
+      appendRecoveryFailure(projectId, versionId, {
+        originalError,
+        failureReason: err?.message || "Recovery failed. The saved plan is intact; settings are unchanged.",
+        diagnostics: { exception: true },
+      });
       setWorkflowError(projectId, versionId,
         err?.message || "Recovery failed. The saved plan is intact; settings are unchanged.");
     } finally {
