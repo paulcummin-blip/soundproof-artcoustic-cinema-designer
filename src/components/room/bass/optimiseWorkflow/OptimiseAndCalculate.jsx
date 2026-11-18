@@ -28,7 +28,7 @@ import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
 import { useOptimiserPlanAuthority } from "../optimiserPlan/optimiserPlanStore.js";
 import { useLatestOptimiserRun } from "../optimiserPlan/optimiserRunAuthority.js";
 import { useSyncExternalStore } from "react";
-import { Sparkles, AlertCircle, Info } from "lucide-react";
+import { Sparkles, AlertCircle, Info, Loader2 } from "lucide-react";
 import { useSharedBassResults } from "../bassResultsStore";
 import { capturePublicationTrace } from "../publicationTraceStore";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -219,6 +219,10 @@ export default function OptimiseAndCalculate({
 
   const runningRef = useRef(false);
   const phaseRef = useRef("idle"); // tracks which phase we're in to avoid double-trigger
+  // Records the phase of the last post-completion error so the targeted Retry
+  // handler can retry only the calculation/publication for post-apply failures
+  // (recalculating / publishing) rather than resetting the whole workflow.
+  const lastErrorPhaseRef = useRef(null);
   // Optimisation Plan runs are evidence-only and tracked separately from the
   // full auto-applying workflow, so the two never share a busy flag.
   // (Owned by useRunOptimisationPlan below.)
@@ -251,6 +255,13 @@ export default function OptimiseAndCalculate({
     frontSubsCfg,rearSubsCfg,amplifierPowerPerSubW:resolvedAmplifierPowerPerSubW};
   const performElectronicUpdate=async receipt=>{
     const before=receipt.before,after=receipt.after;
+    // Capture the cacheKey BEFORE the electronic transaction commits any
+    // settings. The verify step waits for the bass analysis owner to advance
+    // its cacheKey past this value before triggering onCalculate — calling
+    // onCalculate with a stale cacheKey queues the previous design and leaves
+    // the newly applied settings permanently stale. (Mirrors
+    // handlePhysicalRecalculate's fingerprint-advancement wait.)
+    const preCommitCacheKey=sharedRef.current?.cacheKey||null;
     return withElectronicPersistence(projectId,versionId,async io=>{
       if(!settingsEqual(await io.readback(),before))throw new Error("The saved starting settings changed. Run ADI again.");
       const guard=()=>{
@@ -283,6 +294,21 @@ export default function OptimiseAndCalculate({
         }
         const currentSettings=liveElectronicRef.current;
         if(!settingsEqual({instances:currentSettings.subwooferInstances,crossover:currentSettings.appState?.splConfig?.crossover},settings))return false;
+        // Wait for the bass analysis owner to advance its cacheKey to match the
+        // committed settings before triggering the calculation. Calling
+        // onCalculate with a stale cacheKey queues the previous design and
+        // leaves the newly applied settings permanently stale. Skipped on
+        // restore (the restore-path verify is best-effort only).
+        if(!restoring){
+          const cacheStart=Date.now();
+          while(Date.now()-cacheStart<15000){
+            if(!io.current())return false;
+            const probe=sharedRef.current;
+            if(probe?.cacheKey && probe.cacheKey!==preCommitCacheKey && probe?.canCalculate===true)break;
+            await sleep(100);
+          }
+          if(sharedRef.current?.cacheKey===preCommitCacheKey)return false;
+        }
         const live=sharedRef.current;
         if(typeof live?.onCalculate!=="function")return false;
         live.onCalculate();
@@ -1026,6 +1052,7 @@ export default function OptimiseAndCalculate({
       phaseRef.current = "idle";
 
       // Apply one complete candidate-owned electronic configuration.
+      traceStage="electronic-apply";
       const selection=result.selection;
       const baseline=selection.currentResult;
       const context=electronicContextFromUi(liveElectronicRef.current);
@@ -1213,6 +1240,11 @@ export default function OptimiseAndCalculate({
           }).catch(() => null);
         }
         setWorkflowError(projectId, versionId, userMessage);
+        // Record the failure phase so the targeted Retry handler can
+        // distinguish a post-apply recalculation/publication failure (which
+        // should retry only the calculation) from a genuine optimiser failure
+        // (which should reset). Cleared on successful recovery.
+        lastErrorPhaseRef.current = phase;
       } else {
         // ── GENUINE OPTIMISER FAILURE (before completion) ──
         // A genuinely failed re-test still carries its runId in the saved
@@ -1250,10 +1282,64 @@ export default function OptimiseAndCalculate({
     resetWorkflow(projectId, versionId);
     resetImproveBassV2(projectId, versionId);
     adiDecisionRef.current = null;
+    lastErrorPhaseRef.current = null;
     if (typeof sharedRef.current?.onClearTerminal === "function") {
       sharedRef.current.onClearTerminal();
     }
   }, [projectId, versionId]);
+
+  // ── Targeted recovery Retry for post-apply recalculation failures ──
+  // When a completed optimisation's electronic apply succeeds but the
+  // recalculation/publication of the resulting bass authority fails, the
+  // saved plan and the actual (possibly restored) settings are intact.
+  // Retry must NOT re-run the optimiser or auto-apply anything: it retries
+  // only the calculation and publication for the CURRENT pinned design and
+  // settings, and marks success only when the authoritative published
+  // P14/P18/P19/P20 result matches the exact current design identity.
+  // The saved plan, recommendation evidence, and run history are never
+  // mutated. If the settings were restored (not applied), the published
+  // result reflects the restored baseline — the results panel already
+  // distinguishes "available for review" from "applied", so recovery says
+  // nothing about a candidate being applied.
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const handleRecoveryRetry = useCallback(async () => {
+    const phase = lastErrorPhaseRef.current;
+    if (phase !== "recalculating" && phase !== "publishing") {
+      // Not a post-apply recalculation failure — fall back to the existing reset.
+      handleReset();
+      return;
+    }
+    if (recoveryBusy) return;
+    setRecoveryBusy(true);
+    phaseRef.current = "recalculating";
+    setRecalculating(projectId, versionId);
+    try {
+      const live = sharedRef.current;
+      if (typeof live?.onCalculate !== "function") {
+        throw new Error("Bass calculation is not ready. Reload the project and try again.");
+      }
+      live.onCalculate();
+      const published = await waitForCurrentPublication(sharedRef, phaseRef);
+      if (!published) {
+        throw new Error("The recalculated bass result could not be published. The saved plan is intact; settings are unchanged.");
+      }
+      const state = sharedRef.current;
+      if (!hasPublishedCurrentDesign(state)) {
+        throw new Error("The published bass result does not match the current design. The saved plan is intact; settings are unchanged.");
+      }
+      // Recovery successful: the current design has an authoritative published
+      // result. Clear the workflow error — the results panel reads the saved
+      // plan and the published bass authority. No search, no auto-apply.
+      resetWorkflow(projectId, versionId);
+      lastErrorPhaseRef.current = null;
+    } catch (err) {
+      setWorkflowError(projectId, versionId,
+        err?.message || "Recovery failed. The saved plan is intact; settings are unchanged.");
+    } finally {
+      setRecoveryBusy(false);
+      phaseRef.current = "idle";
+    }
+  }, [projectId, versionId, recoveryBusy, handleReset]);
 
   // Update Bass Performance — resets any terminal state from a previous
   // cancelled/failed run, then starts the full optimise-and-calculate
@@ -1514,8 +1600,14 @@ export default function OptimiseAndCalculate({
             <span className="text-[12px] font-semibold text-red-800">Optimisation incomplete</span>
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-red-700">{workflowState.error}</p>
-          <button type="button" onClick={handleReset} className="mt-2 text-[11px] text-red-700 underline underline-offset-2">
-            Retry
+          <button
+            type="button"
+            onClick={handleRecoveryRetry}
+            disabled={recoveryBusy}
+            className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-red-700 underline underline-offset-2 disabled:opacity-50"
+          >
+            {recoveryBusy && <Loader2 className="w-3 h-3 animate-spin" />}
+            {recoveryBusy ? "Retrying…" : "Retry"}
           </button>
         </div>
       )}
