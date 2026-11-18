@@ -520,7 +520,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     signal.throwIfAborted();
     if ((proposalRoot || bodyClass === 'client-report-printing') && pageRasters.some((raster) => !raster)) {
       const failure = new Error('The PDF could not be captured page-for-page. No incomplete copy was stored.');
-      failure.captureDiagnostics = { operation: 'proposal_incomplete_capture', resilience };
+      failure.captureDiagnostics = { operation: proposalRoot ? 'proposal_incomplete_capture' : 'report_incomplete_capture', resilience };
       throw failure;
     }
     let pageCount = 0;
