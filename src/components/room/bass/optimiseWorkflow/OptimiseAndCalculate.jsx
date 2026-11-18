@@ -22,6 +22,7 @@ import { withElectronicPersistence } from "./electronicPersistence.js";
 import { resolveCalibrationAutoApply } from "./adiCalibrationAutoApplyAuthority.js";
 import { validateCandidateForRun, canonicalLevel } from "../improveBassV2/confirmedCandidateValidity.js";
 import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification.js";
+import { authoritativeElectronicsMatchLive } from "./authoritativeElectronicsMatch.js";
 import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison.js";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { resolveCrossoverReceiptState } from "./crossoverReceiptState.js";
@@ -1407,15 +1408,15 @@ export default function OptimiseAndCalculate({
         // The shared authoritative bass context must have ingested the CURRENT
         // live electronic settings before any reuse or dispatch: a live settings
         // signature plus a lagging cacheKey does not prove they correspond.
-        authoritativeElectronicsMatchLive: () => {
-          const live = liveElectronicRef.current;
-          const state = sharedRef.current;
-          if (!live || !state?.authoritative) return false;
-          const liveTuning = (live.subwooferInstances || [])
-            .filter(s => s.enabled !== false)
-            .map(s => ({ sourceId: s.id, delayMs: s.delayMs, gainDb: s.gainDb, phaseControlDeg: s.phaseControlDeg, polarity: s.polarity }));
-          return recommendationSettingsMatch(state.authoritative, { crossover: live.appState?.splConfig?.crossover, tuning: liveTuning });
-        },
+        // The shared authoritative bass context must have ingested the CURRENT
+        // live electronic settings before any reuse or dispatch: a live settings
+        // signature plus a lagging cacheKey does not prove they correspond. The
+        // authoritative context stores EFFECTIVE sources (raw delay + auto-align)
+        // and a NORMALISED crossover, so the expected values are derived from the
+        // canonical live instances/settings using the SAME authoritative
+        // derivation the bass hook uses — never a raw-vs-effective comparison,
+        // which would falsely refuse an ordinary auto-aligned restored baseline.
+        authoritativeElectronicsMatchLive: () => authoritativeElectronicsMatchLive(sharedRef.current, liveElectronicRef.current),
       });
       if (result.action === "success") {
         // Merge-only recovery complete: preserves autoApplied, recommendations
