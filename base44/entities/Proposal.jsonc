@@ -148,6 +148,11 @@
           "default": "professional",
           "nullable": true
         },
+        "brief_coverage_required": {
+          "type": "boolean",
+          "default": false,
+          "description": "True when this proposal was created under the Steering Brief workflow and the editorial coverage gate applies to it. Set at creation time by generateProposal. Existing proposals predating the workflow carry no such flag and are never blocked by the gate. Stored as a declared metadata property so the platform persists it; an undeclared key is stripped at write time."
+        },
         "narrative_steer": {
           "type": "object",
           "description": "The designer's frozen Narrative Steer for this proposal. Soft preferences only; exclusions affect client-facing narrative, never evidence or technical results.",

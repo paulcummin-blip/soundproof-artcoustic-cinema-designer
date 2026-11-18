@@ -5,6 +5,7 @@ import { resolveProposalReview } from '../../shared/proposalEdit/proposalReviewA
 import { readCompleteDocument, readProposalRecords } from '../../shared/proposalEdit/readCompleteDocument.js';
 import { resolveSectionApproval } from '../../shared/proposalApproval/sectionApprovalAuthority.js';
 import { authorizeProposalExport } from '../../shared/proposalEdit/proposalExportAuthorization.js';
+import { briefCoverageGate } from '../../shared/proposalWriter/proposalBriefCoverageGate.js';
 import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 
 /**
@@ -89,7 +90,50 @@ export default async function(req) {
         sections: documentValidation.sections || [],
         publishedSections: documentValidation.document_sections || [],
       });
+      // Capture the raw stored section rows before they are removed from the
+      // validation object. They are the single source of truth for the text the
+      // designer saved (manual revisions included), used below to seed the
+      // editor fields and to run the Steering Brief coverage check.
+      const storedSections: Array<{ section_type: string; body: string; is_enabled?: boolean }> =
+        Array.isArray(documentValidation.sections) ? documentValidation.sections : [];
       delete documentValidation.sections;
+      // ── FIX 1: seed the editor fields from the stored section bodies ──
+      // The "Edit copy" panel reads layer.fields, which the editor model built
+      // from the generation/edit layer (the GPT output or the latest valid edit).
+      // But the designer's manual revisions are saved into ProposalSection.body
+      // through the inline editor, and the main preview publishes those bodies.
+      // Without this re-seed, "Edit copy" opens the older GPT wording instead of
+      // the current approved text. The stored body is the single source of truth:
+      // generation writes it, the inline editor writes it, and the publication
+      // authority reads it. The editor model's copy is provenance.
+      const storedBodies = new Map<string, string>();
+      for (const section of storedSections) {
+        if (section?.section_type && typeof section.body === 'string' && section.body.trim()) {
+          storedBodies.set(section.section_type, section.body);
+        }
+      }
+      if (storedBodies.size > 0) {
+        const reseed = (entry: { section: string; text: string; [k: string]: unknown }) => {
+          const body = storedBodies.get(entry.section);
+          return typeof body === 'string' && body.trim()
+            ? { ...entry, text: body }
+            : entry;
+        };
+        if (Array.isArray(layer.fields)) {
+          layer.fields = layer.fields.map((field: { section: string; text: string; present?: boolean }) => {
+            const body = storedBodies.get(field.section);
+            return typeof body === 'string' && body.trim()
+              ? { ...field, text: body, present: true }
+              : field;
+          });
+        }
+        if (Array.isArray(layer.export_sections)) {
+          layer.export_sections = layer.export_sections.map(reseed);
+        }
+        if (layer.copy?.sections && Array.isArray(layer.copy.sections)) {
+          layer.copy.sections = layer.copy.sections.map(reseed);
+        }
+      }
       layer.approval = approval;
       layer.document_validation = documentValidation;
       // What still needs a human, classified for the editor: the document's own
@@ -99,10 +143,30 @@ export default async function(req) {
       // sentence is the one the plain-language authority already states for that
       // rejection, and no validation outcome is decided here.
       layer.review = resolveProposalReview({ validation: documentValidation, fields: layer.fields });
-      layer.ready = documentValidation.valid;
-      layer.gate = { ...layer.gate, issuable: documentValidation.valid };
-      layer.export_blocked_reason = documentValidation.blocked_reason;
-      layer.status_label = documentValidation.valid ? 'Ready to issue' : 'Needs review';
+      // ── FIX 3: run the Steering Brief coverage check and make omissions
+      // visible during review. The proposal may not be shown as Ready to issue
+      // while material brief requirements remain unresolved. The check runs
+      // against the proposal's own brief and its current section text, so a
+      // designer who edits the copy to address a gap does not have to regenerate
+      // to clear it. Hard enforcement (blocking issue/send) remains in
+      // transitionProposalStatus; this is the review surface.
+      const briefSections = storedSections
+        .filter((s) => s && typeof s === 'object' && s.body && s.is_enabled !== false)
+        .map((s) => ({ section: s.section_type, text: s.body || '' }));
+      const briefGate = briefCoverageGate(proposal, briefSections);
+      layer.brief_coverage = briefGate;
+      const documentValid = documentValidation.valid;
+      const briefClear = !briefGate.applies || !briefGate.blocked;
+      layer.ready = documentValid && briefClear;
+      layer.gate = { ...layer.gate, issuable: documentValid && briefClear };
+      layer.export_blocked_reason = briefClear
+        ? documentValidation.blocked_reason
+        : (briefGate.reason || documentValidation.blocked_reason);
+      layer.status_label = (!documentValid)
+        ? 'Needs review'
+        : (!briefClear
+          ? 'Brief coverage incomplete'
+          : 'Ready to issue');
       if (body.action === 'export') {
         // Enforcement of the approval rule, server-side, where no client can skip
         // it: nothing carrying the generated copy is issued before a person has

@@ -59,16 +59,27 @@ export function briefCoverageGate(proposal = null, sections = []) {
   });
 
   if (coverage.complete === true) {
-    return { applies: true, blocked: false, reason: null, outstanding: [] };
+    return { applies: true, blocked: false, reason: null, outstanding: [], coverage };
   }
 
   const outstanding = Array.isArray(coverage.outstanding) ? coverage.outstanding : [];
+  // Specific, actionable feedback: each outstanding item stated as the brief
+  // wrote it, with the section it belongs to and what the copy is missing. A
+  // dealer reads what to fix and where, not a generic count.
+  const items = outstanding.map((row) => {
+    const sectionLabel = row.revision_section || 'the relevant section';
+    const missing = row.missing_subject
+      ? ` (the copy does not mention ${row.missing_subject})`
+      : '';
+    const reason = row.reason ? `: ${row.reason.replace(/_/g, ' ')}` : '';
+    return `- ${row.item} — edit ${sectionLabel}${missing}${reason}`;
+  });
   const firstItem = outstanding[0]?.item || 'a requirement in your Steering Brief';
   const reason = outstanding.length === 1
-    ? `The proposal does not yet address ${firstItem}. Edit the copy or regenerate so it reflects the Steering Brief, then issue it.`
-    : `The proposal does not yet address ${outstanding.length} requirements from your Steering Brief (for example: ${firstItem}). Edit the copy or regenerate so it reflects the brief, then issue it.`;
+    ? `The proposal does not yet address ${firstItem}. Edit the copy or regenerate so it reflects the Steering Brief, then issue it.\n${items.join('\n')}`
+    : `The proposal does not yet address ${outstanding.length} requirements from your Steering Brief (for example: ${firstItem}). Edit the copy or regenerate so it reflects the brief, then issue it.\n${items.join('\n')}`;
 
-  return { applies: true, blocked: true, reason, outstanding };
+  return { applies: true, blocked: true, reason, outstanding, coverage };
 }
 
 export default briefCoverageGate;

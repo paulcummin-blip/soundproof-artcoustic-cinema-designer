@@ -60,6 +60,8 @@ const SUBJECT_TERMS = Object.freeze([
   { key: 'front_wides', pattern: /\bfront[\s-]*wides?\b/i },
   { key: 'overheads', pattern: /\boverhead|height\s+(?:channel|speaker)/i },
   { key: 'subwoofers', pattern: /\bsubwoofers?\b|\bsubs\b|front\s*\/\s*rear|front\s+and\s+rear/i },
+  { key: 'concealed_subs', pattern: /\bconceal(?:ed|s|ing)?\s+(?:the\s+)?(?:front\s+)?subwoofers?|\bhidden\s+subwoofers?|\binvisible\s+subwoofers?/i },
+  { key: 'fabric_screen_wall', pattern: /\bfabric\s+(?:screen\s+)?wall|\bacoustic(?:ally\s+)?\s+transparent\s+(?:screen\s+)?wall|\bscreen\s+wall\s+conceal/i },
   { key: 'bass_output', pattern: /\bbass\s+output|lfe\b|low[- ]frequency\s+output/i },
   { key: 'bass_extension', pattern: /\bextension\b|\bextends?\b|\bHz\b/i },
   { key: 'bass_response', pattern: /\bbass\s+response\b|\bres(?:ponse)?\s+quality\b|\bP19\b/i },
@@ -70,8 +72,21 @@ const SUBJECT_TERMS = Object.freeze([
   { key: 'dynamic_range', pattern: /\bdynamic\s+range|headroom|\bdBC\b|output\s+capability/i },
   { key: 'timbre', pattern: /\btimbre|tonal|tonally/i },
   { key: 'viewing', pattern: /\bviewing|viewing\s+angle|\brows?\b|seating\s+position|front\s+row|rear\s+row|screen\s+size|\bTV\b|display/i },
+  // Display options: a brief may name a TV and a projection screen together, or
+  // specific screen sizes. Recognised as a viewing subject so the coverage check
+  // asks whether the copy reaches the display choice the client asked about.
+  { key: 'display_options', pattern: /\bprojection\s+screen|\bprojector\b|\bdrop[- ]down\s+screen|\bTV\s+(?:options?|or)|\b\d+\s*(?:"|″|inch(?:es)?)\s*(?:TV|television|screen|project)/i },
   { key: 'acoustic_treatment', pattern: /\bacoustic\s+treatment|abfuser|panel/i },
   { key: 'spatial_resolution', pattern: /\bspatial|surrounds?\b|soundstage|movement\s+of\s+sound/i },
+  // Client-objective subjects: these describe what the project is FOR and what
+  // the proposal should explain, not engineering results. They are recognised so
+  // a brief instruction about showroom purpose, accessible specification, RP22
+  // level discussion or financial choices is identified as a material requirement
+  // the copy must address, and is never silently dropped as unsupported.
+  { key: 'showroom', pattern: /\bshowroom|demonstr(?:ation|ate|ating)|consultative\s+(?:discussion|demonstration|approach)|trade\s+(?:client|customer|demo)|dealer\s+demo/i },
+  { key: 'accessible_spec', pattern: /\baccessible\s+(?:level|specification|spec|performance)|\blevel\s*1\s*(?:to|–|-|—)\s*2\b|\bentry[- ]level\s+spec|\bbaseline\s+spec/i },
+  { key: 'rp22_discussion', pattern: /\bRP22\s+levels?\s*1\s*(?:to|–|-|—)\s*4\b|\bdiscuss(?:ing)?\s+(?:rp22|performance\s+levels?)|\bperformance\s+levels?\s*1\s*(?:to|–|-|—)\s*4\b/i },
+  { key: 'financial_choices', pattern: /\bfinancial\s+(?:choices|decisions|options|considerations|implications)|\bbudget\s+(?:choices?|decisions?|options?|considerations)|\bcost\s+(?:options?|choices?|decisions?|implications)/i },
 ]);
 
 /** Words that carry no subject of their own. */
@@ -114,6 +129,7 @@ const SUBJECT_WRITER_SECTION = Object.freeze({
   front_wides: 'spatial_resolution',
   overheads: 'spatial_resolution',
   viewing: 'what_stays_same',
+  display_options: 'what_stays_same',
   spatial_resolution: 'spatial_resolution',
   bass_output: 'dynamic_range',
   bass_extension: 'dynamic_range',
@@ -123,7 +139,13 @@ const SUBJECT_WRITER_SECTION = Object.freeze({
   timbre: 'timbre_matching',
   system_layout: 'what_stays_same',
   subwoofers: 'what_stays_same',
+  concealed_subs: 'system_design_summary',
+  fabric_screen_wall: 'system_design_summary',
   acoustic_treatment: 'what_changes',
+  showroom: 'overall_design',
+  accessible_spec: 'overall_design',
+  rp22_discussion: 'overall_design',
+  financial_choices: 'overall_design',
 });
 
 /** The specific matter a request asks to be explained: its own words, minus the domain's generic vocabulary. */
@@ -184,6 +206,36 @@ function mentionPassage({ sections, subjectPatterns }) {
 /** A figure a brief item names in its own words, e.g. a size or an output. */
 const NAMED_FIGURE = /(\d+(?:\.\d+)?)\s*(dBC|dBc|dB|kHz|Hz|°|degrees?|inch(?:es)?|")/gi;
 
+/**
+ * A regex pattern that recognises a named figure in the finished copy even when
+ * the writer used a unit variant (75" → 75-inch, 75 inch, 75″, 75in). This is the
+ * paraphrase tolerance the coverage check needs: a brief that says 75" is met by
+ * copy that says 75-inch, and a bare mention elsewhere is still not enough because
+ * the sentence must also reach the item's subject.
+ */
+function namedFigurePattern(figure) {
+  const m = /^(\d+(?:\.\d+)?)\s*(dBC|dBc|dB|kHz|Hz|°|degrees?|inch(?:es)?|")$/i.exec(figure);
+  if (!m) return null;
+  const value = m[1];
+  const unit = m[2].toLowerCase();
+  if (unit === '"' || unit === 'inch' || unit === 'inches') {
+    return new RegExp(`\\b${value}\\s*(?:"|″|-?inch(?:es)?|\\bin\\b)`, 'i');
+  }
+  if (unit === '°' || unit === 'degree' || unit === 'degrees') {
+    return new RegExp(`\\b${value}\\s*(?:°|degrees?|deg)`, 'i');
+  }
+  if (unit === 'khz' || unit === 'hz') {
+    return new RegExp(`\\b${value}\\s*${unit}`, 'i');
+  }
+  if (unit === 'dbc') {
+    return new RegExp(`\\b${value}\\s*dB\\s*C`, 'i');
+  }
+  if (unit === 'db') {
+    return new RegExp(`\\b${value}\\s*dB\\b`, 'i');
+  }
+  return new RegExp(`\\b${value}\\s*${unit.replace(/[()]/g, '')}`, 'i');
+}
+
 /** The result families a brief can ask for, and the figure each one requires. */
 const RESULT_FIGURE_RULES = Object.freeze([
   {
@@ -237,7 +289,13 @@ function requirementsOf(item, subjects) {
   const pattern = new RegExp(NAMED_FIGURE.source, 'gi');
   let match = pattern.exec(text);
   while (match) {
-    requires.push({ key: `named_figure:${match[1]}${match[2]}`, figure: `${match[1]}${match[2]}`, detail: `the item names ${match[1]}${match[2]} and the copy does not state it` });
+    const figure = `${match[1]}${match[2]}`;
+    requires.push({
+      key: `named_figure:${figure}`,
+      figure,
+      pattern: namedFigurePattern(figure),
+      detail: `the item names ${figure} and the copy does not state it`,
+    });
     match = pattern.exec(text);
   }
 
