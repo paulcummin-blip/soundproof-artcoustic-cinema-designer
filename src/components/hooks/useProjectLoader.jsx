@@ -1120,8 +1120,20 @@ appState, // Pass appState directly for setters
       // read-only opening gate never observed an input event (or HMR re-armed
       // that gate). Save its evaluated design through all normal guards first;
       // never attach a current plan to an older stored design.
-      const alreadySaved = saveCompletedPlan && sameCompletedPlan(
-        (await planSaveDeadline("plan-read-before-design-save", () => readProjectVersionRecord(versionId, {force:true})))?.design_state?.optimiser_plan, saveCompletedPlan);
+      let alreadySaved = false;
+      if (saveCompletedPlan) {
+        const savedVersion = await planSaveDeadline("plan-read-before-design-save", () => readProjectVersionRecord(versionId, {force:true}));
+        if (savedVersion?.id !== versionId || savedVersion.project_id !== projectId ||
+            getOptimiserPlanAuthority(projectId, versionId)?.run?.runId !== saveCompletedPlan.run.runId) {
+          throw new Error("The version or optimisation run changed before saving.");
+        }
+        const savedPlan = savedVersion.design_state?.optimiser_plan;
+        if (savedPlan?.run?.runId !== saveCompletedPlan.run.runId &&
+            Date.parse(savedPlan?.run?.startedAt) > Date.parse(saveCompletedPlan.run.startedAt)) {
+          throw new Error("A newer optimisation is already saved; the older plan was retained without overwriting it.");
+        }
+        alreadySaved = sameCompletedPlan(savedPlan, saveCompletedPlan);
+      }
       if (saveCompletedPlan && !alreadySaved) {
         autosaveUserArmedRef.current = true;
         bucket.lastSavedSig = "";
