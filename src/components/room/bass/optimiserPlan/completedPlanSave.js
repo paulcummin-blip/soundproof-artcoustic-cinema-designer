@@ -8,15 +8,18 @@ function sort(value) {
 export function sameCompletedPlan(a, b) {
   return !!a?.run?.runId && a.run.runId === b?.run?.runId && stable(a) === stable(b);
 }
+export function planSaveDeadline(stage, work, deadlineMs = 20000) {
+  let timer;
+  return Promise.race([Promise.resolve().then(work), new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(stage + " timed out; persistence is not yet verified.")), deadlineMs);
+  })]).finally(() => clearTimeout(timer));
+}
 export async function saveCompletedPlan({projectId, versionId, plan, readVersion, writePlan, current, deadlineMs = 20000, onStage = () => {}}) {
   if (!plan?.run?.runId || plan.projectId !== projectId || plan.versionId !== versionId ||
       !plan.designFingerprint) throw new Error("The completed plan has no matching project, version or design identity.");
   const bounded = (stage, work) => {
     onStage(stage);
-    let timer;
-    return Promise.race([Promise.resolve().then(work), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(stage + " timed out; persistence is not yet verified.")), deadlineMs);
-    })]).finally(() => clearTimeout(timer));
+    return planSaveDeadline(stage, work, deadlineMs);
   };
   const read = async stage => {
     if (!current()) throw new Error("The design changed before plan persistence could be verified.");
