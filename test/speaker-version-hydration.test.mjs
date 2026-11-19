@@ -46,7 +46,7 @@ const useReadiness = new Function('React', `
       ? getSpeakerHydrationScope : undefined };
 `);
 const { sameCentreCabinetAim } = await import('../src/components/utils/dualCentrePairAuthority.js');
-const { getCanonicalRole } = await import('../src/components/utils/surroundRoleMap.js');
+const { getCanonicalRole } = await import('../src/components/utils/surroundRoleMap');
 const equalityHelpers = ['safeCanonRole', 'EPS', 'almostEq'].map(name =>
   'const ' + findNode(providerSource, n => n.type === 'VariableDeclarator' && n.id?.name === name) + ';'
 ).join('\n');
