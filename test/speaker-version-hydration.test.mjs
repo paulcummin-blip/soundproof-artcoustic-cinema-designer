@@ -45,8 +45,15 @@ const useReadiness = new Function('React', `
     getSpeakerHydrationScope: typeof getSpeakerHydrationScope === 'function'
       ? getSpeakerHydrationScope : undefined };
 `);
-const sameSpeakers = new Function('return (' + findNode(providerSource,
-  n => n.type === 'FunctionDeclaration' && n.id?.name === 'speakersShallowEqual') + ')')();
+const { sameCentreCabinetAim } = await import('../src/components/utils/dualCentrePairAuthority.js');
+const { getCanonicalRole } = await import('../src/components/utils/surroundRoleMap.js');
+const equalityHelpers = ['safeCanonRole', 'EPS', 'almostEq'].map(name =>
+  'const ' + findNode(providerSource, n => n.type === 'VariableDeclarator' && n.id?.name === name) + ';'
+).join('\n');
+const sameSpeakers = new Function('sameCentreCabinetAim', 'getCanonicalRole',
+  equalityHelpers + 'return (' + findNode(providerSource,
+    n => n.type === 'FunctionDeclaration' && n.id?.name === 'speakersShallowEqual') + ')'
+)(sameCentreCabinetAim, getCanonicalRole);
 const setterDeclaration = findNode(providerSource,
   n => n.type === 'VariableDeclarator' && n.id?.name === 'setSpeakerSystem');
 const useSpeakerSetter = new Function('React', '_setSpeakerSystem', 'speakersShallowEqual',
