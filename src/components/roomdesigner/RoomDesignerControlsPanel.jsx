@@ -2,7 +2,7 @@ import React, { Suspense, useState, useMemo } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
-import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
+import LiveRP22PerformanceSummary from "@/components/rp22/LiveRP22PerformanceSummary";
 import { buildLiveComplianceSummary } from "@/components/rp22/buildLiveComplianceSummary";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
@@ -400,7 +400,7 @@ export default function RoomDesignerControlsPanel({
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Live RP22 Analysis"
+          title="Live RP22 Performance Summary"
           icon={<FileText className="w-5 h-5" />}
           defaultOpen={false}>
           {isFrozen('report') &&
@@ -409,10 +409,8 @@ export default function RoomDesignerControlsPanel({
             </div>
           }
           <Suspense fallback={<div>Loading...</div>}>
-            <RP22CompliancePanel
-              engineeringSummary={liveComplianceSummary}
-              screen={_screen}
-              seatingPositions={_seatingPositions}
+            <LiveRP22PerformanceSummary
+              liveSummary={liveComplianceSummary}
               assumedP15Level={appState?.assumedP15Level}
               assumedP21Level={appState?.assumedP21Level} />
           </Suspense>
