@@ -3,26 +3,49 @@ import { getAvailableCapacity, findActivationEntry } from '../../shared/capacity
 import { findEffectivePromotion } from '../../shared/promotionAuthority.js';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { associateDealerIdentityCore } from '../../shared/dealerIdentityAssociation.js';
+import { acquireCreationLock, releaseCreationLock } from '../../shared/projectCreationLock.js';
+import {
+  findExistingReceipt,
+  createPendingReceipt,
+  completeReceipt,
+  deleteReceipt,
+} from '../../shared/projectCreationIdempotency.js';
 
 /**
- * B3A Trusted backend authority for Professional Project creation.
+ * Trusted backend authority for Professional Project creation.
+ *
+ * Safeguards (credit & promotion integrity):
+ *   1. Fail-closed eligibility: a failed Account or Promotion lookup returns
+ *      ELIGIBILITY_CHECK_FAILED and creates NO project, promotion usage or
+ *      ledger deduction. Only a successful lookup that confirms no applicable
+ *      promotion proceeds to normal capacity charging.
+ *   2. Request idempotency: an optional client `request_id` (UUID) makes a
+ *      repeated request return its original result. A PENDING receipt
+ *      reserves the request so a retry during an in-flight creation backs
+ *      off (CREATION_BUSY) instead of creating a second project.
+ *   3. Per-account serialized creation: a single-record conditional
+ *      updateMany on the Account (creation_lock_holder: null -> token)
+ *      serializes creation per account, so two simultaneous requests with one
+ *      remaining credit cannot both succeed. This is per-account
+ *      serialization, NOT a global exactly-once guarantee.
  *
  * Flow:
  *   Authenticated dealer requests project creation
  *     → Backend resolves authenticated user
  *     → Backend resolves authoritative User.account_id (NOT client-supplied)
  *     → Reject if account_id missing (ACCOUNT_NOT_LINKED)
- *     → Calculate available capacity from CapacityLedger SUM
- *     → Reject if capacity <= 0 (OUT_OF_CAPACITY)
+ *     → FAIL-CLOSED Account + Promotion eligibility lookup
+ *     → Acquire per-account creation lock
+ *     → Replay idempotency receipt if present
+ *     → Calculate available capacity (or free under an active promotion)
  *     → Create Professional Project (commercial_tier=PROFESSIONAL)
- *     → Append PROJECT_ACTIVATION -1 ledger entry (idempotent)
- *     → Link activation_ledger_entry_id on Project
- *     → If ledger creation fails, compensate by deleting the Project (CREATION_FAILED)
+ *     → Append PROJECT_ACTIVATION -1 ledger entry (idempotent) OR PromotionUsage
+ *     → Complete idempotency receipt
+ *     → Release lock (finally)
+ *     → On ledger failure, compensate by deleting the Project
  *
- * The client cannot supply an arbitrary account_id — it is always derived
- * from the authenticated user's record.
- *
- * Returns controlled states: SUCCESS, OUT_OF_CAPACITY, ACCOUNT_NOT_LINKED, CREATION_FAILED.
+ * The client cannot supply an arbitrary account_id. Admins keep the existing
+ * internal-project bypass (no lock, no capacity, no receipt).
  */
 
 export default async function(req) {
@@ -31,9 +54,8 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ status: 'ACCOUNT_NOT_LINKED', error: 'Unauthorized' }, { status: 401 });
 
-    // Revalidate the current provider access token, not just stored dealer
-    // fields, before any dealer project or capacity/promotion write.
-    // Central administrators retain the existing internal-project workflow.
+    // Revalidate the current provider access token before any dealer project
+    // or capacity/promotion write. Central admins keep the internal workflow.
     if (user.role !== 'admin') {
       const association = await associateDealerIdentityCore(base44, user.id);
       if (association?.resolved !== true) {
@@ -56,8 +78,6 @@ export default async function(req) {
     }
 
     // ── 1. Resolve authoritative account_id from the authenticated user ──
-    // Re-fetch as service role to get the authoritative account_id field
-    // (user from auth.me() may not include custom data fields depending on token).
     const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
     const authoritativeUser = (Array.isArray(userRecords) && userRecords.length > 0) ? userRecords[0] : null;
     const accountId = authoritativeUser?.account_id || null;
@@ -66,7 +86,6 @@ export default async function(req) {
     const userRole = authoritativeUser?.role || user?.role || 'user';
     const isAdmin = userRole === 'admin';
 
-    // Non-admin users must have an account_id linked; admins are unrestricted.
     if (!isAdmin && (!accountId || accountId === '')) {
       return Response.json({
         status: 'ACCOUNT_NOT_LINKED',
@@ -74,9 +93,6 @@ export default async function(req) {
       }, { status: 403 });
     }
 
-    // Every new project must be stamped with the authenticated dealer's
-    // Dealer Account ID. Non-admin users without a resolved dealer identity
-    // cannot create projects — no orphaned projects are allowed.
     if (!isAdmin && (!dealerAccountId || dealerAccountId === '')) {
       return Response.json({
         status: 'DEALER_NOT_LINKED',
@@ -93,14 +109,6 @@ export default async function(req) {
     }
     const projectName = (body.name && String(body.name).trim()) || 'Untitled Professional Project';
 
-    // Legitimate new-project input fields passed through from the browser.
-    // Backend-authoritative fields (account_id, commercial_tier, etc.) are NOT
-    // accepted from the client.
-    // room_dimensions_edited: true if the user deliberately supplied real room
-    // dimensions at creation. False if dimensions were left null (the Room
-    // Designer will hydrate generic 4.5×6.0×2.4 defaults, but that does NOT
-    // count as a genuine edit). This flag is the authority for the 7-day
-    // incomplete-project cleanup rule.
     const suppliedDims = (body.room_length != null && Number.isFinite(Number(body.room_length)))
       || (body.room_width != null && Number.isFinite(Number(body.room_width)))
       || (body.room_height != null && Number.isFinite(Number(body.room_height)));
@@ -119,9 +127,6 @@ export default async function(req) {
       notes: body.notes || '',
       acoustic_treatment_enabled: body.acoustic_treatment_enabled ?? false,
       room_dimensions_edited: !!suppliedDims,
-      // New projects are stamped with the coordinated document workflow (v2).
-      // Existing projects retain 'legacy' (the entity default) and are never
-      // migrated. This is a permanent marker stamped once at creation.
       document_workflow: 'v2',
     };
 
@@ -152,218 +157,287 @@ export default async function(req) {
       }, { status: 201 });
     }
 
-    // ── 3b. Resolve Account (service role) for promotion eligibility ──
-    // Account status is already enforced at the auth layer (recordAccountAccess
-    // blocks suspended/inactive users). This is a defence-in-depth check.
+    // ── 3b. Eligibility: Account lookup — FAIL CLOSED ──
+    // If we cannot read the account, we cannot determine promotion eligibility,
+    // so we must NOT proceed to charge a token.
     let account = null;
     try {
       const accountRecords = await base44.asServiceRole.entities.Account.filter({ id: accountId });
       account = (Array.isArray(accountRecords) && accountRecords.length > 0) ? accountRecords[0] : null;
-    } catch (_acctErr) {
-      // If we can't resolve the account, fall through to normal capacity path.
+    } catch (acctErr) {
+      return Response.json({
+        status: 'ELIGIBILITY_CHECK_FAILED',
+        message: 'Unable to verify account eligibility. Please try again.'
+      }, { status: 503 });
+    }
+    if (!account) {
+      return Response.json({
+        status: 'ELIGIBILITY_CHECK_FAILED',
+        message: 'Account not found.'
+      }, { status: 403 });
     }
 
-    // Defence-in-depth: only ACTIVE accounts may create projects under a promotion.
-    // (Suspended/inactive are already blocked at auth, but this guards against
-    // edge cases where account status changed mid-session.)
-    const accountIsActive = account && account.status === 'active';
+    const accountIsActive = account.status === 'active';
 
-    // ── 3c. Check for an effective UNLIMITED_PRO_PROJECTS promotion ──
+    // ── 3c. Eligibility: Promotion lookup — FAIL CLOSED ──
+    // If we cannot check promotion eligibility, we must NOT charge a token:
+    // the dealer may be entitled to a free promotional project.
     let effectivePromotion = null;
     if (accountIsActive) {
       try {
         effectivePromotion = await findEffectivePromotion(base44.asServiceRole, account);
-      } catch (_promoErr) {
-        // If promotion check fails, fall through to normal capacity path.
-        effectivePromotion = null;
+      } catch (promoErr) {
+        return Response.json({
+          status: 'ELIGIBILITY_CHECK_FAILED',
+          message: 'Unable to verify promotion eligibility. Please try again.'
+        }, { status: 503 });
       }
     }
 
-    // ── 3d. PROMOTIONAL PATH: free project, no capacity consumption ──
-    if (effectivePromotion && effectivePromotion.promotion_type === 'UNLIMITED_PRO_PROJECTS') {
-      const promoNowIso = new Date().toISOString();
+    // ── 3d. Request idempotency + per-account serialized creation ──
+    const requestId = (typeof body.request_id === 'string' && body.request_id.trim())
+      ? body.request_id.trim()
+      : null;
+    const service = base44.asServiceRole;
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
 
-      // Create the promotional Professional Project
-      let promoProject = null;
+    const lock = await acquireCreationLock(service, accountId, { now: nowMs });
+    if (!lock.acquired) {
+      return Response.json({
+        status: 'CREATION_BUSY',
+        message: 'A project creation for this account is already in progress. Please retry shortly.'
+      }, { status: 409 });
+    }
+
+    try {
+      // Idempotency: replay a completed request, or detect an in-flight one.
+      if (requestId) {
+        const existing = await findExistingReceipt(service, accountId, requestId);
+        if (existing) {
+          if (existing.status === 'COMPLETED' && existing.response_payload) {
+            return Response.json(existing.response_payload, { status: 201 });
+          }
+          // PENDING — another request is mid-flight.
+          return Response.json({
+            status: 'CREATION_BUSY',
+            message: 'A project creation for this account is already in progress. Please retry shortly.'
+          }, { status: 409 });
+        }
+        // Reserve the request before any Project/Ledger write (crash-safe).
+        await createPendingReceipt(service, accountId, requestId, nowIso);
+      }
+
+      const discardPending = async () => {
+        if (!requestId) return;
+        try {
+          const r = await findExistingReceipt(service, accountId, requestId);
+          if (r) await deleteReceipt(service, r.id);
+        } catch { /* best-effort */ }
+      };
+
+      const finishReceipt = async (payload, extras) => {
+        if (!requestId) return;
+        try {
+          const r = await findExistingReceipt(service, accountId, requestId);
+          if (r) {
+            await completeReceipt(service, r.id, {
+              project_id: extras?.project_id || null,
+              promotion_id: extras?.promotion_id || null,
+              ledger_entry_id: extras?.ledger_entry_id || null,
+              response_payload: payload,
+            }, new Date().toISOString());
+          }
+        } catch { /* best-effort */ }
+      };
+
+      // ── 4a. PROMOTIONAL PATH: free project, no capacity consumption ──
+      if (effectivePromotion && effectivePromotion.promotion_type === 'UNLIMITED_PRO_PROJECTS') {
+        const promoNowIso = new Date().toISOString();
+
+        let promoProject = null;
+        try {
+          promoProject = await service.entities.Project.create({
+            ...projectFields,
+            account_id: accountId,
+            dealer_account_id: dealerAccountId,
+            dealer_name: dealerName,
+            commercial_tier: 'PROFESSIONAL',
+            commercial_source: 'PROMOTION',
+            promotion_id: effectivePromotion.id,
+            professional_activated_date: promoNowIso,
+            activation_ledger_entry_id: null,
+            lifecycle_status: 'Draft',
+          });
+        } catch (createErr) {
+          await discardPending();
+          return Response.json({
+            status: 'CREATION_FAILED',
+            message: 'Unable to create the project. Please try again.'
+          }, { status: 500 });
+        }
+
+        // Create exactly one PromotionUsage row (idempotent by project_id)
+        let usageEntry = null;
+        let usageError = null;
+        try {
+          const existingUsage = await service.entities.PromotionUsage.filter({ project_id: promoProject.id });
+          if (Array.isArray(existingUsage) && existingUsage.length > 0) {
+            usageEntry = existingUsage[0];
+          } else {
+            usageEntry = await service.entities.PromotionUsage.create({
+              promotion_id: effectivePromotion.id,
+              account_id: accountId,
+              project_id: promoProject.id,
+              promotion_type: 'UNLIMITED_PRO_PROJECTS',
+              used_at: promoNowIso,
+            });
+          }
+        } catch (err) {
+          usageError = err;
+        }
+
+        // Failure safety: if PromotionUsage failed, rollback the project
+        if (usageError || !usageEntry) {
+          try {
+            await service.entities.Project.delete(promoProject.id);
+          } catch (_rollbackErr) {
+            await discardPending();
+            return Response.json({
+              status: 'CREATION_FAILED',
+              message: 'Project creation failed during promotion tracking. Please contact support.',
+              project_id: promoProject.id,
+              rollback: 'FAILED — orphan promotional project may exist',
+              detail: 'PromotionUsage creation failed and project rollback also failed.'
+            }, { status: 500 });
+          }
+          await discardPending();
+          return Response.json({
+            status: 'CREATION_FAILED',
+            message: 'Project creation failed during promotion tracking. No capacity was consumed.',
+            rollback: 'SUCCESS — project deleted'
+          }, { status: 500 });
+        }
+
+        const promoSuccessPayload = {
+          status: 'SUCCESS',
+          project: promoProject,
+          promotion: { id: effectivePromotion.id, promotion_type: 'UNLIMITED_PRO_PROJECTS' },
+          capacity_before: null,
+          capacity_after: null,
+          ledger_entry: null
+        };
+        await finishReceipt(promoSuccessPayload, { project_id: promoProject.id, promotion_id: effectivePromotion.id });
+        return Response.json(promoSuccessPayload, { status: 201 });
+      }
+
+      // ── 4b. CAPACITY PATH: check available capacity from ledger SUM ──
+      const available = await getAvailableCapacity(service, accountId);
+      if (available <= 0) {
+        await discardPending();
+        return Response.json({
+          status: 'OUT_OF_CAPACITY',
+          message: 'No Professional Project capacity available. Contact your distributor or administrator.',
+          available_capacity: available
+        }, { status: 403 });
+      }
+
+      // ── 5. Create the Professional Project ──
+      let project = null;
       try {
-        promoProject = await base44.asServiceRole.entities.Project.create({
+        project = await service.entities.Project.create({
           ...projectFields,
           account_id: accountId,
           dealer_account_id: dealerAccountId,
           dealer_name: dealerName,
           commercial_tier: 'PROFESSIONAL',
-          commercial_source: 'PROMOTION',
-          promotion_id: effectivePromotion.id,
-          professional_activated_date: promoNowIso,
-          activation_ledger_entry_id: null,
+          professional_activated_date: nowIso,
+          commercial_source: 'PILOT',
           lifecycle_status: 'Draft',
         });
       } catch (createErr) {
+        await discardPending();
         return Response.json({
           status: 'CREATION_FAILED',
           message: 'Unable to create the project. Please try again.'
         }, { status: 500 });
       }
 
-      // Create exactly one PromotionUsage row (idempotent by project_id)
-      let usageEntry = null;
-      let usageError = null;
+      // ── 6. Append PROJECT_ACTIVATION -1 ledger entry (idempotent) ──
+      const idempotencyKey = `activation:${project.id}`;
+      let ledgerEntry = null;
+      let ledgerError = null;
+
       try {
-        // Idempotency: check if a usage row already exists for this project
-        const existingUsage = await base44.asServiceRole.entities.PromotionUsage.filter({ project_id: promoProject.id });
-        if (Array.isArray(existingUsage) && existingUsage.length > 0) {
-          usageEntry = existingUsage[0];
+        const existing = await findActivationEntry(service, project.id);
+        if (existing) {
+          ledgerEntry = existing;
         } else {
-          usageEntry = await base44.asServiceRole.entities.PromotionUsage.create({
-            promotion_id: effectivePromotion.id,
+          ledgerEntry = await service.entities.CapacityLedger.create({
             account_id: accountId,
-            project_id: promoProject.id,
-            promotion_type: 'UNLIMITED_PRO_PROJECTS',
-            used_at: promoNowIso,
+            transaction_type: 'PROJECT_ACTIVATION',
+            delta: -1,
+            idempotency_key: idempotencyKey,
+            source_system: 'SOUND_PROOF',
+            source_ref: { project_id: project.id },
+            reason: `Project activation: ${projectName}`
           });
         }
       } catch (err) {
-        usageError = err;
+        ledgerError = err;
       }
 
-      // Failure safety: if PromotionUsage failed, rollback the project
-      if (usageError || !usageEntry) {
+      // ── 7. Failure safety: compensate if ledger creation failed ──
+      if (ledgerError || !ledgerEntry) {
         try {
-          await base44.asServiceRole.entities.Project.delete(promoProject.id);
+          await service.entities.Project.delete(project.id);
         } catch (_rollbackErr) {
+          await discardPending();
           return Response.json({
             status: 'CREATION_FAILED',
-            message: 'Project creation failed during promotion tracking. Please contact support.',
-            project_id: promoProject.id,
-            rollback: 'FAILED — orphan promotional project may exist',
-            detail: 'PromotionUsage creation failed and project rollback also failed.'
+            message: 'Project creation failed during activation. Please contact support.',
+            project_id: project.id,
+            rollback: 'FAILED — orphan project may exist',
+            detail: 'Ledger creation failed and project rollback also failed.'
           }, { status: 500 });
         }
+        await discardPending();
         return Response.json({
           status: 'CREATION_FAILED',
-          message: 'Project creation failed during promotion tracking. No capacity was consumed.',
+          message: 'Project creation failed during activation. No capacity was consumed.',
           rollback: 'SUCCESS — project deleted'
         }, { status: 500 });
       }
 
-      // Success — no ledger entry, no capacity consumption
-      return Response.json({
-        status: 'SUCCESS',
-        project: promoProject,
-        promotion: {
-          id: effectivePromotion.id,
-          promotion_type: 'UNLIMITED_PRO_PROJECTS'
-        },
-        capacity_before: null,
-        capacity_after: null,
-        ledger_entry: null
-      }, { status: 201 });
-    }
-
-    // ── 3. Check available capacity from ledger SUM ──
-    const available = await getAvailableCapacity(base44.asServiceRole, accountId);
-    if (available <= 0) {
-      return Response.json({
-        status: 'OUT_OF_CAPACITY',
-        message: 'No Professional Project capacity available. Contact your distributor or administrator.',
-        available_capacity: available
-      }, { status: 403 });
-    }
-
-    // ── 4. Create the Professional Project ──
-    const nowIso = new Date().toISOString();
-    let project = null;
-    try {
-      project = await base44.asServiceRole.entities.Project.create({
-        ...projectFields,
-        account_id: accountId,
-        dealer_account_id: dealerAccountId,
-        dealer_name: dealerName,
-        commercial_tier: 'PROFESSIONAL',
-        professional_activated_date: nowIso,
-        commercial_source: 'PILOT',
-        lifecycle_status: 'Draft',
-      });
-    } catch (createErr) {
-      return Response.json({
-        status: 'CREATION_FAILED',
-        message: 'Unable to create the project. Please try again.'
-      }, { status: 500 });
-    }
-
-    // ── 5. Append PROJECT_ACTIVATION -1 ledger entry (idempotent) ──
-    const idempotencyKey = `activation:${project.id}`;
-    let ledgerEntry = null;
-    let ledgerError = null;
-
-    try {
-      // Idempotency guard: check if an activation entry already exists for this project.
-      const existing = await findActivationEntry(base44.asServiceRole, project.id);
-      if (existing) {
-        ledgerEntry = existing;
-      } else {
-        ledgerEntry = await base44.asServiceRole.entities.CapacityLedger.create({
-          account_id: accountId,
-          transaction_type: 'PROJECT_ACTIVATION',
-          delta: -1,
-          idempotency_key: idempotencyKey,
-          source_system: 'SOUND_PROOF',
-          source_ref: { project_id: project.id },
-          reason: `Project activation: ${projectName}`
-        });
-      }
-    } catch (err) {
-      ledgerError = err;
-    }
-
-    // ── 6. Failure safety: compensate if ledger creation failed ──
-    if (ledgerError || !ledgerEntry) {
-      // Rollback: delete the project to avoid orphaned project without activation.
+      // ── 8. Link activation_ledger_entry_id on the Project ──
       try {
-        await base44.asServiceRole.entities.Project.delete(project.id);
-      } catch (_rollbackErr) {
-        // Best-effort rollback; the project remains but is unactivated.
-        // This is a critical state — surfaced in the response for admin review.
-        return Response.json({
-          status: 'CREATION_FAILED',
-          message: 'Project creation failed during activation. Please contact support.',
-          project_id: project.id,
-          rollback: 'FAILED — orphan project may exist',
-          detail: 'Ledger creation failed and project rollback also failed.'
-        }, { status: 500 });
+        await service.entities.Project.update(project.id, {
+          activation_ledger_entry_id: ledgerEntry.id
+        });
+      } catch (_linkErr) {
+        // Non-fatal: the ledger idempotency_key is the real authority.
       }
-      return Response.json({
-        status: 'CREATION_FAILED',
-        message: 'Project creation failed during activation. No capacity was consumed.',
-        rollback: 'SUCCESS — project deleted'
-      }, { status: 500 });
-    }
 
-    // ── 7. Link activation_ledger_entry_id on the Project ──
-    try {
-      await base44.asServiceRole.entities.Project.update(project.id, {
-        activation_ledger_entry_id: ledgerEntry.id
-      });
-    } catch (_linkErr) {
-      // Non-fatal: the ledger entry exists and the project exists.
-      // The link is a convenience field; the ledger idempotency_key is the real authority.
-      // We still return SUCCESS since capacity was correctly consumed.
-    }
+      // ── 9. Return SUCCESS ──
+      const remaining = await getAvailableCapacity(service, accountId);
+      const capacitySuccessPayload = {
+        status: 'SUCCESS',
+        project: project,
+        capacity_before: available,
+        capacity_after: remaining,
+        ledger_entry: {
+          id: ledgerEntry.id,
+          transaction_type: ledgerEntry.transaction_type,
+          delta: ledgerEntry.delta,
+          idempotency_key: ledgerEntry.idempotency_key
+        }
+      };
+      await finishReceipt(capacitySuccessPayload, { project_id: project.id, ledger_entry_id: ledgerEntry.id });
+      return Response.json(capacitySuccessPayload, { status: 201 });
 
-    // ── 8. Return SUCCESS ──
-    const remaining = await getAvailableCapacity(base44.asServiceRole, accountId);
-    return Response.json({
-      status: 'SUCCESS',
-      project: project,
-      capacity_before: available,
-      capacity_after: remaining,
-      ledger_entry: {
-        id: ledgerEntry.id,
-        transaction_type: ledgerEntry.transaction_type,
-        delta: ledgerEntry.delta,
-        idempotency_key: ledgerEntry.idempotency_key
-      }
-    }, { status: 201 });
+    } finally {
+      await releaseCreationLock(service, accountId, lock.token);
+    }
 
   } catch (error) {
     return Response.json({

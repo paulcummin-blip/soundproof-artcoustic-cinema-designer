@@ -1,0 +1,81 @@
+{
+  "name": "ProjectCreationReceipt",
+  "type": "object",
+  "description": "Request-level idempotency receipt for Professional Project creation. One row per (account_id, request_id). Written only by createProfessionalProject, under the per-account creation lock. PENDING = a creation is in flight (a retry backs off with CREATION_BUSY, never creating a second project); COMPLETED = the creation finished and the stored response_payload is replayed verbatim to an identical retry. A PENDING receipt left by a crashed request blocks further retries until manually reconciled, which is the safe failure (no duplicate charge). Internal financial-integrity record, admin-only; never shown to dealers.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "Account the creation was requested for."
+    },
+    "request_id": {
+      "type": "string",
+      "description": "Client-supplied idempotency key for the creation request (UUID). Scoped to account_id, so the same request_id under a different account is a different receipt."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "COMPLETED"
+      ],
+      "default": "PENDING",
+      "description": "PENDING = creation in flight; COMPLETED = finished and response_payload is replayable to an identical retry."
+    },
+    "project_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Created Project id on success. Null while PENDING."
+    },
+    "promotion_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Promotion id if the project was created under an UNLIMITED_PRO_PROJECTS promotion. Null for a capacity-consumed project."
+    },
+    "ledger_entry_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "CapacityLedger entry id for a capacity-consumed project. Null for promotional projects (no ledger consumption)."
+    },
+    "response_payload": {
+      "type": "object",
+      "description": "The exact JSON response to replay on a repeated request with the same request_id.",
+      "properties": {}
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the creation finished. Null while PENDING."
+    }
+  },
+  "required": [
+    "account_id",
+    "request_id",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

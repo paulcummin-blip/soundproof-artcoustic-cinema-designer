@@ -80,6 +80,17 @@
       "format": "date-time",
       "nullable": true,
       "description": "Sound Proof access expiry timestamp. Set by explicit administrator activation to now + 90 days. When this time has passed the dealer sees a Renew Access screen. Null = no term set (account has not been activated through the new enable flow, or is not subject to the 90-day term). Separate from administrator suspension: renewal may extend this date but never clears a manual suspension."
+    },
+    "creation_lock_holder": {
+      "type": "string",
+      "nullable": true,
+      "description": "Internal per-account creation-lock holder token. Null = free; a non-null value = a Professional Project creation is in progress for this account. Acquired and released only by createProfessionalProject via a single-record conditional updateMany (creation_lock_holder: null -> token), which the platform rechecks at write time. Serializes Professional Project creation per account so the non-atomic capacity-check-then-deduct sequence cannot interleave across concurrent requests. Not a business field: it never affects balances, status, eligibility, expiry or access, and is never read by any dealer-facing surface."
+    },
+    "creation_lock_held_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "Timestamp the creation lock was acquired. Used to reclaim a lock held by a crashed request (older than 30 seconds). Null when the lock is free. Not a business field."
     }
   },
   "required": [
