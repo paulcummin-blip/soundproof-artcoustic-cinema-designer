@@ -28,6 +28,7 @@ import { useAppliedCalibrationAuthority } from "@/components/room/bass/appliedCa
 import { serializeAppliedCalibration } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence.js";
 import { useOptimiserPlanAuthority, getOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
 import { serializeOptimiserPlan, acknowledgeOptimiserPlanSave } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
+import { sameCompletedPlan } from "@/components/room/bass/optimiserPlan/completedPlanSave.js";
 import {
   COMMERCIAL_BLOCK_REASON,
   clearCommercialEdits,
@@ -1118,14 +1119,16 @@ appState, // Pass appState directly for setters
       // read-only opening gate never observed an input event (or HMR re-armed
       // that gate). Save its evaluated design through all normal guards first;
       // never attach a current plan to an older stored design.
-      if (saveCompletedPlan) {
+      const alreadySaved = saveCompletedPlan && sameCompletedPlan(
+        (await readProjectVersionRecord(versionId, {force:true}))?.design_state?.optimiser_plan, saveCompletedPlan);
+      if (saveCompletedPlan && !alreadySaved) {
         autosaveUserArmedRef.current = true;
         bucket.lastSavedSig = "";
         bucket.dirty = true;
       }
       // Flush existing user edits before taking the same one-writer lock.
-      await autosaveAttemptRef.current?.run();
-      if (saveCompletedPlan && bucket.dirty) throw new Error("The current design save did not complete; the completed plan is retained for Retry.");
+      if (!alreadySaved) await autosaveAttemptRef.current?.run();
+      if (saveCompletedPlan && !alreadySaved && bucket.dirty) throw new Error("The current design save did not complete; the completed plan is retained for Retry.");
       if (bucket.inFlight || !current()) throw new Error("The project changed before the ADI save.");
       bucket.inFlight = true;
       if (bucket.debounceId) clearTimeout(bucket.debounceId);
