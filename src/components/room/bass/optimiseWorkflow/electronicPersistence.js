@@ -5,8 +5,8 @@ export function registerElectronicPersistence(projectId,versionId,handler){
   const k=key(projectId,versionId);owners.set(k,handler);
   return()=>{if(owners.get(k)===handler)owners.delete(k);};
 }
-export function withElectronicPersistence(projectId,versionId,work){
+export function withElectronicPersistence(projectId,versionId,work,options){
   const owner=owners.get(key(projectId,versionId));
   if(!owner)throw new Error("The current project is not ready to save ADI settings.");
-  return owner(work);
+  return owner(work,options);
 }
