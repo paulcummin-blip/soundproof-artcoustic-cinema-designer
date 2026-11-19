@@ -180,7 +180,7 @@ export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs 
     acknowledgeOptimiserPlanSave(projectId, versionId, plan);
     console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage:"verified", ...result}));
     return result.at;
-  }, {saveCompletedPlan:true})).catch(error => {
+  }, {saveCompletedPlan:plan})).catch(error => {
     console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage:"failed", error:error?.message}));
     throw error;
   }).finally(() => pendingPlanSaves.delete(key));
