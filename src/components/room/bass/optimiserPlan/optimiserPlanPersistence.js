@@ -19,7 +19,9 @@
 // and reads.
 // ---------------------------------------------------------------------------
 
-import { setOptimiserPlanAuthority } from "./optimiserPlanStore.js";
+import { getOptimiserPlanAuthority, setOptimiserPlanAuthority } from "./optimiserPlanStore.js";
+import { withElectronicPersistence } from "../optimiseWorkflow/electronicPersistence.js";
+import { saveCompletedPlan } from "./completedPlanSave.js";
 
 /**
  * Serialise a plan into a plain, JSON-safe object for design_state.
@@ -90,6 +92,7 @@ export function serializeOptimiserPlan(plan) {
     // secondary recommendation publication keeps its own outcome here too. Absent
     // on records saved before these existed; those are never reinterpreted.
     failure: plan.failure || null,
+    saveRecovery: plan.saveRecovery || null,
     recommendationPublication: plan.recommendationPublication || null,
     // The run's own measured runtime cost, in the budget's named stages: what the
     // electronic search and its canonical confirmations cost, split from the
@@ -163,21 +166,24 @@ export function acknowledgeOptimiserPlanSave(projectId, versionId, plan) {
   }
   for (const notify of saveWaiters) notify(key, value);
 }
-export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs = 60000) {
-  const key = projectId + "::" + versionId;
-  const previous = savedRuns.get(key);
-  if (previous?.runId === runId) return Promise.resolve(previous.at);
-  return new Promise((resolve, reject) => {
-    const notify = (savedKey, value) => {
-      if (savedKey !== key || value.runId !== runId) return;
-      clearTimeout(timer);
-      saveWaiters.delete(notify);
-      resolve(value.at);
-    };
-    const timer = setTimeout(() => {
-      saveWaiters.delete(notify);
-      reject(new Error("The optimiser plan is ready, but its version save was not acknowledged. Retry saving the project."));
-    }, timeoutMs);
-    saveWaiters.add(notify);
-  });
+const pendingPlanSaves = new Map();
+export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs = 20000) {
+  const key = projectId + "::" + versionId + "::" + runId;
+  if (pendingPlanSaves.has(key)) return pendingPlanSaves.get(key);
+  const plan = serializeOptimiserPlan(getOptimiserPlanAuthority(projectId, versionId));
+  if (plan?.run?.runId !== runId) return Promise.reject(new Error("The completed optimisation is no longer the current run."));
+  const task = Promise.resolve().then(() => withElectronicPersistence(projectId, versionId, async owner => {
+    const result = await saveCompletedPlan({
+      projectId, versionId, plan, ...owner, deadlineMs: timeoutMs,
+      onStage: stage => console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage})),
+    });
+    acknowledgeOptimiserPlanSave(projectId, versionId, plan);
+    console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage:"verified", ...result}));
+    return result.at;
+  })).catch(error => {
+    console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage:"failed", error:error?.message}));
+    throw error;
+  }).finally(() => pendingPlanSaves.delete(key));
+  pendingPlanSaves.set(key, task);
+  return task;
 }
