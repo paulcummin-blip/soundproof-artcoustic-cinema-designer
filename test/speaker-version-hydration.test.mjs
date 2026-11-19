@@ -121,6 +121,7 @@ function mount() {
     get app() { return app; }, get store() { return store; },
     hydrate,
     delay() { delayUpdates = true; },
+    resume() { delayUpdates = false; },
     flush() { delayUpdates = false; queued.splice(0).forEach(run => run()); },
     close() { act(() => root.unmount()); }
   };
@@ -160,13 +161,10 @@ test('already-queued A updater is rejected when it executes after B hydration', 
     h.delay();
     let called = 0;
     h.store.setSpeakers(prev => { called++; return prev; });
-    // Release queueing for hydration without executing the held updater.
-    // The hydration raw setters are queued too; flush ordering is controlled by
-    // first advancing the synchronous readiness scope, then draining A.
-    act(() => h.app.setProjectHydrationReady(false));
+    h.resume();
+    act(() => h.hydrate(B));
     act(() => h.flush());
     assert.equal(called, 0, 'guard is checked inside the queued functional update');
-    act(() => h.hydrate(B));
     assert.deepEqual(overheads(h.store.placedSpeakers), expectedB);
   } finally { h.close(); }
 });
