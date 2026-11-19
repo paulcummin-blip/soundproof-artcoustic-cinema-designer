@@ -650,6 +650,7 @@ export default function AdiOptimiserResults({
   versionId,
   currentDesignFingerprint,
   onRunAgain,
+  runAgainLabel = "Run ADI Again",
   handleApplyLever,
   handleUndoLever,
   leverApplyBusy,
@@ -871,7 +872,7 @@ export default function AdiOptimiserResults({
         data-adi-result-run-again="true"
       >
         <Sparkles className="h-4 w-4" />
-        Run ADI Again
+        {runAgainLabel}
       </button>
     </div>
   );
