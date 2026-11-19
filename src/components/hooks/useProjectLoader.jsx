@@ -363,7 +363,9 @@ appState, // Pass appState directly for setters
       // Then load the active version's design_state and merge with the
       // Project's shared fields for hydration.
       let mergedP = p;
-      try {
+      // A version read failure is handled by the outer load-error boundary;
+      // it must never become a successful legacy/default design load.
+      {
         if (!p?.active_version_id) {
           const migRes = await base44.functions.invoke('migrateProjectVersions', { project_id: id });
           if (migRes?.data?.version_id) {
@@ -381,10 +383,6 @@ appState, // Pass appState directly for setters
         } else {
           throw new Error("The project has no saved design version. Retry opening it.");
         }
-      } catch (versionErr) {
-        // A version-backed project must never fall back to sparse legacy
-        // fields and then label their default design as successfully loaded.
-        throw versionErr;
       }
 
       // Skip the state overwrite when ProjectDesignHydrator already hydrated —
