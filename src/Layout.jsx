@@ -38,7 +38,7 @@ import AdiEditorialRejectionDiagnostics from "@/components/adi/AdiEditorialRejec
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
-import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff, readPartialDesignRating, subscribePartialDesignRating } from "@/components/state/designReviewHandoff";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
@@ -105,6 +105,10 @@ export default function Layout({ children, currentPageName }) {
   const [p14TargetUnselected, setP14TargetUnselected] = React.useState(false);
   const [staleScope, setStaleScope] = React.useState(false);
   const [roomDimsMissing, setRoomDimsMissing] = React.useState(false);
+  // Live Partial Design Rating — version-scoped, read from the same handoff
+  // store as the completed engineering summary. Shown only when the completed
+  // rating is unavailable but current valid RP22 evidence exists.
+  const [partialDesignRating, setPartialDesignRating] = React.useState(null);
 
   // Only the Workspace navigation links are collapsible (the rest of the sidebar
   // keeps its full width and content). The mobile overlay drawer is separate.
@@ -191,6 +195,20 @@ export default function Layout({ children, currentPageName }) {
       applyPublication(snapshot || (fromStorage
         ? readDesignReviewHandoff(activeProjectId, activeVersionId, { preferStored: true })
         : null));
+    });
+  }, [activeProjectId, activeVersionId]);
+
+  // Subscribe to the version-scoped Live Partial Design Rating. Cleared when
+  // the completed rating is publishable, so the sidebar shows the completed
+  // card whenever it is available.
+  React.useEffect(() => {
+    if (!activeProjectId || !activeVersionId) {
+      setPartialDesignRating(null);
+      return undefined;
+    }
+    setPartialDesignRating(readPartialDesignRating(activeProjectId, activeVersionId));
+    return subscribePartialDesignRating(activeProjectId, activeVersionId, (partial) => {
+      setPartialDesignRating(partial || null);
     });
   }, [activeProjectId, activeVersionId]);
 
@@ -598,6 +616,7 @@ export default function Layout({ children, currentPageName }) {
                   p14TargetUnselected={p14TargetUnselected}
                   staleScope={staleScope}
                   roomDimsMissing={roomDimsMissing}
+                  partialDesignRating={partialDesignRating}
                 />
               </div>
             )}

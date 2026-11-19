@@ -215,6 +215,76 @@ export function clearRoomDimsMissingIndicator(projectId) {
   }
 }
 
+// ── Version-scoped Live Partial Design Rating indicator ─────────────────
+// A lightweight, version-scoped partial rating (NOT a completed publication).
+// Published from Room Designer whenever the completed rating is not
+// publishable but current valid RP22 evidence exists. The sidebar reads it to
+// show a live "Partial" Design Index with coverage and unavailable groups
+// (bass) while the design is incomplete. It never carries completed-rating
+// authority: reports and Design Review read the completed handoff, not this.
+
+const PARTIAL_RATING_MAP_KEY = "__ROOM_DESIGNER_PARTIAL_RATING_MAP__";
+const PARTIAL_RATING_EVENT = "soundproof:partial-design-rating";
+
+const getPartialMap = () => {
+  if (typeof window === "undefined") return null;
+  if (!window[PARTIAL_RATING_MAP_KEY] || typeof window[PARTIAL_RATING_MAP_KEY] !== "object") {
+    window[PARTIAL_RATING_MAP_KEY] = {};
+  }
+  return window[PARTIAL_RATING_MAP_KEY];
+};
+
+export function publishPartialDesignRating(projectId, versionId, partial) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  const vid = normaliseVersionId(versionId);
+  if (!pid || !vid) return;
+  const map = getPartialMap();
+  if (!map) return;
+  const key = versionKey(pid, vid);
+  if (partial == null) {
+    delete map[key];
+  } else {
+    map[key] = { projectId: pid, versionId: vid, partial, ts: Date.now() };
+  }
+  window.dispatchEvent(new CustomEvent(PARTIAL_RATING_EVENT, {
+    detail: { projectId: pid, versionId: vid, partial: partial || null },
+  }));
+}
+
+export function readPartialDesignRating(projectId, versionId) {
+  if (typeof window === "undefined") return null;
+  const pid = normaliseProjectId(projectId);
+  const vid = normaliseVersionId(versionId);
+  if (!pid || !vid) return null;
+  const map = getPartialMap();
+  if (!map) return null;
+  const entry = map[versionKey(pid, vid)];
+  if (!entry) return null;
+  return entry.partial || null;
+}
+
+export function clearPartialDesignRating(projectId, versionId) {
+  publishPartialDesignRating(projectId, versionId, null);
+}
+
+export function subscribePartialDesignRating(projectId, versionId, callback) {
+  if (typeof window === "undefined" || typeof callback !== "function") return () => {};
+  const pid = normaliseProjectId(projectId);
+  const vid = normaliseVersionId(versionId);
+  if (!pid || !vid) return () => {};
+  const onPublish = (event) => {
+    if (
+      normaliseProjectId(event?.detail?.projectId) === pid &&
+      normaliseVersionId(event?.detail?.versionId) === vid
+    ) {
+      callback(event.detail.partial || null);
+    }
+  };
+  window.addEventListener(PARTIAL_RATING_EVENT, onPublish);
+  return () => window.removeEventListener(PARTIAL_RATING_EVENT, onPublish);
+}
+
 // ── Version-scoped engineering publication ───────────────────────────────
 
 /**

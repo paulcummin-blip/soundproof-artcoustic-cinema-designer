@@ -10,7 +10,7 @@ import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/component
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import buildEngineeringPublicationDesignState from "@/components/roomdesigner/utils/buildEngineeringPublicationDesignState";
-import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, publishRoomDimsMissingIndicator, clearRoomDimsMissingIndicator, readDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendingIndicator, clearDesignReviewHandoff, publishAsdrUnavailableIndicator, clearAsdrUnavailableIndicator, publishSeatPriorityFingerprint, clearSeatPriorityFingerprint, publishRoomDimsMissingIndicator, clearRoomDimsMissingIndicator, readDesignReviewHandoff, publishPartialDesignRating, clearPartialDesignRating } from "@/components/state/designReviewHandoff";
 import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
@@ -2011,6 +2011,26 @@ function RoomDesignerWithState() {
       clearRoomDimsMissingIndicator(indicatorProjectId);
     };
   }, [resolvedProjectId, projectIdState, appDesignRating?.isRoomDimsMissing]);
+
+  // Publish a lightweight, version-scoped Live Partial Design Rating (NOT a
+  // completed publication) so the sidebar can show a live partial Design Index
+  // with coverage and unavailable groups (bass) while the completed rating is
+  // not yet publishable. Cleared when the completed rating is publishable, so
+  // the sidebar shows the authoritative completed card instead. This never
+  // carries completed-rating authority and never triggers bass calculation.
+  React.useEffect(() => {
+    const partialProjectId = resolvedProjectId || projectIdState || null;
+    const partialVersionId = appState?.activeVersionId || null;
+    if (!partialProjectId || !partialVersionId) return;
+    if (appDesignRating?.isPublishable === true) {
+      clearPartialDesignRating(partialProjectId, partialVersionId);
+      return;
+    }
+    publishPartialDesignRating(partialProjectId, partialVersionId, appDesignRating?.partialDesignRating ?? null);
+    return () => {
+      clearPartialDesignRating(partialProjectId, partialVersionId);
+    };
+  }, [resolvedProjectId, projectIdState, appState?.activeVersionId, appDesignRating?.isPublishable, appDesignRating?.partialDesignRating]);
 
   // IMPORTANT: This check must remain after all hook calls to avoid conditional hook call errors.
   if (!appState) {

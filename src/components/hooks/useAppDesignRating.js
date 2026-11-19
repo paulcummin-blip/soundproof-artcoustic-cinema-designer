@@ -20,7 +20,12 @@ import { useCompletedBassAuthority, BASS_AUTHORITY_STATUS } from '@/components/r
 import { bassProjectIdMatch } from '@/components/room/bass/bassCacheKey';
 import { buildComplianceBassPresentation } from '@/components/room/bass/bassCompliancePresentation';
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
-import { buildArtcousticDesignRatingAuthority } from '@/components/report/technical/artcousticSystemDesignRating';
+import {
+  buildArtcousticDesignRatingAuthority,
+  calculateRoomDesignRating,
+  calculateScopedRoomDesignRating,
+} from '@/components/report/technical/artcousticSystemDesignRating';
+import { summarisePartialDesignRating } from '@/components/report/technical/partialDesignRatingCoverage';
 import { summariseEngineeringResults } from '@/components/engineering/engineeringSummaryAuthority';
 import { attachAuthoritativeP20ToSeatSnapshot } from '@/components/room/seatHudPresentation';
 import { summariseAuthoritativeP19Seats } from '@/components/room/bass/p19SeatAuthority';
@@ -436,10 +441,70 @@ export function useAppDesignRating({
     }
   }, [bassReadiness.ready, bassReadiness.fingerprint, roomRating, reportSeatHudById, completedBassPresentation, reportP14Mode, reportP18Mode]);
 
-  const effectiveRating = roomRating;
+  // ── Live Partial Design Rating ──
+  // The completed rating (roomRating) is only computed when the minimum 5.1
+  // system is present. The PARTIAL authority is built from the same current
+  // evidence regardless of the minimum-system gate, so a design that still
+  // has speakers/seats specified but no complete bass system can show a live
+  // partial index from the parameters that ARE calculated. It uses the SAME
+  // scoring core; it never invents missing results and never triggers bass
+  // calculation. Bass parameters that are not yet verified settle to
+  // provisional and are reported as unavailable, not scored.
+  const partialAuthority = useMemo(() => {
+    if (!Array.isArray(seats) || seats.length === 0) return null;
+    if (!analysisResult) return null;
+    if (roomDimsIntegrityBlocksCalculation(appState?.roomDimsIntegrity)) return null;
+    try {
+      const input = buildDesignRatingInput({
+        seats,
+        analysisResult,
+        reportSeatHudById,
+        completedBassAuthority,
+        completedBassPresentation,
+        reportP12Mode,
+        reportP13Mode,
+        reportP14Mode,
+        reportP18Mode,
+        hasFrontWides,
+        placedSpeakers,
+        assumedP15Level: appState?.assumedP15Level || null,
+        assumedP21Level: appState?.assumedP21Level || null,
+        retainedBass: retainedFromRefresh ? lastVerifiedBassRef.current : null,
+        p19SeatAuthority,
+      });
+      return buildArtcousticDesignRatingAuthority(input);
+    } catch (e) {
+      console.warn('[useAppDesignRating] Failed to compute partial authority:', e);
+      return null;
+    }
+  }, [seats, analysisResult, reportSeatHudById, completedBassAuthority, completedBassPresentation, reportP12Mode, reportP13Mode, reportP14Mode, reportP18Mode, hasFrontWides, placedSpeakers, appState?.assumedP15Level, appState?.assumedP21Level, appState?.roomDimsIntegrity, retainedFromRefresh, p19SeatAuthority]);
 
-  if (!minimumSystemMet) return null;
-  if (!effectiveRating) return null;
+  const partialDesignRating = useMemo(() => {
+    if (!partialAuthority) return null;
+    const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
+    const allRating = calculateRoomDesignRating(partialAuthority);
+    const primaryRating = calculateScopedRoomDesignRating(partialAuthority, primarySeatIds);
+    const secondaryRating = calculateScopedRoomDesignRating(partialAuthority, secondarySeatIds);
+    const allCoverage = summarisePartialDesignRating(partialAuthority, partialAuthority.seatIds);
+    // No valid current evidence at all — not a useful partial.
+    if (allCoverage.assessedWeight === 0) return null;
+    return {
+      isPartial: true,
+      all: { designPerformanceIndex: allRating.designPerformanceIndex, ...allCoverage },
+      primary: {
+        designPerformanceIndex: primaryRating.designPerformanceIndex,
+        ...summarisePartialDesignRating(partialAuthority, primarySeatIds),
+      },
+      secondary: secondarySeatIds.length > 0
+        ? {
+            designPerformanceIndex: secondaryRating.designPerformanceIndex,
+            ...summarisePartialDesignRating(partialAuthority, secondarySeatIds),
+          }
+        : null,
+    };
+  }, [partialAuthority, seats]);
+
+  const effectiveRating = roomRating;
 
   const isP14TargetUnselected = bassReadiness.reason === 'p14-target-not-selected';
   const isRoomDimsMissing = roomDimsIntegrityBlocksCalculation(appState?.roomDimsIntegrity);
@@ -457,13 +522,32 @@ export function useAppDesignRating({
     isRoomDimsMissing,
   });
 
+  const isPendingBass = !bassReadiness.ready && !retainedFromRefresh && !isP14TargetUnselected;
+
+  // Completed rating unavailable (no minimum system, or the room-rating
+  // build failed): return a partial-only envelope so the sidebar can show
+  // live partial evidence. No completed-rating fields are exposed, and
+  // isPublishable stays false so the canonical publication path is unchanged.
+  if (!minimumSystemMet || !effectiveRating) {
+    return {
+      partialDesignRating,
+      bassReadiness,
+      isPendingBass,
+      isP14TargetUnselected,
+      isRoomDimsMissing,
+      retainedFromRefresh,
+      isPublishable: false,
+    };
+  }
+
   return {
     ...effectiveRating,
     bassReadiness,
-    isPendingBass: !bassReadiness.ready && !retainedFromRefresh && !isP14TargetUnselected,
+    isPendingBass,
     isP14TargetUnselected,
     isRoomDimsMissing,
     retainedFromRefresh,
     isPublishable,
+    partialDesignRating,
   };
 }

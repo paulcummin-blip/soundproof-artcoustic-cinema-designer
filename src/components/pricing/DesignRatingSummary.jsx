@@ -162,6 +162,111 @@ function CategoryBlock({ label, primary, secondary, isScreen, sectionIncomplete 
 /**
  * Compact Artcoustic System Design Rating sidebar card.
  */
+// Live Partial Design Rating card. Shown when the completed Design Rating is
+// unavailable but current valid RP22 evidence exists. It reuses the existing
+// scoring core's additive Design Performance Index and reports assessed
+// coverage against the full applicable set, the unavailable parameter groups
+// (bass singled out), and Primary/Secondary/All scoped indices. It is labelled
+// "Partial" and never claims comparability to a completed rating.
+function PartialRatingCard({ partial, bassPending }) {
+  const all = partial?.all || null;
+  const primary = partial?.primary || null;
+  const secondary = partial?.secondary || null;
+  if (!all || (all.assessedWeight ?? 0) === 0) return null;
+
+  const unavailableSectionLabels = Object.keys(all.unavailableGroups || {});
+  const showBassNote = all.bassUnavailable === true;
+
+  return (
+    <div
+      style={{
+        padding: '12px 16px',
+        background: '#FFFFFF',
+        border: '1px solid #DCDBD6',
+        borderRadius: '8px',
+        margin: '0 16px 12px 16px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', letterSpacing: '0.04em' }}>
+          ARTCOUSTIC SYSTEM
+          <br />
+          DESIGN RATING
+        </div>
+        <span
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: '#9B5D12',
+            background: '#FBEED7',
+            border: '1px solid #E7C99A',
+            borderRadius: 4,
+            padding: '2px 6px',
+          }}
+        >
+          Partial
+        </span>
+      </div>
+
+      <div style={{ fontSize: 24, fontWeight: 700, color: '#213428', fontFamily: 'Didact Gothic, sans-serif', lineHeight: 1.1 }}>
+        Design Performance Index {all.designPerformanceIndex ?? '—'}
+      </div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#625143', marginTop: 4 }}>
+        {all.assessedCount} of {all.fullApplicableCount} applicable parameters assessed
+        {' '}({Math.round(all.coveragePercent)}%)
+      </div>
+      <div style={{ fontSize: 9.5, fontWeight: 500, color: '#9B9890', marginTop: 3 }}>
+        Based on current valid evidence. Not comparable to a completed rating.
+      </div>
+
+      {primary && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
+          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Primary Seating</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#213428', marginTop: 2 }}>
+            Design Performance Index {primary.designPerformanceIndex ?? '—'}
+            <span style={{ fontSize: 9, fontWeight: 500, color: '#9B9890', marginLeft: 6 }}>
+              {primary.assessedCount}/{primary.fullApplicableCount} params
+            </span>
+          </div>
+        </div>
+      )}
+      {secondary && (secondary.assessedWeight ?? 0) > 0 && (
+        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
+          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Secondary Seating</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#213428', marginTop: 2 }}>
+            Design Performance Index {secondary.designPerformanceIndex ?? '—'}
+            <span style={{ fontSize: 9, fontWeight: 500, color: '#9B9890', marginLeft: 6 }}>
+              {secondary.assessedCount}/{secondary.fullApplicableCount} params
+            </span>
+          </div>
+        </div>
+      )}
+
+      {(showBassNote || unavailableSectionLabels.length > 0) && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #E0DDD7' }}>
+          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>
+            Not yet assessed
+          </div>
+          {showBassNote && (
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#213428', marginBottom: 2 }}>
+              Bass{bassPending ? ' — calculating…' : ''}
+            </div>
+          )}
+          {unavailableSectionLabels
+            .filter((label) => label !== 'Screen / Viewing Geometry' || (all.unavailableGroups[label] || []).length > 0)
+            .map((label) => (
+              <div key={label} style={{ fontSize: 9.5, fontWeight: 500, color: '#625143' }}>
+                {label}: {(all.unavailableGroups[label] || []).map((k) => `P${k.replace('p', '')}`).join(', ')}
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DesignRatingSummary({
   showAsdr = false,
   engineeringSummary = null,
@@ -170,6 +275,7 @@ export default function DesignRatingSummary({
   p14TargetUnselected = false,
   staleScope = false,
   roomDimsMissing = false,
+  partialDesignRating = null,
 }) {
   // Completion state for the four Design Rating sections, read from the ONE
   // canonical engineering completeness authority — the same terminal contract
@@ -202,8 +308,28 @@ export default function DesignRatingSummary({
     </div>
   );
 
-  if (asdrUnavailable) return unavailableCard('Incomplete Design');
+  // Room dimensions required is a hard block — invalid geometry means no
+  // current evidence is valid, so even the partial rating is withheld.
   if (roomDimsMissing) return unavailableCard('Room dimensions required');
+
+  // Completed rating is authoritative when available.
+  const completedAvailable = !!engineeringSummary
+    && engineeringSummary?.project?.rating?.status !== 'NOT_ASSESSED';
+
+  // Live Partial Design Rating — shown only when the completed rating is
+  // unavailable but current valid RP22 evidence exists. Never invents scores
+  // for missing parameters; bass that is not yet verified is reported as
+  // unavailable, not scored.
+  const partial = partialDesignRating?.isPartial
+    && (partialDesignRating.all?.assessedWeight ?? 0) > 0
+    ? partialDesignRating
+    : null;
+
+  if (!completedAvailable && partial) {
+    return <PartialRatingCard partial={partial} bassPending={bassPending} />;
+  }
+
+  if (asdrUnavailable) return unavailableCard('Incomplete Design');
   if (p14TargetUnselected && !engineeringSummary) return unavailableCard('Incomplete Design');
 
   // Bass pending (calculating or stale): the published engineering summary
