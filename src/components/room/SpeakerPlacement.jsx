@@ -4,7 +4,6 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { __b44SigFor, __b44SameSpeakers } from '@/components/utils/speakerEqualityUtils';
 import UnifiedSurroundsConfigExtracted from './UnifiedSurroundsConfig';
 import { useSpeakerSelection } from '@/components/state/speakerSelectionStore';
-import SubwooferPanel from './SubwooferPanel';
 import OverheadChannelsPanel from './OverheadChannelsPanel';
 import { useFinalSafetyPass } from './hooks/useFinalSafetyPass';
 import {
@@ -1679,14 +1678,6 @@ function SpeakerPlacementImpl(props) {
         effectivePreset={effectivePreset}
         allSeatSplMetrics={allSeatSplMetrics}
         mlpSeat={mlpSeat}
-      />
-
-      <SubwooferPanel
-        appState={appState}
-        disabled={disabled}
-        frontSubsCfg={frontSubsCfg}
-        rearSubsCfg={rearSubsCfg}
-        subWarnings={subWarnings}
       />
     </div>
   );

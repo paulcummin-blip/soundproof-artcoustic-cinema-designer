@@ -46,6 +46,9 @@ import BassGraphShellSkeleton from "@/components/room/bass/bda/BassGraphShellSke
 import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpointAuthority";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 import { createApplyRecalcSettleState, resolveApplyRecalcSettle } from "@/components/room/bass/bda/applyRecalcSettleAuthority";
+import SubwooferPanel from "@/components/room/SubwooferPanel";
+import CrossoverIntegrationPanel from "@/components/room/bass/CrossoverIntegrationPanel";
+import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 
 const BassResponse = React.lazy(() =>
   import("@/components/room/BassResponse").then((m) => ({ default: m.default ?? m.BassResponse }))
@@ -193,6 +196,15 @@ export default function BassDesignAssistant({
   const applySettleRef = useRef(null);
   const [applyRecalcPulse, setApplyRecalcPulse] = useState(0);
   const [applySettleTick, setApplySettleTick] = useState(0);
+
+  // Consolidated Subwoofer Design: the front/rear model, quantity, mounting
+  // height, orientation and screen-position controls (previously a separate
+  // "Subwoofers" panel nested in the Speakers section) now live here as a
+  // collapsible group. Controlled so the CurrentDesignBar "Change Speakers"
+  // action can expand it in place.
+  const [subSelectionOpen, setSubSelectionOpen] = useState(false);
+  const [crossoverOpen, setCrossoverOpen] = useState(false);
+  const subSelectionRef = useRef(null);
   const handleEvaluatedApplied = useCallback(() => {
     applySettleRef.current = createApplyRecalcSettleState(shared?.fingerprint || null);
     setApplyRecalcPulse((p) => p + 1);
@@ -255,7 +267,12 @@ export default function BassDesignAssistant({
           roomDims={roomDims}
           bassLifecycleState={effectiveBassLifecycleState}
           statusText={isPlacementPreview ? "Subwoofer positions changed. Previewing room response only." : null}
-          onChangeSpeakers={onChangeSpeakerConfig}
+          onChangeSpeakers={() => {
+            setSubSelectionOpen(true);
+            setTimeout(() => {
+              subSelectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 60);
+          }}
         />
       )}
 
@@ -319,6 +336,42 @@ export default function BassDesignAssistant({
         hasSubwoofers={hasSubwoofers}
         onApplied={handleEvaluatedApplied}
       />
+
+      {/* ── Subwoofer Selection — front/rear model, quantity, mounting height,
+          orientation and screen-position controls. Reuses the existing
+          SubwooferPanel (same compatibility actions and canonical instances the
+          recommendation/optimiser pipeline reads). The low-pass crossover is
+          hidden here; the Crossover & Integration group below owns that view. ── */}
+      <div ref={subSelectionRef}>
+        <CollapsiblePanel
+          title="Subwoofer Selection"
+          defaultOpen={false}
+          isOpen={subSelectionOpen}
+          onToggle={() => setSubSelectionOpen((v) => !v)}
+        >
+          <SubwooferPanel
+            appState={appState}
+            disabled={disabled}
+            frontSubsCfg={frontSubsCfg}
+            rearSubsCfg={rearSubsCfg}
+            subWarnings={subWarnings}
+            noWrapper
+            hideCrossover
+          />
+        </CollapsiblePanel>
+      </div>
+
+      {/* ── Crossover & Integration — the one project crossover authority
+          (useProjectCrossover), the same values the LCR and Bass Response
+          panels read and write. No independent copy. ── */}
+      <CollapsiblePanel
+        title="Crossover & Integration"
+        defaultOpen={false}
+        isOpen={crossoverOpen}
+        onToggle={() => setCrossoverOpen((v) => !v)}
+      >
+        <CrossoverIntegrationPanel />
+      </CollapsiblePanel>
 
       {/* ── Zone 3: Performance ── */}
       {/* The graph is the primary workspace. P14/P18/P19/P20 are the graph

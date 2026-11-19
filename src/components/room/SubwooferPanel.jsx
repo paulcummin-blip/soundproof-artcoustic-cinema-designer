@@ -59,7 +59,7 @@ function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
   return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
 }
 
-export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings, noWrapper = false }) {
+export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearSubsCfg, subWarnings, noWrapper = false, hideCrossover = false }) {
   const roomDimensions = appState?.roomDims;
   const seats = appState?.seatingPositions;
   const compat = useSubwooferCompatibilityActions(appState, frontSubsCfg, rearSubsCfg);
@@ -77,7 +77,11 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
 
   const innerContent = (
       <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
-        {/* Subwoofer low-pass — the same project crossover shown in the LCR panel and Bass Response */}
+        {/* Subwoofer low-pass — the same project crossover shown in the LCR panel
+            and Bass Response. Hidden here when the consolidated Subwoofer Design
+            section owns the full Crossover & Integration view, so the shared
+            authority is never shown twice in one place. */}
+        {!hideCrossover && (
         <div className="mb-4 rounded-lg border border-[#DCDBD6] bg-white p-3">
           <CrossoverControls
             title="Subwoofer Low-Pass"
@@ -88,6 +92,7 @@ export default function SubwooferPanel({ appState, disabled, frontSubsCfg, rearS
             disabled={disabled}
           />
         </div>
+        )}
         <div className="grid grid-cols-12 gap-x-4 gap-y-3">
           <div className="col-span-12 md:col-span-6">
             <h4 className="text-[15px] font-semibold text-[#1B1A1A] mb-2">Front Subwoofers</h4>
