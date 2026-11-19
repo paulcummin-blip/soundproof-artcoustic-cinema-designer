@@ -1718,6 +1718,7 @@ export default function OptimiseAndCalculate({
           versionId={versionId}
           currentDesignFingerprint={shared?.cacheKey || null}
           onRunAgain={runCalibrationAutoApply}
+          runAgainLabel={savedJointPlan?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED ? "Retry saving plan" : undefined}
           handleApplyLever={handleApplyLever}
           handleUndoLever={handleUndoLever}
           leverApplyBusy={leverApplyBusy}
