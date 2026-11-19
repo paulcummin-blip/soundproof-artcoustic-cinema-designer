@@ -16,7 +16,7 @@
 //      optimiser result with the fingerprint it belongs to.
 //
 // This module performs no calculation of any kind. It serialises, hydrates,
-// and reads.
+// and requests verified writes through the existing hydrated save owner.
 // ---------------------------------------------------------------------------
 
 import { getOptimiserPlanAuthority, setOptimiserPlanAuthority } from "./optimiserPlanStore.js";
@@ -152,19 +152,14 @@ export function readPublishedOptimiserPlan(completedBassAuthority) {
 }
 // Acknowledged by the existing version writer, only AFTER its durable update.
 // Bounded to the latest saved run per version; never writes design state itself.
-const savedRuns = new Map();
-const saveWaiters = new Set();
 export function acknowledgeOptimiserPlanSave(projectId, versionId, plan) {
   if (!plan?.run?.runId) return;
-  const key = projectId + "::" + versionId;
-  const value = { runId: plan.run.runId, at: Date.now() };
-  savedRuns.set(key, value);
+  const value = { runId: plan.run.runId };
   if (plan.terminalTrace?.runId === value.runId) {
     console.info("[Bass ADI plan save acknowledgement]", JSON.stringify({
       runId: value.runId, projectId, versionId, planSave: "acknowledged",
     }));
   }
-  for (const notify of saveWaiters) notify(key, value);
 }
 const pendingPlanSaves = new Map();
 export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs = 20000) {
