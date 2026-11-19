@@ -172,21 +172,17 @@ export function waitForOptimiserPlanSave(projectId, versionId, runId, timeoutMs 
   if (pendingPlanSaves.has(key)) return pendingPlanSaves.get(key);
   const plan = serializeOptimiserPlan(getOptimiserPlanAuthority(projectId, versionId));
   if (plan?.run?.runId !== runId) return Promise.reject(new Error("The completed optimisation is no longer the current run."));
-  const task = Promise.resolve().then(() => {
-    if (projectId === "6aff07d16ae44dcd14d3ecd4" && !globalThis.__adiAuditSaveRejected) {
-      globalThis.__adiAuditSaveRejected = true;
-      throw new Error("Audit-only injected version-save rejection");
-    }
-    return withElectronicPersistence(projectId, versionId, async owner => {
+  const task = Promise.resolve().then(() => withElectronicPersistence(projectId, versionId, async owner => {
     const result = await saveCompletedPlan({
-      projectId, versionId, plan, ...owner, deadlineMs: timeoutMs,
+      projectId, versionId, plan, ...owner,
+      current: () => owner.current() && getOptimiserPlanAuthority(projectId, versionId)?.run?.runId === runId,
+      deadlineMs: timeoutMs,
       onStage: stage => console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage})),
     });
     acknowledgeOptimiserPlanSave(projectId, versionId, plan);
     console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage:"verified", ...result}));
     return result.at;
-  }, {saveCompletedPlan:plan});
-  }).catch(error => {
+  }, {saveCompletedPlan:plan})).catch(error => {
     console.info("[Bass ADI plan persistence]", JSON.stringify({projectId, versionId, runId, stage:"failed", error:error?.message}));
     throw error;
   }).finally(() => pendingPlanSaves.delete(key));
