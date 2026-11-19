@@ -1104,7 +1104,7 @@ appState, // Pass appState directly for setters
     const projectId = activeProjectId || projectIdState;
     const versionId = appState?.activeVersionId;
     if (!projectId || !versionId || loadState.phase !== "loaded") return;
-    return registerElectronicPersistence(projectId, versionId, async work => {
+    return registerElectronicPersistence(projectId, versionId, async (work, {saveCompletedPlan = false} = {}) => {
       const bucket = globalThis[`__rdAutosaveRefs_${projectId}`];
       if (!bucket) throw new Error("The save owner is not ready.");
       const generation = loadGenerationRef.current;
@@ -1114,8 +1114,18 @@ appState, // Pass appState directly for setters
       const waitStart = Date.now();
       while (bucket.inFlight && Date.now()-waitStart < 30000) await new Promise(resolve=>setTimeout(resolve,50));
       if (bucket.inFlight || !current()) throw new Error("The project is busy or changed before saving.");
+      // A completed optimisation is an explicit save action, even when the
+      // read-only opening gate never observed an input event (or HMR re-armed
+      // that gate). Save its evaluated design through all normal guards first;
+      // never attach a current plan to an older stored design.
+      if (saveCompletedPlan) {
+        autosaveUserArmedRef.current = true;
+        bucket.lastSavedSig = "";
+        bucket.dirty = true;
+      }
       // Flush existing user edits before taking the same one-writer lock.
       await autosaveAttemptRef.current?.run();
+      if (saveCompletedPlan && bucket.dirty) throw new Error("The current design save did not complete; the completed plan is retained for Retry.");
       if (bucket.inFlight || !current()) throw new Error("The project changed before the ADI save.");
       bucket.inFlight = true;
       if (bucket.debounceId) clearTimeout(bucket.debounceId);
