@@ -161,7 +161,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
   const [requested, setRequested] = useState(false);
   const [downloadPending, setDownloadPending] = useState(false);
   // Cards must not fan out three requests for every project on page load.
-  const { exports, images, versions, loading, loaded, error, refresh } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested || alwaysLoad });
+  const { exports, images, versions, loading, loaded, error, refresh, totalCount, countLoaded } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested || alwaysLoad });
 
   const versionNameById = new Map();
   for (const v of versions) {
@@ -200,6 +200,14 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
 
   const totalAssets = exports.filter((e) => e?.file_uri || e?.file_url).length
     + images.filter((i) => i?.file_url).length;
+  // Heading count is always visible (collapsed or expanded). Prefer the exact
+  // total once full records are loaded; otherwise use the lightweight totals
+  // fetched eagerly by the hook. While counts are still loading show "(…)".
+  const headingCount = loaded && !error
+    ? totalAssets
+    : countLoaded && !error
+      ? totalCount
+      : null;
 
   const handleDownloadAll = async () => {
     if (!loaded || error) { setDownloadPending(true); setRequested(true); setOpen(true); if (error) refresh(); return; }
@@ -237,7 +245,7 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#625143' }} />
             : <ChevronRight className="w-3.5 h-3.5" style={{ color: '#625143' }} />}
           <Package className="w-3.5 h-3.5" style={{ color: '#213428' }} />
-          <span className={labelClass}>Project Assets{loaded && !error ? ` (${totalAssets})` : loading && (requested || alwaysLoad) ? ' (…)' : ''}</span>
+          <span className={labelClass}>Project Assets{headingCount != null ? ` (${headingCount})` : !error ? ' (…)' : ''}</span>
         </span>
         <span
           role="button"
