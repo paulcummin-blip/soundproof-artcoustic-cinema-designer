@@ -243,10 +243,39 @@ export default function ProjectsPage() {
           // its owning account when no name is stamped. Account reads are
           // permission-scoped — a dealer sees only its own account, and a read
           // failure simply leaves the dealer name unresolved.
+          // Resolve only the distinct account_ids referenced by the projects
+          // currently displayed. The account directory now exceeds the old
+          // 200-record list cap, so a fixed-size list excluded older accounts
+          // and surfaced "Account unknown" for projects whose owner sat beyond
+          // that page. A targeted $in query scales with the number of distinct
+          // owners on the page, not the size of the directory.
+          // Resolve only the distinct account_ids referenced by the projects
+          // currently displayed. The account directory now exceeds the old
+          // 200-record list cap, so a fixed-size list excluded older accounts
+          // and surfaced "Account unknown" for projects whose owner sat beyond
+          // that page. A targeted get per distinct owner scales with the number
+          // of owners on the page, not the size of the directory. (The SDK does
+          // not allow $in on the id field, so each id is resolved individually.)
           let accountById = {};
           try {
-            const accounts = await base44.entities.Account.list('-created_date', 200);
-            accountById = Object.fromEntries((accounts || []).map((a) => [a.id, a]));
+            const distinctAccountIds = Array.from(new Set(
+              (updatedProjectList || [])
+                .map((p) => p.account_id)
+                .filter((id) => id && String(id).trim())
+            ));
+            await Promise.all(
+              distinctAccountIds.map(async (id) => {
+                try {
+                  const account = await base44.entities.Account.get(id);
+                  if (account) accountById[id] = account;
+                } catch (err) {
+                  // A single missing/inaccessible account leaves its banner on
+                  // the existing "Account unknown" fallback without breaking
+                  // the rest of the page.
+                  console.warn('[Projects] Account resolve failed for', id, err?.message);
+                }
+              })
+            );
           } catch (accountErr) {
             console.warn('[Projects] Account identity lookup failed:', accountErr);
           }
