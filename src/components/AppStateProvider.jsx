@@ -606,7 +606,21 @@ function useDesignerState() {
     (!__isFreeUse && __autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
   ));
   const [isHydrated, setIsHydrated] = useState(false);
-  const [isProjectHydrationReady, setProjectHydrationReady] = useState(() => __isFreeUse);
+  // Invalidate renderer callbacks synchronously, before hydration queues any
+  // restored state. A new scope also survives false -> true React batching.
+  const [speakerHydrationScope, setSpeakerHydrationScope] = useState(() => ({ ready: __isFreeUse }));
+  const speakerHydrationScopeRef = useRef(speakerHydrationScope);
+  const isProjectHydrationReady = speakerHydrationScope.ready;
+  const getSpeakerHydrationScope = useCallback(() => speakerHydrationScopeRef.current, []);
+  const setProjectHydrationReady = useCallback((value) => {
+    const ready = typeof value === "function"
+      ? !!value(speakerHydrationScopeRef.current.ready)
+      : !!value;
+    if (ready && speakerHydrationScopeRef.current.ready) return;
+    const next = { ready };
+    speakerHydrationScopeRef.current = next;
+    setSpeakerHydrationScope(next);
+  }, []);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
   const [roomResetEpoch, setRoomResetEpoch] = useState(0);
   // Reflow epoch — incremented when the user clicks "Refresh Layout" after room
@@ -2210,6 +2224,7 @@ function useDesignerState() {
     setGlobalSurroundModel,
     isHydrated,
     isProjectHydrationReady,
+    getSpeakerHydrationScope,
     setProjectHydrationReady,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
@@ -2345,6 +2360,8 @@ function useDesignerState() {
     setGlobalSurroundModel,
     isHydrated,
     isProjectHydrationReady,
+    getSpeakerHydrationScope,
+    speakerHydrationScope,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
     seatMetricsById,
