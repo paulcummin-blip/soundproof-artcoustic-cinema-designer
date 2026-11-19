@@ -668,6 +668,7 @@ appState, // Pass appState directly for setters
       return;
     }
 
+    if (optimiserPlanAuthority?.run?.runId) console.info("[Bass ADI save gate audit]", JSON.stringify({projectId:effectiveProjectId,versionId:appState?.activeVersionId,armed:autosaveUserArmedRef.current,instanceStatus:appState?.subwooferInstancesStatus,migrationState:appState?.subwooferInstanceMigrationState,hydration:hydrationAuthorityRef.current,plan:serializeOptimiserPlan(optimiserPlanAuthority)}));
     const AUTOSAVE_INTERVAL_MS = 30_000;
     const AUTOSAVE_DEBOUNCE_MS = 1_000;
 
