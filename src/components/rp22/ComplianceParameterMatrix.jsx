@@ -7,6 +7,15 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import { ChevronDown } from "lucide-react";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
+import {
+  PARAM_CATEGORIES,
+  PARAM_CATEGORY_COLOURS,
+} from "@/components/report/technical/technicalParameterMeta";
+
+// Pillar order and the dark brand-tone banner colour each pillar heading uses.
+// These are the same dark banners the sidebar RP22 Performance Summary shows;
+// applied here as section headings so the detailed matrix reads by pillar.
+const PILLAR_ORDER = ["Spatial Resolution", "Dynamic Range", "Timbre Matching"];
 
 const STATUS_PRESENTATION = {
   calculated: { label: "Calculated", color: "#2d7a4f" },
@@ -82,80 +91,100 @@ export default function ComplianceParameterMatrix({
         )}
       </div>
 
-      {/* 2. Compact Parameter Matrix + 3. Expandable Detail */}
-      <div style={{ border: "1px solid #DCDBD6", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
-        <div style={{ padding: "6px 10px", background: "#F8F8F7", borderBottom: "1px solid #E6E4DD", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#625143", display: "flex", justifyContent: "space-between" }}>
-          <span>Parameter</span>
-          <span>Level</span>
-        </div>
-        {rowsData.map(({ p, lvl, achievedValue, isSeatScope, status }, idx) => {
-          const isOpen = isSeatScope ? true : expandedId === p.id;
-          return (
-            <div key={p.id} style={{ borderTop: idx === 0 ? "none" : "1px solid #F0EFEA" }}>
-              {isSeatScope ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "7px 10px",
-                    width: "100%",
-                  }}
-                >
-                  <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#1B1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      P{p.id} {getOfficialRp22Title(p.id)}
-                    </div>
-                    <div style={{ fontSize: 10, color: "#625143", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {p.scope} · <span style={{ color: status.color }}>{status.label}</span>
-                    </div>
-                  </div>
-                  <div style={{ flex: "0 0 auto" }}>
-                    <SeatScopeBadge />
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(isOpen ? null : p.id)}
-                  aria-expanded={isOpen}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "7px 10px",
-                    width: "100%",
-                    background: "transparent",
-                    border: "none",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#1B1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      P{p.id} {getOfficialRp22Title(p.id)}
-                    </div>
-                    <div style={{ fontSize: 10, color: "#625143", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {p.scope} · <span style={{ color: status.color }}>{status.label}</span> · <span style={{ color: "#213428", fontWeight: 600 }}>{achievedValue}</span>
-                    </div>
-                  </div>
-                  <div style={{ flex: "0 0 auto" }}>
-                    <RP22GradingPill level={lvl} />
-                  </div>
-                  <div style={{ flex: "0 0 auto", color: "#625143", display: "inline-flex", alignItems: "center" }}>
-                    <ChevronDown size={14} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }} />
-                  </div>
-                </button>
-              )}
-              {isOpen && (
-                <div style={{ padding: "6px 10px 12px 10px", background: "#FBFAF8", borderTop: "1px solid #F0EFEA" }}>
-                  {renderDetailCard(p)}
-                </div>
-              )}
+      {/* 2. Compact Parameter Matrix + 3. Expandable Detail — grouped under the
+            three RP22 pillar banners (dark brand-tone section headings). The
+            expandable detail rows, thresholds, per-seat pills and calculation
+            status are unchanged; only pillar section headings are added. */}
+      {PILLAR_ORDER.map((pillar) => {
+        const group = rowsData.filter((entry) => PARAM_CATEGORIES[entry.p.id] === pillar);
+        if (group.length === 0) return null;
+        return (
+          <div key={pillar} style={{ border: "1px solid #DCDBD6", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+            <div style={{
+              padding: "9px 12px",
+              background: PARAM_CATEGORY_COLOURS[pillar],
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}>
+              {pillar}
             </div>
-          );
-        })}
-      </div>
+            <div style={{ padding: "6px 10px", background: "#F8F8F7", borderBottom: "1px solid #E6E4DD", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#625143", display: "flex", justifyContent: "space-between" }}>
+              <span>Parameter</span>
+              <span>Level</span>
+            </div>
+            {group.map(({ p, lvl, achievedValue, isSeatScope, status }, idx) => {
+              const isOpen = isSeatScope ? true : expandedId === p.id;
+              return (
+                <div key={p.id} style={{ borderTop: idx === 0 ? "none" : "1px solid #F0EFEA" }}>
+                  {isSeatScope ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "7px 10px",
+                        width: "100%",
+                      }}
+                    >
+                      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#1B1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          P{p.id} {getOfficialRp22Title(p.id)}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#625143", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {p.scope} · <span style={{ color: status.color }}>{status.label}</span>
+                        </div>
+                      </div>
+                      <div style={{ flex: "0 0 auto" }}>
+                        <SeatScopeBadge />
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isOpen ? null : p.id)}
+                      aria-expanded={isOpen}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "7px 10px",
+                        width: "100%",
+                        background: "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#1B1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          P{p.id} {getOfficialRp22Title(p.id)}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#625143", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {p.scope} · <span style={{ color: status.color }}>{status.label}</span> · <span style={{ color: "#213428", fontWeight: 600 }}>{achievedValue}</span>
+                        </div>
+                      </div>
+                      <div style={{ flex: "0 0 auto" }}>
+                        <RP22GradingPill level={lvl} />
+                      </div>
+                      <div style={{ flex: "0 0 auto", color: "#625143", display: "inline-flex", alignItems: "center" }}>
+                        <ChevronDown size={14} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }} />
+                      </div>
+                    </button>
+                  )}
+                  {isOpen && (
+                    <div style={{ padding: "6px 10px 12px 10px", background: "#FBFAF8", borderTop: "1px solid #F0EFEA" }}>
+                      {renderDetailCard(p)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }

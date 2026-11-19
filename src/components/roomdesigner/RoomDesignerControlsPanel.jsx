@@ -2,9 +2,10 @@ import React, { Suspense, useState, useMemo } from "react";
 import { Ruler, Monitor, Users, Speaker, Waves, Box, FileText } from "lucide-react";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
-import LiveRP22PerformanceSummary from "@/components/rp22/LiveRP22PerformanceSummary";
+import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import { buildLiveComplianceSummary } from "@/components/rp22/buildLiveComplianceSummary";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { publishLiveRp22Summary, clearLiveRp22Summary } from "@/components/state/designReviewHandoff";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDimensionReflowBanner from "@/components/room/RoomDimensionReflowBanner";
 import SeatBoundaryWarning from "@/components/room/SeatBoundaryWarning";
@@ -33,6 +34,8 @@ const EvaluatedRecommendationBackgroundRunner = React.lazy(() =>
 
 export default function RoomDesignerControlsPanel({
   appState,
+  projectId,
+  versionId,
   isFrozen,
   // Room dims
   _roomDims,
@@ -164,6 +167,18 @@ export default function RoomDesignerControlsPanel({
     }),
     [analysisResult, bassResults, _seatingPositions, appState?.assumedP15Level, appState?.assumedP21Level],
   );
+
+  // Publish the live RP22 compliance summary to the version-scoped handoff so
+  // the left sidebar's compact RP22 Performance Summary updates live as the
+  // design changes. This is a read-only projection of the same live analysis
+  // the right-hand panel reads — no calculation is performed here. Cleared
+  // when the panel unmounts or the project/version is not known so a stale
+  // summary never leaks into the sidebar.
+  React.useEffect(() => {
+    if (!projectId || !versionId) return undefined;
+    publishLiveRp22Summary(projectId, versionId, liveComplianceSummary);
+    return () => clearLiveRp22Summary(projectId, versionId);
+  }, [projectId, versionId, liveComplianceSummary]);
 
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
@@ -400,7 +415,7 @@ export default function RoomDesignerControlsPanel({
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="Live RP22 Performance Summary"
+          title="Live RP22 Analysis"
           icon={<FileText className="w-5 h-5" />}
           defaultOpen={false}>
           {isFrozen('report') &&
@@ -409,8 +424,10 @@ export default function RoomDesignerControlsPanel({
             </div>
           }
           <Suspense fallback={<div>Loading...</div>}>
-            <LiveRP22PerformanceSummary
-              liveSummary={liveComplianceSummary}
+            <RP22CompliancePanel
+              engineeringSummary={liveComplianceSummary}
+              screen={_screen}
+              seatingPositions={_seatingPositions}
               assumedP15Level={appState?.assumedP15Level}
               assumedP21Level={appState?.assumedP21Level} />
           </Suspense>

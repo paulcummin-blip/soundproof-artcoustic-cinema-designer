@@ -285,6 +285,79 @@ export function subscribePartialDesignRating(projectId, versionId, callback) {
   return () => window.removeEventListener(PARTIAL_RATING_EVENT, onPublish);
 }
 
+// ── Version-scoped Live RP22 Performance Summary ────────────────────────
+// A lightweight, version-scoped live RP22 summary (NOT a completed
+// publication). Published from the Room Designer controls panel whenever the
+// live compliance summary (a read-only projection of the live RP22 analysis
+// result + verified bass authority) is available. The sidebar reads it to show
+// the compact pillar-grouped RP22 Performance Summary below the Artcoustic
+// System Design Rating, updating live as the design changes — including when
+// the speaker system is incomplete, no subwoofers are installed, bass analysis
+// has not been performed, or some parameters remain unavailable. It never
+// carries completed-rating authority and never invents a combined pillar level.
+
+const LIVE_RP22_MAP_KEY = "__ROOM_DESIGNER_LIVE_RP22_SUMMARY__";
+const LIVE_RP22_EVENT = "soundproof:live-rp22-summary";
+
+const getLiveRp22Map = () => {
+  if (typeof window === "undefined") return null;
+  if (!window[LIVE_RP22_MAP_KEY] || typeof window[LIVE_RP22_MAP_KEY] !== "object") {
+    window[LIVE_RP22_MAP_KEY] = {};
+  }
+  return window[LIVE_RP22_MAP_KEY];
+};
+
+export function publishLiveRp22Summary(projectId, versionId, summary) {
+  if (typeof window === "undefined") return;
+  const pid = normaliseProjectId(projectId);
+  const vid = normaliseVersionId(versionId);
+  if (!pid || !vid) return;
+  const map = getLiveRp22Map();
+  if (!map) return;
+  const key = versionKey(pid, vid);
+  if (summary == null) {
+    delete map[key];
+  } else {
+    map[key] = { projectId: pid, versionId: vid, summary, ts: Date.now() };
+  }
+  window.dispatchEvent(new CustomEvent(LIVE_RP22_EVENT, {
+    detail: { projectId: pid, versionId: vid, summary: summary || null },
+  }));
+}
+
+export function readLiveRp22Summary(projectId, versionId) {
+  if (typeof window === "undefined") return null;
+  const pid = normaliseProjectId(projectId);
+  const vid = normaliseVersionId(versionId);
+  if (!pid || !vid) return null;
+  const map = getLiveRp22Map();
+  if (!map) return null;
+  const entry = map[versionKey(pid, vid)];
+  if (!entry) return null;
+  return entry.summary || null;
+}
+
+export function clearLiveRp22Summary(projectId, versionId) {
+  publishLiveRp22Summary(projectId, versionId, null);
+}
+
+export function subscribeLiveRp22Summary(projectId, versionId, callback) {
+  if (typeof window === "undefined" || typeof callback !== "function") return () => {};
+  const pid = normaliseProjectId(projectId);
+  const vid = normaliseVersionId(versionId);
+  if (!pid || !vid) return () => {};
+  const onPublish = (event) => {
+    if (
+      normaliseProjectId(event?.detail?.projectId) === pid &&
+      normaliseVersionId(event?.detail?.versionId) === vid
+    ) {
+      callback(event.detail.summary || null);
+    }
+  };
+  window.addEventListener(LIVE_RP22_EVENT, onPublish);
+  return () => window.removeEventListener(LIVE_RP22_EVENT, onPublish);
+}
+
 // ── Version-scoped engineering publication ───────────────────────────────
 
 /**

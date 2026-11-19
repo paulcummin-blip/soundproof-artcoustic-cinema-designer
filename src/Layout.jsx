@@ -38,12 +38,13 @@ import AdiEditorialRejectionDiagnostics from "@/components/adi/AdiEditorialRejec
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
-import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff, readPartialDesignRating, subscribePartialDesignRating } from "@/components/state/designReviewHandoff";
+import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff, readPartialDesignRating, subscribePartialDesignRating, readLiveRp22Summary, subscribeLiveRp22Summary } from "@/components/state/designReviewHandoff";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
+import LiveRP22PerformanceSummary from "@/components/rp22/LiveRP22PerformanceSummary";
 import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
 import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
 import DealerHero from "@/components/ui/HeroBanner";
@@ -109,6 +110,12 @@ export default function Layout({ children, currentPageName }) {
   // store as the completed engineering summary. Shown only when the completed
   // rating is unavailable but current valid RP22 evidence exists.
   const [partialDesignRating, setPartialDesignRating] = React.useState(null);
+
+  // Live RP22 Performance Summary — version-scoped, read from the same handoff
+  // store as the completed engineering summary. Shown below the Artcoustic
+  // System Design Rating so the sidebar's compact pillar-grouped RP22 summary
+  // updates live as the design changes, including with an incomplete system.
+  const [liveRp22Summary, setLiveRp22Summary] = React.useState(null);
 
   // Only the Workspace navigation links are collapsible (the rest of the sidebar
   // keeps its full width and content). The mobile overlay drawer is separate.
@@ -209,6 +216,21 @@ export default function Layout({ children, currentPageName }) {
     setPartialDesignRating(readPartialDesignRating(activeProjectId, activeVersionId));
     return subscribePartialDesignRating(activeProjectId, activeVersionId, (partial) => {
       setPartialDesignRating(partial || null);
+    });
+  }, [activeProjectId, activeVersionId]);
+
+  // Subscribe to the version-scoped Live RP22 Performance Summary so the
+  // sidebar's compact pillar-grouped RP22 summary tracks the live RP22
+  // calculations as the design changes. Cleared when no project/version is
+  // active so a stale summary never persists in the sidebar.
+  React.useEffect(() => {
+    if (!activeProjectId || !activeVersionId) {
+      setLiveRp22Summary(null);
+      return undefined;
+    }
+    setLiveRp22Summary(readLiveRp22Summary(activeProjectId, activeVersionId));
+    return subscribeLiveRp22Summary(activeProjectId, activeVersionId, (summary) => {
+      setLiveRp22Summary(summary || null);
     });
   }, [activeProjectId, activeVersionId]);
 
@@ -618,6 +640,9 @@ export default function Layout({ children, currentPageName }) {
                   roomDimsMissing={roomDimsMissing}
                   partialDesignRating={partialDesignRating}
                 />
+                <div style={{ margin: '0 16px 12px 16px' }}>
+                  <LiveRP22PerformanceSummary liveSummary={liveRp22Summary} />
+                </div>
               </div>
             )}
           </aside>

@@ -2310,6 +2310,8 @@ function RoomDesignerWithState() {
         rightContent={(
           <RoomDesignerControlsPanel
             appState={appState}
+            projectId={resolvedProjectId || projectIdState || null}
+            versionId={appState?.activeVersionId || null}
             isFrozen={isFrozen}
             _roomDims={_roomDims}
             _setRoomDims={_setRoomDims}
