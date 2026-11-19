@@ -7,6 +7,7 @@ import { ensureAtmosOverheads, DOLBY_PRESETS, seedSpeakersFromPreset } from "@/c
 export function useSpeakerSystemStore() {
   const {
     speakerSystem, setSpeakerSystem,
+    getSpeakerHydrationScope,
     roomDims, setRoomDims, // Use roomDims from AppState
     screen, setScreen,
     seatingPositions, setSeatingPositions,
@@ -25,11 +26,17 @@ export function useSpeakerSystemStore() {
     [speakerSystem?.placedSpeakers]
   );
 
+  // Keep the render's load identity; never apply A's captured layout to B.
+  const speakerHydrationScope = getSpeakerHydrationScope?.();
+
   const setSpeakers = React.useCallback(
     (listOrUpdater) => {
       if (typeof setSpeakerSystem !== "function") return;
+      if (!speakerHydrationScope?.ready || getSpeakerHydrationScope?.() !== speakerHydrationScope) return;
 
       setSpeakerSystem((prev) => {
+        // React can execute a queued updater after a different load has begun.
+        if (getSpeakerHydrationScope?.() !== speakerHydrationScope) return prev;
         const prevPlacedSpeakers = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
 
         let nextList = typeof listOrUpdater === "function"
@@ -64,7 +71,7 @@ export function useSpeakerSystemStore() {
         return { ...(prev || {}), placedSpeakers: nextList };
       });
     },
-    [setSpeakerSystem, dolbyLayout, roomDims, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]
+    [setSpeakerSystem, getSpeakerHydrationScope, speakerHydrationScope, dolbyLayout, roomDims, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]
   );
 
   const initWithDefaultsAndRules = React.useCallback(() => {
