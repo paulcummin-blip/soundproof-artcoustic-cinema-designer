@@ -651,6 +651,7 @@ export default function AdiOptimiserResults({
   currentDesignFingerprint,
   onRunAgain,
   runAgainLabel = "Run ADI Again",
+  saveBusy = false,
   handleApplyLever,
   handleUndoLever,
   leverApplyBusy,
@@ -868,6 +869,7 @@ export default function AdiOptimiserResults({
       <button
         type="button"
         onClick={onRunAgain}
+        disabled={saveBusy}
         className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349] flex items-center justify-center gap-2"
         data-adi-result-run-again="true"
       >
