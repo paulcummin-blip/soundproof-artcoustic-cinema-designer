@@ -1,4 +1,5 @@
 import { validatePilotPortalAccessIfRequired } from './portalSsoAuthority.js';
+import { startSoundProofTermOnFirstClaim } from './portalActivationAuthority.js';
 import {
   ACCESS_LEVELS,
   ACTIVE_SEAT_STATUSES,
@@ -165,8 +166,22 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // Login, invitation acceptance, legacy linking and Portal SSO must never
   // auto-enable it. Only the manageSoundProofAccess backend function (called
   // by an administrator) may set an account to active.
+  //
+  // The ONE exception is a Portal-originated first-admin invitation: a pending
+  // dealer-admin membership stamped with portal_activation_request_id may be
+  // claimed by its invited user even when the account is still inactive. The
+  // claim activates the account and starts the 90-day term. This is the only
+  // path that auto-activates an inactive account, and it requires the verified
+  // user to control the exact invited email address.
   if (account.status === 'inactive') {
-    return { allowed: false, reason: 'ACCOUNT_NOT_ACTIVATED', account };
+    const isPortalFirstAdminClaim =
+      invitationMembership?.portal_activation_request_id
+      && invitationMembership?.membership_role === 'dealer_admin'
+      && invitationMembership?.status === 'pending';
+    if (!isPortalFirstAdminClaim) {
+      return { allowed: false, reason: 'ACCOUNT_NOT_ACTIVATED', account };
+    }
+    // Fall through to membership claim, which will start the term.
   }
 
   // 90-day Sound Proof access expiry. Applies only to dealer accounts that
@@ -182,10 +197,17 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // administrative suspension (account.status === 'suspended') remains enforced
   // by the earlier check above. Re-enable by setting the flag to true once
   // renewal is live.
-  const SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED = false;
+  // 90-day Sound Proof access expiry is now enforced. The authenticated
+  // Lovable renewal mechanism is implemented (portalSoundProofAccess with
+  // purpose "renew"), so the temporary disable is lifted. An expired active
+  // account is rejected here; the dealer renews through the Partner Portal.
+  // Backend operations additionally recheck the user flag via the RLS
+  // soundproof_access_enabled condition on protected entities.
+  // Note: direct entity RLS checks the flag, not the current time. A
+  // scheduled reconciliation flips the flag for expired accounts; there is
+  // a small delay between expiry and flag flip (see reconcileExpiry workflow).
   if (
-    SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED
-    && account.status === 'active'
+    account.status === 'active'
     && account.soundproof_access_expires_at
   ) {
     const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
@@ -344,6 +366,17 @@ export async function resolveAccountAccess(base44, sessionUser, {
       target: authoritativeUser,
       afterAccessLevel: accessLevel,
     });
+
+    // Portal-first activation: if this pending membership was created by a
+    // Portal activation grant, the first verified user claim starts the
+    // 90-day term. This is the ONLY point at which the term begins.
+    if (invitationMembership?.portal_activation_request_id) {
+      await startSoundProofTermOnFirstClaim(service, {
+        accountId,
+        user: authoritativeUser,
+        membership,
+      });
+    }
   }
 
   return {

@@ -42,8 +42,8 @@ export default async function(req) {
     const body = await req.json().catch(() => ({}));
     const { action, account_id, account_ids } = body || {};
 
-    if (!['enable', 'suspend', 'restore'].includes(action)) {
-      return Response.json({ error: 'action must be enable, suspend or restore.' }, { status: 400 });
+    if (!['enable', 'suspend', 'restore', 'set_eligible'].includes(action)) {
+      return Response.json({ error: 'action must be enable, suspend, restore or set_eligible.' }, { status: 400 });
     }
 
     const ids = Array.isArray(account_ids) && account_ids.length > 0
@@ -124,6 +124,44 @@ async function processAccount(base44, { action, accountId, actor, now }) {
   let newStatus = account.status;
   let newExpiresAt = account.soundproof_access_expires_at || null;
   let userEnabled = null;
+  let newEligible = null;
+
+  // set_eligible: sets soundproof_eligible on the account. Does NOT change
+  // status, expiry, or any user flag. The 90-day term starts only on the
+  // first Portal-originated user claim, not when eligibility is set.
+  if (action === 'set_eligible') {
+    newEligible = body?.eligible === true;
+    await service.entities.Account.update(accountId, {
+      soundproof_eligible: newEligible,
+    });
+    try {
+      await service.entities.AccountUserAudit.create({
+        account_id: accountId,
+        actor_user_id: String(actor.id),
+        actor_email: actor.email || 'admin',
+        action: 'SOUNDPROOF_ELIGIBILITY_SET',
+        target_user_id: null,
+        target_email: null,
+        before_access_level: account.soundproof_eligible ? 'eligible' : 'not_eligible',
+        after_access_level: newEligible ? 'eligible' : 'not_eligible',
+        occurred_at: now,
+        details: {
+          previous_eligible: account.soundproof_eligible === true,
+          new_eligible: newEligible,
+        },
+      });
+    } catch (auditErr) {
+      console.error(`[manageSoundProofAccess] eligibility audit failed: ${auditErr?.message}`);
+    }
+    return {
+      account_id: accountId,
+      account_name: account.name,
+      ok: true,
+      action,
+      previous_eligible: account.soundproof_eligible === true,
+      new_eligible: newEligible,
+    };
+  }
 
   if (action === 'enable') {
     newStatus = 'active';

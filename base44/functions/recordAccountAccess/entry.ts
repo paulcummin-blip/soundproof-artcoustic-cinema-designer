@@ -69,18 +69,11 @@ export default async function(req) {
     }
 
     // EXPIRED — account is active but the 90-day term has passed.
-    //
-    // TEMPORARY DISABLE (2026-11-16): enforcement of the 90-day expiry is
-    // paused until the authenticated Lovable renewal mechanism is implemented
-    // and tested. The stored expiry dates are preserved on every account
-    // record and untouched; only the access-blocking check below is bypassed.
-    // Explicit administrative suspension (account.status === 'suspended') and
-    // inactive accounts remain enforced by the checks above. Re-enable by
-    // setting the flag to true once renewal is live.
-    const SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED = false;
+    // The authenticated Lovable renewal mechanism is now implemented
+    // (portalSoundProofAccess with purpose "renew"), so expiry is enforced.
+    // The dealer renews through the Partner Portal.
     if (
-      SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED
-      && account.status === 'active'
+      account.status === 'active'
       && account.soundproof_access_expires_at
     ) {
       const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
@@ -89,11 +82,29 @@ export default async function(req) {
       }
     }
 
-    // ACTIVE — update last_access_at only.
+    // ACTIVE — update last_access_at and record per-user successful login.
     if (account.status === 'active') {
       await base44.asServiceRole.entities.Account.update(accountId, {
         last_access_at: now,
       });
+
+      // Per-user successful-login tracking for the Sound Proof Admin Dashboard.
+      // Records each authorised dealer login as an append-only audit entry so
+      // the admin can see each user's last login and 30-day usage count.
+      try {
+        await base44.asServiceRole.entities.AccountUserAudit.create({
+          account_id: accountId,
+          actor_user_id: String(user.id),
+          actor_email: user.email || '',
+          action: 'USER_LOGIN_RECORDED',
+          target_email: user.email || '',
+          occurred_at: now,
+          details: { source: 'recordAccountAccess' },
+        });
+      } catch {
+        // Non-blocking: login recording is diagnostic, not access-critical.
+      }
+
       return Response.json({ status: 'active' });
     }
 
