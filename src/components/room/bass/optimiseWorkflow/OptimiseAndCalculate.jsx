@@ -1500,12 +1500,13 @@ export default function OptimiseAndCalculate({
   // reset semantics.
   const handleTimeoutRetry = useCallback(() => {
     const phase = resolveRecoveryFailurePhase(workflowState, lastErrorPhaseRef.current);
-    if (phase === "recalculating" || phase === "publishing") {
+    if (phase === "plan-save" || phase === "recalculating" || phase === "publishing" ||
+        getOptimiserPlanAuthority(projectId, versionId)?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED) {
       handleRecoveryRetry();
     } else {
       handleReset();
     }
-  }, [handleRecoveryRetry, handleReset, workflowState.failurePhase]);
+  }, [handleRecoveryRetry, handleReset, workflowState.failurePhase, projectId, versionId]);
 
   // Update Bass Performance — resets any terminal state from a previous
   // cancelled/failed run, then starts the full optimise-and-calculate
@@ -1538,9 +1539,14 @@ export default function OptimiseAndCalculate({
   // authority. Nothing here decides what may be applied: that is the calibration
   // decision's own job.
   const runCalibrationAutoApply = useCallback(() => {
+    const plan = getOptimiserPlanAuthority(projectId, versionId);
+    if (plan?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED) {
+      void handleRecoveryRetry();
+      return;
+    }
     handleResetRef.current();
     setTimeout(() => handleStartRef.current(), 50);
-  }, []);
+  }, [projectId, versionId, handleRecoveryRetry]);
 
   useEffect(() => {
     if (!registerRecalculate) return;
