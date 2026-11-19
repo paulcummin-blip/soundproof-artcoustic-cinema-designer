@@ -23,7 +23,8 @@
  * formula. The Artcoustic System Design Rating (ASDR) remains a separate
  * surface in the sidebar.
  */
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { firstStatedPrimitive } from "@/components/utils/renderSafe";
 import {
@@ -232,6 +233,13 @@ export default function LiveRP22PerformanceSummary({
   void assumedP15Level;
   void assumedP21Level;
 
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem('b44_live_rp22_panel_open') !== '0'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('b44_live_rp22_panel_open', open ? '1' : '0'); } catch {}
+  }, [open]);
+
   if (!liveSummary) {
     return (
       <div style={{ padding: 16, fontSize: 12, color: "#625143" }}>
@@ -248,27 +256,36 @@ export default function LiveRP22PerformanceSummary({
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{
-        fontSize: 11,
-        color: "#625143",
-        lineHeight: 1.4,
-        padding: "0 2px",
-      }}>
-        Live RP22 results update as the design changes. Parameters that cannot
-        yet be calculated show <strong>Not assessed</strong>. No overall score is
-        assigned here; the Artcoustic System Design Rating is shown separately.
-      </div>
+    <div style={{ border: "1px solid #DCDBD6", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={{ display: "flex", alignItems: "center", gap: 4, width: "100%", textAlign: "left", cursor: "pointer", background: "transparent", border: "none", padding: "12px 16px" }}
+      >
+        {open
+          ? <ChevronDown style={{ width: 12, height: 12, color: "#625143", flexShrink: 0 }} />
+          : <ChevronRight style={{ width: 12, height: 12, color: "#625143", flexShrink: 0 }} />}
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#3E4349", letterSpacing: "0.04em" }}>
+          LIVE RP22
+          <br />
+          PERFORMANCE SUMMARY
+        </div>
+      </button>
 
-      {PILLAR_ORDER.map((label) => (
-        <PillarSection
-          key={label}
-          label={label}
-          colour={PARAM_CATEGORY_COLOURS[label]}
-          parameters={grouped[label]}
-          summary={liveSummary}
-        />
-      ))}
+      {open && (
+        <div style={{ display: "grid", gap: 12, padding: "0 12px 12px 12px" }}>
+          {PILLAR_ORDER.map((label) => (
+            <PillarSection
+              key={label}
+              label={label}
+              colour={PARAM_CATEGORY_COLOURS[label]}
+              parameters={grouped[label]}
+              summary={liveSummary}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

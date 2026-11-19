@@ -15,8 +15,9 @@
 // because some parameters have calculated — Completed requires the published
 // engineering summary.
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 // Existing Sound Proof badge styling (Badge variant="outline" + brand tone).
 // Subtle blue for Live Update, subtle green for Completed.
@@ -30,11 +31,17 @@ const STATUS_BADGE = {
 function RatingCardShell({
   statusLabel,
   statusClass,
-  mainIndex,
   primaryIndex,
   secondaryIndex,
   showSecondary,
 }) {
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem('b44_asdr_panel_open') !== '0'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('b44_asdr_panel_open', open ? '1' : '0'); } catch {}
+  }, [open]);
+
   return (
     <div
       style={{
@@ -45,38 +52,46 @@ function RatingCardShell({
         margin: '0 16px 12px 16px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', letterSpacing: '0.04em' }}>
-          ARTCOUSTIC SYSTEM
-          <br />
-          DESIGN RATING
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {open
+            ? <ChevronDown style={{ width: 12, height: 12, color: '#625143', flexShrink: 0 }} />
+            : <ChevronRight style={{ width: 12, height: 12, color: '#625143', flexShrink: 0 }} />}
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', letterSpacing: '0.04em' }}>
+            ARTCOUSTIC SYSTEM
+            <br />
+            DESIGN RATING
+          </div>
         </div>
         <Badge variant="outline" className={`font-body text-[9px] font-semibold uppercase tracking-[0.08em] ${statusClass}`}>
           {statusLabel}
         </Badge>
-      </div>
+      </button>
 
-      <div style={{ fontSize: 24, fontWeight: 700, color: '#213428', fontFamily: 'Didact Gothic, sans-serif', lineHeight: 1.1 }}>
-        Design Performance Index {mainIndex ?? '—'}
-      </div>
-
-      <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
-        <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          Primary Seating
-        </div>
-        <div style={{ marginTop: 2, fontSize: 13, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
-          Design Performance Index {primaryIndex ?? '—'}
-        </div>
-      </div>
-
-      {showSecondary && (
-        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
+      {open && (
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
           <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Secondary Seating
+            Primary Seating
           </div>
           <div style={{ marginTop: 2, fontSize: 13, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
-            Design Performance Index {secondaryIndex ?? '—'}
+            Design Performance Index {primaryIndex ?? '—'}
           </div>
+
+          {showSecondary && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
+              <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Secondary Seating
+              </div>
+              <div style={{ marginTop: 2, fontSize: 13, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
+                Design Performance Index {secondaryIndex ?? '—'}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -96,7 +111,6 @@ function PartialRatingCard({ partial }) {
     <RatingCardShell
       statusLabel="Live Update"
       statusClass={STATUS_BADGE.live}
-      mainIndex={all.designPerformanceIndex}
       primaryIndex={primary?.designPerformanceIndex}
       secondaryIndex={secondary?.designPerformanceIndex}
       showSecondary={showSecondary}
@@ -188,7 +202,6 @@ export default function DesignRatingSummary({
   }
 
   const primaryIndex = primarySummary?.designPerformanceIndex ?? null;
-  const allIndex = projectSummary?.designPerformanceIndex ?? null;
 
   const secondaryRating = secondarySummary?.rating || null;
   const secondaryIsConfigured =
@@ -203,7 +216,6 @@ export default function DesignRatingSummary({
     <RatingCardShell
       statusLabel="Completed"
       statusClass={STATUS_BADGE.completed}
-      mainIndex={allIndex}
       primaryIndex={primaryIndex}
       secondaryIndex={secondaryIndex}
       showSecondary={secondaryIsConfigured}
