@@ -88,6 +88,11 @@
     "removed_by_user_id": {
       "type": "string",
       "nullable": true
+    },
+    "portal_activation_request_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Unique Portal activation request ID (jti) that created this pending admin seat. Set only on the first dealer-admin membership created through Portal-first activation. Used to identify the Portal-originated first-admin claim that starts the 90-day term, and to reject replayed activation grants. Null for ordinary admin-invited seats."
     }
   },
   "required": [

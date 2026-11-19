@@ -17,6 +17,11 @@
       "default": "active",
       "description": "Account status. inactive = Not Activated (administrator has not enabled Sound Proof access). active = Enabled (administrator has explicitly activated the account). suspended = Suspended (administrator has suspended access). Only the manageSoundProofAccess backend function may change this for Premium Partner accounts; login, invitation acceptance, legacy linking and Portal SSO must never auto-enable an inactive account."
     },
+    "soundproof_eligible": {
+      "type": "boolean",
+      "default": false,
+      "description": "Sound Proof activation eligibility. Set to true by Sound Proof Admin to make a dealer eligible for Portal-first activation. Does NOT start the 90-day term, set account status to active, or enable any user. The 90-day term starts only on successful first-user account claim from the Partner Portal. Separate from status (active/inactive/suspended) and from soundproof_access_expires_at. Only the manageSoundProofAccess backend function may change this."
+    },
     "contact_email": {
       "type": "string",
       "description": "Primary contact email"

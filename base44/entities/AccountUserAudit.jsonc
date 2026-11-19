@@ -1,7 +1,7 @@
 {
   "name": "AccountUserAudit",
   "type": "object",
-  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance and Partner Portal identity claims. Written only by trusted backend functions.",
+  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance, Partner Portal identity claims, Portal-first activation, term starts, renewals, eligibility changes and per-user successful login tracking. Written only by trusted backend functions.",
   "properties": {
     "account_id": {
       "type": "string"
@@ -21,7 +21,15 @@
         "ACCESS_CHANGED",
         "REMOVED",
         "LEGACY_ADMIN_BOOTSTRAPPED",
-        "PORTAL_IDENTITY_CLAIMED"
+        "PORTAL_IDENTITY_CLAIMED",
+        "SOUNDPROOF_ENABLE",
+        "SOUNDPROOF_SUSPEND",
+        "SOUNDPROOF_RESTORE",
+        "SOUNDPROOF_ELIGIBILITY_SET",
+        "PORTAL_ACTIVATION_REQUESTED",
+        "SOUNDPROOF_TERM_STARTED",
+        "SOUNDPROOF_RENEWED",
+        "USER_LOGIN_RECORDED"
       ]
     },
     "target_user_id": {
