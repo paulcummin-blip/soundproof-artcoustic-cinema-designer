@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { desiredAccessFlag } from '../../shared/soundProofAccessFlagAuthority.js';
+import { setFirstActivatedAtIfUnset } from '../../shared/accountActivationAuthority.js';
 
 /**
  * Master-admin-only backend authority for managing Sound Proof access on
@@ -216,6 +217,13 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
     status: newStatus,
     soundproof_access_expires_at: newExpiresAt,
   });
+
+  // Record the canonical first-activation timestamp (write-once) on the first
+  // admin enable. Suspend and restore never change it; renewal never changes
+  // it (renewal is Portal-driven and sets it via startSoundProofTermOnFirstClaim).
+  if (action === 'enable') {
+    await setFirstActivatedAtIfUnset(service, accountId, now);
+  }
 
   // Synchronise the soundproof_access_enabled flag on every linked user so it
   // accurately reflects the authoritative account and membership decisions.

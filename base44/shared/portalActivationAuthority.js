@@ -35,6 +35,7 @@ import {
   normaliseEmail,
 } from './accountAccessRules.js';
 import { PORTAL_SOURCE, PORTAL_TARGET } from './pilotPortalConstants.js';
+import { setFirstActivatedAtIfUnset } from './accountActivationAuthority.js';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const SHARED_SECRET_NAME = 'PORTAL_ACTIVATION_SHARED_SECRET';
@@ -463,6 +464,10 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
     status: 'active',
     soundproof_access_expires_at: newExpiresAt,
   });
+
+  // Record the canonical first-activation timestamp (write-once). Only the
+  // first confirmed term start sets it; renewal and restore never change it.
+  await setFirstActivatedAtIfUnset(service, accountId, now);
 
   try {
     await service.entities.User.update(user.id, {

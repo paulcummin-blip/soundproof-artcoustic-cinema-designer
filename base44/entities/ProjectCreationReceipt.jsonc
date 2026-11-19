@@ -1,7 +1,7 @@
 {
   "name": "ProjectCreationReceipt",
   "type": "object",
-  "description": "Request-level idempotency receipt for Professional Project creation. One row per (account_id, request_id). Written only by createProfessionalProject, under the per-account creation lock. PENDING = a creation is in flight (a retry backs off with CREATION_BUSY, never creating a second project); COMPLETED = the creation finished and the stored response_payload is replayed verbatim to an identical retry. A PENDING receipt left by a crashed request blocks further retries until manually reconciled, which is the safe failure (no duplicate charge). Internal financial-integrity record, admin-only; never shown to dealers.",
+  "description": "Request-level idempotency receipt for Professional Project creation. One row per (account_id, request_id). Written only by createProfessionalProject, under the per-account creation lock. The stage field tracks the last CONFIRMED write so an interrupted creation is recoverable: PENDING = reserved, no write confirmed; PROJECT_CREATED = the Project write returned (project_id known); LEDGER_CREATED = the CapacityLedger -1 entry confirmed (capacity path); USAGE_CREATED = the PromotionUsage row confirmed (promotional path); COMPLETED = finished and response_payload is replayable to an identical retry; RECONCILING = an uncertain failure where a write may have committed before the response was lost \u2014 never retry blindly, recovery inspects the real Project/Ledger/Usage state. A PENDING/RECONCILING receipt left by a crashed request blocks duplicate creation until reconciled (the safe failure \u2014 no duplicate charge). Internal financial-integrity record, admin-only; never shown to dealers.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -18,22 +18,44 @@
         "COMPLETED"
       ],
       "default": "PENDING",
-      "description": "PENDING = creation in flight; COMPLETED = finished and response_payload is replayable to an identical retry."
+      "description": "PENDING = creation in flight or interrupted; COMPLETED = finished and response_payload is replayable to an identical retry."
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "PROJECT_CREATED",
+        "LEDGER_CREATED",
+        "USAGE_CREATED",
+        "COMPLETED",
+        "RECONCILING"
+      ],
+      "default": "PENDING",
+      "description": "Last CONFIRMED write stage for crash recovery. RECONCILING marks an uncertain failure (a write may have committed) \u2014 never retry blindly; recovery inspects the real Project/Ledger/Usage state and resumes or escalates to admin reconciliation."
+    },
+    "creation_path": {
+      "type": "string",
+      "enum": [
+        "capacity",
+        "promotion"
+      ],
+      "default": "capacity",
+      "description": "Which creation path this receipt is on: capacity (consumes a CapacityLedger -1 entry) or promotion (UNLIMITED_PRO_PROJECTS, no ledger consumption). Set at receipt reservation time from the promotion eligibility lookup. Determines which records recovery inspects."
     },
     "project_id": {
       "type": "string",
       "nullable": true,
-      "description": "Created Project id on success. Null while PENDING."
+      "description": "Created Project id, stamped as soon as the Project write returns (stage PROJECT_CREATED). Null while PENDING. The key recovery uses to fetch and verify the real Project."
     },
     "promotion_id": {
       "type": "string",
       "nullable": true,
-      "description": "Promotion id if the project was created under an UNLIMITED_PRO_PROJECTS promotion. Null for a capacity-consumed project."
+      "description": "Promotion id if the project was created under an UNLIMITED_PRO_PROJECTS promotion. Stamped at PROJECT_CREATED on the promotional path. Null for a capacity-consumed project."
     },
     "ledger_entry_id": {
       "type": "string",
       "nullable": true,
-      "description": "CapacityLedger entry id for a capacity-consumed project. Null for promotional projects (no ledger consumption)."
+      "description": "CapacityLedger entry id for a capacity-consumed project, stamped at LEDGER_CREATED. Null for promotional projects (no ledger consumption)."
     },
     "response_payload": {
       "type": "object",

@@ -3,30 +3,28 @@
  * --------------------------------
  * Per-account serialized Professional Project creation.
  *
- * Base44 entities have no unique constraints and writes are not transactional,
- * so the balance-read → project-create → ledger-append sequence in
- * createProfessionalProject is not atomic. The only atomic primitive the
- * platform provides is a single-record conditional `updateMany` whose query
- * names one record's `id` and rechecks the other conditions at write time
- * (confirmed: it returns `updated`, the number of records updated).
+ * Base44 entities have no unique constraints and writes are not transactional.
+ * The only atomic primitive the platform provides is a single-record conditional
+ * updateMany whose query names one record id and rechecks the other conditions at
+ * write time. This module uses that primitive as a per-account mutex on the
+ * Account record itself (creation_lock_holder + creation_lock_held_at).
  *
- * This module uses that primitive as a per-account mutex on the Account record
- * itself (two internal fields, creation_lock_holder + creation_lock_held_at).
- * Exactly one concurrent request per account can flip holder: null → token;
- * the rest get LOCK_BUSY and must retry. Because creation for one account is
- * now serialized, the non-atomic sequence cannot interleave, so two
- * simultaneous requests with one remaining credit can no longer both succeed.
+ * NO AUTOMATIC TIME-BASED TAKEOVER (deliberate):
+ * A lock is never reclaimed merely because it has been held for a fixed duration.
+ * A creation that runs longer than any threshold keeps its lock; a second request
+ * for the same account receives LOCK_BUSY until the first releases. Reclaiming a
+ * lock that a still-running request holds can permit overlapping creation and
+ * duplicate credit deductions, so it is not permitted.
  *
- * This is per-account serialization, NOT a global exactly-once guarantee: a
- * crashed request can leave a stale lock (reclaimed after 30s) and a crashed
- * creation can leave a PENDING receipt (handled by the idempotency module).
+ * A lock left held by a crashed request blocks further creation for that account
+ * until an administrator explicitly force-releases it (forceReleaseCreationLock,
+ * the reconciliation path). This blocked-creation failure is preferred over any
+ * risk of duplicate charges.
  *
- * `creation_lock_holder: null` matches accounts where the field is absent
- * (the Account RLS already relies on null-matching-absent for account_id), so
- * existing accounts that predate this field are lockable without migration.
+ * creation_lock_holder: null matches accounts where the field is absent (the
+ * Account RLS already relies on null-matching-absent), so existing accounts are
+ * lockable without migration.
  */
-
-const STALE_LOCK_MS = 30 * 1000;
 
 function newToken() {
   try {
@@ -37,25 +35,14 @@ function newToken() {
 
 /**
  * Acquire the per-account creation lock.
- * Returns { acquired: true, token, heldAt } or
- *         { acquired: false, token: null, reason }.
+ * Returns { acquired: true, token, heldAt } or { acquired: false, token: null, reason }.
  */
 export async function acquireCreationLock(service, accountId, { now = Date.now() } = {}) {
   if (!accountId) return { acquired: false, token: null, reason: 'NO_ACCOUNT' };
 
   const token = newToken();
   const nowIso = new Date(now).toISOString();
-  const staleIso = new Date(now - STALE_LOCK_MS).toISOString();
 
-  // Best-effort reclaim of a lock held by a crashed request.
-  try {
-    await service.entities.Account.updateMany(
-      { id: accountId, creation_lock_held_at: { $lt: staleIso } },
-      { $set: { creation_lock_holder: null, creation_lock_held_at: null } },
-    );
-  } catch { /* non-fatal: a busy lock simply won't be reclaimed this round */ }
-
-  // Atomic compare-and-set on the single Account record.
   try {
     const result = await service.entities.Account.updateMany(
       { id: accountId, creation_lock_holder: null },
@@ -84,4 +71,42 @@ export async function releaseCreationLock(service, accountId, token) {
   } catch { /* best-effort */ }
 }
 
-export { STALE_LOCK_MS };
+/**
+ * Administrator-only forced release of a stuck lock (crashed request). Does NOT
+ * reclaim based on age. Callers must verify no creation is in flight before
+ * invoking (e.g. inspect ProjectCreationReceipt). Clears the exact held token
+ * so a concurrent legitimate release cannot be clobbered. Returns true if a
+ * holder was cleared.
+ */
+export async function forceReleaseCreationLock(service, accountId) {
+  if (!accountId) return false;
+  const state = await readCreationLockState(service, accountId);
+  if (!state.held || !state.holder) return false;
+  try {
+    const result = await service.entities.Account.updateMany(
+      { id: accountId, creation_lock_holder: state.holder },
+      { $set: { creation_lock_holder: null, creation_lock_held_at: null } },
+    );
+    return !!(result && typeof result.updated === 'number' && result.updated === 1);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read-only diagnostic: is the lock currently held, and by whom/when.
+ */
+export async function readCreationLockState(service, accountId) {
+  if (!accountId) return { held: false, holder: null, heldAt: null };
+  try {
+    const rows = await service.entities.Account.filter({ id: accountId });
+    const account = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    return {
+      held: !!(account?.creation_lock_holder),
+      holder: account?.creation_lock_holder || null,
+      heldAt: account?.creation_lock_held_at || null,
+    };
+  } catch {
+    return { held: false, holder: null, heldAt: null };
+  }
+}

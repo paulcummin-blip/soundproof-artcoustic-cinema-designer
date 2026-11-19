@@ -9,7 +9,9 @@ import {
   createPendingReceipt,
   completeReceipt,
   deleteReceipt,
+  updateReceiptStage,
 } from '../../shared/projectCreationIdempotency.js';
+import { reconcilePendingReceipt } from '../../shared/projectCreationRecovery.js';
 
 /**
  * Trusted backend authority for Professional Project creation.
@@ -17,32 +19,27 @@ import {
  * Safeguards (credit & promotion integrity):
  *   1. Fail-closed eligibility: a failed Account or Promotion lookup returns
  *      ELIGIBILITY_CHECK_FAILED and creates NO project, promotion usage or
- *      ledger deduction. Only a successful lookup that confirms no applicable
- *      promotion proceeds to normal capacity charging.
- *   2. Request idempotency: an optional client `request_id` (UUID) makes a
- *      repeated request return its original result. A PENDING receipt
- *      reserves the request so a retry during an in-flight creation backs
- *      off (CREATION_BUSY) instead of creating a second project.
- *   3. Per-account serialized creation: a single-record conditional
- *      updateMany on the Account (creation_lock_holder: null -> token)
- *      serializes creation per account, so two simultaneous requests with one
- *      remaining credit cannot both succeed. This is per-account
- *      serialization, NOT a global exactly-once guarantee.
+ *      ledger deduction.
+ *   2. Per-account serialized creation: a single-record conditional updateMany
+ *      on the Account (creation_lock_holder: null -> token) serializes creation
+ *      per account. There is NO time-based lock takeover: a lock held by a
+ *      still-running or crashed request stays held until released or
+ *      admin force-released, so two simultaneous requests with one remaining
+ *      credit cannot both succeed. A crashed lock blocks creation (safe) until
+ *      reconciled via the reconcileProjectCreation admin function.
+ *   3. Request idempotency + crash recovery: a client request_id (UUID) makes a
+ *      repeated request return its original result. The receipt records the
+ *      creation stage and object ids as they are confirmed. An interrupted
+ *      (non-COMPLETED) receipt is RECONCILED against the real
+ *      Project/Ledger/Usage state on retry — never blindly replayed or deleted.
+ *      A receipt is never deleted merely because a write returned an error
+ *      (it may have committed); no automatic refund is ever issued without
+ *      confirming the original transaction. The only confirmed no-write exit
+ *      that deletes the receipt is OUT_OF_CAPACITY (read-only).
  *
- * Flow:
- *   Authenticated dealer requests project creation
- *     → Backend resolves authenticated user
- *     → Backend resolves authoritative User.account_id (NOT client-supplied)
- *     → Reject if account_id missing (ACCOUNT_NOT_LINKED)
- *     → FAIL-CLOSED Account + Promotion eligibility lookup
- *     → Acquire per-account creation lock
- *     → Replay idempotency receipt if present
- *     → Calculate available capacity (or free under an active promotion)
- *     → Create Professional Project (commercial_tier=PROFESSIONAL)
- *     → Append PROJECT_ACTIVATION -1 ledger entry (idempotent) OR PromotionUsage
- *     → Complete idempotency receipt
- *     → Release lock (finally)
- *     → On ledger failure, compensate by deleting the Project
+ * This is per-account serialization with crash recovery, NOT a global
+ * exactly-once guarantee. Exactly-once charging has not been demonstrated by
+ * available platform operations and is not claimed.
  *
  * The client cannot supply an arbitrary account_id. Admins keep the existing
  * internal-project bypass (no lock, no capacity, no receipt).
@@ -158,8 +155,6 @@ export default async function(req) {
     }
 
     // ── 3b. Eligibility: Account lookup — FAIL CLOSED ──
-    // If we cannot read the account, we cannot determine promotion eligibility,
-    // so we must NOT proceed to charge a token.
     let account = null;
     try {
       const accountRecords = await base44.asServiceRole.entities.Account.filter({ id: accountId });
@@ -180,8 +175,6 @@ export default async function(req) {
     const accountIsActive = account.status === 'active';
 
     // ── 3c. Eligibility: Promotion lookup — FAIL CLOSED ──
-    // If we cannot check promotion eligibility, we must NOT charge a token:
-    // the dealer may be entitled to a free promotional project.
     let effectivePromotion = null;
     if (accountIsActive) {
       try {
@@ -201,6 +194,9 @@ export default async function(req) {
     const service = base44.asServiceRole;
     const nowMs = Date.now();
     const nowIso = new Date(nowMs).toISOString();
+    const creationPath = (effectivePromotion && effectivePromotion.promotion_type === 'UNLIMITED_PRO_PROJECTS')
+      ? 'promotion'
+      : 'capacity';
 
     const lock = await acquireCreationLock(service, accountId, { now: nowMs });
     if (!lock.acquired) {
@@ -211,31 +207,43 @@ export default async function(req) {
     }
 
     try {
-      // Idempotency: replay a completed request, or detect an in-flight one.
+      // Reconcile any interrupted prior request with the same id, against the
+      // real Project/Ledger/Usage state. Never create a duplicate here.
       if (requestId) {
         const existing = await findExistingReceipt(service, accountId, requestId);
         if (existing) {
           if (existing.status === 'COMPLETED' && existing.response_payload) {
             return Response.json(existing.response_payload, { status: 201 });
           }
-          // PENDING — another request is mid-flight.
-          return Response.json({
-            status: 'CREATION_BUSY',
-            message: 'A project creation for this account is already in progress. Please retry shortly.'
-          }, { status: 409 });
+          const recovered = await reconcilePendingReceipt(service, existing, { accountName: projectName });
+          if (recovered.outcome === 'replay' || recovered.outcome === 'resumed_to_completion') {
+            return Response.json(recovered.responsePayload, { status: 201 });
+          }
+          if (recovered.outcome === 'restart') {
+            // Confirmed no committed write for this request — safe to create fresh.
+            await deleteReceipt(service, existing.id);
+          } else {
+            // reconciling — a write may have committed; do not duplicate.
+            return Response.json({
+              status: 'CREATION_RECONCILING',
+              message: 'A previous creation for this request could not be confirmed. Please retry with a new request id, or contact support if it persists.',
+              reason: recovered.reason || 'UNCERTAIN',
+              project_id: existing.project_id || null,
+            }, { status: 409 });
+          }
         }
-        // Reserve the request before any Project/Ledger write (crash-safe).
-        await createPendingReceipt(service, accountId, requestId, nowIso);
+        // Reserve a PENDING receipt before any Project/Ledger write (crash-safe).
+        await createPendingReceipt(service, accountId, requestId, nowIso, creationPath);
       }
 
-      const discardPending = async () => {
+      // Stage + object-id tracking on the receipt (crash recovery).
+      const setStage = async (patch) => {
         if (!requestId) return;
         try {
           const r = await findExistingReceipt(service, accountId, requestId);
-          if (r) await deleteReceipt(service, r.id);
-        } catch { /* best-effort */ }
+          if (r) await updateReceiptStage(service, r.id, patch);
+        } catch { /* best-effort: stage is for recovery only */ }
       };
-
       const finishReceipt = async (payload, extras) => {
         if (!requestId) return;
         try {
@@ -250,9 +258,15 @@ export default async function(req) {
           }
         } catch { /* best-effort */ }
       };
+      const findUsage = async (pid) => {
+        try {
+          const rows = await service.entities.PromotionUsage.filter({ project_id: pid });
+          return (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
+        } catch { return null; }
+      };
 
       // ── 4a. PROMOTIONAL PATH: free project, no capacity consumption ──
-      if (effectivePromotion && effectivePromotion.promotion_type === 'UNLIMITED_PRO_PROJECTS') {
+      if (creationPath === 'promotion') {
         const promoNowIso = new Date().toISOString();
 
         let promoProject = null;
@@ -269,55 +283,43 @@ export default async function(req) {
             activation_ledger_entry_id: null,
             lifecycle_status: 'Draft',
           });
-        } catch (createErr) {
-          await discardPending();
+        } catch (_createErr) {
+          // Uncertain: the create may have committed without returning an id.
+          // Retain the receipt as RECONCILING; never create a duplicate.
+          await setStage({ stage: 'RECONCILING' });
           return Response.json({
-            status: 'CREATION_FAILED',
-            message: 'Unable to create the project. Please try again.'
-          }, { status: 500 });
+            status: 'CREATION_RECONCILING',
+            message: 'Project creation could not be confirmed. Please retry with a new request id, or contact support if it persists.',
+            reason: 'PROJECT_CREATE_UNCERTAIN',
+          }, { status: 409 });
         }
+        await setStage({ stage: 'PROJECT_CREATED', project_id: promoProject.id, promotion_id: effectivePromotion.id });
 
-        // Create exactly one PromotionUsage row (idempotent by project_id)
-        let usageEntry = null;
-        let usageError = null;
-        try {
-          const existingUsage = await service.entities.PromotionUsage.filter({ project_id: promoProject.id });
-          if (Array.isArray(existingUsage) && existingUsage.length > 0) {
-            usageEntry = existingUsage[0];
-          } else {
+        // PromotionUsage — idempotent by project_id.
+        let usageEntry = await findUsage(promoProject.id);
+        if (!usageEntry) {
+          try {
             usageEntry = await service.entities.PromotionUsage.create({
               promotion_id: effectivePromotion.id,
               account_id: accountId,
               project_id: promoProject.id,
               promotion_type: 'UNLIMITED_PRO_PROJECTS',
-              used_at: promoNowIso,
+              used_at: new Date().toISOString(),
             });
-          }
-        } catch (err) {
-          usageError = err;
-        }
-
-        // Failure safety: if PromotionUsage failed, rollback the project
-        if (usageError || !usageEntry) {
-          try {
-            await service.entities.Project.delete(promoProject.id);
-          } catch (_rollbackErr) {
-            await discardPending();
+          } catch (_usageErr) {
+            // Usage may have committed or not. The project exists (id known), so
+            // a retry with the same request id reconciles and creates the usage
+            // if missing. Do NOT delete the project or the receipt, and do NOT
+            // issue an automatic refund.
             return Response.json({
               status: 'CREATION_FAILED',
-              message: 'Project creation failed during promotion tracking. Please contact support.',
+              message: 'Project created but promotion tracking could not be confirmed. Retry the same request to complete it.',
+              recoverable: true,
               project_id: promoProject.id,
-              rollback: 'FAILED — orphan promotional project may exist',
-              detail: 'PromotionUsage creation failed and project rollback also failed.'
             }, { status: 500 });
           }
-          await discardPending();
-          return Response.json({
-            status: 'CREATION_FAILED',
-            message: 'Project creation failed during promotion tracking. No capacity was consumed.',
-            rollback: 'SUCCESS — project deleted'
-          }, { status: 500 });
         }
+        await setStage({ stage: 'USAGE_CREATED' });
 
         const promoSuccessPayload = {
           status: 'SUCCESS',
@@ -334,7 +336,13 @@ export default async function(req) {
       // ── 4b. CAPACITY PATH: check available capacity from ledger SUM ──
       const available = await getAvailableCapacity(service, accountId);
       if (available <= 0) {
-        await discardPending();
+        // Confirmed no-write failure: safe to discard the receipt and allow retry.
+        if (requestId) {
+          try {
+            const r = await findExistingReceipt(service, accountId, requestId);
+            if (r) await deleteReceipt(service, r.id);
+          } catch { /* best-effort */ }
+        }
         return Response.json({
           status: 'OUT_OF_CAPACITY',
           message: 'No Professional Project capacity available. Contact your distributor or administrator.',
@@ -355,61 +363,46 @@ export default async function(req) {
           commercial_source: 'PILOT',
           lifecycle_status: 'Draft',
         });
-      } catch (createErr) {
-        await discardPending();
+      } catch (_createErr) {
+        // Uncertain: the create may have committed without returning an id.
+        await setStage({ stage: 'RECONCILING' });
         return Response.json({
-          status: 'CREATION_FAILED',
-          message: 'Unable to create the project. Please try again.'
-        }, { status: 500 });
+          status: 'CREATION_RECONCILING',
+          message: 'Project creation could not be confirmed. Please retry with a new request id, or contact support if it persists.',
+          reason: 'PROJECT_CREATE_UNCERTAIN',
+        }, { status: 409 });
       }
+      await setStage({ stage: 'PROJECT_CREATED', project_id: project.id });
 
       // ── 6. Append PROJECT_ACTIVATION -1 ledger entry (idempotent) ──
-      const idempotencyKey = `activation:${project.id}`;
-      let ledgerEntry = null;
-      let ledgerError = null;
-
-      try {
-        const existing = await findActivationEntry(service, project.id);
-        if (existing) {
-          ledgerEntry = existing;
-        } else {
+      let ledgerEntry = await findActivationEntry(service, project.id);
+      if (!ledgerEntry) {
+        try {
           ledgerEntry = await service.entities.CapacityLedger.create({
             account_id: accountId,
             transaction_type: 'PROJECT_ACTIVATION',
             delta: -1,
-            idempotency_key: idempotencyKey,
+            idempotency_key: `activation:${project.id}`,
             source_system: 'SOUND_PROOF',
             source_ref: { project_id: project.id },
             reason: `Project activation: ${projectName}`
           });
-        }
-      } catch (err) {
-        ledgerError = err;
-      }
-
-      // ── 7. Failure safety: compensate if ledger creation failed ──
-      if (ledgerError || !ledgerEntry) {
-        try {
-          await service.entities.Project.delete(project.id);
-        } catch (_rollbackErr) {
-          await discardPending();
+        } catch (_ledgerErr) {
+          // The ledger may have committed or not. The project exists (id known),
+          // so a retry with the same request id reconciles and creates the
+          // ledger if missing. Do NOT delete the project or issue an automatic
+          // refund without confirming the original transaction.
           return Response.json({
             status: 'CREATION_FAILED',
-            message: 'Project creation failed during activation. Please contact support.',
+            message: 'Project created but activation could not be confirmed. Retry the same request to complete it.',
+            recoverable: true,
             project_id: project.id,
-            rollback: 'FAILED — orphan project may exist',
-            detail: 'Ledger creation failed and project rollback also failed.'
           }, { status: 500 });
         }
-        await discardPending();
-        return Response.json({
-          status: 'CREATION_FAILED',
-          message: 'Project creation failed during activation. No capacity was consumed.',
-          rollback: 'SUCCESS — project deleted'
-        }, { status: 500 });
       }
+      await setStage({ stage: 'LEDGER_CREATED', ledger_entry_id: ledgerEntry.id });
 
-      // ── 8. Link activation_ledger_entry_id on the Project ──
+      // ── 7. Link activation_ledger_entry_id on the Project (non-fatal) ──
       try {
         await service.entities.Project.update(project.id, {
           activation_ledger_entry_id: ledgerEntry.id
@@ -418,11 +411,11 @@ export default async function(req) {
         // Non-fatal: the ledger idempotency_key is the real authority.
       }
 
-      // ── 9. Return SUCCESS ──
+      // ── 8. Return SUCCESS ──
       const remaining = await getAvailableCapacity(service, accountId);
       const capacitySuccessPayload = {
         status: 'SUCCESS',
-        project: project,
+        project,
         capacity_before: available,
         capacity_after: remaining,
         ledger_entry: {
