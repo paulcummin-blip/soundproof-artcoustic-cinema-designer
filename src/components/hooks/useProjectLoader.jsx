@@ -362,33 +362,51 @@ appState, // Pass appState directly for setters
       // Then load the active version's design_state and merge with the
       // Project's shared fields for hydration.
       let mergedP = p;
-      try {
+      let createdMigrationVersionId = null;
+      // A version read failure is handled by the outer load-error boundary;
+      // it must never become a successful legacy/default design load.
+      {
         if (!p?.active_version_id) {
           const migRes = await base44.functions.invoke('migrateProjectVersions', { project_id: id });
           if (migRes?.data?.version_id) {
+            if (migRes.data.migrated === true) createdMigrationVersionId = migRes.data.version_id;
             invalidateProjectRead(id);
             const reloaded = await readProjectRecord(id);
             if (reloaded) p = reloaded;
           }
         }
         if (p?.active_version_id) {
-          activeVersionIdRef.current = p.active_version_id;
-          appState?.setActiveVersionId?.(p.active_version_id);
           const version = await readProjectVersionRecord(p.active_version_id);
-          if (version) {
-            mergedP = mergeProjectAndVersion(p, version);
+          if (!version || version.id !== p.active_version_id || version.project_id !== id) {
+            throw new Error("The selected design version could not be loaded for this project. Retry opening it.");
           }
+          mergedP = mergeProjectAndVersion(p, version);
+        } else {
+          throw new Error("The project has no saved design version. Retry opening it.");
         }
-      } catch (versionErr) {
-        console.error('[RD] Version load failed, falling back to project-only hydration:', versionErr);
       }
 
       // Skip the state overwrite when ProjectDesignHydrator already hydrated —
       // hydrateFromProject would clobber any user change made during the boot
       // re-load window (e.g. the first seat-count change on a new project).
-      if (!wasAlreadyHydrated) {
+      const hydratedVersionId = canonical.identity?.activeVersionId || null;
+      // A newly created V1 seeds this same legacy design. Preserve a genuine
+      // first interaction made while that migration was pending. An existing
+      // version found by migration never qualifies for this exception.
+      const sameLegacyDesignJustVersioned = !hydratedVersionId
+        && !appState?.activeVersionId
+        && createdMigrationVersionId === p.active_version_id;
+      const canRetainHydratedDesign = wasAlreadyHydrated
+        && (hydratedVersionId === p.active_version_id || sameLegacyDesignJustVersioned)
+        && (!appState?.activeVersionId || appState.activeVersionId === hydratedVersionId);
+      if (!canRetainHydratedDesign) {
+        appState?.setProjectHydrationReady?.(false);
         hydrateFromProject(mergedP);
       }
+      // Commit the version identity only after that exact version's design is
+      // available. A later pointer must not relabel an earlier AppState.
+      activeVersionIdRef.current = p.active_version_id;
+      appState?.setActiveVersionId?.(p.active_version_id);
       setProjectNameState(mergedP?.name || "Project"); // Update internal projectName state
       // Capture the loaded room_dimensions_edited flag so the autosave path
       // never resets it to false. Defaults to false for pre-feature projects.
@@ -752,6 +770,14 @@ appState, // Pass appState directly for setters
       const myToken = r.saveToken;
 
       try {
+        // The payload and its destination are one capture, before any await.
+        const savedVersionId = activeVersionIdRef.current;
+        const myGeneration = loadGenerationRef.current;
+        const saveScopeCurrent = () => !!savedVersionId
+          && activeVersionIdRef.current === savedVersionId
+          && loadGenerationRef.current === myGeneration
+          && hydrationCanSave(hydrationAuthorityRef.current, effectiveProjectId, myGeneration);
+        if (!saveScopeCurrent()) throw new Error("No matching hydrated design version is available to save.");
         const data = buildProjectData();
         const sig = computeSig(data);
 
@@ -824,10 +850,6 @@ appState, // Pass appState directly for setters
           return;
         }
 
-        // Capture generation before the await so we can detect stale completions
-        // if the project switches while we are waiting for the DB response.
-        const myGeneration = loadGenerationRef.current;
-
         // ─── Version-aware save ──────────────────────────────────────────
         // Split the serialized data into shared fields (→ Project) and
         // design_state (→ ProjectVersion). Both are saved so the active
@@ -835,11 +857,14 @@ appState, // Pass appState directly for setters
         const designState = buildDesignState(data);
         const sharedData = buildSharedUpdate(data);
         const sharedSig = (() => { try { return JSON.stringify(sharedData); } catch { return String(Date.now()); } })();
+        if (!saveScopeCurrent()) throw new Error("The edited version changed before saving.");
         if (sharedSig !== r.lastSavedSharedSig) {
           await Project.update(effectiveProjectId, sharedData);
         }
-        if (activeVersionIdRef.current) {
-          const savedVersionId = activeVersionIdRef.current;
+        // A shared write may yield while a different version is opened.
+        // Refuse the stale capture before any version update is dispatched.
+        if (!saveScopeCurrent()) throw new Error("The edited version changed during save. No other version was written.");
+        if (savedVersionId) {
           const terminalTrace = designState.optimiser_plan?.terminalTrace;
           try {
             await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designState });
@@ -1197,6 +1222,13 @@ appState, // Pass appState directly for setters
     rMS.inFlight = true;
 
     try {
+      const savedVersionId = activeVersionIdRef.current;
+      const myGeneration = loadGenerationRef.current;
+      const saveScopeCurrent = () => !!savedVersionId
+        && activeVersionIdRef.current === savedVersionId
+        && loadGenerationRef.current === myGeneration
+        && hydrationCanSave(hydrationAuthorityRef.current, effectiveProjectId, myGeneration);
+      if (!saveScopeCurrent()) throw new Error("No matching hydrated design version is available to save.");
       // Use shared payload builder — identical shape to autosave so signatures always match.
       const projectData = buildSharedProjectPayload();
 
@@ -1261,9 +1293,6 @@ appState, // Pass appState directly for setters
           };
         }
 
-        // Capture generation before the await.
-        const myGeneration = loadGenerationRef.current;
-
         // ─── Version-aware manual save ───────────────────────────────────
         // Split the serialized data into shared fields (→ Project) and
         // design_state (→ ProjectVersion). Both are saved so the active
@@ -1271,13 +1300,14 @@ appState, // Pass appState directly for setters
         const designStateMS = buildDesignState(projectData);
         const sharedDataMS = buildSharedUpdate(projectData);
         sharedSigMS = (() => { try { return JSON.stringify(sharedDataMS); } catch { return String(Date.now()); } })();
+        if (!saveScopeCurrent()) throw new Error("The edited version changed before saving.");
         if (sharedSigMS !== rMS.lastSavedSharedSig) {
           savedProject = await Project.update(effectiveProjectId, sharedDataMS);
         } else {
           savedProject = { id: effectiveProjectId };
         }
-        if (activeVersionIdRef.current) {
-          const savedVersionId = activeVersionIdRef.current;
+        if (!saveScopeCurrent()) throw new Error("The edited version changed during save. No other version was written.");
+        if (savedVersionId) {
           const terminalTrace = designStateMS.optimiser_plan?.terminalTrace;
           try {
             await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designStateMS });
