@@ -165,17 +165,6 @@ appState, // Pass appState directly for setters
     appState?.activeVersionId || null,
   );
 
-  // Temporary read-only identity observation; no setters or persistence.
-  console.info("[SP version identity audit]", JSON.stringify({
-    projectId:activeProjectId || projectIdState, projectIdFromUrl,
-    loadedVersionRef:activeVersionIdRef.current, appVersion:appState?.activeVersionId,
-    canonical:getProjectHydration(), loadPhase:loadState.phase,
-    format:appState?.dolbyLayout, dolbyPreset, room:appState?.roomDims,
-    seats:appState?.seatingPositions, speakers:placedSpeakers,
-    selectedSpeakersByRole:appState?.selectedSpeakersByRole,
-    speakerNodes:appState?.speakerNodes, subs:appState?.subwooferInstances,
-    instanceStatus:appState?.subwooferInstancesStatus,
-  }));
   // SHARED PAYLOAD BUILDER — single source of truth for both autosave and manual save.
   // Both paths must use this function so their signatures are always identical.
   const buildSharedProjectPayload = useCallback(() => {
