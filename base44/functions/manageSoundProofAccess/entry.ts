@@ -156,7 +156,7 @@ async function processAccount(base44, { action, accountId, actor, now }) {
   });
 
   // Update all linked users' soundproof_access_enabled flag.
-  if (userEnabled !== null && linkedUserIds.length > 0) {
+  if (userEnabled !== null && linkedUserIds.size > 0) {
     for (const userId of linkedUserIds) {
       try {
         await service.entities.User.update(userId, {
