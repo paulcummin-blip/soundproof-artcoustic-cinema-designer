@@ -363,12 +363,14 @@ appState, // Pass appState directly for setters
       // Then load the active version's design_state and merge with the
       // Project's shared fields for hydration.
       let mergedP = p;
+      let createdMigrationVersionId = null;
       // A version read failure is handled by the outer load-error boundary;
       // it must never become a successful legacy/default design load.
       {
         if (!p?.active_version_id) {
           const migRes = await base44.functions.invoke('migrateProjectVersions', { project_id: id });
           if (migRes?.data?.version_id) {
+            if (migRes.data.migrated === true) createdMigrationVersionId = migRes.data.version_id;
             invalidateProjectRead(id);
             const reloaded = await readProjectRecord(id);
             if (reloaded) p = reloaded;
@@ -389,8 +391,14 @@ appState, // Pass appState directly for setters
       // hydrateFromProject would clobber any user change made during the boot
       // re-load window (e.g. the first seat-count change on a new project).
       const hydratedVersionId = canonical.identity?.activeVersionId || null;
+      // A newly created V1 seeds this same legacy design. Preserve a genuine
+      // first interaction made while that migration was pending. An existing
+      // version found by migration never qualifies for this exception.
+      const sameLegacyDesignJustVersioned = !hydratedVersionId
+        && !appState?.activeVersionId
+        && createdMigrationVersionId === p.active_version_id;
       const canRetainHydratedDesign = wasAlreadyHydrated
-        && hydratedVersionId === p.active_version_id
+        && (hydratedVersionId === p.active_version_id || sameLegacyDesignJustVersioned)
         && (!appState?.activeVersionId || appState.activeVersionId === hydratedVersionId);
       if (!canRetainHydratedDesign) {
         appState?.setProjectHydrationReady?.(false);
