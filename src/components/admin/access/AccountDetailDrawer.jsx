@@ -108,7 +108,16 @@ export default function AccountDetailDrawer({
 
           {/* Summary */}
           <div className="grid gap-2 sm:grid-cols-3">
-            <SummaryItem label="2026 turnover" value={formatGBP(row.turnover)} hint="Partner Portal ledger" />
+            <SummaryItem
+              label="2026 turnover"
+              value={formatGBP(row.turnover)}
+              hint={(() => {
+                if (row.turnover === null || row.turnover === undefined) return "Partner Portal ledger";
+                if (row.turnoverTimestampKnown === false) return "Source time unknown · may be stale";
+                if (row.turnoverSourceUpdatedAt) return `Source updated ${formatDateTime(row.turnoverSourceUpdatedAt)}`;
+                return "Partner Portal ledger";
+              })()}
+            />
             <SummaryItem
               label="Logins"
               value={`${row.seatsUsed} of ${row.seatsMaximum}`}

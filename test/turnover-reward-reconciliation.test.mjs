@@ -43,8 +43,95 @@ test("validates and deterministically sorts the minimal entitlement contract", (
 
 test("rejects sensitive or unexpected dealer fields", () => {
   assert.throws(() => validateEntitlementContract(contract([
-    { ...dealer(DEALER_A, [10000]), current_turnover_gbp: 19999 },
+    { ...dealer(DEALER_A, [10000]), secret_field: 19999 },
   ]), 2026), /unsupported fields/);
+});
+
+test("accepts the original turnover field names and normalises them", () => {
+  const result = validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]),
+      current_turnover_gbp: 12345.67,
+      turnover_source_updated_at: "2026-08-24T02:00:00.000Z" },
+  ]), 2026);
+  assert.equal(result.dealers[0].current_turnover_gbp, 12345.67);
+  assert.equal(result.dealers[0].turnover_source_updated_at, "2026-08-24T02:00:00.000Z");
+  assert.equal(result.dealers[0].turnover_timestamp_known, true);
+});
+
+test("accepts the new Lovable turnover field names and normalises them", () => {
+  const result = validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]),
+      annual_turnover_gbp: 12345.67,
+      turnover_updated_at: "2026-08-24T02:00:00.000Z" },
+  ]), 2026);
+  assert.equal(result.dealers[0].current_turnover_gbp, 12345.67);
+  assert.equal(result.dealers[0].turnover_source_updated_at, "2026-08-24T02:00:00.000Z");
+  assert.equal(result.dealers[0].turnover_timestamp_known, true);
+});
+
+test("accepts a null turnover timestamp as Unknown without substituting the current date", () => {
+  const before = Date.now();
+  const result = validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]),
+      annual_turnover_gbp: 12345.67,
+      turnover_updated_at: null },
+  ]), 2026);
+  const after = Date.now();
+  assert.equal(result.dealers[0].current_turnover_gbp, 12345.67);
+  assert.equal(result.dealers[0].turnover_source_updated_at, null);
+  assert.equal(result.dealers[0].turnover_timestamp_known, false);
+  // The null timestamp must never become a real date around "now".
+  if (result.dealers[0].turnover_source_updated_at) {
+    const ts = new Date(result.dealers[0].turnover_source_updated_at).getTime();
+    assert.ok(ts < before - 60000 || ts > after + 60000, "null timestamp was substituted with the current date");
+  }
+});
+
+test("rejects a turnover amount without a timestamp and vice versa", () => {
+  assert.throws(() => validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]), annual_turnover_gbp: 1000 },
+  ]), 2026), /together/);
+  assert.throws(() => validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]), turnover_updated_at: "2026-08-24T02:00:00.000Z" },
+  ]), 2026), /together/);
+});
+
+test("rejects conflicting turnover amounts supplied under both field names", () => {
+  assert.throws(() => validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]),
+      current_turnover_gbp: 1000,
+      annual_turnover_gbp: 2000,
+      turnover_source_updated_at: "2026-08-24T02:00:00.000Z",
+      turnover_updated_at: "2026-08-24T02:00:00.000Z" },
+  ]), 2026), /conflicting turnover amounts/);
+});
+
+test("rejects invalid turnover amounts and invalid timestamps", () => {
+  assert.throws(() => validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]),
+      annual_turnover_gbp: -5,
+      turnover_updated_at: "2026-08-24T02:00:00.000Z" },
+  ]), 2026), /non-negative/);
+  assert.throws(() => validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000]),
+      annual_turnover_gbp: 1000,
+      turnover_updated_at: "not-a-date" },
+  ]), 2026), /invalid/);
+});
+
+test("old and new contract shapes produce identical credit entitlements", () => {
+  const oldShape = validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000, 20000]) },
+  ]), 2026);
+  const newShape = validateEntitlementContract(contract([
+    { ...dealer(DEALER_A, [10000, 20000]),
+      annual_turnover_gbp: 99999,
+      turnover_updated_at: "2026-08-24T02:00:00.000Z" },
+  ]), 2026);
+  assert.deepEqual(oldShape.dealers[0].earned_thresholds_gbp, newShape.dealers[0].earned_thresholds_gbp);
+  assert.equal(oldShape.dealers[0].credits_per_threshold, newShape.dealers[0].credits_per_threshold);
+  assert.equal(oldShape.dealers[0].dealer_account_id, newShape.dealers[0].dealer_account_id);
+  assert.equal(oldShape.contract_version, newShape.contract_version);
 });
 
 test("rejects duplicate stable dealer identifiers", () => {

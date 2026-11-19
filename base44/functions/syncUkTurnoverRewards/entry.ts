@@ -99,6 +99,7 @@ export default async function syncUkTurnoverRewards(req) {
       projects_reversed: 0,
       milestones_reinstated: 0,
       projects_reinstated: 0,
+      turnover_snapshots_appended: 0,
       discrepancy_count: 0,
       error_count: 0,
       error_summary: "",
@@ -199,9 +200,17 @@ export default async function syncUkTurnoverRewards(req) {
     // A new snapshot is appended only when the source timestamp differs from
     // every existing record for that account+year — historical records are
     // never overwritten.
+    // Dedup keys for turnover snapshots: (account_id, source_last_updated).
+    // A new snapshot is appended only when the source timestamp differs from
+    // every existing record for that account+year — historical records are
+    // never overwritten. Null (Unknown) source timestamps are normalised to a
+    // stable sentinel so a repeated null-timestamp payload does not append a
+    // duplicate record on every sync.
+    const NULL_TS_SENTINEL = "\u0000UNKNOWN";
+    const normaliseTsKey = (ts) => (ts ? String(ts) : NULL_TS_SENTINEL);
     const existingTurnoverKeys = new Set();
     for (const r of Array.isArray(existingTurnoverRecords) ? existingTurnoverRecords : []) {
-      existingTurnoverKeys.add(`${r.account_id}|${r.source_last_updated || ""}`);
+      existingTurnoverKeys.add(`${r.account_id}|${normaliseTsKey(r.source_last_updated)}`);
     }
 
     let dealersMatched = 0;
@@ -359,7 +368,7 @@ export default async function syncUkTurnoverRewards(req) {
       // A new TurnoverRecord is created only when the source timestamp differs
       // from every existing record for this account+year — preserving history.
       if (!dryRun && dealerEntitlement.current_turnover_gbp !== undefined) {
-        const turnoverKey = `${accountId}|${dealerEntitlement.turnover_source_updated_at}`;
+        const turnoverKey = `${accountId}|${normaliseTsKey(dealerEntitlement.turnover_source_updated_at)}`;
         if (!existingTurnoverKeys.has(turnoverKey)) {
           await base44.asServiceRole.entities.TurnoverRecord.create({
             account_id: accountId,

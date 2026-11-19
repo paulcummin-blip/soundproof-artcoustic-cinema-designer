@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
-import { buildTurnoverMap } from "@/lib/commercial/commercialOverview";
+import { buildTurnoverMap, buildTurnoverSnapshotMap } from "@/lib/commercial/commercialOverview";
 import {
   ACCESS_GROUPS,
   EMPTY_FILTERS,
@@ -122,6 +122,7 @@ export default function AdminAccountAccess() {
           ledgerByAccount: buildLedgerByAccount(ledgerEntries),
           auditsByAccount: buildAuditsByAccount(audits),
           turnoverMap: buildTurnoverMap(turnoverRecords, CALENDAR_YEAR),
+          turnoverSnapshotMap: buildTurnoverSnapshotMap(turnoverRecords, CALENDAR_YEAR),
           promoByAccount,
         }));
       } catch (err) {

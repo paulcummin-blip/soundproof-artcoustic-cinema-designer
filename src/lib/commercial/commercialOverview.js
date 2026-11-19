@@ -5,48 +5,20 @@
 // so the admin UI can render 25+ accounts with minimal API calls.
 
 import { aggregateCapacityBreakdown } from "./capacityService";
+import {
+  newestTurnoverRecord,
+  aggregateTurnoverForYear,
+  buildTurnoverSnapshotMap,
+  buildTurnoverMap,
+} from "./turnoverSnapshotAuthority";
 
-/**
- * Aggregate TurnoverRecord entries for one account + calendar year.
- * Returns the eligible_turnover_gbp (GBP), or null if no record exists.
- *
- * @param {Array} records - TurnoverRecord array (pre-filtered or full list).
- * @param {string} accountId
- * @param {number} calendarYear
- * @returns {number|null}
- */
-export function aggregateTurnoverForYear(records, accountId, calendarYear) {
-  if (!Array.isArray(records) || !accountId || !calendarYear) return null;
-  let best = null;
-  for (const r of records) {
-    if (r?.account_id !== accountId) continue;
-    if (Number(r?.calendar_year) !== Number(calendarYear)) continue;
-    if (r?.source_system && r.source_system !== "ARTCOUSTIC_PARTNER_PORTAL") continue;
-    const val = Number(r?.eligible_turnover_gbp);
-    if (!Number.isFinite(val)) continue;
-    if (best === null || val > best) best = val;
-  }
-  return best;
-}
-
-/**
- * Build a Map of account_id → turnover (GBP) for a given year.
- */
-export function buildTurnoverMap(records, calendarYear) {
-  const map = new Map();
-  if (!Array.isArray(records)) return map;
-  for (const r of records) {
-    if (Number(r?.calendar_year) !== Number(calendarYear)) continue;
-    if (r?.source_system && r.source_system !== "ARTCOUSTIC_PARTNER_PORTAL") continue;
-    const val = Number(r?.eligible_turnover_gbp);
-    if (!Number.isFinite(val)) continue;
-    const existing = map.get(r.account_id);
-    if (existing === undefined || val > existing) {
-      map.set(r.account_id, val);
-    }
-  }
-  return map;
-}
+// Re-export the turnover snapshot authority so existing callers keep working.
+export {
+  newestTurnoverRecord,
+  aggregateTurnoverForYear,
+  buildTurnoverSnapshotMap,
+  buildTurnoverMap,
+};
 
 /**
  * Build a Map of account_id → { count, lastActivity } from a Project array.

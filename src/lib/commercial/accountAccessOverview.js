@@ -10,6 +10,7 @@
 // All functions are pure so the page can fetch once and filter locally.
 
 import { aggregateCapacityBreakdown } from "./capacityService";
+import { buildTurnoverSnapshotMap } from "./commercialOverview";
 
 // Occupied seats — the same rule the account-user authority applies.
 export const OCCUPIED_STATUSES = ["pending", "active"];
@@ -256,6 +257,7 @@ export function buildAccessRows({
   ledgerByAccount,
   auditsByAccount,
   turnoverMap,
+  turnoverSnapshotMap,
   promoByAccount,
 }) {
   const rows = [];
@@ -280,7 +282,19 @@ export function buildAccessRows({
       ledgerEntries,
       seatsUsed: occupiedMembers(members).length,
       seatsMaximum: MAX_ACCOUNT_SEATS,
-      turnover: turnoverMap?.get(account.id) ?? null,
+      turnover: (() => {
+        const snap = turnoverSnapshotMap?.get(account.id);
+        if (snap) return snap.value;
+        return turnoverMap?.get(account.id) ?? null;
+      })(),
+      turnoverSourceUpdatedAt: (() => {
+        const snap = turnoverSnapshotMap?.get(account.id);
+        return snap ? snap.source_last_updated : null;
+      })(),
+      turnoverTimestampKnown: (() => {
+        const snap = turnoverSnapshotMap?.get(account.id);
+        return snap ? snap.timestamp_known : null;
+      })(),
       lastLogin: account.last_access_at || null,
       credits: buildCreditDetail(ledgerEntries),
       projectCount: projects.length,

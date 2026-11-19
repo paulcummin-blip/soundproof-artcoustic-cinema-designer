@@ -1,7 +1,7 @@
 {
   "name": "TurnoverRecord",
   "type": "object",
-  "description": "Informational source data for an account's eligible turnover, synced from an external system (e.g. Artcoustic Partner Portal). This is NOT the commercial credit authority \u2014 CapacityLedger remains the authority. TurnoverRecords are used to determine which turnover milestones have been reached and should be rewarded.",
+  "description": "Informational source data for an account's eligible turnover, synced from an external system (e.g. Artcoustic Partner Portal). This is NOT the commercial credit authority \u2014 CapacityLedger remains the authority. TurnoverRecords are used to determine which turnover milestones have been reached and should be rewarded. Historical records are never overwritten: each sync with a changed source timestamp appends a new row, and the Dealer Admin selects the newest valid source record (by source_last_updated, falling back to sync_date when the source timestamp is null/Unknown) rather than the highest historical amount.",
   "properties": {
     "account_id": {
       "type": "string",
@@ -34,7 +34,8 @@
     "source_last_updated": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp when the external system last updated this turnover figure."
+      "description": "Timestamp when the external system last updated this turnover figure. Null when the source could not provide a timestamp (Unknown); the Dealer Admin displays this honestly rather than substituting the current date or sync date.",
+      "nullable": true
     },
     "sync_date": {
       "type": "string",

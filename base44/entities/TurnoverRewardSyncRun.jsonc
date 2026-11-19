@@ -94,6 +94,11 @@
       "default": 0,
       "description": "Professional Project credits restored by reinstatement events."
     },
+    "turnover_snapshots_appended": {
+      "type": "number",
+      "default": 0,
+      "description": "New TurnoverRecord snapshot rows appended for changed source turnover figures. Historical records are never overwritten; a new row is appended only when the source timestamp (or null/Unknown sentinel) differs from every existing row for that account+year."
+    },
     "discrepancy_count": {
       "type": "number",
       "default": 0,

@@ -5,6 +5,16 @@ const MAX_DEALERS = 1000;
 const MAX_THRESHOLDS_PER_DEALER = 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+// Per-dealer additive turnover field names accepted from the Portal contract.
+// The original contract used `current_turnover_gbp` and `turnover_source_updated_at`.
+// Lovable's additive change introduces `annual_turnover_gbp` and `turnover_updated_at`
+// (where the timestamp may be null = Unknown). Both shapes are accepted here and
+// normalised to the canonical internal keys `current_turnover_gbp` and
+// `turnover_source_updated_at` so the rest of the pipeline (snapshot authority,
+// Dealer Admin display) never branches on source field names.
+const TURNOVER_AMOUNT_FIELDS = ["current_turnover_gbp", "annual_turnover_gbp"];
+const TURNOVER_TIMESTAMP_FIELDS = ["turnover_source_updated_at", "turnover_updated_at"];
+
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -43,8 +53,40 @@ export function validateEntitlementContract(payload, expectedCalendarYear) {
       "credits_per_threshold",
       "current_turnover_gbp",
       "turnover_source_updated_at",
+      "annual_turnover_gbp",
+      "turnover_updated_at",
     ])) {
       throw new Error("Dealer entitlement contains unsupported fields");
+    }
+
+    // Normalise the additive turnover fields from either the original or the
+    // new Lovable contract shape. A dealer may supply the amount under either
+    // name, and the timestamp under either name. The timestamp is allowed to
+    // be null (Unknown) but may never be substituted with the current date.
+    const amountPresent = TURNOVER_AMOUNT_FIELDS.some((f) => rawDealer[f] !== undefined);
+    const tsField = TURNOVER_TIMESTAMP_FIELDS.find((f) => rawDealer[f] !== undefined);
+    const tsPresent = tsField !== undefined;
+    if (amountPresent !== tsPresent) {
+      throw new Error("Dealer entitlement must provide turnover amount and timestamp together");
+    }
+    if (amountPresent) {
+      // Reject only when the same logical field is supplied under both names
+      // with different values — that is ambiguous, not additive.
+      if (rawDealer.current_turnover_gbp !== undefined && rawDealer.annual_turnover_gbp !== undefined
+        && Number(rawDealer.current_turnover_gbp) !== Number(rawDealer.annual_turnover_gbp)) {
+        throw new Error("Dealer entitlement has conflicting turnover amounts");
+      }
+      if (rawDealer.turnover_source_updated_at !== undefined && rawDealer.turnover_updated_at !== undefined) {
+        const a = rawDealer.turnover_source_updated_at;
+        const b = rawDealer.turnover_updated_at;
+        const bothNull = a === null && b === null;
+        const bothValid = a !== null && b !== null
+          && Number.isFinite(Date.parse(a)) && Number.isFinite(Date.parse(b))
+          && new Date(a).getTime() === new Date(b).getTime();
+        if (!bothNull && !bothValid) {
+          throw new Error("Dealer entitlement has conflicting turnover timestamps");
+        }
+      }
     }
 
     const dealerAccountIdRaw = String(rawDealer.dealer_account_id || "").trim();
@@ -75,33 +117,47 @@ export function validateEntitlementContract(payload, expectedCalendarYear) {
 
     // Optional per-dealer annual turnover and source timestamp (additive).
     // Both must be present together or both absent — a turnover value without
-    // a source timestamp cannot be displayed with a freshness label.
-    const hasTurnover = rawDealer.current_turnover_gbp !== undefined;
-    const hasTurnoverTs = rawDealer.turnover_source_updated_at !== undefined;
-    if (hasTurnover !== hasTurnoverTs) {
-      throw new Error("Dealer entitlement must provide current_turnover_gbp and turnover_source_updated_at together");
-    }
+    // a source timestamp cannot be displayed with a freshness label. The
+    // timestamp may be null, which is preserved as null (Unknown) and never
+    // converted to the current date.
+    const hasTurnover = amountPresent;
     let currentTurnoverGbp = undefined;
     let turnoverSourceUpdatedAt = undefined;
+    let turnoverTimestampKnown = undefined;
     if (hasTurnover) {
-      currentTurnoverGbp = Number(rawDealer.current_turnover_gbp);
+      const amountField = TURNOVER_AMOUNT_FIELDS.find((f) => rawDealer[f] !== undefined);
+      currentTurnoverGbp = Number(rawDealer[amountField]);
       if (!Number.isFinite(currentTurnoverGbp) || currentTurnoverGbp < 0) {
-        throw new Error("Dealer current_turnover_gbp must be a non-negative number");
+        throw new Error("Dealer turnover amount must be a non-negative number");
       }
-      const parsedTs = Date.parse(rawDealer.turnover_source_updated_at);
-      if (!Number.isFinite(parsedTs)) {
-        throw new Error("Dealer turnover_source_updated_at is invalid");
+      const rawTs = rawDealer[tsField];
+      if (rawTs === null) {
+        // Unknown timestamp — preserved honestly. A snapshot is still appended
+        // (the amount is real) but the Dealer Admin shows the source time as
+        // Unknown so a stale value is never mistaken for a current one.
+        turnoverSourceUpdatedAt = null;
+        turnoverTimestampKnown = false;
+      } else {
+        const parsedTs = Date.parse(rawTs);
+        if (!Number.isFinite(parsedTs)) {
+          throw new Error("Dealer turnover timestamp is invalid");
+        }
+        turnoverSourceUpdatedAt = new Date(parsedTs).toISOString();
+        turnoverTimestampKnown = true;
       }
-      turnoverSourceUpdatedAt = new Date(parsedTs).toISOString();
     }
 
-    return {
+    const dealer = {
       dealer_account_id: dealerAccountId,
       earned_thresholds_gbp: thresholds,
       credits_per_threshold: CREDITS_PER_THRESHOLD,
-      current_turnover_gbp: currentTurnoverGbp,
-      turnover_source_updated_at: turnoverSourceUpdatedAt,
     };
+    if (hasTurnover) {
+      dealer.current_turnover_gbp = currentTurnoverGbp;
+      dealer.turnover_source_updated_at = turnoverSourceUpdatedAt;
+      dealer.turnover_timestamp_known = turnoverTimestampKnown;
+    }
+    return dealer;
   });
 
   dealers.sort((a, b) => a.dealer_account_id.localeCompare(b.dealer_account_id));
