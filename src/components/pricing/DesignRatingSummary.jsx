@@ -2,181 +2,39 @@
 // ------------------------------------------
 // Compact Artcoustic System Design Rating sidebar card.
 //
-// Hierarchy: the four design categories lead (Spatial Resolution, Dynamic
-// Range, Timbre Matching, Screen / Viewing Geometry), followed by a divider
-// and the overall Design Performance Index summary for Primary / Secondary /
-// All seating scopes.
+// Presentation-only: heading, a Live Update / Completed status badge, the main
+// Design Performance Index, and the Primary and Secondary scoped indices
+// (Secondary only when secondary seats exist). The Design Performance Index
+// calculation, RP22 grading, weights, thresholds and seating scopes are
+// unchanged — every value is read from the same published engineering summary
+// (Completed) or live partial rating (Live Update) the previous card read.
 //
-// Category results use the FLOOR (lowest achieved level) across all included
-// parameters in each category — never an average, never the modal/most-common
-// level. The weakest applicable parameter governs. Screen / Viewing Geometry
-// retains RP23 terminology. No ASDR/DPI maths, thresholds, weights, parameter
-// authority, or category membership are changed.
+// Exclusion guards (missing room dimensions, incomplete design, bass pending,
+// stale scope) are preserved exactly: a result is never shown on missing,
+// provisional or stale evidence, and a result is never marked Completed merely
+// because some parameters have calculated — Completed requires the published
+// engineering summary.
 
 import React from 'react';
-import RP22GradingPill from '@/components/ui/RP22GradingPill';
-import PillCompletenessOutline from '@/components/ui/PillCompletenessOutline';
-import { assessDesignRatingSectionCompleteness } from '@/components/report/technical/designRatingSectionCompleteness';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
-function levelNum(key) {
-  return Number(String(key).replace('L', ''));
-}
+// Existing Sound Proof badge styling (Badge variant="outline" + brand tone).
+// Subtle blue for Live Update, subtle green for Completed.
+const STATUS_BADGE = {
+  live: 'bg-[#EAF2FB] text-[#1F5FA8] border-[#C5DBF0]',
+  completed: 'bg-[#E8F0E9] text-[#1F5A3A] border-[#C5DDD0]',
+};
 
-// Format a contribution key ("p11") as the concise parameter label ("P11").
-function paramLabel(key) {
-  const num = String(key || '').replace(/^p/i, '');
-  return num ? `P${num}` : String(key || '');
-}
-
-// Tooltip body: category title + one row per limiting parameter.
-function FloorTooltipBody({ label, isPrimary, limiting }) {
-  return (
-    <div style={{ minWidth: 150 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>
-        {label} · {isPrimary ? 'Primary' : 'Secondary'}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {limiting.map((p) => (
-          <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#213428' }}>{paramLabel(p.key)}</span>
-            <RP22GradingPill level={p.level} compact />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Wrap a pill in a hover/focus tooltip showing the limiting parameters,
-// but only when there are limiting parameters to show.
-function FloorPillWithTooltip({ pill, scope, label, isPrimary }) {
-  const limiting = scope?.limitingParams || [];
-  if (limiting.length === 0) return pill;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0} style={{ cursor: 'help', outline: 'none', display: 'inline-flex' }}>{pill}</span>
-      </TooltipTrigger>
-      <TooltipContent
-        side="right"
-        align="start"
-        sideOffset={6}
-        className="bg-white text-foreground border border-[#DCDBD6] shadow-md px-3 py-2 z-50 rounded-md"
-      >
-        <FloorTooltipBody label={label} isPrimary={isPrimary} limiting={limiting} />
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-// One category block — Primary + Secondary seat-scoped floor results.
-// Stable two-column grid: label left, result pill right (shared right edge).
-function CategoryBlock({ label, primary, secondary, isScreen, sectionIncomplete = false }) {
-  const renderScopeLine = (scope, isPrimary) => {
-    if (!scope?.hasContribs) {
-      return (
-        <div style={{ fontSize: 10, fontWeight: 600, color: '#9B9890' }}>
-          {isPrimary ? 'Primary Seats — not assessed' : 'Not configured'}
-        </div>
-      );
-    }
-
-    // Screen / Viewing Geometry — standard RP23 pill only, no commentary.
-    // Separately governed by RP23 authority; not affected by floor method.
-    if (isScreen) {
-      const lvl = scope.screenLevel;
-      if (!lvl) {
-        return (
-          <div style={{ fontSize: 10, fontWeight: 600, color: '#9B9890' }}>
-            {isPrimary ? 'Primary Seats — not assessed' : 'Not configured'}
-          </div>
-        );
-      }
-      const isFail = lvl === 'FAIL';
-      const lead = isPrimary
-        ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats — no lower than')
-        : (isFail ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
-      const pillLabel = isFail ? 'RP23 FAIL' : `RP23 L${levelNum(lvl)}`;
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-          <PillCompletenessOutline incomplete={sectionIncomplete}>
-            <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
-          </PillCompletenessOutline>
-        </div>
-      );
-    }
-
-    // RP22 performance categories — floor (lowest achieved level) method.
-    // The pill itself IS the conservative lowest-category result.
-    const floor = scope.floorLevel;
-    if (scope.hasFail || floor === 'FAIL') {
-      const lead = isPrimary ? 'Primary Seats' : 'Secondary Seats';
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-          <FloorPillWithTooltip
-            pill={
-              <PillCompletenessOutline incomplete={sectionIncomplete}>
-                <RP22GradingPill level="FAIL" compact />
-              </PillCompletenessOutline>
-            }
-            scope={scope}
-            label={label}
-            isPrimary={isPrimary}
-          />
-        </div>
-      );
-    }
-
-    const lead = isPrimary ? 'Primary Seats — no lower than' : 'Secondary Seats — no lower than';
-    const pill = floor ? (
-      <PillCompletenessOutline incomplete={sectionIncomplete}>
-        <RP22GradingPill level={floor} compact />
-      </PillCompletenessOutline>
-    ) : (
-      <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>—</span>
-    );
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-        <FloorPillWithTooltip pill={pill} scope={scope} label={label} isPrimary={isPrimary} />
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ paddingTop: 10, borderTop: '1px solid #E0DDD7' }}>
-      <div style={{ fontSize: 9.5, fontWeight: 800, color: '#1B1A1A', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
-        {label}
-      </div>
-      {renderScopeLine(primary, true)}
-      {secondary?.hasContribs && (
-        <div style={{ marginTop: 2 }}>{renderScopeLine(secondary, false)}</div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Compact Artcoustic System Design Rating sidebar card.
- */
-// Live Partial Design Rating card. Shown when the completed Design Rating is
-// unavailable but current valid RP22 evidence exists. It reuses the existing
-// scoring core's additive Design Performance Index and reports assessed
-// coverage against the full applicable set, the unavailable parameter groups
-// (bass singled out), and Primary/Secondary/All scoped indices. It is labelled
-// "Partial" and never claims comparability to a completed rating.
-function PartialRatingCard({ partial, bassPending }) {
-  const all = partial?.all || null;
-  const primary = partial?.primary || null;
-  const secondary = partial?.secondary || null;
-  if (!all || (all.assessedWeight ?? 0) === 0) return null;
-
-  const unavailableSectionLabels = Object.keys(all.unavailableGroups || {});
-  const showBassNote = all.bassUnavailable === true;
-
+// Shared simplified card shell: heading + status badge + main DPI + Primary
+// index + Secondary index (only when secondary seats exist).
+function RatingCardShell({
+  statusLabel,
+  statusClass,
+  mainIndex,
+  primaryIndex,
+  secondaryIndex,
+  showSecondary,
+}) {
   return (
     <div
       style={{
@@ -187,86 +45,68 @@ function PartialRatingCard({ partial, bassPending }) {
         margin: '0 16px 12px 16px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', letterSpacing: '0.04em' }}>
           ARTCOUSTIC SYSTEM
           <br />
           DESIGN RATING
         </div>
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: '#9B5D12',
-            background: '#FBEED7',
-            border: '1px solid #E7C99A',
-            borderRadius: 4,
-            padding: '2px 6px',
-          }}
-        >
-          Partial
-        </span>
+        <Badge variant="outline" className={`font-body text-[9px] font-semibold uppercase tracking-[0.08em] ${statusClass}`}>
+          {statusLabel}
+        </Badge>
       </div>
 
       <div style={{ fontSize: 24, fontWeight: 700, color: '#213428', fontFamily: 'Didact Gothic, sans-serif', lineHeight: 1.1 }}>
-        Design Performance Index {all.designPerformanceIndex ?? '—'}
-      </div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: '#625143', marginTop: 4 }}>
-        {all.assessedCount} of {all.fullApplicableCount} applicable parameters assessed
-        {' '}({Math.round(all.coveragePercent)}%)
-      </div>
-      <div style={{ fontSize: 9.5, fontWeight: 500, color: '#9B9890', marginTop: 3 }}>
-        Based on current valid evidence. Not comparable to a completed rating.
+        Design Performance Index {mainIndex ?? '—'}
       </div>
 
-      {primary && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
-          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Primary Seating</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#213428', marginTop: 2 }}>
-            Design Performance Index {primary.designPerformanceIndex ?? '—'}
-            <span style={{ fontSize: 9, fontWeight: 500, color: '#9B9890', marginLeft: 6 }}>
-              {primary.assessedCount}/{primary.fullApplicableCount} params
-            </span>
-          </div>
+      <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #ECEAE6' }}>
+        <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          Primary Seating
         </div>
-      )}
-      {secondary && (secondary.assessedWeight ?? 0) > 0 && (
+        <div style={{ marginTop: 2, fontSize: 13, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
+          Design Performance Index {primaryIndex ?? '—'}
+        </div>
+      </div>
+
+      {showSecondary && (
         <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
-          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Secondary Seating</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#213428', marginTop: 2 }}>
-            Design Performance Index {secondary.designPerformanceIndex ?? '—'}
-            <span style={{ fontSize: 9, fontWeight: 500, color: '#9B9890', marginLeft: 6 }}>
-              {secondary.assessedCount}/{secondary.fullApplicableCount} params
-            </span>
+          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            Secondary Seating
           </div>
-        </div>
-      )}
-
-      {(showBassNote || unavailableSectionLabels.length > 0) && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #E0DDD7' }}>
-          <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>
-            Not yet assessed
+          <div style={{ marginTop: 2, fontSize: 13, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
+            Design Performance Index {secondaryIndex ?? '—'}
           </div>
-          {showBassNote && (
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#213428', marginBottom: 2 }}>
-              Bass{bassPending ? ' — calculating…' : ''}
-            </div>
-          )}
-          {unavailableSectionLabels
-            .filter((label) => label !== 'Screen / Viewing Geometry' || (all.unavailableGroups[label] || []).length > 0)
-            .map((label) => (
-              <div key={label} style={{ fontSize: 9.5, fontWeight: 500, color: '#625143' }}>
-                {label}: {(all.unavailableGroups[label] || []).map((k) => `P${k.replace('p', '')}`).join(', ')}
-              </div>
-            ))}
         </div>
       )}
     </div>
   );
 }
 
+// Live Update card: the completed Design Rating is unavailable but current
+// valid RP22 evidence exists. Reads the live partial rating's additive
+// Design Performance Index only — no coverage text, no missing-parameter list.
+function PartialRatingCard({ partial }) {
+  const all = partial?.all || null;
+  const primary = partial?.primary || null;
+  const secondary = partial?.secondary || null;
+  if (!all || (all.assessedWeight ?? 0) === 0) return null;
+  const showSecondary = !!(secondary && (secondary.assessedWeight ?? 0) > 0);
+  return (
+    <RatingCardShell
+      statusLabel="Live Update"
+      statusClass={STATUS_BADGE.live}
+      mainIndex={all.designPerformanceIndex}
+      primaryIndex={primary?.designPerformanceIndex}
+      secondaryIndex={secondary?.designPerformanceIndex}
+      showSecondary={showSecondary}
+    />
+  );
+}
+
+/**
+ * Compact Artcoustic System Design Rating sidebar card.
+ */
 export default function DesignRatingSummary({
   showAsdr = false,
   engineeringSummary = null,
@@ -277,16 +117,6 @@ export default function DesignRatingSummary({
   roomDimsMissing = false,
   partialDesignRating = null,
 }) {
-  // Completion state for the four Design Rating sections, read from the ONE
-  // canonical engineering completeness authority — the same terminal contract
-  // that gates reports, proposals and publication. The outline never reflects
-  // the level itself: a completed L1 section carries no outline, an incomplete
-  // provisional L4 section does.
-  const sectionCompleteness = React.useMemo(
-    () => assessDesignRatingSectionCompleteness(engineeringSummary),
-    [engineeringSummary],
-  );
-
   if (!showAsdr) return null;
 
   const unavailableCard = (message) => (
@@ -312,21 +142,23 @@ export default function DesignRatingSummary({
   // current evidence is valid, so even the partial rating is withheld.
   if (roomDimsMissing) return unavailableCard('Room dimensions required');
 
-  // Completed rating is authoritative when available.
+  // Completed rating is authoritative when the published engineering summary
+  // is available and assessed. Publication conditions are satisfied by the
+  // presence of that summary — a result is never marked Completed merely
+  // because some parameters have calculated.
   const completedAvailable = !!engineeringSummary
     && engineeringSummary?.project?.rating?.status !== 'NOT_ASSESSED';
 
-  // Live Partial Design Rating — shown only when the completed rating is
-  // unavailable but current valid RP22 evidence exists. Never invents scores
-  // for missing parameters; bass that is not yet verified is reported as
-  // unavailable, not scored.
+  // Live Update: the completed rating is unavailable but current valid RP22
+  // evidence exists. Missing, provisional and stale evidence is excluded by
+  // the partial rating authority itself.
   const partial = partialDesignRating?.isPartial
     && (partialDesignRating.all?.assessedWeight ?? 0) > 0
     ? partialDesignRating
     : null;
 
   if (!completedAvailable && partial) {
-    return <PartialRatingCard partial={partial} bassPending={bassPending} />;
+    return <PartialRatingCard partial={partial} />;
   }
 
   if (asdrUnavailable) return unavailableCard('Incomplete Design');
@@ -344,101 +176,37 @@ export default function DesignRatingSummary({
   // Primary/Secondary floors as current until a matching publication arrives.
   if (staleScope && engineeringSummary) return unavailableCard('Incomplete Design');
 
-  // Direct read only: floors, scoped ratings and DPIs are already present in
+  // Direct read only: scoped Design Performance Indices are already present in
   // summariseEngineeringResults(). The sidebar never rebuilds them.
+  const projectSummary = engineeringSummary?.project || null;
   const primarySummary = engineeringSummary?.primary || null;
   const secondarySummary = engineeringSummary?.secondary || null;
-  const projectSummary = engineeringSummary?.project || null;
+
   const allRating = projectSummary?.rating || null;
+  if (!allRating || allRating.status === 'NOT_ASSESSED') {
+    return unavailableCard('Not assessed');
+  }
 
-  const isNotAssessed = !allRating || allRating.status === 'NOT_ASSESSED';
-
-  const primaryCats = primarySummary?.categories || [];
-  const secondaryCats = secondarySummary?.categories || [];
+  const primaryIndex = primarySummary?.designPerformanceIndex ?? null;
+  const allIndex = projectSummary?.designPerformanceIndex ?? null;
 
   const secondaryRating = secondarySummary?.rating || null;
   const secondaryIsConfigured =
-    secondaryRating &&
-    secondaryRating.status !== 'NOT_ASSESSED' &&
-    secondaryRating.status !== 'NOT_CONFIGURED';
-
-  const primaryIndex = primarySummary?.designPerformanceIndex ?? null;
+    secondaryRating
+    && secondaryRating.status !== 'NOT_ASSESSED'
+    && secondaryRating.status !== 'NOT_CONFIGURED';
   const secondaryIndex = secondaryIsConfigured
     ? (secondarySummary?.designPerformanceIndex ?? null)
     : null;
-  const allIndex = projectSummary?.designPerformanceIndex ?? null;
-
-  const CATEGORY_LABELS = ['Spatial Resolution', 'Dynamic Range', 'Timbre Matching', 'Screen / Viewing Geometry'];
-
-  const renderScopeSummary = (label, index, emphasize) => (
-    <div style={{ marginTop: emphasize ? 0 : 4, paddingTop: emphasize ? 0 : 4, borderTop: emphasize ? 'none' : '1px solid #ECEAE6' }}>
-      <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {label}
-      </div>
-      <div style={{ marginTop: 2, fontSize: emphasize ? 13 : 11, fontWeight: 700, color: '#213428', letterSpacing: '0.03em' }}>
-        Design Performance Index {index ?? '—'}
-      </div>
-    </div>
-  );
 
   return (
-    <TooltipProvider delayDuration={200}>
-    <div
-      style={{
-        padding: '12px 16px',
-        background: '#FFFFFF',
-        border: '1px solid #DCDBD6',
-        borderRadius: '8px',
-        margin: '0 16px 12px 16px',
-        maxHeight: '48vh',
-        overflowY: 'auto',
-      }}
-    >
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8, letterSpacing: '0.04em' }}>
-        ARTCOUSTIC SYSTEM
-        <br />
-        DESIGN RATING
-      </div>
-
-      {isNotAssessed ? (
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#9B9890' }}>NOT ASSESSED</div>
-      ) : (
-        <div>
-          {/* ── Four design categories — lead story ── */}
-          {CATEGORY_LABELS.map((label) => {
-            const idx = primaryCats.findIndex((c) => c.label === label);
-            if (idx < 0) return null;
-            return (
-              <CategoryBlock
-                key={label}
-                label={label}
-                primary={primaryCats[idx]}
-                secondary={secondaryCats[idx]}
-                isScreen={primaryCats[idx]?.isScreen}
-                sectionIncomplete={sectionCompleteness.sections[label]?.complete === false}
-              />
-            );
-          })}
-
-          {/* ── Divider ── */}
-          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '2px solid #DCDBD6' }} />
-
-          {/* ── Overall Design Performance Index summary ── */}
-          {renderScopeSummary('Primary Seating', primaryIndex, true)}
-          {secondaryIsConfigured
-            ? renderScopeSummary('Secondary Seating', secondaryIndex, false)
-            : (
-              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ECEAE6' }}>
-                <div style={{ fontSize: 8.5, fontWeight: 700, color: '#625143', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                  Secondary Seating
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9890', marginTop: 2 }}>Not configured</div>
-              </div>
-            )}
-          {renderScopeSummary('All Seating', allIndex, false)}
-        </div>
-      )}
-    </div>
-    </TooltipProvider>
+    <RatingCardShell
+      statusLabel="Completed"
+      statusClass={STATUS_BADGE.completed}
+      mainIndex={allIndex}
+      primaryIndex={primaryIndex}
+      secondaryIndex={secondaryIndex}
+      showSecondary={secondaryIsConfigured}
+    />
   );
 }
