@@ -125,7 +125,7 @@ export default function RoomDesignerVersionBar({
           versionName={displayedVersion?.version_name || null}
           updatedAt={formatLibraryDate(displayedVersion?.updated_date || displayedVersion?.created_date)}
           isCurrent={isCurrent}
-          loading={versionsLoading || !activeVersionId}
+          loading={versionsLoading || !activeVersionId || (!!loadedVersionId && !displayedVersion)}
           disabled={disabled}
           autoEdit={autoEdit}
           onAutoEditHandled={() => setAutoEdit(false)}
