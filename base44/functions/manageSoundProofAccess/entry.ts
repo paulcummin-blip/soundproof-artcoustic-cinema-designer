@@ -102,11 +102,24 @@ async function processAccount(base44, { action, accountId, actor, now }) {
     return { account_id: accountId, ok: false, error: 'Account not found.' };
   }
 
-  // Find all memberships for this account (to identify linked users).
+  // Find all users linked to this account. Two linkage paths exist:
+  //   1. AccountMembership records (the canonical seat model).
+  //   2. User.account_id (legacy and directory-imported accounts whose users
+  //      were linked directly rather than through a membership).
+  // The soundproof_access_enabled RLS flag must be projected onto EVERY user
+  // who can read this account's protected data, so both paths are resolved and
+  // de-duplicated. This also serves as the backfill mechanism: running `enable`
+  // on an active account sets the flag for all linked users.
   const memberships = await service.entities.AccountMembership.filter({ account_id: accountId });
-  const linkedUserIds = (Array.isArray(memberships) ? memberships : [])
-    .filter((m) => m.user_id && String(m.status || 'active') !== 'removed')
-    .map((m) => m.user_id);
+  const linkedUserIds = new Set(
+    (Array.isArray(memberships) ? memberships : [])
+      .filter((m) => m.user_id && String(m.status || 'active') !== 'removed')
+      .map((m) => m.user_id),
+  );
+  const accountUsers = await service.entities.User.filter({ account_id: accountId });
+  for (const u of (Array.isArray(accountUsers) ? accountUsers : [])) {
+    if (u.id) linkedUserIds.add(u.id);
+  }
 
   let newStatus = account.status;
   let newExpiresAt = account.soundproof_access_expires_at || null;
@@ -175,8 +188,8 @@ async function processAccount(base44, { action, accountId, actor, now }) {
         previous_expires_at: account.soundproof_access_expires_at || null,
         new_expires_at: newExpiresAt,
         user_enabled: userEnabled,
-        linked_user_count: linkedUserIds.length,
-        linked_user_ids: linkedUserIds,
+        linked_user_count: linkedUserIds.size,
+        linked_user_ids: [...linkedUserIds],
       },
     });
   } catch (auditErr) {
@@ -192,6 +205,6 @@ async function processAccount(base44, { action, accountId, actor, now }) {
     new_status: newStatus,
     new_expires_at: newExpiresAt,
     user_enabled: userEnabled,
-    linked_users_updated: linkedUserIds.length,
+    linked_users_updated: linkedUserIds.size,
   };
 }

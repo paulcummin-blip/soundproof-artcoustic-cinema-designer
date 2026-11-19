@@ -147,6 +147,11 @@
                   }
                 }
               ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
             }
           ]
         },
@@ -185,6 +190,11 @@
                   }
                 }
               ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
             }
           ]
         },
@@ -223,6 +233,11 @@
                   }
                 }
               ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
             }
           ]
         },
@@ -261,6 +276,11 @@
                   }
                 }
               ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
             }
           ]
         },

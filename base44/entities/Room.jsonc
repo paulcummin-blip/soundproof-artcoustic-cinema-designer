@@ -1,6 +1,7 @@
 {
   "name": "Room",
   "type": "object",
+  "description": "Legacy room record. Not referenced by the active Room Designer workflow (which stores room geometry on the Project entity). Retained for historical records. Admin-only access: no dealer or anonymous read, create, update or delete.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -97,5 +98,27 @@
   },
   "required": [
     "project_id"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

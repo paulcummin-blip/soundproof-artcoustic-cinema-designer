@@ -1,6 +1,7 @@
 {
   "name": "RoomElement",
   "type": "object",
+  "description": "Legacy room element record (doors, windows, projectors, skylights). Not referenced by the active Room Designer workflow (which stores room elements on the Project entity's room_elements array). Retained for historical records. Admin-only access: no dealer or anonymous read, create, update or delete.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -107,5 +108,27 @@
   "required": [
     "project_id",
     "type"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

@@ -229,9 +229,21 @@ export async function resolveAccountAccess(base44, sessionUser, {
   );
 
   if (!membership && bootstrapLegacyMembership) {
+    // Legacy empty-account admin bootstrap. This auto-creates an account-admin
+    // membership for a user who already had account_id on their User record but
+    // no AccountMembership. It must NEVER auto-grant administrator membership to
+    // a newly imported dealer account. The guard below restricts it to users who
+    // arrived with a PRE-EXISTING account link (authoritativeUser.account_id was
+    // already set before this call). A user whose account_id was just resolved
+    // from an invitation or email match carries invitationMembership and never
+    // reaches this branch. Newly imported directory accounts have no users and
+    // no memberships, so no user arrives with their account_id until an explicit
+    // administrator assignment creates a membership — which means this bootstrap
+    // never fires for them. The iCubed pilot path is separate and unaffected.
+    const hadExistingAccountLink = Boolean(String(authoritativeUser.account_id || '').trim());
     const shouldBootstrapAdmin =
       authoritativeUser.account_role === 'admin'
-      || !existingAdmin && occupiedMemberships.length === 0;
+      || (hadExistingAccountLink && !existingAdmin && occupiedMemberships.length === 0);
     membership = await service.entities.AccountMembership.create({
       user_id: authoritativeUser.id,
       email,
