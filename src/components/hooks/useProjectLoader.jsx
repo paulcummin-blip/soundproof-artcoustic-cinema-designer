@@ -392,7 +392,8 @@ appState, // Pass appState directly for setters
       // re-load window (e.g. the first seat-count change on a new project).
       const hydratedVersionId = canonical.identity?.activeVersionId || null;
       const canRetainHydratedDesign = wasAlreadyHydrated
-        && hydratedVersionId === p.active_version_id;
+        && hydratedVersionId === p.active_version_id
+        && (!appState?.activeVersionId || appState.activeVersionId === hydratedVersionId);
       if (!canRetainHydratedDesign) {
         appState?.setProjectHydrationReady?.(false);
         hydrateFromProject(mergedP);
