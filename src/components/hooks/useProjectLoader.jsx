@@ -668,7 +668,6 @@ appState, // Pass appState directly for setters
       return;
     }
 
-    if (optimiserPlanAuthority?.run?.runId) console.info("[Bass ADI save gate audit]", JSON.stringify({projectId:effectiveProjectId,versionId:appState?.activeVersionId,armed:autosaveUserArmedRef.current,instanceStatus:appState?.subwooferInstancesStatus,migrationState:appState?.subwooferInstanceMigrationState,hydration:hydrationAuthorityRef.current,plan:serializeOptimiserPlan(optimiserPlanAuthority)}));
     const AUTOSAVE_INTERVAL_MS = 30_000;
     const AUTOSAVE_DEBOUNCE_MS = 1_000;
 
@@ -1140,7 +1139,16 @@ appState, // Pass appState directly for setters
       };
       try {
         setAutosaveStatus("saving");
-        const result=await work({readback,persist,current});
+        const writePlan = async plan => {
+          if (!current()) throw new Error("The project changed before saving the completed plan.");
+          const row = await read();
+          // Merge only the plan into the freshly read version; geometry,
+          // electronics and historical engineering publications are untouched.
+          await base44.entities.ProjectVersion.update(versionId, {
+            design_state: {...row.design_state, optimiser_plan:plan},
+          });
+        };
+        const result=await work({readback,persist,current,readVersion:read,writePlan});
         if(current()) setAutosaveStatus("saved");
         return result;
       } catch(error) {
