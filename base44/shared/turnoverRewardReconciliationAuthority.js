@@ -37,7 +37,13 @@ export function validateEntitlementContract(payload, expectedCalendarYear) {
   const seenDealerIds = new Set();
   const dealers = payload.dealers.map((rawDealer) => {
     if (!isPlainObject(rawDealer)) throw new Error("Dealer entitlement must be an object");
-    if (!hasOnlyKeys(rawDealer, ["dealer_account_id", "earned_thresholds_gbp", "credits_per_threshold"])) {
+    if (!hasOnlyKeys(rawDealer, [
+      "dealer_account_id",
+      "earned_thresholds_gbp",
+      "credits_per_threshold",
+      "current_turnover_gbp",
+      "turnover_source_updated_at",
+    ])) {
       throw new Error("Dealer entitlement contains unsupported fields");
     }
 
@@ -67,10 +73,34 @@ export function validateEntitlementContract(payload, expectedCalendarYear) {
       }
     }
 
+    // Optional per-dealer annual turnover and source timestamp (additive).
+    // Both must be present together or both absent — a turnover value without
+    // a source timestamp cannot be displayed with a freshness label.
+    const hasTurnover = rawDealer.current_turnover_gbp !== undefined;
+    const hasTurnoverTs = rawDealer.turnover_source_updated_at !== undefined;
+    if (hasTurnover !== hasTurnoverTs) {
+      throw new Error("Dealer entitlement must provide current_turnover_gbp and turnover_source_updated_at together");
+    }
+    let currentTurnoverGbp = undefined;
+    let turnoverSourceUpdatedAt = undefined;
+    if (hasTurnover) {
+      currentTurnoverGbp = Number(rawDealer.current_turnover_gbp);
+      if (!Number.isFinite(currentTurnoverGbp) || currentTurnoverGbp < 0) {
+        throw new Error("Dealer current_turnover_gbp must be a non-negative number");
+      }
+      const parsedTs = Date.parse(rawDealer.turnover_source_updated_at);
+      if (!Number.isFinite(parsedTs)) {
+        throw new Error("Dealer turnover_source_updated_at is invalid");
+      }
+      turnoverSourceUpdatedAt = new Date(parsedTs).toISOString();
+    }
+
     return {
       dealer_account_id: dealerAccountId,
       earned_thresholds_gbp: thresholds,
       credits_per_threshold: CREDITS_PER_THRESHOLD,
+      current_turnover_gbp: currentTurnoverGbp,
+      turnover_source_updated_at: turnoverSourceUpdatedAt,
     };
   });
 

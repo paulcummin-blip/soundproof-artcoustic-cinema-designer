@@ -147,12 +147,15 @@ export default async function syncUkTurnoverRewards(req) {
       }, { status: 422 });
     }
 
-    const [allLinks, allMilestones] = await Promise.all([
+    const [allLinks, allMilestones, existingTurnoverRecords] = await Promise.all([
       base44.asServiceRole.entities.ExternalAccountLink.filter({
         source_system: SOURCE_SYSTEM,
         active: true,
       }),
       base44.asServiceRole.entities.TurnoverMilestone.filter({
+        calendar_year: calendarYear,
+      }),
+      base44.asServiceRole.entities.TurnoverRecord.filter({
         calendar_year: calendarYear,
       }),
     ]);
@@ -192,6 +195,15 @@ export default async function syncUkTurnoverRewards(req) {
       milestonesByAccount.get(milestone.account_id).push(milestone);
     }
 
+    // Dedup keys for turnover snapshots: (account_id, source_last_updated).
+    // A new snapshot is appended only when the source timestamp differs from
+    // every existing record for that account+year — historical records are
+    // never overwritten.
+    const existingTurnoverKeys = new Set();
+    for (const r of Array.isArray(existingTurnoverRecords) ? existingTurnoverRecords : []) {
+      existingTurnoverKeys.add(`${r.account_id}|${r.source_last_updated || ""}`);
+    }
+
     let dealersMatched = 0;
     let dealersUnmatched = 0;
     let dealersUpdated = 0;
@@ -202,6 +214,7 @@ export default async function syncUkTurnoverRewards(req) {
     let projectsReversed = 0;
     let milestonesReinstated = 0;
     let projectsReinstated = 0;
+    let turnoverSnapshotsAppended = 0;
     let errorCount = 0;
     const errors = [];
     const dealerResults = [];
@@ -341,6 +354,29 @@ export default async function syncUkTurnoverRewards(req) {
       }
 
       if (appliedActions.length > 0) dealersUpdated += 1;
+
+      // Append a turnover snapshot for the dealer's current annual figure.
+      // A new TurnoverRecord is created only when the source timestamp differs
+      // from every existing record for this account+year — preserving history.
+      if (!dryRun && dealerEntitlement.current_turnover_gbp !== undefined) {
+        const turnoverKey = `${accountId}|${dealerEntitlement.turnover_source_updated_at}`;
+        if (!existingTurnoverKeys.has(turnoverKey)) {
+          await base44.asServiceRole.entities.TurnoverRecord.create({
+            account_id: accountId,
+            external_account_link_id: link.id,
+            calendar_year: calendarYear,
+            eligible_turnover_gbp: dealerEntitlement.current_turnover_gbp,
+            source_currency: "GBP",
+            source_turnover: dealerEntitlement.current_turnover_gbp,
+            source_system: SOURCE_SYSTEM,
+            source_last_updated: dealerEntitlement.turnover_source_updated_at,
+            sync_date: new Date().toISOString(),
+          });
+          existingTurnoverKeys.add(turnoverKey);
+          turnoverSnapshotsAppended += 1;
+        }
+      }
+
       dealerResults.push({
         dealer_account_id: dealerId,
         sound_proof_account_id: accountId,
@@ -370,6 +406,7 @@ export default async function syncUkTurnoverRewards(req) {
       projects_reversed: projectsReversed,
       milestones_reinstated: milestonesReinstated,
       projects_reinstated: projectsReinstated,
+      turnover_snapshots_appended: turnoverSnapshotsAppended,
       discrepancy_count: errorCount,
       error_count: errorCount,
       error_summary: errors.join("; ").slice(0, 2000),
@@ -394,6 +431,7 @@ export default async function syncUkTurnoverRewards(req) {
         projects_reversed: projectsReversed,
         milestones_reinstated: milestonesReinstated,
         projects_reinstated: projectsReinstated,
+        turnover_snapshots_appended: turnoverSnapshotsAppended,
         error_count: errorCount,
       },
       dealers: dealerResults,
