@@ -76,7 +76,7 @@ export default function ProjectDesignHydrator({ projectId }) {
       Number.isFinite(Number(app?.roomDims?.widthM)) &&
       Number.isFinite(Number(app?.roomDims?.lengthM));
 
-    if (alreadyHydrated && commercialReady) {
+    if (alreadyHydrated && commercialReady && (app.activeVersionId || null) === canonicalVersionId) {
       completeDesignHydration(projectId);
       return undefined;
     }
