@@ -1067,7 +1067,8 @@ export default function OptimiseAndCalculate({
           publicationError: saveFailReason,
         }).catch(() => null);
         setWorkflowError(projectId, versionId,
-          "The optimisation completed, but its results could not be saved. Retry saving the project.");
+          "The optimisation completed, but its results could not be saved. " + saveFailReason, "plan-save");
+        lastErrorPhaseRef.current = "plan-save";
         return;
       }
 
@@ -1373,6 +1374,38 @@ export default function OptimiseAndCalculate({
     // with setWorkflowError) survives the unmount so Retry still routes to the
     // recovery orchestrator instead of falling back to handleReset.
     const phase = resolveRecoveryFailurePhase(workflowState, lastErrorPhaseRef.current);
+    const completed = getOptimiserPlanAuthority(projectId, versionId);
+    if (phase === "plan-save" || completed?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED) {
+      if (recoveryBusy) return;
+      setRecoveryBusy(true);
+      const originalError = completed?.failure?.message || workflowState.error;
+      try {
+        if (!completed?.run?.runId || sharedRef.current?.cacheKey !== completed.designFingerprint) {
+          throw new Error("The completed plan belongs to a different design. Restore that design before retrying its save.");
+        }
+        const recovered = {
+          ...completed, failure:null,
+          saveRecovery:{originalError, recoveredAt:new Date().toISOString(), runId:completed.run.runId},
+          terminalTrace:completed.terminalTrace ? {...completed.terminalTrace, planSave:"acknowledged"} : null,
+        };
+        setOptimiserPlanAuthority(projectId, versionId, recovered);
+        await waitForOptimiserPlanSave(projectId, versionId, completed.run.runId);
+        if (sharedRef.current?.cacheKey !== completed.designFingerprint) throw new Error("The design changed during save recovery.");
+        // Recovery ends at a verified saved plan. Recommendations remain for
+        // review; no search, electronic Apply or bass publication is invoked.
+        setRecoveryComplete(projectId, versionId, originalError);
+        lastErrorPhaseRef.current = null;
+      } catch (error) {
+        if (completed) setOptimiserPlanAuthority(projectId, versionId, {
+          ...completed,
+          failure:{...completed.failure, status:OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+            category:OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED, message:error.message, originalError},
+        });
+        setWorkflowError(projectId, versionId, "The completed plan is retained. Retry saving: " + error.message, "plan-save");
+        lastErrorPhaseRef.current = "plan-save";
+      } finally { setRecoveryBusy(false); }
+      return;
+    }
     if (phase !== "recalculating" && phase !== "publishing") {
       // Not a post-apply recalculation failure — fall back to the existing reset.
       handleReset();
