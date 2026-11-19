@@ -1539,6 +1539,7 @@ export default function OptimiseAndCalculate({
   // authority. Nothing here decides what may be applied: that is the calibration
   // decision's own job.
   const runCalibrationAutoApply = useCallback(() => {
+    if (recoveryBusy) return;
     const plan = getOptimiserPlanAuthority(projectId, versionId);
     if (plan?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED) {
       void handleRecoveryRetry();
@@ -1546,7 +1547,7 @@ export default function OptimiseAndCalculate({
     }
     handleResetRef.current();
     setTimeout(() => handleStartRef.current(), 50);
-  }, [projectId, versionId, handleRecoveryRetry]);
+  }, [projectId, versionId, handleRecoveryRetry, recoveryBusy]);
 
   useEffect(() => {
     if (!registerRecalculate) return;
@@ -1718,7 +1719,8 @@ export default function OptimiseAndCalculate({
           versionId={versionId}
           currentDesignFingerprint={shared?.cacheKey || null}
           onRunAgain={runCalibrationAutoApply}
-          runAgainLabel={savedJointPlan?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED ? "Retry saving plan" : undefined}
+          runAgainLabel={recoveryBusy ? "Retrying save…" : savedJointPlan?.failure?.status === OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED ? "Retry saving plan" : undefined}
+          saveBusy={recoveryBusy}
           handleApplyLever={handleApplyLever}
           handleUndoLever={handleUndoLever}
           leverApplyBusy={leverApplyBusy}
