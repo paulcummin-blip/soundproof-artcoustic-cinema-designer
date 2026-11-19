@@ -72,6 +72,11 @@ export default function RoomDesignerVersionBar({
   const activeVersion = versionApi?.activeVersion || null;
   const activeVersionId = versionApi?.activeVersionId || null;
   const versionsLoading = versionApi?.loading === true;
+  // Name the design actually loaded, even if another reader has already
+  // discovered a newer active pointer while its design is still loading.
+  const displayedVersion = loadedVersionId
+    ? versionApi?.versions?.find(v => v.id === loadedVersionId) || null
+    : activeVersion;
 
   // "Current" means the design being edited IS the project's active version.
   // When the project's active version has moved on since this design was
@@ -117,8 +122,8 @@ export default function RoomDesignerVersionBar({
       {/* Active version — compact card */}
       <div className="min-w-[200px]" style={{ flexShrink: 2 }}>
         <ActiveVersionCard
-          versionName={activeVersion?.version_name || null}
-          updatedAt={formatLibraryDate(activeVersion?.updated_date || activeVersion?.created_date)}
+          versionName={displayedVersion?.version_name || null}
+          updatedAt={formatLibraryDate(displayedVersion?.updated_date || displayedVersion?.created_date)}
           isCurrent={isCurrent}
           loading={versionsLoading || !activeVersionId}
           disabled={disabled}
