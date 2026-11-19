@@ -31,6 +31,7 @@ import {
 import { readRoomDimsMissingIndicator } from "@/components/state/designReviewHandoff";
 
 import ApiBadge from "@/components/ui/ApiBadge";
+import SidebarResizeHandle from "@/components/ui/SidebarResizeHandle";
 import BrandIntroOverlay from "@/components/ui/BrandIntroOverlay";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BuildDiagnosticPanel from "@/components/dev/BuildDiagnosticPanel";
@@ -53,6 +54,36 @@ import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/a
 import { useAuth } from "@/lib/AuthContext";
 import { hasCapability, isStrictMasterAdmin } from "@/lib/accountAccess";
 
+
+// Content-driven sidebar width for the Live RP22 Performance Summary panel.
+// The default is derived from the actual seat-pill, gap and padding sizes so
+// four seat performance badges sit on a single row without clipping; the
+// minimum is the same content fit, so dragging the divider narrower never
+// drops a badge to a second row. No RP22 calculation is changed here — these
+// are layout measurements only.
+const SEAT_PILL_MIN_WIDTH = 44;     // RP22GradingPill app variant minWidth
+const SEAT_PILL_OUTLINE = 4;        // 2px box-shadow ring, each side
+const SEAT_GAP = 5;                 // SeatPillGrid SEAT_GAP
+const TARGET_SEATS_PER_ROW = 4;
+const PARAM_ROW_PADDING_X = 24;     // ParameterRow: 12px each side
+const PILLAR_BORDER_X = 2;          // PillarSection: 1px each side
+const RP22_PANEL_PADDING_X = 24;    // LiveRP22 inner grid: 12px each side
+const RP22_PANEL_BORDER_X = 2;      // LiveRP22 outer container: 1px each side
+const SIDEBAR_RP22_MARGIN_X = 32;   // Layout RP22 wrapper: 16px each side
+const SIDEBAR_COMFORT_PADDING = 24;
+
+const SEAT_ROW_MIN_WIDTH =
+  TARGET_SEATS_PER_ROW * (SEAT_PILL_MIN_WIDTH + SEAT_PILL_OUTLINE) +
+  (TARGET_SEATS_PER_ROW - 1) * SEAT_GAP;
+const RP22_PANEL_MIN_WIDTH =
+  SEAT_ROW_MIN_WIDTH +
+  PARAM_ROW_PADDING_X +
+  PILLAR_BORDER_X +
+  RP22_PANEL_PADDING_X +
+  RP22_PANEL_BORDER_X;
+const SIDEBAR_MIN_WIDTH = RP22_PANEL_MIN_WIDTH + SIDEBAR_RP22_MARGIN_X;
+const SIDEBAR_DEFAULT_WIDTH = SIDEBAR_MIN_WIDTH + SIDEBAR_COMFORT_PADDING;
+const SIDEBAR_MAX_WIDTH = 480;
 
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
@@ -125,6 +156,28 @@ export default function Layout({ children, currentPageName }) {
   React.useEffect(() => {
     try { localStorage.setItem('b44_workspace_nav_open', workspaceNavOpen ? '1' : '0'); } catch {}
   }, [workspaceNavOpen]);
+
+  // Resizable sidebar width — drives the Live RP22 Performance Summary panel
+  // width. Persisted to localStorage (same approach as the workspace-nav
+  // toggle above) so the chosen width survives workspace-view switches and
+  // page reloads. Clamped to the content-derived min/max on read.
+  const [sidebarWidth, setSidebarWidth] = React.useState(() => {
+    try {
+      const stored = localStorage.getItem('b44_sidebar_width');
+      const value = stored ? Number(stored) : NaN;
+      if (
+        Number.isFinite(value) &&
+        value >= SIDEBAR_MIN_WIDTH &&
+        value <= SIDEBAR_MAX_WIDTH
+      ) {
+        return value;
+      }
+    } catch {}
+    return SIDEBAR_DEFAULT_WIDTH;
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem('b44_sidebar_width', String(sidebarWidth)); } catch {}
+  }, [sidebarWidth]);
   const [isMobile, setIsMobile] = React.useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 1024);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
@@ -346,9 +399,10 @@ export default function Layout({ children, currentPageName }) {
             className={`app-shell-sidebar border-r border-brand-border bg-brand-sidebar-bg flex flex-col transition-transform duration-200 ${
               isMobile
                 ? `fixed top-0 left-0 h-full w-64 z-50 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`
-                : 'w-64'
+                : ''
             }`}
             data-app-shell-sidebar="true"
+            style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0, position: 'relative' }}
           >
             {/* Brand */}
             <div className="p-4">
@@ -644,6 +698,14 @@ export default function Layout({ children, currentPageName }) {
                   <LiveRP22PerformanceSummary liveSummary={liveRp22Summary} />
                 </div>
               </div>
+            )}
+            {!isMobile && (
+              <SidebarResizeHandle
+                width={sidebarWidth}
+                minWidth={SIDEBAR_MIN_WIDTH}
+                maxWidth={SIDEBAR_MAX_WIDTH}
+                onWidthChange={setSidebarWidth}
+              />
             )}
           </aside>
           )}
