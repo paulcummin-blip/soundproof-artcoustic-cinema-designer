@@ -1,0 +1,128 @@
+{
+  "name": "DealerDirectoryImportRun",
+  "type": "object",
+  "description": "One dealer-directory import run: the overlap lock, the run lifecycle, and the durable audit of every Account and ExternalAccountLink the import created. Master-admin-only, created by the importDealerDirectory backend function. A run starts as RUNNING and ends as COMPLETED, PARTIAL, FAILED or ABORTED. The importer refuses to start while another RUNNING run started less than 15 minutes ago, so two imports cannot overlap. The created_summary array is the persistent audit of created accounts and links; conflicts records any identity conflicts that aborted the run. No engineering, credit, turnover, membership or access state is ever read from or written by this record.",
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Stable, unique run identifier minted when the run started."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "RUNNING",
+        "COMPLETED",
+        "PARTIAL",
+        "FAILED",
+        "ABORTED",
+        "DRY_RUN"
+      ],
+      "default": "RUNNING",
+      "description": "RUNNING = in progress (acts as the overlap lock); COMPLETED = all proposed accounts and links created; PARTIAL = some creates failed; FAILED = directory fetch/validation error or stale lock cleared; ABORTED = identity conflicts detected, nothing created; DRY_RUN = advisory dry-run marker (no lock held)."
+    },
+    "dry_run": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when this run was a dry run. Dry runs create no accounts or links and hold no lock."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run started."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the run reached its terminal state. Null while RUNNING."
+    },
+    "requested_by_user_id": {
+      "type": "string",
+      "description": "Base44 user id of the master admin who requested the import."
+    },
+    "requested_by_email": {
+      "type": "string",
+      "description": "Email of the master admin who requested the import."
+    },
+    "dealers_received": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of dealer records received from the directory for this run."
+    },
+    "accounts_created": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of Sound Proof Account records this run created."
+    },
+    "links_created": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of ExternalAccountLink records this run created."
+    },
+    "accounts_preserved": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of directory dealers that matched existing Sound Proof accounts and were left unchanged."
+    },
+    "conflicts_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of identity conflicts detected. Non-zero means the run aborted without creating anything."
+    },
+    "abort_reason": {
+      "type": "string",
+      "nullable": true,
+      "description": "Why the run aborted. Null unless status is ABORTED."
+    },
+    "error_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Failure or partial-error summary. Null when the run had no errors."
+    },
+    "created_summary": {
+      "type": "array",
+      "default": [],
+      "description": "Durable audit of every Account and ExternalAccountLink this run created, in creation order. Each entry: { account_id, external_link_id, dealer_account_id, portal_user_id, account_name, sector }. Internal audit only; never carries client or personal data.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "default": [],
+      "description": "Identity conflicts that aborted the run (ambiguous name matches or unlinked name matches), sanitised to dealer organisation identity only.",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "run_id",
+    "status",
+    "started_at",
+    "requested_by_user_id",
+    "requested_by_email"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
