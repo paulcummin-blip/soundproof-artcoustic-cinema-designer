@@ -586,6 +586,7 @@ export default function RP22ClientReport() {
     versionId: authority.versionId,
     enabled: autoIntentEnabled,
     onBeforeGenerate: autoContextReview.review,
+    forceRegenerate: reportIntent.regenerateIntent,
   });
 
   // The page CONTENT is assembled by the report's own composition hook; the
@@ -799,6 +800,14 @@ export default function RP22ClientReport() {
     if (!reportFullyReady || !exportIntegrity.ready || publication.status === 'storing') return;
     return rawHandleExport();
   }, [reportFullyReady, exportIntegrity.ready, publication.status, rawHandleExport]);
+
+  // Store-only export: captures, validates and stores the PDF through the
+  // existing issued-document pipeline without opening a browser print
+  // dialogue. Used by the Create Technical Report action's autoStore intent.
+  const handleStoreOnly = useCallback(() => {
+    if (!reportFullyReady || !exportIntegrity.ready || publication.status === 'storing') return;
+    return rawHandleExport({ storeOnly: true });
+  }, [reportFullyReady, exportIntegrity.ready, publication.status, rawHandleExport]);
   const generationFailed = readiness.state === REPORT_STATE.FAILED || adiFailed;
   // The overlay stage: "writing" once ADI is generating; "building" otherwise.
   const overlayStage = adiRunning ? 'writing' : 'building';
@@ -886,6 +895,11 @@ export default function RP22ClientReport() {
     requested: reportIntent.exportPdf,
     ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
     onRun: handleExport,
+  });
+  useReportActionIntent({
+    requested: reportIntent.autoStore,
+    ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
+    onRun: handleStoreOnly,
   });
   useReportActionIntent({
     requested: reportIntent.updateReport,

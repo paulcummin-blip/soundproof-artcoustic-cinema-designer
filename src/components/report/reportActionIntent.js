@@ -21,6 +21,8 @@ import { useEffect, useRef } from 'react';
 
 export const REPORT_AUTOPRINT_PARAM = 'autoPrint';
 export const REPORT_UPDATE_PARAM = 'updateReport';
+export const REPORT_AUTOSTORE_PARAM = 'autoStore';
+export const REPORT_REGENERATE_INTENT_PARAM = 'regenerateIntent';
 
 /** What a report URL asks the report page to do. */
 export function readReportActionIntent(search) {
@@ -30,6 +32,8 @@ export function readReportActionIntent(search) {
   return {
     exportPdf: params.get(REPORT_AUTOPRINT_PARAM) === '1',
     updateReport: params.get(REPORT_UPDATE_PARAM) === '1',
+    autoStore: params.get(REPORT_AUTOSTORE_PARAM) === '1',
+    regenerateIntent: params.get(REPORT_REGENERATE_INTENT_PARAM) === '1',
   };
 }
 

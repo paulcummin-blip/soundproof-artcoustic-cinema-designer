@@ -29,7 +29,8 @@ import { Button } from '@/components/ui/button';
 import { REPORT_ROUTE } from '@/components/report/reportLibraryContext';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
 import { openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
-import { REPORT_AUTOPRINT_PARAM, REPORT_UPDATE_PARAM } from '@/components/report/reportActionIntent';
+import { REPORT_AUTOPRINT_PARAM, REPORT_UPDATE_PARAM, REPORT_AUTOSTORE_PARAM, REPORT_REGENERATE_INTENT_PARAM } from '@/components/report/reportActionIntent';
+import { useDesignContextReview } from '@/components/adi/designContext/useDesignContextReview';
 import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel, NOT_AVAILABLE_LABEL } from './documentWorkflowStatus';
 import { useProjectImageCount } from './useProjectImageCount';
 import DocumentCard from './DocumentCard';
@@ -93,6 +94,12 @@ export default function DocumentWorkflowPanel({
     }
   };
 
+  // Pre-generation Design Context review. The review discovers questions and
+  // presents them before the report is generated, so the designer's
+  // explanations reach the Design Intent writer. The dialog is rendered at the
+  // end of this panel.
+  const contextReview = useDesignContextReview({ projectId, versionId });
+
   const navigateToReportRenderer = (options = {}) => {
     if (disabled || !projectId || !versionId) return;
     const params = new URLSearchParams();
@@ -100,13 +107,21 @@ export default function DocumentWorkflowPanel({
     if (versionId) params.set('versionId', versionId);
     if (options.updateReport) params.set(REPORT_UPDATE_PARAM, '1');
     if (options.autoPrint) params.set(REPORT_AUTOPRINT_PARAM, '1');
+    if (options.autoStore) params.set(REPORT_AUTOSTORE_PARAM, '1');
+    if (options.regenerateIntent) params.set(REPORT_REGENERATE_INTENT_PARAM, '1');
     window.location.assign(`${REPORT_ROUTE.VISUAL}?${params.toString()}`);
   };
 
-  const handleTechnicalReportAct = () => {
+  const handleTechnicalReportAct = async () => {
+    // Run the Design Context review before navigating. The designer may
+    // answer, skip, or cancel. Cancellation stops the action entirely so no
+    // report is generated or stored without the designer's involvement.
+    const proceed = await contextReview.review();
+    if (!proceed) return;
     navigateToReportRenderer({
       updateReport: trState === WORKFLOW_STATE.OUTDATED,
-      autoPrint: true,
+      autoStore: true,
+      regenerateIntent: true,
     });
   };
 
@@ -224,6 +239,9 @@ export default function DocumentWorkflowPanel({
         loading={imageCountLoading}
         onManage={openImageLibrary}
       />
+
+      {/* Pre-generation Design Context review dialog */}
+      <contextReview.Dialog />
     </div>
   );
 }

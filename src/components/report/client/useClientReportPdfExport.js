@@ -107,6 +107,9 @@ export function useClientReportPdfExport({
   });
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
+  // The last export's store-only flag, held so a targeted retry re-stores without
+  // opening a browser print dialogue when the original export was store-only.
+  const storeOnlyRef = useRef(false);
   // The app-owned window the report is printed from, when one could be opened.
   const printWindowRef = useRef(null);
   // The export action itself, held stably so a failed Library storage can offer
@@ -143,9 +146,11 @@ export function useClientReportPdfExport({
     };
   }, [cleanup]);
 
-  const handleExport = useCallback(async () => {
+  const handleExport = useCallback(async ({ storeOnly = false } = {}) => {
     if (exporting || printingRef.current || publication.status === 'storing') return;
     if (activePageCount === 0) return;
+
+    storeOnlyRef.current = storeOnly;
 
     const title = buildProjectReportTitle(
       projectName,
@@ -156,7 +161,12 @@ export function useClientReportPdfExport({
     // Open the app-owned print window FIRST, synchronously, while the browser
     // still treats this as a user gesture. The window is opened on the report
     // filename, so the saved PDF is named by the report itself.
-    printWindowRef.current = openReportPrintWindow(title);
+    // In store-only mode the browser print dialogue is never opened: the PDF
+    // is captured, validated and stored through the issued-document pipeline
+    // without invoking window.print().
+    if (!storeOnly) {
+      printWindowRef.current = openReportPrintWindow(title);
+    }
 
     printingRef.current = true;
     setExporting(true);
@@ -177,7 +187,9 @@ export function useClientReportPdfExport({
           filename: title,
           // A storage failure that could not be retried from the held PDF can
           // re-run this export, and says so on the button that does it.
-          retryExport: () => retryExportRef.current?.(),
+          // A store-only export's retry also stays store-only, so a failed
+          // automatic store never opens a browser print dialogue on retry.
+          retryExport: () => retryExportRef.current?.({ storeOnly: storeOnlyRef.current }),
         }
       : null;
     const speakerDesignParams = (speakerDesignCompanion?.groups?.length > 0 && issuedDocument?.projectId)
@@ -228,8 +240,17 @@ export function useClientReportPdfExport({
     }
     if (!outcome.complete) {
       setError('Document creation is incomplete. Retry storage before downloading the report.');
-      closeReportPrintWindow(printWindowRef.current);
-      printWindowRef.current = null;
+      if (!storeOnly) {
+        closeReportPrintWindow(printWindowRef.current);
+        printWindowRef.current = null;
+      }
+      cleanup();
+      return;
+    }
+
+    // Store-only mode: the PDF has been captured, validated and stored through
+    // the issued-document pipeline. No browser print dialogue is opened.
+    if (storeOnly) {
       cleanup();
       return;
     }
