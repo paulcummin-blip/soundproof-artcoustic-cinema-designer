@@ -47,7 +47,7 @@ function splitPillContent(resultText) {
   };
 }
 
-export default function BassPerformanceStrip() {
+export default function BassPerformanceStrip({ placementPreviewActive = false }) {
   const { shared, authorityState } = useSharedBassAuthorityState();
   const interaction = useGraphInteraction();
   const [clock, setClock] = useState(Date.now());
@@ -151,7 +151,12 @@ export default function BassPerformanceStrip() {
                   ? "bg-[#213428]/8 ring-1 ring-[#213428]/25"
                   : "hover:bg-[#213428]/4"
                 }`}
-              style={{ padding: "8px 10px", minHeight: "46px" }}
+              style={{
+                padding: "8px 10px",
+                minHeight: "46px",
+                opacity: placementPreviewActive ? 0.45 : 1,
+                transition: "opacity 300ms ease",
+              }}
               aria-label={pill.text}
               title={`Click to focus the graph on ${PARAM_LABELS[key]}`}
             >
