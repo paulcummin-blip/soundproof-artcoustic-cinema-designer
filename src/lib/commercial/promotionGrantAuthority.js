@@ -9,7 +9,7 @@
 //   promo_grant:{promotion_id}:{account_id}
 // so retries never double-credit. Unlimited Projects uses the Promotion
 // record's own identity — overlapping periods resolve deterministically
-// (earliest starts_at wins in the display).
+// (latest uninterrupted expiry is shown in the display).
 //
 // This module never writes to the database — it builds the records the
 // dialog commits. It never activates dealer login access, never alters
