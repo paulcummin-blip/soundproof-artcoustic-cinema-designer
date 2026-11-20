@@ -34,14 +34,21 @@ export function prepareProposalEvidence(suppliedSnapshots, projectVersions, reso
   return { versionEvidence, comparisonTable, comparisonEvidenceText };
 }
 
-export function prepareProposalInterpretation({ suppliedSnapshots, project, client_brief, resolvedType, resolvedVersionIds, versionLabelById }) {
+export function prepareProposalInterpretation({ suppliedSnapshots, project, client_brief, resolvedType, resolvedVersionIds, versionLabelById, recordedIntentByVersion = null }) {
   const exactLabels = new Map(suppliedSnapshots.map(entry => [entry.version_id, entry.version_name || entry.snapshot?.version?.name || versionLabelById.get(entry.version_id)]));
+  const intentMap = recordedIntentByVersion instanceof Map ? recordedIntentByVersion : new Map();
   const interpretations = suppliedSnapshots.map(entry => {
     const versionId = entry?.version_id || entry?.versionId || null;
+    const recordedIntent = intentMap.get(versionId) || [];
     return { label: entry?.label || exactLabels.get(versionId) || null,
       interpretation: buildProjectInterpretation({ snapshot: entry?.snapshot || null, project, clientBrief: client_brief,
         reportType: resolvedType, versions: resolvedVersionIds.map(id => ({ id, label: exactLabels.get(id) || null })),
-        reportLabel: exactLabels.get(versionId) || null }) };
+        reportLabel: exactLabels.get(versionId) || null,
+        // The designer's confirmed explanations of design decisions the engineering
+        // evidence does not establish. The interpretation's important_design_decisions
+        // carries these, so the writer can explain WHY a decision was made without
+        // inventing a motivation.
+        recordedIntent }) };
   });
   const primaryInterpretation = interpretations[0]?.interpretation || null;
   const comparisonReading = resolvedType === 'comparison' ? compareInterpretations(interpretations) : null;

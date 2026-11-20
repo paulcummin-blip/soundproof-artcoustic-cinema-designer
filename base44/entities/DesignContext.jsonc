@@ -1,0 +1,216 @@
+{
+  "name": "DesignContext",
+  "type": "object",
+  "description": "Version-scoped designer context: the designer's own explanations of design decisions whose reasons are not established by engineering data. One record per project version. Only answered items and explicit no-reason confirmations are stored; skipped questions are never persisted, so a skipped question may be asked again on a future generation. Each item carries a decision-specific input fingerprint so that a material change to the relevant design inputs triggers reconfirmation rather than silent reuse. Read by both the Technical Report Design Intent generation and the Client Proposal generation, so confirmed human answers take priority over inferred motivations in both documents. Written only by the saveDesignContext backend function. Never carries client names, project titles, personal data or engineering results \u2014 only the designer's explanation of a design decision.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project this context belongs to."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ID of the ProjectVersion this context belongs to. One record per version."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+    },
+    "context_items": {
+      "type": "array",
+      "default": [],
+      "description": "The designer's confirmed context items. Each entry: {question_id, question, area, status ('answered'|'no_reason'), answer, decision_fingerprint, answered_at, answered_by}. A 'answered' item carries the designer's explanation; a 'no_reason' item carries an explicit confirmation that there is no particular reason. Skipped questions are never stored here.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the context was last updated."
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Name or email of the user who last updated the context.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "project_id",
+    "version_id",
+    "account_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -35,6 +35,7 @@ import { DESIGN_INTENT_REFUSAL, runReportDesignIntent } from './reportDesignInte
 import { buildReportGeometryContext } from './reportGeometryContext.js';
 import { buildReportVisualContext } from './reportVisualContext.js';
 import { buildDesignIntentGenerationReport } from './reportDesignIntentGenerationReport.js';
+import { recordedIntentFromContext } from '../designContext/designContextModel.js';
 
 /** Why a generation attempt could not be set up at all. */
 export const DESIGN_INTENT_ATTEMPT_BLOCK = Object.freeze({
@@ -136,6 +137,19 @@ export async function buildReportDesignIntentAttempt({
     .catch(() => null);
   const libraryImages = assetPage?.items || [];
 
+  // ── THE SAVED DESIGNER CONTEXT for this version ──
+  // The designer's own explanations of design decisions the engineering evidence
+  // does not establish. Read with the designer's session so the same access that
+  // governs the context governs this read. A context that cannot be read is simply
+  // no recorded intent at all: the attempt continues and the writer describes the
+  // arrangement without inventing a motivation, exactly as before.
+  const contextPage = await entities.DesignContext
+    .filter({ project_id: projectId, version_id: versionId }, { limit: 1 })
+    .catch(() => null);
+  const contextRecord = (contextPage?.items || [])[0] || null;
+  const contextItems = Array.isArray(contextRecord?.context_items) ? contextRecord.context_items : [];
+  const recordedIntent = recordedIntentFromContext(contextItems);
+
   // ── The writer's own switch, before any evidence is read ──
   const configResult = await authorityEntities.SystemConfig.filter({}, { limit: 1 });
   const configRecord = (Array.isArray(configResult) ? configResult : (configResult?.items || []))[0] || null;
@@ -163,6 +177,11 @@ export async function buildReportDesignIntentAttempt({
     sourceFingerprints: snapshot.source_fingerprints || null,
     user,
     now,
+    // The designer's confirmed explanations of design decisions the engineering
+    // evidence does not establish. Passed to the interpretation as recorded
+    // intent, so the writer can explain WHY a decision was made without
+    // inventing a motivation.
+    recordedIntent,
     readEvidence: evidenceReader || (async ({ versionIds }) => {
       const page = await entities.ProjectVersion.filter(
         { project_id: projectId, id: { $in: versionIds } },

@@ -27,6 +27,7 @@
 import { useCallback, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { isCompleteDesignIntentText } from './designIntentAuthority';
+import { useDesignContextReview } from '@/components/adi/designContext/useDesignContextReview';
 
 /** The shared event that tells the report to reload its saved Design Intent. */
 const INTENT_UPDATED_EVENT = 'adi-design-intent-updated';
@@ -45,8 +46,17 @@ const EMPTY = { status: REGENERATE_STATUS.IDLE, newText: null, newRecord: null, 
 export function useRegenerateDesignIntent({ projectId = null, versionId = null, hasAcceptedNarrative = false } = {}) {
   const [state, setState] = useState(EMPTY);
 
+  // The pre-generation context review step. Before generating a new Design
+  // Intent, ADI asks the designer about design decisions whose reasons the
+  // engineering evidence does not establish. The designer's answers are saved
+  // per version and fed into the writer alongside the existing evidence.
+  const contextReview = useDesignContextReview({ projectId, versionId });
+
   const generate = useCallback(async () => {
     if (!projectId || !versionId) return;
+    // Run the context review first. If the designer cancels, abort.
+    const proceed = await contextReview.review();
+    if (!proceed) return;
     setState({ status: REGENERATE_STATUS.GENERATING, newText: null, newRecord: null, error: null });
     try {
       const response = await base44.functions.invoke('generateReportDesignIntent', {
@@ -137,6 +147,9 @@ export function useRegenerateDesignIntent({ projectId = null, versionId = null, 
     keepExisting,
     commit,
     dismissError,
+    // The pre-generation context review dialog. The page renders this so the
+    // designer can answer the context questions before the writer is called.
+    ContextDialog: contextReview.Dialog,
   };
 }
 

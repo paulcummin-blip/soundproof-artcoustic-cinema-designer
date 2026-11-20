@@ -139,8 +139,11 @@ export default function ProjectReportDesignSummary({
 
   // The deliberate Regenerate Design Intent flow. The action sits beside the
   // Design Intent heading; the comparison dialog commits only the reviewed
-  // narrative and leaves every other report field untouched.
+  // narrative and leaves every other report field untouched. Before generating,
+  // the context review step asks the designer about design decisions whose
+  // reasons the engineering evidence does not establish.
   const regenerate = useRegenerateDesignIntent({ projectId, versionId, hasAcceptedNarrative });
+  const ContextDialog = regenerate.ContextDialog;
 
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -282,6 +285,10 @@ export default function ProjectReportDesignSummary({
           </button>
         </div>
       )}
+
+      {/* The pre-generation context review dialog. Shown when the designer
+          clicks Regenerate Design Intent, before the writer is called. */}
+      {!print && ContextDialog && <ContextDialog />}
     </div>
   );
 }

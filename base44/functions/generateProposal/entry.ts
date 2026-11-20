@@ -30,6 +30,7 @@ import { HIGHLIGHTS_SECTION_TYPE, PRESENTED_OPTIONS_SECTION_TYPE, resolveSection
 import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { normaliseClarificationAnswers } from '../../shared/proposalClarification/clarificationAnswers.js';
+import { recordedIntentFromContext } from '../../shared/designContext/designContextModel.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
 // The proposal-specific reuse verdict, shared with the report-evidence reader:
 // wording-only publication moves are safe, but a changed client-facing Display
@@ -379,8 +380,31 @@ export default async function(req) {
       engineering_fingerprint: primaryPublication?.engineering_fingerprint || null,
       published_at: primaryPublication?.published_at || null,
     };
+    // ── The designer's saved design context for each version ──
+    // The designer's confirmed explanations of design decisions the engineering
+    // evidence does not establish. Read per version and passed to the
+    // interpretation as recorded intent, so the writer can explain WHY a decision
+    // was made without inventing a motivation.
+    const recordedIntentByVersion = new Map();
+    for (const versionId of resolvedVersionIds) {
+      try {
+        const contextPage = await base44.entities.DesignContext.filter(
+          { project_id, version_id: versionId },
+          { limit: 1 },
+        );
+        const contextRecord = (contextPage?.items || [])[0] || null;
+        const contextItems = Array.isArray(contextRecord?.context_items) ? contextRecord.context_items : [];
+        const recordedIntent = recordedIntentFromContext(contextItems);
+        if (recordedIntent.length > 0) recordedIntentByVersion.set(versionId, recordedIntent);
+      } catch {
+        // A context that cannot be read is simply no recorded intent: the
+        // writer describes the arrangement without inventing a motivation.
+      }
+    }
+
     const { primaryInterpretation, comparisonReading } = prepareProposalInterpretation({
       suppliedSnapshots, project, client_brief, resolvedType, resolvedVersionIds, versionLabelById,
+      recordedIntentByVersion,
     });
     console.log(`[generateProposal] ADI stage 1 interpretation | ${formatInterpretationForLog(primaryInterpretation)}`);
 

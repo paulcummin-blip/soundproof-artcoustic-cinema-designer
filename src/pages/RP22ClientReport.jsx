@@ -27,6 +27,7 @@ import ClientReportPrintStyles from "@/components/report/client/ClientReportPrin
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
 import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
+import { useDesignContextReview } from "@/components/adi/designContext/useDesignContextReview";
 import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
 import ReportLoadingOverlay from "@/components/report/ReportLoadingOverlay";
 import {
@@ -576,7 +577,16 @@ export default function RP22ClientReport() {
   // generation. Ordinary viewing of a saved report never triggers generation
   // or modifies the saved snapshot's payload.
   const autoIntentEnabled = updateRequested || !savedReport.saved;
-  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({ projectId, versionId: authority.versionId, enabled: autoIntentEnabled });
+  // The pre-generation context review for the auto-generation flow. Before the
+  // first Design Intent is generated, ADI asks the designer about design
+  // decisions whose reasons the engineering evidence does not establish.
+  const autoContextReview = useDesignContextReview({ projectId, versionId: authority.versionId });
+  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({
+    projectId,
+    versionId: authority.versionId,
+    enabled: autoIntentEnabled,
+    onBeforeGenerate: autoContextReview.review,
+  });
 
   // The page CONTENT is assembled by the report's own composition hook; the
   // composition authority (projectReportRegistry) owns the document — the section
@@ -1263,6 +1273,9 @@ export default function RP22ClientReport() {
       </div>
 
       <ClientReportPrintStyles />
+
+      {/* The pre-generation context review dialog for the auto-generation flow. */}
+      <autoContextReview.Dialog />
     </div>
   );
 }

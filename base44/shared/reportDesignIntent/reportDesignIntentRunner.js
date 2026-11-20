@@ -107,7 +107,7 @@ function refusal(code, detail) {
  * frozen engineering snapshot is held, and the designer's own recorded intent as
  * instructions. Neither is a source of figures, and neither is ever copy.
  */
-function buildIntentDesignContext({ engineeringSnapshot, project, versions, clientBrief, designerNotes }) {
+function buildIntentDesignContext({ engineeringSnapshot, project, versions, clientBrief, designerNotes, recordedIntent = [] }) {
   let interpretation = null;
   if (engineeringSnapshot && typeof engineeringSnapshot === 'object') {
     const built = buildProjectInterpretation({
@@ -117,6 +117,11 @@ function buildIntentDesignContext({ engineeringSnapshot, project, versions, clie
       reportType: 'single',
       versions,
       reportLabel: 'Project Report',
+      // The designer's confirmed explanations of design decisions the engineering
+      // evidence does not establish. The interpretation's important_design_decisions
+      // carries these, so the writer can explain WHY a decision was made without
+      // inventing a motivation.
+      recordedIntent: Array.isArray(recordedIntent) ? recordedIntent : [],
     });
     if (built && typeof built === 'object') interpretation = built;
   }
@@ -212,6 +217,11 @@ export async function runReportDesignIntent({
   user = null,
   now = null,
   onEvidencePack = null,
+  // The designer's confirmed explanations of design decisions the engineering
+  // evidence does not establish. Passed to the interpretation as recorded
+  // intent, so the writer can explain WHY a decision was made without inventing
+  // a motivation. Empty where no context has been saved.
+  recordedIntent = [],
   // PREPARE ONLY: build the frozen pack and the scoped writer input and stop,
   // making no provider call and writing nothing. It exists so a caller that needs
   // the very same evidence and the very same contract for another purpose — the
@@ -288,6 +298,7 @@ export async function runReportDesignIntent({
         versions,
         clientBrief,
         designerNotes,
+        recordedIntent,
       }),
       geometryContext: geometry,
       visualContext: visual,
