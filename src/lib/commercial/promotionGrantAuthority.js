@@ -7,7 +7,9 @@
 //
 // Idempotency: each BONUS_PROJECTS grant uses a stable idempotency key
 //   promo_grant:{promotion_id}:{account_id}
-// so retries never double-credit. Unlimited Projects uses the Promotion
+// with serialized server checks in promotionGrantExecution. Repeated daily
+// grants with the same target and credit amount resume the existing grant.
+// Unlimited Projects uses the Promotion
 // record's own identity — overlapping periods resolve deterministically
 // (latest uninterrupted expiry is shown in the display).
 //
@@ -171,7 +173,7 @@ export function buildUnlimitedPromotion({ selection, startDateInput, endDateInpu
 
 /**
  * Build a CapacityLedger entry for a promotional credit grant.
- * Uses a stable idempotency key so retries never double-credit.
+ * Builds the stable key checked by the serialized server grant authority.
  */
 export function buildPromotionalLedgerEntry({ accountId, promotionId, credits, actor, now = new Date() }) {
   return {
