@@ -370,10 +370,11 @@ export default function BassDesignAssistant({
                   {previewTerminalMessage}
                 </div>
               )}
-              {/* Authoritative P14/P18/P19/P20 performance result strip */}
-              <div className={isPlacementPreview ? "opacity-45" : ""}>
-                <BassPerformanceStrip />
-              </div>
+              {/* Authoritative P14/P18/P19/P20 performance result strip.
+                  Placement preview subdues ONLY the P14/P18/P19/P20 result
+                  indicators — the Calculate Bass Parameters button and its
+                  status message stay at full opacity. */}
+              <BassPerformanceStrip placementPreviewActive={isPlacementPreview} />
               {/* P20 individual seat-consistency results — directly below the
                   strip. P20 is a seat-consistency parameter, so the headline
                   and its constituent seat grades are one presentation. */}
