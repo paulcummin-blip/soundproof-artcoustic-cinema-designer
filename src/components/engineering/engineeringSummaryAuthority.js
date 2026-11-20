@@ -527,7 +527,7 @@ export function summariseEngineeringResults({
   // Legacy project/rating envelopes alias Primary; no combined score is calculated.
   const projectRating = primaryRating;
   const secondaryRating = calculateScopedRoomDesignRating(designRatingAuthority, secondarySeatIds);
-  const scopedRatings = { primary: primaryRating, secondary: secondaryRating, all: projectRating };
+  const scopedRatings = { primary: primaryRating, secondary: secondaryRating };
 
   const seatDesignRatings = {};
   const seatDesignPerformanceIndexById = {};

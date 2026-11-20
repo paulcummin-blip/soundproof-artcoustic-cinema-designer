@@ -440,10 +440,9 @@ export default function DesignOverviewBlock({ engineeringSummary, recommendation
       {/* Overall DPI summaries — Primary / Secondary / All */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <DpiScopeSummary label="Primary Seating" summary={primarySummary} emphasize />
-        {secondaryIsConfigured
-          ? <DpiScopeSummary label="Secondary Seating" summary={secondarySummary} />
-          : <DpiScopeSummary label="Secondary Seating" summary={null} />}
-        <DpiScopeSummary label="All Seating" summary={projectSummary} />
+        {secondarySummary?.seatIds?.length > 0 && (
+          <DpiScopeSummary label="Secondary Seating" summary={secondarySummary} />
+        )}
       </div>
 
       {/* Full canonical scorecard — collapsed by default */}

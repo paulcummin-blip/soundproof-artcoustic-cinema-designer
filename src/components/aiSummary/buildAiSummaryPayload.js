@@ -256,8 +256,6 @@ export function buildAiSummaryPayload({ publishedSnapshot, projectDetails, proje
       ? Number(summary.primary.designPerformanceIndex) : null,
     secondary: isFiniteNumber(summary.secondary?.designPerformanceIndex)
       ? Number(summary.secondary.designPerformanceIndex) : null,
-    all: isFiniteNumber(summary.project?.designPerformanceIndex)
-      ? Number(summary.project.designPerformanceIndex) : null,
   };
 
   // ── Category Floors ──

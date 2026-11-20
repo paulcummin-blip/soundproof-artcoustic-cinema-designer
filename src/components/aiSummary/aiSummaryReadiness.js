@@ -44,13 +44,11 @@ export function isAiSummaryReady({ publishedSnapshot, projectId, versionId }) {
   // Number(null) === 0 which IS finite, so check null/undefined explicitly.
   const primaryDpi = summary.primary?.designPerformanceIndex;
   const secondaryDpi = summary.secondary?.designPerformanceIndex;
-  const allDpi = summary.project?.designPerformanceIndex;
+  const hasSecondary = (summary.secondary?.seatIds?.length ?? 0) > 0;
 
   if (primaryDpi == null || !Number.isFinite(Number(primaryDpi)))
     return { ready: false, reason: "waiting-for-analysis" };
-  if (secondaryDpi == null || !Number.isFinite(Number(secondaryDpi)))
-    return { ready: false, reason: "waiting-for-analysis" };
-  if (allDpi == null || !Number.isFinite(Number(allDpi)))
+  if (hasSecondary && (secondaryDpi == null || !Number.isFinite(Number(secondaryDpi))))
     return { ready: false, reason: "waiting-for-analysis" };
 
   // ── Fingerprints must be present (proves settled bass + seat scope) ──

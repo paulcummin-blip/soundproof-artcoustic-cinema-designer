@@ -90,8 +90,9 @@ export default function ScopedAsdrSummary({ engineeringSummary }) {
   return (
     <div>
       <ScopeLine label="Primary Seating" summary={engineeringSummary.primary} emphasize />
-      <ScopeLine label="Secondary Seating" summary={engineeringSummary.secondary} />
-      <ScopeLine label="All Seating" summary={engineeringSummary.project} />
+      {engineeringSummary.secondary?.seatIds?.length > 0 && (
+        <ScopeLine label="Secondary Seating" summary={engineeringSummary.secondary} />
+      )}
       <div
         style={{
           fontSize: "7pt",

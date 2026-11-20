@@ -485,7 +485,6 @@ export function useAppDesignRating({
   const partialDesignRating = useMemo(() => {
     if (!partialAuthority) return null;
     const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seats);
-    const allRating = calculateRoomDesignRating(partialAuthority);
     const primaryRating = calculateScopedRoomDesignRating(partialAuthority, primarySeatIds);
     const secondaryRating = calculateScopedRoomDesignRating(partialAuthority, secondarySeatIds);
     const allCoverage = summarisePartialDesignRating(partialAuthority, partialAuthority.seatIds);
@@ -493,7 +492,7 @@ export function useAppDesignRating({
     if (allCoverage.assessedWeight === 0) return null;
     return {
       isPartial: true,
-      all: { designPerformanceIndex: allRating.designPerformanceIndex, ...allCoverage },
+      all: allCoverage, // coverage only; no combined index
       primary: {
         designPerformanceIndex: primaryRating.designPerformanceIndex,
         ...summarisePartialDesignRating(partialAuthority, primarySeatIds),

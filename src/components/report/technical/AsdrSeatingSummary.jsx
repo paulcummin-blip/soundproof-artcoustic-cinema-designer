@@ -97,17 +97,16 @@ function SeatingBlock({ label, summary, emphasize, concise }) {
   );
 }
 
-export default function AsdrSeatingSummary({ primary, secondary, all }) {
+export default function AsdrSeatingSummary({ primary, secondary }) {
   return (
     <div
       className="print-avoid-break tech-asdr-seating-summary"
       style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
     >
       <SeatingBlock label="Primary Seating" summary={primary} emphasize concise={false} />
-      {secondary?.rating && (
+      {secondary?.seatIds?.length > 0 && (
         <SeatingBlock label="Secondary Seating" summary={secondary} emphasize={false} concise={false} />
       )}
-      <SeatingBlock label="All Seating" summary={all} emphasize={false} concise />
     </div>
   );
 }
