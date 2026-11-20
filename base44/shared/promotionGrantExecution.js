@@ -50,14 +50,17 @@ export async function applyPromotionGrant(service, input, actor) {
     if(JSON.stringify(actual)!==JSON.stringify(expected))
       throw fail('Recipients have changed. Review the account selection again.', 'RECIPIENTS_CHANGED');
 
-    // A retained request keeps these dates/target/amount unchanged on every retry.
+    // Bonus requests share their dated grant name/target/amount across tabs;
+    // repeating the same configured daily grant resumes it, never adds credits again.
+    // Unlimited requests share their exact target and dates.
     // Unlimited grants also recognise the already-created equivalent live grant.
     const lookup=async()=>{
       const rows=await service.entities.Promotion.filter({
         promotion_type:promotion.promotion_type,
         target_scope:promotion.target_scope,
-        starts_at:promotion.starts_at,
-        ends_at:promotion.ends_at,
+        ...(promotion.promotion_type==='BONUS_PROJECTS'
+          ? {name:promotion.name}
+          : {starts_at:promotion.starts_at,ends_at:promotion.ends_at}),
       });
       const matching=rows.filter(p=>sameTarget(p,promotion) &&
         (promotion.promotion_type!=='BONUS_PROJECTS' || Number(p.bonus_projects)===credits));
