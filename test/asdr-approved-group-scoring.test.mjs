@@ -96,3 +96,11 @@ test("published contribution detail reconciles exactly and P8 remains excluded",
     assert.equal(contrib(r,"p8"),undefined);
   }
 });
+test("bridge excludes explicitly provisional or stale numeric room and seat evidence",()=>{
+  for(const flag of [{provisional:true},{status:"provisional"},{status:"stale"},{verified:false}]){
+    const input=buildDesignRatingInput({seats,analysisResult:{gradedParameters:{primary:{2:{value:3,...flag}}}},reportSeatHudById:{p1:{rp22:{p1:{value:3,level:"L4",...flag}}}}});
+    const r=score(input);
+    assert.equal(contrib(r,"p2"),undefined);
+    assert.equal(contrib(r,"p1"),undefined);
+  }
+});
