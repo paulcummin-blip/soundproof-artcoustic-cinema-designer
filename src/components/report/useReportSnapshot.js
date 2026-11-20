@@ -266,6 +266,11 @@ export function useReportSnapshot({
           proposalSource,
           reportEvidence: evidence,
           evidence_parity: buildParityRecord(parity),
+          // Preserve the existing accepted Design Intent so a re-save or
+          // regenerate does not lose the narrative written by
+          // generateReportDesignIntent. The narrative is replaced only by an
+          // explicit new accepted narrative, never by a report snapshot save.
+          design_intent: saved?.payload?.design_intent || null,
         },
       });
       // A report that already exists and carries no evidence is REFRESHED, not

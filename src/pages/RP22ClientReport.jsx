@@ -576,7 +576,12 @@ export default function RP22ClientReport() {
   // Design Intent generation is restricted to explicit Update Report or first
   // generation. Ordinary viewing of a saved report never triggers generation
   // or modifies the saved snapshot's payload.
-  const autoIntentEnabled = updateRequested || !savedReport.saved;
+  // Design Intent generation is enabled for first generation, explicit Update
+  // Report, and the Create New path (regenerateIntent). The last case carries
+  // an existing saved report, so without this flag the forced regeneration
+  // would be gated off and the designer's new explanations would never reach
+  // the writer.
+  const autoIntentEnabled = updateRequested || !savedReport.saved || reportIntent.regenerateIntent;
   // The pre-generation context review for the auto-generation flow. Before the
   // first Design Intent is generated, ADI asks the designer about design
   // decisions whose reasons the engineering evidence does not establish.
@@ -867,6 +872,20 @@ export default function RP22ClientReport() {
     [authority.authoritySnapshot, seatingPositions, placedSpeakers, subwooferInstances, orderedPages]
   );
 
+  // ── Snapshot save gate ────────────────────────────────────────────────────
+  // The initial snapshot save (no existing saved report) proceeds without
+  // waiting for Design Intent, because the generation backend reads the saved
+  // snapshot's frozen evidence to produce the narrative. A re-save on an
+  // existing snapshot waits for Design Intent to settle, so the accepted
+  // narrative is never overwritten by a report payload that does not carry it.
+  // A settled Design Intent (COMPLETE or FAILED) or an already-accepted saved
+  // narrative unblocks the save; a generation that is not expected never blocks.
+  const designIntentSettled = autoIntentStatus === AUTO_INTENT.COMPLETE
+    || autoIntentStatus === AUTO_INTENT.FAILED
+    || !autoIntentEnabled
+    || savedNarrativeAccepted;
+  const snapshotSaveReady = !savedReport.saved || designIntentSettled;
+
   const reportSnapshot = useReportSnapshot({
     projectId,
     versionId: authority.versionId,
@@ -880,7 +899,7 @@ export default function RP22ClientReport() {
     payload: snapshotPayload,
     reportSource: { project: projectDetails, engineeringSummary, app: appState,
       presentation: { seatingPositions, placedSpeakers, priceData: reportPricing.priceSummary } },
-    ready: reportReady && orderedPages.length > 0,
+    ready: reportReady && orderedPages.length > 0 && snapshotSaveReady,
   });
 
   // ── Report actions requested by the link that opened this report ──────────
