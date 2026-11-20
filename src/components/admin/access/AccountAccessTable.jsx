@@ -16,7 +16,11 @@ import {
 // no second balance system. Numeric columns are right-aligned with tabular-nums.
 // Promotion status and expiry are combined into one compact column.
 
-const GRID = "2fr 1fr 0.95fr 0.5fr 0.55fr 0.55fr 0.45fr 0.5fr 0.85fr 1.15fr 64px";
+// Last Activity uses a fixed column width so dates such as "14 Nov 2026" and
+// the em-dash placeholder always render at the same width and right edge. The
+// Promotion column keeps its badge and expiry date together in one cell,
+// separated from Last Activity by a vertical divider (added per-cell below).
+const GRID = "2fr 1fr 0.95fr 0.5fr 0.55fr 0.55fr 0.45fr 0.5fr 122px 1.2fr 64px";
 const MIN_WIDTH = 1320;
 
 const HEADERS = [
@@ -60,7 +64,13 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
             <div
               key={index}
               title={header.title}
-              className={header.align === "right" ? "text-right" : ""}
+              className={[
+                header.align === "right" ? "text-right" : "",
+                // Clear vertical separation before the Promotion column.
+                index === 9 ? "border-l border-[#E7E5E1] pl-3" : "",
+                // Keep the Last Activity header on one line, right-aligned.
+                index === 8 ? "whitespace-nowrap" : "",
+              ].join(" ").trim()}
             >
               {header.label}
             </div>
@@ -125,13 +135,13 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
                 {row.projectCount}
               </div>
 
-              {/* Last Activity */}
-              <div className="text-right tabular-nums text-[#625143]">
+              {/* Last Activity — fixed-width, right-aligned; em-dash aligns with dates. */}
+              <div className="whitespace-nowrap text-right tabular-nums text-[#625143]">
                 {row.lastActivity ? formatDate(new Date(row.lastActivity).toISOString()) : "—"}
               </div>
 
-              {/* Promotion — status + expiry combined compactly */}
-              <div className="flex items-center gap-1.5">
+              {/* Promotion — status + expiry kept together, separated by a divider. */}
+              <div className="flex min-w-0 flex-nowrap items-center gap-1.5 border-l border-[#E7E5E1] pl-3">
                 <PromotionPill
                   label={promoLabel}
                   tone={row.promotion?.tone || "muted"}
