@@ -199,11 +199,11 @@ async function withActivationLock(service, accountId, work) {
   }
 }
 
-async function grantAudits(service, accountId, jti) {
+async function grantAudits(service, jti) {
   const matches = [];
   const seen = new Set();
   for (let skip = 0; ; skip += 500) {
-    const page = await service.entities.AccountUserAudit.filter({ account_id: accountId }, 'created_date', 500, skip);
+    const page = await service.entities.AccountUserAudit.filter({ actor_user_id: 'portal' }, 'created_date', 500, skip);
     if (!Array.isArray(page)) throw new Error('ACTIVATION_AUDIT_UNAVAILABLE');
     for (const row of page) {
       if (!row.id || seen.has(row.id)) throw new Error('ACTIVATION_AUDIT_INCOMPLETE');
@@ -269,8 +269,8 @@ export async function createPortalActivation(service, base44, { grant, account }
   return withActivationLock(service, account.id, async current => {
     const error = await checkGrantUnderLock(service, current, grant);
     if (error) return { ok: false, error };
-    const audits = await grantAudits(service, current.id, grant.jti);
-    if (audits.some(a => !sameGrant(a.details, grant))) return { ok: false, error: 'GRANT_REPLAY_MISMATCH' };
+    const audits = await grantAudits(service, grant.jti);
+    if (audits.some(a => a.account_id !== current.id || !sameGrant(a.details, grant))) return { ok: false, error: 'GRANT_REPLAY_MISMATCH' };
     const existing = await findExistingPortalActivation(service, grant.jti);
     if (existing) {
       if (existing.account_id !== current.id || normaliseEmail(existing.email) !== grant.admin_email
@@ -333,8 +333,8 @@ export async function renewPortalAccess(service, { grant, account }) {
   return withActivationLock(service, account.id, async current => {
     const error = await checkGrantUnderLock(service, current, grant);
     if (error) return { ok: false, error };
-    const audits = await grantAudits(service, current.id, grant.jti);
-    if (audits.some(a => !sameGrant(a.details, grant))) return { ok: false, error: 'GRANT_REPLAY_MISMATCH' };
+    const audits = await grantAudits(service, grant.jti);
+    if (audits.some(a => a.account_id !== current.id || !sameGrant(a.details, grant))) return { ok: false, error: 'GRANT_REPLAY_MISMATCH' };
     if (await findExistingPortalActivation(service, grant.jti)) return { ok: false, error: 'GRANT_ALREADY_USED' };
     if (audits.length) {
       const completed = audits.find(a => a.details.phase === 'completed');
@@ -457,8 +457,8 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
       return { ok: false, error: 'VERIFIED_CLAIM_REQUIRED' };
     }
     if (account.status === 'suspended' || account.soundproof_eligible !== true) return { ok: false, error: 'ACCOUNT_NOT_ELIGIBLE' };
-    const audits = await grantAudits(service, accountId, seat.portal_activation_request_id);
-    if (!audits.some(a => a.action === 'PORTAL_ACTIVATION_REQUESTED'
+    const audits = await grantAudits(service, seat.portal_activation_request_id);
+    if (!audits.some(a => a.account_id === accountId && a.action === 'PORTAL_ACTIVATION_REQUESTED'
       && a.details.purpose === 'activate'
       && a.details.admin_email === normaliseEmail(claimant.email))) return { ok: false, error: 'ACTIVATION_PROOF_MISSING' };
     // A repeated claim never restarts or extends a term.
