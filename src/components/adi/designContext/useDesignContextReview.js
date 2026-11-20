@@ -39,6 +39,12 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
   const [questions, setQuestions] = useState([]);
   const [savedItems, setSavedItems] = useState([]);
   const resolverRef = React.useRef(null);
+  // Transient skip exclusions for the current generation only. When the
+  // designer skips a question that was previously answered, the saved answer
+  // is NOT deleted — it remains for future generations. The skip IDs are
+  // carried here so the caller can pass them to the generation function,
+  // which excludes them from the writer's recorded intent for this run.
+  const skippedQuestionIdsRef = React.useRef([]);
 
   const review = useCallback(async () => {
     if (!projectId || !versionId) return true; // No review needed; proceed.
@@ -79,6 +85,17 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
 
   const proceed = useCallback(async (rows) => {
     setStatus(STATUS.SAVING);
+    // Record the skipped question IDs for this generation. A skipped
+    // question's answer — even if previously saved — must not reach the
+    // writer for this generation. The saved answer is NOT deleted: it
+    // remains in storage for future generations unless the designer
+    // explicitly changes it.
+    const skippedIds = (Array.isArray(rows) ? rows : [])
+      .filter((row) => row.status === 'skipped')
+      .map((row) => row.question_id)
+      .filter(Boolean);
+    skippedQuestionIdsRef.current = skippedIds;
+
     try {
       // Build the items to save: only answered and no_reason items.
       // Skipped items are not persisted.
@@ -150,10 +167,19 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
     });
   }, [status, questions, savedItems, proceed, cancel]);
 
+  // The skipped question IDs from the most recent review. Callers read
+  // this after `review()` resolves to pass temporary skip exclusions to
+  // the generation function. Cleared on cancel.
+  const getSkippedQuestionIds = useCallback(() => {
+    const ids = skippedQuestionIdsRef.current;
+    return Array.isArray(ids) ? [...ids] : [];
+  }, []);
+
   return {
     review,
     proceed,
     cancel,
+    getSkippedQuestionIds,
     Dialog,
     isReviewing: status === STATUS.REVIEWING || status === STATUS.DISCOVERING || status === STATUS.SAVING,
   };

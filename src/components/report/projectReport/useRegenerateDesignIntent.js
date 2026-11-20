@@ -57,12 +57,14 @@ export function useRegenerateDesignIntent({ projectId = null, versionId = null, 
     // Run the context review first. If the designer cancels, abort.
     const proceed = await contextReview.review();
     if (!proceed) return;
+    const skipQuestionIds = contextReview.getSkippedQuestionIds();
     setState({ status: REGENERATE_STATUS.GENERATING, newText: null, newRecord: null, error: null });
     try {
       const response = await base44.functions.invoke('generateReportDesignIntent', {
         project_id: projectId,
         version_id: versionId,
         generate_only: true,
+        ...(skipQuestionIds.length > 0 ? { skip_question_ids: skipQuestionIds } : {}),
       });
       const data = response?.data || {};
       if (data.ok === true && data.generate_only === true) {

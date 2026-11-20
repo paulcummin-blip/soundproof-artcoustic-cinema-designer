@@ -39,9 +39,19 @@ const MUTED = '#625143';
 const RULE = '#DCDBD6';
 
 /** One question row with answer, no-reason, and skip controls. */
-function ContextQuestionRow({ item, index, onChange }) {
+function ContextQuestionRow({ item, index, onChange, registerAnswerRef }) {
   const isSaved = item.status === 'answered' || item.status === 'no_reason';
+  const isSkipped = item.status === 'skipped' && !isSaved;
   const needsReconfirmation = item.needs_reconfirmation === true;
+
+  const handleSkip = () => {
+    onChange(index, { status: 'skipped', answer: '' });
+  };
+
+  const handleUndoSkip = () => {
+    onChange(index, { status: 'skipped', answer: '' });
+    // Restore the textarea so the designer can type an answer.
+  };
 
   return (
     <div style={{
@@ -50,6 +60,7 @@ function ContextQuestionRow({ item, index, onChange }) {
       border: `1px solid ${RULE}`,
       borderLeft: needsReconfirmation ? `4px solid #C77F0E` : `1px solid ${RULE}`,
       borderRadius: 8,
+      opacity: isSkipped ? 0.7 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
         <HelpCircle style={{ width: 16, height: 16, color: BRAND, flexShrink: 0, marginTop: 2 }} />
@@ -90,69 +101,113 @@ function ContextQuestionRow({ item, index, onChange }) {
         </div>
       </div>
 
-      {item.status !== 'no_reason' && (
-        <textarea
-          value={item.answer || ''}
-          onChange={(e) => onChange(index, { answer: e.target.value, status: e.target.value.trim() ? 'answered' : 'skipped' })}
-          placeholder="Type the designer's reason here, or skip for this generation..."
-          style={{
-            width: '100%',
-            minHeight: 60,
-            padding: '8px 10px',
-            fontSize: 13,
-            fontFamily: FONT_BODY,
-            color: '#3E4349',
-            background: '#FAFAF8',
-            border: `1px solid ${RULE}`,
-            borderRadius: 6,
-            resize: 'vertical',
-            outline: 'none',
-          }}
-        />
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
-        <label style={{
-          display: 'inline-flex',
+      {isSkipped ? (
+        <div style={{
+          display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          fontSize: 12,
-          fontFamily: FONT_BODY,
-          color: MUTED,
-          cursor: 'pointer',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '8px 10px',
+          background: '#F8F8F7',
+          border: `1px solid ${RULE}`,
+          borderRadius: 6,
         }}>
-          <input
-            type="checkbox"
-            checked={item.status === 'no_reason'}
-            onChange={(e) => onChange(index, {
-              status: e.target.checked ? 'no_reason' : 'skipped',
-              answer: e.target.checked ? '' : (item.answer || ''),
-            })}
-            style={{ cursor: 'pointer' }}
-          />
-          No particular reason
-        </label>
-        <button
-          type="button"
-          onClick={() => onChange(index, { status: 'skipped', answer: '' })}
-          style={{
+          <span style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 6,
             fontSize: 12,
             fontFamily: FONT_BODY,
             color: MUTED,
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            textDecoration: 'underline',
-            textUnderlineOffset: 2,
-          }}
-        >
-          <MinusCircle style={{ width: 12, height: 12 }} />
-          Skip for this generation
-        </button>
-      </div>
+          }}>
+            <MinusCircle style={{ width: 14, height: 14 }} />
+            Skipped for this generation
+          </span>
+          <button
+            type="button"
+            onClick={handleUndoSkip}
+            style={{
+              fontSize: 12,
+              fontFamily: FONT_BODY,
+              color: BRAND,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textUnderlineOffset: 2,
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      ) : (
+        <>
+          {item.status !== 'no_reason' && (
+            <textarea
+              ref={(el) => registerAnswerRef(index, el)}
+              value={item.answer || ''}
+              onChange={(e) => onChange(index, { answer: e.target.value, status: e.target.value.trim() ? 'answered' : 'skipped' })}
+              placeholder="Type the designer's reason here, or skip for this generation..."
+              style={{
+                width: '100%',
+                minHeight: 60,
+                padding: '8px 10px',
+                fontSize: 13,
+                fontFamily: FONT_BODY,
+                color: '#3E4349',
+                background: '#FAFAF8',
+                border: `1px solid ${RULE}`,
+                borderRadius: 6,
+                resize: 'vertical',
+                outline: 'none',
+              }}
+            />
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
+            <label style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              fontFamily: FONT_BODY,
+              color: MUTED,
+              cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={item.status === 'no_reason'}
+                onChange={(e) => onChange(index, {
+                  status: e.target.checked ? 'no_reason' : 'skipped',
+                  answer: e.target.checked ? '' : (item.answer || ''),
+                })}
+                style={{ cursor: 'pointer' }}
+              />
+              No particular reason
+            </label>
+            <button
+              type="button"
+              onClick={handleSkip}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 12,
+                fontFamily: FONT_BODY,
+                color: MUTED,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                textUnderlineOffset: 2,
+              }}
+            >
+              <MinusCircle style={{ width: 12, height: 12 }} />
+              Skip for this generation
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -210,7 +265,31 @@ export default function DesignContextDialog({
       next[index] = { ...next[index], ...patch };
       return next;
     });
+    // When a question is skipped, move focus to the next unanswered
+    // question's textarea so the designer can continue without scrolling.
+    if (patch.status === 'skipped' && !patch.answer) {
+      setTimeout(() => focusNextUnanswered(index + 1), 0);
+    }
   }, []);
+
+  const answerRefs = React.useRef({});
+  const registerAnswerRef = React.useCallback((index, el) => {
+    if (el) answerRefs.current[index] = el;
+    else delete answerRefs.current[index];
+  }, []);
+
+  const focusNextUnanswered = React.useCallback((fromIndex) => {
+    const startIndex = Math.max(0, fromIndex);
+    for (let i = startIndex; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (!row) continue;
+      const isActive = row.status !== 'no_reason' && row.status !== 'skipped';
+      if (isActive && answerRefs.current[i]) {
+        answerRefs.current[i].focus();
+        return;
+      }
+    }
+  }, [rows]);
 
   const handleProceed = React.useCallback(() => {
     if (typeof onProceed === 'function') {
@@ -248,6 +327,7 @@ export default function DesignContextDialog({
                 item={row}
                 index={index}
                 onChange={handleRowChange}
+                registerAnswerRef={registerAnswerRef}
               />
             ))}
           </div>

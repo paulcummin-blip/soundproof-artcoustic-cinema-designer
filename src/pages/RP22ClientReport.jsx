@@ -585,12 +585,31 @@ export default function RP22ClientReport() {
   // The pre-generation context review for the auto-generation flow. Before the
   // first Design Intent is generated, ADI asks the designer about design
   // decisions whose reasons the engineering evidence does not establish.
+  // When the designer arrives from the Document Workflow panel, skip
+  // exclusions from that panel's review are carried via the URL so the
+  // designer does not see the dialog twice and skipped answers are excluded
+  // from this generation only.
   const autoContextReview = useDesignContextReview({ projectId, versionId: authority.versionId });
+  const urlSkipCtx = React.useMemo(() => {
+    try {
+      const raw = new URLSearchParams(window.location.search).get('skipCtx');
+      if (!raw) return [];
+      return raw.split(',').map((id) => id.trim()).filter(Boolean);
+    } catch { return []; }
+  }, []);
+  const onBeforeGenerateCallback = React.useCallback(async () => {
+    // When skip exclusions were carried from the Document Workflow panel's
+    // review, the designer already reviewed: do not open the dialog again.
+    if (urlSkipCtx.length > 0) return { skippedQuestionIds: urlSkipCtx };
+    const proceed = await autoContextReview.review();
+    if (!proceed) return false;
+    return { skippedQuestionIds: autoContextReview.getSkippedQuestionIds() };
+  }, [autoContextReview, urlSkipCtx]);
   const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({
     projectId,
     versionId: authority.versionId,
     enabled: autoIntentEnabled,
-    onBeforeGenerate: autoContextReview.review,
+    onBeforeGenerate: onBeforeGenerateCallback,
     forceRegenerate: reportIntent.regenerateIntent,
   });
 

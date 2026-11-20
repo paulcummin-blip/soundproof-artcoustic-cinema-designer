@@ -222,6 +222,24 @@ function checkSubwooferArrangement(state, project = null) {
     };
   }
 
+  // Subwoofers distributed across front and rear: a purposeful arrangement
+  // that materially affects the bass response. Worth asking about because
+  // the engineering data records the geometry but not the designer's
+  // motivation (smooth seat-to-seat response, modal control, etc.).
+  if (enabled.length >= 2 && frontCount >= 1 && rearCount >= 1) {
+    return {
+      question_id: 'subwoofer_front_rear_distribution',
+      question: `The ${enabled.length} subwoofers are distributed across the front and rear of the room. Is there a particular reason for this distribution?`,
+      area: CONTEXT_AREA.SUBWOOFERS,
+      decision_fingerprint: decisionFingerprint(CONTEXT_AREA.SUBWOOFERS, {
+        count: enabled.length,
+        front: frontCount,
+        rear: rearCount,
+        arrangement: 'front_rear',
+      }),
+    };
+  }
+
   return null;
 }
 
@@ -376,13 +394,20 @@ export async function discoverAiQuestions({
   if (deterministicQuestions.length >= MAX_DISCOVERY_QUESTIONS) return [];
 
   const state = readDesignState(version);
-  const roomDims = readRoomDims(state);
+  const roomDims = readRoomDims(state, project);
   const seats = readSeatingPositions(state);
   const subs = Array.isArray(state.subwooferInstances)
     ? state.subwooferInstances
     : (Array.isArray(state.subwoofers) ? state.subwoofers : []);
   const enabledSubs = subs.filter((s) => s?.enabled !== false);
 
+  // The facts given to the AI are deliberately limited to design decisions
+  // whose WHY is not established by the engineering data AND whose explanation
+  // would materially improve the client-facing narrative. Ordinary
+  // configuration options (such as standard baffle mounting) are excluded:
+  // the existence of an option is not itself a meaningful design decision.
+  // The AI is never asked to invent a design constraint or speculate about
+  // a reason the designer did not record.
   const facts = {
     room: roomDims.widthM !== null && roomDims.lengthM !== null
       ? `${roomDims.widthM}m x ${roomDims.lengthM}m x ${roomDims.heightM ?? '?'}m`
@@ -393,7 +418,6 @@ export async function discoverAiQuestions({
     dolby_config: asText(state.dolbyLayout || state.dolbyPreset) || 'not recorded',
     overhead_model: asText(state.overheadGlobalModel) || 'not recorded',
     acoustic_treatment: state.acousticTreatmentEnabled === true ? 'enabled' : 'not enabled',
-    screen_mount: asText(state.screen_mount_mode) || asText(parseMaybe(state.screen)?.mount_mode) || 'not recorded',
   };
 
   const existingIds = deterministicQuestions.map((q) => q.question_id).join(', ');
@@ -408,8 +432,12 @@ export async function discoverAiQuestions({
     '',
     'Rules:',
     '- Each question must be grounded in the actual project facts above. Never invent a fact.',
-    '- Each question asks WHY a design decision was made, never WHAT was designed.',
+    '- Each question asks WHY a meaningful design decision was made, never WHAT was designed.',
+    '- Only ask about decisions whose explanation would materially improve the client-facing narrative: unusual seating positions, genuinely significant screen-size compromises, unconventional speaker positioning, or purposeful subwoofer distribution.',
+    '- Do not generate a question merely because a configuration option exists. Ordinary choices (standard baffle mounting, a common channel layout, a typical subwoofer count) are not design decisions that need explanation.',
     '- Never assume a motivation. The question must ask the designer for their reason.',
+    '- Never invent a design constraint or speculate about a reason the designer did not record.',
+    '- Three questions is a maximum, not a target. Zero questions is acceptable when nothing meaningful needs clarification.',
     '- Keep each question to one or two sentences in plain professional English.',
     '- Do not repeat questions already asked: ' + (existingIds || 'none'),
     '',

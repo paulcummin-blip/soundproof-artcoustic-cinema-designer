@@ -109,6 +109,12 @@ export default function DocumentWorkflowPanel({
     if (options.autoPrint) params.set(REPORT_AUTOPRINT_PARAM, '1');
     if (options.autoStore) params.set(REPORT_AUTOSTORE_PARAM, '1');
     if (options.regenerateIntent) params.set(REPORT_REGENERATE_INTENT_PARAM, '1');
+    // Carry temporary skip exclusions from this panel's review so the report
+    // page does not re-ask skipped questions and excludes their previously
+    // saved answers from this generation only.
+    if (Array.isArray(options.skipQuestionIds) && options.skipQuestionIds.length > 0) {
+      params.set('skipCtx', options.skipQuestionIds.join(','));
+    }
     window.location.assign(`${REPORT_ROUTE.VISUAL}?${params.toString()}`);
   };
 
@@ -122,6 +128,7 @@ export default function DocumentWorkflowPanel({
       updateReport: trState === WORKFLOW_STATE.OUTDATED,
       autoStore: true,
       regenerateIntent: true,
+      skipQuestionIds: contextReview.getSkippedQuestionIds(),
     });
   };
 

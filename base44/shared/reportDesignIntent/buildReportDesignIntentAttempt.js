@@ -96,6 +96,12 @@ export async function buildReportDesignIntentAttempt({
    * production save and the admin preview generate exactly as they always have.
    */
   prepareOnly = false,
+  /**
+   * Temporary skip exclusions for this generation only. A skipped question's
+   * previously saved answer is NOT deleted — it remains for future generations.
+   * These IDs exclude it from the writer's recorded intent for this run.
+   */
+  skipQuestionIds = [],
 } = {}) {
   if (!projectId || !versionId) {
     return blocked(DESIGN_INTENT_ATTEMPT_BLOCK.INVALID_REQUEST, 400, 'project_id and version_id are required.');
@@ -147,7 +153,20 @@ export async function buildReportDesignIntentAttempt({
     .filter({ project_id: projectId, version_id: versionId }, { limit: 1 })
     .catch(() => null);
   const contextRecord = (contextPage?.items || [])[0] || null;
-  const contextItems = Array.isArray(contextRecord?.context_items) ? contextRecord.context_items : [];
+  const allContextItems = Array.isArray(contextRecord?.context_items) ? contextRecord.context_items : [];
+  // Apply temporary skip exclusions: a question the designer skipped for this
+  // generation has its previously saved answer excluded from the writer's
+  // recorded intent. The saved answer is NOT deleted — it remains in storage
+  // for future generations. Only the IDs the caller explicitly skipped are
+  // excluded; all other saved answers are passed through as before.
+  const skipSet = new Set(
+    (Array.isArray(skipQuestionIds) ? skipQuestionIds : [])
+      .map((id) => String(id || ''))
+      .filter(Boolean),
+  );
+  const contextItems = skipSet.size > 0
+    ? allContextItems.filter((item) => !skipSet.has(String(item?.question_id || '')))
+    : allContextItems;
   const recordedIntent = recordedIntentFromContext(contextItems);
 
   // ── The writer's own switch, before any evidence is read ──

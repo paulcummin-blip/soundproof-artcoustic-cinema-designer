@@ -33,7 +33,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { project_id, version_id, generate_only } = body || {};
+    const { project_id, version_id, generate_only, skip_question_ids } = body || {};
     if (!project_id || !version_id) {
       return Response.json({ error: 'project_id and version_id are required.' }, { status: 400 });
     }
@@ -42,6 +42,14 @@ export default async function(req) {
     if (accessContext?.allowed !== true || accessContext.capabilities?.soundProof !== true) {
       return Response.json({ error: 'Sound Proof access is required to write a report narrative.' }, { status: 403 });
     }
+
+    // Temporary skip exclusions for this generation only. A skipped
+    // question's previously saved answer is NOT deleted — it remains for
+    // future generations. These IDs exclude it from the writer's recorded
+    // intent for this run.
+    const skipQuestionIds = Array.isArray(skip_question_ids)
+      ? skip_question_ids.map((id) => String(id || '')).filter(Boolean)
+      : [];
 
     const coreInput = {
       entities: base44.entities,
@@ -53,6 +61,7 @@ export default async function(req) {
       accountIdFallback: accessContext.user?.account_id || accessContext.account?.id || null,
       isMasterAdmin: accessContext.isMasterAdmin === true,
       now: new Date().toISOString(),
+      ...(skipQuestionIds.length > 0 ? { skipQuestionIds } : {}),
     };
 
     // ── GENERATE ONLY: produce a NEW narrative using the report's existing frozen
