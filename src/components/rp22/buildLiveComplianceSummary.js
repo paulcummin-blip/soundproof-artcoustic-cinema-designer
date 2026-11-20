@@ -221,7 +221,7 @@ export function buildLiveComplianceSummary({ analysisResult, bassResults = null,
       .sort(([a], [b]) => a - b)
       .map(([row, rowSeats]) => ({
         row,
-        seats: rowSeats.sort((a, b) => b.column - a.column),
+        seats: rowSeats.sort((a, b) => a.column - b.column),
       }));
   }
 
