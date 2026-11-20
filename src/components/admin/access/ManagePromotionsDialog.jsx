@@ -375,7 +375,7 @@ export default function ManagePromotionsDialog({
 
             {promoType === "unlimited_projects" && (
               <div style={{ fontSize: 11, color: BRAND.muted, padding: "8px 10px", background: "#F8F8F7", borderRadius: 8, border: `1px solid ${BRAND.border}`, marginBottom: 12 }}>
-                Earned and purchased credits will not be consumed during the unlimited period. If overlapping unlimited promotions exist, the earliest start date is shown as current.
+                Earned and purchased credits will not be consumed during the unlimited period. Overlapping unlimited promotions retain access until the latest uninterrupted expiry.
               </div>
             )}
 
