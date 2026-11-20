@@ -36,7 +36,7 @@ import {
   lowestBassLevel,
 } from "@/components/utils/rp22/bassGradingAuthority";
 
-export const ENGINEERING_SUMMARY_SCHEMA_VERSION = 1;
+export const ENGINEERING_SUMMARY_SCHEMA_VERSION = 2;
 const SCORECARD_CATEGORY_ORDER = [
   "Spatial Resolution",
   "Dynamic Range",
@@ -523,8 +523,9 @@ export function summariseEngineeringResults({
   const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(canonicalSeats);
   const allSeatIds = designRatingAuthority?.seatIds || canonicalSeats.map((seat) => seat?.id).filter(Boolean);
 
-  const projectRating = calculateRoomDesignRating(designRatingAuthority);
   const primaryRating = calculateScopedRoomDesignRating(designRatingAuthority, primarySeatIds);
+  // Legacy project/rating envelopes alias Primary; no combined score is calculated.
+  const projectRating = primaryRating;
   const secondaryRating = calculateScopedRoomDesignRating(designRatingAuthority, secondarySeatIds);
   const scopedRatings = { primary: primaryRating, secondary: secondaryRating, all: projectRating };
 

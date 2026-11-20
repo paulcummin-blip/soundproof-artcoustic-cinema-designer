@@ -231,9 +231,17 @@ export function buildDesignRatingInput({
         }
       : null;
 
+  // P19 is assessed only at RSP. Never substitute an individual seat result.
+  const rspP19 = completedBassPresentation?.parameters?.p19;
+  const p19 = bassVerified
+    ? (rspP19?.isAuthoritative === true && rspP19?.status === "complete"
+        ? { rawValue: rspP19.rawValue, authoritativeLevel: rspP19.level, verified: true }
+        : null)
+    : (retainedBassActive ? retainedBass.p19Rsp ?? null : null);
+
   // ── Seat-scope parameters ─────────────────────────────────────────
 
-  const seatParamKeys = ["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17", "p19", "p20"];
+  const seatParamKeys = ["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17", "p20"];
   const seatScope = {};
 
   // Room-level guard: some seat-scope parameters also have a room-level
@@ -274,22 +282,15 @@ export function buildDesignRatingInput({
     }
 
     for (const seatId of seatIds) {
-      // P19 and P20 are already graded by the canonical BassResult.
-      // Design Rating preserves those exact grades and never re-grades raw dB.
-      if (key === "p19" || key === "p20") {
-        const hud = reportSeatHudById?.[seatId];
-        const p19Seat = key === "p19" ? (p19SeatAuthority?.bySeatId?.[seatId] || null) : null;
-        const metric = key === "p20" ? hud?.rp22?.p20 : null;
-        const rawValue = key === "p19" ? p19Seat?.rawValue : extractRawValue(metric);
-        const authoritativeLevel = key === "p19" ? p19Seat?.grade : metric?.level;
-        const calculated = key === "p19" ? p19Seat?.calculated === true : !isMetricIneligible(metric);
-        if (bassVerified && calculated && isNum(rawValue) && authoritativeLevel) {
-          seatScope[key][seatId] = { rawValue, authoritativeLevel, verified: true };
+      // P20 preserves the canonical individual-seat grade without re-grading.
+      if (key === "p20") {
+        const metric = reportSeatHudById?.[seatId]?.rp22?.p20;
+        const rawValue = extractRawValue(metric);
+        if (bassVerified && !isMetricIneligible(metric) && isNum(rawValue) && metric?.level) {
+          seatScope[key][seatId] = { rawValue, authoritativeLevel: metric.level, verified: true };
         } else if (retainedBassActive) {
-          const retainedRawMap = key === "p19" ? retainedBass.p19BySeat : retainedBass.p20BySeat;
-          const retainedLevelMap = key === "p19" ? retainedBass.p19LevelBySeat : retainedBass.p20LevelBySeat;
-          const retainedRaw = retainedRawMap?.[seatId];
-          const retainedLevel = retainedLevelMap?.[seatId];
+          const retainedRaw = retainedBass.p20BySeat?.[seatId];
+          const retainedLevel = retainedBass.p20LevelBySeat?.[seatId];
           seatScope[key][seatId] = isNum(retainedRaw) && retainedLevel
             ? { rawValue: retainedRaw, authoritativeLevel: retainedLevel, verified: true }
             : null;
@@ -307,15 +308,7 @@ export function buildDesignRatingInput({
 
       const metric = hud.rp22?.[key];
       if (!metric) {
-        // Bass seat-scope (P19/P20): fall back to retained same-fingerprint bass
-        // when current publication is temporarily unavailable.
-        if ((key === "p19" || key === "p20") && retainedBassActive) {
-          const retainedMap = key === 'p19' ? retainedBass.p19BySeat : retainedBass.p20BySeat;
-          const retainedVal = retainedMap?.[seatId];
-          seatScope[key][seatId] = isNum(retainedVal) ? { rawValue: retainedVal, verified: true } : null;
-        } else {
-          seatScope[key][seatId] = null;
-        }
+        seatScope[key][seatId] = null;
         continue;
       }
 
@@ -375,7 +368,7 @@ export function buildDesignRatingInput({
     p10: seatScope.p10,
     p16: seatScope.p16,
     p17: seatScope.p17,
-    p19: seatScope.p19,
+    p19,
     p20: seatScope.p20,
     // P21: a published measured grade wins; otherwise the permanent L2
     // design assumption contributes to the rating.

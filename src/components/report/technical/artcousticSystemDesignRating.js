@@ -106,7 +106,7 @@ export const PARAM_SCOPE = Object.freeze({
   p1: "seat", p2: "room", p3: "room", p4: "seat", p5: "seat",
   p6: "seat", p7: "room", p8: "room", p9: "seat", p10: "seat",
   p11: "room", p12: "room", p13: "room", p14: "room", p15: "room",
-  p16: "seat", p17: "seat", p18: "room", p19: "seat", p20: "seat",
+  p16: "seat", p17: "seat", p18: "room", p19: "room", p20: "seat",
   p21: "room", screen: "seat",
 });
 
@@ -341,7 +341,7 @@ function scoreP18(rawValue, mode) {
   const assessment = assessP18Extension(rawValue, mode || "minimum");
   return {
     level: assessment.levelLabel || "FAIL",
-    multiplier: assessment.performanceMultiplier,
+    multiplier: multiplierForLevel(assessment.levelLabel || "FAIL"),
   };
 }
 
@@ -414,6 +414,10 @@ function scoreRoomParam(key, input) {
     return { state: "scored", level: result.level, multiplier: multiplierForLevel(result.level), reason: null };
   }
 
+  // P19 is the canonical RSP grade, shared unchanged by both seating groups.
+  // No per-seat fallback and no second grading of its raw deviation.
+  if (key === "p19") return scorePublishedBassGrade(input, key);
+
   const norm = normalizeInput(input, BASS_PARAMS.has(key));
   if (norm.state === "na") return { state: "na", level: null, multiplier: null, reason: null };
   if (norm.state === "provisional") {
@@ -444,21 +448,19 @@ function scoreRoomParam(key, input) {
  * Score a single seat-scope parameter for a single seat.
  * @returns {{ state: string, level: string|null, multiplier: number|null, reason: string|null }}
  */
-function scoreSeatParam(key, input) {
-  // P19/P20 arrive pre-graded from the canonical BassResult. Raw deviation
-  // remains diagnostic only; Design Rating never grades bass a second time.
-  if (key === "p19" || key === "p20") {
-    const authoritativeLevel = String(input?.authoritativeLevel || "").toUpperCase();
-    if (input?.verified !== true || !/^(L[1-4]|FAIL)$/.test(authoritativeLevel)) {
-      return { state: "provisional", level: null, multiplier: null, reason: `missing-authoritative-${key}-seat-grade` };
-    }
-    return {
-      state: "scored",
-      level: authoritativeLevel,
-      multiplier: multiplierForLevel(authoritativeLevel),
-      reason: null,
-    };
+function scorePublishedBassGrade(input, key) {
+  const level = String(input?.authoritativeLevel || "").toUpperCase();
+  const unavailable = input?.provisional === true || input?.indeterminate === true
+    || /^(provisional|uncalculated|calculating|updating|stale|no_data|not_calculated)$/.test(String(input?.status || ""));
+  if (input?.verified !== true || unavailable || !/^(L[1-4]|FAIL)$/.test(level)) {
+    return { state: "provisional", level: null, multiplier: null, reason: `missing-authoritative-${key}-grade` };
   }
+  return { state: "scored", level, multiplier: multiplierForLevel(level), reason: null };
+}
+
+function scoreSeatParam(key, input) {
+  // Preserve P20's individual-seat grade; only ASDR group selection changes.
+  if (key === "p20") return scorePublishedBassGrade(input, key);
 
   const norm = normalizeInput(input, BASS_PARAMS.has(key));
   if (norm.state === "na") return { state: "na", level: null, multiplier: null, reason: null };
@@ -507,7 +509,7 @@ function scoreSeatParam(key, input) {
  * @param {Object} [input.p16] - Seat-scope
  * @param {Object} [input.p17] - Seat-scope
  * @param {Object} [input.p18] - Room-scope: { rawValue: number, verified: boolean } | { na: true } | null
- * @param {Object} [input.p19] - Seat-scope: { [seatId]: { rawValue: number, verified: boolean } | null }
+ * @param {Object} [input.p19] - RSP-scope: { authoritativeLevel, verified: true } | null
  * @param {Object} [input.p20] - Seat-scope (na for single-seat)
  * @param {Object} [input.screen] - Seat-scope: { [seatId]: number|null }
  * @returns {{ parameters: Object, seatIds: string[], excludedParams: string[] }}
@@ -625,7 +627,7 @@ export function buildArtcousticDesignRatingAuthority(input) {
  *   fundamental eligibility rule: ineligible seats never lower, raise, or
  *   default the parameter level.
  *
- * metric contribution = average multiplier × weight
+ * metric contribution = highest valid level multiplier in the group × weight
  * maximum metric contribution = 12 × weight
  *
  * @param {Object} authority - Authority map from buildArtcousticDesignRatingAuthority
@@ -670,54 +672,21 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       // Extract mode from the original input stored on the authority parameter
       mode = param.mode || null;
     } else {
-      // seat-scope: average multipliers across applicable seats IN SCOPE,
-      // weighted 65% Primary / 35% Secondary when both groups are present.
-      // The scope filter happens HERE — before averaging and distribution —
-      // so Primary/Secondary/All scopes see only their seat subsets.
-      //
-      // When both Primary and Secondary seats are present in the scope, the
-      // final multiplier = (Primary avg × 0.65) + (Secondary avg × 0.35).
-      // This rewards performance in the seats that matter most — a large
-      // number of Secondary seats can never outweigh excellent Primary
-      // performance, and poor Primary seats cannot be hidden by good
-      // Secondary seats.
-      //
-      // When only one group exists (e.g. scoped Primary-only or Secondary-only
-      // ratings, or a one-row cinema where all seats are Primary), the flat
-      // group average is used — the weighting never distorts a single-group
-      // scope.
+      // ASDR uses the highest valid achieved level in THIS seating group.
+      // Missing/provisional seats never contribute; individual RP22 grades stay intact.
       const scopedSeatIds = (authority?.seatIds || []).filter((id) => seatIdSet.has(id));
-      const primarySeats = [];
-      const secondarySeats = [];
+      let selected = null;
       for (const id of scopedSeatIds) {
         const sa = param.seats?.[id];
-        if (!sa || sa.state === "na") continue; // N/A seat — skip individually
-        if (sa.state === "provisional") {
-          hasProvisional = true; // diagnostic only — does not affect status
-          continue; // not-calculated/missing seat — skip individually
+        if (!sa || sa.state !== "scored" || multiplierForLevel(sa.level) == null) {
+          if (sa?.state === "provisional") hasProvisional = true;
+          continue;
         }
-        const priority = authority?.seatPriorities?.[id] || "primary";
-        if (priority === "secondary") {
-          secondarySeats.push(sa);
-        } else {
-          primarySeats.push(sa);
-        }
+        if (!selected || multiplierForLevel(sa.level) > multiplierForLevel(selected.level)) selected = sa;
       }
-      if (primarySeats.length === 0 && secondarySeats.length === 0) continue;
-      const primaryAvg = primarySeats.length > 0
-        ? primarySeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0) / primarySeats.length
-        : 0;
-      const secondaryAvg = secondarySeats.length > 0
-        ? secondarySeats.reduce((acc, s) => acc + (s.multiplier ?? 0), 0) / secondarySeats.length
-        : 0;
-      if (primarySeats.length > 0 && secondarySeats.length > 0) {
-        multiplier = (primaryAvg * 0.65) + (secondaryAvg * 0.35);
-      } else if (primarySeats.length > 0) {
-        multiplier = primaryAvg;
-      } else {
-        multiplier = secondaryAvg;
-      }
-      resultLevel = buildSeatDistribution(param.seats, scopedSeatIds);
+      if (!selected) continue;
+      resultLevel = selected.level;
+      multiplier = multiplierForLevel(resultLevel);
     }
 
     const earnedPoints = multiplier * weight;
@@ -775,25 +744,27 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
 }
 
 /**
- * Calculate the room Artcoustic System Design Rating across ALL seats.
+ * Legacy rating envelope: the Primary Seating rating.
  *
- * This is the existing production path. It delegates to the shared internal
- * core using every authoritative seat ID, preserving exact numerical
- * behaviour for all current consumers (scorecard, sidebar, recommendations).
+ * Retained for callers of the original API; never combines seating groups.
  *
  * @param {Object} authority - Authority map from buildArtcousticDesignRatingAuthority
- * @returns {Object} room rating (All Seating)
+ * @returns {Object} Primary Seating rating
  */
 export function calculateRoomDesignRating(authority) {
-  const allSeatIds = authority?.seatIds || [];
-  return calculateRoomDesignRatingCore(authority, allSeatIds);
+  // Legacy API compatibility: this envelope represents Primary Seating only.
+  // There is no combined / all-seating Design Performance Index.
+  const primarySeatIds = (authority?.seatIds || []).filter(
+    (id) => (authority?.seatPriorities?.[id] || "primary") === "primary"
+  );
+  return calculateScopedRoomDesignRating(authority, primarySeatIds);
 }
 
 /**
  * Calculate a scoped room Artcoustic System Design Rating.
  *
  * Same shared core as calculateRoomDesignRating, but restricts seat-scope
- * parameter averaging and distribution to the supplied seat subset.
+ * parameter selection to the supplied seat subset.
  * Room-scope parameters are identical across all scopes (they have no seat
  * dependency). Only seat-scope parameters change when the seat set changes.
  *

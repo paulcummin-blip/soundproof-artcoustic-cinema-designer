@@ -433,9 +433,12 @@ export function useAppDesignRating({
         p18Raw: completedBassPresentation?.parameters?.p18?.rawValue ?? null,
         p18Mode: reportP18Mode,
         p18Qualified: completedBassPresentation?.parameters?.p18?.qualifiedAtSelectedP14Output !== false,
-        p19BySeat,
+        p19Rsp: completedBassPresentation?.parameters?.p19?.isAuthoritative === true
+          && completedBassPresentation?.parameters?.p19?.status === "complete"
+          ? { rawValue: completedBassPresentation.parameters.p19.rawValue,
+              authoritativeLevel: completedBassPresentation.parameters.p19.level, verified: true }
+          : null,
         p20BySeat,
-        p19LevelBySeat,
         p20LevelBySeat,
       };
     }
