@@ -5,36 +5,33 @@ import PromotionPill from "@/components/admin/access/PromotionPill";
 import {
   accountTypeLabel,
   formatGBP,
+  formatDate,
 } from "@/lib/commercial/accountAccessOverview";
 
-// Dealer table: Dealer | Access | 2026 Turnover | Credits Available |
-// Projects Created | Promotion Status | Promotion Expiry | View.
+// Dealer table columns:
+// Dealer | Access | 2026 Turnover | Available | Credits Used | Projects |
+// Last Activity | Promotion | View
+//
+// Numeric columns are right-aligned with tabular-nums. Promotion status and
+// expiry are combined into one compact column so the row stays narrow.
 
-const GRID = "2fr 1fr 0.9fr 0.7fr 0.7fr 1fr 0.9fr 80px";
-const MIN_WIDTH = 1120;
+const GRID = "2fr 1fr 0.95fr 0.65fr 0.65fr 0.6fr 0.85fr 1.15fr 64px";
+const MIN_WIDTH = 1180;
 
 const HEADERS = [
-  { label: "Dealer", title: "Dealer account and primary admin email" },
-  { label: "Access", title: "Account access state (Active, Not Activated, Suspended)" },
-  { label: "2026 turnover", title: "Eligible turnover from the Partner Portal — newest source snapshot" },
-  { label: "Available", title: "Canonical credit balance — SUM of the capacity ledger" },
-  { label: "Projects", title: "Current projects stamped to this account" },
-  { label: "Promotion", title: "Promotion status — Unlimited Active, Expires Soon, Expired, None" },
-  { label: "Expiry", title: "Promotion end date (inclusive)" },
-  { label: "View", title: "" },
+  { label: "Dealer", title: "Dealer account and primary admin email", align: "left" },
+  { label: "Access", title: "Account access state (Active, Not Activated, Suspended)", align: "left" },
+  { label: "2026 Turnover", title: "Eligible turnover from the Partner Portal — newest source snapshot", align: "right" },
+  { label: "Available", title: "Canonical credit balance — SUM of the capacity ledger", align: "right" },
+  { label: "Credits Used", title: "Actual ledger deductions (PROJECT_ACTIVATION entries)", align: "right" },
+  { label: "Projects", title: "Current projects stamped to this account", align: "right" },
+  { label: "Last Activity", title: "Latest project, login or access event — not a sync timestamp", align: "right" },
+  { label: "Promotion", title: "Promotion status and expiry date", align: "left" },
+  { label: "", title: "", align: "right" },
 ];
 
-function combinedAccess(row) {
-  if (row.account.status === "suspended") return { label: "Suspended", tone: "danger" };
-  if (row.account.status === "inactive") return { label: "Not Activated", tone: "muted" };
-  if (row.access.label === "No users") return { label: "Not Activated", tone: "muted" };
-  if (row.access.label.startsWith("Pending")) return { label: "Not Activated", tone: "warn" };
-  return { label: "Active", tone: "ok" };
-}
-
 /**
- * One grouped account list — simplified to six columns. Rows are already
- * assembled and filtered by the page.
+ * One grouped account list. Rows are already assembled and filtered by the page.
  * Props: rows, onOpen(row), onAddCredits(row) [unused — kept for caller compat],
  *        emptyMessage
  */
@@ -51,20 +48,26 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
 
   return (
     <div className="overflow-x-auto rounded-lg border border-[#DCDBD6] bg-white">
-      <div className="min-w-[1120px]">
+      <div className="min-w-[1180px]">
         <div
           style={{ gridTemplateColumns: GRID }}
           className="grid items-center gap-2 border-b border-[#E7E5E1] bg-[#F4F3F1] px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-[#625143]"
         >
-          {HEADERS.map((header) => (
-            <div key={header.label} title={header.title} className={header.label === "View" ? "text-right" : ""}>
+          {HEADERS.map((header, index) => (
+            <div
+              key={index}
+              title={header.title}
+              className={header.align === "right" ? "text-right" : ""}
+            >
               {header.label}
             </div>
           ))}
         </div>
 
         {list.map((row, index) => {
-          const access = combinedAccess(row);
+          const access = row.accessState || { label: "—", tone: "muted" };
+          const promoLabel = row.promotion?.status || "None";
+          const promoExpiry = row.promotion?.expiryDisplay;
           return (
             <div
               key={row.account.id}
@@ -73,6 +76,7 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
                 index < list.length - 1 ? "border-b border-[#EDEBE7]" : ""
               }`}
             >
+              {/* Dealer */}
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-semibold text-[#1B1A1A]">
                   {row.account.name || "Unnamed account"}
@@ -83,30 +87,51 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
                 </div>
               </div>
 
+              {/* Access */}
               <div>
                 <AccessPill label={access.label} tone={access.tone} />
               </div>
 
-              <div className="tabular-nums text-[#3E4349]">{formatGBP(row.turnover)}</div>
+              {/* 2026 Turnover */}
+              <div className="text-right tabular-nums text-[#3E4349]">
+                {formatGBP(row.turnover)}
+              </div>
 
+              {/* Available credits */}
               <div className="text-right tabular-nums font-bold text-[#1B1A1A]">
                 {row.credits.available ?? 0}
               </div>
 
-              <div className="tabular-nums text-[#3E4349]">{row.projectCount}</div>
+              {/* Credits Used — actual ledger deductions, not project count */}
+              <div className="text-right tabular-nums text-[#3E4349]">
+                {row.credits.used ?? 0}
+              </div>
 
-              <div>
+              {/* Projects — current projects only */}
+              <div className="text-right tabular-nums text-[#3E4349]">
+                {row.projectCount}
+              </div>
+
+              {/* Last Activity */}
+              <div className="text-right tabular-nums text-[#625143]">
+                {row.lastActivity ? formatDate(new Date(row.lastActivity).toISOString()) : "—"}
+              </div>
+
+              {/* Promotion — status + expiry combined compactly */}
+              <div className="flex items-center gap-1.5">
                 <PromotionPill
-                  label={row.promotion?.status || "None"}
+                  label={promoLabel}
                   tone={row.promotion?.tone || "muted"}
                   title={row.promotion?.effective?.headline || row.promotion?.effective?.name || undefined}
                 />
+                {promoExpiry && promoLabel !== "None" && (
+                  <span className="whitespace-nowrap text-[11px] text-[#625143]">
+                    {promoExpiry}
+                  </span>
+                )}
               </div>
 
-              <div className="tabular-nums text-[#3E4349]">
-                {row.promotion?.expiryDisplay || "—"}
-              </div>
-
+              {/* View */}
               <div className="flex items-center justify-end">
                 <button
                   type="button"

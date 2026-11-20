@@ -13,6 +13,7 @@ import {
   applyAccessFilters,
   bucketRowsByGroup,
   buildAccessRows,
+  buildAccessSummary,
   buildAdminGrantEntry,
   buildAuditsByAccount,
   buildLedgerByAccount,
@@ -160,6 +161,7 @@ export default function AdminAccountAccess() {
     () => rows.reduce((sum, row) => sum + (Number(row.credits.available) || 0), 0),
     [rows]
   );
+  const summary = useMemo(() => buildAccessSummary(rows), [rows]);
 
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS);
 
@@ -251,10 +253,10 @@ export default function AdminAccountAccess() {
         </div>
       </div>
 
-      {/* Compact summary */}
+      {/* Concise summary indicators */}
       <div className="mb-5 flex flex-wrap gap-2">
         <span className="rounded-lg border border-[#DCDBD6] bg-white px-3 py-1.5 text-[12px] text-[#3E4349]">
-          <span className="font-bold text-[#1B1A1A]">{rows.length}</span> accounts
+          <span className="font-bold text-[#1B1A1A]">{summary.total}</span> accounts
         </span>
         {ACCESS_GROUPS.map((group) => (
           <span
@@ -265,6 +267,18 @@ export default function AdminAccountAccess() {
           </span>
         ))}
         <span className="rounded-lg border border-[#BBD3C4] bg-[#EEF4F0] px-3 py-1.5 text-[12px] text-[#213428]">
+          Active access: <span className="font-bold">{summary.activeAccess}</span>
+        </span>
+        <span className="rounded-lg border border-[#E4D6BE] bg-[#FAF5EC] px-3 py-1.5 text-[12px] text-[#7A5B22]">
+          Credits, no projects: <span className="font-bold">{summary.unusedCreditsNoProjects}</span>
+        </span>
+        <span className="rounded-lg border border-[#C7D5E8] bg-[#EFF3F9] px-3 py-1.5 text-[12px] text-[#2C5AA0]">
+          With project activity: <span className="font-bold">{summary.withProjectActivity}</span>
+        </span>
+        <span className="rounded-lg border border-[#BBD3C4] bg-[#EEF4F0] px-3 py-1.5 text-[12px] text-[#213428]">
+          Unlimited promo: <span className="font-bold">{summary.activeUnlimitedPromo}</span>
+        </span>
+        <span className="rounded-lg border border-[#DCDBD6] bg-white px-3 py-1.5 text-[12px] text-[#3E4349]">
           Available credits: <span className="font-bold">{availableCredits}</span>
         </span>
       </div>

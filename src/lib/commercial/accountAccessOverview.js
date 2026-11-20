@@ -59,6 +59,7 @@ export const EMPTY_FILTERS = {
   users: "all",
   projects: "all",
   promotion: "all",
+  activity: "all",
 };
 
 // ---------------------------------------------------------------- grouping
@@ -120,6 +121,62 @@ export function buildLinksByAccount(links) {
     map.get(link.account_id).push(link);
   }
   return map;
+}
+
+// --------------------------------------------------------------- access state
+
+/**
+ * Combined access label for table, summary and filter use.
+ * Mirrors the logic that lived in AccountAccessTable so the page-level
+ * summary and the activity filter see the same "Active / Not Activated /
+ * Suspended" picture the table shows.
+ */
+export function combinedAccessState(account, members) {
+  if (account?.status === "suspended") return { label: "Suspended", tone: "danger" };
+  if (account?.status === "inactive") return { label: "Not Activated", tone: "muted" };
+  const occupied = occupiedMembers(members);
+  if (occupied.length === 0) return { label: "Not Activated", tone: "muted" };
+  const pendingOnly = occupied.every((m) => (m.status || "pending") === "pending");
+  if (pendingOnly) return { label: "Not Activated", tone: "warn" };
+  return { label: "Active", tone: "ok" };
+}
+
+/**
+ * Last reliable account activity — the latest of project creates/updates,
+ * account-use audit events and the account's last_access_at. A turnover sync
+ * timestamp is deliberately never used: it is not genuine account activity.
+ */
+export function resolveLastActivity(projects, audits, lastAccessAt) {
+  let best = null;
+  for (const project of Array.isArray(projects) ? projects : []) {
+    for (const key of ["updated_date", "created_date"]) {
+      const v = project?.[key];
+      if (!v) continue;
+      const ms = new Date(v).getTime();
+      if (Number.isFinite(ms) && (best === null || ms > best)) best = ms;
+    }
+  }
+  const USEFUL_AUDIT_ACTIONS = new Set([
+    "USER_LOGIN_RECORDED",
+    "INVITATION_ACCEPTED",
+    "SOUNDPROOF_ENABLE",
+    "SOUNDPROOF_RENEWED",
+    "ACCESS_CHANGED",
+    "INVITED",
+    "INVITATION_RESENT",
+  ]);
+  for (const audit of Array.isArray(audits) ? audits : []) {
+    if (!USEFUL_AUDIT_ACTIONS.has(audit?.action)) continue;
+    const v = audit?.occurred_at;
+    if (!v) continue;
+    const ms = new Date(v).getTime();
+    if (Number.isFinite(ms) && (best === null || ms > best)) best = ms;
+  }
+  if (lastAccessAt) {
+    const ms = new Date(lastAccessAt).getTime();
+    if (Number.isFinite(ms) && (best === null || ms > best)) best = ms;
+  }
+  return best; // ms epoch, or null
 }
 
 // ---------------------------------------------------------------- membership
@@ -325,6 +382,8 @@ export function buildAccessRows({
         return snap ? snap.timestamp_known : null;
       })(),
       lastLogin: account.last_access_at || null,
+      lastActivity: resolveLastActivity(projects, auditsByAccount?.get(account.id) || [], account.last_access_at || null),
+      accessState: combinedAccessState(account, members),
       credits: buildCreditDetail(ledgerEntries),
       projectCount: projects.length,
       promoProjects: promoByAccount?.get(account.id) || 0,
@@ -354,6 +413,7 @@ export function applyAccessFilters(rows, filters) {
   const users = filters?.users || "all";
   const projects = filters?.projects || "all";
   const promotion = filters?.promotion || "all";
+  const activity = filters?.activity || "all";
 
   return (Array.isArray(rows) ? rows : []).filter((row) => {
     if (group !== "all" && row.group !== group) return false;
@@ -372,6 +432,13 @@ export function applyAccessFilters(rows, filters) {
     if (promotion === "active" && row.promotion?.status !== "Unlimited Active" && row.promotion?.status !== "Expires Soon") return false;
     if (promotion === "expires_soon" && row.promotion?.status !== "Expires Soon") return false;
     if (promotion === "none" && row.promotion?.status !== "None") return false;
+
+    // Activity quick-filter — a single dimension over the same derived row data.
+    if (activity === "active" && row.accessState?.label !== "Active") return false;
+    if (activity === "not_activated" && row.accessState?.label !== "Not Activated") return false;
+    if (activity === "credits_no_projects" && !(row.credits.available > 0 && row.projectCount === 0)) return false;
+    if (activity === "has_projects" && !(row.projectCount > 0)) return false;
+    if (activity === "unlimited_promo" && row.promotion?.status !== "Unlimited Active" && row.promotion?.status !== "Expires Soon") return false;
 
     if (query) {
       const memberText = row.members
@@ -433,4 +500,28 @@ export function accountTypeLabel(account) {
   const type = account?.account_type;
   if (!type) return "—";
   return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+// ---------------------------------------------------------------- summary
+
+/**
+ * Concise top-summary indicators over the full (unfiltered) row set.
+ * Each count is derived from the same row fields the table and filters use,
+ * so the indicators never diverge from the visible rows.
+ */
+export function buildAccessSummary(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  let activeAccess = 0;
+  let unusedCreditsNoProjects = 0;
+  let withProjectActivity = 0;
+  let activeUnlimitedPromo = 0;
+  for (const row of list) {
+    if (row.accessState?.label === "Active") activeAccess += 1;
+    if (row.credits?.available > 0 && row.projectCount === 0) unusedCreditsNoProjects += 1;
+    if (row.projectCount > 0) withProjectActivity += 1;
+    if (row.promotion?.status === "Unlimited Active" || row.promotion?.status === "Expires Soon") {
+      activeUnlimitedPromo += 1;
+    }
+  }
+  return { total: list.length, activeAccess, unusedCreditsNoProjects, withProjectActivity, activeUnlimitedPromo };
 }
