@@ -17,8 +17,13 @@ import {
  * POST /functions/portalSoundProofAccess
  *   Authorization: Bearer <PORTAL_ACTIVATION_SHARED_SECRET>
  *   Body: { grant: { jti, exp, purpose, target, dealer_account_id,
- *                    portal_user_id, portal_profile_id,
+ *                    portal_user_id, portal_profile_id, external_account_number,
  *                    admin_email?, admin_full_name? } }
+ *
+ * jti is "<canonical portal_user_id>:<unique nonce>"; exp is at most five
+ * minutes ahead. The authenticated Portal server supplies the canonical
+ * subject and trading-account number from its verified dealer records.
+ * dealer_account_id is the Portal dealer UUID, NOT the trading-account number.
  *
  * purpose "activate": creates one pending dealer-admin invitation. Does NOT
  *   start the 90-day term. The term starts when the invited user verifies,
@@ -62,7 +67,7 @@ export default async function(req: Request): Promise<Response> {
       const status = resolution.error === 'DEALER_LINK_NOT_FOUND' ? 404
         : resolution.error === 'ACCOUNT_NOT_FOUND' ? 404
         : resolution.error === 'DEALER_LINK_AMBIGUOUS' ? 409
-        : 404;
+        : 403;
       return json(status, { ok: false, error: resolution.error });
     }
 
@@ -75,7 +80,8 @@ export default async function(req: Request): Promise<Response> {
           : result.error === 'ACCOUNT_SUSPENDED' ? 403
           : result.error === 'ADMIN_SEAT_ALREADY_OCCUPIED' ? 403
           : result.error === 'SEAT_LIMIT_REACHED' ? 403
-          : 500;
+          : result.error === 'ACCOUNT_NOT_FOUND' ? 404
+          : 409;
         return json(status, { ok: false, error: result.error });
       }
       return json(200, {
@@ -97,7 +103,8 @@ export default async function(req: Request): Promise<Response> {
         const status = result.error === 'ACCOUNT_SUSPENDED' ? 403
           : result.error === 'ACCOUNT_NOT_ELIGIBLE' ? 403
           : result.error === 'ACCOUNT_NOT_YET_ACTIVATED' ? 403
-          : 500;
+          : result.error === 'ACCOUNT_NOT_FOUND' ? 404
+          : 409;
         return json(status, { ok: false, error: result.error });
       }
       return json(200, {

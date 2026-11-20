@@ -9,6 +9,8 @@ import {
   resolveAccountAccess,
 } from '../../shared/accountAccessAuthority.js';
 
+import { acquireCreationLock, releaseCreationLock } from '../../shared/projectCreationLock.js';
+
 const OCCUPIED_STATUSES = new Set(['pending', 'active']);
 const ADMIN_ROLES = new Set(['dealer_admin', 'distributor_admin', 'internal_admin']);
 const LEGACY_MEMBERSHIP_ROLES = new Set(['designer', 'viewer']);
@@ -242,6 +244,18 @@ export default async function(req) {
       return Response.json(await loadAccountUsers(service, account));
     }
 
+    // Serialise every membership mutation with Portal activation and project
+    // creation; never reclaim a still-held lock merely because time has passed.
+    const lock = await acquireCreationLock(service, account.id);
+    if (!lock.acquired) return errorResponse('ACCOUNT_OPERATION_BUSY', 'Another account operation is in progress. Please retry.', 409);
+    let release = true;
+    try {
+      // Recheck authority after acquiring the lock, not only before waiting.
+      const fresh = await resolveAccountAccess(base44, sessionUser);
+      if (!fresh.allowed || (!fresh.isMasterAdmin
+        && (fresh.capabilities?.manageUsers !== true || fresh.user?.account_id !== account.id))) {
+        return errorResponse('FORBIDDEN', 'Account administration is not available.', 403);
+      }
     const memberships = await service.entities.AccountMembership.filter({ account_id: account.id });
     const allMemberships = Array.isArray(memberships) ? memberships : [];
     const occupied = allMemberships.filter((membership) =>
@@ -290,6 +304,9 @@ export default async function(req) {
       }
 
       const existingUserRows = await service.entities.User.filter({ email });
+      if (!Array.isArray(existingUserRows) || existingUserRows.length > 1 || existingUserRows.some(u => u.disabled === true)) {
+        return errorResponse('LOGIN_REQUIRES_REVIEW', 'This login requires an administrator review before invitation.', 409);
+      }
       let linkedUser = Array.isArray(existingUserRows) && existingUserRows.length > 0
         ? existingUserRows[0]
         : null;
@@ -308,61 +325,26 @@ export default async function(req) {
         );
       }
 
+      const accessLevel = makeAccountAdmin ? ACCESS_LEVELS.FULL_ACCESS : requestedAccess;
+      // Reserve the seat before delivery. A timeout may mean an email was sent;
+      // subsequent invite requests see this seat and cannot send another email.
+      // Claiming and linking the user belongs to verified login, not invitation.
+      const membership = await service.entities.AccountMembership.create({
+        user_id: null, email, full_name: linkedUser?.full_name || null,
+        account_id: account.id, membership_role: membershipRole(accessLevel, makeAccountAdmin),
+        access_level: accessLevel, is_account_admin: makeAccountAdmin, status: 'pending',
+        invited_by_user_id: context.user.id, invited_by_email: context.user.email,
+        invited_at: new Date().toISOString(), accepted_at: null,
+      });
       let invitationSent = false;
-      if (!linkedUser) {
+      let invitationError = null;
+      if (!linkedUser || linkedUser.is_verified !== true) {
         try {
           await inviteThroughPlatform(base44, email);
           invitationSent = true;
-        } catch (inviteError) {
-          return errorResponse(
-            'INVITATION_FAILED',
-            inviteError?.message === 'INVITATION_SERVICE_UNAVAILABLE'
-              ? 'The invitation service is unavailable.'
-              : 'The email invitation could not be sent.',
-            502,
-          );
+        } catch {
+          invitationError = 'INVITATION_DELIVERY_UNCONFIRMED';
         }
-
-        const invitedUserRows = await service.entities.User.filter({ email });
-        linkedUser = Array.isArray(invitedUserRows) && invitedUserRows.length > 0
-          ? invitedUserRows[0]
-          : null;
-      }
-
-      const accessLevel = makeAccountAdmin ? ACCESS_LEVELS.FULL_ACCESS : requestedAccess;
-      const now = new Date().toISOString();
-      const removedMembership = allMemberships.find((membership) =>
-        normaliseEmail(membership.email) === email && membership.status === 'removed'
-      );
-      const membershipPayload = {
-        user_id: linkedUser?.id || null,
-        email,
-        full_name: linkedUser?.full_name || null,
-        account_id: account.id,
-        membership_role: membershipRole(accessLevel, makeAccountAdmin),
-        access_level: accessLevel,
-        is_account_admin: makeAccountAdmin,
-        status: linkedUser?.is_verified === true ? 'active' : 'pending',
-        invited_by_user_id: context.user.id,
-        invited_by_email: context.user.email,
-        invited_at: now,
-        accepted_at: linkedUser?.is_verified === true ? now : null,
-        removed_at: null,
-        removed_by_user_id: null,
-      };
-
-      const membership = removedMembership
-        ? await service.entities.AccountMembership.update(removedMembership.id, membershipPayload)
-        : await service.entities.AccountMembership.create(membershipPayload);
-
-      if (linkedUser) {
-        await service.entities.User.update(linkedUser.id, {
-          account_id: account.id,
-          account_role: makeAccountAdmin ? 'admin' : 'account_user',
-          access_level: accessLevel,
-          app_role: legacyAppRoleForAccess(accessLevel, makeAccountAdmin),
-          disabled: false,
-        });
       }
 
       await appendAccountUserAudit(service, {
@@ -375,6 +357,7 @@ export default async function(req) {
           is_account_admin: makeAccountAdmin,
           membership_id: membership.id,
           invitation_sent: invitationSent,
+          invitation_error: invitationError,
         },
       });
 
@@ -421,10 +404,19 @@ export default async function(req) {
     }
 
     if (action === 'resend') {
-      if (target.status === 'removed') {
-        return errorResponse('MEMBERSHIP_INACTIVE', 'Removed users must be invited again.');
+      if (target.status !== 'pending') {
+        return errorResponse('MEMBERSHIP_INACTIVE', 'Only pending invitations can be resent.');
       }
       const email = normaliseEmail(target.email);
+      if (Date.now() - Date.parse(target.invited_at || '') < 60000) {
+        return errorResponse('INVITATION_RECENTLY_SENT', 'An invitation was recently attempted. Please wait before an explicit resend.', 409);
+      }
+      // Reserve the delivery attempt before contacting the external service.
+      await service.entities.AccountMembership.update(target.id, {
+        invited_at: new Date().toISOString(),
+        invited_by_user_id: context.user.id,
+        invited_by_email: context.user.email,
+      });
       try {
         await inviteThroughPlatform(base44, email);
       } catch {
@@ -477,6 +469,13 @@ export default async function(req) {
     }
 
     return errorResponse('UNKNOWN_ACTION', 'Unsupported account-user action.', 400);
+    } catch (error) {
+      // Unknown write outcomes require review, never overlapping retries.
+      release = false;
+      throw error;
+    } finally {
+      if (release) await releaseCreationLock(service, account.id, lock.token);
+    }
   } catch (error) {
     return Response.json({
       error: 'ACCOUNT_USER_MANAGEMENT_FAILED',

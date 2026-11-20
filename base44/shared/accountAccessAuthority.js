@@ -311,6 +311,17 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'MEMBERSHIP_INACTIVE', account };
   }
 
+  // Validate and start a Portal term before changing membership/User bindings.
+  // This also recovers a claim interrupted after the account write without
+  // extending the term or requiring another activation grant.
+  if (membership.status === 'pending' && membership.portal_activation_request_id) {
+    const expiresAt = await startSoundProofTermOnFirstClaim(service, {
+      accountId, user: authoritativeUser, membership,
+    });
+    account.status = 'active';
+    account.soundproof_access_expires_at = expiresAt;
+  }
+
   if (!authoritativeUser.account_id && invitationMembership) {
     await service.entities.User.update(authoritativeUser.id, { account_id: accountId });
     authoritativeUser.account_id = accountId;
@@ -329,7 +340,6 @@ export async function resolveAccountAccess(base44, sessionUser, {
   const isAccountAdmin =
     membership.is_account_admin === true
     || ADMIN_MEMBERSHIP_ROLES.has(membership.membership_role)
-    || authoritativeUser.account_role === 'admin'
     || legacySoleMembership;
 
   const accessLevel = isAccountAdmin
@@ -394,16 +404,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
       afterAccessLevel: accessLevel,
     });
 
-    // Portal-first activation: if this pending membership was created by a
-    // Portal activation grant, the first verified user claim starts the
-    // 90-day term. This is the ONLY point at which the term begins.
-    if (invitationMembership?.portal_activation_request_id) {
-      await startSoundProofTermOnFirstClaim(service, {
-        accountId,
-        user: authoritativeUser,
-        membership,
-      });
-    }
+
   }
 
   return {

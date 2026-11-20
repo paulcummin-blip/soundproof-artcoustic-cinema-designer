@@ -312,7 +312,6 @@ export async function resolveAccountAccessReadOnly({
   const isAccountAdmin =
     membership.is_account_admin === true
     || ADMIN_MEMBERSHIP_ROLES.has(membership.membership_role)
-    || authoritativeUser.account_role === 'admin'
     || legacySoleMembership;
 
   const accessLevel = isAccountAdmin
