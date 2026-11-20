@@ -6,8 +6,9 @@
 // creates a parallel entitlement system, never alters ledger entries.
 //
 // Deterministic promotion selection: when multiple UNLIMITED_PRO_PROJECTS
-// promotions match an account at the same time, the one with the earliest
-// starts_at wins (stable, predictable for admins).
+// promotions overlap, show the latest uninterrupted entitlement expiry.
+
+import { resolveUnlimitedEntitlement } from "../../../base44/shared/unlimitedEntitlement.js";
 
 import {
   matchesTarget,
@@ -69,23 +70,14 @@ export function buildPromoUsageByAccountAndPromo(usageRecords) {
 /**
  * Resolve the single effective UNLIMITED_PRO_PROJECTS promotion for an account
  * at the given time. Deterministic: among all effective matching promotions,
- * the one with the earliest starts_at wins.
+ * the latest current end wins, with uninterrupted future coverage derived separately.
  *
  * @param {Array} promotionsForAccount - Promotion[] targeting this account
  * @param {number} [now] - timestamp override
  * @returns {object|null} The winning Promotion, or null
  */
 export function resolveEffectivePromotion(promotionsForAccount, now = Date.now()) {
-  if (!Array.isArray(promotionsForAccount)) return null;
-  let best = null;
-  for (const promo of promotionsForAccount) {
-    if (promo?.promotion_type !== "UNLIMITED_PRO_PROJECTS") continue;
-    if (deriveDisplayStatus(promo, now) !== "Active") continue;
-    if (!best || String(promo.starts_at || "") < String(best.starts_at || "")) {
-      best = promo;
-    }
-  }
-  return best;
+  return resolveUnlimitedEntitlement(promotionsForAccount, now);
 }
 
 // ---------------------------------------------------------- status derivation
@@ -107,7 +99,7 @@ export function resolveEffectivePromotion(promotionsForAccount, now = Date.now()
 export function derivePromotionStatus(effectivePromotion, allPromotionsForAccount, now = Date.now()) {
   if (effectivePromotion) {
     const endMs = effectivePromotion.ends_at
-      ? new Date(effectivePromotion.ends_at).getTime()
+      ? new Date(effectivePromotion.effective_ends_at || effectivePromotion.ends_at).getTime()
       : NaN;
     const daysRemaining = Number.isFinite(endMs)
       ? Math.ceil((endMs - now) / (1000 * 60 * 60 * 24))
@@ -117,7 +109,7 @@ export function derivePromotionStatus(effectivePromotion, allPromotionsForAccoun
     return {
       label: expiresSoon ? "Expires Soon" : "Unlimited Active",
       tone: expiresSoon ? "warn" : "ok",
-      expiryDisplay: isoToEndDisplayDate(effectivePromotion.ends_at),
+      expiryDisplay: isoToEndDisplayDate(effectivePromotion.effective_ends_at || effectivePromotion.ends_at),
     };
   }
 
