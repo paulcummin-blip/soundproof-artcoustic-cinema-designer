@@ -107,11 +107,11 @@ export default function AccountDrawerPromotions({ row, onPromotionsChanged, allA
                   {formatPromotionDate(effective.starts_at)} – {isoToEndDisplayDate(effective.ends_at)}
                 </div>
               </div>
-              <AccessPill label={deriveDisplayStatus(effective)} tone="ok" />
+              <AccessPill label={promotion.status} tone={promotion.tone} />
             </div>
             <div className="mt-2 flex items-center gap-2">
               <span className="text-[11px] text-[#3E4349]">
-                Expires {isoToEndDisplayDate(effective.ends_at)}
+                Expires {promotion.expiryDisplay}
               </span>
               <span className="text-[11px] text-[#625143]">·</span>
               <span className="text-[11px] text-[#3E4349]">
@@ -121,7 +121,7 @@ export default function AccountDrawerPromotions({ row, onPromotionsChanged, allA
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
-                onClick={() => handleEdit(effective)}
+                onClick={() => handleEdit(allPromotions.find(p => p.id === effective.id) || effective)}
                 className="inline-flex items-center gap-1 rounded-md border border-[#DCDBD6] px-2 py-1 text-[11px] font-semibold text-[#1B1A1A] hover:bg-white"
               >
                 <Pencil className="h-3 w-3" />
@@ -168,60 +168,47 @@ export default function AccountDrawerPromotions({ row, onPromotionsChanged, allA
           )}
         </div>
 
-        {/* Historical promotional periods */}
-        {allPromotions.length > 0 && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowHistory((v) => !v)}
-              className="flex w-full items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#625143] hover:text-[#1B1A1A]"
+        {/* Keep current/scheduled promotions separate from historical records. */}
+        {[
+          { label: "Current promotions", promos: allPromotions.filter(p => deriveDisplayStatus(p) === "Active"), visible: true },
+          { label: "Scheduled / draft promotions", promos: allPromotions.filter(p => ["Scheduled", "Draft"].includes(deriveDisplayStatus(p))), visible: true },
+          { label: "Promotion history", promos: allPromotions.filter(p => ["Expired", "Cancelled"].includes(deriveDisplayStatus(p))), visible: showHistory, history: true },
+        ].filter(group => group.promos.length > 0).map(group => (
+          <div key={group.label}>
+            <button type="button"
+              onClick={() => group.history && setShowHistory(v => !v)}
+              className="flex w-full items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#625143]"
             >
-              {showHistory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              All promotions ({allPromotions.length})
+              {group.history && (showHistory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)}
+              {group.label} ({group.promos.length})
             </button>
-            {showHistory && (
-              <div className="mt-1.5 divide-y divide-[#F1EFEC]">
-                {allPromotions.map((promo) => {
-                  const status = deriveDisplayStatus(promo);
-                  const usage = promoUsageCount(promo.id);
-                  const isEffective = promo.id === effective?.id;
-                  return (
-                    <div key={promo.id} className="flex items-center justify-between gap-2 py-1.5">
-                      <div className="min-w-0">
-                        <div className="truncate text-[12px] font-semibold text-[#1B1A1A]">
-                          {promo.headline || promo.name || "Promotion"}
-                        </div>
-                        <div className="text-[11px] text-[#625143]">
-                          {formatPromotionDate(promo.starts_at)} – {isoToEndDisplayDate(promo.ends_at)}
-                          {" · "}
-                          {PROMOTION_TYPE_LABELS[promo.promotion_type] || promo.promotion_type}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <AccessPill
-                          label={isEffective ? "Current" : status}
-                          tone={status === "Active" ? "ok" : status === "Expired" ? "muted" : status === "Cancelled" ? "danger" : "info"}
-                        />
-                        <div className="mt-0.5 text-[10px] text-[#625143]">
-                          {usage} project{usage !== 1 ? "s" : ""}
-                        </div>
-                        {!isEffective && promo.status === "ACTIVE" && (
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(promo)}
-                            className="mt-0.5 text-[10px] font-semibold text-[#2C5AA0] hover:underline"
-                          >
-                            Edit
-                          </button>
-                        )}
+            {group.visible && <div className="mt-1.5 divide-y divide-[#F1EFEC]">
+              {group.promos.map(promo => {
+                const status = deriveDisplayStatus(promo);
+                const usage = promoUsageCount(promo.id);
+                return (
+                  <div key={promo.id} className="flex items-center justify-between gap-2 py-1.5">
+                    <div className="min-w-0">
+                      <div className="truncate text-[12px] font-semibold text-[#1B1A1A]">{promo.headline || promo.name || "Promotion"}</div>
+                      <div className="text-[11px] text-[#625143]">
+                        {formatPromotionDate(promo.starts_at)} – {isoToEndDisplayDate(promo.ends_at)}
+                        {" · "}{PROMOTION_TYPE_LABELS[promo.promotion_type] || promo.promotion_type}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    <div className="shrink-0 text-right">
+                      <AccessPill label={status} tone={status === "Active" ? "ok" : status === "Cancelled" ? "danger" : "muted"} />
+                      <div className="mt-0.5 text-[10px] text-[#625143]">{usage} project{usage !== 1 ? "s" : ""}</div>
+                      {promo.status === "ACTIVE" && (
+                        <button type="button" onClick={() => handleEdit(promo)}
+                          className="mt-0.5 text-[10px] font-semibold text-[#2C5AA0] hover:underline">Edit</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>}
           </div>
-        )}
+        ))}
       </div>
 
       {/* Manage Promotions dialog (grant) — preselects this dealer */}
