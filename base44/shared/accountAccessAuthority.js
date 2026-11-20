@@ -114,6 +114,11 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'USER_DISABLED' };
   }
 
+  // A verified platform login is required before an invitation can confer access.
+  if (authoritativeUser.is_verified !== true) {
+    return { allowed: false, reason: 'EMAIL_NOT_VERIFIED' };
+  }
+
   const email = normaliseEmail(authoritativeUser.email);
   let accountId = String(authoritativeUser.account_id || '').trim();
   let invitationMembership = null;
@@ -142,11 +147,13 @@ export async function resolveAccountAccess(base44, sessionUser, {
   if (!accountId && email) {
     const invitationRows = await service.entities.AccountMembership.filter({ email });
     const eligibleInvitations = (invitationRows || []).filter((item) =>
-      item.status === 'pending' || item.status === 'active'
+      item.status === 'pending' && !item.user_id
     );
     if (eligibleInvitations.length === 1) {
       invitationMembership = eligibleInvitations[0];
       accountId = String(invitationMembership.account_id || '').trim();
+    } else if (eligibleInvitations.length > 1) {
+      return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS' };
     }
   }
 
@@ -233,17 +240,25 @@ export async function resolveAccountAccess(base44, sessionUser, {
     };
   }
 
-  if (!authoritativeUser.account_id && invitationMembership) {
-    await service.entities.User.update(authoritativeUser.id, { account_id: accountId });
-    authoritativeUser.account_id = accountId;
-  }
-
   const accountMemberships = await service.entities.AccountMembership.filter({ account_id: accountId });
   const allMemberships = Array.isArray(accountMemberships) ? accountMemberships : [];
-  let membership = allMemberships.find((item) =>
-    item?.user_id === authoritativeUser.id
-    || (normaliseEmail(item?.email) && normaliseEmail(item.email) === email)
-  ) || invitationMembership || null;
+  const boundMemberships = allMemberships.filter((item) => item?.user_id === authoritativeUser.id);
+  const emailMemberships = allMemberships.filter((item) => email && normaliseEmail(item?.email) === email);
+  if (boundMemberships.length > 1) {
+    return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS', account };
+  }
+  if (!boundMemberships.length && emailMemberships.some((item) => item.user_id && item.user_id !== authoritativeUser.id)) {
+    return { allowed: false, reason: 'MEMBERSHIP_IDENTITY_MISMATCH', account };
+  }
+  const unboundInvitations = emailMemberships.filter((item) => !item.user_id && item.status === 'pending');
+  if (!boundMemberships.length && unboundInvitations.length > 1) {
+    return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS', account };
+  }
+  // A userid binding wins; email can claim only an unbound pending invitation.
+  let membership = boundMemberships[0] || unboundInvitations[0] || invitationMembership || null;
+  if (!membership && emailMemberships.some((item) => item.status === 'removed' || item.status === 'suspended')) {
+    return { allowed: false, reason: 'MEMBERSHIP_INACTIVE', account };
+  }
 
   const occupiedMemberships = allMemberships.filter((item) => ACTIVE_SEAT_STATUSES.has(item?.status || 'active'));
   const existingAdmin = occupiedMemberships.find((item) =>
@@ -294,6 +309,11 @@ export async function resolveAccountAccess(base44, sessionUser, {
   }
   if (membership.status === 'removed' || membership.status === 'suspended') {
     return { allowed: false, reason: 'MEMBERSHIP_INACTIVE', account };
+  }
+
+  if (!authoritativeUser.account_id && invitationMembership) {
+    await service.entities.User.update(authoritativeUser.id, { account_id: accountId });
+    authoritativeUser.account_id = accountId;
   }
 
   const legacySoleMembership =
@@ -347,6 +367,13 @@ export async function resolveAccountAccess(base44, sessionUser, {
   }
 
   const userPatch = {};
+  // Project/version RLS uses this server-maintained projection. New seats must
+  // receive it only after the current account and membership have passed checks.
+  // The inactive first-admin path remains the responsibility of the term hook.
+  if (account.status === 'active') {
+    const enabled = accessLevel === ACCESS_LEVELS.FULL_ACCESS || accessLevel === ACCESS_LEVELS.SOUND_PROOF_ONLY;
+    if (authoritativeUser.soundproof_access_enabled !== enabled) userPatch.soundproof_access_enabled = enabled;
+  }
   if (authoritativeUser.account_role !== (isAccountAdmin ? 'admin' : 'account_user')) {
     userPatch.account_role = isAccountAdmin ? 'admin' : 'account_user';
   }

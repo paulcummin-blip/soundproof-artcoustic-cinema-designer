@@ -142,6 +142,11 @@ export async function resolveAccountAccessReadOnly({
   // exactly as it found it, so everything below works on the path's own copy.
   const login = { ...authoritativeUser };
 
+  // A verified platform login is required before an invitation can confer access.
+  if (authoritativeUser.is_verified !== true) {
+    return { allowed: false, reason: 'EMAIL_NOT_VERIFIED' };
+  }
+
   const email = normaliseEmail(login.email);
   let accountId = String(login.account_id || '').trim();
   let invitationMembership = null;
@@ -169,11 +174,13 @@ export async function resolveAccountAccessReadOnly({
   if (!accountId && email) {
     const invitationRows = await entities.AccountMembership.filter({ email });
     const eligibleInvitations = (invitationRows || []).filter((item) =>
-      item.status === 'pending' || item.status === 'active'
+      item.status === 'pending' && !item.user_id
     );
     if (eligibleInvitations.length === 1) {
       invitationMembership = eligibleInvitations[0];
       accountId = String(invitationMembership.account_id || '').trim();
+    } else if (eligibleInvitations.length > 1) {
+      return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS' };
     }
   }
 
@@ -206,7 +213,7 @@ export async function resolveAccountAccessReadOnly({
   // administrative suspension (account.status === 'suspended') remains enforced
   // by the earlier check above. Re-enable by setting the flag to true once
   // renewal is live.
-  const SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED = false;
+  const SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED = true;
   if (
     SOUNDPROOF_EXPIRY_ENFORCEMENT_ENABLED
     && account.status === 'active'
@@ -239,10 +246,23 @@ export async function resolveAccountAccessReadOnly({
 
   const accountMemberships = await entities.AccountMembership.filter({ account_id: accountId });
   const allMemberships = Array.isArray(accountMemberships) ? accountMemberships : [];
-  let membership = allMemberships.find((item) =>
-    item?.user_id === login.id
-    || (normaliseEmail(item?.email) && normaliseEmail(item.email) === email)
-  ) || invitationMembership || null;
+  const boundMemberships = allMemberships.filter((item) => item?.user_id === login.id);
+  const emailMemberships = allMemberships.filter((item) => email && normaliseEmail(item?.email) === email);
+  if (boundMemberships.length > 1) {
+    return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS', account };
+  }
+  if (!boundMemberships.length && emailMemberships.some((item) => item.user_id && item.user_id !== login.id)) {
+    return { allowed: false, reason: 'MEMBERSHIP_IDENTITY_MISMATCH', account };
+  }
+  const unboundInvitations = emailMemberships.filter((item) => !item.user_id && item.status === 'pending');
+  if (!boundMemberships.length && unboundInvitations.length > 1) {
+    return { allowed: false, reason: 'MEMBERSHIP_AMBIGUOUS', account };
+  }
+  // A userid binding wins; email can claim only an unbound pending invitation.
+  let membership = boundMemberships[0] || unboundInvitations[0] || invitationMembership || null;
+  if (!membership && emailMemberships.some((item) => item.status === 'removed' || item.status === 'suspended')) {
+    return { allowed: false, reason: 'MEMBERSHIP_INACTIVE', account };
+  }
 
   const occupiedMemberships = allMemberships.filter((item) => ACTIVE_SEAT_STATUSES.has(item?.status || 'active'));
   const existingAdmin = occupiedMemberships.find((item) =>

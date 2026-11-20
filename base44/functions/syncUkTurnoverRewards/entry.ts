@@ -1,3 +1,5 @@
+import { getCapacityLedgerEntries } from '../../shared/capacityAuthority.js';
+import { acquireCreationLock, releaseCreationLock } from '../../shared/projectCreationLock.js';
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.40";
 import { secrets } from "base44:runtime";
 import {
@@ -245,11 +247,29 @@ export default async function syncUkTurnoverRewards(req) {
       const accountId = link.account_id;
       // Query per account so app-wide ledger growth cannot truncate old threshold
       // events and accidentally make a previously credited threshold look missing.
-      const accountLedger = await base44.asServiceRole.entities.CapacityLedger.filter(
-        { account_id: accountId },
-        "-created_date",
-        5000,
-      );
+      const service = base44.asServiceRole;
+      const lock = dryRun ? null : await acquireCreationLock(service, accountId);
+      if (!dryRun && !lock.acquired) {
+        errorCount += 1;
+        errors.push(`Account ${accountId}: REWARD_SYNC_BUSY`);
+        dealerResults.push({ dealer_account_id: dealerId, sound_proof_account_id: accountId, match_status: 'RETRY_REQUIRED', planned_actions: 0 });
+        continue;
+      }
+      let safeToRelease = true;
+      try {
+      // The project-creation mutex also serializes reward reconciliations.
+      // Read the complete ledger after acquiring it; never act on an old plan.
+      const accountLedger = await getCapacityLedgerEntries(service, accountId);
+      const latestRewardTime = accountLedger.reduce((latest, entry) =>
+        entry.source_ref?.reward_program === 'UK_TURNOVER_REWARD'
+          ? Math.max(latest, Date.parse(entry.source_ref?.entitlement_calculated_at || '') || 0)
+          : latest, 0);
+      if (Date.parse(contract.calculated_at) < latestRewardTime) {
+        errorCount += 1;
+        errors.push(`Account ${accountId}: STALE_ENTITLEMENT`);
+        dealerResults.push({ dealer_account_id: dealerId, sound_proof_account_id: accountId, match_status: 'STALE_ENTITLEMENT', planned_actions: 0 });
+        continue;
+      }
       let actions;
       try {
         actions = buildThresholdReconciliationPlan({
@@ -271,7 +291,8 @@ export default async function syncUkTurnoverRewards(req) {
       }
 
       dealersReconciled += 1;
-      const milestoneMap = latestMilestoneByThreshold(milestonesByAccount.get(accountId) || []);
+      const currentMilestones = await service.entities.TurnoverMilestone.filter({ account_id: accountId, calendar_year: calendarYear }, '-created_date', 5000);
+      const milestoneMap = latestMilestoneByThreshold(currentMilestones);
       const appliedActions = [];
 
       for (const action of actions) {
@@ -283,7 +304,9 @@ export default async function syncUkTurnoverRewards(req) {
           });
           if (Array.isArray(duplicate) && duplicate.length > 0) continue;
 
-          const ledgerEntry = await base44.asServiceRole.entities.CapacityLedger.create({
+          safeToRelease = false; // An unconfirmed write must retain the mutex for reconciliation.
+          let ledgerEntry;
+          const ledgerPayload = {
             account_id: accountId,
             transaction_type: action.kind === "REVERSE" ? "REVERSAL" : "UK_TURNOVER_REWARD",
             delta: action.delta,
@@ -304,7 +327,18 @@ export default async function syncUkTurnoverRewards(req) {
                 ? `UK turnover reward reinstated £${action.threshold.toLocaleString()} milestone (${calendarYear})`
                 : `UK turnover reward £${action.threshold.toLocaleString()} milestone (${calendarYear})`,
             reversal_of: action.reversal_of,
-          });
+          };
+          try {
+            ledgerEntry = await service.entities.CapacityLedger.create(ledgerPayload);
+          } catch (writeError) {
+            const confirmed = await service.entities.CapacityLedger.filter({ idempotency_key: action.idempotency_key });
+            if (!Array.isArray(confirmed) || confirmed.length !== 1
+              || confirmed[0].account_id !== accountId || confirmed[0].delta !== action.delta
+              || confirmed[0].transaction_type !== ledgerPayload.transaction_type) throw writeError;
+            ledgerEntry = confirmed[0];
+          }
+          if (!ledgerEntry?.id) throw new Error('REWARD_WRITE_UNCONFIRMED');
+          safeToRelease = true;
           accountLedger.push(ledgerEntry);
 
           const nowIso = new Date().toISOString();
@@ -369,7 +403,11 @@ export default async function syncUkTurnoverRewards(req) {
       // from every existing record for this account+year — preserving history.
       if (!dryRun && dealerEntitlement.current_turnover_gbp !== undefined) {
         const turnoverKey = `${accountId}|${normaliseTsKey(dealerEntitlement.turnover_source_updated_at)}`;
-        if (!existingTurnoverKeys.has(turnoverKey)) {
+        const currentSnapshots = await service.entities.TurnoverRecord.filter({
+          account_id: accountId, calendar_year: calendarYear,
+          source_last_updated: dealerEntitlement.turnover_source_updated_at ?? null,
+        }, '-created_date', 1);
+        if (!currentSnapshots?.length) {
           await base44.asServiceRole.entities.TurnoverRecord.create({
             account_id: accountId,
             external_account_link_id: link.id,
@@ -393,6 +431,9 @@ export default async function syncUkTurnoverRewards(req) {
         entitlement_threshold_count: dealerEntitlement.earned_thresholds_gbp.length,
         planned_actions: appliedActions,
       });
+      } finally {
+        if (lock?.acquired && safeToRelease) await releaseCreationLock(service, accountId, lock.token);
+      }
     }
 
     const finalStatus = dryRun

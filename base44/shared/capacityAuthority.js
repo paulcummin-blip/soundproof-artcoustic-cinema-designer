@@ -15,11 +15,33 @@
  * @param {string} accountId
  * @returns {Promise<number>} available capacity (can be 0 or negative)
  */
+export async function getCapacityLedgerEntries(base44, accountId) {
+  if (!accountId) return [];
+  const pageSize = 500;
+  const entries = [];
+  const seen = new Set();
+  for (let skip = 0; ; skip += pageSize) {
+    const page = await base44.entities.CapacityLedger.filter(
+      { account_id: accountId }, 'created_date', pageSize, skip,
+    );
+    if (!Array.isArray(page)) throw new Error('CAPACITY_LEDGER_UNAVAILABLE');
+    for (const entry of page) {
+      if (!entry?.id || entry.account_id !== accountId || seen.has(entry.id)) {
+        throw new Error('CAPACITY_LEDGER_PAGE_INCONSISTENT');
+      }
+      if (typeof entry.delta !== 'number' || !Number.isFinite(entry.delta)) {
+        throw new Error('CAPACITY_LEDGER_DELTA_INVALID');
+      }
+      seen.add(entry.id);
+      entries.push(entry);
+    }
+    if (page.length < pageSize) return entries;
+  }
+}
+
 export async function getAvailableCapacity(base44, accountId) {
-  if (!accountId) return 0;
-  const entries = await base44.entities.CapacityLedger.filter({ account_id: accountId });
-  if (!Array.isArray(entries) || entries.length === 0) return 0;
-  return entries.reduce((sum, e) => sum + (typeof e.delta === 'number' ? e.delta : 0), 0);
+  const entries = await getCapacityLedgerEntries(base44, accountId);
+  return entries.reduce((sum, entry) => sum + entry.delta, 0);
 }
 
 /**

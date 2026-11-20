@@ -1,3 +1,4 @@
+import { getAvailableCapacity } from '../../shared/capacityAuthority.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
@@ -45,17 +46,7 @@ export default async function(req) {
       return Response.json({ status: "ACCOUNT_NOT_LINKED", available: null });
     }
 
-    const entries = await base44.asServiceRole.entities.CapacityLedger.filter(
-      { account_id: accountId },
-      "-created_date",
-      5000
-    );
-
-    // SUM(delta) — REVERSAL entries net to zero automatically.
-    const available = (Array.isArray(entries) ? entries : []).reduce((sum, e) => {
-      const d = Number(e?.delta);
-      return sum + (Number.isFinite(d) ? d : 0);
-    }, 0);
+    const available = await getAvailableCapacity(base44.asServiceRole, accountId);
 
     // A correction can make the internal ledger net negative after already-used
     // projects are preserved. Dealer UI reports usable availability, never debt.
