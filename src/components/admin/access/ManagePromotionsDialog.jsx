@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -7,10 +7,8 @@ import {
   resolveRecipients,
   buildBonusPromotion,
   buildUnlimitedPromotion,
-  buildPromotionalLedgerEntry,
-  partitionExistingGrants,
 } from "@/lib/commercial/promotionGrantAuthority";
-import { isoToEndDateInput } from "@/components/admin/promotions/promotionStatus";
+import { preparePromotionRequest, completePromotionRequest } from "@/lib/commercial/promotionGrantRequest";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -72,6 +70,7 @@ export default function ManagePromotionsDialog({
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState(null);
   const [applying, setApplying] = useState(false);
+  const applyingRef = useRef(false);
   const [result, setResult] = useState(null);
   const [recipients, setRecipients] = useState([]);
 
@@ -122,8 +121,8 @@ export default function ManagePromotionsDialog({
     }
     if (promoType === "free_credits") {
       const n = Number(creditsPerAccount);
-      if (!Number.isFinite(n) || n <= 0) {
-        setError("Enter a positive number of credits.");
+      if (!Number.isSafeInteger(n) || n <= 0) {
+        setError("Enter a positive whole number of credits.");
         return;
       }
     }
@@ -147,61 +146,38 @@ export default function ManagePromotionsDialog({
   }
 
   async function handleApply() {
+    if (applyingRef.current) return;
+    applyingRef.current = true;
     setApplying(true);
     setError(null);
     try {
-      if (promoType === "free_credits") {
-        const promoRecord = buildBonusPromotion({
-          selection, creditsPerAccount, accounts: allAccounts, actor: user,
-        });
-        const created = await base44.entities.Promotion.create(promoRecord);
-
-        const { newRecipients, alreadyGranted } = partitionExistingGrants(
-          recipients, allLedgerEntries, created.id
-        );
-
-        let affected = 0;
-        if (newRecipients.length > 0) {
-          const entries = newRecipients.map((account) =>
-            buildPromotionalLedgerEntry({
-              accountId: account.id,
-              promotionId: created.id,
-              credits: creditsPerAccount,
-              actor: user,
-            })
-          );
-          await base44.entities.CapacityLedger.bulkCreate(entries);
-          affected = newRecipients.length;
-        }
-
-        setResult({
-          type: "free_credits",
-          promotionId: created.id,
-          affected,
-          skipped: alreadyGranted.length,
-          totalRecipients: recipients.length,
-        });
-      } else {
-        const promoRecord = buildUnlimitedPromotion({
-          selection, startDateInput: startDate, endDateInput: endDate,
-          accounts: allAccounts, actor: user,
-        });
-        const created = await base44.entities.Promotion.create(promoRecord);
-        setResult({
-          type: "unlimited_projects",
-          promotionId: created.id,
-          affected: recipients.length,
-          skipped: 0,
-          totalRecipients: recipients.length,
-          startDate,
-          endDate,
-        });
-      }
+      const key = "soundproof:6a1166c68ddc81e5ea2cdf6b:promotion:" + user.id;
+      const signature = JSON.stringify({
+        promoType, selection,
+        credits: promoType === "free_credits" ? Number(creditsPerAccount) : null,
+        startDate: promoType === "unlimited_projects" ? startDate : null,
+        endDate: promoType === "unlimited_projects" ? endDate : null,
+      });
+      const request = preparePromotionRequest(window.localStorage, key, signature, () =>
+        promoType === "free_credits"
+          ? buildBonusPromotion({ selection, creditsPerAccount, accounts: allAccounts, actor: user })
+          : buildUnlimitedPromotion({ selection, startDateInput: startDate, endDateInput: endDate, accounts: allAccounts, actor: user }),
+        recipients.map(a => a.id), new Date().toISOString().slice(0, 10)
+      );
+      const response = await base44.functions.invoke("applyManagedPromotion", {
+        promotion: request.promotion, recipient_ids: request.recipient_ids,
+      });
+      const applied = response.data;
+      if (!applied?.promotionId || applied.error) throw new Error(applied?.error || "Promotion result could not be confirmed. Retry the same request.");
+      completePromotionRequest(window.localStorage, key, request);
+      setResult({ ...applied, startDate, endDate });
       setStep("result");
       onApplied?.();
     } catch (err) {
-      setError(err?.message || "Failed to apply promotion.");
+      setError(err?.response?.data?.error || err?.message || "Failed to apply promotion.");
+      onApplied?.(); // refresh any confirmed partial grants without reporting success
     } finally {
+      applyingRef.current = false;
       setApplying(false);
     }
   }
