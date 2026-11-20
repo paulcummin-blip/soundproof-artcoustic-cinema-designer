@@ -27,3 +27,15 @@ test('exclusive expiry, cancelled, draft and future grants do not grant current 
  for(const extra of [{status:'CANCELLED'},{status:'DRAFT'},{starts_at:'2027-01-01T00:00:00Z'}])
   assert.equal(overview.resolveEffectivePromotion([{...latest,...extra}],now),null);
 });
+
+test('contiguous scheduled windows extend expiry but gaps do not',()=>{
+ const adjacent=p('future','2027-03-01T00:00:00Z','2027-04-01T00:00:00Z');
+ const gap=p('gap','2027-04-02T00:00:00Z','2027-05-01T00:00:00Z');
+ const list=[gap,adjacent,latest,old];
+ const before=JSON.stringify(list);
+ const effective=overview.resolveEffectivePromotion(list,now);
+ assert.equal(effective.id,'new');
+ assert.equal(effective.ends_at,latest.ends_at);
+ assert.equal(overview.derivePromotionStatus(effective,list,now).expiryDisplay,'31 Mar 2027');
+ assert.equal(JSON.stringify(list),before);
+});
