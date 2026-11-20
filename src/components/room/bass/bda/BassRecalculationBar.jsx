@@ -27,11 +27,11 @@ export default function BassRecalculationBar({
   const disabled = calculating || !canCalculate;
 
   return (
-    <div className="col-span-2 sm:col-span-4 mt-2 flex flex-wrap items-center justify-end gap-3">
+    <div className="col-span-2 sm:col-span-4 mt-2 flex flex-col gap-3">
       {warning && (
         <div
           data-bass-recalculation-warning="true"
-          className="mr-auto min-w-0 rounded-md px-2.5 py-1.5"
+          className="min-w-0 rounded-md px-2.5 py-1.5"
           style={{ border: "1px solid #C1B6AD", background: "#F1F0EE" }}
         >
           <div className="font-semibold" style={{ fontSize: "11.5px", color: "#625143" }}>
@@ -47,12 +47,11 @@ export default function BassRecalculationBar({
         onClick={onCalculate}
         disabled={disabled}
         title={canCalculate ? undefined : "Complete the room, speakers and seating to calculate bass parameters"}
-        className="shrink-0 inline-flex items-center gap-2 rounded-md px-4 py-2.5 font-bold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-        style={{ fontSize: "13px", background: "#213428", color: "#FFFFFF" }}
+        className="w-full rounded-lg bg-[#213428] px-4 py-3 text-[13px] font-semibold text-white transition-opacity hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45 flex items-center justify-center gap-2"
       >
         <RotateCw
           className={calculating ? "animate-spin" : undefined}
-          style={{ width: 14, height: 14 }}
+          style={{ width: 16, height: 16 }}
           aria-hidden="true"
         />
         {calculating ? "Calculating…" : "Calculate Bass Parameters"}
