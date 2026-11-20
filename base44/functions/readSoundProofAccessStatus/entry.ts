@@ -15,9 +15,13 @@ import {
  *   Authorization: Bearer <PORTAL_ACTIVATION_SHARED_SECRET>
  *   Body: { dealer_account_id: string }
  *
+ * The dealer_account_id is the immutable Portal Dealer Account ID (UUID),
+ * never a trading-account number. A non-UUID value is rejected before lookup
+ * so the endpoint never matches by trading-account number alone.
+ *
  * Responses:
  *   200 — status returned
- *   400 — dealer_account_id missing
+ *   400 — dealer_account_id missing or not a valid UUID
  *   401 — bearer token missing or incorrect
  *   404 — dealer link or account not found (DEALER_LINK_NOT_FOUND,
  *         DEALER_LINK_UNRESOLVED, ACCOUNT_NOT_FOUND)
@@ -25,6 +29,10 @@ import {
  *         DEALER_LINK_NOT_CANONICAL)
  *   500 — internal error
  */
+
+const PORTAL_DEALER_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default async function(req: Request): Promise<Response> {
   const json = (status: number, body: Record<string, unknown>) =>
     Response.json(body, {
@@ -45,6 +53,9 @@ export default async function(req: Request): Promise<Response> {
     const dealerAccountId = String(body?.dealer_account_id || '').trim();
     if (!dealerAccountId) {
       return json(400, { ok: false, error: 'DEALER_ACCOUNT_ID_REQUIRED' });
+    }
+    if (!PORTAL_DEALER_UUID_PATTERN.test(dealerAccountId)) {
+      return json(400, { ok: false, error: 'DEALER_ACCOUNT_ID_INVALID' });
     }
 
     const result = await readSoundProofAccessStatus(service, { dealerAccountId });
