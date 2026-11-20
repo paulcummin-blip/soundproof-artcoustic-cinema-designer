@@ -99,6 +99,21 @@ export async function saveReportSnapshot({ existing = null, record, currentFinge
       evidence_parity: write.preserved
         ? (target?.payload?.evidence_parity ?? record.payload?.evidence_parity ?? null)
         : (record.payload?.evidence_parity ?? null),
+      // ── DESIGN INTENT IS OWNED BY THE DATABASE, NOT THE HOOK ──────────────
+      // The accepted narrative is written to this same record only by the
+      // Design Intent generator (generateAndSaveReportDesignIntent /
+      // commitReportDesignIntent), which writes accepted records directly and
+      // never through this snapshot-save path. A snapshot save carries the
+      // hook's local `saved` narrative, which can be older than what the
+      // generator just committed. The canonical row read above IS the freshest
+      // database state, so its accepted narrative always wins: a stale
+      // in-memory narrative can never overwrite a newer accepted one, and an
+      // unaccepted draft (never stored by the generator) can never replace an
+      // accepted one. When no canonical row exists yet (first-ever save) the
+      // incoming value is used, which is null — an internal incomplete
+      // snapshot that the export gate refuses to issue until the generator
+      // accepts a narrative.
+      design_intent: target?.payload?.design_intent ?? record.payload?.design_intent ?? null,
     },
   };
   const response = target?.id
