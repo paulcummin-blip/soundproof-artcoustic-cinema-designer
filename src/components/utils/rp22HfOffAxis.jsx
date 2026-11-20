@@ -16,7 +16,7 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 // P17 DESIGN-GUIDE COVERAGE WINDOWS — the single source of the 1.5 / 3 / 4 dB
 // windows a seat's effective off-axis angle is graded against. Measured polar
 // data derives the windows only; it is never the seat's P17 dB score.
-import { resolveP17Windows, gradeOffAxisAngle } from "@/components/utils/rp22/p17CoverageWindows";
+import { resolveP17Windows, gradeOffAxisAngle, P17_WINDOW_LEVEL_DB, P17_WINDOW_CAUSE } from "@/components/utils/rp22/p17CoverageWindows";
 // P17 OVERHEAD ACOUSTIC-AXIS GEOMETRY — the single authority for resolving a ceiling
 // speaker's acoustic axis (its built-in tilt aimed at the RSP) and the effective off-axis
 // angle measured from it. Also consumed by computeSeatHudMetrics, so every P17 path agrees
@@ -902,15 +902,14 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     // Legacy seat-versus-RSP variance — read-only diagnostics, never graded.
     let maxDelta = -Infinity;
     let limitingEntry = null;
-    // P17 DESIGN GUIDE — the seat's grade is the BEST coverage window any
-    // surround/upper channel achieves at this seat: the channel that serves the
-    // seat decides it. A channel pointing away from the seat is not the seat's
-    // coverage provider, so it may not decide the grade; it is still reported as
-    // per-speaker evidence.
-    let bestLevelNumber = -Infinity;
+    // P17 DESIGN GUIDE — the seat's grade is the LOWEST coverage level among all
+    // applicable surround/upper channels: the worst-covered channel limits the
+    // seat. A speaker pointing away from the seat drags the seat's grade down
+    // rather than being concealed by a better-positioned channel.
+    let limitingLevelNumber = +Infinity;
     let worstRole = null;
     let worstAngleDeg = -Infinity;
-    let worstLossDb = null;
+    let limitingWindowDb = null;
     let worstWindows = null;
     let worstEvidenceType = null;
     let worstCause = null;
@@ -995,21 +994,22 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         limitingEntry = speakerEntry;
       }
 
-      // P17 design guide: keep the best-covered channel. Ties break to the largest
-      // angle — the channel closest to its window edge, which is the actionable one.
+      // P17 design guide: keep the WORST-covered channel — the one with the lowest
+      // coverage level limits the seat. Ties break to the largest angle (the channel
+      // closest to its window edge, which is the actionable one).
       const levelNumber = isNum(resultAtSeat.windowLevelNumber) ? resultAtSeat.windowLevelNumber : null;
       if (levelNumber != null) {
-        const isBetterLevel = levelNumber > bestLevelNumber
-          || (levelNumber === bestLevelNumber && resultAtSeat.offAxisDeg > worstAngleDeg);
-        if (isBetterLevel) {
-          bestLevelNumber = levelNumber;
+        const isWorseLevel = levelNumber < limitingLevelNumber
+          || (levelNumber === limitingLevelNumber && resultAtSeat.offAxisDeg > worstAngleDeg);
+        if (isWorseLevel) {
+          limitingLevelNumber = levelNumber;
           worstRole = resultAtSeat.role;
           worstAngleDeg = resultAtSeat.offAxisDeg;
           decidingGeometricAngleDeg = isNum(resultAtSeat.geometricAngleDeg) ? Number(resultAtSeat.geometricAngleDeg.toFixed(1)) : null;
           decidingBuiltInTiltDeg = isNum(resultAtSeat.builtInTiltDeg) ? Number(resultAtSeat.builtInTiltDeg) : null;
           decidingAxisBasis = resultAtSeat.axisBasis ?? null;
           decidingRspGeometricAngleDeg = isNum(resultAtRsp?.geometricAngleDeg) ? Number(resultAtRsp.geometricAngleDeg.toFixed(1)) : null;
-          worstLossDb = isNum(resultAtSeat.windowDb) ? Number(resultAtSeat.windowDb.toFixed(1)) : null;
+          limitingWindowDb = isNum(resultAtSeat.windowDb) ? Number(resultAtSeat.windowDb.toFixed(1)) : null;
           worstWindows = resultAtSeat.windows ?? null;
           worstEvidenceType = resultAtSeat.evidenceType ?? null;
           worstCause = resultAtSeat.windowCause ?? null;
@@ -1030,23 +1030,31 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     }
 
     // Guard: no surround/upper channel could be graded at this seat
-    if (!worstRole || !isNum(bestLevelNumber) || bestLevelNumber === -Infinity) {
+    if (!worstRole || !isNum(limitingLevelNumber) || limitingLevelNumber === +Infinity) {
       perSeat[seatId] = null;
       continue;
     }
 
+    // P17 never displays L1 for an assessed result. A speaker outside its usable
+    // window limits the seat to L2 (the design does not meet the L3 requirement),
+    // never L1. RP22 P17 supports L3 and L4 thresholds; L2 here is Sound Proof's
+    // "does not meet L3" indicator, not an RP22-defined Level 2 threshold.
+    const seatLevelNumber = Math.max(2, limitingLevelNumber);
+    const seatWindowDb = P17_WINDOW_LEVEL_DB[seatLevelNumber] ?? 4.0;
+    const seatCause = P17_WINDOW_CAUSE[seatLevelNumber] ?? P17_WINDOW_CAUSE[2];
+
     perSeat[seatId] = {
       // ── P17 DESIGN-GUIDE RESULT (this is what grades the seat) ──
-      p17Db: worstLossDb,                        // dB the decided coverage window represents
-      windowLevel: `L${bestLevelNumber}`,
-      windowLevelNumber: bestLevelNumber,
-      windows: worstWindows,                     // the deciding channel's L4 / L3 / L2 windows
+      p17Db: seatWindowDb,                       // dB the limiting coverage window represents
+      windowLevel: `L${seatLevelNumber}`,
+      windowLevelNumber: seatLevelNumber,
+      windows: worstWindows,                     // the limiting channel's L4 / L3 / L2 windows
       evidenceType: worstEvidenceType,           // measured-derived | estimated
-      cause: worstCause,                         // within_l4_window … outside_usable_window
-      worstRole,                                 // the channel that decided this seat's grade
+      cause: seatCause,                          // within_l4_window … outside_l3_window
+      worstRole,                                 // the channel that limited this seat's grade
       worstAngleDeg: isNum(worstAngleDeg) ? Number(worstAngleDeg.toFixed(1)) : null, // effective, off the acoustic axis
-      worstLossDb: isNum(worstLossDb) ? Number(worstLossDb.toFixed(1)) : null,
-      // ── Acoustic-axis evidence for the deciding channel (read-only, never graded) ──
+      worstLossDb: isNum(limitingWindowDb) ? Number(limitingWindowDb.toFixed(1)) : null, // limiting speaker's actual window dB (uncapped, diagnostic)
+      // ── Acoustic-axis evidence for the limiting channel (read-only, never graded) ──
       geometricAngleDeg: decidingGeometricAngleDeg,       // angle from ceiling vertical to this seat
       rspGeometricAngleDeg: decidingRspGeometricAngleDeg, // angle from ceiling vertical to the RSP
       builtInTiltDeg: decidingBuiltInTiltDeg,             // the product's own built-in tilt

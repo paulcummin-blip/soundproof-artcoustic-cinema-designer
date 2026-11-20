@@ -61,7 +61,7 @@ function test(name, fn) {
 
 /* TEST 1 — the engine grades by coverage window; the polar delta is diagnostic */
 test("engine grades the seat from coverage windows and keeps the raw delta as a diagnostic", () => {
-  assert.match(ENGINE, /import \{ resolveP17Windows, gradeOffAxisAngle \} from "@\/components\/utils\/rp22\/p17CoverageWindows";/,
+  assert.match(ENGINE, /import \{ resolveP17Windows, gradeOffAxisAngle, P17_WINDOW_LEVEL_DB, P17_WINDOW_CAUSE \} from "@\/components\/utils\/rp22\/p17CoverageWindows";/,
     "the engine must grade through the coverage-window authority");
   assert.match(ENGINE, /function gradeSpeakerCoverage\(\{ role, modelKey, modelMeta, offAxisDeg \}\)/,
     "the engine must resolve one speaker's windows and grade its angle");
@@ -69,12 +69,12 @@ test("engine grades the seat from coverage windows and keeps the raw delta as a 
   assert.equal(calls.length, 4,
     "every speaker path (measured polars, estimated overheads, bed layer) must grade through the coverage windows");
 
-  // The graded value is the window the seat sits in, never a raw polar deviation.
-  assert.match(ENGINE, /p17Db: worstLossDb,/, "the seat's P17 value must be the deciding coverage window");
-  assert.match(ENGINE, /windowLevel: `L\$\{bestLevelNumber\}`,/, "the seat must carry the window grade");
-  assert.match(ENGINE, /!worstRole \|\| !isNum\(bestLevelNumber\) \|\| bestLevelNumber === -Infinity/,
+  // The graded value is the window the limiting channel sits in, never a raw polar deviation.
+  assert.match(ENGINE, /p17Db: seatWindowDb,/, "the seat's P17 value must be the limiting coverage window");
+  assert.match(ENGINE, /windowLevel: `L\$\{seatLevelNumber\}`,/, "the seat must carry the window grade");
+  assert.match(ENGINE, /!worstRole \|\| !isNum\(limitingLevelNumber\) \|\| limitingLevelNumber === \+Infinity/,
     "a seat with no graded channel must report unavailable rather than a grade");
-  assert.match(ENGINE, /windows: worstWindows,/, "the deciding channel's windows must be carried");
+  assert.match(ENGINE, /windows: worstWindows,/, "the limiting channel's windows must be carried");
 
   // The raw measured delta survives, read-only.
   assert.match(ENGINE, /rawVarianceDb: maxDelta === -Infinity \? null : Number\(Math\.max\(0, maxDelta\)\.toFixed\(2\)\),/,
@@ -82,9 +82,9 @@ test("engine grades the seat from coverage windows and keeps the raw delta as a 
   assert.match(ENGINE, /limiting: limitingEntry,/, "the worst-delta speaker entry must still be exposed");
   assert.match(ENGINE, /if \(isBeyondNonLcrLimit\) beyondLimit\.push\(speakerEntry\);/,
     "beyond-limit speakers must still be collected");
-  // The best-covered channel decides the grade (an away-pointing speaker cannot).
-  assert.match(ENGINE, /const isBetterLevel = levelNumber > bestLevelNumber/,
-    "the seat must be graded by the channel that covers it best");
+  // The worst-covered channel limits the grade (a poorly aimed speaker cannot be concealed).
+  assert.match(ENGINE, /const isWorseLevel = levelNumber < limitingLevelNumber/,
+    "the seat must be graded by the channel that covers it worst");
 });
 
 /* TEST 2 — the windows are a design guide derived from measured polars */
