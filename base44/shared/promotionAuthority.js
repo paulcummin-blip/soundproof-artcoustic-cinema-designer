@@ -1,3 +1,5 @@
+import { resolveUnlimitedEntitlement } from "./unlimitedEntitlement.js";
+
 /**
  * Canonical promotion eligibility authority.
  *
@@ -65,7 +67,7 @@ export function matchesTarget(promotion, account) {
 
 /**
  * Find the effective UNLIMITED_PRO_PROJECTS promotion for an account at the
- * current time. Returns the first qualifying promotion or null.
+ * current time. Returns the latest qualifying entitlement or null.
  *
  * Only UNLIMITED_PRO_PROJECTS affects project creation in Stage P1.
  * DISCOUNT_PERCENT and BONUS_PROJECTS are stored but do not alter the
@@ -84,12 +86,5 @@ export async function findEffectivePromotion(base44, account, now = Date.now()) 
   const promotions = await base44.entities.Promotion.filter({ status: 'ACTIVE' });
   if (!Array.isArray(promotions) || promotions.length === 0) return null;
 
-  for (const promotion of promotions) {
-    if (promotion.promotion_type !== 'UNLIMITED_PRO_PROJECTS') continue;
-    if (!isEffective(promotion, now)) continue;
-    if (!matchesTarget(promotion, account)) continue;
-    return promotion;
-  }
-
-  return null;
+  return resolveUnlimitedEntitlement(promotions.filter(p => matchesTarget(p, account)), now);
 }
