@@ -17,7 +17,9 @@ import {
  *
  * The dealer_account_id is the immutable Portal Dealer Account ID (UUID),
  * never a trading-account number. A non-UUID value is rejected before lookup
- * so the endpoint never matches by trading-account number alone.
+ * so the endpoint never matches by trading-account number alone. The shared
+ * authority resolves it through portal_dealer_account_id on the canonical
+ * active link, with a legacy fallback to external_account_number.
  *
  * Responses:
  *   200 — status returned

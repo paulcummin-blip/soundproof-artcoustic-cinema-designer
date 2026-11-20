@@ -26,10 +26,10 @@ const access = moduleAt('base44/shared/accountAccessAuthority.js', {
 }, ['resolveAccountAccess','appendAccountUserAudit']);
 const account = (p={}) => ({id:'a',name:'Synthetic A',status:'inactive',soundproof_eligible:true,...p});
 const link = (p={}) => ({id:'link-a',source_system:constants.PORTAL_SOURCE,active:true,
-  account_id:'a',partner_user_id:'portal-a',external_account_number:'trade-a',...p});
+  account_id:'a',partner_user_id:'portal-a',portal_dealer_account_id:'11111111-2222-4333-8444-555555555555',external_account_number:'trade-a',...p});
 const rawGrant = (p={}) => ({purpose:'activate',jti:'portal-a:nonce-1',exp:Math.floor(Date.now()/1000)+240,
   target:'SOUND_PROOF',portal_user_id:'portal-a',portal_profile_id:'profile-a',
-  dealer_account_id:'11111111-2222-4333-8444-555555555555',external_account_number:'trade-a',
+  dealer_account_id:'11111111-2222-4333-8444-555555555555',trading_account_number:'trade-a',
   admin_email:'first@example.invalid',...p});
 const grant = p => {
   const r=portal.validateActivationGrant({grant:rawGrant(p)});
@@ -93,8 +93,7 @@ const invite=(fn,email,p={})=>fn(new Request('https://synthetic.invalid/members'
 const activeFixture=(extra=[])=>fixture({Account:[account({status:'active'})],User:[user()],
   AccountMembership:[member(),...extra]});
 test('short-lived grants reject expired, long-lived, wrong-target and wrong-subject nonces',()=>{
-  for(const p of [{exp:1},{exp:Math.floor(Date.now()/1000)+301},{target:'OTHER'},{jti:'portal-b:nonce'},
-    {external_account_number:''}])assert.equal(portal.validateActivationGrant({grant:rawGrant(p)}).ok,false);
+  for(const p of [{exp:1},{exp:Math.floor(Date.now()/1000)+301},{target:'OTHER'},{jti:'portal-b:nonce'}])assert.equal(portal.validateActivationGrant({grant:rawGrant(p)}).ok,false);
   assert.equal(portal.validateActivationGrant({grant:rawGrant()}).ok,true);
 });
 test('activation endpoint bearer validation rejects missing and wrong secrets',()=>{
@@ -109,7 +108,7 @@ test('canonical Portal subject resolves one account without confusing dealer UUI
 });
 test('wrong Portal subject, trade number, missing or ambiguous mapping denied',async()=>{
   const f=fixture();
-  assert.equal((await portal.resolveDealerAccountFromGrant(f.service,grant({external_account_number:'trade-b'}))).ok,false);
+  assert.equal((await portal.resolveDealerAccountFromGrant(f.service,grant({trading_account_number:'trade-b'}))).ok,false);
   assert.equal((await portal.resolveDealerAccountFromGrant(f.service,grant({portal_user_id:'portal-b',jti:'portal-b:n'}))).ok,false);
   f.data.ExternalAccountLink.push(link({id:'duplicate',account_id:'b'}));
   assert.equal((await portal.resolveDealerAccountFromGrant(f.service,grant())).error,'DEALER_LINK_AMBIGUOUS');
@@ -130,9 +129,8 @@ test('simultaneous redemption and different grants produce at most one admin',as
 });
 test('rebound email or dealer UUID cannot reuse consumed grant',async()=>{
   const f=fixture();await activate(f);
-  for(const p of [{admin_email:'other@example.invalid'},{dealer_account_id:'other-dealer'}]){
-    assert.equal((await activate(f,grant(p))).error,'GRANT_REPLAY_MISMATCH');
-  }
+  assert.equal((await activate(f,grant({admin_email:'other@example.invalid'}))).error,'GRANT_REPLAY_MISMATCH');
+  assert.equal((await activate(f,grant({dealer_account_id:'22222222-3333-4444-8555-666666666666'}))).error,'DEALER_IDENTITY_MISMATCH');
   assert.equal(f.calls.emails,1);
 });
 test('wrong-account membership and removed activation grant cannot be reused',async()=>{
@@ -309,4 +307,3 @@ test('used renewal grant cannot migrate to another account after an identity-lin
   assert.equal(r.ok,false);
   assert.equal(f.data.Account[1].soundproof_access_expires_at,'2027-02-01T00:00:00Z');
 });
-

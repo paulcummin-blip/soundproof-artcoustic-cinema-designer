@@ -48,11 +48,14 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
   const linkList = Array.isArray(externalLinks) ? externalLinks : [];
 
   const linksByPortalUserId = new Map();
+  const linksByPortalDealerId = new Map();
   const linksByDealerId = new Map();
   for (const link of linkList) {
     const partnerUser = normaliseUuid(link?.partner_user_id);
+    const portalDealerId = normaliseUuid(link?.portal_dealer_account_id);
     const extNum = normaliseUuid(link?.external_account_number);
     if (partnerUser) linksByPortalUserId.set(partnerUser, link);
+    if (portalDealerId) linksByPortalDealerId.set(portalDealerId, link);
     if (extNum) linksByDealerId.set(extNum, link);
   }
 
@@ -77,8 +80,9 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
     const portalUserId = normaliseUuid(record.portal_user_id);
 
     const linkByPortalUser = linksByPortalUserId.get(portalUserId);
+    const linkByPortalDealerId = linksByPortalDealerId.get(dealerId);
     const linkByDealerId = linksByDealerId.get(dealerId);
-    const matchedLink = linkByPortalUser || linkByDealerId || null;
+    const matchedLink = linkByPortalUser || linkByPortalDealerId || linkByDealerId || null;
     const matchedAccountId = matchedLink ? String(matchedLink.account_id || "") : "";
     const matchedAccount = matchedAccountId ? accountsById.get(matchedAccountId) : null;
 
@@ -95,7 +99,7 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
         sound_proof_account_id: matchedAccount.id,
         sound_proof_account_name: matchedAccount.name,
         sound_proof_account_status: matchedAccount.status,
-        linked_via: linkByPortalUser ? "portal_user_id" : "dealer_account_id",
+        linked_via: linkByPortalUser ? "portal_user_id" : linkByPortalDealerId ? "portal_dealer_account_id" : "dealer_account_id",
       });
     } else if (nameMatches.length === 1) {
       accountsNeedingLinking.push({

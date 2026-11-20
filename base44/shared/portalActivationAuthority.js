@@ -109,8 +109,7 @@ export function validateActivationGrant(body) {
   if (!jti.startsWith(portalUserId + ':') || jti.length <= portalUserId.length + 1) {
     return { ok: false, error: 'GRANT_JTI_SUBJECT_MISMATCH' };
   }
-  const externalAccountNumber = String(grant.external_account_number || '').trim();
-  if (!externalAccountNumber) return { ok: false, error: 'GRANT_EXTERNAL_ACCOUNT_MISSING' };
+  const tradingAccountNumber = String(grant.trading_account_number || '').trim() || null;
 
   const portalProfileId = String(grant.portal_profile_id || '').trim() || null;
 
@@ -122,7 +121,7 @@ export function validateActivationGrant(body) {
       exp: expMs,
       target,
       dealer_account_id: dealerAccountId,
-      external_account_number: externalAccountNumber,
+      trading_account_number: tradingAccountNumber,
       portal_user_id: portalUserId,
       portal_profile_id: portalProfileId,
     },
@@ -161,9 +160,19 @@ export async function resolveDealerAccountFromGrant(service, grant) {
   }
 
   const link = activeLinks[0];
-  // Portal dealer UUID and external trading-account number are different IDs.
-  if (String(link.external_account_number || '') !== grant.external_account_number) {
+  // Verify the immutable Portal Dealer Account UUID against the link's
+  // portal_dealer_account_id. For legacy imported links where the UUID was
+  // stored in external_account_number, accept that as a fallback.
+  const linkDealerId = String(link.portal_dealer_account_id || '').trim()
+    || String(link.external_account_number || '').trim();
+  if (!linkDealerId || linkDealerId !== grant.dealer_account_id) {
     return { ok: false, error: 'DEALER_IDENTITY_MISMATCH' };
+  }
+  // If the grant supplies a trading-account number, verify it against the
+  // link's external_account_number (the commercial trading reference).
+  if (grant.trading_account_number
+    && String(link.external_account_number || '') !== grant.trading_account_number) {
+    return { ok: false, error: 'TRADING_ACCOUNT_MISMATCH' };
   }
   const accountId = String(link.account_id || '').trim();
   if (!accountId) {
@@ -221,7 +230,7 @@ function grantBinding(grant) {
     portal_user_id: grant.portal_user_id,
     portal_profile_id: grant.portal_profile_id || null,
     dealer_account_id: grant.dealer_account_id,
-    external_account_number: grant.external_account_number,
+    trading_account_number: grant.trading_account_number || null,
     admin_email: grant.admin_email || null,
   };
 }
@@ -371,19 +380,25 @@ export async function renewPortalAccess(service, { grant, account }) {
  */
 export async function readSoundProofAccessStatus(service, { dealerAccountId }) {
   // The immutable Portal Dealer Account ID (UUID) is the organisation identity.
-  // It is resolved through the canonical active Portal identity mapping
-  // (partner_user_id on ExternalAccountLink), never by dealer name, email or
-  // trading-account number alone. The dealer directory import stores the
-  // Portal Dealer Account ID in ExternalAccountLink.external_account_number
-  // and the canonical Portal user ID in partner_user_id; a canonical link
-  // carries both. A link without partner_user_id is a secondary reference
-  // link and must not be used for status lookup.
-  const links = await service.entities.ExternalAccountLink.filter({
+  // It is resolved through portal_dealer_account_id on the canonical active
+  // Portal link (partner_user_id set), never by dealer name, email or
+  // trading-account number alone. Legacy directory-imported links carry the
+  // UUID in external_account_number; the fallback preserves them. A link
+  // without partner_user_id is a secondary reference and must not be used.
+  let links = await service.entities.ExternalAccountLink.filter({
     source_system: PORTAL_SOURCE,
-    external_account_number: dealerAccountId,
+    portal_dealer_account_id: dealerAccountId,
     active: true,
   });
-  const activeLinks = (Array.isArray(links) ? links : []).filter((l) => l?.active !== false);
+  let activeLinks = (Array.isArray(links) ? links : []).filter((l) => l?.active !== false);
+  if (activeLinks.length === 0) {
+    links = await service.entities.ExternalAccountLink.filter({
+      source_system: PORTAL_SOURCE,
+      external_account_number: dealerAccountId,
+      active: true,
+    });
+    activeLinks = (Array.isArray(links) ? links : []).filter((l) => l?.active !== false);
+  }
   if (activeLinks.length === 0) {
     return { ok: false, error: 'DEALER_LINK_NOT_FOUND' };
   }

@@ -255,6 +255,7 @@ export default async function importDealerDirectory(req) {
           account_id: account.id,
           source_system: DIRECTORY_SOURCE_SYSTEM,
           partner_user_id: record.portal_user_id,
+          portal_dealer_account_id: record.dealer_account_id,
           external_account_number: record.dealer_account_id,
           external_account_name: record.account_name,
           active: true,

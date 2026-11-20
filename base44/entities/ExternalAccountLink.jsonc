@@ -1,7 +1,7 @@
 {
   "name": "ExternalAccountLink",
   "type": "object",
-  "description": "Links a Sound Proof Account to one or more external ledger/trading accounts (e.g. Artcoustic Partner Portal). Supports 1:N \u2014 one Sound Proof account can have multiple external trading accounts. Required for businesses with multiple trading accounts. For Partner Portal consolidated turnover matching, exactly one active link per account should carry partner_user_id set (the canonical link); this represents the already-consolidated organisation turnover.",
+  "description": "Links a Sound Proof Account to one or more external ledger/trading accounts (e.g. Artcoustic Partner Portal). Supports 1:N \u2014 one Sound Proof account can have multiple external trading accounts. Required for businesses with multiple trading accounts. For Partner Portal consolidated turnover matching, exactly one active link per account should carry partner_user_id set (the canonical link); this represents the already-consolidated organisation turnover. The immutable Portal Dealer Account UUID (portal_dealer_account_id) is the organisation identity, distinct from the trading-account number (external_account_number) and the Portal user (partner_user_id).",
   "properties": {
     "account_id": {
       "type": "string",
@@ -16,9 +16,14 @@
       "description": "Canonical Partner Portal user_id for consolidated turnover matching. Set on exactly one active link per account for source_system='ARTCOUSTIC_PARTNER_PORTAL'. Null for non-partner links or secondary ledger reference links. Matching uses this field, not dealer name or ledger number.",
       "nullable": true
     },
+    "portal_dealer_account_id": {
+      "type": "string",
+      "description": "Immutable Portal Dealer Account UUID (organisation identity). Set on the canonical active link. Distinct from external_account_number (trading reference) and partner_user_id (Portal user). Null for legacy links not yet stamped; the activation and status endpoints fall back to external_account_number for those. Never overwritten automatically after being set.",
+      "nullable": true
+    },
     "external_account_number": {
       "type": "string",
-      "description": "Account number/key in the external system. Primary ledger/account identity for reference."
+      "description": "Account number/key in the external system. Primary ledger/account identity for reference. For legacy directory-imported links this holds the dealer UUID; for links stamped with portal_dealer_account_id it holds the commercial trading-account number."
     },
     "external_account_name": {
       "type": "string",

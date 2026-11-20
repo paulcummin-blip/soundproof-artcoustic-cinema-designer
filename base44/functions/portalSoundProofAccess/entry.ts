@@ -17,13 +17,17 @@ import {
  * POST /functions/portalSoundProofAccess
  *   Authorization: Bearer <PORTAL_ACTIVATION_SHARED_SECRET>
  *   Body: { grant: { jti, exp, purpose, target, dealer_account_id,
- *                    portal_user_id, portal_profile_id, external_account_number,
+ *                    portal_user_id, portal_profile_id, trading_account_number?,
  *                    admin_email?, admin_full_name? } }
  *
  * jti is "<canonical portal_user_id>:<unique nonce>"; exp is at most five
  * minutes ahead. The authenticated Portal server supplies the canonical
- * subject and trading-account number from its verified dealer records.
- * dealer_account_id is the Portal dealer UUID, NOT the trading-account number.
+ * subject from its verified dealer records.
+ * dealer_account_id is the immutable Portal Dealer Account UUID (organisation
+ * identity). trading_account_number is the commercial trading reference,
+ * separately supplied and optional. portal_user_id is the authenticated
+ * Portal user. All supplied identifiers are verified against the active
+ * Portal link.
  *
  * purpose "activate": creates one pending dealer-admin invitation. Does NOT
  *   start the 90-day term. The term starts when the invited user verifies,

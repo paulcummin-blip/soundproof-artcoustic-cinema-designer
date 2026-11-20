@@ -79,20 +79,22 @@ export default async function readDealerDirectory(req) {
     const accountList = Array.isArray(accounts) ? accounts : [];
     const linkList = Array.isArray(externalLinks) ? externalLinks : [];
 
-    // Index existing external links by dealer_account_id and portal_user_id.
+    // Index existing external links by portal_dealer_account_id, portal_user_id
+    // and external_account_number (legacy fallback).
     const linksByDealerId = new Map();
+    const linksByPortalDealerId = new Map();
     const linksByPortalUserId = new Map();
     for (const link of linkList) {
-      const dealerId = normaliseUuid(link?.partner_user_id);
       const portalUserId = normaliseUuid(link?.partner_user_id);
-      const accountId = String(link?.account_id || "").trim();
+      const portalDealerId = normaliseUuid(link?.portal_dealer_account_id);
+      const extNum = normaliseUuid(link?.external_account_number);
       // The ExternalAccountLink stores partner_user_id as the canonical Portal
-      // user identifier. The dealer directory separates dealer_account_id
-      // (organisation) from portal_user_id (login). We match the directory's
-      // portal_user_id against link.partner_user_id, and separately track
-      // the linked account.
-      if (dealerId) linksByDealerId.set(dealerId, link);
+      // user identifier, and portal_dealer_account_id as the immutable Portal
+      // Dealer Account UUID (organisation identity). Legacy directory-imported
+      // links carry the dealer UUID in external_account_number instead.
       if (portalUserId) linksByPortalUserId.set(portalUserId, link);
+      if (portalDealerId) linksByPortalDealerId.set(portalDealerId, link);
+      if (extNum) linksByDealerId.set(extNum, link);
     }
 
     // Index existing accounts by id and by lowercased name for name-based review.
@@ -124,8 +126,9 @@ export default async function readDealerDirectory(req) {
       directoryPortalUserIds.add(portalUserId);
 
       const linkByPortalUser = linksByPortalUserId.get(portalUserId);
+      const linkByPortalDealerId = linksByPortalDealerId.get(dealerId);
       const linkByDealerId = linksByDealerId.get(dealerId);
-      const matchedLink = linkByPortalUser || linkByDealerId || null;
+      const matchedLink = linkByPortalUser || linkByPortalDealerId || linkByDealerId || null;
       const matchedAccountId = matchedLink ? String(matchedLink.account_id || "") : "";
       const matchedAccount = matchedAccountId ? accountsById.get(matchedAccountId) : null;
 
@@ -143,7 +146,7 @@ export default async function readDealerDirectory(req) {
           sound_proof_account_id: matchedAccount.id,
           sound_proof_account_name: matchedAccount.name,
           sound_proof_account_status: matchedAccount.status,
-          linked_via: linkByPortalUser ? "portal_user_id" : "dealer_account_id",
+          linked_via: linkByPortalUser ? "portal_user_id" : linkByPortalDealerId ? "portal_dealer_account_id" : "dealer_account_id",
         });
       } else if (hasNameMatch) {
         // Name matches but no external link — needs identity linking.
