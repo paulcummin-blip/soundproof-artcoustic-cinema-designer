@@ -280,7 +280,7 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   const defaultOverlays = {
     LCR: false, FRONT_WIDE: false, SIDE_SURROUND: false, REAR_SURROUND: false,
     OVERHEADS_2: false, OVERHEADS_4: false, OVERHEADS_6: false, RP22_ANGLES: false,
-    enableDolbyZones: false, ROOM_DIMS: false,
+    enableDolbyZones: false, ROOM_DIMS: true,
   };
   const overlaysData = parseMaybe(p?.overlays, defaultOverlays);
   const normalisedOverlays = { ...defaultOverlays, ...overlaysData };
@@ -289,6 +289,11 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   for (const key of ['OVERHEADS_2', 'OVERHEADS_4', 'OVERHEADS_6']) {
     normalisedOverlays[key] = typeof normalisedOverlays[key] === 'boolean' ? normalisedOverlays[key] : defaultOverlays[key];
   }
+  // Room Dimensions overlay defaults to ON for every project open, regardless
+  // of any previously saved value. The designer can turn it off for the current
+  // session; it returns to ON when the project is reopened. Speaker Positions
+  // and all other overlays are unaffected.
+  normalisedOverlays.ROOM_DIMS = true;
   if (typeof setOverlays === "function") setOverlays(normalisedOverlays);
 
   // 6) SEATING — normalise priorities once so no active seat reaches scoped-rating
