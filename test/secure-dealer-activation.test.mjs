@@ -297,3 +297,16 @@ test('existing unexpired account with unknown historical first activation can re
   assert.equal((await renew(f)).ok,true);assert.equal(f.data.Account[0].first_activated_at,undefined);
 });
 
+
+test('used renewal grant cannot migrate to another account after an identity-link correction',async()=>{
+  const f=fixture({Account:[
+    account({status:'active',soundproof_access_expires_at:'2027-02-01T00:00:00Z'}),
+    account({id:'b',status:'active',soundproof_access_expires_at:'2027-02-01T00:00:00Z'}),
+  ]});
+  assert.equal((await renew(f)).ok,true);
+  f.data.ExternalAccountLink[0].account_id='b';
+  const r=await portal.renewPortalAccess(f.service,{grant:grant({purpose:'renew'}),account:f.data.Account[1]});
+  assert.equal(r.ok,false);
+  assert.equal(f.data.Account[1].soundproof_access_expires_at,'2027-02-01T00:00:00Z');
+});
+
