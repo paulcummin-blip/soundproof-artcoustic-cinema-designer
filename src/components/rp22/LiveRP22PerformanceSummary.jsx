@@ -36,6 +36,11 @@ import {
   RP22_PRESENTATION_PARAMETERS,
   isSeatScopedParameterKey,
 } from "@/components/utils/rp22ParameterPresentation";
+import {
+  ASSUMED_P15_OPTIONS,
+  ASSUMED_P21_OPTIONS,
+} from "@/components/utils/assumedParameterAuthority";
+import { requestAssumedLevelChange } from "@/components/state/assumedLevelStore";
 
 const PILLAR_ORDER = ["Spatial Resolution", "Dynamic Range", "Timbre Matching"];
 
@@ -108,11 +113,53 @@ function SeatPillGrid({ rows }) {
   );
 }
 
+// ── Compact inline L1–L4 selector for editable assumed parameters ──────────
+function AssumedLevelSelector({ paramId, currentLevel, onSelect }) {
+  const options = paramId === 15 ? ASSUMED_P15_OPTIONS : ASSUMED_P21_OPTIONS;
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
+      {options.map((opt) => {
+        const selected = opt.level === currentLevel;
+        return (
+          <button
+            key={opt.level}
+            type="button"
+            onClick={() => onSelect(opt.level)}
+            title={opt.sublabel}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "2px 6px 2px 2px",
+              borderRadius: 9999,
+              border: selected ? "1.5px solid #213428" : "1px solid #DCDBD6",
+              background: selected ? "rgba(33,52,40,0.06)" : "transparent",
+              cursor: "pointer",
+            }}
+          >
+            <RP22GradingPill level={opt.level} />
+            <span style={{
+              fontSize: 9,
+              fontWeight: 600,
+              color: selected ? "#213428" : "#9B8E82",
+              whiteSpace: "nowrap",
+            }}>
+              {opt.sublabel}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── One parameter row ───────────────────────────────────────────────────────
 function ParameterRow({ param, summary, pillarColour }) {
   const pid = param.id;
   const key = `p${pid}`;
   const seatScoped = isSeatParam(pid);
+  const isAssumedParam = pid === 15 || pid === 21;
+  const [selectorOpen, setSelectorOpen] = useState(false);
 
   const roomResult = summary?.roomResultsByParameter?.[pid] || null;
   const presentationStatus =
@@ -138,6 +185,11 @@ function ParameterRow({ param, summary, pillarColour }) {
 
   const title = getHumanTitleForParam(pid);
   const scopeTag = seatScoped ? "Seat" : (param.scope || "Room");
+
+  const handleSelect = (selectedLevel) => {
+    setSelectorOpen(false);
+    requestAssumedLevelChange(pid, selectedLevel);
+  };
 
   return (
     <div
@@ -169,10 +221,38 @@ function ParameterRow({ param, summary, pillarColour }) {
                 {achieved}
               </span>
             )}
-            <RP22GradingPill level={level || (seatAllNa ? "N/A" : "—")} />
+            {isAssumedParam ? (
+              <button
+                type="button"
+                onClick={() => setSelectorOpen((o) => !o)}
+                title="Click to change the assumed level"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: 2,
+                  borderRadius: 9999,
+                  border: selectorOpen ? "1.5px solid #213428" : "1px solid transparent",
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <RP22GradingPill level={level || "—"} />
+              </button>
+            ) : (
+              <RP22GradingPill level={level || (seatAllNa ? "N/A" : "—")} />
+            )}
           </div>
         )}
       </div>
+
+      {isAssumedParam && selectorOpen && !seatScoped && (
+        <AssumedLevelSelector
+          paramId={pid}
+          currentLevel={level || "L2"}
+          onSelect={handleSelect}
+        />
+      )}
 
       {seatScoped && (
         <div style={{ marginTop: 8 }}>

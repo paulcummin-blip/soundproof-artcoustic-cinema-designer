@@ -216,6 +216,8 @@ export default function RP22CompliancePanel({
   seatingPositions,
   assumedP15Level,
   assumedP21Level,
+  onAssumedP15Change = null,
+  onAssumedP21Change = null,
 }) {
   // Threshold presentation follows the same target basis published with the
   // authoritative engineering result; this panel never resolves modes locally.
@@ -524,6 +526,7 @@ export default function RP22CompliancePanel({
             <P15P21AssumptionControl
             paramId={p.id}
             value={p.id === 15 ? assumedP15Level : assumedP21Level}
+            onChange={p.id === 15 ? onAssumedP15Change : onAssumedP21Change}
             variant="screen"
             />
             )}

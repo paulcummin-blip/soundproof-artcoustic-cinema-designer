@@ -20,6 +20,7 @@ import { applyManualOverrideToScreen } from "@/components/models/screen/resolveE
 import { sameCentreCabinetAim } from "@/components/utils/dualCentrePairAuthority";
 import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
 import { resolveRoomDimsIntegrity, ROOM_DIMS_INTEGRITY } from "@/components/utils/roomDimensionsIntegrity";
+import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
@@ -712,7 +713,10 @@ function useDesignerState() {
   // published by the engineering authority. Legacy stored selections are
   // intentionally ignored so every consumer starts from the same result.
   const [assumedP15Level, setAssumedP15Level] = useState("L2");
-  const setAssumedP15LevelSafe = useCallback(() => setAssumedP15Level("L2"), []);
+  const setAssumedP15LevelSafe = useCallback(
+    (level) => setAssumedP15Level(normalizeAssumedLevel(level) || "L2"),
+    [],
+  );
 
   const [assumedP21Level, setAssumedP21Level] = useState("L2");
 
@@ -730,7 +734,10 @@ function useDesignerState() {
   }, []);
   const [p12Level, setP12Level] = useState(null);
 
-  const setAssumedP21LevelSafe = useCallback(() => setAssumedP21Level("L2"), []);
+  const setAssumedP21LevelSafe = useCallback(
+    (level) => setAssumedP21Level(normalizeAssumedLevel(level) || "L2"),
+    [],
+  );
 
   const [mlpOverride, setMlpOverride] = useState(() => (
     (__autosavePayload && __autosavePayload.mlpOverride) ? __autosavePayload.mlpOverride : null

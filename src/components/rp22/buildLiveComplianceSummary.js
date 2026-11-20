@@ -165,7 +165,7 @@ export function buildLiveComplianceSummary({ analysisResult, bassResults = null,
     }
     if (pid === 15 || pid === 21) {
       const measured = gradedPrimary[pid] || null;
-      const assumed = resolveAssumedParameterResult(pid, measured);
+      const assumed = resolveAssumedParameterResult(pid, measured, pid === 15 ? assumedP15Level : assumedP21Level);
       roomResultsByParameter[pid] = assumed;
       continue;
     }

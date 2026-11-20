@@ -346,8 +346,8 @@ export function useAppDesignRating({
       };
       // Publish the permanent assumptions as ordinary scored room results so
       // every downstream consumer receives the same L2 authority and display.
-      roomResultsByParameter[15] = resolveAssumedParameterResult(15, roomResultsByParameter[15]);
-      roomResultsByParameter[21] = resolveAssumedParameterResult(21, roomResultsByParameter[21]);
+      roomResultsByParameter[15] = resolveAssumedParameterResult(15, roomResultsByParameter[15], appState?.assumedP15Level);
+      roomResultsByParameter[21] = resolveAssumedParameterResult(21, roomResultsByParameter[21], appState?.assumedP21Level);
       // P14 and P18 are published room results. P19 is RSP-scoped, so it is never
       // part of the per-seat RP22 graded parameters — its published room result
       // comes from the same completed bass authority. Without P19 here the

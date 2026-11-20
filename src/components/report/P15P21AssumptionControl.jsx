@@ -1,24 +1,43 @@
 /**
- * Fixed presentation for the permanent P15/P21 design assumptions.
+ * Editable presentation for the P15/P21 design assumptions.
  *
- * Both parameters remain L2 until a measured result is published by the
- * engineering authority. This component is deliberately read-only: it cannot
- * create a competing grade or persistence path.
+ * Both parameters are design-stage assumptions, not measured results. The
+ * designer selects an L1–L4 level; selecting a level immediately calls
+ * onChange(level) and the authority updates every downstream consumer.
+ *
+ * The level colours and pill styling are the existing RP22GradingPill styling.
+ * The "Assumed" label is always shown — these are never labelled as a
+ * measurement.
  */
 import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import { DEFAULT_ASSUMED_LEVEL } from "@/components/utils/assumedParameterAuthority";
+import {
+  DEFAULT_ASSUMED_LEVEL,
+  normalizeAssumedLevel,
+  ASSUMED_P15_OPTIONS,
+  ASSUMED_P21_OPTIONS,
+  P15_LEVEL_TO_NCB,
+  P21_LEVEL_TO_DB,
+} from "@/components/utils/assumedParameterAuthority";
 
 const LABEL_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
 
 export default function P15P21AssumptionControl({
   paramId,
+  value = null,
+  onChange = null,
   variant = "screen",
 }) {
   const isP15 = Number(paramId) === 15;
+  const currentLevel = normalizeAssumedLevel(value) || DEFAULT_ASSUMED_LEVEL;
+  const options = isP15 ? ASSUMED_P15_OPTIONS : ASSUMED_P21_OPTIONS;
+  const editable = typeof onChange === "function";
+
   const detail = isP15
-    ? "Design target: NCB 22"
-    : "Early reflections have not been measured. Level 2 is used as the design assumption.";
+    ? `Design target: NCB ${P15_LEVEL_TO_NCB[currentLevel]}`
+    : currentLevel === "L1"
+      ? "Early reflections control is not applicable at this level."
+      : "Early reflections have not been measured. This level is used as the design assumption.";
 
   if (variant === "print") {
     return (
@@ -40,7 +59,7 @@ export default function P15P21AssumptionControl({
       >
         <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
           <strong style={{ color: "#1B1A1A" }}>Assumed</strong>
-          <strong style={{ color: "#213428" }}>{DEFAULT_ASSUMED_LEVEL}</strong>
+          <strong style={{ color: "#213428" }}>{currentLevel}</strong>
         </div>
         <div style={{ marginTop: "0.6mm" }}>{detail}</div>
       </div>
@@ -58,14 +77,50 @@ export default function P15P21AssumptionControl({
         fontFamily: LABEL_FONT,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "#1B1A1A", letterSpacing: "0.02em" }}>
           Assumed
         </span>
-        <RP22GradingPill level={DEFAULT_ASSUMED_LEVEL} />
+        <span style={{ fontSize: 10, color: "#9B8E82", fontStyle: "italic" }}>
+          {detail}
+        </span>
       </div>
-      <div style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4, color: "#625143" }}>
-        {detail}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {options.map((opt) => {
+          const selected = opt.level === currentLevel;
+          return (
+            <button
+              key={opt.level}
+              type="button"
+              disabled={!editable}
+              onClick={() => editable && onChange(opt.level)}
+              title={opt.sublabel}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 8px 3px 4px",
+                borderRadius: 9999,
+                border: selected
+                  ? "1.5px solid #213428"
+                  : "1px solid #DCDBD6",
+                background: selected ? "rgba(33,52,40,0.06)" : "transparent",
+                cursor: editable ? "pointer" : "default",
+                transition: "border-color 0.15s, background 0.15s",
+              }}
+            >
+              <RP22GradingPill level={opt.level} />
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: selected ? "#213428" : "#9B8E82",
+                whiteSpace: "nowrap",
+              }}>
+                {opt.sublabel}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

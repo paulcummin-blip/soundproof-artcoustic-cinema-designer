@@ -6,6 +6,7 @@ import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 import { buildLiveComplianceSummary } from "@/components/rp22/buildLiveComplianceSummary";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { publishLiveRp22Summary, clearLiveRp22Summary } from "@/components/state/designReviewHandoff";
+import { registerAssumedLevelHandler } from "@/components/state/assumedLevelStore";
 import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 import RoomDimensionReflowBanner from "@/components/room/RoomDimensionReflowBanner";
 import SeatBoundaryWarning from "@/components/room/SeatBoundaryWarning";
@@ -179,6 +180,16 @@ export default function RoomDesignerControlsPanel({
     publishLiveRp22Summary(projectId, versionId, liveComplianceSummary);
     return () => clearLiveRp22Summary(projectId, versionId);
   }, [projectId, versionId, liveComplianceSummary]);
+
+  // Register the real appState setters as the P15/P21 change handlers so the
+  // left sidebar's Live RP22 Performance Summary can request level changes
+  // through the shared store. This is transport only — the actual state update
+  // is the existing appState setter.
+  React.useEffect(() => {
+    const unreg15 = registerAssumedLevelHandler(15, appState?.setAssumedP15LevelSafe);
+    const unreg21 = registerAssumedLevelHandler(21, appState?.setAssumedP21LevelSafe);
+    return () => { unreg15(); unreg21(); };
+  }, [appState?.setAssumedP15LevelSafe, appState?.setAssumedP21LevelSafe]);
 
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
@@ -429,7 +440,9 @@ export default function RoomDesignerControlsPanel({
               screen={_screen}
               seatingPositions={_seatingPositions}
               assumedP15Level={appState?.assumedP15Level}
-              assumedP21Level={appState?.assumedP21Level} />
+              assumedP21Level={appState?.assumedP21Level}
+              onAssumedP15Change={appState?.setAssumedP15LevelSafe}
+              onAssumedP21Change={appState?.setAssumedP21LevelSafe} />
           </Suspense>
         </CollapsiblePanel>
 

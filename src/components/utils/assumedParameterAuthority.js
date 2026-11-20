@@ -3,13 +3,13 @@
 // Single canonical authority for the designer-assumed RP22 parameters P15
 // (background noise floor) and P21 (early reflections).
 //
-// P15 and P21 are permanent L2 design assumptions until measured data exists.
-// They are NOT calculation failures and they are never user-selected grades.
-// A future measured result must enter through the measured-result authority;
-// legacy stored assumption values are deliberately ignored.
+// P15 and P21 are design-stage assumptions, not measured results. The designer
+// selects an L1–L4 level; it persists against the project/version and feeds
+// every consumer — Room Designer, Design Review, Technical/Visual reports,
+// PDFs, Design Rating and AI Summary — through this one authority.
 //
-// Every consumer — Room Designer, Design Review, Technical/Visual reports,
-// PDFs, Design Rating and AI Summary — resolves the same L2 authority here.
+// A future measured result must enter through the measured-result authority;
+// while no measured result exists, the designer's selected assumption is used.
 //
 // Presentation only — no thresholds or grading maths of its own; the level
 // mapping below mirrors the existing RP22 catalog definitions.
@@ -64,52 +64,69 @@ export function normalizeAssumedLevel(raw) {
   return m ? `L${m[1]}` : null;
 }
 
-/** Permanent design assumption used while no measured result exists. */
+/** Default assumption when no level has been selected. */
 export const DEFAULT_ASSUMED_LEVEL = "L2";
 
 /**
- * Resolve the effective design assumption. Legacy stored L1/L3/L4 values are
- * ignored: an unmeasured P15/P21 result is always L2. Measured results do not
- * pass through this helper and therefore replace the assumption naturally.
+ * Resolve the effective design assumption. Returns the normalised stored
+ * level, falling back to the default (L2) when the stored value is absent or
+ * invalid. Measured results do not pass through this helper.
  */
-export function getEffectiveAssumedLevel(_legacyStoredLevel) {
-  return DEFAULT_ASSUMED_LEVEL;
+export function getEffectiveAssumedLevel(storedLevel) {
+  return normalizeAssumedLevel(storedLevel) || DEFAULT_ASSUMED_LEVEL;
 }
 
-export const P15_ASSUMPTION_RESULT = Object.freeze({
-  parameter: 15,
-  level: "L2",
-  value: 22,
-  formatted: "NCB 22",
-  hudLabel: "NCB 22",
-  status: "assumed",
-  state: "scored",
-  assumed: true,
-  assumptionText: "Design target: NCB 22",
-});
+/** Build the P15 assumption result object for a given level. */
+export function buildP15AssumptionResult(level) {
+  const lvl = getEffectiveAssumedLevel(level);
+  return Object.freeze({
+    parameter: 15,
+    level: lvl,
+    value: P15_LEVEL_TO_NCB[lvl],
+    formatted: `NCB ${P15_LEVEL_TO_NCB[lvl]}`,
+    hudLabel: `NCB ${P15_LEVEL_TO_NCB[lvl]}`,
+    status: "assumed",
+    state: "scored",
+    assumed: true,
+    assumptionText: `Design target: NCB ${P15_LEVEL_TO_NCB[lvl]}`,
+  });
+}
 
-export const P21_ASSUMPTION_RESULT = Object.freeze({
-  parameter: 21,
-  level: "L2",
-  value: -8,
-  formatted: "Assumed",
-  hudLabel: "Assumed",
-  status: "assumed",
-  state: "scored",
-  assumed: true,
-  assumptionText: "Early reflections have not been measured. Level 2 is used as the design assumption.",
-});
+/** Build the P21 assumption result object for a given level. */
+export function buildP21AssumptionResult(level) {
+  const lvl = getEffectiveAssumedLevel(level);
+  const db = P21_LEVEL_TO_DB[lvl];
+  const assumptionText = lvl === "L1"
+    ? "Early reflections control is not applicable at this level."
+    : "Early reflections have not been measured. This level is used as the design assumption.";
+  return Object.freeze({
+    parameter: 21,
+    level: lvl,
+    value: db,
+    formatted: lvl === "L1" ? "N/A" : "Assumed",
+    hudLabel: lvl === "L1" ? "N/A" : "Assumed",
+    status: "assumed",
+    state: "scored",
+    assumed: true,
+    assumptionText,
+  });
+}
+
+// Backward-compat frozen L2 defaults (used by callers that need the default
+// without calling the builder).
+export const P15_ASSUMPTION_RESULT = buildP15AssumptionResult("L2");
+export const P21_ASSUMPTION_RESULT = buildP21AssumptionResult("L2");
 
 /**
  * Return a measured result when one is explicitly published; otherwise return
- * the permanent canonical assumption presentation for P15/P21.
+ * the designer's assumed level presentation for P15/P21.
  */
-export function resolveAssumedParameterResult(parameterId, measuredResult = null) {
+export function resolveAssumedParameterResult(parameterId, measuredResult = null, assumedLevel = null) {
   if (measuredResult?.status === "measured" && normalizeAssumedLevel(measuredResult?.level)) {
     return { ...measuredResult, assumed: false };
   }
-  if (Number(parameterId) === 15) return { ...P15_ASSUMPTION_RESULT };
-  if (Number(parameterId) === 21) return { ...P21_ASSUMPTION_RESULT };
+  if (Number(parameterId) === 15) return { ...buildP15AssumptionResult(assumedLevel) };
+  if (Number(parameterId) === 21) return { ...buildP21AssumptionResult(assumedLevel) };
   return measuredResult;
 }
 
@@ -119,7 +136,7 @@ export function getAssumedP15DisplayValue(level) {
   return `NCB ${P15_LEVEL_TO_NCB[lvl]}`;
 }
 
-/** Derive the permanent P21 design target. The unmeasured state is always L2 / −8 dB. */
+/** Derive the P21 display value from an assumed level. Defaults to L2 / −8 dB. */
 export function getAssumedP21DisplayValue(level) {
   const lvl = getEffectiveAssumedLevel(level);
   if (lvl === "L1") return "N/A";

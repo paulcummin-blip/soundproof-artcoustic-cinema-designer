@@ -25,6 +25,7 @@ import { hydrateOptimiserPlan } from "@/components/room/bass/optimiserPlan/optim
 import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
 import { manualSizeFromPersisted } from "@/components/models/screen/manualScreenConfig";
 import { resolvePresetBackupGeometry } from "@/components/models/screen/resolveEffectiveScreen";
+import { normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { resolveRoomDimsIntegrity } from "@/components/utils/roomDimensionsIntegrity";
 
@@ -722,11 +723,13 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
     appState.setViewingPriority(vp);
   }
 
-  // 10e2) P15/P21 PERMANENT DESIGN ASSUMPTIONS
-  // Old selectable assumption fields are ignored. Until a measured result is
-  // published by the engineering authority, both parameters are always L2.
-  appState?.setAssumedP15LevelSafe?.("L2");
-  appState?.setAssumedP21LevelSafe?.("L2");
+  // 10e2) P15/P21 DESIGN ASSUMPTIONS
+  // Restore the designer's selected assumption from the version's design_state.
+  // Falls back to L2 when no level has been saved yet.
+  const storedP15Level = normalizeAssumedLevel(p?.assumedP15Level ?? p?.assumed_p15_level) || "L2";
+  const storedP21Level = normalizeAssumedLevel(p?.assumedP21Level ?? p?.assumed_p21_level) || "L2";
+  appState?.setAssumedP15LevelSafe?.(storedP15Level);
+  appState?.setAssumedP21LevelSafe?.(storedP21Level);
 
   // 10c) COMMERCIAL SELECTIONS (manual extras + price-display basis)
   // Hydrated from the loaded version before anything can render a default, so a
