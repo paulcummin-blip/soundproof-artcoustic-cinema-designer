@@ -4,6 +4,10 @@ import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
 import { buildTurnoverMap, buildTurnoverSnapshotMap } from "@/lib/commercial/commercialOverview";
 import {
+  buildPromotionsByAccount,
+  buildPromoUsageByAccountAndPromo,
+} from "@/lib/commercial/promotionEntitlementOverview";
+import {
   ACCESS_GROUPS,
   EMPTY_FILTERS,
   applyAccessFilters,
@@ -124,6 +128,8 @@ export default function AdminAccountAccess() {
           turnoverMap: buildTurnoverMap(turnoverRecords, CALENDAR_YEAR),
           turnoverSnapshotMap: buildTurnoverSnapshotMap(turnoverRecords, CALENDAR_YEAR),
           promoByAccount,
+          promotionsByAccount: buildPromotionsByAccount(promotions || [], accounts || []),
+          promoUsageByAccountAndPromo: buildPromoUsageByAccountAndPromo(promotionUsage || []),
         }));
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Accounts could not be loaded.");
@@ -320,6 +326,7 @@ export default function AdminAccountAccess() {
         onAddCredits={(row) => { setCreditError(null); setCreditsRow(row); }}
         onRescind={(row) => { setAccessError(null); setAccessChange({ row, mode: "rescind" }); }}
         onReinstate={(row) => { setAccessError(null); setAccessChange({ row, mode: "reinstate" }); }}
+        onPromotionsChanged={() => setRefreshKey((key) => key + 1)}
       />
 
       <AddCreditsDialog

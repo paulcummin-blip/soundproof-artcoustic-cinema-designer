@@ -1,34 +1,26 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 import AccessPill from "@/components/admin/access/AccessPill";
+import PromotionPill from "@/components/admin/access/PromotionPill";
 import {
   accountTypeLabel,
   formatGBP,
 } from "@/lib/commercial/accountAccessOverview";
 
-// Simplified Premium Partners table: Dealer | Access | 2026 Turnover |
-// Available Credits | Projects | View.
-//
-// The Access column combines the existing Account.status and the derived
-// Sound Proof access state into a single, clear label without changing any
-// underlying definitions or enforcement:
-//   Suspended     — Account.status === "suspended"
-//   Not Activated — Account.status === "inactive", or no occupied seats,
-//                   or only pending invitations
-//   Active        — Account.status === "active" with active users
-//
-// The separate Credits action has been removed from each row; credit
-// management remains available inside the View drawer.
+// Dealer table: Dealer | Access | 2026 Turnover | Credits Available |
+// Projects Created | Promotion Status | Promotion Expiry | View.
 
-const GRID = "2fr 1.1fr 1fr 0.9fr 0.7fr 100px";
-const MIN_WIDTH = 880;
+const GRID = "2fr 1fr 0.9fr 0.7fr 0.7fr 1fr 0.9fr 80px";
+const MIN_WIDTH = 1120;
 
 const HEADERS = [
   { label: "Dealer", title: "Dealer account and primary admin email" },
   { label: "Access", title: "Account access state (Active, Not Activated, Suspended)" },
-  { label: "2026 turnover", title: "Eligible turnover from the Partner Portal ledger" },
+  { label: "2026 turnover", title: "Eligible turnover from the Partner Portal — newest source snapshot" },
   { label: "Available", title: "Canonical credit balance — SUM of the capacity ledger" },
-  { label: "Projects", title: "Projects stamped to this account" },
+  { label: "Projects", title: "Current projects stamped to this account" },
+  { label: "Promotion", title: "Promotion status — Unlimited Active, Expires Soon, Expired, None" },
+  { label: "Expiry", title: "Promotion end date (inclusive)" },
   { label: "View", title: "" },
 ];
 
@@ -59,7 +51,7 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
 
   return (
     <div className="overflow-x-auto rounded-lg border border-[#DCDBD6] bg-white">
-      <div className="min-w-[880px]">
+      <div className="min-w-[1120px]">
         <div
           style={{ gridTemplateColumns: GRID }}
           className="grid items-center gap-2 border-b border-[#E7E5E1] bg-[#F4F3F1] px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-[#625143]"
@@ -102,6 +94,18 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
               </div>
 
               <div className="tabular-nums text-[#3E4349]">{row.projectCount}</div>
+
+              <div>
+                <PromotionPill
+                  label={row.promotion?.status || "None"}
+                  tone={row.promotion?.tone || "muted"}
+                  title={row.promotion?.effective?.headline || row.promotion?.effective?.name || undefined}
+                />
+              </div>
+
+              <div className="tabular-nums text-[#3E4349]">
+                {row.promotion?.expiryDisplay || "—"}
+              </div>
 
               <div className="flex items-center justify-end">
                 <button

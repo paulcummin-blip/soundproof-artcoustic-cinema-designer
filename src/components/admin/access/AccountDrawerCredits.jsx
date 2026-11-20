@@ -1,10 +1,12 @@
-import React from "react";
-import { Coins } from "lucide-react";
+import React, { useState } from "react";
+import { Coins, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   LEDGER_TYPE_LABELS,
   formatDate,
   formatDelta,
 } from "@/lib/commercial/accountAccessOverview";
+
+const PAGE_SIZE = 10;
 
 function BreakdownRow({ label, value, strong = false, negative = false }) {
   return (
@@ -26,9 +28,12 @@ function BreakdownRow({ label, value, strong = false, negative = false }) {
  */
 export default function AccountDrawerCredits({ row }) {
   const credits = row?.credits || {};
-  const entries = [...(row?.ledgerEntries || [])]
-    .sort((a, b) => String(b?.created_date || "").localeCompare(String(a?.created_date || "")))
-    .slice(0, 8);
+  const allEntries = [...(row?.ledgerEntries || [])]
+    .sort((a, b) => String(b?.created_date || "").localeCompare(String(a?.created_date || "")));
+
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(allEntries.length / PAGE_SIZE));
+  const pageEntries = allEntries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const extras = [
     credits.promotional ? { label: "Promotional", value: credits.promotional } : null,
@@ -62,36 +67,73 @@ export default function AccountDrawerCredits({ row }) {
       </div>
 
       <div className="border-t border-[#EDEBE7] px-4 py-3">
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#625143]">
-          Recent ledger entries
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[#625143]">
+            Transaction history
+          </div>
+          <div className="text-[10px] text-[#625143]">
+            {allEntries.length} {allEntries.length === 1 ? "entry" : "entries"}
+          </div>
         </div>
-        {entries.length === 0 ? (
+        {allEntries.length === 0 ? (
           <div className="text-[12px] text-[#3E4349]">No capacity entries recorded yet.</div>
         ) : (
-          <div className="divide-y divide-[#F1EFEC]">
-            {entries.map((entry) => (
-              <div key={entry.id} className="flex items-start justify-between gap-3 py-1.5">
-                <div className="min-w-0">
-                  <div className="text-[12px] font-semibold text-[#1B1A1A]">
-                    {LEDGER_TYPE_LABELS[entry.transaction_type] || entry.transaction_type || "Entry"}
-                  </div>
-                  {entry.reason && (
-                    <div className="truncate text-[11px] text-[#625143]" title={entry.reason}>
-                      {entry.reason}
+          <>
+            <div className="divide-y divide-[#F1EFEC]">
+              {pageEntries.map((entry) => (
+                <div key={entry.id} className="flex items-start justify-between gap-3 py-1.5">
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-semibold text-[#1B1A1A]">
+                      {LEDGER_TYPE_LABELS[entry.transaction_type] || entry.transaction_type || "Entry"}
                     </div>
-                  )}
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className={`tabular-nums text-[12px] font-bold ${
-                    Number(entry.delta) >= 0 ? "text-[#213428]" : "text-[#8F2F2F]"
-                  }`}>
-                    {formatDelta(entry.delta)}
+                    {entry.reason && (
+                      <div className="truncate text-[11px] text-[#625143]" title={entry.reason}>
+                        {entry.reason}
+                      </div>
+                    )}
+                    {entry.source_ref?.granted_by_email && (
+                      <div className="text-[10px] text-[#625143]">
+                        by {entry.source_ref.granted_by_email}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[10px] text-[#625143]">{formatDate(entry.created_date)}</div>
+                  <div className="shrink-0 text-right">
+                    <div className={`tabular-nums text-[12px] font-bold ${
+                      Number(entry.delta) >= 0 ? "text-[#213428]" : "text-[#8F2F2F]"
+                    }`}>
+                      {formatDelta(entry.delta)}
+                    </div>
+                    <div className="text-[10px] text-[#625143]">{formatDate(entry.created_date)}</div>
+                  </div>
                 </div>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="mt-2 flex items-center justify-between border-t border-[#F1EFEC] pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="inline-flex items-center gap-1 rounded-md border border-[#DCDBD6] px-2 py-1 text-[11px] font-semibold text-[#3E4349] hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-3 w-3" />
+                  Prev
+                </button>
+                <span className="text-[11px] text-[#625143]">
+                  Page {page + 1} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="inline-flex items-center gap-1 rounded-md border border-[#DCDBD6] px-2 py-1 text-[11px] font-semibold text-[#3E4349] hover:bg-slate-50 disabled:opacity-40"
+                >
+                  Next
+                  <ChevronRight className="h-3 w-3" />
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </section>

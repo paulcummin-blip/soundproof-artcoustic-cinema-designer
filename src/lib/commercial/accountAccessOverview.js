@@ -11,6 +11,12 @@
 
 import { aggregateCapacityBreakdown } from "./capacityService";
 import { buildTurnoverSnapshotMap } from "./commercialOverview";
+import {
+  resolveEffectivePromotion,
+  derivePromotionStatus,
+  countPromoProjectsForAccount,
+  countProjectsCreatedTotal,
+} from "./promotionEntitlementOverview";
 
 // Occupied seats — the same rule the account-user authority applies.
 export const OCCUPIED_STATUSES = ["pending", "active"];
@@ -52,6 +58,7 @@ export const EMPTY_FILTERS = {
   credits: "all",
   users: "all",
   projects: "all",
+  promotion: "all",
 };
 
 // ---------------------------------------------------------------- grouping
@@ -259,6 +266,8 @@ export function buildAccessRows({
   turnoverMap,
   turnoverSnapshotMap,
   promoByAccount,
+  promotionsByAccount,
+  promoUsageByAccountAndPromo,
 }) {
   const rows = [];
   for (const account of Array.isArray(accounts) ? accounts : []) {
@@ -269,6 +278,16 @@ export function buildAccessRows({
     const projects = projectsByAccount?.get(account.id) || [];
     const ledgerEntries = ledgerByAccount?.get(account.id) || [];
     const admin = primaryMember(members);
+
+    const allPromotionsForAccount = promotionsByAccount?.get(account.id) || [];
+    const effectivePromotion = resolveEffectivePromotion(allPromotionsForAccount);
+    const promoUsageByPromo = promoUsageByAccountAndPromo?.get(account.id) || new Map();
+    const promoProjectsTotal = countPromoProjectsForAccount(
+      promoUsageByAccountAndPromo, account.id
+    );
+    const promoStatus = derivePromotionStatus(
+      effectivePromotion, allPromotionsForAccount
+    );
 
     rows.push({
       account,
@@ -282,6 +301,16 @@ export function buildAccessRows({
       ledgerEntries,
       seatsUsed: occupiedMembers(members).length,
       seatsMaximum: MAX_ACCOUNT_SEATS,
+      promotion: {
+        effective: effectivePromotion,
+        status: promoStatus.label,
+        tone: promoStatus.tone,
+        expiryDisplay: promoStatus.expiryDisplay,
+        all: allPromotionsForAccount,
+      },
+      promoUsageByPromo,
+      promoProjectsTotal,
+      projectsCreatedTotal: countProjectsCreatedTotal(ledgerEntries, promoProjectsTotal),
       turnover: (() => {
         const snap = turnoverSnapshotMap?.get(account.id);
         if (snap) return snap.value;
@@ -324,6 +353,7 @@ export function applyAccessFilters(rows, filters) {
   const credits = filters?.credits || "all";
   const users = filters?.users || "all";
   const projects = filters?.projects || "all";
+  const promotion = filters?.promotion || "all";
 
   return (Array.isArray(rows) ? rows : []).filter((row) => {
     if (group !== "all" && row.group !== group) return false;
@@ -338,6 +368,10 @@ export function applyAccessFilters(rows, filters) {
 
     if (projects === "has" && row.projectCount === 0) return false;
     if (projects === "none" && row.projectCount > 0) return false;
+
+    if (promotion === "active" && row.promotion?.status !== "Unlimited Active" && row.promotion?.status !== "Expires Soon") return false;
+    if (promotion === "expires_soon" && row.promotion?.status !== "Expires Soon") return false;
+    if (promotion === "none" && row.promotion?.status !== "None") return false;
 
     if (query) {
       const memberText = row.members

@@ -6,6 +6,8 @@ const VISIBLE_LIMIT = 12;
 
 /**
  * Projects stamped to this account through the existing ownership fields.
+ * Shows a project-usage breakdown: total created (historical evidence),
+ * current projects, and projects created during unlimited promotions.
  * Props: row
  */
 export default function AccountDrawerProjects({ row }) {
@@ -13,6 +15,8 @@ export default function AccountDrawerProjects({ row }) {
     String(b?.updated_date || "").localeCompare(String(a?.updated_date || ""))
   );
   const visible = projects.slice(0, VISIBLE_LIMIT);
+  const projectsCreatedTotal = row?.projectsCreatedTotal ?? projects.length;
+  const promoProjectsTotal = row?.promoProjectsTotal ?? 0;
 
   return (
     <section className="rounded-xl border border-[#DCDBD6] bg-white">
@@ -30,6 +34,28 @@ export default function AccountDrawerProjects({ row }) {
         <div className="px-4 py-5 text-[13px] text-[#3E4349]">No projects yet.</div>
       ) : (
         <>
+          <div className="border-b border-[#EDEBE7] px-4 py-2.5">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border border-[#E7E5E1] bg-[#FAFAF9] px-2 py-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#625143]">Total created</div>
+                <div className="mt-0.5 text-[15px] font-bold text-[#1B1A1A]">{projectsCreatedTotal}</div>
+                <div className="text-[9px] text-[#625143]">Historical evidence</div>
+              </div>
+              <div className="rounded-lg border border-[#E7E5E1] bg-[#FAFAF9] px-2 py-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#625143]">Current</div>
+                <div className="mt-0.5 text-[15px] font-bold text-[#1B1A1A]">{projects.length}</div>
+                <div className="text-[9px] text-[#625143]">Stamped to dealer</div>
+              </div>
+              <div className="rounded-lg border border-[#E7E5E1] bg-[#FAFAF9] px-2 py-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#625143]">Promo projects</div>
+                <div className="mt-0.5 text-[15px] font-bold text-[#1B1A1A]">{promoProjectsTotal}</div>
+                <div className="text-[9px] text-[#625143]">During promotions</div>
+              </div>
+            </div>
+            <div className="mt-1.5 text-[10px] text-[#625143]">
+              Five design versions remain included per project.
+            </div>
+          </div>
           <div className="divide-y divide-[#EDEBE7]">
             {visible.map((project) => (
               <div key={project.id} className="flex items-center justify-between gap-3 px-4 py-2.5">

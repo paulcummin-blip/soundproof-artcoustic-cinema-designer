@@ -13,6 +13,7 @@ import AccountDrawerCredits from "@/components/admin/access/AccountDrawerCredits
 import AccountDrawerEvents from "@/components/admin/access/AccountDrawerEvents";
 import AccountDrawerMembers from "@/components/admin/access/AccountDrawerMembers";
 import AccountDrawerProjects from "@/components/admin/access/AccountDrawerProjects";
+import AccountDrawerPromotions from "@/components/admin/access/AccountDrawerPromotions";
 import {
   STATUS_TONES,
   accountTypeLabel,
@@ -41,6 +42,7 @@ export default function AccountDetailDrawer({
   onAddCredits,
   onRescind,
   onReinstate,
+  onPromotionsChanged,
 }) {
   if (!row) return null;
 
@@ -124,9 +126,10 @@ export default function AccountDetailDrawer({
               hint="Occupied seats"
             />
             <SummaryItem label="Last login" value={formatDateTime(row.lastLogin)} hint="Account access stamp" />
-            <SummaryItem label="Projects" value={row.projectCount} hint="Stamped to this dealer" />
+            <SummaryItem label="Projects" value={row.projectCount} hint="Current projects" />
+            <SummaryItem label="Total created" value={row.projectsCreatedTotal ?? 0} hint="Historical evidence (ledger + promo usage)" />
             <SummaryItem label="Available credits" value={row.credits.available ?? 0} hint="Capacity ledger SUM" />
-            <SummaryItem label="Promo projects" value={row.promoProjects} hint="Promotion usage" />
+            <SummaryItem label="Promo projects" value={row.promoProjectsTotal ?? 0} hint="Created during promotions" />
           </div>
 
           {/* Dealer identity */}
@@ -156,6 +159,7 @@ export default function AccountDetailDrawer({
 
           <AccountDrawerMembers row={row} />
           <AccountDrawerCredits row={row} />
+          <AccountDrawerPromotions row={row} onPromotionsChanged={onPromotionsChanged} />
           <AccountDrawerProjects row={row} />
           <AccountDrawerEvents row={row} />
         </div>

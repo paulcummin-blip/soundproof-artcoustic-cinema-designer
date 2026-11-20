@@ -34,6 +34,13 @@ const PROJECT_OPTIONS = [
   { value: "none", label: "No projects" },
 ];
 
+const PROMOTION_OPTIONS = [
+  { value: "all", label: "Promotions: any" },
+  { value: "active", label: "Unlimited active" },
+  { value: "expires_soon", label: "Expires soon" },
+  { value: "none", label: "No promotion" },
+];
+
 function FilterSelect({ label, value, options, onChange }) {
   return (
     <label className="flex flex-col gap-1">
@@ -111,6 +118,12 @@ export default function AccountAccessFilters({
           value={filters.projects}
           options={PROJECT_OPTIONS}
           onChange={(value) => onChange({ projects: value })}
+        />
+        <FilterSelect
+          label="Promotion"
+          value={filters.promotion}
+          options={PROMOTION_OPTIONS}
+          onChange={(value) => onChange({ promotion: value })}
         />
 
         <div className="flex items-center gap-2 pb-0.5">
