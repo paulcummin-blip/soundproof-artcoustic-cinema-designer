@@ -20,7 +20,11 @@ import {
 import ImageScopeBadge from '@/components/library/ImageScopeBadge';
 import ImageScopeSelect from '@/components/library/ImageScopeSelect';
 import ImageProposalControls from '@/components/library/ImageProposalControls';
-import { comparisonGroupsOf } from '@/components/proposal/images/proposalImagePlacementAuthority';
+import {
+  IMAGE_PRESENTATION,
+  IMAGE_PURPOSE,
+  comparisonGroupsOf,
+} from '@/components/proposal/images/proposalImagePlacementAuthority';
 
 /**
  * Project gallery panel — one Cover Image plus Image 1 to Image 10.
@@ -158,6 +162,12 @@ export default function ProposalAssetsPanel({
           // states it — an image can never land in a scope that is not on screen.
           scope: group.scope,
           version_id: group.versionId,
+          // Sound Proof default presentation settings for a newly uploaded image.
+          // Both remain editable per image afterwards, and a replaced image keeps
+          // the settings its record already holds (the replace path never writes
+          // these fields), so previously uploaded images are left untouched.
+          image_purpose: IMAGE_PURPOSE.WHOLE_ROOM,
+          image_presentation: IMAGE_PRESENTATION.FULL_WIDTH,
         });
       }
       await load();
