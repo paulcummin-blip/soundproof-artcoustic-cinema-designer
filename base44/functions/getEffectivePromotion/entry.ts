@@ -82,7 +82,7 @@ export default async function(req) {
       promotion_type: promotion.promotion_type,
       headline: promotion.headline || null,
       message: promotion.message || null,
-      ends_at: promotion.ends_at,
+      ends_at: promotion.effective_ends_at || promotion.ends_at,
     });
   } catch (error) {
     // Fail-closed: on any error, show no promotion. The dealer sees normal
