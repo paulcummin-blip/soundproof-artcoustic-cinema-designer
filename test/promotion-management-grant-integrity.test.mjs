@@ -92,3 +92,29 @@ test('reload keeps pending request and rejects a replacement configuration',()=>
  assert.deepEqual(one,retry);
  assert.throws(()=>requestHelpers.preparePromotionRequest(adapter,'k','changed',()=>({}),['s2'],'2026-11-21'),/unfinished/);
 });
+
+test('244-account isolated bulk grant preserves existing credits, promotions and dealer access',async()=>{
+ const accounts=Array.from({length:244},(_,i)=>({id:'dealer-'+String(i).padStart(3,'0'),name:'Synthetic '+i,account_type:'dealer',status:i%2?'active':'inactive'}));
+ accounts.push({id:'admin',name:'Synthetic internal',account_type:'admin'});
+ const existing=[{id:'earned',account_id:'dealer-000',transaction_type:'UK_TURNOVER_REWARD',delta:10},
+  {id:'purchased',account_id:'dealer-000',transaction_type:'PURCHASED',delta:3}];
+ const oldPromo={id:'historical',name:'Historical',status:'CANCELLED'};
+ const m=memoryStore({Account:accounts,CapacityLedger:existing,Promotion:[oldPromo]});
+ const before=structuredClone(m.data.Account.filter(a=>a.account_type==='dealer'));
+ const promotion=grants.buildBonusPromotion({selection:{type:'all'},creditsPerAccount:5,accounts,actor,now:new Date('2026-11-20T12:00:00Z')});
+ const input={promotion,recipient_ids:accounts.filter(a=>a.account_type!=='admin').map(a=>a.id)};
+ const first=await applyPromotionGrant(m.service,input,actor);const repeat=await applyPromotionGrant(m.service,input,actor);
+ assert.equal(first.affected,244);assert.equal(repeat.skipped,244);assert.equal(repeat.affected,0);
+ assert.equal(m.data.CapacityLedger.length,246);
+ assert.deepEqual(m.data.CapacityLedger.slice(0,2),existing);
+ assert.deepEqual(m.data.Promotion[0],oldPromo);
+ assert.deepEqual(m.data.Account.filter(a=>a.account_type==='dealer'),before);
+ assert.equal(m.data.CapacityLedger.some(e=>e.account_id==='admin'),false);
+});
+test('actual credit aggregator keeps promotional, rewarded and purchased amounts separate',async()=>{
+ const raw=readFileSync(new URL('../src/lib/commercial/capacityService.js',import.meta.url),'utf8')
+  .replace(/import \{ base44 \} from "[^"]+";/,'');
+ const mod=await import('data:text/javascript;base64,'+Buffer.from(raw).toString('base64'));
+ const b=mod.aggregateCapacityBreakdown([{transaction_type:'PROMOTIONAL',delta:5},{transaction_type:'UK_TURNOVER_REWARD',delta:10},{transaction_type:'PURCHASED',delta:3}]);
+ assert.equal(b.promotional,5);assert.equal(b.rewarded,10);assert.equal(b.purchased,3);assert.equal(b.remaining,18);
+});
