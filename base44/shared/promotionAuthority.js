@@ -55,6 +55,9 @@ export function matchesTarget(promotion, account) {
       return promotion.target_distributor_id != null
         && account.parent_account_id === promotion.target_distributor_id;
 
+    case 'ALL_ACCOUNTS':
+      return account.account_type !== 'admin' && account.account_type !== 'internal';
+
     default:
       return false;
   }

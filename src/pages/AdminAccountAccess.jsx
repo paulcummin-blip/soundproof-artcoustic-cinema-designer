@@ -27,6 +27,8 @@ import AccountAccessTable from "@/components/admin/access/AccountAccessTable";
 import AccountDetailDrawer from "@/components/admin/access/AccountDetailDrawer";
 import AddCreditsDialog from "@/components/admin/access/AddCreditsDialog";
 import RescindAccessDialog from "@/components/admin/access/RescindAccessDialog";
+import ManagePromotionsDialog from "@/components/admin/access/ManagePromotionsDialog";
+import { Gift } from "lucide-react";
 
 const GROUP_ACCENTS = {
   partners: "#213428",
@@ -57,6 +59,9 @@ export default function AdminAccountAccess() {
   const [accessChange, setAccessChange] = useState(null); // { row, mode }
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessError, setAccessError] = useState(null);
+  const [promoDialogOpen, setPromoDialogOpen] = useState(false);
+  const [allAccounts, setAllAccounts] = useState([]);
+  const [allLedgerEntries, setAllLedgerEntries] = useState([]);
 
   const CALENDAR_YEAR = new Date().getFullYear();
 
@@ -96,6 +101,9 @@ export default function AdminAccountAccess() {
         ]);
 
         if (!mounted) return;
+
+        setAllAccounts(accounts || []);
+        setAllLedgerEntries(ledgerEntries || []);
 
         // Promotional projects — usage records of currently effective promotions.
         const now = Date.now();
@@ -229,6 +237,14 @@ export default function AdminAccountAccess() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPromoDialogOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#213428] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#2A4434]"
+          >
+            <Gift className="h-4 w-4" />
+            Manage Promotions
+          </button>
           <span className="rounded-full bg-[#213428] px-3.5 py-1 text-[12px] font-bold tracking-wider text-white">
             ADMIN
           </span>
@@ -327,6 +343,8 @@ export default function AdminAccountAccess() {
         onRescind={(row) => { setAccessError(null); setAccessChange({ row, mode: "rescind" }); }}
         onReinstate={(row) => { setAccessError(null); setAccessChange({ row, mode: "reinstate" }); }}
         onPromotionsChanged={() => setRefreshKey((key) => key + 1)}
+        allAccounts={allAccounts}
+        allLedgerEntries={allLedgerEntries}
       />
 
       <AddCreditsDialog
@@ -346,6 +364,14 @@ export default function AdminAccountAccess() {
         onConfirm={handleAccessChange}
         busy={accessBusy}
         error={accessError}
+      />
+
+      <ManagePromotionsDialog
+        open={promoDialogOpen}
+        onClose={() => setPromoDialogOpen(false)}
+        onApplied={() => setRefreshKey((key) => key + 1)}
+        allAccounts={allAccounts}
+        allLedgerEntries={allLedgerEntries}
       />
     </div>
   );

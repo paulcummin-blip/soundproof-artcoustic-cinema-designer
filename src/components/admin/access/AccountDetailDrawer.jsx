@@ -43,6 +43,8 @@ export default function AccountDetailDrawer({
   onRescind,
   onReinstate,
   onPromotionsChanged,
+  allAccounts,
+  allLedgerEntries,
 }) {
   if (!row) return null;
 
@@ -159,7 +161,12 @@ export default function AccountDetailDrawer({
 
           <AccountDrawerMembers row={row} />
           <AccountDrawerCredits row={row} />
-          <AccountDrawerPromotions row={row} onPromotionsChanged={onPromotionsChanged} />
+          <AccountDrawerPromotions
+            row={row}
+            onPromotionsChanged={onPromotionsChanged}
+            allAccounts={allAccounts}
+            allLedgerEntries={allLedgerEntries}
+          />
           <AccountDrawerProjects row={row} />
           <AccountDrawerEvents row={row} />
         </div>

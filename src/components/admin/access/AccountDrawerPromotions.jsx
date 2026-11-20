@@ -12,6 +12,7 @@ import {
   deriveIntroductoryReadiness,
 } from "@/lib/commercial/promotionEntitlementOverview";
 import PromotionFormDialog from "@/components/admin/promotions/PromotionFormDialog";
+import ManagePromotionsDialog from "@/components/admin/access/ManagePromotionsDialog";
 import AccessPill from "@/components/admin/access/AccessPill";
 
 /**
@@ -19,9 +20,9 @@ import AccessPill from "@/components/admin/access/AccessPill";
  * promotional periods, projects created during each period, introductory
  * unlimited readiness, and existing controls to grant / extend / cancel.
  *
- * Props: row, onPromotionsChanged?
+ * Props: row, onPromotionsChanged?, allAccounts, allLedgerEntries
  */
-export default function AccountDrawerPromotions({ row, onPromotionsChanged }) {
+export default function AccountDrawerPromotions({ row, onPromotionsChanged, allAccounts = [], allLedgerEntries = [] }) {
   const account = row?.account;
   const promotion = row?.promotion;
   const allPromotions = promotion?.all || [];
@@ -31,6 +32,7 @@ export default function AccountDrawerPromotions({ row, onPromotionsChanged }) {
   const [editPromotion, setEditPromotion] = useState(null);
   const [endConfirm, setEndConfirm] = useState(null);
   const [ending, setEnding] = useState(false);
+  const [grantDialogOpen, setGrantDialogOpen] = useState(false);
 
   if (!account) return null;
 
@@ -79,7 +81,7 @@ export default function AccountDrawerPromotions({ row, onPromotionsChanged }) {
         </div>
         <button
           type="button"
-          onClick={() => { setEditPromotion(null); setFormOpen(true); }}
+          onClick={() => setGrantDialogOpen(true)}
           className="inline-flex items-center gap-1 rounded-lg border border-[#DCDBD6] px-2.5 py-1 text-[11px] font-semibold text-[#1B1A1A] hover:bg-slate-50"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -222,11 +224,21 @@ export default function AccountDrawerPromotions({ row, onPromotionsChanged }) {
         )}
       </div>
 
-      {/* Promotion form dialog (create / edit / extend) */}
+      {/* Manage Promotions dialog (grant) — preselects this dealer */}
+      <ManagePromotionsDialog
+        open={grantDialogOpen}
+        onClose={() => setGrantDialogOpen(false)}
+        onApplied={refresh}
+        allAccounts={allAccounts}
+        allLedgerEntries={allLedgerEntries}
+        preselectedAccountId={account.id}
+      />
+
+      {/* Promotion form dialog (edit / extend only) */}
       <PromotionFormDialog
         open={formOpen}
         promotion={editPromotion}
-        allAccounts={[account]}
+        allAccounts={allAccounts}
         allPromotions={allPromotions}
         usageCount={editPromotion ? promoUsageCount(editPromotion.id) : 0}
         onSaved={handleFormSaved}

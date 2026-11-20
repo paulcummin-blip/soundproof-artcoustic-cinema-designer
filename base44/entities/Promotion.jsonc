@@ -22,16 +22,17 @@
         "DISCOUNT_PERCENT",
         "BONUS_PROJECTS"
       ],
-      "description": "UNLIMITED_PRO_PROJECTS = free project creation, no ledger consumption. DISCOUNT_PERCENT = alters purchase pricing (future). BONUS_PROJECTS = grants N credits (future)."
+      "description": "UNLIMITED_PRO_PROJECTS = free project creation, no ledger consumption. BONUS_PROJECTS = grants N credits via PROMOTIONAL ledger entries (one per account, idempotent). DISCOUNT_PERCENT = alters purchase pricing (future)."
     },
     "target_scope": {
       "type": "string",
       "enum": [
         "ALL_DEALER_GROUP",
         "SINGLE_ACCOUNT",
-        "DISTRIBUTOR_DOWNSTREAM"
+        "DISTRIBUTOR_DOWNSTREAM",
+        "ALL_ACCOUNTS"
       ],
-      "description": "ALL_DEALER_GROUP = all accounts with matching dealer_group. SINGLE_ACCOUNT = one specific account. DISTRIBUTOR_DOWNSTREAM = all dealers under a distributor (future)."
+      "description": "ALL_DEALER_GROUP = all accounts with matching dealer_group. SINGLE_ACCOUNT = one specific account. DISTRIBUTOR_DOWNSTREAM = all dealers under a distributor (future). ALL_ACCOUNTS = all non-admin, non-internal accounts."
     },
     "target_dealer_group": {
       "type": "string",
@@ -84,7 +85,7 @@
     "bonus_projects": {
       "type": "number",
       "nullable": true,
-      "description": "For BONUS_PROJECTS (future). Null for UNLIMITED_PRO_PROJECTS."
+      "description": "For BONUS_PROJECTS \u2014 number of credits granted per recipient account. The grant is written as a PROMOTIONAL CapacityLedger entry with idempotency_key promo_grant:{promotion_id}:{account_id}. Null for UNLIMITED_PRO_PROJECTS."
     }
   },
   "required": [

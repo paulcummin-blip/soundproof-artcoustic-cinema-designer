@@ -148,6 +148,7 @@ export const TARGET_SCOPE_LABELS = {
   ALL_DEALER_GROUP: "Dealer Group",
   SINGLE_ACCOUNT: "Single Account",
   DISTRIBUTOR_DOWNSTREAM: "Distributor Downstream",
+  ALL_ACCOUNTS: "All Accounts",
 };
 
 export const PROMOTION_TYPE_LABELS = {
@@ -172,6 +173,9 @@ export function matchesTarget(promotion, account) {
     case "DISTRIBUTOR_DOWNSTREAM":
       return promotion.target_distributor_id != null &&
         account.parent_account_id === promotion.target_distributor_id;
+    case "ALL_ACCOUNTS":
+      return account.account_type !== "admin" &&
+        account.account_type !== "internal";
     default:
       return false;
   }
@@ -198,6 +202,14 @@ export function getEligibleAccounts(accounts, promotion) {
   }
   if (promotion.target_scope === "SINGLE_ACCOUNT") {
     return accounts.filter((a) => a.id === promotion.target_account_id);
+  }
+  if (promotion.target_scope === "ALL_ACCOUNTS") {
+    return accounts.filter(
+      (a) =>
+        a.account_type !== "admin" &&
+        a.account_type !== "internal" &&
+        !(a.name || "").toUpperCase().includes("TEST")
+    );
   }
   return [];
 }
