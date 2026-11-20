@@ -56,6 +56,7 @@ function extractRawValue(metric) {
  */
 function isMetricIneligible(metric) {
   if (!metric || typeof metric !== "object") return true; // missing → ineligible
+  if (metric.provisional === true || metric.indeterminate === true || metric.verified === false) return true;
   const status = String(metric.status || "").toLowerCase();
   const formatted = String(metric.formatted || "").toUpperCase().trim();
 
@@ -64,7 +65,7 @@ function isMetricIneligible(metric) {
   if (formatted === "N/A" || formatted === "NOT APPLICABLE") return true;
 
   // Not-calculated family — applicable but not yet computed
-  if (/not.?calculated|uncalculated|calculating|updating|no.?data|incomplete/.test(status)) return true;
+  if (/not.?calculated|uncalculated|calculating|updating|no.?data|incomplete|provisional|stale|indeterminate/.test(status)) return true;
   if (/^not.?calculated$/i.test(formatted) || formatted === "CALCULATING" || formatted === "UPDATING") return true;
 
   // Dash / empty formatted with no real value
@@ -93,6 +94,7 @@ function isMetricIneligible(metric) {
  */
 function isLegitimateOverheadNa(metric) {
   if (!metric || typeof metric !== "object") return false;
+  if (metric.provisional === true || metric.indeterminate === true || metric.verified === false) return true;
   const status = String(metric.status || "").toLowerCase();
   if (status === "not_applicable" || status === "na") return true;
   if (metric.applicable === false) return true;
@@ -152,16 +154,16 @@ export function buildDesignRatingInput({
   // ── Room-scope parameters ──────────────────────────────────────────
 
   // P2: Number of screen wall speakers (bed count from canonical layout)
-  const p2 = isNum(room[2]?.value) ? { rawValue: room[2].value } : null;
+  const p2 = !isMetricIneligible(room[2]) && isNum(room[2]?.value) ? { rawValue: room[2].value } : null;
 
   // P3: Screen wall speakers outside zones (fail count: 0 = L4, >0 = FAIL)
-  const p3 = isNum(room[3]?.value) ? { rawValue: room[3].value } : null;
+  const p3 = !isMetricIneligible(room[3]) && isNum(room[3]?.value) ? { rawValue: room[3].value } : null;
 
   // P7: Front wide angular deviation — N/A if layout has no front wides
   let p7;
   if (!hasFrontWides) {
     p7 = { na: true };
-  } else if (room[7] && isNum(room[7].value)) {
+  } else if (!isMetricIneligible(room[7]) && isNum(room[7]?.value)) {
     p7 = { rawValue: room[7].value };
   } else {
     p7 = null; // provisional (front wides exist but no data yet)
@@ -178,7 +180,7 @@ export function buildDesignRatingInput({
     || String(p11RoomResult?.level || "").toUpperCase() === "N/A";
   const p11 = p11NotApplicable
     ? { na: true }
-    : (!p11RoomResult
+    : (isMetricIneligible(p11RoomResult)
         ? null
         : {
             outsideCount: p11RoomResult.value,
@@ -187,12 +189,12 @@ export function buildDesignRatingInput({
           });
 
   // P12: Screen speakers SPL capability at RSP
-  const p12 = isNum(room[12]?.value)
+  const p12 = !isMetricIneligible(room[12]) && isNum(room[12]?.value)
     ? { rawValue: room[12].value, mode: reportP12Mode }
     : null;
 
   // P13: Non-screen speakers SPL capability at RSP
-  const p13 = isNum(room[13]?.value)
+  const p13 = !isMetricIneligible(room[13]) && isNum(room[13]?.value)
     ? { rawValue: room[13].value, mode: reportP13Mode }
     : null;
 
