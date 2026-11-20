@@ -96,13 +96,22 @@ function readDesignState(version) {
 
 /**
  * Read room dimensions from the design state, handling both naming conventions.
+ *
+ * Many saved versions do not carry the room dimensions inside their design_state
+ * at all — the dimensions live on the parent Project entity (roomDims JSON,
+ * room_width/room_length/room_height). The parent Project is supplied as a
+ * fallback so a deterministic check that needs the room geometry can still run
+ * for those versions. The design state is always preferred: it is the version's
+ * own authority for its room, and a version whose room has been edited away from
+ * the project's recorded dimensions is read from the version.
  */
-function readRoomDims(state) {
+function readRoomDims(state, project = null) {
   const dims = parseMaybe(state.roomDims) || {};
+  const projDims = parseMaybe(project?.roomDims) || {};
   return {
-    widthM: num(dims.widthM ?? dims.width_m) ?? num(state.room_width),
-    lengthM: num(dims.lengthM ?? dims.length_m) ?? num(state.room_length),
-    heightM: num(dims.heightM ?? dims.height_m) ?? num(state.room_height),
+    widthM: num(dims.widthM ?? dims.width_m) ?? num(state.room_width) ?? num(projDims.widthM ?? projDims.width_m) ?? num(project?.room_width),
+    lengthM: num(dims.lengthM ?? dims.length_m) ?? num(state.room_length) ?? num(projDims.lengthM ?? projDims.length_m) ?? num(project?.room_length),
+    heightM: num(dims.heightM ?? dims.height_m) ?? num(state.room_height) ?? num(projDims.heightM ?? projDims.height_m) ?? num(project?.room_height),
   };
 }
 
@@ -140,8 +149,8 @@ function readSeatingPositions(state) {
  * architectural constraint). The engineering data records the geometry but not
  * the motivation.
  */
-function checkSeatingForwardOfRearWall(state) {
-  const roomDims = readRoomDims(state);
+function checkSeatingForwardOfRearWall(state, project = null) {
+  const roomDims = readRoomDims(state, project);
   const seats = readSeatingPositions(state);
   if (roomDims.widthM === null || roomDims.lengthM === null || seats.length === 0) return null;
 
@@ -176,7 +185,7 @@ function checkSeatingForwardOfRearWall(state) {
  * on one wall, or a single subwoofer in a multi-row room), the designer may have
  * a reason that the engineering data does not establish.
  */
-function checkSubwooferArrangement(state) {
+function checkSubwooferArrangement(state, project = null) {
   const instances = Array.isArray(state.subwooferInstances)
     ? state.subwooferInstances
     : (Array.isArray(state.subwoofers) ? state.subwoofers : []);
@@ -189,7 +198,7 @@ function checkSubwooferArrangement(state) {
   })).filter((pos) => pos.x !== null && pos.y !== null);
   if (positions.length === 0) return null;
 
-  const roomDims = readRoomDims(state);
+  const roomDims = readRoomDims(state, project);
   if (roomDims.lengthM === null) return null;
 
   // Classify the arrangement: are all subwoofers in the front half, the rear half, or distributed?
@@ -224,7 +233,8 @@ function checkSubwooferArrangement(state) {
  * motivation.
  */
 function checkAcousticTreatment(state) {
-  const enabled = state.acousticTreatmentEnabled === true;
+  const enabled = state.acousticTreatmentEnabled === true
+    || state.acoustic_treatment_enabled === true;
   if (!enabled) return null;
   const qty = num(state.selectedAbfuserQty) ?? 0;
   if (qty === 0) return null;
@@ -247,8 +257,8 @@ function checkAcousticTreatment(state) {
  * the designer may have a reason (a preference for a single row, space for
  * other uses, etc.).
  */
-function checkSingleRowInLargeRoom(state) {
-  const roomDims = readRoomDims(state);
+function checkSingleRowInLargeRoom(state, project = null) {
+  const roomDims = readRoomDims(state, project);
   const seats = readSeatingPositions(state);
   if (roomDims.lengthM === null || seats.length === 0) return null;
 
@@ -309,17 +319,22 @@ const DETERMINISTIC_CHECKS = [
  * Run the deterministic discovery checks against a version's design state.
  * Returns questions in priority order, at most MAX_DISCOVERY_QUESTIONS.
  *
+ * The parent Project is supplied so checks that need the room geometry can
+ * fall back to the project's recorded dimensions where the version's own
+ * design state carries none.
+ *
  * @param {Object} version — the ProjectVersion record
+ * @param {Object} [project] — the parent Project record
  * @returns {Array<Object>} discovered questions
  */
-export function discoverDeterministicQuestions(version) {
+export function discoverDeterministicQuestions(version, project = null) {
   const state = readDesignState(version);
   const questions = [];
   const seen = new Set();
   for (const check of DETERMINISTIC_CHECKS) {
     if (questions.length >= MAX_DISCOVERY_QUESTIONS) break;
     try {
-      const question = check(state);
+      const question = check(state, project);
       if (!question || !question.question_id || seen.has(question.question_id)) continue;
       seen.add(question.question_id);
       questions.push(question);
@@ -463,7 +478,7 @@ export async function discoverDesignContextQuestions({
   invokeLLM = null,
 } = {}) {
   if (!version?.id) return [];
-  const deterministic = discoverDeterministicQuestions(version);
+  const deterministic = discoverDeterministicQuestions(version, project);
   if (deterministic.length >= MAX_DISCOVERY_QUESTIONS) return deterministic;
 
   const aiQuestions = await discoverAiQuestions({

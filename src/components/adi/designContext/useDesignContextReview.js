@@ -23,7 +23,7 @@
  *   // Render the dialog in the component:
  *   <contextReview.Dialog />
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import DesignContextDialog from './DesignContextDialog';
 
@@ -121,6 +121,21 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
       resolverRef.current(false);
       resolverRef.current = null;
     }
+  }, []);
+
+  // If the component unmounts while a review is waiting on the designer
+  // (the page was navigated away, the report closed, etc.), the pending
+  // promise must not stay unresolved: the generation flow that called
+  // review() would otherwise hang forever. Resolving with false aborts the
+  // generation cleanly, exactly as a cancel does, so no generation promise
+  // is ever left dangling by navigation or unmounting.
+  useEffect(() => {
+    return () => {
+      if (resolverRef.current) {
+        resolverRef.current(false);
+        resolverRef.current = null;
+      }
+    };
   }, []);
 
   const Dialog = React.useMemo(() => function DesignContextDialogBound() {
