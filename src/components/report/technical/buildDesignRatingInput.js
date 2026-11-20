@@ -94,7 +94,7 @@ function isMetricIneligible(metric) {
  */
 function isLegitimateOverheadNa(metric) {
   if (!metric || typeof metric !== "object") return false;
-  if (metric.provisional === true || metric.indeterminate === true || metric.verified === false) return true;
+  if (metric.provisional === true || metric.indeterminate === true || metric.verified === false) return false;
   const status = String(metric.status || "").toLowerCase();
   if (status === "not_applicable" || status === "na") return true;
   if (metric.applicable === false) return true;

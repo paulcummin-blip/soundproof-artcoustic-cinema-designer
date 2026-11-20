@@ -6,7 +6,7 @@
  *
  * Primary / Secondary show: designation, Internal Design Index, modal
  * achieved level, and the level distribution.
- * All Seating shows: designation, Internal Design Index, and a concise
+ * Each configured seating group shows: designation, Design Performance Index, and a concise
  * supporting sentence (existing getDesignRatingSupportingSentence).
  *
  * Pure presentation — consumes existing designation / index / supporting
