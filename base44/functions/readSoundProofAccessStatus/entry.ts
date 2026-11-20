@@ -19,8 +19,10 @@ import {
  *   200 — status returned
  *   400 — dealer_account_id missing
  *   401 — bearer token missing or incorrect
- *   404 — dealer link or account not found
- *   409 — dealer mapping ambiguous
+ *   404 — dealer link or account not found (DEALER_LINK_NOT_FOUND,
+ *         DEALER_LINK_UNRESOLVED, ACCOUNT_NOT_FOUND)
+ *   409 — dealer mapping ambiguous or not canonical (DEALER_LINK_AMBIGUOUS,
+ *         DEALER_LINK_NOT_CANONICAL)
  *   500 — internal error
  */
 export default async function(req: Request): Promise<Response> {
@@ -49,7 +51,9 @@ export default async function(req: Request): Promise<Response> {
     if (!result.ok) {
       const status = result.error === 'DEALER_LINK_NOT_FOUND' ? 404
         : result.error === 'ACCOUNT_NOT_FOUND' ? 404
+        : result.error === 'DEALER_LINK_UNRESOLVED' ? 404
         : result.error === 'DEALER_LINK_AMBIGUOUS' ? 409
+        : result.error === 'DEALER_LINK_NOT_CANONICAL' ? 409
         : 500;
       return json(status, { ok: false, error: result.error });
     }

@@ -370,6 +370,14 @@ export async function renewPortalAccess(service, { grant, account }) {
  * access decision.
  */
 export async function readSoundProofAccessStatus(service, { dealerAccountId }) {
+  // The immutable Portal Dealer Account ID (UUID) is the organisation identity.
+  // It is resolved through the canonical active Portal identity mapping
+  // (partner_user_id on ExternalAccountLink), never by dealer name, email or
+  // trading-account number alone. The dealer directory import stores the
+  // Portal Dealer Account ID in ExternalAccountLink.external_account_number
+  // and the canonical Portal user ID in partner_user_id; a canonical link
+  // carries both. A link without partner_user_id is a secondary reference
+  // link and must not be used for status lookup.
   const links = await service.entities.ExternalAccountLink.filter({
     source_system: PORTAL_SOURCE,
     external_account_number: dealerAccountId,
@@ -383,7 +391,18 @@ export async function readSoundProofAccessStatus(service, { dealerAccountId }) {
     return { ok: false, error: 'DEALER_LINK_AMBIGUOUS' };
   }
 
-  const accountId = String(activeLinks[0].account_id || '').trim();
+  const link = activeLinks[0];
+  // The canonical Portal identity mapping requires partner_user_id to be set.
+  // A link without partner_user_id is not the verified organisation identity.
+  if (!link.partner_user_id) {
+    return { ok: false, error: 'DEALER_LINK_NOT_CANONICAL' };
+  }
+
+  const accountId = String(link.account_id || '').trim();
+  if (!accountId) {
+    return { ok: false, error: 'DEALER_LINK_UNRESOLVED' };
+  }
+
   const accounts = await service.entities.Account.filter({ id: accountId });
   const account = (Array.isArray(accounts) && accounts.length > 0) ? accounts[0] : null;
   if (!account) {
