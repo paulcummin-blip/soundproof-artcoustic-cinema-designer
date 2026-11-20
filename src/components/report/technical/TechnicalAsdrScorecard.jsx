@@ -4,7 +4,7 @@
  * Technical Report — the Artcoustic System Design Rating page.
  *
  * This page carries the proprietary ASDR only:
- *   - the three scoped scores, Primary / Secondary / All Seating, each stated
+ *   - the independent seating-group scores, Primary / Secondary, each stated
  *     as its Design Performance Index
  *   - the per-seat ASDR score grid (AsdrSeatScoreGrid)
  *   - the proprietary-rating explanation at the foot of the page
@@ -97,7 +97,7 @@ export default function TechnicalAsdrScorecard({
         </div>
       </div>
 
-      {/* ── The three scoped ASDR scores — the page's lead content ── */}
+      {/* ── The independent seating-group ASDR scores — the page's lead content ── */}
       <div
         style={{
           background: COLORS.cardBg,

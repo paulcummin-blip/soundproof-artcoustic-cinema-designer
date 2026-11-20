@@ -212,9 +212,9 @@ export function buildAdiAssessment(
   const primaryHasFail = hasAnyFail(primaryCats);
   const secondaryHasFail = hasAnyFail(secondaryCats);
 
-  const projectRating = engineeringSummary.project?.rating;
+  const projectRating = engineeringSummary.primary?.rating;
   const designation = getRoomDesignRatingDesignation(projectRating);
-  const dpi = engineeringSummary.project?.designPerformanceIndex;
+  const dpi = engineeringSummary.primary?.designPerformanceIndex;
 
   const compromisedSeatCount =
     engineeringSummary.project?.reportCounts?.compromisedSeatCount || 0;

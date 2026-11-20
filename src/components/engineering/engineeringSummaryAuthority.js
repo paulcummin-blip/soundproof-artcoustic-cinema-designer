@@ -12,7 +12,6 @@
  */
 
 import {
-  calculateRoomDesignRating,
   calculateScopedRoomDesignRating,
   calculateSeatDesignRating,
 } from "@/components/report/technical/artcousticSystemDesignRating";

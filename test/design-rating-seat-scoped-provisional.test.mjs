@@ -9,8 +9,8 @@
 //   "provisional" if ANY seat (across the entire project) was provisional.
 //   calculateRoomDesignRatingCore then short-circuited at the parameter level
 //   before the seat-level loop could skip provisional/N/A seats individually.
-//   Result: P19 was excluded from ALL scoped ratings whenever a single
-//   secondary seat was not calculated, while p19SeatAuthority.primary.floor
+//   Result: P20 was excluded from ALL scoped ratings whenever a single
+//   secondary seat was not calculated, while p20SeatAuthority.primary.floor
 //   still reported the calculated floor — a mixed-revision symptom.
 //
 // FIX:
@@ -34,10 +34,10 @@ function getContribution(scopedRating, key) {
 // ═══════════════════════════════════════════════════════════════
 // TEST 1: Mixed calculated/provisional — OOHAV acceptance
 // Primary seats L3+L3, Secondary seats provisional.
-// P19 must be SCORED; Primary scope L3; Secondary scope no P19.
+// P20 must be SCORED; Primary scope L3; Secondary scope no P20.
 // ═══════════════════════════════════════════════════════════════
 
-test("Mixed calculated/provisional: P19 scored, Primary L3, Secondary no P19", () => {
+test("Mixed calculated/provisional: P20 scored, Primary L3, Secondary no P20", () => {
   const seats = [
     { id: "p1", priority: "primary" },
     { id: "p2", priority: "primary" },
@@ -47,7 +47,7 @@ test("Mixed calculated/provisional: P19 scored, Primary L3, Secondary no P19", (
   ];
   const input = {
     seats,
-    p19: {
+    p20: {
       p1: { verified: true, authoritativeLevel: "L3" },
       p2: { verified: true, authoritativeLevel: "L3" },
       s1: null,
@@ -59,21 +59,21 @@ test("Mixed calculated/provisional: P19 scored, Primary L3, Secondary no P19", (
   const authority = buildArtcousticDesignRatingAuthority(input);
 
   // Parameter-level state must be "scored" (at least one scored seat)
-  assert.equal(authority.parameters.p19.state, "scored",
-    "P19 paramState must be SCORED when primary seats are scored");
+  assert.equal(authority.parameters.p20.state, "scored",
+    "P20 paramState must be SCORED when primary seats are scored");
 
-  // Primary scope: P19 present with L3
+  // Primary scope: P20 present with L3
   const primaryScoped = calculateScopedRoomDesignRating(authority, ["p1", "p2"]);
-  const p19Primary = getContribution(primaryScoped, "p19");
-  assert.ok(p19Primary, "P19 must be present in Primary scope contributions");
-  assert.equal(p19Primary.resultLevel, "L3",
-    "P19 Primary resultLevel must be L3");
+  const p20Primary = getContribution(primaryScoped, "p20");
+  assert.ok(p20Primary, "P20 must be present in Primary scope contributions");
+  assert.equal(p20Primary.resultLevel, "L3",
+    "P20 Primary resultLevel must be L3");
 
-  // Secondary scope: P19 absent (all provisional seats skipped individually)
+  // Secondary scope: P20 absent (all provisional seats skipped individually)
   const secondaryScoped = calculateScopedRoomDesignRating(authority, ["s1", "s2", "s3"]);
-  const p19Secondary = getContribution(secondaryScoped, "p19");
-  assert.equal(p19Secondary, null,
-    "P19 must NOT be present in Secondary scope (all seats provisional)");
+  const p20Secondary = getContribution(secondaryScoped, "p20");
+  assert.equal(p20Secondary, null,
+    "P20 must NOT be present in Secondary scope (all seats provisional)");
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -131,17 +131,17 @@ test("All provisional: paramState PROVISIONAL, no contribution", () => {
   const seats = [{ id: "s1" }, { id: "s2" }];
   const input = {
     seats,
-    p19: { s1: null, s2: null },
+    p20: { s1: null, s2: null },
   };
 
   const authority = buildArtcousticDesignRatingAuthority(input);
 
-  assert.equal(authority.parameters.p19.state, "provisional",
-    "P19 paramState must be PROVISIONAL when all seats are provisional");
+  assert.equal(authority.parameters.p20.state, "provisional",
+    "P20 paramState must be PROVISIONAL when all seats are provisional");
 
   const scoped = calculateScopedRoomDesignRating(authority, ["s1", "s2"]);
-  const p19 = getContribution(scoped, "p19");
-  assert.equal(p19, null, "P19 must NOT contribute when all seats provisional");
+  const p20 = getContribution(scoped, "p20");
+  assert.equal(p20, null, "P20 must NOT contribute when all seats provisional");
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -166,42 +166,42 @@ test("All N/A: paramState NA, no contribution", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// TEST 5: P19 raw values remain irrelevant — authoritativeLevel is the authority
+// TEST 5: P20 raw values remain irrelevant — authoritativeLevel is the authority
 // Supply contradictory rawValue; published grade must come from authoritativeLevel.
 // ═══════════════════════════════════════════════════════════════
 
-test("P19 raw values irrelevant: authoritativeLevel governs, not rawValue", () => {
+test("P20 raw values irrelevant: authoritativeLevel governs, not rawValue", () => {
   const seats = [{ id: "s1" }, { id: "s2" }];
   // authoritativeLevel L3 but rawValue 999 (would imply terrible deviation).
   // The grade must remain L3 — rawValue is diagnostic only.
   const input = {
     seats,
-    p19: {
+    p20: {
       s1: { verified: true, authoritativeLevel: "L3", rawValue: 999 },
       s2: { verified: true, authoritativeLevel: "L3", rawValue: -50 },
     },
   };
 
   const authority = buildArtcousticDesignRatingAuthority(input);
-  assert.equal(authority.parameters.p19.state, "scored",
-    "P19 must be SCORED with verified authoritative levels");
+  assert.equal(authority.parameters.p20.state, "scored",
+    "P20 must be SCORED with verified authoritative levels");
 
   const scoped = calculateScopedRoomDesignRating(authority, ["s1", "s2"]);
-  const p19 = getContribution(scoped, "p19");
-  assert.ok(p19, "P19 must contribute");
-  assert.equal(p19.resultLevel, "L3",
-    "P19 resultLevel must be L3 from authoritativeLevel, not re-graded from rawValue");
+  const p20 = getContribution(scoped, "p20");
+  assert.ok(p20, "P20 must contribute");
+  assert.equal(p20.resultLevel, "L3",
+    "P20 resultLevel must be L3 from authoritativeLevel, not re-graded from rawValue");
 
   // Seat-level grades must match authoritativeLevel, not rawValue
-  assert.equal(authority.parameters.p19.seats.s1.level, "L3",
+  assert.equal(authority.parameters.p20.seats.s1.level, "L3",
     "Seat s1 level must be L3 (authoritativeLevel), not re-graded from rawValue 999");
-  assert.equal(authority.parameters.p19.seats.s2.level, "L3",
+  assert.equal(authority.parameters.p20.seats.s2.level, "L3",
     "Seat s2 level must be L3 (authoritativeLevel), not re-graded from rawValue -50");
 });
 
 // ═══════════════════════════════════════════════════════════════
 // TEST 6: Generic audit — P5 and P9 also benefit from the fix
-// Verifies the correction is not a P19-only special case.
+// Verifies the correction is not a P20-only special case.
 // ═══════════════════════════════════════════════════════════════
 
 test("Generic: P5 scored/provisional mix → SCORED, provisional seat skipped", () => {
@@ -257,27 +257,27 @@ test("Generic: P9 scored/na mix → SCORED, N/A seat skipped", () => {
 
 // ═══════════════════════════════════════════════════════════════
 // TEST 7: FAIL grade is a genuine scored seat, not provisional
-// A FAIL P19 seat must be scored (included), not excluded as provisional.
+// A FAIL P20 seat must be scored (included), not excluded as provisional.
 // ═══════════════════════════════════════════════════════════════
 
-test("FAIL P19 seat is scored (not provisional): contributes FAIL to scope", () => {
+test("FAIL P20 seat is scored (not provisional): contributes FAIL to scope", () => {
   const seats = [{ id: "s1" }, { id: "s2" }];
   const input = {
     seats,
-    p19: {
+    p20: {
       s1: { verified: true, authoritativeLevel: "FAIL" },
       s2: { verified: true, authoritativeLevel: "L3" },
     },
   };
 
   const authority = buildArtcousticDesignRatingAuthority(input);
-  assert.equal(authority.parameters.p19.state, "scored",
-    "P19 paramState must be SCORED when seats have verified grades (including FAIL)");
+  assert.equal(authority.parameters.p20.state, "scored",
+    "P20 paramState must be SCORED when seats have verified grades (including FAIL)");
 
   const scoped = calculateScopedRoomDesignRating(authority, ["s1", "s2"]);
-  const p19 = getContribution(scoped, "p19");
-  assert.ok(p19, "P19 must contribute when seats are scored (including FAIL)");
-  // Distribution includes both FAIL and L3
-  assert.ok(p19.resultLevel.includes("FAIL"),
-    "P19 resultLevel must include FAIL from seat s1");
+  const p20 = getContribution(scoped, "p20");
+  assert.ok(p20, "P20 must contribute when seats are scored (including FAIL)");
+  // Highest valid group level is L3; the individual FAIL remains intact.
+  assert.equal(p20.resultLevel, "L3");
+  assert.equal(authority.parameters.p20.seats.s1.level, "FAIL");
 });

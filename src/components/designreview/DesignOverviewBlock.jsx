@@ -412,10 +412,6 @@ export default function DesignOverviewBlock({ engineeringSummary, recommendation
   const scorecardPillars = scorecard.categories || [];
   const lowestResults = scorecard.lowestPerformanceResults || [];
   const secondaryRating = secondarySummary?.rating || null;
-  const secondaryIsConfigured =
-    secondaryRating &&
-    secondaryRating.status !== "NOT_ASSESSED" &&
-    secondaryRating.status !== "NOT_CONFIGURED";
 
   // Recommendation counts
   const improvementCount = Array.isArray(recommendations?.improvements)

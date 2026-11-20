@@ -5,7 +5,7 @@
  *
  * Uses ONLY the approved Stage B adapter:
  *   buildArtcousticDesignRatingAuthority(...)
- *   calculateRoomDesignRating(...)
+ *   calculateScopedRoomDesignRating(...)
  *
  * The UI layer supplies ONLY existing canonical authority inputs.
  * No thresholds, FAIL rules, or bass scoring are reimplemented here.
@@ -22,7 +22,6 @@ import { buildComplianceBassPresentation } from '@/components/room/bass/bassComp
 import { buildDesignRatingInput } from '@/components/report/technical/buildDesignRatingInput';
 import {
   buildArtcousticDesignRatingAuthority,
-  calculateRoomDesignRating,
   calculateScopedRoomDesignRating,
 } from '@/components/report/technical/artcousticSystemDesignRating';
 import { summarisePartialDesignRating } from '@/components/report/technical/partialDesignRatingCoverage';
@@ -410,17 +409,10 @@ export function useAppDesignRating({
   // the current analysis.
   useEffect(() => {
     if (bassReadiness.ready && roomRating) {
-      const p19BySeat = {};
       const p20BySeat = {};
-      const p19LevelBySeat = {};
       const p20LevelBySeat = {};
       for (const [seatId, hud] of Object.entries(reportSeatHudById || {})) {
-        const p19Raw = extractMetricRawValue(hud?.rp22?.p19);
         const p20Raw = extractMetricRawValue(hud?.rp22?.p20);
-        if (p19Raw != null) {
-          p19BySeat[seatId] = p19Raw;
-          p19LevelBySeat[seatId] = hud?.rp22?.p19?.level || null;
-        }
         if (p20Raw != null) {
           p20BySeat[seatId] = p20Raw;
           p20LevelBySeat[seatId] = hud?.rp22?.p20?.level || null;
