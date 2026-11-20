@@ -32,7 +32,7 @@ import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState"
 import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
 import useBassAuthorityAutoPublication from "@/components/room/bass/bda/useBassAuthorityAutoPublication";
 import BassRecalculationBar from "@/components/room/bass/bda/BassRecalculationBar";
-import { bassRecalculationRequired } from "@/components/room/bass/bda/bassRecalculationWarning";
+import { resolveRecalculationWarning } from "@/components/room/bass/bda/bassRecalculationWarning";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -82,7 +82,7 @@ export default function BassPerformanceStrip() {
   // result is retained): say so, beside the button that fixes it. The condition
   // is read from the same authority state that decides currency — there is no
   // second change detection here.
-  const recalculationRequired = bassRecalculationRequired({
+  const recalculationWarning = resolveRecalculationWarning({
     hasResult,
     stateCode: authorityState.code,
   });
@@ -195,7 +195,7 @@ export default function BassPerformanceStrip() {
         hasResult={hasResult}
         calculating={calculating}
         canCalculate={canCalculate}
-        warning={recalculationRequired}
+        warning={recalculationWarning}
         onCalculate={calculate}
       />
     </div>

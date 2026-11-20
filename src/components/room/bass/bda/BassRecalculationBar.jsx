@@ -12,7 +12,9 @@
 // PRESENTATION ONLY.
 import React from "react";
 import { RotateCw } from "lucide-react";
-import { RECALCULATION_WARNING } from "@/components/room/bass/bda/bassRecalculationWarning";
+// The warning copy is now passed in as a prop (resolveRecalculationWarning)
+// so the heading and message adapt to the two states: "Calculation Required"
+// (no previous result) and "Update Required" (previous result is outdated).
 
 export default function BassRecalculationBar({
   hasResult = false,
@@ -33,10 +35,10 @@ export default function BassRecalculationBar({
           style={{ border: "1px solid #C1B6AD", background: "#F1F0EE" }}
         >
           <div className="font-semibold" style={{ fontSize: "11.5px", color: "#625143" }}>
-            {RECALCULATION_WARNING.heading}
+            {warning.heading}
           </div>
           <div style={{ fontSize: "11px", color: "#3E4349", lineHeight: 1.35 }}>
-            {RECALCULATION_WARNING.message}
+            {warning.message}
           </div>
         </div>
       )}

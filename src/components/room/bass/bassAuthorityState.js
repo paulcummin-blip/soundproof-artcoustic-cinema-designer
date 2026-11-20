@@ -9,6 +9,8 @@
  *   PREVIEW ONLY              a previous result is retained while the design has
  *                             moved on — the values shown are a preview
  *   NEEDS CALCULATION         no result exists for the current design yet
+ *   UPDATE REQUIRED           a previous result exists but design changes have
+ *                             made those results outdated
  *   SAVING                    the completed result is saved and the engineering
  *                             publication is being written automatically
  *   PERFORMANCE CURRENT       the completed result is saved AND published
@@ -47,6 +49,7 @@ export const BASS_AUTHORITY_STATE = Object.freeze({
   CALCULATING: "calculating",
   PREVIEW_ONLY: "preview_only",
   NEEDS_CALCULATION: "needs_calculation",
+  UPDATE_REQUIRED: "update_required",
   CALCULATED_NOT_PUBLISHED: "calculated_not_published",
   PUBLISHING: "publishing",
   CURRENT: "current",
@@ -67,14 +70,19 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
     actionLabel: null,
   },
   [BASS_AUTHORITY_STATE.PREVIEW_ONLY]: {
-    label: "Preview only",
-    message: "Preview only — calculate bass performance to update RP22 results.",
-    actionLabel: "Calculate Bass Performance",
+    label: "Update required",
+    message: "Preview of previous results — calculate bass parameters to update RP22 results.",
+    actionLabel: null,
   },
   [BASS_AUTHORITY_STATE.NEEDS_CALCULATION]: {
-    label: "Needs calculation",
-    message: "No bass result exists for the current design — calculate bass performance to produce RP22 results.",
-    actionLabel: "Calculate Bass Performance",
+    label: "Not yet calculated",
+    message: "No bass calculation has been completed for this design. Calculate bass parameters to produce RP22 results.",
+    actionLabel: null,
+  },
+  [BASS_AUTHORITY_STATE.UPDATE_REQUIRED]: {
+    label: "Update required",
+    message: "Design changes have made the previous bass results outdated. Calculate bass parameters to update RP22 results.",
+    actionLabel: null,
   },
   // The completed result is saved and its publication is being written. This is
   // a transient state the designer watches, never a step they perform: there is
@@ -253,7 +261,13 @@ export function resolveBassAuthorityState({
     || lifecycleState === "stale_needs_recalculation"
     || placementPreviewActive === true;
   if (contract && (placementPreviewActive || lifecycleState === "restoring")) return withCopy(BASS_AUTHORITY_STATE.PREVIEW_ONLY);
-  if (designMovedOn) return withCopy(BASS_AUTHORITY_STATE.NEEDS_CALCULATION);
+  if (designMovedOn) {
+    // A previous result exists but the design has moved on: the results are
+    // outdated, not absent. Distinguish this from the never-calculated case.
+    return withCopy(!!resultFingerprint
+      ? BASS_AUTHORITY_STATE.UPDATE_REQUIRED
+      : BASS_AUTHORITY_STATE.NEEDS_CALCULATION);
+  }
 
   // Saved AND current: the completed contract is the authority for the design
   // as it stands now. This is the same completion test the readiness authority

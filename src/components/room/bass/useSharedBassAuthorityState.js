@@ -3,9 +3,9 @@
 //
 // PRESENTATION ONLY. It assembles exactly the inputs the authority band uses
 // and hands them to the single resolver, so every visible badge names the same
-// state as the band: Preview only, Needs calculation, Calculated — not
-// published, Current (or Calculating). It computes no engineering value and
-// holds no state of its own.
+// state as the band: Not yet calculated, Update required, Preview, Saving,
+// Publishing, Performance Current (or Calculating). It computes no
+// engineering value and holds no state of its own.
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { usePublicationAttempt } from "@/components/engineering/publicationAcknowledgementStore";
 import { resolveBassAuthorityState } from "@/components/room/bass/bassAuthorityState";
