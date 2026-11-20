@@ -4,7 +4,7 @@ import React from "react";
 function isRenderableNode(v) {
   if (v == null) return true;
   const t = typeof v;
-  if (t === "string" || t === "number") return true;
+  if (t === "string" || t === "number" || t === "boolean") return true;
   if (React.isValidElement(v)) return true;
   // Allow arrays only if every item is renderable
   if (Array.isArray(v)) return v.every(isRenderableNode);
