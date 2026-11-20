@@ -19,6 +19,7 @@
 
 import {
   ASSET_SLOT,
+  isCoverAsset,
   resolveSlotAssignments,
   slotNumber,
 } from '@/components/proposal/assetSlotAuthority';
@@ -257,7 +258,14 @@ export function resolvePackImages({ assets = [], versionIds = [], versionNameByI
  */
 export function resolveCoverAsset(assets = [], versionIds = []) {
   const list = Array.isArray(assets) ? assets : [];
-  const coverOf = (scopeKey) => resolveScopedSlotAssignments(list, scopeKey).bySlot[ASSET_SLOT.COVER] || null;
+  // The cover is the one image in a scope marked as the cover (usage 'cover',
+  // the legacy 'cover' slot, or the legacy 'cover_image' asset type). It is no
+  // longer held in a dedicated cover slot — the cover designation is a flag on
+  // a numbered image — so the cover is resolved by scanning the scope's images.
+  const coverOf = (scopeKey) => {
+    const scoped = (Array.isArray(list) ? list : []).filter((asset) => scopeKeyOfAsset(asset) === scopeKey);
+    return scoped.find((asset) => isCoverAsset(asset)) || null;
+  };
   const projectCover = coverOf('project');
 
   const ids = (Array.isArray(versionIds) ? versionIds : []).filter(Boolean);

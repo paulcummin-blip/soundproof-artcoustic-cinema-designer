@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { ASSET_SLOT, imagesInSlotOrder } from '@/components/proposal/assetSlotAuthority';
+import { isCoverAsset, imagesInSlotOrder } from '@/components/proposal/assetSlotAuthority';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import {
   COMPOSITION_WEIGHT,
@@ -29,7 +29,7 @@ export const NO_PROJECT_IMAGES_MESSAGE = 'No project images selected.';
 
 /** The project's gallery images in slot order (the cover is not repeated here). */
 export function projectGalleryImages(images = []) {
-  return imagesInSlotOrder(images).filter(({ slot }) => slot !== ASSET_SLOT.COVER);
+  return imagesInSlotOrder(images).filter(({ asset }) => !isCoverAsset(asset));
 }
 
 /**

@@ -3,8 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, ImageOff } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
 import {
-  ASSET_SLOT,
   ASSET_SLOT_OPTIONS,
+  isCoverAsset,
   slotAssetType,
   slotNumber,
 } from '@/components/proposal/assetSlotAuthority';
@@ -27,12 +27,15 @@ import {
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
 
 /**
- * Project gallery panel — one Cover Image plus Image 1 to Image 10.
+ * Project gallery panel — Image 1 to Image 10, labelled sequentially.
  *
- * Captions explain what each image is, so no image has to be declared as a front
- * view, a plan or a construction shot. Images uploaded under the older labelled
- * model appear in the slot their type maps to (see assetSlotAuthority) and are
- * stamped with that slot the next time they are edited.
+ * One image at most is the cover, marked by a "Use as cover" checkbox that sets
+ * the existing `usage` field to 'cover'. Selecting another cover automatically
+ * releases the previous one; no image is moved, re-uploaded or swapped. Captions
+ * explain what each image is, so no image has to be declared as a front view, a
+ * plan or a construction shot. Images uploaded under the older labelled model
+ * appear in the slot their type maps to (see assetSlotAuthority) and are stamped
+ * with that slot the next time they are edited.
  *
  * Props:
  * - projectId: string (null if no active project)
@@ -335,30 +338,30 @@ export default function ProposalAssetsPanel({
   };
 
   /**
-   * Move an image into this gallery's cover slot, and the image already there
-   * into the slot this one leaves. Both records, files, captions and scopes are
-   * kept: only the slot each image occupies is exchanged.
+   * Mark one image as the cover, or clear the cover. Only the existing `usage`
+   * field moves: 'cover' marks the cover, 'gallery' releases it. The file, the
+   * caption, the scope and the slot all stay exactly as they are, and selecting
+   * another cover automatically releases the previous one. Deleting the cover
+   * image clears the selection safely — no other image is silently made the
+   * cover.
    */
-  const handleUseAsCover = async (group, slot, asset) => {
-    if (!asset?.id || slot === ASSET_SLOT.COVER) return;
-    const current = assignmentsFor(group).bySlot[ASSET_SLOT.COVER] || null;
+  const handleCoverChange = async (group, asset, makeCover) => {
+    if (!asset?.id) return;
     try {
-      if (current && current.id !== asset.id) {
-        await base44.entities.ProposalAsset.update(current.id, {
-          slot,
-          asset_type: slotAssetType(slot),
-          usage: 'gallery',
-        });
+      if (makeCover) {
+        const scoped = assignmentsFor(group).assets || [];
+        const previousCover = scoped.find((a) => a.id !== asset.id && isCoverAsset(a));
+        if (previousCover) {
+          await base44.entities.ProposalAsset.update(previousCover.id, { usage: 'gallery' });
+        }
+        await base44.entities.ProposalAsset.update(asset.id, { usage: 'cover' });
+      } else {
+        await base44.entities.ProposalAsset.update(asset.id, { usage: 'gallery' });
       }
-      await base44.entities.ProposalAsset.update(asset.id, {
-        slot: ASSET_SLOT.COVER,
-        asset_type: 'cover_image',
-        usage: 'cover',
-      });
       await load();
     } catch (err) {
-      console.error('Failed to set the cover image:', err);
-      alert('Failed to set this image as the cover. Please try again.');
+      console.error('Failed to change the cover image:', err);
+      alert('Failed to change the cover image. Please try again.');
     }
   };
 
@@ -463,7 +466,7 @@ export default function ProposalAssetsPanel({
                     {existing && (
                       <ImageProposalControls
                         asset={existing}
-                        canUseAsCover={slot !== ASSET_SLOT.COVER}
+                        isCover={isCoverAsset(existing)}
                         comparisonGroupOptions={comparisonGroupOptions}
                         onUsageChange={(usage) => handleUsageChange(existing, usage)}
                         onSeatingChange={(value) => handleSeatingChange(existing, value)}
@@ -472,7 +475,7 @@ export default function ProposalAssetsPanel({
                         onSectionTargetChange={(value) => handleSectionTargetChange(existing, value)}
                         onFocalChange={(patch) => handleFocalChange(existing, patch)}
                         onComparisonChange={(patch) => handleComparisonChange(existing, patch)}
-                        onUseAsCover={() => handleUseAsCover(group, slot, existing)}
+                        onCoverChange={(makeCover) => handleCoverChange(group, existing, makeCover)}
                       />
                     )}
                   </div>

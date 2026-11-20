@@ -61,7 +61,6 @@ import {
   COMPARISON_SECTION_ID,
   CROP_ORIENTATION,
   EDITORIAL_ROLE,
-  PROPOSAL_COVER_SLOT,
   SEATING_STYLE_SECTION_ID,
   IMAGE_PRESENTATION,
   comparisonGroupsOf,
@@ -77,6 +76,7 @@ import {
   sectionTargetOf,
   seatingStyleOf,
 } from './proposalImagePlacementAuthority.js';
+import { isCoverAsset } from '../assetSlotAuthority.js';
 
 /** At least one full page sits between two uses of the same source. */
 export const MIN_PAGE_GAP = 2;
@@ -144,8 +144,8 @@ export function resolveCoverAssetId({ assets = [], coverImageUrl = null } = {}) 
     const matched = list.find((asset) => asset?.file_url && asset.file_url === coverImageUrl);
     if (matched?.id) return matched.id;
   }
-  const slotCover = list.find((asset) => asset?.slot === PROPOSAL_COVER_SLOT);
-  if (slotCover?.id) return slotCover.id;
+  const coverAsset = list.find((asset) => isCoverAsset(asset));
+  if (coverAsset?.id) return coverAsset.id;
   return list.find((asset) => asset?.id)?.id || null;
 }
 
@@ -163,7 +163,7 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   const usableCount = usable.length;
 
   const coverAsset = usable.find((asset) => asset.id && asset.id === coverAssetId)
-    || usable.find((asset) => asset.slot === PROPOSAL_COVER_SLOT)
+    || usable.find((asset) => isCoverAsset(asset))
     || usable[0]
     || null;
 

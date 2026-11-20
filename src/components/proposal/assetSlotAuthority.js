@@ -1,14 +1,17 @@
 /**
  * assetSlotAuthority.js
  * ---------------------------------------------------------------------------
- * The one authority for the simple project gallery: a Cover Image plus
- * Image 1 to Image 10. Captions explain what each image is, so the system never
- * has to know whether an image is a front view, a plan or a construction shot.
+ * The one authority for the simple project gallery: Image 1 to Image 10, each
+ * labelled sequentially. Captions explain what each image is, so the system
+ * never has to know whether an image is a front view, a plan or a construction
+ * shot. One image at most is the cover, marked by a "Use as cover" checkbox that
+ * sets the existing `usage` field to 'cover' — no image is moved, re-uploaded or
+ * swapped when the cover changes.
  *
- * It also places images uploaded under the older labelled model into the new
- * slots, read-time and losslessly:
+ * It also places images uploaded under the older labelled model into the
+ * numbered slots, read-time and losslessly:
  *
- *   cover_image          → cover
+ *   cover_image          → the cover, which fills the first numbered slot
  *   front_view           → image_1
  *   rear_view            → image_2
  *   plan                 → image_3
@@ -20,9 +23,11 @@
  *   documents            → image_9
  *   gallery              → the next free image slot, in order
  *
- * An image that already carries a slot keeps it. Anything that cannot be placed
- * in the ten image slots is returned as `surplus` — still stored, never deleted,
- * and shown as such rather than silently disappearing.
+ * An image that already carries a numbered slot keeps it. The cover image (the
+ * legacy 'cover' slot, the legacy 'cover_image' type, or usage 'cover') fills the
+ * first free numbered slot so it leads the gallery. Anything that cannot be
+ * placed in the ten image slots is returned as `surplus` — still stored, never
+ * deleted, and shown as such rather than silently disappearing.
  *
  * Pure functions. No fetching, no writing, no side effects.
  */
@@ -55,16 +60,13 @@ export const IMAGE_SLOT_KEYS = Object.freeze([
   ASSET_SLOT.IMAGE_10,
 ]);
 
-/** Every slot the page offers, cover first. */
-export const ASSET_SLOT_OPTIONS = Object.freeze([
-  { slot: ASSET_SLOT.COVER, label: "Cover Image" },
-  // Image 1 is the hero image: it leads the Project Images page of the report,
-  // so its slot says so wherever the gallery is labelled.
-  ...IMAGE_SLOT_KEYS.map((slot, index) => ({
+/** Every slot the page offers — ten numbered image slots, labelled sequentially. */
+export const ASSET_SLOT_OPTIONS = Object.freeze(
+  IMAGE_SLOT_KEYS.map((slot, index) => ({
     slot,
-    label: index === 0 ? 'Image 1 (Hero Image)' : `Image ${index + 1}`,
+    label: `Image ${index + 1}`,
   })),
-]);
+);
 
 /** Where an image from the older labelled model belongs in the simple gallery. */
 export const LEGACY_ASSET_TYPE_SLOTS = Object.freeze({
@@ -122,6 +124,19 @@ export function resolveAssetSlot(asset) {
   return legacy || null;
 }
 
+/**
+ * Whether this image is the project's cover. The cover designation lives on the
+ * existing `usage` field ('cover'), retained from the older slot model ('cover'
+ * slot) and the legacy asset_type ('cover_image') so no stored record is moved.
+ * One image at most is the cover for any scope.
+ */
+export function isCoverAsset(asset) {
+  if (!asset) return false;
+  return asset.usage === 'cover'
+    || asset.slot === ASSET_SLOT.COVER
+    || asset.asset_type === 'cover_image';
+}
+
 const orderOf = (asset, index) => {
   // order_index 0 is a real position (the first stored image), so it is only the
   // array index that stands in when the field carries no number at all.
@@ -151,19 +166,32 @@ export function resolveSlotAssignments(assets = []) {
     return true;
   };
 
-  // 1. An image's own declared slot wins, first one first.
+  // 1. An image's own declared NUMBERED slot wins first, so the cover never
+  //    displaces an image that already holds a numbered slot.
   list.forEach((asset) => {
     const declared = asset.slot || asset.slot_key || null;
-    if (isValidSlot(declared)) claim(asset, declared);
+    if (isImageSlot(declared)) claim(asset, declared);
   });
 
-  // 2. Images from the older labelled model take the slot their type maps to.
+  // 2. The cover image (usage 'cover', the legacy 'cover' slot, or the legacy
+  //    'cover_image' type) fills the first free numbered slot so it appears in
+  //    the numbered gallery. A cover that already holds a numbered slot (a new
+  //    cover set by the checkbox) stays where it is — no stored record is moved.
+  const coverAsset = list.find((asset) => isCoverAsset(asset)) || null;
+  if (coverAsset && !byId[coverAsset.id]) {
+    const firstFree = IMAGE_SLOT_KEYS.find((slot) => !bySlot[slot]);
+    if (firstFree) claim(coverAsset, firstFree);
+  }
+
+  // 3. Images from the older labelled model take the numbered slot their type
+  //    maps to (cover_image is already the cover above).
   list.forEach((asset) => {
-    if (byId[asset.id]) return;
-    claim(asset, LEGACY_ASSET_TYPE_SLOTS[asset.asset_type || asset.type || ""] || null);
+    if (byId[asset.id] || asset === coverAsset) return;
+    const legacySlot = LEGACY_ASSET_TYPE_SLOTS[asset.asset_type || asset.type || ""];
+    if (legacySlot && legacySlot !== ASSET_SLOT.COVER) claim(asset, legacySlot);
   });
 
-  // 3. Anything left (gallery images, unknown types, duplicate slots) fills the
+  // 4. Anything left (gallery images, unknown types, duplicate slots) fills the
   //    next free image slot in its stored order — preserved, never dropped.
   list
     .map((asset, index) => ({ asset, order: orderOf(asset, index) }))
@@ -182,7 +210,8 @@ export function resolveSlotAssignments(assets = []) {
     byId,
     bySlot,
     surplus,
-    hasCover: Boolean(bySlot[ASSET_SLOT.COVER]),
+    coverAsset,
+    hasCover: Boolean(coverAsset),
     imageSlotsUsed: IMAGE_SLOT_KEYS.filter((slot) => Boolean(bySlot[slot])),
   };
 }

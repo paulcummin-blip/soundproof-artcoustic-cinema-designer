@@ -12,7 +12,7 @@
  */
 
 import { withDecisionConfidence } from './confidence';
-import { ASSET_SLOT, IMAGE_SLOT_KEYS, resolveAssetSlot, slotAssetType } from '../assetSlotAuthority';
+import { ASSET_SLOT, IMAGE_SLOT_KEYS, isCoverAsset, resolveAssetSlot, slotAssetType } from '../assetSlotAuthority';
 
 const IMAGE_SECTIONS = [
   { section: 'cover', editorial_intent: 'Establish the room as a destination — the first impression of the space.' },
@@ -45,8 +45,10 @@ export function deriveImageStory({ engineeringAuthority, engineeringFloor }) {
   // gallery decides availability: the proposal no longer needs to know whether
   // an image is a front view, a plan or a construction shot.
   const slots = new Set();
+  let hasCover = false;
   if (Array.isArray(images.assets)) {
     for (const asset of images.assets) {
+      if (isCoverAsset(asset)) hasCover = true;
       const slot = asset.slot || resolveAssetSlot(asset);
       if (slot) slots.add(slot);
     }
@@ -54,7 +56,7 @@ export function deriveImageStory({ engineeringAuthority, engineeringFloor }) {
 
   return IMAGE_SECTIONS.map((s) => {
     const slot = s.section === 'cover'
-      ? (slots.has(ASSET_SLOT.COVER) ? ASSET_SLOT.COVER : null)
+      ? (hasCover ? ASSET_SLOT.COVER : null)
       : (IMAGE_SLOT_KEYS.find((key) => slots.has(key)) || null);
     return {
       section: s.section,

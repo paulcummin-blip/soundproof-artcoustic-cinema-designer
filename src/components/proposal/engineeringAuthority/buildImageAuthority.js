@@ -13,6 +13,7 @@
 
 import {
   ASSET_SLOT,
+  isCoverAsset,
   isImageSlot,
   resolveAssetSlot,
   resolveSlotAssignments,
@@ -66,6 +67,7 @@ export function buildImageAuthority(proposalAssets) {
         proposal_importance: asset.proposal_importance || 'Preferred',
         order_index: asset.order_index || 0,
         suggested_placement: suggestionFor(slot, legacyType),
+        is_cover: isCoverAsset(asset),
       };
     })
     .sort((a, b) => {
@@ -84,8 +86,8 @@ export function buildImageAuthority(proposalAssets) {
   return {
     images,
     has_images: images.length > 0,
-    cover_image: images.find((i) => i.slot === ASSET_SLOT.COVER) || null,
-    gallery_images: images.filter((i) => isImageSlot(i.slot)),
+    cover_image: images.find((i) => i.is_cover) || null,
+    gallery_images: images.filter((i) => !i.is_cover && isImageSlot(i.slot)),
     fixed_assets: images.filter((i) => i.slot == null),
   };
 }

@@ -3,8 +3,8 @@
  * ---------------------
  * The designer's simple controls over ONE Library image, for the proposal:
  *
+ *   Use as cover                          — marks this image as the cover
  *   Use in proposal / Hidden from proposal — whether the plan may place it
- *   Use as cover                          — swaps this image into the cover slot
  *   Seating option                        — groups it as a lifestyle alternative
  *   Image purpose                         — what this image is meant to communicate
  *   Presentation                          — Full Width, Inline Detail, Cropped Detail
@@ -12,8 +12,8 @@
  *   Focal point                           — which part of the frame the crop keeps
  *
  * These are presentation choices. Nothing here changes the stored file, the
- * caption, the scope, or any engineering value, and the only slot that moves is
- * the deliberate cover swap (both images are kept).
+ * caption, the scope, the slot, or any engineering value. The cover is a flag on
+ * the existing `usage` field — no image is moved, re-uploaded or swapped.
  *
  * PLACE WITH is the ONLY authority for where an Inline Detail image is composed:
  * nothing else decides its section — not the purpose, the product, the file name
@@ -82,7 +82,7 @@ const FOCAL_VERTICAL_OPTIONS = [
 
 export default function ImageProposalControls({
   asset,
-  canUseAsCover = false,
+  isCover = false,
   // The comparison groups already named on this project, offered to this image's
   // comparison controls so two images are put in one group by name.
   comparisonGroupOptions = [],
@@ -95,7 +95,7 @@ export default function ImageProposalControls({
   onSectionTargetChange,
   onFocalChange,
   onComparisonChange,
-  onUseAsCover,
+  onCoverChange,
 }) {
   if (!asset) return null;
 
@@ -129,9 +129,15 @@ export default function ImageProposalControls({
   return (
     <div className="mt-3 border-t border-[#EFECE4] pt-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-[0.12em] text-[#A79E8C]" style={FONT}>
-          Proposal
-        </span>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none" style={FONT}>
+          <input
+            type="checkbox"
+            checked={isCover}
+            onChange={(e) => onCoverChange(e.target.checked)}
+            className="w-3 h-3 accent-[#213428] cursor-pointer"
+          />
+          <span className="text-[11px] text-[#625143]">Use as cover</span>
+        </label>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -145,17 +151,6 @@ export default function ImageProposalControls({
           >
             {hidden ? 'Hidden from proposal' : 'Use in proposal'}
           </button>
-          {canUseAsCover && !hidden && (
-            <button
-              type="button"
-              onClick={onUseAsCover}
-              className="text-[11px] px-2 py-1 rounded border border-[#DCDBD6] text-[#625143] bg-white hover:border-[#213428] hover:text-[#213428] transition-colors"
-              style={FONT}
-              title="Move this image into the cover slot"
-            >
-              Use as cover
-            </button>
-          )}
         </div>
       </div>
 
