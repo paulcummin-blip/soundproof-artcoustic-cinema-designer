@@ -295,6 +295,17 @@ export function useEvaluatedPlacementRecommendations({
     && stage1State?.status === "complete"
     && stage1State?.fingerprint === expectedStage1Fingerprint;
 
+  // Stage 2 evidence matches only when the store holds a COMPLETED result
+  // whose fingerprint equals the fingerprint the current inputs would
+  // produce. When the subwoofer model or P14 target changes but Stage 2
+  // has not re-evaluated, the stored fingerprint is stale and the previous
+  // recommendations must NOT be displayed as current — the cards show the
+  // evaluating state until the matching result arrives.
+  const currentEvaluationFingerprint = stage2Result?.computedFingerprint || null;
+  const stage2EvidenceMatches = stage2State?.status === "complete"
+    && !!currentEvaluationFingerprint
+    && stage2State?.fingerprint === currentEvaluationFingerprint;
+
   const status = (() => {
     if (!inputs.geometryReady) return "waiting";
     // Stage 1 error is a terminal state — surface it, don't mask as discovery.
@@ -306,17 +317,14 @@ export function useEvaluatedPlacementRecommendations({
     // Stage 1 has matching evidence — Stage 2 needs model + P14 target.
     if (!inputs.canEvaluate) return "awaiting-prerequisites";
     if (stage2State?.status === "error") return "error";
-    if (stage2State?.status === "complete") return "complete";
-    // Stage 1 matches and Stage 2 is genuinely queued or running (status
-    // "updating"), or about to schedule (the effect schedules immediately
-    // when Stage 1 evidence matches). Only "updating" is genuine active
-    // work; idle/stale/cancelled are transient (Stage 2 reschedules on the
-    // next effect tick) and never displayed indefinitely as "evaluating"
-    // because the Stage 1 evidence guard prevents the permanent-idle trap.
-    if (stage2State?.status === "updating") return "evaluating";
-    // Matching Stage 1 but Stage 2 is idle/stale/cancelled — about to
-    // reschedule (transient). Show "evaluating" only when genuinely running;
-    // otherwise surface the actual state concisely.
+    // Only a COMPLETED Stage 2 result whose fingerprint matches the current
+    // expected fingerprint is displayed as current. A stale complete result
+    // (model or P14 changed but Stage 2 has not re-evaluated) is treated as
+    // evaluating so the previous recommendations are never shown as current.
+    if (stage2EvidenceMatches) return "complete";
+    // Stage 2 is complete-but-stale, updating, or about to reschedule.
+    // Show "evaluating" so the previous recommendations are not displayed
+    // as current while the new evaluation is in flight.
     return "evaluating";
   })();
 
@@ -328,12 +336,7 @@ export function useEvaluatedPlacementRecommendations({
     return null;
   })();
 
-  const isCurrent = stage2State?.status === "complete";
-
-  // The EXPECTED Stage 2 fingerprint from current inputs — the Apply authority
-  // compares this with the candidate's SAVED run fingerprint to reject a stale
-  // candidate whose evidence no longer matches the current design.
-  const currentEvaluationFingerprint = stage2Result?.computedFingerprint || null;
+  const isCurrent = stage2EvidenceMatches;
 
   return {
     options,
