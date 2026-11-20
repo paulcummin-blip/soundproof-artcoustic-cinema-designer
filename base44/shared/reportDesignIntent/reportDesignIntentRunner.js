@@ -107,7 +107,7 @@ function refusal(code, detail) {
  * frozen engineering snapshot is held, and the designer's own recorded intent as
  * instructions. Neither is a source of figures, and neither is ever copy.
  */
-function buildIntentDesignContext({ engineeringSnapshot, project, versions, clientBrief, designerNotes, recordedIntent = [] }) {
+function buildIntentDesignContext({ engineeringSnapshot, project, versions, clientBrief, designerNotes, recordedIntent = [], pack = null }) {
   let interpretation = null;
   if (engineeringSnapshot && typeof engineeringSnapshot === 'object') {
     const built = buildProjectInterpretation({
@@ -124,6 +124,14 @@ function buildIntentDesignContext({ engineeringSnapshot, project, versions, clie
       recordedIntent: Array.isArray(recordedIntent) ? recordedIntent : [],
     });
     if (built && typeof built === 'object') interpretation = built;
+  } else if (Array.isArray(recordedIntent) && recordedIntent.length > 0) {
+    // Without a frozen engineering snapshot the full ADI interpretation cannot be
+    // derived, but the designer's confirmed explanations are still authoritative:
+    // carry them as a partial interpretation so the writer receives them in
+    // design_decisions. No figure, level, product or performance claim is derived
+    // here — the frozen evidence pack remains the sole authority for those, and
+    // the prompt's rules enforce it.
+    interpretation = { important_design_decisions: recordedIntent };
   }
 
   return {
@@ -132,10 +140,10 @@ function buildIntentDesignContext({ engineeringSnapshot, project, versions, clie
         rule: INTERPRETATION_RULE,
         available: true,
         source: VERIFIED_INTERPRETATION_SOURCE,
-        view: interpretationView(interpretation),
-      }
-      : null,
-    editorial_brief: buildEditorialBrief({ dealerNotes: designerNotes || project?.notes || null }),
+        view: interpretationView(interpretation, { pack }),
+        }
+        : null,
+        editorial_brief: buildEditorialBrief({ dealerNotes: designerNotes || project?.notes || null }),
   };
 }
 
@@ -299,6 +307,7 @@ export async function runReportDesignIntent({
         clientBrief,
         designerNotes,
         recordedIntent,
+        pack,
       }),
       geometryContext: geometry,
       visualContext: visual,
