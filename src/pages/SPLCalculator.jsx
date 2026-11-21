@@ -579,11 +579,6 @@ export default function SPLCalculatorPage() {
                           <option value="">Choose alternative speaker</option>
                           {competitorRows.map((c) => <option key={c.id} value={c.id}>{c.optionLabel}</option>)}
                         </select>
-                        {candidate && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                            <span title="Open source data for the figures and assumptions used" style={{ fontSize: 11, fontWeight: 700, color: candidate.adequacy?.tone || "#9A6E00" }}>{candidate.badgeLabel}</span>
-                          </div>
-                        )}
                       </div>
                       <div />
                       <div style={{ fontWeight: 600, textAlign: "right" }}>{record ? formatPrice(numeric(record?.retail_price_inc_vat)) : "—"}</div>
