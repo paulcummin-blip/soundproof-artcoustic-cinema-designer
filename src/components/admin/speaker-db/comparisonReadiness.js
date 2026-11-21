@@ -181,7 +181,7 @@ export function sensitivityText(specification) {
   const spec = specification || {};
   if (!present(spec.sensitivity_db)) return "—";
   const basis = present(spec.sensitivity_basis) ? spec.sensitivity_basis : "basis not stated";
-  return `${spec.sensitivity_db} dB · ${basis}`;
+  return `${Math.round(Number(spec.sensitivity_db))} dB · ${basis}`;
 }
 
 /** The power figure the comparison is allowed to use, and where it came from. */
@@ -193,7 +193,7 @@ export function powerBasisText(specification) {
     if (power.source === "peak_power_assumed") return `${power.value} W · ${power.label} (provisional)`;
     return `${power.value} W · recommended amplifier max`;
   }
-  if (present(spec.max_continuous_spl_db)) return `${spec.max_continuous_spl_db} dB · published max SPL`;
+  if (present(spec.max_continuous_spl_db)) return `${Math.round(Number(spec.max_continuous_spl_db))} dB · published max SPL`;
   return "No power or max SPL";
 }
 

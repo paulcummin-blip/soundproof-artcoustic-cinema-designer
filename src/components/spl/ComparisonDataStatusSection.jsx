@@ -46,12 +46,20 @@ function textOrNull(value, suffix = "") {
   return Number.isFinite(n) ? `${Number(n.toFixed(1))}${suffix}` : `${value}${suffix}`;
 }
 
+// SPL and sensitivity figures are displayed as whole-number decibels.
+// The underlying values retain full precision; only the display is rounded.
+function dbTextOrNull(value, suffix = "") {
+  if (!hasValue(value)) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? `${Math.round(n)}${suffix}` : `${value}${suffix}`;
+}
+
 function orUnstated(value, fallback = "Half Space — assumed by Sound Proof") {
   return String(value || "").trim() || fallback;
 }
 
 function sensitivityRow(record) {
-  const v = textOrNull(record.sensitivity_value_db, " dB");
+  const v = dbTextOrNull(record.sensitivity_value_db, " dB");
   return v ? `${v} @ ${record.sensitivity_reference || "basis unstated"}` : NOT_PUBLISHED;
 }
 
@@ -70,7 +78,7 @@ function powerAuthorityRow(record) {
 }
 
 function continuousSplRow(record) {
-  return textOrNull(record.published_max_continuous_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
+  return dbTextOrNull(record.published_max_continuous_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
 
 // The manufacturer's published max SPL figure that Sound Proof treats as peak
@@ -83,7 +91,7 @@ function manufacturerMaxSplRow(record) {
     ?? record.halfspace_published_max_continuous_spl_db_1m;
   if (!hasValue(figure)) return null;
   const n = Number(figure);
-  const value = Number.isFinite(n) ? Number(n.toFixed(1)) : figure;
+  const value = Number.isFinite(n) ? Math.round(n) : figure;
   const label = authority === "published_peak"
     ? "Published peak maximum SPL"
     : "Manufacturer max SPL (continuous not specified)";
@@ -95,7 +103,7 @@ function manufacturerMaxSplRow(record) {
 function estimatedContinuousSplRow(record) {
   if (!hasValue(record.halfspace_estimated_continuous_from_peak_spl_db_1m)) return null;
   const n = Number(record.halfspace_estimated_continuous_from_peak_spl_db_1m);
-  const value = Number.isFinite(n) ? Number(n.toFixed(1)) : record.halfspace_estimated_continuous_from_peak_spl_db_1m;
+  const value = Number.isFinite(n) ? Math.round(n) : record.halfspace_estimated_continuous_from_peak_spl_db_1m;
   return `${value} dB — Sound Proof estimated continuous (assumed peak − 6 dB)`;
 }
 
@@ -116,7 +124,7 @@ function manufacturerStatedSplRow(record) {
 }
 
 function peakSplRow(record) {
-  return textOrNull(record.published_max_peak_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
+  return dbTextOrNull(record.published_max_peak_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
 
 function measurementBasisRow(record) {
@@ -165,7 +173,7 @@ function resultMethodText(record) {
   if (basis === "Published") return "Published continuous SPL figure";
   if (basis === "Estimated") return "Estimated continuous SPL (published max SPL − 6 dB), capping the sensitivity-and-power calculation";
   if (basis === "Calculated") {
-    const calcSpl = textOrNull(record.halfspace_calculated_max_continuous_spl_db_1m, " dB");
+    const calcSpl = dbTextOrNull(record.halfspace_calculated_max_continuous_spl_db_1m, " dB");
     return calcSpl
       ? `Calculated ${calcSpl} at 1 m from published sensitivity and amplifier power`
       : "Calculated from published sensitivity and amplifier power";

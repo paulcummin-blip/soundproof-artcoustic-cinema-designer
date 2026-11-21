@@ -142,6 +142,14 @@ function infoValue(value, suffix = "") {
   return `${value}${suffix}`;
 }
 
+// SPL and sensitivity figures are displayed as whole-number decibels.
+// Full-precision values are retained internally for all calculations.
+function dbInfoValue(value, suffix = " dB") {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "number" && Number.isFinite(value)) return `${Math.round(value)}${suffix}`;
+  return `${value}${suffix}`;
+}
+
 // What each column's comparison actually rests on. An Artcoustic row is
 // published measured capability; a competitor row is calculated from published
 // specifications; a C row is an ADI estimate from partial manufacturer data and
@@ -173,18 +181,18 @@ function artcousticInfoRows(speaker, price, result = null) {
     ["Model", speaker.model],
     ["Sound Proof role availability", [speaker.p12Key ? "Screen / P12" : null, speaker.p13Key ? "Non-screen / P13" : null].filter(Boolean).join(" · ")],
     ["Retail inc VAT", formatPrice(price)],
-    ["Sensitivity 1 W / 1 m", infoValue(meta?.sensitivity_db_1w_1m, " dB")],
-    ["Sensitivity 2.83 V / 1 m", infoValue(meta?.sensitivity_dB_2p83, " dB")],
+    ["Sensitivity 1 W / 1 m", dbInfoValue(meta?.sensitivity_db_1w_1m)],
+    ["Sensitivity 2.83 V / 1 m", dbInfoValue(meta?.sensitivity_dB_2p83)],
     ["Nominal impedance", infoValue(meta?.nominalOhms, " Ω")],
     ["Continuous power", infoValue(meta?.power_handling_w ?? meta?.max_power, " W")],
-    ["Continuous SPL @ 1 m · Half Space", infoValue(meta?.max_spl_cont_db_1m_halfspace ?? meta?.max_spl_cont_db_1m ?? meta?.max_spl, " dB")],
-    ["Peak SPL @ 1 m · Half Space", infoValue(meta?.max_spl_peak_db_cf6_1m_halfspace ?? meta?.max_spl_peak_db_cf6_1m ?? meta?.peak_spl, " dB")],
-    ["Continuous SPL @ 1 m · Anechoic", infoValue(meta?.max_spl_cont_db_1m_anechoic, " dB")],
-    ["Peak SPL @ 1 m · Anechoic", infoValue(meta?.max_spl_peak_db_cf6_1m_anechoic, " dB")],
+    ["Continuous SPL @ 1 m · Half Space", dbInfoValue(meta?.max_spl_cont_db_1m_halfspace ?? meta?.max_spl_cont_db_1m ?? meta?.max_spl)],
+    ["Peak SPL @ 1 m · Half Space", dbInfoValue(meta?.max_spl_peak_db_cf6_1m_halfspace ?? meta?.max_spl_peak_db_cf6_1m ?? meta?.peak_spl)],
+    ["Continuous SPL @ 1 m · Anechoic", dbInfoValue(meta?.max_spl_cont_db_1m_anechoic)],
+    ["Peak SPL @ 1 m · Anechoic", dbInfoValue(meta?.max_spl_peak_db_cf6_1m_anechoic)],
     ["Usable LF response (-6 dB)", infoValue(meta?.usable_lf_hz_minus6db, " Hz")],
     ["Measurement basis", "Artcoustic published Half Space authority"],
     ["Evidence standing", "Published measured capability (Artcoustic registry)"],
-    ["Calculated SPL at RSP", infoValue(result?.designSpl ?? result?.rawSpl, " dB")],
+    ["Calculated SPL at RSP", dbInfoValue(result?.designSpl ?? result?.rawSpl)],
     ["Graded from", "Calculated SPL at RSP, whole dB"],
     ["Source", "Canonical Sound Proof speaker registry"],
   ];

@@ -85,8 +85,7 @@ const hasTechnicalValues = (record) => {
 function sensitivityText(record) {
   const v = record?.sensitivity_value_db;
   if (!hasVal(v)) return DASH;
-  const ref = hasVal(record?.sensitivity_reference) ? record.sensitivity_reference : "";
-  return ref ? `${v} dB` : `${v} dB`;
+  return `${Math.round(Number(v))} dB`;
 }
 
 function powerText(record) {
@@ -97,7 +96,7 @@ function powerText(record) {
 
 function splText(record) {
   const v = record?.published_max_continuous_spl_db_1m ?? record?.halfspace_published_max_continuous_spl_db_1m;
-  return hasVal(v) ? `${v} dB` : DASH;
+  return hasVal(v) ? `${Math.round(Number(v))} dB` : DASH;
 }
 
 /** Build a row object the SpeakerFormDialog expects from a comparison candidate. */

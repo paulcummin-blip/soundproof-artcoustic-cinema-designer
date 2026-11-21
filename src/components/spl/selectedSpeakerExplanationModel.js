@@ -19,7 +19,7 @@ const hasValue = (value) =>
 function db(value, suffix = " dB") {
   if (!hasValue(value)) return null;
   const n = Number(value);
-  return `${Number(n.toFixed(1))}${suffix}`;
+  return `${Math.round(n)}${suffix}`;
 }
 
 function watts(value) {

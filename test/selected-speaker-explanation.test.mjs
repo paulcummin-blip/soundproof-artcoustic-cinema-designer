@@ -27,7 +27,7 @@ test('GOOD (calculated): James BE806 MKII-style — sensitivity, impedance, reco
   assert.match(e.calculated, /amplifier recommendation/);
   assert.match(e.dontKnow, /maximum SPL/);
   // The actual normalized calculated SPL at 1 m must appear, not a hardcoded value.
-  assert.match(e.calculated, /114\.8 dB/);
+  assert.match(e.calculated, /115 dB/);
   // The −6 dB peak allowance is never mentioned when no max SPL is published.
   assert.doesNotMatch(e.why, /−6 dB/);
   assert.doesNotMatch(e.calculated, /−6 dB/);

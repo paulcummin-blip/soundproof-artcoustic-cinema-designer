@@ -210,8 +210,8 @@ test('Triad TS-IWSAT6 explanation states sensitivity is missing', () => {
   assert.match(e.why, /sensitivity/i);
   assert.equal(e.calculated, null);
   assert.match(e.dontKnow, /sensitivity/i);
-  // The published max SPL figure appears in the explanation
-  assert.match(e.dontKnow, /104\.6/);
+  // The published max SPL figure appears in the explanation (rounded to whole dB)
+  assert.match(e.dontKnow, /105/);
 });
 
 // ===========================================================================

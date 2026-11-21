@@ -32,13 +32,17 @@ const LEGACY_LABELS = {
 
 const numberText = (value, unit) => (hasValue(value) ? `${value}${unit}` : DASH);
 
+// SPL and sensitivity figures are displayed as whole-number decibels.
+// Full-precision values are retained in storage and in all calculations.
+const dbNumberText = (value) => (hasValue(value) ? `${Math.round(Number(value))} dB` : DASH);
+
 /** Sensitivity as published, with the basis it was quoted on. */
 export function sensitivityCell(row) {
   if (row.specification) return sensitivityText(row.specification);
   const value = row.record?.sensitivity_value_db;
   if (!hasValue(value)) return DASH;
   const basis = hasValue(row.record?.sensitivity_reference) ? row.record.sensitivity_reference : "basis not stated";
-  return `${value} dB · ${basis}`;
+  return `${Math.round(Number(value))} dB · ${basis}`;
 }
 
 /** Power handling, or the manufacturer's amplifier recommendation. */
@@ -63,7 +67,7 @@ export function maxSplCell(row) {
   const published = row.specification
     ? row.specification.max_continuous_spl_db
     : row.record?.published_max_continuous_spl_db_1m;
-  if (hasValue(published)) return { text: numberText(published, " dB"), note: "" };
+  if (hasValue(published)) return { text: dbNumberText(published), note: "" };
   const estimatePossible = row.readiness
     ? row.readiness.eligible === true
     : hasValue(row.record?.calculated_max_continuous_spl_db_1m);
