@@ -294,9 +294,13 @@ console.log("\n=== 5. ONE SEAT IMPROVES, ANOTHER DETERIORATES ===\n");
     { id: "p1", priority: "primary" },
     { id: "p2", priority: "primary" },
   ];
-  const beforePS = [spk(30), spk(30), spk(30), spk(30), spk(30)];
-  const afterP1 = [spk(10), spk(30), spk(30), spk(30), spk(30)]; // improves
-  const afterP2 = [spk(60), spk(60), spk(60), spk(60), spk(60)]; // deteriorates
+  // Angles chosen to cross the L4 coverage floor (38°): 50° is in the L3
+  // window (below the L4 floor, quality < 0.75 → positive deficiency), so
+  // re-aiming to 10° (within the L4 window) actually changes the deficiency
+  // and produces a visible per-seat improvement under the deficiency policy.
+  const beforePS = [spk(50), spk(50), spk(50), spk(50), spk(50)];
+  const afterP1 = [spk(10), spk(50), spk(50), spk(50), spk(50)]; // improves (crosses L4 floor)
+  const afterP2 = [spk(65), spk(65), spk(65), spk(65), spk(65)]; // deteriorates (deeper into L2)
 
   const authBefore = buildArtcousticDesignRatingAuthority({
     seats,
@@ -380,21 +384,30 @@ console.log("\n=== 6. SPEAKER-COUNT NORMALISATION ===\n");
     Math.abs(pts5 - pts10) < 1e-9 && Math.abs(pts7 - pts10) < 1e-9 && Math.abs(pts15 - pts10) < 1e-9 ? "PASS" : "FAIL"
   );
 
-  // Also test: improving one speaker in a 5-speaker system moves the mean
-  // more than in a 10-speaker system (proportionate sensitivity).
-  const improve5 = [spk(5), spk(20), spk(20), spk(20), spk(20)];
-  const improve10 = [spk(5), spk(20), spk(20), spk(20), spk(20), spk(20), spk(20), spk(20), spk(20), spk(20)];
-  const ptsImprove5 = computeP17CoveragePoints("L3", improve5);
+  // Deficiency-based policy: improving one poorly-aimed speaker (crossing
+  // the L4 floor) produces the SAME delta regardless of total speaker count,
+  // because the contribution uses total deficiency against a fixed capacity
+  // (no per-speaker mean dilution). This is the intended no-count-bias
+  // property: a coverage gap from a poorly-aimed speaker registers fully
+  // whether the system has 5 or 10 speakers. Uses its own off-axis base
+  // (all at 50°, below the L4 floor) so the improvement crosses a threshold.
+  const baseOff5  = Array(5).fill(0).map(() => spk(50));
+  const baseOff10 = Array(10).fill(0).map(() => spk(50));
+  const improve5  = [spk(10), ...Array(4).fill(0).map(() => spk(50))];
+  const improve10 = [spk(10), ...Array(9).fill(0).map(() => spk(50))];
+  const ptsBaseOff5  = computeP17CoveragePoints("L3", baseOff5);
+  const ptsBaseOff10 = computeP17CoveragePoints("L3", baseOff10);
+  const ptsImprove5  = computeP17CoveragePoints("L3", improve5);
   const ptsImprove10 = computeP17CoveragePoints("L3", improve10);
-  const delta5 = ptsImprove5 - pts5;
-  const delta10 = ptsImprove10 - pts10;
+  const delta5 = ptsImprove5 - ptsBaseOff5;
+  const delta10 = ptsImprove10 - ptsBaseOff10;
 
   record(
-    "1-speaker improvement: 5-spk delta > 10-spk delta (proportionate)",
-    `delta5 > delta10 > 0`,
+    "1-speaker improvement: same delta for 5-spk and 10-spk (no count bias)",
+    `delta5 ≈ delta10 > 0`,
     `delta5=${delta5.toFixed(3)} delta10=${delta10.toFixed(3)}`,
     `ratio=${(delta5 / Math.max(delta10, 1e-9)).toFixed(2)}`,
-    delta5 > delta10 && delta10 > 0 ? "PASS" : "FAIL"
+    Math.abs(delta5 - delta10) < 1e-9 && delta10 > 0 ? "PASS" : "FAIL"
   );
 }
 

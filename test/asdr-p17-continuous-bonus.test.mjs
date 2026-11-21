@@ -425,8 +425,12 @@ console.log("\nCase 11: continuous quality — same RP22 band, different non-lim
   const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
   const limiting = { angleDeg: 42, windows, windowLevelNumber: 3 };
 
+  // Better aim (5°, within L4) vs worse aim (50°, BELOW the L4 floor at 40°).
+  // The deficiency policy only penalises speakers below the L4 coverage floor,
+  // so the comparison must cross that floor to be meaningful — on-axis speakers
+  // (5° vs 30°, both above the floor) correctly produce no difference.
   const perSpeakerBetter = [limiting, { angleDeg: 5, windows, windowLevelNumber: 4 }, { angleDeg: 5, windows, windowLevelNumber: 4 }, { angleDeg: 5, windows, windowLevelNumber: 4 }];
-  const perSpeakerWorse  = [limiting, { angleDeg: 30, windows, windowLevelNumber: 4 }, { angleDeg: 30, windows, windowLevelNumber: 4 }, { angleDeg: 30, windows, windowLevelNumber: 4 }];
+  const perSpeakerWorse  = [limiting, { angleDeg: 50, windows, windowLevelNumber: 3 }, { angleDeg: 50, windows, windowLevelNumber: 3 }, { angleDeg: 50, windows, windowLevelNumber: 3 }];
 
   const qBetter = computeP17MeanQuality(perSpeakerBetter);
   const qWorse  = computeP17MeanQuality(perSpeakerWorse);
@@ -525,8 +529,12 @@ console.log("\nCase 14: poor aiming reduces score within same RP22 band");
   const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
   const limiting = { angleDeg: 45, windows, windowLevelNumber: 3 };
 
+  // Good aim (5°, within L4) vs poor aim (50°, BELOW the L4 floor at 40°).
+  // The deficiency policy only penalises speakers below the L4 coverage floor,
+  // so the "poor" case must cross that floor to register — on-axis speakers
+  // (5° vs 35°, both above the floor) correctly produce no difference.
   const perSpeakerGood = [limiting, { angleDeg: 5, windows, windowLevelNumber: 4 }, { angleDeg: 5, windows, windowLevelNumber: 4 }];
-  const perSpeakerPoor = [limiting, { angleDeg: 35, windows, windowLevelNumber: 4 }, { angleDeg: 35, windows, windowLevelNumber: 4 }];
+  const perSpeakerPoor = [limiting, { angleDeg: 50, windows, windowLevelNumber: 3 }, { angleDeg: 50, windows, windowLevelNumber: 3 }];
 
   const mqGood = computeP17MeanQuality(perSpeakerGood);
   const mqPoor = computeP17MeanQuality(perSpeakerPoor);

@@ -186,100 +186,140 @@ export function effectiveP17Multiplier(level, meanQuality) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Normalised grade-relative continuous coverage contribution
+// Deficiency-based continuous coverage contribution
 // ═══════════════════════════════════════════════════════════════
 //
-// Replaces the previous unnormalised additive sum. Three confirmed defects
-// are corrected:
+// Replaces the previous mean-based grade-relative contribution. The
+// confirmed defect was DILUTION: a genuine multi-speaker coverage
+// improvement (e.g. rear-surround aiming) was averaged across all
+// applicable speakers, so correcting two poorly-aimed speakers in a
+// twelve-speaker system moved the mean by only one sixth of the
+// per-speaker improvement — invisible in the Design Performance Index.
 //
-//  1. GRADE-BOUNDARY MONOTONICITY: the contribution is capped at the grade
-//     gap (nextBase − currentBase) × weight. At the cap, the lower grade's
-//     total equals the next grade's base contribution, so improving the
-//     limiting speaker across ANY grade boundary (L1→L2, L2→L3, L3→L4)
-//     never drops the total P17 earned points.
+// The new contribution is built on per-speaker DEFICIENCY: how far each
+// speaker sits below the L4 coverage floor (quality 0.75). Speakers
+// already at or above the floor contribute ZERO deficiency, so they
+// neither dilute the improvement from correcting poorly-aimed speakers
+// nor generate free points simply by being present. A poorly-aimed
+// speaker registers fully regardless of how many other speakers are
+// correctly oriented.
 //
-//  2. ON-AXIS SMOOTH SATURATION: no on-axis exclusion threshold. The quality
-//     function already approaches 1.0 smoothly as the angle approaches 0°,
-//     so a speaker improving 2°→1° raises the mean and the contribution —
-//     it never loses points. Already-excellent coverage saturates with
-//     little remaining headroom but is never penalised.
+// Properties:
+//  - MONOTONIC: improving any speaker lowers its deficiency (or leaves
+//    it at zero when already above the floor), so the coverage score
+//    never decreases. Worsening any speaker raises deficiency, lowering
+//    the score — never an increase.
+//  - NO DILUTION: the contribution uses TOTAL deficiency against a FIXED
+//    capacity (not a per-speaker mean), so a coverage gap from a
+//    poorly-aimed speaker is not averaged away by many well-oriented
+//    speakers.
+//  - SPEAKER-COUNT FAIR: adding a speaker already at/above the L4 floor
+//    adds zero deficiency, so it does not change the score. Adding a
+//    speaker below the floor correctly lowers the score. No automatic
+//    points for count.
+//  - GRADE-INDEPENDENT: the contribution is a pure function of
+//    per-speaker quality, independent of the discrete P17 grade.
+//    Crossing a grade boundary (worst speaker improves to the next
+//    window) always raises the total: the base multiplier jumps up by
+//    at least one grade step while this contribution changes smoothly
+//    — never a reversal.
+//  - L4 HEADROOM: L4 seats earn a continuous contribution when not every
+//    speaker is at the L4 floor, so improving coverage within an L4 seat
+//    is recognised. Speakers already effectively on-axis (quality
+//    ≥ 0.75) produce little or no change.
+//  - BOUNDED: the contribution is capped at COVERAGE_HEADROOM_MULT ×
+//    P17_WEIGHT raw points per seat.
 //
-//  3. SPEAKER-COUNT NORMALISATION: uses the MEAN per-speaker quality
-//     (average), not the sum, so 5.x, 7.x and 9.x systems with the same
-//     average coverage quality receive the same contribution. Speaker
-//     count already has its own treatment elsewhere in ASDR; this does not
-//     introduce a second quantity reward.
+// Calibration (Dixon reference): 2 rear surrounds improving from well
+// outside usable coverage to within the L4 window at every seat produces
+// a coverage-score delta of ≈0.375 per seat. With the configured
+// headroom that is ≈18–25 raw points per seat, which after the balanced
+// seat aggregation and the /10 DPI rounding yields a clearly visible
+// 2–3 point ASDR improvement. Correcting more poorly-aimed speakers
+// produces a larger, proportionate gain.
 //
-// Formula:
-//   progress = clamp((meanQuality − gradeFloor) / (1.0 − gradeFloor), 0, 1)
-//   continuous = progress × (nextGradeBase − currentGradeBase) × weight
-//
-// The full quality range [gradeFloor, 1.0] is used (not just to the next
-// grade ceiling) to avoid premature saturation when the mean exceeds the
-// grade ceiling — many non-limiting speakers can be well above the grade
-// while the limiting speaker holds it down.
-//
-// Monotonicity proof (no boundary drop):
-//   At any grade G (≠ L4), max total = base_G × w + (base_next − base_G) × w
-//                                    = base_next × w.
-//   At the next grade G+1 (just reached), min total = base_next × w + 0.
-//   So max lower-grade total = min next-grade total. The total can never
-//   drop when the limiting speaker crosses a grade boundary. Improving
-//   non-limiting speakers raises the mean, raising progress, raising the
-//   contribution — also never a drop.
-//
-// Pure: no React, no SDK, no writes. Imported by the rating adapter and by
-// regression tests so both use one formula.
+// Pure: no React, no SDK, no writes. Imported by the rating adapter and
+// by regression tests so both use one formula.
 
 /** P17 canonical weight (mirrors base44/shared/canonicalParameterWeights.js). */
 const P17_WEIGHT = 5;
 
-/** Grade base multipliers (mirrors LEVEL_MULTIPLIERS). */
-const GRADE_BASE_MULT = Object.freeze({ L4: 12, L3: 8, L2: 4, L1: 2 });
-
-/** Next grade base for the ceiling cap (L4 has no next → no contribution). */
-const NEXT_GRADE_MULT = Object.freeze({ L3: 12, L2: 8, L1: 4 });
+/** L4 coverage-floor quality. Speakers at/above this are "well covered". */
+const L4_FLOOR_QUALITY = 0.75;
 
 /**
- * Quality at each grade's floor (the angle-to-window ratio at the grade's
- * lower boundary, from continuousSpeakerQuality):
- *   L4 floor = 0.75  (l4Deg → 0.75)
- *   L3 floor = 0.50  (l3Deg → 0.50)
- *   L2 floor = 0.25  (l2Deg → 0.25)
- *   L1 floor = 0.00  (beyond l2Deg → 0.0)
+ * Maximum continuous contribution: bounded additive multiplier points
+ * above the discrete P17 base. Calibrated against the Dixon reference
+ * case so a substantial multi-speaker aiming improvement across several
+ * seats produces a clearly visible ASDR change (≈2–3 displayed points),
+ * while correcting more poorly-aimed speakers can produce a larger,
+ * proportionate gain.
  */
-const GRADE_FLOOR_QUALITY = Object.freeze({ L4: 0.75, L3: 0.50, L2: 0.25, L1: 0.00 });
+const COVERAGE_HEADROOM_MULT = 10;
 
 /**
- * Compute the normalised grade-relative continuous coverage points for a
- * P17 seat.
+ * Deficiency capacity: the total per-speaker deficiency at which the
+ * coverage score reaches zero. A FIXED constant (not proportional to
+ * speaker count), so the coverage gap from a poorly-aimed speaker
+ * registers fully regardless of how many other speakers are correctly
+ * oriented. Represents approximately 5–6 speakers worth of full
+ * deficiency at the L4 floor.
+ */
+const DEFICIENCY_CAPACITY = 4.0;
+
+/**
+ * Compute the deficiency-based continuous coverage points for a P17 seat.
  *
  * @param {string} level - the seat's discrete P17 level ("L1".."L4").
+ *        Genuine N/A or FAIL returns 0 (the base multiplier handles them).
  * @param {Array} perSpeaker - engine per-speaker entries (angleDeg + windows).
- * @returns {number} additive ASDR points (>= 0, bounded by the grade gap).
+ * @returns {number} additive ASDR points (≥ 0, bounded by the headroom).
  */
 export function computeP17CoveragePoints(level, perSpeaker) {
+  // Genuine N/A or FAIL: no continuous contribution (the base handles it).
   if (!/^(L[1-4])$/.test(String(level || ""))) return 0;
-  // L4: already at the top RP22 coverage level — no higher grade to approach.
-  if (String(level) === "L4") return 0;
   if (!Array.isArray(perSpeaker) || perSpeaker.length === 0) return 0;
 
-  const meanQuality = computeP17MeanQuality(perSpeaker);
-  if (meanQuality == null) return 0;
+  // Per-speaker coverage quality from angle + windows (continuous, [0,1]).
+  const qualities = [];
+  for (const entry of perSpeaker) {
+    const q = continuousSpeakerQuality(entry);
+    if (q != null) qualities.push(q);
+  }
+  if (qualities.length === 0) return 0;
 
-  const floorQ = GRADE_FLOOR_QUALITY[level];
-  const maxContinuous = (NEXT_GRADE_MULT[level] - GRADE_BASE_MULT[level]) * P17_WEIGHT;
-  const span = 1.0 - floorQ;
-  if (span <= 0 || maxContinuous <= 0) return 0;
+  // Total deficiency: how far below the L4 coverage floor each speaker sits.
+  // Speakers already at/above the floor (quality ≥ 0.75) add ZERO deficiency,
+  // so they never dilute the improvement from correcting poorly-aimed
+  // speakers and never generate free points simply by being present.
+  let totalDeficiency = 0;
+  for (const q of qualities) {
+    totalDeficiency += Math.max(0, L4_FLOOR_QUALITY - q);
+  }
 
-  const progress = Math.max(0, Math.min(1, (meanQuality - floorQ) / span));
-  return progress * maxContinuous;
+  // Coverage score: 1.0 when every speaker meets the L4 coverage floor, 0.0
+  // when the total deficiency reaches the capacity. Monotonic: improving
+  // any speaker lowers deficiency, raising the score; worsening any speaker
+  // lowers it.
+  const coverageScore = Math.max(0, Math.min(1, 1 - totalDeficiency / DEFICIENCY_CAPACITY));
+
+  // Bounded additive contribution, INDEPENDENT of the discrete grade.
+  // Because it is a pure function of per-speaker quality, crossing a P17
+  // grade boundary (worst speaker improves to the next window) always
+  // raises the total: the base multiplier jumps up by at least one grade
+  // step while this contribution changes smoothly — never a reversal.
+  return coverageScore * COVERAGE_HEADROOM_MULT * P17_WEIGHT;
 }
 
-// Expose constants for tests and diagnostics.
+// Expose constants for tests and diagnostics. The legacy grade-relative
+// constants are retained for backward compatibility with tests that read
+// them; the active formula no longer uses them.
 export const P17_COVERAGE_CONSTANTS = Object.freeze({
   P17_WEIGHT,
-  GRADE_BASE_MULT,
-  NEXT_GRADE_MULT,
-  GRADE_FLOOR_QUALITY,
+  L4_FLOOR_QUALITY,
+  COVERAGE_HEADROOM_MULT,
+  DEFICIENCY_CAPACITY,
+  GRADE_BASE_MULT: Object.freeze({ L4: 12, L3: 8, L2: 4, L1: 2 }),
+  NEXT_GRADE_MULT: Object.freeze({ L3: 12, L2: 8, L1: 4 }),
+  GRADE_FLOOR_QUALITY: Object.freeze({ L4: 0.75, L3: 0.50, L2: 0.25, L1: 0.00 }),
 });

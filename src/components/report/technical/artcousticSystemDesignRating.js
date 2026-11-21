@@ -457,9 +457,12 @@ function scoreSeatParam(key, input) {
     case "p16": scored = scoreP16(norm.rawValue); break;
     case "p17": {
       scored = scoreP17(norm.rawValue);
-      // Properly-scaled continuous coverage contribution: additive points
-      // derived from the per-speaker coverage excess (sum, not mean), so
-      // multi-speaker improvements survive without dilution. The perSpeaker
+      // Deficiency-based continuous coverage contribution: additive points
+      // derived from per-speaker coverage DEFICIENCY (how far each speaker
+      // sits below the L4 coverage floor). Speakers already at/above the
+      // floor contribute zero deficiency, so they neither dilute a
+      // multi-speaker improvement nor add free points — a genuinely better
+      // acoustic design receives a meaningfully higher score. The perSpeaker
       // array is supplied on the P17 seat input by buildDesignRatingInput.
       // Zero when no per-speaker evidence (legacy saved publications).
       const p17PerSpeaker = (typeof input === "object" && input && Array.isArray(input.p17PerSpeaker))

@@ -83,7 +83,10 @@ console.log("\n2. Small adjustment (pub2 → pub3, LW 16°→14°):\n");
   const pts3 = computeP17CoveragePoints('L2', pub3_c1);
   const delta = pts3 - pts2;
   console.log(`    coveragePts: ${pts2.toFixed(2)} → ${pts3.toFixed(2)} (Δ=${delta.toFixed(2)} pts = ${(delta/10).toFixed(3)} DPI)`);
-  check("small adjustment produces small positive change", delta > 0 && delta < 5, `${delta.toFixed(2)} pts`);
+  // On-axis adjustments (both within the L4 window) produce zero change under
+  // the deficiency-based policy: speakers already at/above the L4 floor have
+  // zero deficiency, so small on-axis re-aiming does not dilute or inflate.
+  check("small adjustment produces small or zero change (on-axis = no change)", delta >= 0 && delta < 5, `${delta.toFixed(2)} pts`);
   check("small adjustment DPI < 0.5", Math.abs(delta/10) < 0.5, `${(delta/10).toFixed(3)} DPI`);
 }
 
