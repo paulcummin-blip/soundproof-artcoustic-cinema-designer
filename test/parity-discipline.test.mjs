@@ -74,9 +74,10 @@ test("SPL_BASES exposes a distinct peak option separate from continuous", () => 
   assert.match(peak.label, /peak|short-term/i, "peak label must signal it is not continuous");
 });
 
-test("FULL requires published measured SPL plus confirmed space and basis", () => {
+test("FULL: manufacturer publishes a continuous maximum SPL", () => {
   const rec = {
     p12_p13_eligible: true,
+    max_spl_authority_type: "published_continuous",
     halfspace_published_max_continuous_spl_db_1m: 110,
     sensitivity_space_provenance: "half_space_stated",
     max_spl_space_provenance: "half_space_stated",
@@ -85,22 +86,33 @@ test("FULL requires published measured SPL plus confirmed space and basis", () =
   assert.equal(classifyDataAdequacy(rec).key, "FULL");
 });
 
-test("GOOD when a controlled assumption remains (assumed half space)", () => {
+test("FULL is not downgraded when measurement space is assumed", () => {
+  // A published continuous max SPL is the direct capability figure; an assumed
+  // half-space on an unrelated axis does not affect it.
   const rec = {
     p12_p13_eligible: true,
+    max_spl_authority_type: "published_continuous",
     halfspace_published_max_continuous_spl_db_1m: 110,
     sensitivity_space_provenance: "half_space_assumed",
     max_spl_space_provenance: "half_space_assumed",
     sensitivity_reference: "1W/1m",
   };
+  assert.equal(classifyDataAdequacy(rec).key, "FULL");
+});
+
+test("GOOD: published peak SPL needs the −6 dB allowance", () => {
+  const rec = {
+    p12_p13_eligible: true,
+    max_spl_authority_type: "assumed_peak",
+    halfspace_published_max_peak_spl_db_1m: 118,
+  };
   assert.equal(classifyDataAdequacy(rec).key, "GOOD");
 });
 
-test("INCOMPLETE when not eligible for P12/P13", () => {
+test("LIMITED when not eligible for P12/P13", () => {
   const rec = { p12_p13_eligible: false };
   const label = classifyDataAdequacy(rec);
   assert.equal(label.key, "INCOMPLETE");
-  assert.match(label.meaning, /Incomplete data/i);
   assert.match(label.meaning, /fair P12\/P13 comparison not available/i);
 });
 

@@ -8,7 +8,7 @@
 // Regression cases:
 //   Sonance R1  — 90 dB @ 2.83V/1m, 8 Ω, "Power Handling: 5W min; 150W max"
 //   Sonance R2  — 92 dB @ 2.83V/1m, 6 Ω, "Power Handling: 5W min; 200W max"
-//   Wisdom P2i  — sensitivity + impedance + published max SPL → GOOD DATA
+//   Wisdom P2i  — sensitivity + impedance + published continuous SPL → FULL DATA
 //   Triad TS-IWSAT6 — continuous SPL + peak SPL → GOOD/FULL per transparency rules
 //
 // Does NOT test the P12/P13 engine — only the extraction→mapping→label discipline.
@@ -53,20 +53,21 @@ test("Sonance R1: Power Handling min/max range is reported as power_handling_con
   assert.equal(info.power_w.quote, "Power Handling: 5 Watts minimum; 150 Watts maximum", "literal source label preserved as evidence");
 });
 
-test("Sonance R1: qualifies for GOOD DATA (sensitivity + impedance + power, space assumed)", () => {
-  // Simulate the normalised record the comparison produces from the Sonance R1
-  // extraction: sensitivity 90 dB @ 2.83V/1m, 8 Ω, 150 W power handling, space
-  // unstated → Half Space assumed.
-  const rec = {
-    p12_p13_eligible: true,
-    halfspace_published_max_continuous_spl_db_1m: null, // no published max SPL
-    sensitivity_space_provenance: "half_space_assumed",
-    max_spl_space_provenance: "half_space_assumed",
-    sensitivity_reference: "2.83V/1m",
-  };
-  const adequacy = classifyDataAdequacy(rec);
-  assert.equal(adequacy.key, "GOOD", "Sonance R1 with sensitivity + impedance + power and assumed space is GOOD DATA");
-  assert.notEqual(adequacy.key, "INCOMPLETE", "must not be INCOMPLETE when power handling is captured");
+test("Sonance R1: no published max SPL → LIMITED DATA", () => {
+// Simulate the normalised record the comparison produces from the Sonance R1
+// extraction: sensitivity 90 dB @ 2.83V/1m, 8 Ω, 150 W power handling, space
+// unstated → Half Space assumed. No published maximum SPL, so the capability
+// is calculated from sensitivity + power handling — LIMITED DATA.
+const rec = {
+  p12_p13_eligible: true,
+  max_spl_authority_type: "none",
+  halfspace_published_max_continuous_spl_db_1m: null, // no published max SPL
+  sensitivity_space_provenance: "half_space_assumed",
+  max_spl_space_provenance: "half_space_assumed",
+  sensitivity_reference: "2.83V/1m",
+};
+const adequacy = classifyDataAdequacy(rec);
+assert.equal(adequacy.key, "INCOMPLETE", "no published max SPL → LIMITED DATA even with power handling captured");
 });
 
 test("Sonance R1: measurement space unstated resolves to Half Space assumed (no +6 dB correction)", () => {
@@ -111,15 +112,20 @@ test("Sonance R2: Power Handling min/max range with 200W max is reported as powe
   assert.equal(info.power_w.quote, "Power Handling: 5 Watts minimum; 200 Watts maximum");
 });
 
-test("Sonance R2: qualifies for GOOD DATA", () => {
+test("Sonance R2: no published max SPL → LIMITED DATA", () => {
+  // Sonance R2 publishes sensitivity, impedance and power handling but no
+  // maximum SPL. The capability is calculated from sensitivity + power, so
+  // the comparison depends on estimated rather than directly published
+  // performance — LIMITED DATA, not GOOD.
   const rec = {
     p12_p13_eligible: true,
+    max_spl_authority_type: "none",
     halfspace_published_max_continuous_spl_db_1m: null,
     sensitivity_space_provenance: "half_space_assumed",
     max_spl_space_provenance: "half_space_assumed",
     sensitivity_reference: "2.83V/1m",
   };
-  assert.equal(classifyDataAdequacy(rec).key, "GOOD");
+  assert.equal(classifyDataAdequacy(rec).key, "INCOMPLETE");
 });
 
 // ---------------------------------------------------------------------------
@@ -183,7 +189,7 @@ test("empty potential_unmapped produces no warning", () => {
 // Wisdom P2i — sensitivity + impedance + published max SPL → GOOD DATA
 // ---------------------------------------------------------------------------
 
-test("Wisdom P2i: sensitivity + impedance + published max SPL with assumed space → GOOD DATA", () => {
+test("Wisdom P2i: published continuous SPL with assumed space → FULL DATA", () => {
   const raw = {
     reported: [
       item("sensitivity_db", "89", "Sensitivity: 89 dB"),
@@ -200,15 +206,17 @@ test("Wisdom P2i: sensitivity + impedance + published max SPL with assumed space
   assert.equal(found.max_spl_db, "108", "published max SPL is proposed");
   assert.equal(found.max_spl_basis, "continuous");
 
-  // With a published continuous SPL + assumed half space → GOOD DATA
+  // A published continuous SPL is the direct capability figure — assumed
+  // half-space on an unrelated axis does not downgrade it.
   const rec = {
     p12_p13_eligible: true,
+    max_spl_authority_type: "published_continuous",
     halfspace_published_max_continuous_spl_db_1m: 108,
     sensitivity_space_provenance: "half_space_assumed",
     max_spl_space_provenance: "half_space_assumed",
     sensitivity_reference: "2.83V/1m",
   };
-  assert.equal(classifyDataAdequacy(rec).key, "GOOD");
+  assert.equal(classifyDataAdequacy(rec).key, "FULL");
 });
 
 // ---------------------------------------------------------------------------
@@ -233,26 +241,30 @@ test("Triad TS-IWSAT6: continuous SPL and peak SPL are both captured", () => {
   assert.equal(found.max_spl_basis, "continuous");
 });
 
-test("Triad TS-IWSAT6: with confirmed half-space → FULL DATA", () => {
+test("Triad TS-IWSAT6: published continuous SPL → FULL DATA", () => {
   const rec = {
     p12_p13_eligible: true,
+    max_spl_authority_type: "published_continuous",
     halfspace_published_max_continuous_spl_db_1m: 110,
     sensitivity_space_provenance: "half_space_published",
     max_spl_space_provenance: "half_space_published",
     sensitivity_reference: "2.83V/1m",
   };
-  assert.equal(classifyDataAdequacy(rec).key, "FULL", "confirmed space + basis + published SPL is FULL");
+  assert.equal(classifyDataAdequacy(rec).key, "FULL", "published continuous SPL is FULL regardless of space confirmation");
 });
 
-test("Triad TS-IWSAT6: with assumed half-space → GOOD DATA", () => {
+test("Triad TS-IWSAT6: published continuous SPL with assumed space → still FULL", () => {
+  // An assumed half-space does not downgrade a published continuous max SPL;
+  // the capability figure is used directly.
   const rec = {
     p12_p13_eligible: true,
+    max_spl_authority_type: "published_continuous",
     halfspace_published_max_continuous_spl_db_1m: 110,
     sensitivity_space_provenance: "half_space_assumed",
     max_spl_space_provenance: "half_space_assumed",
     sensitivity_reference: "2.83V/1m",
   };
-  assert.equal(classifyDataAdequacy(rec).key, "GOOD");
+  assert.equal(classifyDataAdequacy(rec).key, "FULL");
 });
 
 // ---------------------------------------------------------------------------

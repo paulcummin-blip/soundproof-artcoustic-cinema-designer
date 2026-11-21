@@ -52,7 +52,7 @@ test('INCOMPLETE shared row classifies as INCOMPLETE data adequacy', () => {
   const n = normalizeCompetitor(incompleteSharedRow);
   const label = classifyDataAdequacy(n);
   assert.equal(label.key, DATA_ADEQUACY.INCOMPLETE.key);
-  assert.equal(label.short, 'INCOMPLETE');
+  assert.equal(label.short, 'LIMITED');
 });
 
 test('selectComparisonLibraryRows includes the INCOMPLETE speaker_database row', () => {

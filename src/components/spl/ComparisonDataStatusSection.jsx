@@ -184,16 +184,16 @@ function whyText(adequacy, record) {
     return PROVISIONAL_EXPLANATION;
   }
   if (adequacy.key === DATA_ADEQUACY.FULL.key) {
-    return "Enough transparent manufacturer evidence for a like-for-like P12/P13 comparison on the same basis used for Artcoustic.";
+    return "Manufacturer publishes a continuous maximum SPL, so the RP22 capability figure is used directly.";
   }
-  if (adequacy.key === DATA_ADEQUACY.INCOMPLETE.key) {
-    return "Unable to calculate RP22 speaker capability from the information published by the manufacturer.";
+  if (adequacy.key === DATA_ADEQUACY.GOOD.key) {
+    return "Manufacturer publishes a maximum SPL but does not confirm continuous output. Sound Proof applies a −6 dB crest-factor allowance to estimate continuous capability.";
   }
-  // GOOD — tailor the sentence to what is actually published.
-  const publishedSpl = hasValue(record.published_max_continuous_spl_db_1m);
-  const lead = "A defensible comparison is possible using manufacturer-published sensitivity and amplifier guidance.";
-  if (!publishedSpl) return `${lead} No published continuous SPL figure, so capability is calculated from sensitivity and amplifier power.`;
-  return lead;
+  // LIMITED — no published maximum SPL, or essential information is missing.
+  if (record && record.p12_p13_eligible === true) {
+    return "No published maximum SPL. Capability is estimated from sensitivity and power handling, so the comparison depends on calculated rather than directly published performance.";
+  }
+  return "Unable to calculate RP22 speaker capability from the information published by the manufacturer.";
 }
 
 function Row({ label, value, first = false }) {
