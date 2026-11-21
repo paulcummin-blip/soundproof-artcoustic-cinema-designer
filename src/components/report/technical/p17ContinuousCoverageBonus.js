@@ -277,6 +277,12 @@ function perSpeakerCoverageExcess(entry) {
  */
 export function computeP17CoveragePoints(level, perSpeaker) {
   if (!/^(L[1-4])$/.test(String(level || ""))) return 0;
+  // L4 saturation: a seat already at the top RP22 coverage level gets no
+  // additional continuous contribution. This prevents inflating the scores
+  // of designs already at L4, preserving "do not inflate unchanged projects."
+  // Only L3/L2/L1 seats — where speakers can be re-aimed from poor to good
+  // coverage — receive the continuous coverage contribution.
+  if (String(level) === "L4") return 0;
   if (!Array.isArray(perSpeaker) || perSpeaker.length === 0) return 0;
 
   let sum = 0;

@@ -37,9 +37,22 @@ function windowDbForLimiting(levelNumbers) {
   return { 4: 1.5, 3: 3, 2: 4, 1: 5 }[limiting];
 }
 function p17SeatInput(levelNumbers) {
+  // Generate per-speaker entries from level numbers so the new coverage-points
+  // formula has the angle+windows evidence it needs. L4 → 10° (quality ~0.934,
+  // excess ~0.084 — contributes to coverage points); L3/L2/L1 → angles at
+  // their respective window edges (quality < 0.85, no contribution).
+  const bedWin = { l4Deg: 38, l3Deg: 54, l2Deg: 72 };
+  const levelToAngle = { 4: 10, 3: 46, 2: 63, 1: 80 };
+  const perSpeaker = levelNumbers.map((n, i) => ({
+    role: `S${i}`,
+    angleDeg: levelToAngle[n] || 80,
+    windows: bedWin,
+    windowLevelNumber: n,
+  }));
   return {
     rawValue: windowDbForLimiting(levelNumbers),
     p17ContinuousMeanQuality: meanQ(levelNumbers),
+    p17PerSpeaker: perSpeaker,
   };
 }
 
@@ -278,12 +291,12 @@ console.log("\nCase 8: Dixon — 10 speakers, LW improves L2 -> L4, rest unchang
   console.log(`    before: meanQ=${mqBefore.toFixed(4)} mult=${p17Before?.multiplier?.toFixed(3)} level=${p17Before?.resultLevel} points=${rBefore.actualPoints?.toFixed(1)}`);
   console.log(`    after:  meanQ=${mqAfter.toFixed(4)} mult=${p17After?.multiplier?.toFixed(3)} level=${p17After?.resultLevel} points=${rAfter.actualPoints?.toFixed(1)}`);
   check("meanQuality increased", mqAfter > mqBefore);
-  check("bonus increased (improvement recognised)", p17After?.multiplier > p17Before?.multiplier,
-    `${p17Before?.multiplier?.toFixed(3)} -> ${p17After?.multiplier?.toFixed(3)}`);
+  check("coverage points increased (improvement recognised)", (p17After?.continuousPoints || 0) > (p17Before?.continuousPoints || 0),
+    `${p17Before?.continuousPoints?.toFixed(3)} -> ${p17After?.continuousPoints?.toFixed(3)}`);
   check("RP22 level unchanged (L2)", p17Before?.resultLevel === "1×L2" && p17After?.resultLevel === "1×L2");
   check("improvement is proportionate (not excessive)",
-    (p17After?.multiplier - p17Before?.multiplier) < 1.0,
-    `delta=${((p17After?.multiplier || 0) - (p17Before?.multiplier || 0)).toFixed(3)}`);
+    ((p17After?.continuousPoints || 0) - (p17Before?.continuousPoints || 0)) < 20.0,
+    `delta=${((p17After?.continuousPoints || 0) - (p17Before?.continuousPoints || 0)).toFixed(3)}`);
 }
 
 // ── Case 9: Dixon substantial — primary L4, secondary several speakers re-aimed ─
@@ -348,9 +361,9 @@ console.log("\nCase 10: severe off-axis — 8 speakers all L1 -> 7 corrected to 
     p17After?.resultLevel === "1×L1");
   check("DPI improved visibly", rAfter.designPerformanceIndex > rBefore.designPerformanceIndex,
     `${rBefore.designPerformanceIndex} -> ${rAfter.designPerformanceIndex}`);
-  check("bonus increased substantially",
-    (p17After?.multiplier - p17Before?.multiplier) > 2.0,
-    `delta=${((p17After?.multiplier || 0) - (p17Before?.multiplier || 0)).toFixed(3)}`);
+  check("coverage points increased substantially",
+    ((p17After?.continuousPoints || 0) - (p17Before?.continuousPoints || 0)) > 10.0,
+    `delta=${((p17After?.continuousPoints || 0) - (p17Before?.continuousPoints || 0)).toFixed(3)}`);
 }
 
 // ── Cross-check: other ASDR parameters unaffected ───────────────────
@@ -402,35 +415,33 @@ console.log("\nDirect check: worsening the limiting speaker never increases bonu
 
 // ── Case 11: Continuous quality — same RP22 window, different angles ──
 
-console.log("\nCase 11: continuous quality — same RP22 window, different angles");
+console.log("\nCase 11: continuous quality — same RP22 band, different non-limiting coverage");
 {
-  // Typical coverage windows for a bed-layer surround
+  // The seat is limited by one speaker at L3 (42°). The other speakers are
+  // well-aimed (within L4). Better aim = speakers at 5° (quality 0.969, excess
+  // 0.119); worse aim = speakers at 30° (quality 0.813, excess 0 — below 0.85
+  // floor). Both seats stay at L3 (limiting speaker unchanged), but the
+  // coverage contribution differs.
   const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+  const limiting = { angleDeg: 42, windows, windowLevelNumber: 3 };
 
-  // Two angles both within the L3 window (40 < angle <= 55), but different.
-  // The discrete windowLevelNumber is 3 for both — the old formula could not
-  // distinguish them. The continuous function can.
-  const entryA = { angleDeg: 42, windows, windowLevelNumber: 3 };
-  const entryB = { angleDeg: 53, windows, windowLevelNumber: 3 };
+  const perSpeakerBetter = [limiting, { angleDeg: 5, windows, windowLevelNumber: 4 }, { angleDeg: 5, windows, windowLevelNumber: 4 }, { angleDeg: 5, windows, windowLevelNumber: 4 }];
+  const perSpeakerWorse  = [limiting, { angleDeg: 30, windows, windowLevelNumber: 4 }, { angleDeg: 30, windows, windowLevelNumber: 4 }, { angleDeg: 30, windows, windowLevelNumber: 4 }];
 
-  const qA = computeP17MeanQuality([entryA]);
-  const qB = computeP17MeanQuality([entryB]);
+  const qBetter = computeP17MeanQuality(perSpeakerBetter);
+  const qWorse  = computeP17MeanQuality(perSpeakerWorse);
+  console.log(`    better aim (3×5° + limiting): meanQ=${qBetter?.toFixed(4)}`);
+  console.log(`    worse aim  (3×30° + limiting): meanQ=${qWorse?.toFixed(4)}`);
+  check("better aim has higher mean quality", qBetter > qWorse);
 
-  console.log(`    angle 42° (L3): quality=${qA?.toFixed(4)}`);
-  console.log(`    angle 53° (L3): quality=${qB?.toFixed(4)}`);
-
-  check("both in L3 window but different continuous quality", qA !== qB);
-  check("nearer on-axis has higher quality", qA > qB);
-
-  // Feed through the rating adapter: both seats at L3, but one has better aim.
   const seats = [{id:"s1",priority:"primary"}];
-  const authBetter = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: qA } } });
-  const authWorse  = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: qB } } });
+  const authBetter = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17PerSpeaker: perSpeakerBetter } } });
+  const authWorse  = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17PerSpeaker: perSpeakerWorse } } });
   const rBetter = calculateRoomDesignRating(authBetter);
   const rWorse  = calculateRoomDesignRating(authWorse);
 
-  console.log(`    better aim (42°): mult=${p17Contrib(rBetter)?.multiplier?.toFixed(3)} DPI=${rBetter.designPerformanceIndex}`);
-  console.log(`    worse aim  (53°): mult=${p17Contrib(rWorse)?.multiplier?.toFixed(3)} DPI=${rWorse.designPerformanceIndex}`);
+  console.log(`    better aim: contPts=${p17Contrib(rBetter)?.continuousPoints?.toFixed(2)} earned=${p17Contrib(rBetter)?.earnedPoints?.toFixed(2)} DPI=${rBetter.designPerformanceIndex}`);
+  console.log(`    worse aim:  contPts=${p17Contrib(rWorse)?.continuousPoints?.toFixed(2)} earned=${p17Contrib(rWorse)?.earnedPoints?.toFixed(2)} DPI=${rWorse.designPerformanceIndex}`);
 
   check("better aim scores higher within same RP22 band", rBetter.actualPoints > rWorse.actualPoints);
   check("RP22 level unchanged (both L3)", p17Contrib(rBetter)?.resultLevel === "1×L3" && p17Contrib(rWorse)?.resultLevel === "1×L3");
@@ -508,28 +519,31 @@ console.log("\nCase 13: well-oriented speaker in L3-limited seat — small gain"
 
 console.log("\nCase 14: poor aiming reduces score within same RP22 band");
 {
+  // Seat limited by one speaker at L3 (45°). Two non-limiting speakers:
+  // good aim at 5° (quality 0.969, excess 0.119) vs poor aim at 35° (quality
+  // 0.781, excess 0 — below 0.85 floor). Both seats stay L3.
   const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+  const limiting = { angleDeg: 45, windows, windowLevelNumber: 3 };
 
-  // Two speakers both in L3, but one near the L4 edge (41°) and one near the L2 edge (54°).
-  const entryGood = { angleDeg: 41, windows, windowLevelNumber: 3 };
-  const entryPoor = { angleDeg: 54, windows, windowLevelNumber: 3 };
+  const perSpeakerGood = [limiting, { angleDeg: 5, windows, windowLevelNumber: 4 }, { angleDeg: 5, windows, windowLevelNumber: 4 }];
+  const perSpeakerPoor = [limiting, { angleDeg: 35, windows, windowLevelNumber: 4 }, { angleDeg: 35, windows, windowLevelNumber: 4 }];
 
-  const mqGood = computeP17MeanQuality([entryGood, entryGood]);
-  const mqPoor = computeP17MeanQuality([entryPoor, entryPoor]);
+  const mqGood = computeP17MeanQuality(perSpeakerGood);
+  const mqPoor = computeP17MeanQuality(perSpeakerPoor);
 
-  console.log(`    good aim (41°): meanQ=${mqGood?.toFixed(4)}`);
-  console.log(`    poor aim (54°): meanQ=${mqPoor?.toFixed(4)}`);
+  console.log(`    good aim (2×5° + limiting): meanQ=${mqGood?.toFixed(4)}`);
+  console.log(`    poor aim (2×35° + limiting): meanQ=${mqPoor?.toFixed(4)}`);
 
   check("good aim higher quality", mqGood > mqPoor);
 
   const seats = [{id:"s1",priority:"primary"}];
-  const authGood = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: mqGood } } });
-  const authPoor = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: mqPoor } } });
+  const authGood = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17PerSpeaker: perSpeakerGood } } });
+  const authPoor = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17PerSpeaker: perSpeakerPoor } } });
   const rGood = calculateRoomDesignRating(authGood);
   const rPoor = calculateRoomDesignRating(authPoor);
 
-  console.log(`    good: mult=${p17Contrib(rGood)?.multiplier?.toFixed(3)} DPI=${rGood.designPerformanceIndex}`);
-  console.log(`    poor: mult=${p17Contrib(rPoor)?.multiplier?.toFixed(3)} DPI=${rPoor.designPerformanceIndex}`);
+  console.log(`    good: contPts=${p17Contrib(rGood)?.continuousPoints?.toFixed(2)} DPI=${rGood.designPerformanceIndex}`);
+  console.log(`    poor: contPts=${p17Contrib(rPoor)?.continuousPoints?.toFixed(2)} DPI=${rPoor.designPerformanceIndex}`);
 
   check("good aim scores higher", rGood.actualPoints > rPoor.actualPoints);
   check("RP22 level unchanged (both L3)", p17Contrib(rGood)?.resultLevel === "1×L3" && p17Contrib(rPoor)?.resultLevel === "1×L3");
