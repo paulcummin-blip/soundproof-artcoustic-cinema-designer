@@ -46,7 +46,9 @@ function isUsable(asset) {
   return true;
 }
 
-const groupNameOf = (asset) => ['lounge', 'recliner'].includes(asset?.seating_style) && !isOptionImage(asset)
+const isSeatingOptionPurpose = (asset) => recorded(asset?.image_purpose) === 'seating_option';
+
+const groupNameOf = (asset) => isSeatingOptionPurpose(asset) && ['lounge', 'recliner'].includes(asset?.seating_style) && !isOptionImage(asset)
   ? 'Seating style' : (recorded(asset?.comparison_group) || DEFAULT_OPTION_GROUP);
 
 function orderOf(asset) {
@@ -75,7 +77,7 @@ function orderedImages(images, name) {
  * @returns {{groups: Array<{group: string, options: Array<string>, note: string|null}>}|null}
  */
 export function buildOptionGuidance(assets = []) {
-  const images = (Array.isArray(assets) ? assets : []).filter((asset) => isUsable(asset) && (isOptionImage(asset) || ['lounge', 'recliner'].includes(asset.seating_style)));
+  const images = (Array.isArray(assets) ? assets : []).filter((asset) => isUsable(asset) && (isOptionImage(asset) || (isSeatingOptionPurpose(asset) && ['lounge', 'recliner'].includes(asset.seating_style))));
   if (images.length === 0) return null;
 
   const names = [];

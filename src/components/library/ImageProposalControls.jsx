@@ -156,22 +156,6 @@ export default function ImageProposalControls({
 
       {!hidden && (
         <>
-          <div>
-            <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>
-              Seating option
-            </label>
-            <select
-              value={seating}
-              onChange={(event) => onSeatingChange(event.target.value)}
-              className={SELECT_CLASS}
-              style={FONT}
-            >
-              <option value="">Not a seating option</option>
-              <option value={SEATING_STYLE.LOUNGE}>{SEATING_STYLE_LABELS[SEATING_STYLE.LOUNGE]}</option>
-              <option value={SEATING_STYLE.RECLINER}>{SEATING_STYLE_LABELS[SEATING_STYLE.RECLINER]}</option>
-            </select>
-          </div>
-
           {/* IMAGE PURPOSE — what this image is meant to communicate. It is the
               composer's editorial context: which narrative content the image
               belongs with, and whether it is a drawing that must stay whole. It
@@ -197,6 +181,30 @@ export default function ImageProposalControls({
                 : 'Tell the proposal what this image is for, and it is placed with the text it explains.'}
             </p>
           </div>
+
+          {/* SEATING TYPE — a secondary control that only applies when the image's
+              purpose is Seating option. The same seating_style field the old
+              standalone Seating option dropdown wrote, now revealed only where it
+              is meaningful. Changing Image Purpose away from Seating option hides
+              this control without clearing the saved seating_style, so a later
+              switch back restores the designer's earlier choice. */}
+          {purpose === IMAGE_PURPOSE.SEATING_OPTION && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>
+                Seating type
+              </label>
+              <select
+                value={seating}
+                onChange={(event) => onSeatingChange(event.target.value)}
+                className={SELECT_CLASS}
+                style={FONT}
+              >
+                <option value="">Not specified</option>
+                <option value={SEATING_STYLE.LOUNGE}>{SEATING_STYLE_LABELS[SEATING_STYLE.LOUNGE]}</option>
+                <option value={SEATING_STYLE.RECLINER}>{SEATING_STYLE_LABELS[SEATING_STYLE.RECLINER]}</option>
+              </select>
+            </div>
+          )}
 
           {/* PRESENTATION — how this image is placed in the document: the large
               editorial image, a smaller whole drawing, or a smaller editorial

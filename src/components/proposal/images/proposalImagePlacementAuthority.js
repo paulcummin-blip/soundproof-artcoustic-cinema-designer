@@ -603,6 +603,19 @@ export function seatingStyleOf(asset) {
 }
 
 /**
+ * Whether this image's CURRENT purpose is a seating option — the one authority
+ * for whether seating-specific proposal logic applies to it. The seating_style
+ * field is preserved metadata (it still drives the Seating type dropdown and the
+ * seating page labels), but an image only enters the seating page, the option
+ * guidance and the report's alternative exclusion when its purpose is
+ * Seating option. Changing the purpose away hides the seating selector without
+ * destroying the saved seating_style, and the image re-enters the narrative.
+ */
+export function isSeatingOptionImage(asset) {
+  return imagePurposeOf(asset) === IMAGE_PURPOSE.SEATING_OPTION;
+}
+
+/**
  * The focal point an image is framed on. Only the two declared values are read:
  * anything else is the default, so a bad value can never crop an image oddly.
  */

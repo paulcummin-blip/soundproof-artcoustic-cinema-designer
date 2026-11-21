@@ -75,6 +75,7 @@ import {
   purposeSectionTypes,
   sectionTargetOf,
   seatingStyleOf,
+  isSeatingOptionImage,
 } from './proposalImagePlacementAuthority.js';
 import { isCoverAsset } from '../assetSlotAuthority.js';
 
@@ -191,14 +192,18 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   };
 
   // A seating-style image is a lifestyle alternative: it belongs to the seating
-  // page and is never scattered through the narrative as a design feature.
-  const seatingSources = usable.filter((asset) => asset !== coverAsset && !isCompared(asset) && seatingStyleOf(asset));
+  // page and is never scattered through the narrative as a design feature. The
+  // image's CURRENT purpose is the authority for this grouping — the seating_style
+  // field is preserved metadata that drives the page labels, but an image only
+  // enters the seating page when its purpose is Seating option, so switching the
+  // purpose away returns the image to the narrative without losing its saved choice.
+  const seatingSources = usable.filter((asset) => asset !== coverAsset && !isCompared(asset) && isSeatingOptionImage(asset));
   // "Use in proposal" is the body-inclusion authority for every source, including
   // the source also selected for the cover. The cover placement is additional: it
   // neither consumes nor excludes the source from the narrative. Presentation says
   // HOW the body use is composed, not WHETHER the body use exists; an image with no
   // presentation recorded keeps the established narrative treatment.
-  const narrativeSources = usable.filter((asset) => !isCompared(asset) && !seatingStyleOf(asset));
+  const narrativeSources = usable.filter((asset) => !isCompared(asset) && !isSeatingOptionImage(asset));
 
   // ── Page order. The cover is page 1; each composed section takes the next
   // page; the seating-style page sits immediately before the closing section,
@@ -477,7 +482,7 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   const withheldDetailIds = new Set(detailImagesAwaitingTarget);
   const unplaced = usable.filter(
     (asset) => asset.id && !bodyPlacedIds.has(asset.id)
-      && !seatingStyleOf(asset) && !isCompared(asset)
+      && !isSeatingOptionImage(asset) && !isCompared(asset)
       // An Inline Detail image with no section named is NOT guessed at: it waits
       // for the designer to choose its section rather than joining whichever
       // narrative page happens to have room for it.

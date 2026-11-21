@@ -313,7 +313,6 @@ export function visualEligibility(asset, { versionId = null } = {}) {
   if (asset?.usage === 'do_not_use') return reject(VISUAL_EXCLUSION.HIDDEN);
   // An alternative the client is being offered is not the selected design.
   if (asset?.comparison_enabled === true) return reject(VISUAL_EXCLUSION.COMPARISON_OPTION);
-  if (asText(asset?.seating_style)) return reject(VISUAL_EXCLUSION.SEATING_OPTION);
   if (ALTERNATIVE_PURPOSES.includes(asText(asset?.image_purpose))) return reject(VISUAL_EXCLUSION.SEATING_OPTION);
   // Character, not dimensions.
   if (DRAWING_PURPOSES.includes(asText(asset?.image_purpose))) return reject(VISUAL_EXCLUSION.TECHNICAL_DRAWING);
