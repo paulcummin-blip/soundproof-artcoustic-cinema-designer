@@ -74,7 +74,6 @@ import {
   makePlacement,
   purposeSectionTypes,
   sectionTargetOf,
-  seatingStyleOf,
   isSeatingOptionImage,
 } from './proposalImagePlacementAuthority.js';
 import { isCoverAsset } from '../assetSlotAuthority.js';
