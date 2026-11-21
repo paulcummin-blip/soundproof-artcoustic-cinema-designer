@@ -88,7 +88,7 @@ const MAX_MULTIPLIER = 12;
  * @param {object} entry - per-speaker entry from the P17 engine
  * @returns {number|null} quality in [0, 1], or null when no evidence
  */
-function continuousSpeakerQuality(entry) {
+export function continuousSpeakerQuality(entry) {
   if (!entry) return null;
 
   // Prefer the genuinely continuous path: angle + windows
@@ -186,119 +186,100 @@ export function effectiveP17Multiplier(level, meanQuality) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Properly-scaled continuous coverage contribution (additive points)
+// Normalised grade-relative continuous coverage contribution
 // ═══════════════════════════════════════════════════════════════
 //
-// The multiplier-bonus approach above is capped at one grade step (4
-// multiplier points) and averaged across speakers via mean quality, which
-// dilutes multi-speaker improvements: when 2 of 10 speakers improve, the
-// mean quality moves by only 20% of the per-speaker delta, producing <0.2
-// displayed DPI — invisible in the rounded index.
+// Replaces the previous unnormalised additive sum. Three confirmed defects
+// are corrected:
 //
-// This additive-points contribution solves the dilution by summing per-speaker
-// excess quality (not averaging), so the improvement from the speakers that
-// actually changed is not divided by the count of speakers that didn't.
-// The sum is then scaled and bounded to produce 2–3 displayed DPI for a
-// substantial multi-speaker coverage improvement, while remaining zero for
-// designs with poor coverage (no baseline inflation).
+//  1. GRADE-BOUNDARY MONOTONICITY: the contribution is capped at the grade
+//     gap (nextBase − currentBase) × weight. At the cap, the lower grade's
+//     total equals the next grade's base contribution, so improving the
+//     limiting speaker across ANY grade boundary (L1→L2, L2→L3, L3→L4)
+//     never drops the total P17 earned points.
 //
-// Principles:
-//  - On-axis speakers (angle ≤ threshold) are excluded: they are already at
-//    quality ~1.0, never change with aiming, and would inflate the baseline
-//    without adding signal. ("Speakers already providing excellent coverage
-//    should receive little or no extra reward.")
-//  - Only speakers above a high quality floor contribute, so poorly-covered
-//    speakers (quality below the floor) add nothing. The discrete P17 grade
-//    already captures their deficiency.
-//  - Per-speaker excess is capped, giving diminishing returns for very good
-//    coverage.
-//  - The contribution is monotonic: improving any speaker can only raise it,
-//    worsening any speaker can only lower it.
-//  - Zero for designs with no speakers above the floor (no baseline inflation).
-//  - Bounded by COVERAGE_MAX_POINTS per seat.
+//  2. ON-AXIS SMOOTH SATURATION: no on-axis exclusion threshold. The quality
+//     function already approaches 1.0 smoothly as the angle approaches 0°,
+//     so a speaker improving 2°→1° raises the mean and the contribution —
+//     it never loses points. Already-excellent coverage saturates with
+//     little remaining headroom but is never penalised.
+//
+//  3. SPEAKER-COUNT NORMALISATION: uses the MEAN per-speaker quality
+//     (average), not the sum, so 5.x, 7.x and 9.x systems with the same
+//     average coverage quality receive the same contribution. Speaker
+//     count already has its own treatment elsewhere in ASDR; this does not
+//     introduce a second quantity reward.
+//
+// Formula:
+//   progress = clamp((meanQuality − gradeFloor) / (1.0 − gradeFloor), 0, 1)
+//   continuous = progress × (nextGradeBase − currentGradeBase) × weight
+//
+// The full quality range [gradeFloor, 1.0] is used (not just to the next
+// grade ceiling) to avoid premature saturation when the mean exceeds the
+// grade ceiling — many non-limiting speakers can be well above the grade
+// while the limiting speaker holds it down.
+//
+// Monotonicity proof (no boundary drop):
+//   At any grade G (≠ L4), max total = base_G × w + (base_next − base_G) × w
+//                                    = base_next × w.
+//   At the next grade G+1 (just reached), min total = base_next × w + 0.
+//   So max lower-grade total = min next-grade total. The total can never
+//   drop when the limiting speaker crosses a grade boundary. Improving
+//   non-limiting speakers raises the mean, raising progress, raising the
+//   contribution — also never a drop.
 //
 // Pure: no React, no SDK, no writes. Imported by the rating adapter and by
 // regression tests so both use one formula.
 
-/** Speakers aimed within this angle of the seat are excluded (already excellent). */
-const ON_AXIS_THRESHOLD_DEG = 1.0;
+/** P17 canonical weight (mirrors base44/shared/canonicalParameterWeights.js). */
+const P17_WEIGHT = 5;
 
-/** Quality floor: only speakers with quality above this contribute. */
-const COVERAGE_QUALITY_FLOOR = 0.85;
+/** Grade base multipliers (mirrors LEVEL_MULTIPLIERS). */
+const GRADE_BASE_MULT = Object.freeze({ L4: 12, L3: 8, L2: 4, L1: 2 });
 
-/** Per-speaker excess cap (diminishing returns for very good coverage). */
-const PER_SPEAKER_EXCESS_CAP = 0.15;
+/** Next grade base for the ceiling cap (L4 has no next → no contribution). */
+const NEXT_GRADE_MULT = Object.freeze({ L3: 12, L2: 8, L1: 4 });
 
 /**
- * Scale converting the summed per-speaker excess into additive ASDR points.
- * Calibrated so a substantial multi-speaker improvement (e.g. two wides
- * moving from ~50° to ~10° at two seats) produces approximately 2 displayed
- * DPI points.
+ * Quality at each grade's floor (the angle-to-window ratio at the grade's
+ * lower boundary, from continuousSpeakerQuality):
+ *   L4 floor = 0.75  (l4Deg → 0.75)
+ *   L3 floor = 0.50  (l3Deg → 0.50)
+ *   L2 floor = 0.25  (l2Deg → 0.25)
+ *   L1 floor = 0.00  (beyond l2Deg → 0.0)
  */
-const COVERAGE_POINTS_SCALE = 147;
-
-/** Maximum continuous coverage points per seat (bounds the contribution). */
-const COVERAGE_MAX_POINTS = 30;
+const GRADE_FLOOR_QUALITY = Object.freeze({ L4: 0.75, L3: 0.50, L2: 0.25, L1: 0.00 });
 
 /**
- * Per-speaker coverage excess: the amount by which this speaker's quality
- * exceeds the coverage floor, capped for diminishing returns, zero for
- * on-axis speakers (already excellent) and speakers below the floor.
- *
- * @param {object} entry - per-speaker entry from the P17 engine
- * @returns {number} excess in [0, PER_SPEAKER_EXCESS_CAP]
- */
-function perSpeakerCoverageExcess(entry) {
-  if (!entry) return 0;
-
-  // Exclude on-axis speakers — already excellent, no extra reward.
-  const angleDeg = isNum(entry.angleDeg)
-    ? Math.abs(entry.angleDeg)
-    : (isNum(entry.offAxisDeg) ? Math.abs(entry.offAxisDeg) : null);
-  if (angleDeg != null && angleDeg <= ON_AXIS_THRESHOLD_DEG) return 0;
-
-  const q = continuousSpeakerQuality(entry);
-  if (q == null) return 0;
-
-  return Math.min(PER_SPEAKER_EXCESS_CAP, Math.max(0, q - COVERAGE_QUALITY_FLOOR));
-}
-
-/**
- * Compute the additive continuous coverage points for a P17 seat.
- *
- * Sums the per-speaker coverage excess across applicable speakers, scales
- * the sum into raw ASDR points, and bounds the result. Unlike the
- * mean-quality bonus, this sum is NOT divided by the speaker count, so
- * improvements to individual speakers survive without dilution.
+ * Compute the normalised grade-relative continuous coverage points for a
+ * P17 seat.
  *
  * @param {string} level - the seat's discrete P17 level ("L1".."L4").
  * @param {Array} perSpeaker - engine per-speaker entries (angleDeg + windows).
- * @returns {number} additive ASDR points (>= 0, bounded).
+ * @returns {number} additive ASDR points (>= 0, bounded by the grade gap).
  */
 export function computeP17CoveragePoints(level, perSpeaker) {
   if (!/^(L[1-4])$/.test(String(level || ""))) return 0;
-  // L4 saturation: a seat already at the top RP22 coverage level gets no
-  // additional continuous contribution. This prevents inflating the scores
-  // of designs already at L4, preserving "do not inflate unchanged projects."
-  // Only L3/L2/L1 seats — where speakers can be re-aimed from poor to good
-  // coverage — receive the continuous coverage contribution.
+  // L4: already at the top RP22 coverage level — no higher grade to approach.
   if (String(level) === "L4") return 0;
   if (!Array.isArray(perSpeaker) || perSpeaker.length === 0) return 0;
 
-  let sum = 0;
-  for (const entry of perSpeaker) {
-    sum += perSpeakerCoverageExcess(entry);
-  }
+  const meanQuality = computeP17MeanQuality(perSpeaker);
+  if (meanQuality == null) return 0;
 
-  const points = COVERAGE_POINTS_SCALE * sum;
-  return Math.min(COVERAGE_MAX_POINTS, Math.max(0, points));
+  const floorQ = GRADE_FLOOR_QUALITY[level];
+  const maxContinuous = (NEXT_GRADE_MULT[level] - GRADE_BASE_MULT[level]) * P17_WEIGHT;
+  const span = 1.0 - floorQ;
+  if (span <= 0 || maxContinuous <= 0) return 0;
+
+  const progress = Math.max(0, Math.min(1, (meanQuality - floorQ) / span));
+  return progress * maxContinuous;
 }
 
 // Expose constants for tests and diagnostics.
 export const P17_COVERAGE_CONSTANTS = Object.freeze({
-  ON_AXIS_THRESHOLD_DEG,
-  COVERAGE_QUALITY_FLOOR,
-  PER_SPEAKER_EXCESS_CAP,
-  COVERAGE_POINTS_SCALE,
-  COVERAGE_MAX_POINTS,
+  P17_WEIGHT,
+  GRADE_BASE_MULT,
+  NEXT_GRADE_MULT,
+  GRADE_FLOOR_QUALITY,
 });

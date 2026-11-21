@@ -1,14 +1,16 @@
 // p17-coverage-dixon-validation.test.mjs
-// Validation that the properly-scaled continuous coverage contribution makes
-// genuine multi-speaker improvements visible in the Design Performance Index.
+// Validation that the corrected normalised continuous coverage contribution
+// makes genuine multi-speaker improvements visible in the raw P17 earned
+// points, while respecting speaker-count normalisation and grade ceilings.
 //
 // Uses the actual saved Dixon P17 evidence (Avensys Custom Install, 9.1.6)
-// across four aiming configurations, verifying that:
-//  1. A substantial multi-speaker improvement produces ~2 displayed DPI.
+// across aiming configurations, verifying that:
+//  1. A substantial multi-speaker improvement produces a positive raw-point
+//     delta (visible in the full index, not concealed by rounding).
 //  2. Small adjustments produce small changes.
 //  3. Worsening coverage reduces the contribution.
-//  4. An unchanged design does not receive a general baseline increase.
-//  5. Speakers already at excellent coverage receive little or no extra reward.
+//  4. The contribution is normalised by speaker count (no count bias).
+//  5. Near-on-axis speakers contribute smoothly (no on-axis exclusion).
 //
 // Run: node --import ./test/_mount-loader.mjs test/p17-coverage-dixon-validation.test.mjs
 
@@ -19,7 +21,7 @@ import {
 import {
   computeP17CoveragePoints,
   computeP17MeanQuality,
-  P17_COVERAGE_CONSTANTS,
+  continuousSpeakerQuality,
 } from "../src/components/report/technical/p17ContinuousCoverageBonus.js";
 
 let failures = 0;
@@ -58,7 +60,7 @@ const pub3_c1 = [
 
 console.log("\n=== DIXON P17 COVERAGE CONTRIBUTION VALIDATION ===\n");
 
-// 1. Substantial improvement → ~2 DPI
+// 1. Substantial improvement → positive raw-point delta
 console.log("1. Substantial multi-speaker improvement (pub1 → pub2):\n");
 {
   const pts1 = computeP17CoveragePoints('L2', pub1_c1);
@@ -67,11 +69,11 @@ console.log("1. Substantial multi-speaker improvement (pub1 → pub2):\n");
   const dpiDelta = delta / 10;
   const mq1 = computeP17MeanQuality(pub1_c1);
   const mq2 = computeP17MeanQuality(pub2_c1);
-  console.log(`    meanQ: ${mq1.toFixed(4)} → ${mq2.toFixed(4)} (old delta=${((mq2-mq1)*5.333).toFixed(2)} mult pts)`);
-  console.log(`    coveragePts: ${pts1.toFixed(2)} → ${pts2.toFixed(2)} (Δ=${delta.toFixed(2)} pts = ${dpiDelta.toFixed(2)} DPI)`);
-  check("substantial improvement produces ~2 DPI", dpiDelta >= 1.5 && dpiDelta <= 3.0, `${dpiDelta.toFixed(2)} DPI`);
+  console.log(`    meanQ: ${mq1.toFixed(4)} → ${mq2.toFixed(4)} (Δ=${(mq2-mq1).toFixed(4)})`);
+  console.log(`    coveragePts: ${pts1.toFixed(2)} → ${pts2.toFixed(2)} (Δ=${delta.toFixed(2)} pts = ${dpiDelta.toFixed(3)} DPI)`);
+  check("substantial improvement produces positive raw-point delta", delta > 0, `${delta.toFixed(2)} pts`);
   check("improvement is positive", delta > 0);
-  check("old meanQ delta would have been <0.2 DPI", Math.abs((mq2-mq1)*5.333*5/10) < 0.2, `old DPI delta=${((mq2-mq1)*5.333*5/10).toFixed(3)}`);
+  check("mean quality increased", mq2 > mq1, `${mq1.toFixed(4)} → ${mq2.toFixed(4)}`);
 }
 
 // 2. Small adjustment → small change
@@ -95,46 +97,37 @@ console.log("\n3. Worsening coverage (pub2 → pub1):\n");
   check("worsening reduces the contribution", delta < 0, `${delta.toFixed(2)} pts`);
 }
 
-// 4. Unchanged design: no baseline increase
-console.log("\n4. Unchanged design / no baseline inflation:\n");
+// 4. Speaker-count normalisation
+console.log("\n4. Speaker-count normalisation (same avg quality → same contribution):\n");
 {
-  const allPoor = [
-    spk('SL',30,bedWin), spk('SR',30,bedWin), spk('LW',50,bedWin), spk('RW',50,bedWin),
-    spk('TFL',30,ohWin), spk('TFR',40,ohWin), spk('TML',30,ohWin), spk('TMR',40,ohWin),
-    spk('TRL',30,ohWin), spk('TRR',40,ohWin),
-  ];
-  const poorPts = computeP17CoveragePoints('L2', allPoor);
-  const pub1Pts = computeP17CoveragePoints('L2', pub1_c1);
-  console.log(`    all-poor design: ${poorPts.toFixed(2)} pts | pub1 (poor wide): ${pub1Pts.toFixed(2)} pts`);
-  check("all-poor-coverage design gets 0 contribution", poorPts === 0, `${poorPts.toFixed(2)} pts`);
-  check("pub1 contribution is small (not a large baseline)", pub1Pts < 5, `${pub1Pts.toFixed(2)} pts`);
+  // All speakers at 20° → identical quality regardless of count
+  const q20 = continuousSpeakerQuality(spk('S', 20, bedWin));
+  const spk20 = (n) => Array(n).fill(0).map(() => spk('S', 20, bedWin));
+  const pts5 = computeP17CoveragePoints('L3', spk20(5));
+  const pts7 = computeP17CoveragePoints('L3', spk20(7));
+  const pts10 = computeP17CoveragePoints('L3', spk20(10));
+  const pts15 = computeP17CoveragePoints('L3', spk20(15));
+  console.log(`    5 speakers: ${pts5.toFixed(3)} | 7: ${pts7.toFixed(3)} | 10: ${pts10.toFixed(3)} | 15: ${pts15.toFixed(3)}`);
+  check("5/7/10/15 speakers same avg quality → same contribution",
+    Math.abs(pts5 - pts10) < 1e-9 && Math.abs(pts7 - pts10) < 1e-9 && Math.abs(pts15 - pts10) < 1e-9,
+    `max-min=${(Math.max(pts5,pts7,pts10,pts15)-Math.min(pts5,pts7,pts10,pts15)).toFixed(6)}`);
 }
 
-// 5. Excellent speakers receive little extra
-console.log("\n5. On-axis speakers excluded (already excellent):\n");
+// 5. Near-on-axis smooth saturation (no exclusion)
+console.log("\n5. Near-on-axis smooth saturation (no exclusion):\n");
 {
-  const nearOnAxis = [
-    spk('SL',0,bedWin), spk('SR',0,bedWin), spk('LW',1,bedWin), spk('RW',2,bedWin),
-    spk('TFL',3,ohWin), spk('TFR',4,ohWin), spk('TML',2,ohWin), spk('TMR',3,ohWin),
-    spk('TRL',2,ohWin), spk('TRR',4,ohWin),
-  ];
-  const pts = computeP17CoveragePoints('L2', nearOnAxis);
-  // SL, SR at 0° are excluded (on-axis threshold). LW at 1° also excluded (≤1°).
-  // The remaining 7 speakers at 2-4° have excellent coverage → near max contribution.
-  // Verify the contribution is positive (others contribute) and that on-axis
-  // speakers don't inflate it beyond the bound.
-  const withOnAxis = computeP17CoveragePoints('L2', [
-    spk('SL',0,bedWin), spk('SR',0,bedWin), spk('LW',0,bedWin), spk('RW',0,bedWin),
-    spk('TFL',0,ohWin), spk('TFR',0,ohWin), spk('TML',0,ohWin), spk('TMR',0,ohWin),
-    spk('TRL',0,ohWin), spk('TRR',0,ohWin),
-  ]);
-  console.log(`    near-on-axis (SL/SR 0°, others 1-4°): ${pts.toFixed(2)} pts | all-on-axis (all 0°): ${withOnAxis.toFixed(2)} pts`);
-  check("on-axis speakers (0°) excluded — all-on-axis gets 0", withOnAxis === 0, `${withOnAxis.toFixed(2)} pts`);
-  check("others contribute (near-on-axis > 0)", pts > 0, `${pts.toFixed(2)} pts`);
+  // Improving a speaker 2°→1° must not lose points
+  const pts2 = computeP17CoveragePoints('L3', [spk('S',2,bedWin), spk('S',2,bedWin), spk('S',2,bedWin), spk('S',2,bedWin), spk('S',2,bedWin)]);
+  const pts1 = computeP17CoveragePoints('L3', [spk('S',1,bedWin), spk('S',1,bedWin), spk('S',1,bedWin), spk('S',1,bedWin), spk('S',1,bedWin)]);
+  const pts0 = computeP17CoveragePoints('L3', [spk('S',0,bedWin), spk('S',0,bedWin), spk('S',0,bedWin), spk('S',0,bedWin), spk('S',0,bedWin)]);
+  console.log(`    2°: ${pts2.toFixed(3)} | 1°: ${pts1.toFixed(3)} | 0°: ${pts0.toFixed(3)}`);
+  check("2°→1° does not lose points (no on-axis reversal)", pts1 >= pts2 - 1e-9, `${pts2.toFixed(3)} → ${pts1.toFixed(3)}`);
+  check("1°→0° does not lose points", pts0 >= pts1 - 1e-9, `${pts1.toFixed(3)} → ${pts0.toFixed(3)}`);
+  check("on-axis speakers contribute (not excluded)", pts0 > 0, `${pts0.toFixed(3)} pts`);
 }
 
-// 6. Full adapter: scoped DPI responds
-console.log("\n6. Full adapter: secondary scoped DPI responds to coverage:\n");
+// 6. Full adapter: scoped earned points respond
+console.log("\n6. Full adapter: secondary scoped earned points respond to coverage:\n");
 {
   const seats = [{id:'c1',priority:'secondary'},{id:'c5',priority:'secondary'}];
   const buildAuth = (perSpeaker) => ({ seats, p17: { c1: {rawValue:4.0,p17PerSpeaker:perSpeaker}, c5: {rawValue:4.0,p17PerSpeaker:perSpeaker} } });
@@ -147,11 +140,10 @@ console.log("\n6. Full adapter: secondary scoped DPI responds to coverage:\n");
   console.log(`    pub1: mult=${p1?.multiplier?.toFixed(2)} contPts=${p1?.continuousPoints?.toFixed(2)} earned=${p1?.earnedPoints?.toFixed(2)} DPI=${r1.designPerformanceIndex}`);
   console.log(`    pub2: mult=${p2?.multiplier?.toFixed(2)} contPts=${p2?.continuousPoints?.toFixed(2)} earned=${p2?.earnedPoints?.toFixed(2)} DPI=${r2.designPerformanceIndex}`);
   console.log(`    pub3: mult=${p3?.multiplier?.toFixed(2)} contPts=${p3?.continuousPoints?.toFixed(2)} earned=${p3?.earnedPoints?.toFixed(2)} DPI=${r3.designPerformanceIndex}`);
-  const d12 = (r2.designPerformanceIndex||0)-(r1.designPerformanceIndex||0);
-  const d23 = (r3.designPerformanceIndex||0)-(r2.designPerformanceIndex||0);
-  check("pub1→pub2 DPI increased", d12 > 0, `Δ=${d12}`);
-  check("pub1→pub2 DPI delta >= 1", d12 >= 1, `Δ=${d12}`);
-  check("pub2→pub3 small DPI change", Math.abs(d23) <= 1, `Δ=${d23}`);
+  const e12 = (p2?.earnedPoints||0)-(p1?.earnedPoints||0);
+  const e23 = (p3?.earnedPoints||0)-(p2?.earnedPoints||0);
+  check("pub1→pub2 earned points increased", e12 > 0, `Δ=${e12.toFixed(2)}`);
+  check("pub2→pub3 small earned change", Math.abs(e23) <= 1, `Δ=${e23.toFixed(2)}`);
   check("continuousPts on contribution", p1?.continuousPoints != null);
   check("pub2 continuousPts > pub1", (p2?.continuousPoints||0) > (p1?.continuousPoints||0));
 }
@@ -160,6 +152,7 @@ console.log("\n6. Full adapter: secondary scoped DPI responds to coverage:\n");
 console.log("\n7. Monotonicity: worsening a speaker never increases coverage points:\n");
 {
   let violations = 0;
+  let prevPts = null;
   for (let a = 2; a < 70; a++) {
     const before = [spk('LW',a,bedWin), spk('RW',a,bedWin), ...pub2_c1.slice(0,8)];
     const after = [spk('LW',a+1,bedWin), spk('RW',a+1,bedWin), ...pub2_c1.slice(0,8)];
@@ -168,6 +161,26 @@ console.log("\n7. Monotonicity: worsening a speaker never increases coverage poi
     if (ptsA > ptsB + 1e-9) { violations++; console.log(`    VIOLATION at ${a}°→${a+1}°: ${ptsB.toFixed(3)}→${ptsA.toFixed(3)}`); }
   }
   check("no monotonicity violations (2°→70° sweep)", violations === 0, violations ? `${violations} violation(s)` : "");
+}
+
+// 8. Grade-boundary monotonicity (L3→L4 no drop)
+console.log("\n8. Grade boundary L3→L4: total P17 earned does not drop:\n");
+{
+  // 5 non-limiting speakers at 10° (excellent). Limiting speaker crosses L3→L4.
+  const nonLimiting = Array(5).fill(0).map((_,i) => spk(`NL${i}`, 10, bedWin));
+  const below = [spk('LIM', 38.5, bedWin), ...nonLimiting]; // limiting just past l4Deg → L3
+  const above = [spk('LIM', 37.5, bedWin), ...nonLimiting]; // limiting just before l4Deg → L4
+
+  const seats = [{id:'s1',priority:'primary'}];
+  const authBelow = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 2.0, p17PerSpeaker: below } } });
+  const authAbove = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 1.5, p17PerSpeaker: above } } });
+  const rBelow = calculateScopedRoomDesignRating(authBelow, ['s1']);
+  const rAbove = calculateScopedRoomDesignRating(authAbove, ['s1']);
+  const eBelow = (rBelow.contributions||[]).find(c=>c.key==='p17')?.earnedPoints ?? 0;
+  const eAbove = (rAbove.contributions||[]).find(c=>c.key==='p17')?.earnedPoints ?? 0;
+  console.log(`    L3 (limiting 38.5°): earned=${eBelow.toFixed(2)}`);
+  console.log(`    L4 (limiting 37.5°): earned=${eAbove.toFixed(2)}`);
+  check("L3→L4 earned does not drop", eAbove >= eBelow - 1e-9, `Δ=${(eAbove-eBelow).toFixed(2)}`);
 }
 
 console.log(`\n${failures === 0 ? "ALL DIXON VALIDATION TESTS PASS" : `${failures} test(s) failed`}\n`);
