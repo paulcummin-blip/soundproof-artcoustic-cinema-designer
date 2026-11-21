@@ -624,7 +624,7 @@ export default function Layout({ children, currentPageName }) {
                     fontFamily: 'Didact Gothic, sans-serif',
                   }}
                 >
-                  <div className="flex items-center justify-between gap-2 px-3 py-3">
+                  <div className="flex items-center justify-between gap-2 px-3 py-[18px]">
                     <div className="flex flex-col">
                       <span
                         style={{
@@ -640,8 +640,8 @@ export default function Layout({ children, currentPageName }) {
                       </span>
                       <span
                         style={{
-                          fontSize: 15,
-                          fontWeight: 600,
+                          fontSize: 16,
+                          fontWeight: 700,
                           color: '#FFFFFF',
                           letterSpacing: '0.02em',
                           lineHeight: 1.3,
@@ -652,7 +652,7 @@ export default function Layout({ children, currentPageName }) {
                       </span>
                     </div>
                     <ArrowUpRight
-                      className="w-4 h-4 text-white transition-transform duration-200 group-hover:translate-x-[2px] group-hover:-translate-y-[2px]"
+                      className="w-5 h-5 text-white transition-transform duration-200 group-hover:translate-x-[2px] group-hover:-translate-y-[2px]"
                       strokeWidth={1.75}
                     />
                   </div>
