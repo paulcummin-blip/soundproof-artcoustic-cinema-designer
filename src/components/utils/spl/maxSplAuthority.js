@@ -49,24 +49,32 @@ export function isExplicitlyPeakSpl(basis) {
 
 /**
  * Classify the max-SPL authority for a competitor row.
- *   'published_continuous' — manufacturer explicitly published continuous SPL
- *                             (value in the continuous field, basis AES/IEC/continuous)
+ *   'published_continuous' — manufacturer explicitly published a continuous SPL
+ *                             (a value in the continuous field, basis not peak)
  *   'published_peak'        — manufacturer explicitly identified the figure as peak
- *                             (basis = peak)
- *   'assumed_peak'          — manufacturer published a max SPL but did not confirm
- *                             continuous (basis unspecified/unknown/calculated/null)
+ *                             (basis = peak, or a peak field with no continuous)
+ *   'assumed_peak'          — manufacturer published a max SPL but no continuous
+ *                             figure (peak field only, basis not peak)
  *   'none'                  — no published max SPL figure at all
  *
- * A value in the continuous field is only trusted as continuous when the basis
- * explicitly confirms it. A continuous-field value with a non-continuous basis is
- * treated as an unqualified maximum SPL (assumed peak), so the −6 dB allowance
- * applies consistently to every figure the manufacturer did not label continuous.
+ * A value in the continuous field is the PRIMARY signal that the manufacturer
+ * explicitly stated a continuous maximum SPL. The extraction and approval process
+ * only populates max_continuous_spl_db when the source labels a figure
+ * continuous / Cont. / RMS / long-term / rated / AES / IEC. The basis label
+ * describes HOW the figure was obtained (measured, calculated, AES, IEC); it
+ * does not override the continuous/peak distinction. So a populated continuous
+ * field with a 'calculated', 'manufacturer unspecified', 'unknown', or null basis
+ * is still a manufacturer-confirmed continuous figure — the label records the
+ * derivation method, not whether the figure is continuous or peak.
+ *
+ * Only an explicit 'peak' basis contradicts a populated continuous field (the
+ * manufacturer called the same figure peak), and that is treated as published_peak.
  *
  * @param {object} params { rawContinuous, rawPeak, maxSplBasis }
  * @returns {{type: 'published_continuous'|'published_peak'|'assumed_peak'|'none'}}
  */
 export function classifyMaxSplAuthority({ rawContinuous, rawPeak, maxSplBasis }) {
-  if (rawContinuous !== null && isExplicitlyContinuousSpl(maxSplBasis)) {
+  if (rawContinuous !== null && !isExplicitlyPeakSpl(maxSplBasis)) {
     return { type: 'published_continuous' };
   }
   const hasMaxSplFigure = rawContinuous !== null || rawPeak !== null;

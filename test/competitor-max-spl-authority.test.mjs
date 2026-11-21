@@ -302,16 +302,23 @@ test('Authority: −6 dB allowance is independent of full-space +6 dB correction
   assert.equal(n.max_spl_space_provenance, "full_space_published_converted");
 });
 
-test('Authority: continuous field with non-continuous basis → treated as assumed peak', () => {
-  // Edge case: a value in the continuous field but the basis is "manufacturer unspecified"
+test('Authority: continuous field with non-continuous basis → published_continuous (field is the authority)', () => {
+  // A value in the continuous field is populated by the extraction/approval
+  // process ONLY when the manufacturer explicitly labels a figure continuous.
+  // The basis label (calculated/manufacturer unspecified/unknown/null) describes
+  // how the figure was derived, not whether it is continuous or peak. So a
+  // populated continuous field with a non-continuous, non-peak basis is treated
+  // as published_continuous — the −6 dB allowance does NOT apply.
   const record = baseRecord({
     published_max_continuous_spl_db_1m: 107,
     max_spl_basis: "manufacturer unspecified",
   });
   const n = normalizeCompetitor(record);
-  assert.equal(n.max_spl_authority_type, "assumed_peak");
-  assert.equal(n.halfspace_estimated_continuous_from_peak_spl_db_1m, 101);
-  assert.equal(n.halfspace_max_spl_limit_db_1m, 101);
+  assert.equal(n.max_spl_authority_type, "published_continuous");
+  assert.equal(n.halfspace_published_max_continuous_spl_db_1m, 107);
+  assert.equal(n.halfspace_estimated_continuous_from_peak_spl_db_1m, null);
+  assert.equal(n.halfspace_max_spl_limit_db_1m, 107);
+  assert.equal(n.capability_basis, "Published");
 });
 
 test('classifyMaxSplAuthority unit tests', () => {
@@ -323,8 +330,13 @@ test('classifyMaxSplAuthority unit tests', () => {
   assert.equal(classifyMaxSplAuthority({ rawContinuous: null, rawPeak: 107, maxSplBasis: null }).type, "assumed_peak");
   assert.equal(classifyMaxSplAuthority({ rawContinuous: null, rawPeak: 107, maxSplBasis: "manufacturer unspecified" }).type, "assumed_peak");
   assert.equal(classifyMaxSplAuthority({ rawContinuous: null, rawPeak: null, maxSplBasis: null }).type, "none");
-  // Continuous field with non-continuous basis → assumed peak (basis not confirmed)
-  assert.equal(classifyMaxSplAuthority({ rawContinuous: 107, rawPeak: null, maxSplBasis: "unknown" }).type, "assumed_peak");
+  // Continuous field with non-continuous, non-peak basis → published_continuous
+  // (the continuous field is populated only when the manufacturer labels a
+  // figure continuous; the basis describes derivation, not continuous/peak)
+  assert.equal(classifyMaxSplAuthority({ rawContinuous: 107, rawPeak: null, maxSplBasis: "unknown" }).type, "published_continuous");
+  assert.equal(classifyMaxSplAuthority({ rawContinuous: 107, rawPeak: null, maxSplBasis: "manufacturer unspecified" }).type, "published_continuous");
+  assert.equal(classifyMaxSplAuthority({ rawContinuous: 107, rawPeak: null, maxSplBasis: "calculated" }).type, "published_continuous");
+  assert.equal(classifyMaxSplAuthority({ rawContinuous: 107, rawPeak: null, maxSplBasis: null }).type, "published_continuous");
   // Continuous field but basis explicitly says peak → published_peak (basis is the authority)
   assert.equal(classifyMaxSplAuthority({ rawContinuous: 107, rawPeak: null, maxSplBasis: "peak" }).type, "published_peak");
 });

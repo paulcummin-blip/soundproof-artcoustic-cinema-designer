@@ -44,6 +44,11 @@ import {
   isTrustedEvidence,
 } from "@/components/admin/speaker-db/secondaryEvidence/secondaryEvidencePolicy.js";
 import { trustedSourceLine } from "@/components/utils/spl/trustedSecondarySources.js";
+import {
+  ADI_ESTIMATE_STATEMENT,
+  CROSSOVER_ASSUMPTION,
+  COMPARISON_PARITY_STATEMENT,
+} from "@/components/utils/spl/comparisonAssumptions.js";
 
 export const COMPARISON_CLASSES = {
   A: {
@@ -84,11 +89,16 @@ export const COMPARISON_CLASSES = {
   },
 };
 
-export const ADI_ESTIMATE_STATEMENT =
-  "This is an ADI estimate based on available manufacturer data. It is useful for early comparison but not equivalent to verified published capability data.";
-
-export const COMPARISON_PARITY_STATEMENT =
-  "Same RP22 P12/P13 engine, distance, amplifier power and 1 W / 1 m normalisation as the Artcoustic row.";
+// The comparison assumptions (ADI estimate statement, 100 Hz crossover
+// convention, parity statement) live in utils/spl/comparisonAssumptions.js —
+// pure constants with no SDK import, so tests and every surface that states
+// the assumptions import the same values. Re-exported here so existing
+// importers of this module are unaffected.
+export {
+  ADI_ESTIMATE_STATEMENT,
+  CROSSOVER_ASSUMPTION,
+  COMPARISON_PARITY_STATEMENT,
+};
 
 // Controlled assumptions — each one is stated wherever the comparison is shown.
 // The installed-speaker normalisation assumption lives in
@@ -109,7 +119,7 @@ export function classifyComparisonRow(row) {
   const { row: assumptionRow, assumed: assumedSensitivityBasis } = applySensitivityBasisAssumption(row);
   const record = normalizeCompetitor(assumptionRow);
 
-  const assumptions = [];
+  const assumptions = [CROSSOVER_ASSUMPTION];
   if (assumedSensitivityBasis) assumptions.push(ASSUMED_SENSITIVITY_BASIS);
   const spaceAssumption = installedSpaceAssumptionForRow(record);
   if (spaceAssumption.applied) assumptions.push(spaceAssumption.note);
