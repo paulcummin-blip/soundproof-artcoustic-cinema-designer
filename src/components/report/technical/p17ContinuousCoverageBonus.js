@@ -184,3 +184,115 @@ export function effectiveP17Multiplier(level, meanQuality) {
   if (!isNum(base)) return null;
   return Math.min(MAX_MULTIPLIER, base + computeP17ContinuousBonus(level, meanQuality));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Properly-scaled continuous coverage contribution (additive points)
+// ═══════════════════════════════════════════════════════════════
+//
+// The multiplier-bonus approach above is capped at one grade step (4
+// multiplier points) and averaged across speakers via mean quality, which
+// dilutes multi-speaker improvements: when 2 of 10 speakers improve, the
+// mean quality moves by only 20% of the per-speaker delta, producing <0.2
+// displayed DPI — invisible in the rounded index.
+//
+// This additive-points contribution solves the dilution by summing per-speaker
+// excess quality (not averaging), so the improvement from the speakers that
+// actually changed is not divided by the count of speakers that didn't.
+// The sum is then scaled and bounded to produce 2–3 displayed DPI for a
+// substantial multi-speaker coverage improvement, while remaining zero for
+// designs with poor coverage (no baseline inflation).
+//
+// Principles:
+//  - On-axis speakers (angle ≤ threshold) are excluded: they are already at
+//    quality ~1.0, never change with aiming, and would inflate the baseline
+//    without adding signal. ("Speakers already providing excellent coverage
+//    should receive little or no extra reward.")
+//  - Only speakers above a high quality floor contribute, so poorly-covered
+//    speakers (quality below the floor) add nothing. The discrete P17 grade
+//    already captures their deficiency.
+//  - Per-speaker excess is capped, giving diminishing returns for very good
+//    coverage.
+//  - The contribution is monotonic: improving any speaker can only raise it,
+//    worsening any speaker can only lower it.
+//  - Zero for designs with no speakers above the floor (no baseline inflation).
+//  - Bounded by COVERAGE_MAX_POINTS per seat.
+//
+// Pure: no React, no SDK, no writes. Imported by the rating adapter and by
+// regression tests so both use one formula.
+
+/** Speakers aimed within this angle of the seat are excluded (already excellent). */
+const ON_AXIS_THRESHOLD_DEG = 1.0;
+
+/** Quality floor: only speakers with quality above this contribute. */
+const COVERAGE_QUALITY_FLOOR = 0.85;
+
+/** Per-speaker excess cap (diminishing returns for very good coverage). */
+const PER_SPEAKER_EXCESS_CAP = 0.15;
+
+/**
+ * Scale converting the summed per-speaker excess into additive ASDR points.
+ * Calibrated so a substantial multi-speaker improvement (e.g. two wides
+ * moving from ~50° to ~10° at two seats) produces approximately 2 displayed
+ * DPI points.
+ */
+const COVERAGE_POINTS_SCALE = 147;
+
+/** Maximum continuous coverage points per seat (bounds the contribution). */
+const COVERAGE_MAX_POINTS = 30;
+
+/**
+ * Per-speaker coverage excess: the amount by which this speaker's quality
+ * exceeds the coverage floor, capped for diminishing returns, zero for
+ * on-axis speakers (already excellent) and speakers below the floor.
+ *
+ * @param {object} entry - per-speaker entry from the P17 engine
+ * @returns {number} excess in [0, PER_SPEAKER_EXCESS_CAP]
+ */
+function perSpeakerCoverageExcess(entry) {
+  if (!entry) return 0;
+
+  // Exclude on-axis speakers — already excellent, no extra reward.
+  const angleDeg = isNum(entry.angleDeg)
+    ? Math.abs(entry.angleDeg)
+    : (isNum(entry.offAxisDeg) ? Math.abs(entry.offAxisDeg) : null);
+  if (angleDeg != null && angleDeg <= ON_AXIS_THRESHOLD_DEG) return 0;
+
+  const q = continuousSpeakerQuality(entry);
+  if (q == null) return 0;
+
+  return Math.min(PER_SPEAKER_EXCESS_CAP, Math.max(0, q - COVERAGE_QUALITY_FLOOR));
+}
+
+/**
+ * Compute the additive continuous coverage points for a P17 seat.
+ *
+ * Sums the per-speaker coverage excess across applicable speakers, scales
+ * the sum into raw ASDR points, and bounds the result. Unlike the
+ * mean-quality bonus, this sum is NOT divided by the speaker count, so
+ * improvements to individual speakers survive without dilution.
+ *
+ * @param {string} level - the seat's discrete P17 level ("L1".."L4").
+ * @param {Array} perSpeaker - engine per-speaker entries (angleDeg + windows).
+ * @returns {number} additive ASDR points (>= 0, bounded).
+ */
+export function computeP17CoveragePoints(level, perSpeaker) {
+  if (!/^(L[1-4])$/.test(String(level || ""))) return 0;
+  if (!Array.isArray(perSpeaker) || perSpeaker.length === 0) return 0;
+
+  let sum = 0;
+  for (const entry of perSpeaker) {
+    sum += perSpeakerCoverageExcess(entry);
+  }
+
+  const points = COVERAGE_POINTS_SCALE * sum;
+  return Math.min(COVERAGE_MAX_POINTS, Math.max(0, points));
+}
+
+// Expose constants for tests and diagnostics.
+export const P17_COVERAGE_CONSTANTS = Object.freeze({
+  ON_AXIS_THRESHOLD_DEG,
+  COVERAGE_QUALITY_FLOOR,
+  PER_SPEAKER_EXCESS_CAP,
+  COVERAGE_POINTS_SCALE,
+  COVERAGE_MAX_POINTS,
+});
