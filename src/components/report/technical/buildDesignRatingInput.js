@@ -343,9 +343,17 @@ export function buildDesignRatingInput({
       // alongside it so the rating adapter can add a bounded bonus without
       // changing the RP22 level.
       if (key === "p17") {
+        // Pass the per-speaker coverage evidence so the rating adapter can
+        // compute the properly-scaled continuous coverage points from
+        // per-speaker excess (sum, not mean). The mean quality is retained
+        // for backward compatibility with legacy consumers.
         const meanQuality = computeP17MeanQuality(metric?.perSpeaker);
         seatScope[key][seatId] = isNum(rawValue)
-          ? { rawValue, p17ContinuousMeanQuality: isNum(meanQuality) ? meanQuality : 0 }
+          ? {
+              rawValue,
+              p17ContinuousMeanQuality: isNum(meanQuality) ? meanQuality : 0,
+              p17PerSpeaker: Array.isArray(metric?.perSpeaker) ? metric.perSpeaker : [],
+            }
           : null;
       } else {
         seatScope[key][seatId] = isNum(rawValue) ? rawValue : null;

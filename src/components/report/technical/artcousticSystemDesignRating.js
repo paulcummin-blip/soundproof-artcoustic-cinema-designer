@@ -40,7 +40,7 @@ import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 // Turns the per-seat coverage-quality margin (supplied on the P17 seat input
 // by buildDesignRatingInput) into a bounded additive bonus on P17's ASDR
 // multiplier. RP22 P17 levels and thresholds are untouched.
-import { computeP17ContinuousBonus } from "./p17ContinuousCoverageBonus";
+import { computeP17ContinuousBonus, computeP17CoveragePoints } from "./p17ContinuousCoverageBonus";
 // THE ONE canonical ASDR table — the same bytes the reports, the highlights and the
 // proposal writer rank by. Imported and re-exported, never copied.
 import { PARAM_WEIGHTS, LEVEL_MULTIPLIERS, TOTAL_WEIGHT } from '../../../../shared/canonicalParameterWeights.js';
@@ -457,13 +457,15 @@ function scoreSeatParam(key, input) {
     case "p16": scored = scoreP16(norm.rawValue); break;
     case "p17": {
       scored = scoreP17(norm.rawValue);
-      // Continuous ASDR contribution: the margin between the average per-speaker
-      // coverage quality and the limiting speaker's quality, supplied on the
-      // P17 seat input by buildDesignRatingInput. Zero when no evidence.
-      const p17MeanQuality = (typeof input === "object" && input && Number.isFinite(input.p17ContinuousMeanQuality))
-        ? Number(input.p17ContinuousMeanQuality)
-        : 0;
-      scored.continuousBonus = computeP17ContinuousBonus(scored.level, p17MeanQuality);
+      // Properly-scaled continuous coverage contribution: additive points
+      // derived from the per-speaker coverage excess (sum, not mean), so
+      // multi-speaker improvements survive without dilution. The perSpeaker
+      // array is supplied on the P17 seat input by buildDesignRatingInput.
+      // Zero when no per-speaker evidence (legacy saved publications).
+      const p17PerSpeaker = (typeof input === "object" && input && Array.isArray(input.p17PerSpeaker))
+        ? input.p17PerSpeaker
+        : [];
+      scored.continuousPoints = computeP17CoveragePoints(scored.level, p17PerSpeaker);
       break;
     }
     case "screen": scored = scoreScreen(norm.rawValue); break;
@@ -477,7 +479,14 @@ function scoreSeatParam(key, input) {
     state: "scored",
     level: scored.level,
     multiplier: multiplierForLevel(scored.level),
-    continuousBonus: scored.continuousBonus || 0,
+    // P17 continuous coverage points (additive, separate from the multiplier).
+    // Zero for every parameter except P17, which sets it from per-speaker
+    // coverage excess. The rating core adds these to the earned points
+    // WITHOUT going through the multiplier, so the L4 cap does not limit
+    // the coverage contribution.
+    continuousPoints: scored.continuousPoints || 0,
+    // Kept for backward compatibility; always 0 now (P17 uses continuousPoints).
+    continuousBonus: 0,
     reason: null,
   };
 }
@@ -659,6 +668,9 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
     let multiplier;
     let resultLevel;
     let mode = null;
+    // P17 continuous coverage points (additive, separate from the multiplier).
+    // Zero for every parameter except P17.
+    let p17GroupContinuous = 0;
 
     if (param.scope === "room") {
       multiplier = param.multiplier;
@@ -679,13 +691,20 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       };
 
       if (key === "p17") {
-        // P17 BALANCED AGGREGATION: average the effective multiplier across all
-        // applicable (scored) seats in the group, so improvements AND
-        // deterioration at every seat contribute to the result. An improvement
-        // at one seat cannot conceal significant deterioration at another.
-        // The per-seat RP22 P17 grades are unchanged; only the ASDR group
-        // aggregation differs from the best-seat rule used by other parameters.
-        let sumEff = 0;
+        // P17 BALANCED AGGREGATION: average the base multiplier AND the
+        // continuous coverage points separately across all applicable (scored)
+        // seats in the group, so improvements AND deterioration at every seat
+        // contribute to the result. An improvement at one seat cannot conceal
+        // significant deterioration at another. The per-seat RP22 P17 grades
+        // are unchanged; only the ASDR group aggregation differs from the
+        // best-seat rule used by other parameters.
+        //
+        // The continuous coverage points are added as SEPARATE additive raw
+        // points (not through the multiplier), so the L4 multiplier cap does
+        // not limit the coverage contribution. This makes genuine multi-speaker
+        // coverage improvements visible in the Design Performance Index.
+        let sumBase = 0;
+        let sumContinuous = 0;
         let seatCount = 0;
         const levelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0 };
         for (const id of scopedSeatIds) {
@@ -694,14 +713,16 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
             if (sa?.state === "provisional") hasProvisional = true;
             continue;
           }
-          const em = effectiveMultiplier(sa);
-          if (em == null) continue;
-          sumEff += em;
+          sumBase += multiplierForLevel(sa.level);
+          sumContinuous += (sa.continuousPoints || 0);
           seatCount += 1;
           if (levelCounts[sa.level] != null) levelCounts[sa.level] += 1;
         }
         if (seatCount === 0) continue;
-        multiplier = sumEff / seatCount;
+        multiplier = sumBase / seatCount;
+        // Continuous coverage points are added AFTER the multiplier × weight
+        // calculation (see the p17ContinuousPoints assignment below).
+        p17GroupContinuous = sumContinuous / seatCount;
         // Report the per-seat level distribution (e.g. "2×L4 · 2×L2") so the
         // presentation layer's existing parser sees the balanced mix.
         const distParts = ["L4", "L3", "L2", "L1", "FAIL"]
@@ -725,7 +746,9 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       }
     }
 
-    const earnedPoints = multiplier * weight;
+    // P17 continuous coverage points are added as separate additive raw points,
+    // not through the multiplier (so the L4 cap does not limit them).
+    const earnedPoints = multiplier * weight + p17GroupContinuous;
     const maximumPoints = 12 * weight;
 
     actualPoints += earnedPoints;
@@ -740,6 +763,7 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       effectiveWeight: weight,
       resultLevel,
       multiplier,
+      continuousPoints: p17GroupContinuous,
       earnedPoints,
       maximumPoints,
       mode,
@@ -884,12 +908,12 @@ export function calculateSeatDesignRating(authority, seatId) {
         hasProvisional = true; // diagnostic only
         continue;
       }
-      // P17 continuous bonus: the seat's effective multiplier is its base level
-      // multiplier plus the bounded continuous coverage-quality bonus, capped at
-      // the L4 maximum of 12. Only P17 sets a non-zero continuousBonus; for every
-      // other seat-scope parameter the effective multiplier equals the base.
-      const seatMultiplier = Math.min(12, (seatAuth.multiplier ?? 0) + (seatAuth.continuousBonus || 0));
-      actualPoints += seatMultiplier * weight;
+      // P17 continuous coverage points: added as separate additive raw points
+      // (not through the multiplier, so the L4 cap does not limit the coverage
+      // contribution). Only P17 sets a non-zero continuousPoints; for every
+      // other seat-scope parameter it is zero.
+      const seatMultiplier = seatAuth.multiplier ?? 0;
+      actualPoints += seatMultiplier * weight + (seatAuth.continuousPoints || 0);
       maximumAvailablePoints += 12 * weight;
       applicableWeight += weight;
       assessedWeight += weight;
