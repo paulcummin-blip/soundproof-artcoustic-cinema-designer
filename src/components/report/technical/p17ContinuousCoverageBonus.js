@@ -49,11 +49,21 @@ const qualityForLevelNumber = (n) => (isNum(n) && n >= 1 && n <= 4 ? n / 4 : nul
 /** Quality at the L1 floor — the reference below which no bonus is earned. */
 const L1_QUALITY = 0.25;
 
-/** Maps the quality span [0.25, 1.0] (span 0.75) to multiplier points. */
-const BONUS_SCALE = 4.0;
+/** Quality span from L1 (0.25) to L4 (1.0). */
+const QUALITY_SPAN = 1.0 - L1_QUALITY; // 0.75
 
-/** Caps the bonus well below one grade step (4 points) — no double-counting. */
-const MODESTY_CAP = 2.0;
+/**
+ * Caps the bonus at one full grade step (4 multiplier points). This is the
+ * maximum a continuous contribution can add without double-counting the
+ * discrete RP22 grade: a seat at L1 with every other speaker at L4 coverage
+ * quality reaches an effective multiplier of 6 (between L2 and L3), never
+ * exceeding the next grade boundary by more than the coverage evidence
+ * justifies.
+ */
+const MODESTY_CAP = 4.0;
+
+/** Maps the full quality span [0.25, 1.0] to the cap (4.0). */
+const BONUS_SCALE = MODESTY_CAP / QUALITY_SPAN; // 16/3 ≈ 5.333
 
 const MAX_MULTIPLIER = 12;
 

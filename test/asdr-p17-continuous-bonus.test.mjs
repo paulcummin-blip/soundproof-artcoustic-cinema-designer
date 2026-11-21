@@ -25,7 +25,7 @@ import {
   effectiveP17Multiplier,
 } from "../src/components/report/technical/p17ContinuousCoverageBonus.js";
 
-const P17_WEIGHT = 5;
+const P17_WEIGHT = 7;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -283,6 +283,73 @@ console.log("\nCase 8: Dixon — 10 speakers, LW improves L2 -> L4, rest unchang
   check("RP22 level unchanged (L2)", p17Before?.resultLevel === "1×L2" && p17After?.resultLevel === "1×L2");
   check("improvement is proportionate (not excessive)",
     (p17After?.multiplier - p17Before?.multiplier) < 1.0,
+    `delta=${((p17After?.multiplier || 0) - (p17Before?.multiplier || 0)).toFixed(3)}`);
+}
+
+// ── Case 9: Dixon substantial — primary L4, secondary several speakers re-aimed ─
+
+console.log("\nCase 9: Dixon substantial — primary L4 (unchanged), secondary 6 of 8 speakers L1 -> L4");
+{
+  const seats = [
+    {id:"p1",priority:"primary"}, {id:"p2",priority:"primary"},
+    {id:"s1",priority:"secondary"}, {id:"s2",priority:"secondary"}, {id:"s3",priority:"secondary"},
+  ];
+  // Primary already L4 at RSP — re-aiming does not help the primary seat.
+  const primaryBefore = [4,4,4,4];
+  const primaryAfter  = [4,4,4,4];
+  // Secondary: 8 speakers, 2 stay at L1 (still off-axis), 6 improve L1 -> L4.
+  const secBefore = Array(8).fill(1);
+  const secAfter  = [...Array(6).fill(4), ...Array(2).fill(1)];
+
+  const before = p17OnlyAuthority(seats, {
+    p1: primaryBefore, p2: primaryBefore,
+    s1: secBefore, s2: secBefore, s3: secBefore,
+  });
+  const after = p17OnlyAuthority(seats, {
+    p1: primaryAfter, p2: primaryAfter,
+    s1: secAfter, s2: secAfter, s3: secAfter,
+  });
+  const primBeforeR = scopedRating(before, ["p1","p2"]);
+  const primAfterR  = scopedRating(after,  ["p1","p2"]);
+  const secBeforeR  = scopedRating(before, ["s1","s2","s3"]);
+  const secAfterR   = scopedRating(after,  ["s1","s2","s3"]);
+
+  console.log(`    primary  before: DPI=${primBeforeR.designPerformanceIndex} points=${primBeforeR.actualPoints?.toFixed(1)}`);
+  console.log(`    primary  after:  DPI=${primAfterR.designPerformanceIndex} points=${primAfterR.actualPoints?.toFixed(1)}`);
+  console.log(`    second.  before: DPI=${secBeforeR.designPerformanceIndex} points=${secBeforeR.actualPoints?.toFixed(1)}`);
+  console.log(`    second.  after:  DPI=${secAfterR.designPerformanceIndex} points=${secAfterR.actualPoints?.toFixed(1)}`);
+
+  check("primary DPI unchanged (RSP already L4)",
+    primAfterR.designPerformanceIndex === primBeforeR.designPerformanceIndex,
+    `${primBeforeR.designPerformanceIndex} -> ${primAfterR.designPerformanceIndex}`);
+  const secDelta = secAfterR.designPerformanceIndex - secBeforeR.designPerformanceIndex;
+  check("secondary DPI improved by >= 2 (substantial re-aiming recognised)",
+    secDelta >= 2, `${secBeforeR.designPerformanceIndex} -> ${secAfterR.designPerformanceIndex} (delta ${secDelta})`);
+  check("secondary DPI improved by <= 3 (not excessive)",
+    secDelta <= 3, `delta ${secDelta}`);
+  check("secondary RP22 discrete level unchanged (L1 — worst speaker still off-axis)",
+    p17Contrib(secAfterR)?.resultLevel === "3×L1");
+}
+
+// ── Case 10: Severe off-axis corrected ───────────────────────────────
+
+console.log("\nCase 10: severe off-axis — 8 speakers all L1 -> 7 corrected to L4, 1 stays L1");
+{
+  const seats = [{id:"s1",priority:"primary"}];
+  const before = p17OnlyAuthority(seats, { s1: Array(8).fill(1) });
+  const after  = p17OnlyAuthority(seats, { s1: [...Array(7).fill(4), 1] });
+  const rBefore = calculateRoomDesignRating(before);
+  const rAfter  = calculateRoomDesignRating(after);
+  const p17Before = p17Contrib(rBefore);
+  const p17After  = p17Contrib(rAfter);
+  console.log(`    before: meanQ=${meanQ(Array(8).fill(1)).toFixed(3)} mult=${p17Before?.multiplier?.toFixed(3)} DPI=${rBefore.designPerformanceIndex}`);
+  console.log(`    after:  meanQ=${meanQ([...Array(7).fill(4),1]).toFixed(3)} mult=${p17After?.multiplier?.toFixed(3)} DPI=${rAfter.designPerformanceIndex}`);
+  check("RP22 discrete level stays L1 (worst speaker still off-axis)",
+    p17After?.resultLevel === "1×L1");
+  check("DPI improved visibly", rAfter.designPerformanceIndex > rBefore.designPerformanceIndex,
+    `${rBefore.designPerformanceIndex} -> ${rAfter.designPerformanceIndex}`);
+  check("bonus increased substantially",
+    (p17After?.multiplier - p17Before?.multiplier) > 2.0,
     `delta=${((p17After?.multiplier || 0) - (p17Before?.multiplier || 0)).toFixed(3)}`);
 }
 
