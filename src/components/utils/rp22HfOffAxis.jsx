@@ -786,6 +786,19 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     const offAxis = Math.max(0, Math.floor(offAxisRaw + 1e-9));
     const effectiveAngleDeg = offAxis;
 
+    // ASDR AIMING REFERENCE — the off-axis angle this seat would see if the
+    // speaker were in its canonical wall-flat orientation. A READ-ONLY
+    // diagnostic field consumed only by the ASDR aiming credit; it never feeds
+    // the RP22 P17 grade, the loss, the windows or the level. Computed from the
+    // SAME seatAzDeg and wall-normal used by the effective-angle calculation, so
+    // it is geometrically consistent with the current off-axis and the coverage
+    // windows. Null when the role has no defined wall-normal.
+    const wallNormalRef = getWallNormal(role);
+    const wallFlatOffAxisRaw = isNum(wallNormalRef) ? shortestAngleDeg(seatAzDeg, wallNormalRef) : null;
+    const wallFlatOffAxisDeg = isNum(wallFlatOffAxisRaw)
+      ? Math.max(0, Math.floor(wallFlatOffAxisRaw + 1e-9))
+      : null;
+
     // Get model metadata for dispersion
     const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
 
@@ -833,6 +846,9 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       lossDb: Number(lossDb.toFixed(1)),
       isBeyondNonLcrLimit,
       coverageLimitDeg: nonLcrLimit,  // model −3 dB coverage half-window (diagnostic only)
+      // ASDR aiming reference (read-only — never graded): the off-axis angle
+      // this seat would see with the speaker wall-flat. Null for non-bed roles.
+      wallFlatOffAxisDeg,
       debug: diagnosticDebug,
       ...coverage,
     };
@@ -972,6 +988,9 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         lossDb: Number(delta.toFixed(1)),
         isBeyondNonLcrLimit,
         coverageLimitDeg: isNum(resultAtSeat.coverageLimitDeg) ? Number(resultAtSeat.coverageLimitDeg.toFixed(1)) : null,
+        // ASDR aiming reference (read-only — never graded): off-axis angle with
+        // the speaker wall-flat. Bed-layer only; null for overheads/legacy.
+        wallFlatOffAxisDeg: isNum(resultAtSeat.wallFlatOffAxisDeg) ? Number(resultAtSeat.wallFlatOffAxisDeg) : null,
         // ── P17 design-guide evidence for this speaker at this seat ──
         windowDb: isNum(resultAtSeat.windowDb) ? Number(resultAtSeat.windowDb.toFixed(1)) : null,
         windowLevel: resultAtSeat.windowLevel ?? null,

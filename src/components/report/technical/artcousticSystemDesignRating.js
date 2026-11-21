@@ -41,6 +41,13 @@ import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 // by buildDesignRatingInput) into a bounded additive bonus on P17's ASDR
 // multiplier. RP22 P17 levels and thresholds are untouched.
 import { computeP17ContinuousBonus, computeP17CoveragePoints } from "./p17ContinuousCoverageBonus";
+// Pure helper for the INDEPENDENT ASDR speaker-aiming credit. Rewards genuine
+// coverage improvements at individual seats (especially outermost secondary
+// seats) that the discrete RP22 P17 grade cannot show because another speaker
+// limits the parameter grade. Separate from P17 continuous coverage: this
+// measures the angular benefit vs the canonical wall-flat reference, not
+// absolute coverage deficiency. RP22 P17 is untouched.
+import { computeSeatAimingPoints } from "./asdrAimingCredit";
 // THE ONE canonical ASDR table — the same bytes the reports, the highlights and the
 // proposal writer rank by. Imported and re-exported, never copied.
 import { PARAM_WEIGHTS, LEVEL_MULTIPLIERS, TOTAL_WEIGHT } from '../../../../shared/canonicalParameterWeights.js';
@@ -436,7 +443,7 @@ function scorePublishedBassGrade(input, key) {
   return { state: "scored", level, multiplier: multiplierForLevel(level), reason: null };
 }
 
-function scoreSeatParam(key, input) {
+function scoreSeatParam(key, input, seatPriority) {
   // Preserve P20's individual-seat grade; only ASDR group selection changes.
   if (key === "p20") return scorePublishedBassGrade(input, key);
 
@@ -469,6 +476,12 @@ function scoreSeatParam(key, input) {
         ? input.p17PerSpeaker
         : [];
       scored.continuousPoints = computeP17CoveragePoints(scored.level, p17PerSpeaker);
+      // Independent ASDR aiming credit: rewards the angular benefit of the
+      // current orientation vs the canonical wall-flat reference, scaled by
+      // the seat's priority-scope allocation. Separate from the continuous
+      // coverage contribution (which measures absolute deficiency, not the
+      // wall-flat delta). Zero when no wall-flat evidence (legacy publications).
+      scored.aimingPoints = computeSeatAimingPoints(p17PerSpeaker, seatPriority || "primary");
       break;
     }
     case "screen": scored = scoreScreen(norm.rawValue); break;
@@ -488,6 +501,9 @@ function scoreSeatParam(key, input) {
     // WITHOUT going through the multiplier, so the L4 cap does not limit
     // the coverage contribution.
     continuousPoints: scored.continuousPoints || 0,
+    // Independent ASDR aiming credit (additive raw points, separate from the
+    // coverage contribution). Zero for every parameter except P17.
+    aimingPoints: scored.aimingPoints || 0,
     // Kept for backward compatibility; always 0 now (P17 uses continuousPoints).
     continuousBonus: 0,
     reason: null,
@@ -583,7 +599,7 @@ export function buildArtcousticDesignRatingAuthority(input) {
 
       for (const seatId of seatIds) {
         const seatInput = paramInput?.[seatId];
-        const seatAuth = scoreSeatParam(key, seatInput);
+        const seatAuth = scoreSeatParam(key, seatInput, seatPriorities[seatId] || "primary");
         seatAuthorities[seatId] = seatAuth;
         if (seatAuth.state !== "na") allNa = false;
         if (seatAuth.state === "scored") hasScored = true;
@@ -674,6 +690,9 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
     // P17 continuous coverage points (additive, separate from the multiplier).
     // Zero for every parameter except P17.
     let p17GroupContinuous = 0;
+    // Independent ASDR aiming credit (additive raw points, separate from both
+    // the multiplier and the coverage contribution). Zero except P17.
+    let p17GroupAiming = 0;
 
     if (param.scope === "room") {
       multiplier = param.multiplier;
@@ -708,6 +727,7 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
         // coverage improvements visible in the Design Performance Index.
         let sumBase = 0;
         let sumContinuous = 0;
+        let sumAiming = 0;
         let seatCount = 0;
         const levelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0 };
         for (const id of scopedSeatIds) {
@@ -718,6 +738,7 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
           }
           sumBase += multiplierForLevel(sa.level);
           sumContinuous += (sa.continuousPoints || 0);
+          sumAiming += (sa.aimingPoints || 0);
           seatCount += 1;
           if (levelCounts[sa.level] != null) levelCounts[sa.level] += 1;
         }
@@ -726,6 +747,9 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
         // Continuous coverage points are added AFTER the multiplier × weight
         // calculation (see the p17ContinuousPoints assignment below).
         p17GroupContinuous = sumContinuous / seatCount;
+        // Independent ASDR aiming credit: averaged across seats (balanced, so
+        // more benefiting seats count more) and added as separate raw points.
+        p17GroupAiming = sumAiming / seatCount;
         // Report the per-seat level distribution (e.g. "2×L4 · 2×L2") so the
         // presentation layer's existing parser sees the balanced mix.
         const distParts = ["L4", "L3", "L2", "L1", "FAIL"]
@@ -749,9 +773,11 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       }
     }
 
-    // P17 continuous coverage points are added as separate additive raw points,
-    // not through the multiplier (so the L4 cap does not limit them).
-    const earnedPoints = multiplier * weight + p17GroupContinuous;
+    // P17 continuous coverage points AND the independent aiming credit are
+    // added as separate additive raw points, not through the multiplier (so
+    // the L4 cap does not limit them). The aiming credit is a clearly
+    // identified ASDR-only contribution separate from the coverage contribution.
+    const earnedPoints = multiplier * weight + p17GroupContinuous + p17GroupAiming;
     const maximumPoints = 12 * weight;
 
     actualPoints += earnedPoints;
@@ -767,6 +793,7 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       resultLevel,
       multiplier,
       continuousPoints: p17GroupContinuous,
+      aimingPoints: p17GroupAiming,
       earnedPoints,
       maximumPoints,
       mode,
@@ -911,12 +938,12 @@ export function calculateSeatDesignRating(authority, seatId) {
         hasProvisional = true; // diagnostic only
         continue;
       }
-      // P17 continuous coverage points: added as separate additive raw points
-      // (not through the multiplier, so the L4 cap does not limit the coverage
-      // contribution). Only P17 sets a non-zero continuousPoints; for every
-      // other seat-scope parameter it is zero.
+      // P17 continuous coverage points AND the independent aiming credit: added
+      // as separate additive raw points (not through the multiplier, so the L4
+      // cap does not limit them). Only P17 sets non-zero values; for every other
+      // seat-scope parameter both are zero.
       const seatMultiplier = seatAuth.multiplier ?? 0;
-      actualPoints += seatMultiplier * weight + (seatAuth.continuousPoints || 0);
+      actualPoints += seatMultiplier * weight + (seatAuth.continuousPoints || 0) + (seatAuth.aimingPoints || 0);
       maximumAvailablePoints += 12 * weight;
       applicableWeight += weight;
       assessedWeight += weight;
