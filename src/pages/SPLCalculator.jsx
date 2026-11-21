@@ -17,6 +17,7 @@ import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
 import SpeakerInfo from "@/components/spl/SpeakerInfo";
 import ComparisonDataStatusSection from "@/components/spl/ComparisonDataStatusSection";
+import SelectedSpeakerExplanation from "@/components/spl/SelectedSpeakerExplanation";
 import DataQualityGuide from "@/components/spl/DataQualityGuide";
 import CompetitorPriceManager from "@/components/spl/CompetitorPriceManager";
 
@@ -571,8 +572,8 @@ export default function SPLCalculatorPage() {
                 const item = competitorResults.find((x) => x.record.id === id);
                 const compShowDataNote = record && shouldShowOpenBackWarning(record);
                 return (
-                  <div key={`${id}-${index}`}>
-                    <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gridTemplateRows: compShowDataNote ? "auto auto" : "auto", gap: "8px 12px", alignItems: "center", padding: "14px 16px", border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.panel }}>
+                  <div key={`${id}-${index}`} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 12, overflow: "hidden", background: BRAND.panel }}>
+                    <div style={{ display: "grid", gridTemplateColumns: ROW_GRID, gridTemplateRows: compShowDataNote ? "auto auto" : "auto", gap: "8px 12px", alignItems: "center", padding: "14px 16px" }}>
                       <div style={{ minWidth: 0 }}>
                         <select value={id} onChange={(e) => updateSelectedCompetitor(index, e.target.value)} style={{ width: "100%", border: 0, background: "transparent", fontSize: 15, fontWeight: 700, color: id ? BRAND.text : BRAND.subtext, minWidth: 0 }}>
                           <option value="">Choose alternative speaker</option>
@@ -606,6 +607,7 @@ export default function SPLCalculatorPage() {
                       </div>
                       {compShowDataNote && <div style={{ gridColumn: "4 / 6", fontSize: 11, color: "#7A5C00" }}>Open-back design — installed results vary.</div>}
                     </div>
+                    {record && <SelectedSpeakerExplanation record={record} candidate={candidate} />}
                     {candidate?.classKey === "D" && (
                       <div style={{ padding: "5px 16px", fontSize: 12, color: BRAND.hint }}>
                         Unable to calculate RP22 speaker capability from the information published by the manufacturer.

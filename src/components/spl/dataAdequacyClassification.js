@@ -20,13 +20,18 @@
 //   FULL     — the manufacturer publishes an explicit continuous maximum SPL.
 //               The capability figure is used directly; no additional
 //               assumptions are required.
-//   GOOD     — the manufacturer publishes a maximum SPL but does not confirm
-//               continuous output. Sound Proof applies the agreed −6 dB
-//               crest-factor allowance to estimate continuous capability.
-//   LIMITED  — no published maximum SPL (capability calculated from
-//               sensitivity and power handling), or essential capability
-//               information is missing. A fair P12/P13 comparison is not
-//               available.
+//   GOOD     — EITHER the manufacturer publishes a maximum SPL but does not
+//               confirm continuous output (Sound Proof applies the agreed
+//               −6 dB crest-factor allowance), OR no maximum SPL is published
+//               but the normalizer has successfully calculated capability from
+//               adequate manufacturer inputs (published sensitivity, reference,
+//               impedance and a valid power authority such as a recommended
+//               amplifier maximum or a stated power rating).
+//   LIMITED  — essential capability information is missing, or the calculation
+//               depends on a substantial provisional assumption (a peak-power
+//               estimate with no continuous rating, recommended amplifier
+//               maximum or published maximum SPL). A fair P12/P13 comparison is
+//               not available.
 // ---------------------------------------------------------------------------
 
 export const DATA_ADEQUACY = Object.freeze({
@@ -42,14 +47,14 @@ export const DATA_ADEQUACY = Object.freeze({
     label: "GOOD DATA",
     short: "GOOD",
     tone: "#9A6E00",
-    meaning: "Manufacturer publishes a maximum SPL but does not confirm continuous output. Sound Proof applies a −6 dB crest-factor allowance to estimate continuous capability — a controlled assumption.",
+    meaning: "The manufacturer publishes enough information for a credible RP22 estimate, but a meaningful part of the capability is calculated or extrapolated — either a maximum SPL that needs the −6 dB peak-to-continuous allowance, or a capability calculated from published sensitivity, impedance and a valid power authority when no maximum SPL is published.",
   },
   INCOMPLETE: {
     key: "INCOMPLETE",
     label: "LIMITED DATA",
     short: "LIMITED",
     tone: "#B23A3A",
-    meaning: "Limited data — no published maximum SPL, so capability is estimated from sensitivity and power handling, or essential capability information is missing. Fair P12/P13 comparison not available.",
+    meaning: "Important manufacturer information needed to determine capability is missing, or the calculation depends on a substantial provisional assumption. The RP22 prediction is significantly less reliable.",
   },
 });
 
@@ -85,8 +90,14 @@ export function classifyDataAdequacy(record) {
   // meaningful, controlled assumption.
   if (authority === "published_peak" || authority === "assumed_peak") return DATA_ADEQUACY.GOOD;
 
-  // LIMITED: no published maximum SPL. The capability is calculated from
-  // sensitivity and power handling, so the comparison depends on estimated
-  // rather than directly published performance.
-  return DATA_ADEQUACY.INCOMPLETE;
+  // No published maximum SPL. The normalizer has already confirmed the row is
+  // eligible (published sensitivity, a recognised reference, impedance where
+  // required, and a valid power authority), so capability is calculated from
+  // adequate manufacturer data. That is a credible estimate — GOOD DATA — not
+  // LIMITED. A provisional peak-power estimate (the only remaining case here,
+  // already guarded above) stays LIMITED.
+  if (authority === "none") return DATA_ADEQUACY.GOOD;
+
+  // Defensive: any other authority value on an eligible, non-provisional row.
+  return DATA_ADEQUACY.GOOD;
 }

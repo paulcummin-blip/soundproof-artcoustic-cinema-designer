@@ -66,17 +66,24 @@ test('GOOD: manufacturer explicitly labels the SPL as peak', () => {
   assert.equal(classifyDataAdequacy(r).key, 'GOOD');
 });
 
-test('LIMITED: no published max SPL, capability calculated from sensitivity + power', () => {
+test('GOOD: no published max SPL, capability calculated from sensitivity + power authority', () => {
+  // Eligible with a recognised sensitivity reference, impedance and a valid
+  // (non-provisional) power authority — a credible calculated estimate is GOOD.
   const r = {
     p12_p13_eligible: true,
     max_spl_authority_type: 'none',
+    provisional_peak_assumed: false,
     halfspace_published_max_continuous_spl_db_1m: null,
     halfspace_calculated_max_continuous_spl_db_1m: 110,
+    sensitivity_value_db: 96,
+    sensitivity_reference: '2.83V/1m',
+    rated_impedance_ohm: 4,
+    power_authority_w: 150,
+    power_authority: 'Manufacturer recommended amplifier maximum',
     sensitivity_space_provenance: 'half_space_published',
     max_spl_space_provenance: 'half_space_published',
-    sensitivity_reference: '2.83V/1m',
   };
-  assert.equal(classifyDataAdequacy(r).key, 'INCOMPLETE');
+  assert.equal(classifyDataAdequacy(r).key, 'GOOD');
 });
 
 test('LIMITED: provisional peak-to-continuous power estimate', () => {
@@ -93,4 +100,37 @@ test('LIMITED: provisional peak-to-continuous power estimate', () => {
 test('labels are the three admin-facing terms, never A/B/C/D', () => {
   const labels = Object.values(DATA_ADEQUACY).map((d) => d.label);
   assert.deepEqual(labels.sort(), ['FULL DATA', 'GOOD DATA', 'LIMITED DATA']);
+});
+
+test('FULL: Ascendo-style explicit continuous maximum SPL (half space)', () => {
+  const r = {
+    p12_p13_eligible: true,
+    max_spl_authority_type: 'published_continuous',
+    halfspace_published_max_continuous_spl_db_1m: 123,
+    halfspace_published_max_peak_spl_db_1m: 135,
+    sensitivity_value_db: 97,
+    sensitivity_reference: '1W/1m',
+    rated_impedance_ohm: 8,
+    // Amplifier/power fields absent — unrelated, must not downgrade FULL.
+    continuous_power_w: null,
+    recommended_amp_max_w: null,
+  };
+  assert.equal(classifyDataAdequacy(r).key, 'FULL');
+});
+
+test('GOOD: calculated from published continuous power rating (no max SPL)', () => {
+  const r = {
+    p12_p13_eligible: true,
+    max_spl_authority_type: 'none',
+    provisional_peak_assumed: false,
+    halfspace_published_max_continuous_spl_db_1m: null,
+    halfspace_calculated_max_continuous_spl_db_1m: 112,
+    sensitivity_value_db: 90,
+    sensitivity_reference: '2.83V/1m',
+    rated_impedance_ohm: 8,
+    power_authority_w: 120,
+    power_authority: 'Continuous',
+    normalized_continuous_power_w: 120,
+  };
+  assert.equal(classifyDataAdequacy(r).key, 'GOOD');
 });
