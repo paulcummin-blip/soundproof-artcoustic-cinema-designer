@@ -80,6 +80,16 @@
       "type": "string",
       "description": "Official manufacturer specification PDF URL."
     },
+    "datasheet_file_uri": {
+      "type": "string",
+      "nullable": true,
+      "description": "Private file_uri of an administrator-uploaded manufacturer PDF datasheet, stored as the source reference for the Read Source extraction. Null when no datasheet has been uploaded. The manufacturer website URL (official_product_url) is kept separately and is never overwritten by this field. Use CreateFileSignedUrl to mint a time-limited view link; never store the PDF bytes in an entity field."
+    },
+    "datasheet_file_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Original filename of the uploaded datasheet (e.g. 'perlisten-s7t-datasheet.pdf'), shown in the Read Source source-management UI so the admin can identify the attached PDF. Null when no datasheet has been uploaded."
+    },
     "hero_image_url": {
       "type": "string",
       "description": "Hero product image URL for comparison pages and detail headers.",

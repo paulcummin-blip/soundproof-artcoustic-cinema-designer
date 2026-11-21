@@ -68,14 +68,27 @@ export function currentFormFor(candidate) {
   return candidate ? formFromRow(candidateToFormRow(candidate)) : {};
 }
 
-/** Read one candidate's source via the existing extractModelSpecification function. */
-export async function readSourceExtraction(candidate) {
-  const sourceUrl = sourceUrlOf(candidate);
+/**
+ * Read one candidate's source via the existing extractModelSpecification function.
+ *
+ * When `options.fileUri` is supplied the source is an admin-uploaded manufacturer
+ * PDF datasheet (private file storage); the backend mints a signed URL and reads
+ * the PDF verbatim. Otherwise the candidate's website/datasheet URL is read as
+ * before. The two paths share the same extraction rules and review surface.
+ *
+ * @param {object} candidate
+ * @param {{fileUri?: string, fileName?: string}} [options]
+ */
+export async function readSourceExtraction(candidate, options = {}) {
+  const fileUri = options.fileUri || null;
+  const fileName = options.fileName || null;
   const res = await base44.functions.invoke("extractModelSpecification", {
     manufacturerName: candidate.manufacturer,
     model: candidate.model,
-    sourceUrl,
-    sourceType: "Official Product Page",
+    sourceUrl: fileUri ? "" : sourceUrlOf(candidate),
+    sourceType: fileUri ? "Uploaded PDF" : "Official Product Page",
+    fileUri,
+    fileName,
   });
   const data = res?.data ?? res;
   if (data?.error) throw new Error(data.error);

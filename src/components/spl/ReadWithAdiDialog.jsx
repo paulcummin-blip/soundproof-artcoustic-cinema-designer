@@ -42,6 +42,7 @@ import {
 import { DATA_ADEQUACY } from "@/components/spl/dataAdequacyClassification";
 import { ASSUMED_SENSITIVITY_BASIS_NOTE } from "@/components/utils/spl/sensitivityBasisAssumption";
 import { base44 } from "@/api/base44Client";
+import ReadSourceChooser from "@/components/spl/ReadSourceChooser";
 
 const BRAND = {
   text: "#1B1A1A", subtext: "#3E4349", hint: "#625143",
@@ -112,13 +113,13 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     [proposalFields, currentForm, info],
   );
 
-  // Fetch the extraction and the current stored specification in parallel
-  // when a candidate is opened. The specification is the base the proposed
-  // status is assessed against — it must be the real stored record, not a
-  // null base that discards every field the form does not capture.
+  // On open, reset state and fetch the current stored specification — the base
+  // the proposed status is assessed against. The source read is NOT started
+  // automatically: the admin first chooses whether to read the manufacturer
+  // website or upload a PDF datasheet (ReadSourceChooser), then this calls the
+  // shared extractModelSpecification path with the chosen source.
   useEffect(() => {
     if (!open || !candidate) return;
-    setLoading(true);
     setError("");
     setRaw(null);
     setDecisions({});
@@ -126,20 +127,34 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
     setExistingSpec(null);
     (async () => {
       try {
-        const [data, spec] = await Promise.all([
-          readSourceExtraction(candidate),
-          fetchExistingSpecification(candidate),
-        ]);
-        setRaw(data);
+        const spec = await fetchExistingSpecification(candidate);
         setExistingSpec(spec);
-        setDecisions(decideDefaults(currentFormFor(candidate), extractionToFound(data).info));
-      } catch (e) {
-        setError(e?.message || "ADI could not read this source.");
-      } finally {
-        setLoading(false);
+      } catch {
+        setExistingSpec(null);
       }
     })();
   }, [open, candidate]);
+
+  // Read the chosen source (website or uploaded PDF) through the same
+  // extractModelSpecification backend function. The website path passes no
+  // fileUri; the PDF path passes the uploaded file's private file_uri so the
+  // backend mints a signed URL and reads the PDF verbatim.
+  const readFromSource = async (options = {}) => {
+    if (!candidate) return;
+    setLoading(true);
+    setError("");
+    setRaw(null);
+    setDecisions({});
+    try {
+      const data = await readSourceExtraction(candidate, options);
+      setRaw(data);
+      setDecisions(decideDefaults(currentFormFor(candidate), extractionToFound(data).info));
+    } catch (e) {
+      setError(e?.message || "ADI could not read this source.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // The form values that would be saved if the admin applied the current
   // decisions — current values with accepted source values merged in. Used only
@@ -240,6 +255,16 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
             <ExternalLink size={12} style={{ verticalAlign: -1, marginRight: 4 }} />
             <a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: BRAND.subtext }}>{sourceUrl}</a>
           </div>
+        )}
+
+        {!loading && !error && !raw && (
+          <ReadSourceChooser
+            candidate={candidate}
+            websiteUrl={sourceUrl}
+            disabled={loading || saving}
+            onChooseWebsite={() => readFromSource()}
+            onChoosePdf={(fileUri, fileName) => readFromSource({ fileUri, fileName })}
+          />
         )}
 
         {loading && (

@@ -151,12 +151,36 @@ export default async function (req) {
     const model = String(body?.model || '').trim();
     const sourceUrl = String(body?.sourceUrl || '').trim();
     const sourceType = String(body?.sourceType || 'Official Product Page').trim();
+    // Uploaded datasheet path: an admin-uploaded manufacturer PDF stored as a
+    // private file. The file_uri is minted into a short-lived signed URL so the
+    // LLM can download the PDF via file_urls. The website URL remains separate
+    // and is never substituted.
+    const fileUri = String(body?.fileUri || '').trim();
+    const fileName = String(body?.fileName || '').trim();
 
-    if (!manufacturerName || !model || !sourceUrl) {
-      return Response.json({ error: 'Manufacturer, model and source URL are required' }, { status: 400 });
+    if (!manufacturerName || !model || (!sourceUrl && !fileUri)) {
+      return Response.json({ error: 'Manufacturer, model and a source (URL or uploaded PDF) are required' }, { status: 400 });
     }
 
-    const isPdf = /\.pdf(\?|#|$)/i.test(sourceUrl);
+    // For an uploaded datasheet, mint a signed URL the LLM can download. The
+    // file_uri itself is private and not publicly fetchable, so it cannot be
+    // passed directly as a file_url.
+    let pdfFileUrl = null;
+    if (fileUri) {
+      try {
+        const signed = await base44.integrations.Core.CreateFileSignedUrl({ file_uri: fileUri, expires_in: 900 });
+        pdfFileUrl = signed?.signed_url || null;
+      } catch {
+        return Response.json({ error: 'The uploaded datasheet could not be opened for reading.' }, { status: 500 });
+      }
+      if (!pdfFileUrl) {
+        return Response.json({ error: 'The uploaded datasheet could not be opened for reading.' }, { status: 500 });
+      }
+    }
+
+    const isUploadedPdf = Boolean(pdfFileUrl);
+    const isUrlPdf = !isUploadedPdf && /\.pdf(\?|#|$)/i.test(sourceUrl);
+    const isPdf = isUploadedPdf || isUrlPdf;
     const read = isPdf ? { ok: true, note: '', text: '', isPdf: true } : await readSource(sourceUrl);
 
     let raw = null;
@@ -167,15 +191,19 @@ export default async function (req) {
       // An official PDF is read as an attached document. The LLM downloads it
       // from the URL via file_urls and extracts only from it — no web search,
       // no general knowledge, no alternative source.
+      const pdfUrl = isUploadedPdf ? pdfFileUrl : sourceUrl;
+      const sourceLabel = isUploadedPdf && fileName
+        ? `${sourceType} (uploaded PDF: ${fileName})`
+        : `${sourceType} (official PDF) at ${sourceUrl}`;
       raw = await base44.integrations.Core.InvokeLLM({
         prompt: [
           rulesFor(manufacturerName, model),
           ``,
-          `SOURCE: ${sourceType} (official PDF) at ${sourceUrl}`,
+          `SOURCE: ${sourceLabel}`,
           `Read the attached PDF and extract only from it.`,
           `If you cannot read the attached PDF, return an empty fields array and model_confirmed false.`,
         ].join('\n'),
-        file_urls: [sourceUrl],
+        file_urls: [pdfUrl],
         response_json_schema: EXTRACTION_SCHEMA,
       });
       // Verify the PDF was actually read: if no fields were reported, the LLM
@@ -185,7 +213,9 @@ export default async function (req) {
         .filter((f) => f && f.status === 'reported').length;
       if (reportedCount === 0) {
         sourceReadFailed = true;
-        sourceReadNote = 'The linked PDF could not be read. No values were extracted and no alternative source was used.';
+        sourceReadNote = isUploadedPdf
+          ? 'The uploaded datasheet could not be read. No values were extracted and no alternative source was used.'
+          : 'The linked PDF could not be read. No values were extracted and no alternative source was used.';
       }
     } else if (read.ok && read.text) {
       // The page text is supplied verbatim: no web search, no general knowledge.
@@ -227,9 +257,16 @@ export default async function (req) {
       else notFound.push(field);
     }
 
+    // For an uploaded datasheet, record a descriptive label (not the private
+    // file_uri and not a short-lived signed URL) so the specification's audit
+    // trail states the source was an uploaded PDF by name.
+    const sourceUrlForEvidence = isUploadedPdf && fileName
+      ? `Uploaded PDF datasheet: ${fileName}`
+      : sourceUrl;
+
     return Response.json({
       model_confirmed: raw?.model_confirmed === true,
-      source_url: sourceUrl,
+      source_url: sourceUrlForEvidence,
       source_type: sourceType,
       source_date: new Date().toISOString().split('T')[0],
       source_read: !sourceReadFailed,
