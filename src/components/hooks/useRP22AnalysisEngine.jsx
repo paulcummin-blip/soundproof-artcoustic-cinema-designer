@@ -1245,8 +1245,19 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return m ? Number(m[1]) : null;
     };
 
-    // Authoritative layout selector
+    // Authoritative layout selector — uses the SAME canonical Dolby layout
+    // authority as the general speaker-analysis path (visibleRoles in
+    // AppStateProvider): speakerSystem.dolbyLayout / .dolbyPreset, then the
+    // standalone dolbyLayout parameter. The previous selector checked
+    // .layout / .format / .layoutName, which the app never sets, so bedCount
+    // was always null and SBL/SBR were silently dropped from P17 for 9.x
+    // layouts. The legacy fields are kept as trailing fallbacks for safety.
     const layoutStr =
+      aimState?.speakerSystem?.dolbyLayout ||
+      overheadState?.speakerSystem?.dolbyLayout ||
+      aimState?.speakerSystem?.dolbyPreset ||
+      overheadState?.speakerSystem?.dolbyPreset ||
+      dolbyLayout ||
       aimState?.speakerSystem?.layout ||
       overheadState?.speakerSystem?.layout ||
       aimState?.speakerSystem?.format ||
