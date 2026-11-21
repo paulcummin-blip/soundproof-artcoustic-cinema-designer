@@ -116,12 +116,18 @@ export function buildSelectedSpeakerExplanation(record, candidate = null) {
     };
   }
 
-  // GOOD: no published max SPL, capability calculated from published inputs
+  // GOOD: no published max SPL, capability calculated from published inputs.
+  // The manufacturer supplies sufficient sensitivity, impedance where
+  // required, and power information to estimate maximum output. Sound Proof
+  // calculates the capability — no −6 dB peak allowance applies because no
+  // maximum SPL is published.
   const sens = db(record.sensitivity_value_db);
   const sensRef = String(record.sensitivity_reference || "").trim();
   const imp = ohms(record.sensitivity_impedance_used_ohm ?? record.rated_impedance_ohm);
   const power = watts(record.power_authority_w);
   const phrase = powerAuthorityPhrase(record);
+  const article = phrase === "amplifier recommendation" ? "an" : "a";
+  const calcSpl = db(record.halfspace_calculated_max_continuous_spl_db_1m);
 
   const inputParts = [
     sens ? `the published ${sens}${sensRef ? ` @ ${sensRef}` : ""} sensitivity` : null,
@@ -132,9 +138,11 @@ export function buildSelectedSpeakerExplanation(record, candidate = null) {
   return {
     label: adequacy.label,
     tone: adequacy.tone,
-    why: `The manufacturer provides sensitivity, impedance and ${power ? "a " + phrase : "power data"}, allowing Sound Proof to estimate output capability for RP22.`,
-    calculated: `Maximum output from ${inputParts.join(", ") || "the published specifications"}.`,
+    why: `The manufacturer provides sensitivity, impedance and ${power ? article + " " + phrase : "power data"}, allowing Sound Proof to estimate output capability for RP22.`,
+    calculated: calcSpl
+      ? `Approximately ${calcSpl} at 1 m from ${inputParts.join(", ") || "the published specifications"}.`
+      : `Maximum output from ${inputParts.join(", ") || "the published specifications"}.`,
     assumed: null,
-    dontKnow: "The manufacturer does not publish maximum SPL, so the result is an estimate rather than a stated speaker capability.",
+    dontKnow: "The manufacturer does not publish maximum SPL, so this is an estimate rather than a stated speaker capability.",
   };
 }

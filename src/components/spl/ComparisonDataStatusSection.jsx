@@ -161,7 +161,12 @@ function resultMethodText(record) {
   const basis = String(record.capability_basis || "").trim();
   if (basis === "Published") return "Published continuous SPL figure";
   if (basis === "Estimated") return "Estimated continuous SPL (published max SPL − 6 dB), capping the sensitivity-and-power calculation";
-  if (basis === "Calculated") return "Calculated from published sensitivity and amplifier power";
+  if (basis === "Calculated") {
+    const calcSpl = textOrNull(record.halfspace_calculated_max_continuous_spl_db_1m, " dB");
+    return calcSpl
+      ? `Calculated ${calcSpl} at 1 m from published sensitivity and amplifier power`
+      : "Calculated from published sensitivity and amplifier power";
+  }
   const label = String(record.spl_evidence_label || "").trim();
   if (label) return label;
   const authority = String(record.spl_authority || "").trim();
@@ -186,7 +191,15 @@ function whyText(adequacy, record) {
     return "Manufacturer publishes a continuous maximum SPL, so the RP22 capability figure is used directly.";
   }
   if (adequacy.key === DATA_ADEQUACY.GOOD.key) {
-    return "Manufacturer publishes a maximum SPL but does not confirm continuous output. Sound Proof applies a −6 dB crest-factor allowance to estimate continuous capability.";
+    const authority = String(record?.max_spl_authority_type || "").trim();
+    // GOOD has two pathways. When the manufacturer publishes a maximum SPL
+    // but does not confirm continuous output, Sound Proof applies the −6 dB
+    // crest-factor allowance. When no maximum SPL is published, capability is
+    // calculated from sensitivity and power — no −6 dB allowance applies.
+    if (authority === "published_peak" || authority === "assumed_peak") {
+      return "Manufacturer publishes a maximum SPL but does not confirm continuous output. Sound Proof applies a −6 dB crest-factor allowance to estimate continuous capability.";
+    }
+    return "Manufacturer does not publish a maximum SPL. Sound Proof calculates capability from the published sensitivity, impedance and power authority.";
   }
   // LIMITED — no published maximum SPL, or essential information is missing.
   if (record && record.p12_p13_eligible === true) {
