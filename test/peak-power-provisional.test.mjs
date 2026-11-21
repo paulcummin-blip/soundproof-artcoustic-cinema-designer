@@ -120,28 +120,51 @@ test('IEC rating takes precedence over peak', () => {
   assert.equal(isProvisional(auth), false);
 });
 
-// --- Provisional result classification: always LIMITED DATA even when eligible ---
-test('Provisional peak-assumed result is always LIMITED DATA (INCOMPLETE adequacy)', () => {
-  // Simulate a normalized record that is eligible but provisional.
-  const provisionalRecord = {
+// --- Provisional result classification: conditional on published sensitivity ---
+// A provisional peak-assumed result is GOOD DATA when the manufacturer also
+// publishes sensitivity (a credible amplifier-dependent calculation is
+// possible) and LIMITED DATA when sensitivity is missing.
+test('Provisional peak-assumed with sensitivity is GOOD DATA', () => {
+  const provisionalWithSensitivity = {
     p12_p13_eligible: true,
     provisional_peak_assumed: true,
-    halfspace_published_max_continuous_spl_db_1m: null,
+    halfspace_sensitivity_db_1w_1m: 87.99,
+    halfspace_published_max_peak_spl_db_1m: 118,
+    halfspace_estimated_continuous_from_peak_spl_db_1m: 112,
     halfspace_calculated_max_continuous_spl_db_1m: 111.97,
-    sensitivity_space_provenance: 'half_space_assumed',
-    max_spl_space_provenance: 'half_space_assumed',
     sensitivity_reference: '2.83V/1m',
   };
 
-  // Mirrors classifyDataAdequacy: provisional → INCOMPLETE even when eligible.
+  // Mirrors classifyDataAdequacy: provisional + sensitivity → GOOD.
   function classifyAdequacy(record) {
     if (!record || record.p12_p13_eligible !== true) return 'INCOMPLETE';
-    if (record.provisional_peak_assumed === true) return 'INCOMPLETE';
-    // ... would check FULL/GOOD here
+    if (record.provisional_peak_assumed === true) {
+      return record.halfspace_sensitivity_db_1w_1m == null ? 'INCOMPLETE' : 'GOOD';
+    }
     return 'GOOD';
   }
 
-  assert.equal(classifyAdequacy(provisionalRecord), 'INCOMPLETE');
+  assert.equal(classifyAdequacy(provisionalWithSensitivity), 'GOOD');
+});
+
+test('Provisional peak-assumed without sensitivity stays LIMITED DATA', () => {
+  const provisionalNoSensitivity = {
+    p12_p13_eligible: true,
+    provisional_peak_assumed: true,
+    halfspace_sensitivity_db_1w_1m: null,
+    halfspace_published_max_peak_spl_db_1m: 118,
+    halfspace_estimated_continuous_from_peak_spl_db_1m: 112,
+  };
+
+  function classifyAdequacy(record) {
+    if (!record || record.p12_p13_eligible !== true) return 'INCOMPLETE';
+    if (record.provisional_peak_assumed === true) {
+      return record.halfspace_sensitivity_db_1w_1m == null ? 'INCOMPLETE' : 'GOOD';
+    }
+    return 'GOOD';
+  }
+
+  assert.equal(classifyAdequacy(provisionalNoSensitivity), 'INCOMPLETE');
 });
 
 // --- L8i full calculation check: 91 dB @ 2.83V/1m, 4 Ω, 500 W peak ---

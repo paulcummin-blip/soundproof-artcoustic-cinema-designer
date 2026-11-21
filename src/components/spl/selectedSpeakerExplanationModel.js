@@ -70,8 +70,10 @@ export function buildSelectedSpeakerExplanation(record, candidate = null) {
     };
   }
 
-  // LIMITED: provisional peak-power estimate
-  if (record.provisional_peak_assumed === true) {
+  // LIMITED: provisional peak-power estimate without published sensitivity.
+  // Without sensitivity there is no defensible amplifier-dependent output
+  // curve, so the result cannot support a credible P12/P13 prediction.
+  if (record.provisional_peak_assumed === true && record.halfspace_sensitivity_db_1w_1m == null) {
     const peakW = watts(record.published_peak_power_w);
     const assumed = [
       peakW ? `${PEAK_TO_CONTINUOUS_FACTOR * 100}% of the published ${peakW} peak power rating as continuous-equivalent power` : null,
@@ -80,10 +82,48 @@ export function buildSelectedSpeakerExplanation(record, candidate = null) {
     return {
       label: adequacy.label,
       tone: adequacy.tone,
-      why: "The manufacturer does not publish a continuous power rating, recommended amplifier maximum or maximum SPL. Sound Proof has used a provisional estimate to produce a comparison figure.",
+      why: "The manufacturer does not publish sensitivity, a continuous power rating, a recommended amplifier maximum or a maximum SPL. Sound Proof has used a provisional estimate, but without sensitivity there is no defensible amplifier-dependent output curve.",
       calculated: null,
       assumed,
-      dontKnow: "A continuous power rating, recommended amplifier maximum and maximum SPL are all unavailable, so the result depends on a substantial assumption.",
+      dontKnow: "Sensitivity, a continuous power rating, a recommended amplifier maximum and a maximum SPL are all unavailable, so the result depends on a substantial assumption.",
+    };
+  }
+
+  // GOOD: provisional peak-power estimate with published sensitivity. The
+  // manufacturer publishes sensitivity, impedance, peak power handling and
+  // (when present) a maximum SPL, providing enough information for a credible
+  // RP22 performance estimate. Sound Proof estimates a continuous-equivalent
+  // power from the published peak rating and respects any published max SPL
+  // cap. Numerical values are derived from the normalised record, never
+  // hardcoded for a model.
+  if (record.provisional_peak_assumed === true) {
+    const peakW = watts(record.published_peak_power_w);
+    const assumedW = watts(record.assumed_continuous_power_w);
+    const maxSplFigure = record.halfspace_published_max_peak_spl_db_1m
+      ?? record.halfspace_published_max_continuous_spl_db_1m
+      ?? null;
+    const maxSplDb = db(maxSplFigure);
+    const estimatedCont = db(record.halfspace_estimated_continuous_from_peak_spl_db_1m);
+    const hasMaxSplCap = record.max_spl_authority_type === "published_peak"
+      || record.max_spl_authority_type === "assumed_peak";
+
+    const calcParts = [
+      assumedW && peakW
+        ? `Sound Proof estimates a ${assumedW} continuous-equivalent power limit from the published ${peakW} peak rating`
+        : "Sound Proof estimates a continuous-equivalent power limit from the published peak rating",
+    ];
+    if (hasMaxSplCap && maxSplDb && estimatedCont) {
+      calcParts.push(`the manufacturer's ${maxSplDb} maximum SPL is reduced by ${PEAK_TO_CONTINUOUS_ALLOWANCE_DB} dB, giving an estimated continuous maximum of ${estimatedCont}`);
+    }
+    return {
+      label: adequacy.label,
+      tone: adequacy.tone,
+      why: hasMaxSplCap
+        ? "The manufacturer publishes sensitivity, impedance, peak power handling and maximum SPL, providing enough information for a credible RP22 performance estimate."
+        : "The manufacturer publishes sensitivity, impedance and peak power handling, providing enough information for a credible RP22 performance estimate.",
+      calculated: `${calcParts.join(". ")}.`,
+      assumed: null,
+      dontKnow: "The manufacturer does not explicitly publish continuous power handling or continuous maximum SPL, so both limits involve stated assumptions.",
     };
   }
 

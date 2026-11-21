@@ -192,11 +192,24 @@ function wattRow(value) {
 }
 
 function whyText(adequacy, record) {
-  // A provisional peak-to-continuous estimate is eligible (a P12/P13 level is
-  // produced) but stays LIMITED DATA. The explanation states the assumption
-  // rather than saying the calculation is unavailable.
-  if (record?.provisional_peak_assumed === true) {
+  // A provisional peak-to-continuous estimate without sensitivity cannot
+  // produce a defensible amplifier-dependent output curve, so it stays
+  // LIMITED DATA. The explanation states the assumption rather than saying
+  // the calculation is unavailable.
+  if (record?.provisional_peak_assumed === true
+      && record?.halfspace_sensitivity_db_1w_1m == null) {
     return PROVISIONAL_EXPLANATION;
+  }
+  // GOOD: provisional peak estimate with published sensitivity. The
+  // manufacturer publishes sensitivity, impedance, peak power handling and
+  // (when present) maximum SPL, providing enough information for a credible
+  // RP22 performance estimate.
+  if (record?.provisional_peak_assumed === true) {
+    const hasMaxSpl = record?.max_spl_authority_type === "published_peak"
+      || record?.max_spl_authority_type === "assumed_peak";
+    return hasMaxSpl
+      ? "The manufacturer publishes sensitivity, impedance, peak power handling and maximum SPL, providing enough information for a credible RP22 performance estimate. Sound Proof estimates continuous-equivalent power from the peak rating and applies a −6 dB crest-factor allowance to the maximum SPL."
+      : "The manufacturer publishes sensitivity, impedance and peak power handling, providing enough information for a credible RP22 performance estimate. Sound Proof estimates continuous-equivalent power from the published peak rating.";
   }
   if (adequacy.key === DATA_ADEQUACY.FULL.key) {
     return "Manufacturer publishes a continuous maximum SPL, so the RP22 capability figure is used directly.";

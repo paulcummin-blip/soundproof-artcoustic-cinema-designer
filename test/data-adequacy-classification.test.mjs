@@ -86,15 +86,56 @@ test('GOOD: no published max SPL, capability calculated from sensitivity + power
   assert.equal(classifyDataAdequacy(r).key, 'GOOD');
 });
 
-test('LIMITED: provisional peak-to-continuous power estimate', () => {
+test('LIMITED: provisional peak power with no published sensitivity — no defensible amplifier-dependent curve', () => {
+  // Peak power is published but sensitivity is not, so there is no
+  // defensible amplifier-dependent output curve. The published max SPL (if
+  // any) is only a ceiling, not a prediction at the selected amplifier power.
+  const r = {
+    p12_p13_eligible: true,
+    provisional_peak_assumed: true,
+    max_spl_authority_type: 'assumed_peak',
+    halfspace_sensitivity_db_1w_1m: null,
+    halfspace_published_max_peak_spl_db_1m: 118,
+    halfspace_estimated_continuous_from_peak_spl_db_1m: 112,
+  };
+  assert.equal(classifyDataAdequacy(r).key, 'INCOMPLETE');
+});
+
+test('GOOD: provisional peak power with published sensitivity — credible amplifier-dependent estimate (Wisdom L8i)', () => {
+  // The manufacturer publishes sensitivity, impedance, peak power handling
+  // and a maximum SPL. Sound Proof estimates 250 W continuous-equivalent from
+  // the 500 W peak rating and respects the 112 dB estimated-continuous cap.
+  // That is a credible RP22 estimate, not a LIMITED result.
+  const r = {
+    p12_p13_eligible: true,
+    provisional_peak_assumed: true,
+    max_spl_authority_type: 'assumed_peak',
+    halfspace_sensitivity_db_1w_1m: 87.99,
+    halfspace_published_max_peak_spl_db_1m: 118,
+    halfspace_estimated_continuous_from_peak_spl_db_1m: 112,
+    halfspace_calculated_max_continuous_spl_db_1m: 111.97,
+    sensitivity_value_db: 91,
+    sensitivity_reference: '2.83V/1m',
+    rated_impedance_ohm: 4,
+  };
+  assert.equal(classifyDataAdequacy(r).key, 'GOOD');
+});
+
+test('GOOD: provisional peak power with sensitivity but no max SPL — calculated estimate', () => {
+  // No max SPL is published, but sensitivity + peak power support a credible
+  // calculated estimate. GOOD DATA, not LIMITED.
   const r = {
     p12_p13_eligible: true,
     provisional_peak_assumed: true,
     max_spl_authority_type: 'none',
+    halfspace_sensitivity_db_1w_1m: 87.99,
     halfspace_published_max_continuous_spl_db_1m: null,
     halfspace_calculated_max_continuous_spl_db_1m: 111.97,
+    sensitivity_value_db: 91,
+    sensitivity_reference: '2.83V/1m',
+    rated_impedance_ohm: 4,
   };
-  assert.equal(classifyDataAdequacy(r).key, 'INCOMPLETE');
+  assert.equal(classifyDataAdequacy(r).key, 'GOOD');
 });
 
 test('labels are the three admin-facing terms, never A/B/C/D', () => {

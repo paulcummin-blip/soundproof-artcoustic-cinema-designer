@@ -123,6 +123,35 @@ const ascendoFull = {
 const triadIWSAT4 = { ...triadIWSAT6, model: 'TS-IWSAT4', continuous_power_w: 120, recommended_amp_max_w: 150, published_max_continuous_spl_db_1m: 97.8, published_max_peak_spl_db_1m: 115.8, peak_power_w: 240 };
 const triadIWSAT5 = { ...triadIWSAT6, model: 'TS-IWSAT5', continuous_power_w: 160, recommended_amp_max_w: 200, published_max_continuous_spl_db_1m: 103.2, published_max_peak_spl_db_1m: 121.2, peak_power_w: 320 };
 
+// ── Wisdom Audio L8i: passive, published sensitivity + impedance + peak power
+//    + max SPL (continuous not stated). Continuous power and recommended amp
+//    max are unavailable, so power is estimated as 50% of the 500 W peak. The
+//    118 dB max SPL is treated as assumed-peak → 112 dB estimated continuous.
+//    With sensitivity published, this is a credible RP22 estimate: GOOD DATA.
+const wisdomL8i = {
+  manufacturer: 'Wisdom Audio',
+  model: 'L8i',
+  product_type: 'Other',
+  rated_impedance_ohm: 4,
+  sensitivity_value_db: 91,
+  sensitivity_reference: '2.83V/1m',
+  sensitivity_impedance_used_ohm: 4,
+  continuous_power_w: null,
+  recommended_amp_min_w: null,
+  recommended_amp_max_w: null,
+  peak_power_w: 500,
+  power_rating_type: '',
+  published_max_continuous_spl_db_1m: null,
+  published_max_peak_spl_db_1m: 118,
+  max_spl_basis: 'manufacturer unspecified',
+  max_spl_measurement_basis: null,
+  sensitivity_measurement_basis: null,
+  source_product_id: 'prod-wisdom-l8i',
+  source_specification_id: 'spec-wisdom-l8i',
+  published: true,
+  active: true,
+};
+
 // ===========================================================================
 // 1. Triad TS-IWSAT6: no invented 87 dB sensitivity
 // ===========================================================================
@@ -343,6 +372,52 @@ test('Distance loss formula is unchanged (20·log10(d) for point source)', () =>
 });
 
 // ===========================================================================
+// 9b. Wisdom Audio L8i: provisional peak power + published sensitivity → GOOD
+// ===========================================================================
+
+test('Wisdom L8i normalizes with provisional peak-assumed power and published sensitivity', () => {
+  const n = normalizeCompetitor(wisdomL8i);
+  assert.equal(n.provisional_peak_assumed, true);
+  assert.equal(n.assumed_continuous_power_w, 250);
+  assert.equal(n.published_peak_power_w, 500);
+  assert.notEqual(n.halfspace_sensitivity_db_1w_1m, null);
+  assert.ok(Math.abs(n.halfspace_sensitivity_db_1w_1m - 87.99) < 0.01,
+    `halfspace sensitivity ~ 87.99, got ${n.halfspace_sensitivity_db_1w_1m}`);
+  assert.equal(n.max_spl_authority_type, 'assumed_peak');
+  assert.equal(n.halfspace_max_spl_limit_db_1m, 112);
+});
+
+test('Wisdom L8i classified GOOD DATA (provisional peak with sensitivity)', () => {
+  const n = normalizeCompetitor(wisdomL8i);
+  const adequacy = classifyDataAdequacy(n);
+  assert.equal(adequacy.key, DATA_ADEQUACY.GOOD.key);
+  assert.equal(adequacy.label, 'GOOD DATA');
+});
+
+test('Wisdom L8i explanation is GOOD and derives 250 W and 112 dB from the record', () => {
+  const n = normalizeCompetitor(wisdomL8i);
+  const e = buildSelectedSpeakerExplanation(n);
+  assert.equal(e.label, 'GOOD DATA');
+  assert.match(e.why, /sensitivity/i);
+  assert.match(e.why, /peak power/i);
+  // The calculated line derives the 250 W estimate and the 112 dB cap from
+  // the normalised record, never from hardcoded model text.
+  assert.match(e.calculated, /250 W/);
+  assert.match(e.calculated, /500 W/);
+  assert.match(e.calculated, /118/);
+  assert.match(e.calculated, /112/);
+  assert.match(e.dontKnow, /continuous power/i);
+  assert.match(e.dontKnow, /continuous maximum SPL/i);
+});
+
+test('Wisdom L8i engine meta is built (sensitivity published)', () => {
+  const meta = competitorMetaForComparison(wisdomL8i);
+  assert.notEqual(meta, null);
+  assert.notEqual(meta.sensitivity_db_1w_1m, null);
+  assert.equal(meta.max_spl_cont_db_1m_halfspace, 112);
+});
+
+// ===========================================================================
 // 10. Speaker selection and comparison UI: candidates are still built
 // ===========================================================================
 
@@ -375,6 +450,7 @@ test('Affected model classifications summary', () => {
     { record: jamesBE806, expected: 'GOOD', desc: 'James BE806 MKII' },
     { record: kefCi200QL, expected: 'GOOD', desc: 'KEF Ci200QL' },
     { record: ascendoFull, expected: 'FULL', desc: 'Ascendo THE12 PRO' },
+    { record: wisdomL8i, expected: 'GOOD', desc: 'Wisdom Audio L8i' },
   ];
   for (const { record, expected, desc } of cases) {
     const n = normalizeCompetitor(record);

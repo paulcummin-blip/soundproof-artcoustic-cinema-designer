@@ -28,10 +28,13 @@
 //               impedance and a valid power authority such as a recommended
 //               amplifier maximum or a stated power rating).
 //   LIMITED  — essential capability information is missing, or the calculation
-//               depends on a substantial provisional assumption (a peak-power
-//               estimate with no continuous rating, recommended amplifier
-//               maximum or published maximum SPL). A fair P12/P13 comparison is
-//               not available.
+//               depends on a substantial provisional assumption that makes the
+//               result unreliable. A peak-power estimate alone is not a
+//               disqualifier when the manufacturer also publishes sensitivity
+//               (so a credible amplifier-dependent calculation is possible) and
+//               any published maximum SPL cap is respected; it stays LIMITED
+//               when sensitivity is missing and no defensible amplifier-dependent
+//               output curve can be produced.
 // ---------------------------------------------------------------------------
 
 export const DATA_ADEQUACY = Object.freeze({
@@ -74,10 +77,6 @@ export const DATA_ADEQUACY = Object.freeze({
 export function classifyDataAdequacy(record) {
   if (!record || record.p12_p13_eligible !== true) return DATA_ADEQUACY.INCOMPLETE;
 
-  // A provisional peak-to-continuous power estimate (no max SPL, only peak
-  // power) depends substantially on estimated performance — always LIMITED.
-  if (record.provisional_peak_assumed === true) return DATA_ADEQUACY.INCOMPLETE;
-
   const authority = record.max_spl_authority_type;
 
   // FULL: manufacturer publishes an explicit continuous maximum SPL. The
@@ -93,6 +92,21 @@ export function classifyDataAdequacy(record) {
       return DATA_ADEQUACY.INCOMPLETE;
     }
     return DATA_ADEQUACY.FULL;
+  }
+
+  // A provisional peak-to-continuous power estimate (continuous power and
+  // recommended amplifier maximum both unavailable, power taken as 50% of the
+  // published peak rating) is a controlled assumption, not an automatic
+  // disqualifier. When the manufacturer also publishes sensitivity — so a
+  // credible amplifier-dependent calculation is possible — and any published
+  // maximum SPL cap is respected, GOOD DATA is appropriate: the result rests
+  // on published sensitivity and a stated, conservative power assumption. It
+  // stays LIMITED when sensitivity is missing, because without it there is no
+  // defensible amplifier-dependent output curve and the published max SPL (if
+  // any) is only a ceiling, not a prediction at the selected amplifier power.
+  if (record.provisional_peak_assumed === true) {
+    if (record.halfspace_sensitivity_db_1w_1m == null) return DATA_ADEQUACY.INCOMPLETE;
+    return DATA_ADEQUACY.GOOD;
   }
 
   // GOOD: manufacturer publishes a maximum SPL but does not confirm continuous
