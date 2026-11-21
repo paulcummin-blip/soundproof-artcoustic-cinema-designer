@@ -94,7 +94,7 @@ export function candidateExtractRows(candidate) {
   const spec = candidateSpecification(candidate);
   const basis = spec.sensitivity_basis && spec.sensitivity_basis !== "unknown" ? ` @ ${spec.sensitivity_basis}` : "";
   const power = [
-    spec.power_handling_continuous_w ? `${spec.power_handling_continuous_w} W continuous` : null,
+    spec.power_handling_continuous_w ? `${spec.power_handling_continuous_w} W (power handling)` : null,
     spec.aes_power_w ? `${spec.aes_power_w} W AES` : null,
     spec.recommended_amp_max_w ? `amp max ${spec.recommended_amp_max_w} W` : null,
   ].filter(Boolean).join(" · ");

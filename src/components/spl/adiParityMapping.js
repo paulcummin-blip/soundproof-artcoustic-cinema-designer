@@ -202,10 +202,12 @@ export function extractionToFound(raw) {
   }
   if (info.power_advisories.length === 0) delete info.power_advisories;
 
-  // Only a REPORTED continuous-source rating is classified as continuous power.
-  // An ambiguous "Power handling" figure is surfaced separately as an advisory
-  // (info.power_handling_note) preserving the manufacturer wording — it is NOT
-  // proposed as continuous or amplifier power, so no basis is invented.
+  // A REPORTED manufacturer power handling figure is classified as continuous
+  // power for the P12/P13 calculation. The category label "Manufacturer Power
+  // Handling" preserves the manufacturer's wording without inventing a standard.
+  // A genuinely ambiguous continuous-source figure (status "ambiguous" — now rare
+  // since bare "Power Handling: N W" is extracted as "reported") is surfaced
+  // separately as an advisory (info.power_handling_note) so no basis is invented.
   const continuous = CONTINUOUS_SOURCES.find(
     (src) => byField[src.field] && byField[src.field].status === "reported",
   );

@@ -8,8 +8,8 @@
 //   4. Peak-only SPL stays out of the continuous field.
 //   5. "Max SPL" with no continuous qualifier stays out of the continuous field.
 //   6. Manufacturer-calculated SPL is proposed (calculated basis).
-//   7. "Power Handling 900 W" (no qualifier) is NOT recommended amplifier max
-//      and NOT a continuous basis — preserved as an advisory note.
+//   7. "Power Handling 900 W" (no qualifier) is stored as manufacturer power
+//      handling (reported), not recommended amplifier max.
 //   8. Only explicitly continuous figures enter the continuous-SPL field.
 //   9. A record with published continuous SPL + confirmed half-space + 1W/1m
 //      basis qualifies as FULL DATA even when power terminology is undefined.
@@ -103,18 +103,18 @@ test("manufacturer-calculated SPL is proposed with calculated basis", () => {
   assert.equal(found.max_spl_basis, "calculated");
 });
 
-test("Power Handling 900 W (no qualifier) is not recommended amplifier max and not continuous", () => {
+test("Power Handling 900 W (no qualifier) is stored as manufacturer power handling", () => {
   const raw = {
     reported: [
-      item("power_handling_continuous_w", "900", "Power Handling 900 W", "ambiguous"),
+      item("power_handling_continuous_w", "900", "Power Handling 900 W"),
     ],
   };
   const { found, info } = extractionToFound(raw);
-  assert.equal(found.power_w, undefined, "ambiguous power handling is not proposed as power_w");
-  assert.equal(found.power_basis, undefined, "no continuous basis is invented");
-  assert.ok(info.power_handling_note, "ambiguous power is surfaced as an advisory note");
-  assert.equal(info.power_handling_note.value, "900");
-  assert.equal(info.power_handling_note.category, "Power handling (basis not stated)");
+  assert.equal(found.power_w, "900", "manufacturer power handling is proposed as power_w");
+  assert.equal(found.power_basis, "continuous", "power basis is continuous-source");
+  assert.equal(info.power_w.category, "Manufacturer Power Handling",
+    "category preserves the manufacturer wording without inventing a standard");
+  assert.ok(!info.power_handling_note, "no basis-not-stated advisory when the manufacturer stated the figure");
 });
 
 test("only explicitly continuous figures enter the continuous-SPL field", () => {
@@ -135,11 +135,12 @@ test("FULL DATA when published continuous SPL + reported half-space + 1W/1m, pow
   const rec = {
     p12_p13_eligible: true,
     halfspace_published_max_continuous_spl_db_1m: 123,
+    max_spl_authority_type: "published_continuous",
     sensitivity_space_provenance: "half_space_published",
     max_spl_space_provenance: "half_space_published",
     sensitivity_reference: "1W/1m",
   };
-  assert.equal(classifyDataAdequacy(rec).key, "FULL", "direct-SPL route with confirmed space + basis is FULL even without power");
+  assert.equal(classifyDataAdequacy(rec).key, "FULL", "direct-SPL route with published continuous SPL is FULL even without power");
 });
 
 test("Ascendo full extraction maps to FULL DATA inputs", () => {
@@ -152,9 +153,7 @@ test("Ascendo full extraction maps to FULL DATA inputs", () => {
       item("max_peak_spl_db", "135", "Measured Data 123 dB (Cont.) / 135 dB (Peak)"),
       item("max_spl_basis", "continuous", "Measured Data"),
       item("measurement_space", "half-space", "Measured Data (Half Space 2pi)"),
-    ],
-    ambiguous: [
-      item("power_handling_continuous_w", "900", "Power Handling 900 W", "ambiguous"),
+      item("power_handling_continuous_w", "900", "Power Handling 900 W"),
     ],
   };
   const { found, info } = extractionToFound(raw);
@@ -165,6 +164,8 @@ test("Ascendo full extraction maps to FULL DATA inputs", () => {
   assert.equal(found.max_peak_spl_db, "135");
   assert.equal(found.max_spl_basis, "continuous");
   assert.equal(found.measurement_space, "half-space");
-  assert.equal(found.power_w, undefined, "ambiguous power not auto-proposed");
-  assert.ok(info.power_handling_note, "power handling preserved as advisory");
+  assert.equal(found.power_w, "900", "manufacturer power handling is proposed");
+  assert.equal(info.power_w.category, "Manufacturer Power Handling",
+    "category preserves the manufacturer wording without inventing a standard");
+  assert.ok(!info.power_handling_note, "no basis-not-stated advisory for reported power handling");
 });
