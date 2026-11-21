@@ -62,7 +62,7 @@ const PRODUCTS_ENGINEERING_CARDS = [
   },
   {
     title: "RP22 Speaker Capability",
-    description: "Speaker comparison database, model-first product entry and RP22 comparison management.",
+    description: "Add and manage competitor speakers, read manufacturer specifications with ADI, and compare RP22 P12/P13 capability.",
     status: "Healthy",
     count: "—",
     href: "/SPLCalculator",

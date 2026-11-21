@@ -28,7 +28,6 @@ import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminProjectIntelligence from './pages/AdminProjectIntelligence';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
 import AdminSpeakerDatabase from './pages/AdminSpeakerDatabase';
-import SpeakerComparisonLibrary from './pages/SpeakerComparisonLibrary';
 import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
 import AdminAddSpeaker from './pages/AdminAddSpeaker';
 import AdminModelFirstSpeaker from './pages/AdminModelFirstSpeaker';
