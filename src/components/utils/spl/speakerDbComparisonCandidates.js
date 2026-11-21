@@ -223,7 +223,7 @@ export function buildCandidate({
     splEvidenceSource: record.spl_evidence_source || "",
     splEvidenceLabel: record.spl_evidence_label || "",
     splEvidenceStatement: record.spl_evidence_statement || "",
-    pillLabel: record.provisional_peak_assumed === true ? "LIMITED DATA" : null,
+    pillLabel: (record.provisional_peak_assumed === true || record.missing_sensitivity_with_power_rating === true) ? "LIMITED DATA" : null,
     tone: klass.tone,
     meaning: klass.meaning,
     statusLabel,

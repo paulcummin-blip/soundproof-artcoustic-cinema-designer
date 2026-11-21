@@ -9,7 +9,7 @@
 // calculated/assumed/dontKnow may be null.
 // ---------------------------------------------------------------------------
 
-import { classifyDataAdequacy } from "./dataAdequacyClassification";
+import { classifyDataAdequacy, DATA_ADEQUACY } from "./dataAdequacyClassification";
 import { PEAK_TO_CONTINUOUS_ALLOWANCE_DB } from "@/components/utils/spl/maxSplAuthority";
 import { PEAK_TO_CONTINUOUS_FACTOR } from "@/components/utils/spl/peakPowerAssumption";
 
@@ -89,9 +89,24 @@ export function buildSelectedSpeakerExplanation(record, candidate = null) {
 
   const authority = record.max_spl_authority_type;
 
-  // FULL: manufacturer publishes an explicit continuous max SPL
+  // FULL: manufacturer publishes an explicit continuous max SPL.
+  // But a passive speaker (with a power handling rating) that lacks sensitivity
+  // cannot support an amplifier-dependent P12/P13 prediction — the published
+  // max SPL is a ceiling, not a prediction at the selected amplifier power.
   if (authority === "published_continuous") {
     const spl = db(record.halfspace_published_max_continuous_spl_db_1m);
+    if (adequacy.key === DATA_ADEQUACY.INCOMPLETE.key) {
+      return {
+        label: adequacy.label,
+        tone: adequacy.tone,
+        why: "The manufacturer publishes maximum SPL, but not the sensitivity needed to estimate output at different amplifier powers. Sound Proof cannot reliably predict P12/P13 performance at the selected amplifier setting.",
+        calculated: null,
+        assumed: null,
+        dontKnow: spl
+          ? `Published continuous maximum SPL (${spl}) is available as manufacturer information, but without sensitivity the amplifier-dependent output cannot be determined.`
+          : "Without sensitivity, the amplifier-dependent output cannot be determined.",
+      };
+    }
     return {
       label: adequacy.label,
       tone: adequacy.tone,

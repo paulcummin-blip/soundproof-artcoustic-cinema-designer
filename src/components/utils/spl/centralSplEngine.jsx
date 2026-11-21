@@ -94,6 +94,13 @@ function safeNum(v) {
 function resolveEffectiveSensitivity(speakerMeta, effectiveSplInputs) {
   // Use published half-space sensitivity directly — no -6 dB anechoic reduction.
   // The quoted sensitivity_db_1w_1m values are half-space (2π) measurements.
+  // When a competitor meta explicitly declares sensitivity as null (no
+  // manufacturer-published sensitivity), do NOT substitute the generic 87 dB
+  // fallback — return null so the engine uses only the published max SPL
+  // hard cap (the system output for an active/self-powered loudspeaker).
+  if (speakerMeta && speakerMeta.sensitivity_db_1w_1m === null) {
+    return null;
+  }
   return safeNum(speakerMeta?.sensitivity_db_1w_1m) ||
          safeNum(speakerMeta?.sensitivity) ||
          87; // default fallback
@@ -219,11 +226,19 @@ function calculateSplAtPoint({
   // Build effective speaker data — source basis is published half-space values.
   // Propagation remains current direct-sound seat-loss method.
   // This is intended for realistic in-room design prediction, not exact acoustic simulation.
+  // When the resolved meta explicitly declares sensitivity as null (a competitor
+  // without manufacturer-published sensitivity), preserve the null so the
+  // engine does not substitute the generic 87 dB fallback. The engine then
+  // uses the published max SPL hard cap directly.
+  const hasExplicitNullSensitivity = resolvedMeta
+    && 'sensitivity_db_1w_1m' in resolvedMeta
+    && resolvedMeta.sensitivity_db_1w_1m === null;
   const effectiveMeta = {
-    sensitivity_db_1w_1m: safeNum(resolvedMeta?.sensitivity_db_1w_1m) || 
+    sensitivity_db_1w_1m: hasExplicitNullSensitivity ? null : (
+                          safeNum(resolvedMeta?.sensitivity_db_1w_1m) || 
                           safeNum(resolvedMeta?.sensitivity) || 
                           safeNum(sensitivity_dB_1w1m) || 
-                          87,
+                          87),
     power_handling_w: safeNum(resolvedMeta?.power_handling_w) || 
                       safeNum(resolvedMeta?.max_power) || 
                       Infinity,

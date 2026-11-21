@@ -155,6 +155,9 @@ function missingInputs(record) {
 }
 
 function resultMethodText(record) {
+  if (record?.missing_sensitivity_with_power_rating === true) {
+    return "Not calculated — sensitivity is not published, so the amplifier-dependent output cannot be determined. The published maximum SPL is shown as manufacturer information only.";
+  }
   if (record?.provisional_peak_assumed === true) {
     return "Provisional estimate, calculated from sensitivity and assumed continuous-equivalent power (50% of published peak).";
   }
@@ -200,6 +203,14 @@ function whyText(adequacy, record) {
       return "Manufacturer publishes a maximum SPL but does not confirm continuous output. Sound Proof applies a −6 dB crest-factor allowance to estimate continuous capability.";
     }
     return "Manufacturer does not publish a maximum SPL. Sound Proof calculates capability from the published sensitivity, impedance and power authority.";
+  }
+  // LIMITED: published continuous max SPL but missing sensitivity (passive
+  // speaker). The manufacturer publishes a ceiling, but not the sensitivity
+  // needed to estimate output at the selected amplifier power.
+  if (adequacy.key === DATA_ADEQUACY.INCOMPLETE.key
+      && record?.max_spl_authority_type === "published_continuous") {
+    const spl = textOrNull(record?.halfspace_published_max_continuous_spl_db_1m, " dB");
+    return `The manufacturer publishes maximum SPL${spl ? ` (${spl})` : ""}, but not the sensitivity needed to estimate output at different amplifier powers. Sound Proof cannot reliably predict P12/P13 performance at the selected amplifier setting.`;
   }
   // LIMITED — no published maximum SPL, or essential information is missing.
   if (record && record.p12_p13_eligible === true) {

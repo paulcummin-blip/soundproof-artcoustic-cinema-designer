@@ -82,8 +82,18 @@ export function classifyDataAdequacy(record) {
 
   // FULL: manufacturer publishes an explicit continuous maximum SPL. The
   // capability figure is used directly. Unrelated fields (measurement space,
-  // sensitivity basis, recommended amplifier) are not required.
-  if (authority === "published_continuous") return DATA_ADEQUACY.FULL;
+  // sensitivity basis, recommended amplifier) are not required — UNLESS the
+  // speaker is passive (has a published power handling rating) and lacks
+  // sensitivity. In that case the comparison requires amplifier-dependent
+  // output, and without sensitivity there is no defensible power-to-output
+  // curve. The published max SPL is a ceiling, not a prediction at the
+  // selected amplifier power, so FULL DATA is not justified.
+  if (authority === "published_continuous") {
+    if (record.missing_sensitivity_with_power_rating === true) {
+      return DATA_ADEQUACY.INCOMPLETE;
+    }
+    return DATA_ADEQUACY.FULL;
+  }
 
   // GOOD: manufacturer publishes a maximum SPL but does not confirm continuous
   // output. Sound Proof applies the −6 dB crest-factor allowance — a

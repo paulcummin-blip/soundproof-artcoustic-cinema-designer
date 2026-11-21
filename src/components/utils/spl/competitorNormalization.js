@@ -315,6 +315,12 @@ export function normalizeCompetitor(record) {
     // only when no continuous rating or recommended amplifier maximum was
     // published, so a better-quality figure always takes precedence.
     provisional_peak_assumed: powerIsPeakAssumed,
+    // A passive speaker (with a published power handling rating) that lacks
+    // manufacturer-published sensitivity cannot support an amplifier-dependent
+    // P12/P13 prediction: the published max SPL is a ceiling, but without
+    // sensitivity there is no defensible power-to-output curve. The comparison
+    // must not invent sensitivity or produce definitive grades from it.
+    missing_sensitivity_with_power_rating: oneW === null && powerFromRating !== null,
     published_peak_power_w: powerIsPeakAssumed ? publishedPeak : null,
     assumed_continuous_power_w: powerIsPeakAssumed ? power : null,
     calculated_max_continuous_spl_db_1m: rawCalculated,
@@ -358,6 +364,12 @@ export function normalizeCompetitor(record) {
 export function competitorMetaForComparison(record) {
   const n = normalizeCompetitor(record);
   if (!n.p12_p13_eligible) return null;
+  // A passive speaker without manufacturer-published sensitivity cannot
+  // support an amplifier-dependent P12/P13 prediction. Return no meta so the
+  // engine is not called, no invented sensitivity enters the calculation, and
+  // no SPL or grade is produced. The published max SPL remains available as
+  // manufacturer information in the comparison info panel.
+  if (n.missing_sensitivity_with_power_rating === true) return null;
   return {
     id: `competitor:${record.id}`,
     model: `${record.manufacturer} ${record.model}`,
