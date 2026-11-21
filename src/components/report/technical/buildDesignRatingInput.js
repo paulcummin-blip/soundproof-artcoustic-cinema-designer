@@ -27,10 +27,10 @@ import {
   hasZonalSpeakerLayer,
 } from "@/components/utils/rp22/overheadLayerAuthority";
 // Pure helper for the ASDR continuous P17 off-axis improvement contribution.
-// Computes the per-seat coverage-quality margin from the P17 HUD metric's
-// per-speaker evidence; the rating adapter turns the margin into a bounded
+// Computes the per-seat mean coverage quality from the P17 HUD metric's
+// per-speaker evidence; the rating adapter turns it into a bounded, monotonic
 // bonus on P17's multiplier. No RP22 level is changed here.
-import { computeP17ContinuousMargin } from "./p17ContinuousCoverageBonus";
+import { computeP17MeanQuality } from "./p17ContinuousCoverageBonus";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -343,9 +343,9 @@ export function buildDesignRatingInput({
       // alongside it so the rating adapter can add a bounded bonus without
       // changing the RP22 level.
       if (key === "p17") {
-        const margin = computeP17ContinuousMargin(metric?.perSpeaker, metric?.windowLevelNumber);
+        const meanQuality = computeP17MeanQuality(metric?.perSpeaker);
         seatScope[key][seatId] = isNum(rawValue)
-          ? { rawValue, p17ContinuousMargin: isNum(margin) ? margin : 0 }
+          ? { rawValue, p17ContinuousMeanQuality: isNum(meanQuality) ? meanQuality : 0 }
           : null;
       } else {
         seatScope[key][seatId] = isNum(rawValue) ? rawValue : null;

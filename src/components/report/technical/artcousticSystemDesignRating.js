@@ -460,10 +460,10 @@ function scoreSeatParam(key, input) {
       // Continuous ASDR contribution: the margin between the average per-speaker
       // coverage quality and the limiting speaker's quality, supplied on the
       // P17 seat input by buildDesignRatingInput. Zero when no evidence.
-      const p17Margin = (typeof input === "object" && input && Number.isFinite(input.p17ContinuousMargin))
-        ? Number(input.p17ContinuousMargin)
+      const p17MeanQuality = (typeof input === "object" && input && Number.isFinite(input.p17ContinuousMeanQuality))
+        ? Number(input.p17ContinuousMeanQuality)
         : 0;
-      scored.continuousBonus = computeP17ContinuousBonus(scored.level, p17Margin);
+      scored.continuousBonus = computeP17ContinuousBonus(scored.level, p17MeanQuality);
       break;
     }
     case "screen": scored = scoreScreen(norm.rawValue); break;
@@ -666,33 +666,63 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
       // Extract mode from the original input stored on the authority parameter
       mode = param.mode || null;
     } else {
-      // ASDR uses the highest valid achieved level in THIS seating group.
+      // Seat-scope parameter aggregation.
       // Missing/provisional seats never contribute; individual RP22 grades stay intact.
-      // P17 also carries a continuous coverage-quality bonus: the seat is
-      // selected by its EFFECTIVE multiplier (base level multiplier plus the
-      // bounded continuous bonus, capped at the L4 maximum of 12), so genuine
-      // aiming improvements can raise the ASDR contribution without changing
-      // the discrete RP22 level. Only P17 sets a non-zero continuousBonus; for
-      // every other seat-scope parameter the effective multiplier equals the
-      // base level multiplier, so selection is unchanged.
+      // Only P17 sets a non-zero continuousBonus (bounded, monotonic, from mean
+      // per-speaker coverage quality), so for every other seat-scope parameter the
+      // effective multiplier equals the base level multiplier.
       const scopedSeatIds = (authority?.seatIds || []).filter((id) => seatIdSet.has(id));
       const effectiveMultiplier = (sa) => {
         const base = multiplierForLevel(sa.level);
         if (base == null) return null;
         return Math.min(12, base + (sa.continuousBonus || 0));
       };
-      let selected = null;
-      for (const id of scopedSeatIds) {
-        const sa = param.seats?.[id];
-        if (!sa || sa.state !== "scored" || multiplierForLevel(sa.level) == null) {
-          if (sa?.state === "provisional") hasProvisional = true;
-          continue;
+
+      if (key === "p17") {
+        // P17 BALANCED AGGREGATION: average the effective multiplier across all
+        // applicable (scored) seats in the group, so improvements AND
+        // deterioration at every seat contribute to the result. An improvement
+        // at one seat cannot conceal significant deterioration at another.
+        // The per-seat RP22 P17 grades are unchanged; only the ASDR group
+        // aggregation differs from the best-seat rule used by other parameters.
+        let sumEff = 0;
+        let seatCount = 0;
+        const levelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, FAIL: 0 };
+        for (const id of scopedSeatIds) {
+          const sa = param.seats?.[id];
+          if (!sa || sa.state !== "scored" || multiplierForLevel(sa.level) == null) {
+            if (sa?.state === "provisional") hasProvisional = true;
+            continue;
+          }
+          const em = effectiveMultiplier(sa);
+          if (em == null) continue;
+          sumEff += em;
+          seatCount += 1;
+          if (levelCounts[sa.level] != null) levelCounts[sa.level] += 1;
         }
-        if (!selected || effectiveMultiplier(sa) > effectiveMultiplier(selected)) selected = sa;
+        if (seatCount === 0) continue;
+        multiplier = sumEff / seatCount;
+        // Report the per-seat level distribution (e.g. "2×L4 · 2×L2") so the
+        // presentation layer's existing parser sees the balanced mix.
+        const distParts = ["L4", "L3", "L2", "L1", "FAIL"]
+          .filter((lvl) => levelCounts[lvl] > 0)
+          .map((lvl) => `${levelCounts[lvl]}×${lvl}`);
+        resultLevel = distParts.join(" · ") || null;
+      } else {
+        // All other seat-scope parameters: existing best-seat selection.
+        let selected = null;
+        for (const id of scopedSeatIds) {
+          const sa = param.seats?.[id];
+          if (!sa || sa.state !== "scored" || multiplierForLevel(sa.level) == null) {
+            if (sa?.state === "provisional") hasProvisional = true;
+            continue;
+          }
+          if (!selected || effectiveMultiplier(sa) > effectiveMultiplier(selected)) selected = sa;
+        }
+        if (!selected) continue;
+        resultLevel = selected.level;
+        multiplier = effectiveMultiplier(selected);
       }
-      if (!selected) continue;
-      resultLevel = selected.level;
-      multiplier = effectiveMultiplier(selected);
     }
 
     const earnedPoints = multiplier * weight;
