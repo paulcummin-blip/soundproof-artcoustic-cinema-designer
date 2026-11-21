@@ -84,7 +84,10 @@ function mapMaxSplBasis(v) {
   // Peak/short-term SPL is NEVER collapsed to continuous — a "maximum SPL"
   // figure is useful evidence but is not automatically continuous capability.
   if (s === "peak") return "peak";
-  if (["aes", "iec", "continuous"].includes(s)) return "continuous";
+  // "rms" is manufacturer terminology for a continuous-duration figure (e.g.
+  // "Max RMS SPL"), so it maps to the existing 'continuous' basis — no new
+  // classification is introduced.
+  if (["aes", "iec", "continuous", "rms"].includes(s)) return "continuous";
   if (s === "calculated") return "calculated";
   return "manufacturer unspecified";
 }

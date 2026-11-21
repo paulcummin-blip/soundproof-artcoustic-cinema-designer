@@ -85,10 +85,17 @@ export function matchEnumValue(field, raw, enums) {
     // angle directly ("2 pi", "2π", "4π") as often as they state the name, so
     // both forms are recognised. A stated 2π must never fall through to the
     // "assumed half space" path — it is a reported half space.
+    //
+    // "Anechoic" is deliberately NOT mapped to free-space. A datasheet that
+    // says "Anechoic Frequency Response" is describing how the
+    // frequency-response curve was measured, not the space in which
+    // sensitivity or maximum SPL was measured. Only an explicit "Full Space"
+    // or "4π" declaration establishes free-space for the SPL/sensitivity
+    // measurement.
     if (/2pi/.test(compact)) return 'half-space';
     if (/4pi/.test(compact)) return 'free-space';
     if (/half/.test(compact)) return 'half-space';
-    if (/free|full|anechoic/.test(compact)) return 'free-space';
+    if (/free|full/.test(compact)) return 'free-space';
     if (/inroom/.test(compact)) return 'in-room';
     if (/unspecified|unknown|notstated|none/.test(compact)) return 'unspecified';
     return '';
@@ -97,7 +104,9 @@ export function matchEnumValue(field, raw, enums) {
     if (/^aes/.test(compact)) return 'AES';
     if (/^iec/.test(compact)) return 'IEC';
     if (/unspecified/.test(compact)) return 'manufacturer unspecified';
-    if (/^continuous/.test(compact)) return 'continuous';
+    // "RMS" is a continuous-duration qualifier (manufacturer terminology for
+    // the same continuous basis), so it maps to 'continuous'.
+    if (/^continuous|^rms/.test(compact)) return 'continuous';
     if (/^peak/.test(compact)) return 'peak';
     if (/^calculated/.test(compact)) return 'calculated';
     if (/unknown|notstated|none/.test(compact)) return 'unknown';

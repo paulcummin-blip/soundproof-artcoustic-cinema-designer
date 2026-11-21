@@ -13,6 +13,13 @@
 //   8. Only explicitly continuous figures enter the continuous-SPL field.
 //   9. A record with published continuous SPL + confirmed half-space + 1W/1m
 //      basis qualifies as FULL DATA even when power terminology is undefined.
+//  Triad TS-IRLCR5 defects:
+//  10. "Anechoic Frequency Response" must NOT establish measurement_space as
+//      free-space — it is a frequency-response context, not an SPL space.
+//  11. "Max RMS SPL (AES75/1m) (dBZ) 104.7" maps to continuous SPL, not peak
+//      and not unmapped — "RMS" is the duration qualifier, "Max" modifies level.
+//  12. "rms" basis maps to "continuous" (existing field, no new classification).
+//  13. No +6 dB space correction and no −6 dB peak allowance on the RMS figure.
 // ---------------------------------------------------------------------------
 
 import { test } from "node:test";
@@ -168,4 +175,147 @@ test("Ascendo full extraction maps to FULL DATA inputs", () => {
   assert.equal(info.power_w.category, "Manufacturer Power Handling",
     "category preserves the manufacturer wording without inventing a standard");
   assert.ok(!info.power_handling_note, "no basis-not-stated advisory for reported power handling");
+});
+
+// ---------------------------------------------------------------------------
+// Triad TS-IRLCR5 regression: anechoic frequency response must not establish
+// Full Space, and "Max RMS SPL" must map to continuous capability.
+// ---------------------------------------------------------------------------
+
+const MEASUREMENT_SPACE_ENUM = { measurement_space: ["free-space", "half-space", "in-room", "unspecified"] };
+
+test("anechoic does not map to free-space in measurement_space enum matching", () => {
+  // "Anechoic" on its own must NOT establish free-space. Only explicit
+  // "Full Space" / "4π" / "4 pi" should map to free-space.
+  assert.equal(
+    matchEnumValue("measurement_space", "anechoic", MEASUREMENT_SPACE_ENUM),
+    "",
+    "'anechoic' alone must not map to any measurement_space value",
+  );
+  assert.equal(
+    matchEnumValue("measurement_space", "Anechoic Frequency Response", MEASUREMENT_SPACE_ENUM),
+    "",
+    "'Anechoic Frequency Response' must not map to free-space",
+  );
+  // Explicit Full Space / 4π still map correctly.
+  assert.equal(
+    matchEnumValue("measurement_space", "Full Space", MEASUREMENT_SPACE_ENUM),
+    "free-space",
+  );
+  assert.equal(
+    matchEnumValue("measurement_space", "4π", MEASUREMENT_SPACE_ENUM),
+    "free-space",
+  );
+  // Half Space / 2π still map correctly.
+  assert.equal(
+    matchEnumValue("measurement_space", "Half Space", MEASUREMENT_SPACE_ENUM),
+    "half-space",
+  );
+  assert.equal(
+    matchEnumValue("measurement_space", "2π", MEASUREMENT_SPACE_ENUM),
+    "half-space",
+  );
+});
+
+test("Max RMS SPL maps to continuous SPL, not peak and not unmapped", () => {
+  // The LLM should extract "Max RMS SPL (AES75/1m) (dBZ) 104.7" as
+  // max_continuous_spl_db = 104.7 with max_spl_basis = "continuous".
+  // The "Peak SPL: 122.7 dB" stays separate in max_peak_spl_db.
+  const raw = {
+    reported: [
+      item("sensitivity_db", "87", "Sensitivity 87 dB at 2.83 V / 1 m"),
+      item("sensitivity_basis", "2.83V/1m", "2.83 V / 1 m"),
+      item("nominal_impedance_ohm", "6", "Impedance 6 Ω"),
+      item("max_continuous_spl_db", "104.7", "Max RMS SPL (AES75/1m) (dBZ) 104.7"),
+      item("max_peak_spl_db", "122.7", "Peak SPL 122.7 dB"),
+      item("max_spl_basis", "continuous", "Max RMS SPL"),
+      // measurement_space is NOT reported — the source only says "Anechoic
+      // Frequency Response", which does not establish a space for SPL.
+      item("power_handling_continuous_w", "180", "Continuous Power Handling 180 W"),
+      item("recommended_amp_max_w", "200", "Recommended Amplifier 200 W"),
+      item("peak_power_w", "360", "Peak Power Handling 360 W"),
+    ],
+  };
+  const { found, info } = extractionToFound(raw);
+
+  // The RMS figure enters the continuous field — it is the capability authority.
+  assert.equal(found.max_spl_db, "104.7", "Max RMS SPL enters the continuous SPL field");
+  assert.equal(found.max_spl_basis, "continuous", "RMS basis is classified as continuous");
+  // The peak figure stays separate — no −6 dB subtraction from the RMS figure.
+  assert.equal(found.max_peak_spl_db, "122.7", "Peak SPL stays separate");
+  // The continuous figure was not collapsed from the peak (no −6 dB applied).
+  assert.notEqual(found.max_spl_db, 116.7, "no −6 dB peak allowance on the RMS figure");
+  // measurement_space is not proposed (source did not state it for SPL).
+  assert.equal(found.measurement_space, undefined, "no measurement_space proposed from anechoic frequency response");
+  // No unmapped warning for the RMS SPL concept.
+  assert.ok(!info.potential_unmapped, "Max RMS SPL is not flagged as unmapped");
+  // Sensitivity and impedance are proposed normally.
+  assert.equal(found.sensitivity_db, "87");
+  assert.equal(found.sensitivity_reference, "2.83V/1m");
+  assert.equal(found.impedance_ohm, "6");
+});
+
+test("rms basis maps to continuous in mapMaxSplBasis", () => {
+  // The LLM may return "rms" as the basis label for "Max RMS SPL". It maps
+  // to the existing 'continuous' basis — no new classification introduced.
+  assert.equal(mapMaxSplBasis("rms"), "continuous");
+  assert.equal(mapMaxSplBasis("RMS"), "continuous");
+  assert.equal(mapMaxSplBasis("continuous"), "continuous");
+  assert.equal(mapMaxSplBasis("peak"), "peak");
+});
+
+test("rms maps to continuous in matchEnumValue for max_spl_basis", () => {
+  const SPL_BASIS_ENUM = { max_spl_basis: ["AES", "IEC", "continuous", "peak", "manufacturer unspecified", "calculated", "unknown"] };
+  assert.equal(matchEnumValue("max_spl_basis", "rms", SPL_BASIS_ENUM), "continuous");
+  assert.equal(matchEnumValue("max_spl_basis", "RMS", SPL_BASIS_ENUM), "continuous");
+  assert.equal(matchEnumValue("max_spl_basis", "continuous", SPL_BASIS_ENUM), "continuous");
+  assert.equal(matchEnumValue("max_spl_basis", "peak", SPL_BASIS_ENUM), "peak");
+});
+
+test("Triad TS-IRLCR5 full extraction: no space correction, continuous RMS authority", () => {
+  // Simulates the ADI extraction from the Triad datasheet where the only
+  // "anechoic" mention is in "Anechoic Frequency Response" — not an SPL
+  // measurement-space declaration. measurement_space is left unspecified.
+  const raw = {
+    reported: [
+      item("sensitivity_db", "87", "Sensitivity: 87 dB at 2.83 V / 1 m"),
+      item("sensitivity_basis", "2.83V/1m", "2.83 V / 1 m"),
+      item("nominal_impedance_ohm", "6", "Impedance: 6 Ω"),
+      item("max_continuous_spl_db", "104.7", "Max RMS SPL (AES75/1m) (dBZ) 104.7"),
+      item("max_peak_spl_db", "122.7", "Peak SPL 122.7 dB"),
+      item("max_spl_basis", "continuous", "Max RMS SPL"),
+      item("power_handling_continuous_w", "180", "Continuous Power Handling: 180 W"),
+      item("recommended_amp_max_w", "200", "Recommended Amplifier: 200 W"),
+      item("peak_power_w", "360", "Peak Power Handling: 360 W"),
+    ],
+  };
+  const { found } = extractionToFound(raw);
+
+  // No measurement_space is proposed — defaults to assumed Half Space
+  // (no +6 dB correction) in the downstream normaliser.
+  assert.equal(found.measurement_space, undefined,
+    "anechoic frequency response does not establish measurement_space");
+
+  // The RMS figure is the continuous capability authority — no −6 dB
+  // peak allowance and no +6 dB space correction.
+  assert.equal(found.max_spl_db, "104.7",
+    "Max RMS SPL is the continuous SPL, preserved at full precision");
+  assert.equal(found.max_spl_basis, "continuous",
+    "RMS is classified as continuous, not peak or manufacturer unspecified");
+  assert.equal(found.max_peak_spl_db, "122.7",
+    "Peak SPL is preserved separately at full precision");
+});
+
+test("explicit Full Space still maps to free-space when stated for SPL", () => {
+  // When the source genuinely states "Full Space" or "4π" for the SPL
+  // measurement (not just "anechoic" for frequency response), it still
+  // maps to free-space and receives the +6 dB correction downstream.
+  assert.equal(
+    matchEnumValue("measurement_space", "Full Space", MEASUREMENT_SPACE_ENUM),
+    "free-space",
+  );
+  assert.equal(
+    matchEnumValue("measurement_space", "4pi", MEASUREMENT_SPACE_ENUM),
+    "free-space",
+  );
 });
