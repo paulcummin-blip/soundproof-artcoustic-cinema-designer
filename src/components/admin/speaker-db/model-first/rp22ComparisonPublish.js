@@ -199,6 +199,13 @@ export function buildComparisonRow({ product, specification, manufacturerName })
     max_spl_test_conditions: present(spec.max_spl_test_conditions)
       ? spec.max_spl_test_conditions
       : (present(spec.max_spl_basis) ? spec.max_spl_basis : ""),
+    // The max-SPL basis enum is carried explicitly so the comparison normalizer
+    // can classify the peak-to-continuous authority. "unknown" and
+    // "manufacturer unspecified" are valid basis values, so a direct
+    // null/empty check is used instead of present() (which filters them out).
+    max_spl_basis: (spec.max_spl_basis != null && String(spec.max_spl_basis).trim() !== "")
+      ? spec.max_spl_basis
+      : null,
     frequency_range: frequencyRange,
     usable_lf_minus6db_hz: toleranceSaysSix && low !== null ? low : null,
     horizontal_coverage_deg: present(spec.horizontal_dispersion_deg) ? spec.horizontal_dispersion_deg : null,

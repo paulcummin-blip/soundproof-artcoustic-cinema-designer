@@ -59,18 +59,26 @@ export function classifyDataAdequacy(record) {
   // The estimate is useful but not a manufacturer-verified capability.
   if (record.provisional_peak_assumed === true) return DATA_ADEQUACY.INCOMPLETE;
 
+  // An estimated-continuous-from-peak SPL (manufacturer did not confirm
+  // continuous; Sound Proof applied −6 dB) is a defensible estimate from a
+  // published figure. It is GOOD DATA (not FULL), because the −6 dB allowance
+  // is a controlled engineering assumption.
+  const isEstimatedFromPeak = record.max_spl_authority_type === "published_peak"
+    || record.max_spl_authority_type === "assumed_peak";
+
   // A defensible numerical result is possible. Now: is it FULL or GOOD?
-  const publishedSpl = hasValue(record.halfspace_published_max_continuous_spl_db_1m);
+  const publishedContinuousSpl = hasValue(record.halfspace_published_max_continuous_spl_db_1m);
   const spaceConfirmed = record.sensitivity_space_provenance !== "half_space_assumed"
     && record.max_spl_space_provenance !== "half_space_assumed";
   const basisConfirmed = record.sensitivity_reference === "1W/1m"
     || record.sensitivity_reference === "2.83V/1m";
   const basisAssumed = record.sensitivity_basis_assumed === true;
 
-  // FULL requires published measured capability AND no controlled assumptions
-  // behind the space or the sensitivity basis. An assumed sensitivity basis
-  // (2.83 V / 1 m when the manufacturer did not state the reference) is a
-  // controlled ADI assumption, so the row stays at GOOD DATA.
-  if (publishedSpl && spaceConfirmed && basisConfirmed && !basisAssumed) return DATA_ADEQUACY.FULL;
+  // FULL requires published measured continuous capability (manufacturer
+  // explicitly confirmed continuous) AND no controlled assumptions behind the
+  // space or the sensitivity basis. An estimated-continuous-from-peak figure is
+  // never FULL, and an assumed sensitivity basis (2.83 V / 1 m when the
+  // manufacturer did not state the reference) keeps the row at GOOD DATA.
+  if (publishedContinuousSpl && !isEstimatedFromPeak && spaceConfirmed && basisConfirmed && !basisAssumed) return DATA_ADEQUACY.FULL;
   return DATA_ADEQUACY.GOOD;
 }

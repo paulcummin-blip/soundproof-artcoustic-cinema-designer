@@ -16,6 +16,12 @@ import {
   resolveSplEvidenceSource,
 } from './splEvidenceSourceAuthority.js';
 import { assumedContinuousFromPeak, PEAK_ASSUMPTION_LABEL } from './peakPowerAssumption.js';
+import {
+  classifyMaxSplAuthority,
+  peakFigureForEstimate,
+  estimatedContinuousFromPeak,
+  PEAK_TO_CONTINUOUS_ALLOWANCE_DB,
+} from './maxSplAuthority.js';
 
 export const FULL_TO_HALF_SPACE_DB = 6;
 
@@ -146,6 +152,32 @@ export function normalizeCompetitor(record) {
   const continuous = rawContinuous !== null ? rawContinuous + maxSplBasis.correctionDb : null;
   const peak = rawPeak !== null ? rawPeak + maxSplBasis.correctionDb : null;
 
+  // Max SPL authority: unless the manufacturer explicitly confirmed a continuous
+  // figure (AES/IEC/continuous basis), every published max SPL is treated as peak
+  // and converted to estimated continuous via the −6 dB crest-factor allowance.
+  // The allowance is applied ONCE here, to the space-corrected value, and is
+  // never repeated inside the central SPL engine. It is independent of the
+  // full-space → half-space space correction above.
+  const maxSplAuthority = classifyMaxSplAuthority({
+    rawContinuous,
+    rawPeak,
+    maxSplBasis: record.max_spl_basis,
+  });
+  const peakFigure = peakFigureForEstimate({
+    continuous,
+    peak,
+    authorityType: maxSplAuthority.type,
+  });
+  const halfspaceEstimatedContinuousFromPeak = estimatedContinuousFromPeak(peakFigure);
+
+  // The max SPL limit (hard cap) for the comparison:
+  //   published continuous (explicitly confirmed) → use directly
+  //   estimated continuous from peak (−6 dB)       → use as cap
+  //   no published max SPL                         → null (calculated only)
+  const halfspaceMaxSplLimit = maxSplAuthority.type === 'published_continuous'
+    ? continuous
+    : halfspaceEstimatedContinuousFromPeak;
+
   // Calculated capability uses the sensitivity space correction (already in halfSensitivity)
   const rawCalculated = oneW !== null && power !== null ? oneW + 10 * Math.log10(power) : null;
   const calculated = halfSensitivity !== null && power !== null ? halfSensitivity + 10 * Math.log10(power) : null;
@@ -169,11 +201,23 @@ export function normalizeCompetitor(record) {
   // capability: the manufacturer's own declaration decides. The figure that is
   // graded does not change — provenance sets the evidence label and, at most,
   // holds the confidence class back.
-  const evidenceSource = resolveSplEvidenceSource({
-    publishedSpl: continuous,
-    splBasis: record.max_spl_test_conditions,
-    declaredEvidenceQuality: record.source_evidence_quality,
-  });
+  // When the max SPL authority is an estimated-continuous-from-peak figure, the
+  // graded SPL is a Sound Proof estimate, not a manufacturer-published figure.
+  const evidenceSource = maxSplAuthority.type === 'published_continuous'
+    ? resolveSplEvidenceSource({
+        publishedSpl: continuous,
+        splBasis: record.max_spl_test_conditions,
+        declaredEvidenceQuality: record.source_evidence_quality,
+      })
+    : maxSplAuthority.type === 'published_peak' || maxSplAuthority.type === 'assumed_peak'
+      ? { key: 'sound_proof_estimate', label: 'Sound Proof Estimate', confidenceCap: 'B',
+          authority: 'Estimated continuous SPL (peak − 6 dB)', statement:
+          'The manufacturer did not explicitly confirm a continuous maximum SPL. Sound Proof has applied a −6 dB crest-factor allowance to the published maximum SPL to estimate continuous capability. It is an estimate, not a manufacturer-verified continuous rating.' }
+      : resolveSplEvidenceSource({
+        publishedSpl: null,
+        splBasis: record.max_spl_test_conditions,
+        declaredEvidenceQuality: record.source_evidence_quality,
+      });
 
   // Data confidence classification:
   // A — manufacturer-measured continuous SPL + confirmed space basis
@@ -198,6 +242,10 @@ export function normalizeCompetitor(record) {
   // A provisional peak-assumed result is an estimate — never A or B. It is
   // always held at C (ADI estimate) and the adequacy stays LIMITED DATA.
   if (powerIsPeakAssumed) dataConfidence = 'C';
+  // An estimated-continuous-from-peak SPL rests on a published figure plus a
+  // Sound Proof engineering assumption (−6 dB). It is never A — it is a
+  // defensible estimate, not measured continuous capability.
+  if ((maxSplAuthority.type === 'published_peak' || maxSplAuthority.type === 'assumed_peak') && dataConfidence === 'A') dataConfidence = 'B';
   // Evidence provenance: a manufacturer-calculated SPL, or a figure whose basis is
   // not stated, is never classified as measured capability.
   dataConfidence = capEvidenceConfidence(dataConfidence, evidenceSource.confidenceCap);
@@ -230,7 +278,11 @@ export function normalizeCompetitor(record) {
 
   // How the capability figure was obtained, and the quality of the evidence
   // behind the power authority it rests on.
-  let capabilityBasis = continuous !== null ? 'Published' : 'Calculated';
+  let capabilityBasis = maxSplAuthority.type === 'published_continuous'
+    ? 'Published'
+    : (maxSplAuthority.type === 'published_peak' || maxSplAuthority.type === 'assumed_peak')
+      ? 'Estimated'
+      : 'Calculated';
   let evidenceQuality = powerIsPublishedRating
     ? 'Manufacturer Published'
     : power === null ? 'Unknown' : 'Manufacturer Calculated';
@@ -268,10 +320,16 @@ export function normalizeCompetitor(record) {
     calculated_max_continuous_spl_db_1m: rawCalculated,
     halfspace_published_max_continuous_spl_db_1m: continuous,
     halfspace_published_max_peak_spl_db_1m: peak,
+    halfspace_estimated_continuous_from_peak_spl_db_1m: halfspaceEstimatedContinuousFromPeak,
+    halfspace_max_spl_limit_db_1m: halfspaceMaxSplLimit,
+    max_spl_authority_type: maxSplAuthority.type,
     halfspace_calculated_max_continuous_spl_db_1m: calculated,
     spl_authority: !eligible
       ? 'Incomplete'
-      : continuous !== null ? evidenceSource.authority : 'Calculated from sensitivity + power',
+      : maxSplAuthority.type === 'published_continuous' ? evidenceSource.authority
+      : (maxSplAuthority.type === 'published_peak' || maxSplAuthority.type === 'assumed_peak')
+        ? 'Estimated continuous SPL (peak − 6 dB)'
+        : 'Calculated from sensitivity + power',
     // Evidence provenance of the graded SPL figure, so every surface that describes
     // the evidence states where the figure came from rather than implying measurement.
     spl_evidence_source: evidenceSource.key,
@@ -307,7 +365,13 @@ export function competitorMetaForComparison(record) {
     // The stated power authority — published rating preferred, recommended
     // amplifier maximum otherwise. Never an inferred figure.
     power_handling_w: n.power_authority_w,
-    max_spl_cont_db_1m_halfspace: n.halfspace_published_max_continuous_spl_db_1m ?? n.halfspace_calculated_max_continuous_spl_db_1m,
+    // The hard cap passed to the central SPL engine: the max SPL limit
+    // (published continuous or estimated continuous from peak) when a
+    // published max SPL exists, otherwise the calculated capability. The
+    // engine applies Math.min(amp-limited, hardCap), so a peak-derived
+    // limit constrains a sensitivity-and-power calculation that would
+    // otherwise exceed it.
+    max_spl_cont_db_1m_halfspace: n.halfspace_max_spl_limit_db_1m ?? n.halfspace_calculated_max_continuous_spl_db_1m,
     recommended_amp_max_w: n.recommended_amp_max_w,
     isLineSource: false,
   };

@@ -74,6 +74,32 @@ function continuousSplRow(record) {
   return textOrNull(record.published_max_continuous_spl_db_1m, " dB @ 1 m") || NOT_PUBLISHED;
 }
 
+// The manufacturer's published max SPL figure that Sound Proof treats as peak
+// (or assumed peak) when the manufacturer did not explicitly confirm continuous.
+// Shown with its basis label so the reader can see the distinction.
+function manufacturerMaxSplRow(record) {
+  const authority = String(record.max_spl_authority_type || "").trim();
+  if (authority !== "published_peak" && authority !== "assumed_peak") return null;
+  const figure = record.halfspace_published_max_peak_spl_db_1m
+    ?? record.halfspace_published_max_continuous_spl_db_1m;
+  if (!hasValue(figure)) return null;
+  const n = Number(figure);
+  const value = Number.isFinite(n) ? Number(n.toFixed(1)) : figure;
+  const label = authority === "published_peak"
+    ? "Published peak maximum SPL"
+    : "Manufacturer max SPL (continuous not specified)";
+  return `${value} dB — ${label}`;
+}
+
+// The Sound Proof estimated continuous max SPL derived from a peak or
+// unqualified max SPL via the −6 dB crest-factor allowance.
+function estimatedContinuousSplRow(record) {
+  if (!hasValue(record.halfspace_estimated_continuous_from_peak_spl_db_1m)) return null;
+  const n = Number(record.halfspace_estimated_continuous_from_peak_spl_db_1m);
+  const value = Number.isFinite(n) ? Number(n.toFixed(1)) : record.halfspace_estimated_continuous_from_peak_spl_db_1m;
+  return `${value} dB — Sound Proof estimated continuous (assumed peak − 6 dB)`;
+}
+
 // A manufacturer-stated max SPL whose measurement basis was not explicitly
 // established is preserved in max_spl_test_conditions as advisory text (set
 // by buildSpecPatch when the basis is "manufacturer unspecified"). Surface it
@@ -135,6 +161,7 @@ function resultMethodText(record) {
   }
   const basis = String(record.capability_basis || "").trim();
   if (basis === "Published") return "Published continuous SPL figure";
+  if (basis === "Estimated") return "Estimated continuous SPL (published max SPL − 6 dB), capping the sensitivity-and-power calculation";
   if (basis === "Calculated") return "Calculated from published sensitivity and amplifier power";
   const label = String(record.spl_evidence_label || "").trim();
   if (label) return label;
@@ -200,6 +227,8 @@ export default function ComparisonDataStatusSection({
   const assumptions = Array.isArray(candidate?.assumptions) ? candidate.assumptions : [];
 
   const manufacturerSpl = manufacturerStatedSplRow(record);
+  const manufacturerMaxSpl = manufacturerMaxSplRow(record);
+  const estimatedContinuous = estimatedContinuousSplRow(record);
   const isProvisional = record?.provisional_peak_assumed === true;
   const dataUsed = [
     ["Manufacturer", record.manufacturer || "—"],
@@ -219,6 +248,12 @@ export default function ComparisonDataStatusSection({
     if (peakW) dataUsed.push(["Manufacturer peak power handling", peakW]);
     if (assumedW) dataUsed.push(["Assumed continuous-equivalent power", assumedW]);
     dataUsed.push(["Calculation assumption", `${PEAK_TO_CONTINUOUS_FACTOR * 100}% of published peak power`]);
+  }
+  if (manufacturerMaxSpl) {
+    dataUsed.push(["Manufacturer max SPL", manufacturerMaxSpl]);
+  }
+  if (estimatedContinuous) {
+    dataUsed.push(["Sound Proof estimated continuous", estimatedContinuous]);
   }
   if (manufacturerSpl) {
     dataUsed.push(["Manufacturer maximum SPL", manufacturerSpl]);

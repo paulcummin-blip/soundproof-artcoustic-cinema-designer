@@ -59,6 +59,20 @@
     "max_spl_test_conditions": {
       "type": "string"
     },
+    "max_spl_basis": {
+      "type": "string",
+      "enum": [
+        "AES",
+        "IEC",
+        "continuous",
+        "peak",
+        "manufacturer unspecified",
+        "calculated",
+        "unknown"
+      ],
+      "nullable": true,
+      "description": "RP22 comparison: the basis behind the published max SPL figure, carried from the source specification's max_spl_basis. Drives the peak-to-continuous authority: only AES/IEC/continuous establishes a manufacturer-confirmed continuous figure; every other basis (including peak and manufacturer unspecified) is treated as peak and converted to estimated continuous via \u22126 dB. Null on legacy rows \u2014 the normalizer treats a null basis with a present max SPL figure as assumed peak."
+    },
     "frequency_range": {
       "type": "string"
     },
@@ -124,7 +138,7 @@
     "capability_basis": {
       "type": "string",
       "nullable": true,
-      "description": "How the capability figure was obtained: 'Published' when a published continuous SPL is used, 'Calculated' when derived from sensitivity plus the power authority, or the secondary-evidence basis phrase when the values came from an admin-approved secondary document. Null when the row is ungradeable."
+      "description": "How the capability figure was obtained: 'Published' when a published continuous SPL is used, 'Estimated' when derived from a peak/unqualified max SPL via the \u22126 dB allowance, 'Calculated' when derived from sensitivity plus the power authority, or the secondary-evidence basis phrase when the values came from an admin-approved secondary document. Null when the row is ungradeable."
     },
     "evidence_quality": {
       "type": "string",
@@ -154,6 +168,27 @@
     },
     "halfspace_published_max_peak_spl_db_1m": {
       "type": "number"
+    },
+    "halfspace_estimated_continuous_from_peak_spl_db_1m": {
+      "type": "number",
+      "nullable": true,
+      "description": "Estimated continuous maximum SPL derived from a published peak or unqualified max SPL figure via the \u22126 dB crest-factor allowance. Null when the manufacturer explicitly confirmed a continuous figure, or when no max SPL is published. This is the value the comparison uses as the capability limit (hard cap) when the manufacturer did not confirm continuous."
+    },
+    "halfspace_max_spl_limit_db_1m": {
+      "type": "number",
+      "nullable": true,
+      "description": "The maximum continuous SPL limit used as the hard cap in the comparison: the published continuous SPL when the manufacturer explicitly confirmed it, otherwise the estimated continuous from peak. Null when no max SPL is published (the comparison then uses the calculated capability from sensitivity + power)."
+    },
+    "max_spl_authority_type": {
+      "type": "string",
+      "enum": [
+        "published_continuous",
+        "published_peak",
+        "assumed_peak",
+        "none"
+      ],
+      "nullable": true,
+      "description": "How the max SPL authority was classified: published_continuous (manufacturer explicitly confirmed continuous), published_peak (manufacturer explicitly identified peak), assumed_peak (manufacturer published a max SPL but did not confirm continuous), none (no published max SPL)."
     },
     "halfspace_calculated_max_continuous_spl_db_1m": {
       "type": "number"
