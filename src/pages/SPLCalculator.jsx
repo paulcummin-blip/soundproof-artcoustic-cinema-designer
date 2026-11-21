@@ -494,30 +494,30 @@ export default function SPLCalculatorPage() {
           <h1 style={{ fontSize: 28, fontWeight: 400, margin: 0, letterSpacing: "0.01em" }}>RP22 Speaker Capability</h1>
         </div>
 
-        <div style={{ background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "220px 220px 280px", justifyContent: "start", gap: 14 }}>
-            <label style={{ fontSize: 13, color: BRAND.subtext }}>
+        <div style={{ background: BRAND.panel, border: `2px solid #9A968D`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "220px 220px 280px", justifyContent: "start", gap: 14, alignItems: "end" }}>
+            <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
               Speaker to RSP distance
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                <input value={distance} onChange={(e) => setDistance(e.target.value)} inputMode="decimal" style={{ width: "100%", border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "10px 11px", fontSize: 15 }} />
-                <span style={{ color: BRAND.hint }}>m</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <input value={distance} onChange={(e) => setDistance(e.target.value)} inputMode="decimal" style={{ width: "100%", border: `2px solid #A6A29A`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text }} />
+                <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>m</span>
               </div>
             </label>
-            <label style={{ fontSize: 13, color: BRAND.subtext }}>
+            <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
               Amplifier power available
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                <input value={ampPower} onChange={(e) => setAmpPower(e.target.value)} inputMode="numeric" style={{ width: "100%", border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "10px 11px", fontSize: 15 }} />
-                <span style={{ color: BRAND.hint }}>W</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <input value={ampPower} onChange={(e) => setAmpPower(e.target.value)} inputMode="numeric" style={{ width: "100%", border: `2px solid #A6A29A`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text }} />
+                <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>W</span>
               </div>
             </label>
             <div>
-              <div style={{ fontSize: 13, color: BRAND.subtext, marginBottom: 6 }}>RP22 target basis</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext, marginBottom: 8 }}>RP22 target basis</div>
               <div style={{ display: "flex", gap: 6 }}>
                 {[
                   ["minimum", "Minimum"],
                   ["recommended", "Recommended"],
                 ].map(([value, label]) => (
-                  <button key={value} type="button" onClick={() => setBasis(value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 9, border: `1px solid ${basis === value ? BRAND.text : BRAND.border}`, background: basis === value ? BRAND.text : "#FFF", color: basis === value ? "#FFF" : BRAND.text, cursor: "pointer", fontSize: 13 }}>{label}</button>
+                  <button key={value} type="button" onClick={() => setBasis(value)} style={{ flex: 1, padding: "14px 12px", borderRadius: 9, border: `2px solid ${basis === value ? BRAND.text : "#A6A29A"}`, background: basis === value ? BRAND.text : "#FFF", color: basis === value ? "#FFF" : BRAND.text, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>{label}</button>
                 ))}
               </div>
             </div>
