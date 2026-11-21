@@ -25,7 +25,7 @@ import {
   effectiveP17Multiplier,
 } from "../src/components/report/technical/p17ContinuousCoverageBonus.js";
 
-const P17_WEIGHT = 7;
+const P17_WEIGHT = 5;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -398,6 +398,190 @@ console.log("\nDirect check: worsening the limiting speaker never increases bonu
     `L2 bonus=${b1.toFixed(3)} L1 bonus=${b2.toFixed(3)}`);
   check("effective multiplier decreased",
     effectiveP17Multiplier("L1", q2) < effectiveP17Multiplier("L2", q1));
+}
+
+// ── Case 11: Continuous quality — same RP22 window, different angles ──
+
+console.log("\nCase 11: continuous quality — same RP22 window, different angles");
+{
+  // Typical coverage windows for a bed-layer surround
+  const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+
+  // Two angles both within the L3 window (40 < angle <= 55), but different.
+  // The discrete windowLevelNumber is 3 for both — the old formula could not
+  // distinguish them. The continuous function can.
+  const entryA = { angleDeg: 42, windows, windowLevelNumber: 3 };
+  const entryB = { angleDeg: 53, windows, windowLevelNumber: 3 };
+
+  const qA = computeP17MeanQuality([entryA]);
+  const qB = computeP17MeanQuality([entryB]);
+
+  console.log(`    angle 42° (L3): quality=${qA?.toFixed(4)}`);
+  console.log(`    angle 53° (L3): quality=${qB?.toFixed(4)}`);
+
+  check("both in L3 window but different continuous quality", qA !== qB);
+  check("nearer on-axis has higher quality", qA > qB);
+
+  // Feed through the rating adapter: both seats at L3, but one has better aim.
+  const seats = [{id:"s1",priority:"primary"}];
+  const authBetter = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: qA } } });
+  const authWorse  = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: qB } } });
+  const rBetter = calculateRoomDesignRating(authBetter);
+  const rWorse  = calculateRoomDesignRating(authWorse);
+
+  console.log(`    better aim (42°): mult=${p17Contrib(rBetter)?.multiplier?.toFixed(3)} DPI=${rBetter.designPerformanceIndex}`);
+  console.log(`    worse aim  (53°): mult=${p17Contrib(rWorse)?.multiplier?.toFixed(3)} DPI=${rWorse.designPerformanceIndex}`);
+
+  check("better aim scores higher within same RP22 band", rBetter.actualPoints > rWorse.actualPoints);
+  check("RP22 level unchanged (both L3)", p17Contrib(rBetter)?.resultLevel === "1×L3" && p17Contrib(rWorse)?.resultLevel === "1×L3");
+}
+
+// ── Case 12: Already well-oriented speaker — little additional gain ───
+
+console.log("\nCase 12: already well-oriented speaker — little additional gain");
+{
+  const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+
+  // Speaker at 5° vs 10° — both deep in the L4 window
+  const entry5 = { angleDeg: 5, windows, windowLevelNumber: 4 };
+  const entry10 = { angleDeg: 10, windows, windowLevelNumber: 4 };
+
+  const q5 = computeP17MeanQuality([entry5]);
+  const q10 = computeP17MeanQuality([entry10]);
+
+  console.log(`    5°:  quality=${q5?.toFixed(4)}`);
+  console.log(`    10°: quality=${q10?.toFixed(4)}`);
+
+  check("5° has higher quality than 10°", q5 > q10);
+  check("quality difference is small (well-oriented)", (q5 - q10) < 0.05);
+
+  // When the seat is at L4, bonus is 0 regardless — no further gain
+  const seats = [{id:"s1",priority:"primary"}];
+  const auth5 = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 1.5, p17ContinuousMeanQuality: q5 } } });
+  const auth10 = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 1.5, p17ContinuousMeanQuality: q10 } } });
+  const r5 = calculateRoomDesignRating(auth5);
+  const r10 = calculateRoomDesignRating(auth10);
+
+  check("L4 saturated — no gain from further aiming", r5.actualPoints === r10.actualPoints);
+  check("both at L4 multiplier 12", p17Contrib(r5)?.multiplier === 12 && p17Contrib(r10)?.multiplier === 12);
+}
+
+// ── Case 13: Well-oriented speaker in a seat limited by another ──────
+
+console.log("\nCase 13: well-oriented speaker in L3-limited seat — small gain");
+{
+  const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+
+  // 4 speakers: one at L3 (limiting), one well-oriented, two others in L4.
+  // Re-aiming the well-oriented speaker from 10° to 5° produces a small,
+  // proportionate gain — not a large jump.
+  const limiting = { angleDeg: 45, windows, windowLevelNumber: 3 };
+  const well5  = { angleDeg: 5,  windows, windowLevelNumber: 4 };
+  const well10 = { angleDeg: 10, windows, windowLevelNumber: 4 };
+  const other  = { angleDeg: 30, windows, windowLevelNumber: 4 };
+
+  const mq5  = computeP17MeanQuality([limiting, well5,  other, other]);
+  const mq10 = computeP17MeanQuality([limiting, well10, other, other]);
+
+  console.log(`    well-oriented at 5°:  meanQ=${mq5?.toFixed(4)}`);
+  console.log(`    well-oriented at 10°: meanQ=${mq10?.toFixed(4)}`);
+
+  check("mean quality slightly higher at 5°", mq5 > mq10);
+  check("difference is small (well-oriented speaker)", (mq5 - mq10) < 0.02);
+
+  // Score change is small and proportionate
+  const seats = [{id:"s1",priority:"primary"}];
+  const auth5  = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: mq5  } } });
+  const auth10 = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: mq10 } } });
+  const r5  = calculateRoomDesignRating(auth5);
+  const r10 = calculateRoomDesignRating(auth10);
+
+  console.log(`    5°:  points=${r5.actualPoints?.toFixed(2)} DPI=${r5.designPerformanceIndex}`);
+  console.log(`    10°: points=${r10.actualPoints?.toFixed(2)} DPI=${r10.designPerformanceIndex}`);
+
+  check("score at least as high (proportionate)", r5.actualPoints >= r10.actualPoints);
+  check("improvement is small (not excessive)", (r5.actualPoints - r10.actualPoints) < 2.0);
+  check("RP22 level unchanged (L3)", p17Contrib(r5)?.resultLevel === "1×L3" && p17Contrib(r10)?.resultLevel === "1×L3");
+}
+
+// ── Case 14: Deliberately poor aiming reduces the score ──────────────
+
+console.log("\nCase 14: poor aiming reduces score within same RP22 band");
+{
+  const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+
+  // Two speakers both in L3, but one near the L4 edge (41°) and one near the L2 edge (54°).
+  const entryGood = { angleDeg: 41, windows, windowLevelNumber: 3 };
+  const entryPoor = { angleDeg: 54, windows, windowLevelNumber: 3 };
+
+  const mqGood = computeP17MeanQuality([entryGood, entryGood]);
+  const mqPoor = computeP17MeanQuality([entryPoor, entryPoor]);
+
+  console.log(`    good aim (41°): meanQ=${mqGood?.toFixed(4)}`);
+  console.log(`    poor aim (54°): meanQ=${mqPoor?.toFixed(4)}`);
+
+  check("good aim higher quality", mqGood > mqPoor);
+
+  const seats = [{id:"s1",priority:"primary"}];
+  const authGood = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: mqGood } } });
+  const authPoor = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 3.0, p17ContinuousMeanQuality: mqPoor } } });
+  const rGood = calculateRoomDesignRating(authGood);
+  const rPoor = calculateRoomDesignRating(authPoor);
+
+  console.log(`    good: mult=${p17Contrib(rGood)?.multiplier?.toFixed(3)} DPI=${rGood.designPerformanceIndex}`);
+  console.log(`    poor: mult=${p17Contrib(rPoor)?.multiplier?.toFixed(3)} DPI=${rPoor.designPerformanceIndex}`);
+
+  check("good aim scores higher", rGood.actualPoints > rPoor.actualPoints);
+  check("RP22 level unchanged (both L3)", p17Contrib(rGood)?.resultLevel === "1×L3" && p17Contrib(rPoor)?.resultLevel === "1×L3");
+}
+
+// ── Case 15: Same physical config always same score (determinism) ─────
+
+console.log("\nCase 15: same physical config always produces same score");
+{
+  const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+  const perSpeaker = [
+    { angleDeg: 30, windows, windowLevelNumber: 4 },
+    { angleDeg: 45, windows, windowLevelNumber: 3 },
+    { angleDeg: 60, windows, windowLevelNumber: 2 },
+  ];
+
+  const mq1 = computeP17MeanQuality(perSpeaker);
+  const mq2 = computeP17MeanQuality(perSpeaker);
+
+  check("same input -> same quality", mq1 === mq2);
+
+  const seats = [{id:"s1",priority:"primary"}];
+  const auth1 = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 4.0, p17ContinuousMeanQuality: mq1 } } });
+  const auth2 = buildArtcousticDesignRatingAuthority({ seats, p17: { s1: { rawValue: 4.0, p17ContinuousMeanQuality: mq2 } } });
+  const r1 = calculateRoomDesignRating(auth1);
+  const r2 = calculateRoomDesignRating(auth2);
+
+  check("same config -> same DPI", r1.designPerformanceIndex === r2.designPerformanceIndex);
+  check("same config -> same actualPoints", r1.actualPoints === r2.actualPoints);
+}
+
+// ── Case 16: Fallback to discrete when angle/windows absent ──────────
+
+console.log("\nCase 16: fallback to discrete quality when angle/windows absent");
+{
+  // Legacy entry with only windowLevelNumber (no angleDeg, no windows)
+  const legacyEntry = { windowLevelNumber: 3 };
+  const qLegacy = computeP17MeanQuality([legacyEntry]);
+
+  // Should match the discrete mapping: 3/4 = 0.75
+  check("legacy fallback matches discrete L3", qLegacy === 0.75);
+
+  // Continuous entry with angle + windows should differ from pure discrete
+  const windows = { l4Deg: 40, l3Deg: 55, l2Deg: 70, usableDb: 4.0, evidenceType: "estimated" };
+  const continuousEntry = { angleDeg: 50, windows, windowLevelNumber: 3 };
+  const qContinuous = computeP17MeanQuality([continuousEntry]);
+
+  console.log(`    legacy (L3 discrete): quality=${qLegacy?.toFixed(4)}`);
+  console.log(`    continuous (50°, L3): quality=${qContinuous?.toFixed(4)}`);
+
+  check("continuous differs from discrete fallback", qContinuous !== qLegacy);
+  check("continuous at 50° < discrete L3 (0.75)", qContinuous < 0.75);
 }
 
 // ── Summary ──────────────────────────────────────────────────────────
