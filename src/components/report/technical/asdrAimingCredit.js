@@ -24,6 +24,13 @@
  *   A speaker improved from 43° to 13° has a large gain (~0.75).
  *   A change that worsens coverage has a negative gain (earns nothing).
  *
+ * NET PAIR IMPROVEMENT (not max-of-pair):
+ *   For each speaker group (e.g. front wides = LW + RW), the per-seat group
+ *   result is the AVERAGE of both speakers' signed quality changes. A
+ *   significant improvement in one speaker must NOT conceal greater
+ *   deterioration in the other. If the combined pair coverage becomes worse
+ *   at a seat, that seat earns ZERO positive credit for the group.
+ *
  * NO DOUBLE COUNTING with the existing P17 continuous coverage contribution:
  *   - The coverage contribution measures ABSOLUTE deficiency from the L4 floor
  *     (how far each speaker sits BELOW 0.75 quality). It rewards a seat being
@@ -42,8 +49,19 @@
  *   deterioration at other seats lowers the average (it is never rewarded).
  *
  * NO SPEAKER-COUNT INFLATION:
- *   Within a group (e.g. front wides = LW + RW), the per-seat gain is the BEST
- *   (max) speaker's gain, not the sum. Two front wides do not earn twice one.
+ *   Within a group (e.g. front wides = LW + RW), the per-seat gain is the
+ *   AVERAGE of both speakers' gains (not the sum). Two front wides do not
+ *   earn twice one. Adding a speaker already at/above its wall-flat quality
+ *   does not change the average gain, so it adds no inflation.
+ *
+ * CREDIT CURVE:
+ *   creditFraction = min(1, max(0, netGain) × CREDIT_SCALE)
+ *
+ *   A net quality gain of ~0.25 (e.g. moving from ~44° to ~7° off-axis with
+ *   typical Artcoustic windows) earns ~100% of the allocation. A small gain
+ *   of ~0.03 (e.g. 8° to 3°, already nearly on-axis) earns ~12%. This makes
+ *   the distinction between substantial and marginal improvements visible in
+ *   the Design Performance Index without claiming measured-dB precision.
  *
  * Properties (per the ASDR aiming credit brief):
  *  - A speaker flat against the wall earns zero aiming credit.
@@ -52,8 +70,9 @@
  *  - Meaningful rear-surround improvements can earn up to +3 secondary DPI.
  *  - Credit is never earned merely because a toggle is enabled.
  *  - Identical physical orientations produce identical scores.
- *  - A change that worsens coverage is never rewarded.
+ *  - A change that worsens net pair coverage is never rewarded.
  *  - Previous editing history never influences the score.
+ *  - No speaker-count inflation (average, not sum, within a group).
  *
  * Pure: no React, no SDK, no writes. Imported by the rating adapter and by
  * regression tests so both use one formula.
@@ -68,7 +87,7 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v);
  *
  * The DPI is round(actualPoints / 10), so a displayed +5 = 50 raw points.
  * These are CEILINGS earned through actual coverage improvement, never
- * automatic rewards. The quality gain ∈ [0, 1] scales linearly up to the cap.
+ * automatic rewards. The net quality gain ∈ [0, 1] scales up to the cap.
  *
  *               Primary (raw)   Secondary (raw)
  * Front wides     20 (+2)         50 (+5)
@@ -79,6 +98,23 @@ const AIMING_ALLOCATIONS = Object.freeze({
   primary: Object.freeze({ frontWide: 20, sideSurround: 0, rearSurround: 10 }),
   secondary: Object.freeze({ frontWide: 50, sideSurround: 10, rearSurround: 30 }),
 });
+
+/**
+ * Credit-curve scale factor. Converts the net quality gain [0, 1] to a
+ * credit fraction [0, 1] that scales the group's raw-point allocation.
+ *
+ * Calibration reference (Artcoustic Q4-3 windows: l4=38°, l3=54°, l2=72°):
+ *   44° → 7°  : net gain ~0.29 → 0.29 × 4 = 1.16 → capped at 1.0 (100%)
+ *   44° → 13° : net gain ~0.24 → 0.24 × 4 = 0.96 (96%)
+ *   28° → 13° : net gain ~0.10 → 0.10 × 4 = 0.40 (40%)
+ *   8°  → 3°  : net gain ~0.03 → 0.03 × 4 = 0.13 (13%)
+ *
+ * This makes a substantial angular improvement earn most of the available
+ * allocation while a tiny improvement (already on-axis) earns little — the
+ * distinction the brief requires, without claiming precision beyond the
+ * coverage-window estimate.
+ */
+const CREDIT_SCALE = 4.0;
 
 /** Map a canonical speaker role to its aiming-credit group (or null). */
 function groupForRole(role) {
@@ -115,11 +151,12 @@ function speakerAimingGain(entry) {
 /**
  * Compute the per-seat ASDR aiming credit (raw points) for one seat.
  *
- * For each applicable speaker group, the per-seat gain is the BEST speaker's
- * quality gain in that group (max, not sum — no speaker-count inflation). The
- * gain is clamped at 0 (a net-worsening group earns nothing) and scaled by the
- * group's raw-point allocation for the seat's priority scope. The total is the
- * sum across groups, bounded by the sum of the applicable allocations.
+ * For each applicable speaker group, the per-seat net gain is the AVERAGE of
+ * all speakers' signed quality changes in that group. A significant
+ * improvement in one speaker must NOT conceal greater deterioration in the
+ * other. If the net pair gain is ≤ 0, the group earns zero credit at this
+ * seat. The credit fraction scales linearly with the net gain (capped at
+ * 100% of the group allocation). The total is the sum across groups.
  *
  * @param {Array}  perSpeaker    - per-speaker entries from the P17 engine
  * @param {string} seatPriority - "primary" | "secondary"
@@ -142,21 +179,32 @@ export function computeSeatAimingPoints(perSpeaker, seatPriority) {
     const speakers = groups[groupName];
     if (speakers.length === 0) continue;
 
-    // Per-seat group gain: the strongest aiming improvement at this seat from
-    // any speaker in the group. Max (not sum) so two speakers do not earn twice
-    // one. Negative when every speaker in the group worsened at this seat.
-    let bestGain = null;
+    // NET pair improvement: average of all speakers' signed quality changes
+    // in this group. A significant improvement in one speaker must NOT
+    // conceal greater deterioration in the other.
+    let sumGain = 0;
+    let count = 0;
     for (const spk of speakers) {
       const gain = speakerAimingGain(spk);
       if (gain != null) {
-        bestGain = bestGain == null ? gain : Math.max(bestGain, gain);
+        sumGain += gain;
+        count += 1;
       }
     }
-    if (bestGain == null) continue; // no aiming evidence for this group here
+    if (count === 0) continue; // no aiming evidence for this group here
 
-    // Clamp at 0: a net-worsening group earns no credit. A group with mixed
-    // improvement/deterioration nets lower than a uniformly-improving one.
-    total += Math.max(0, bestGain) * alloc[groupName];
+    const netGain = sumGain / count;
+
+    // Net deterioration earns zero credit for this group at this seat.
+    // A group with mixed improvement/deterioration that nets negative earns
+    // nothing — the improvement in one speaker does not conceal the
+    // deterioration in the other.
+    if (netGain <= 0) continue;
+
+    // Credit curve: substantial net improvements earn most of the allocation,
+    // small improvements earn little. Linear scaling capped at 100%.
+    const creditFraction = Math.min(1, netGain * CREDIT_SCALE);
+    total += creditFraction * alloc[groupName];
   }
 
   return total;
@@ -164,4 +212,5 @@ export function computeSeatAimingPoints(perSpeaker, seatPriority) {
 
 export const AIMING_CREDIT_CONSTANTS = Object.freeze({
   AIMING_ALLOCATIONS,
+  CREDIT_SCALE,
 });

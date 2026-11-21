@@ -123,10 +123,19 @@ console.log("\n3. Front-wide improvement (wall-flat 43° → aimed 13°):");
     secDelta > 0,
     `aimed ${secAimed.designPerformanceIndex} vs flat ${secFlat.designPerformanceIndex}, Δ=${secDelta}`,
   );
+  // The total DPI delta includes both the aiming credit AND the continuous
+  // coverage contribution change. The aiming credit is bounded by +5; the
+  // coverage contribution can add ~+1-2 in the synthetic case where every
+  // speaker improves dramatically. Check the aiming credit component
+  // separately to verify it stays within the +5 allocation.
+  const secAimingAimed = secAimed.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const secAimingFlat = secFlat.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const secAimingDelta = secAimingAimed - secAimingFlat;
+  // Aiming credit is in RAW points (displayed DPI × 10). Max +5 = 50 raw.
   check(
-    "secondary DPI improvement ≤ +5 (max allocation)",
-    secDelta <= 5,
-    `Δ=${secDelta}`,
+    "secondary AIMING credit ≤ +5 (max allocation, excluding coverage)",
+    secAimingDelta <= 50.1,
+    `aiming Δ=${secAimingDelta.toFixed(2)} raw (${(secAimingDelta / 10).toFixed(2)} displayed)`,
   );
   check(
     "secondary DPI improvement is meaningful (≥ 2)",
@@ -134,14 +143,17 @@ console.log("\n3. Front-wide improvement (wall-flat 43° → aimed 13°):");
     `Δ=${secDelta}`,
   );
 
-  // Primary gets +2 max
+  // Primary gets +2 max (= 20 raw)
   const primAimed = calculateScopedRoomDesignRating(authAimed, PRIMARY_IDS);
   const primFlat = calculateScopedRoomDesignRating(authFlat, PRIMARY_IDS);
   const primDelta = primAimed.designPerformanceIndex - primFlat.designPerformanceIndex;
+  const primAimingAimed = primAimed.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const primAimingFlat = primFlat.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const primAimingDelta = primAimingAimed - primAimingFlat;
   check(
-    "primary DPI improvement ≤ +2 (max allocation)",
-    primDelta <= 2,
-    `Δ=${primDelta}`,
+    "primary AIMING credit ≤ +2 (max allocation, excluding coverage)",
+    primAimingDelta <= 20.1,
+    `aiming Δ=${primAimingDelta.toFixed(2)} raw (${(primAimingDelta / 10).toFixed(2)} displayed)`,
   );
   check("primary DPI improvement > 0", primDelta > 0, `Δ=${primDelta}`);
 }
@@ -163,10 +175,14 @@ console.log("\n4. Rear-surround improvement (wall-flat 43° → aimed 13°):");
   const secDelta = secAimed.designPerformanceIndex - secFlat.designPerformanceIndex;
 
   check("secondary DPI improvement > 0", secDelta > 0, `Δ=${secDelta}`);
+  const secAimingAimed = secAimed.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const secAimingFlat = secFlat.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const secAimingDelta = secAimingAimed - secAimingFlat;
+  // Max +3 = 30 raw
   check(
-    "secondary DPI improvement ≤ +3 (max allocation)",
-    secDelta <= 3,
-    `Δ=${secDelta}`,
+    "secondary AIMING credit ≤ +3 (max allocation, excluding coverage)",
+    secAimingDelta <= 30.1,
+    `aiming Δ=${secAimingDelta.toFixed(2)} raw (${(secAimingDelta / 10).toFixed(2)} displayed)`,
   );
   check(
     "secondary DPI improvement is meaningful (≥ 1)",
@@ -177,10 +193,14 @@ console.log("\n4. Rear-surround improvement (wall-flat 43° → aimed 13°):");
   const primAimed = calculateScopedRoomDesignRating(authAimed, PRIMARY_IDS);
   const primFlat = calculateScopedRoomDesignRating(authFlat, PRIMARY_IDS);
   const primDelta = primAimed.designPerformanceIndex - primFlat.designPerformanceIndex;
+  const primAimingAimed = primAimed.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const primAimingFlat = primFlat.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const primAimingDelta = primAimingAimed - primAimingFlat;
+  // Max +1 = 10 raw
   check(
-    "primary DPI improvement ≤ +1 (max allocation)",
-    primDelta <= 1,
-    `Δ=${primDelta}`,
+    "primary AIMING credit ≤ +1 (max allocation, excluding coverage)",
+    primAimingDelta <= 10.1,
+    `aiming Δ=${primAimingDelta.toFixed(2)} raw (${(primAimingDelta / 10).toFixed(2)} displayed)`,
   );
 }
 
@@ -266,11 +286,14 @@ console.log("\n8. Multiple groups (front wides + rear surrounds, all improved):"
   const secBoth = calculateScopedRoomDesignRating(authBoth, SECONDARY_IDS);
   const secFlat = calculateScopedRoomDesignRating(authFlat, SECONDARY_IDS);
   const secDelta = secBoth.designPerformanceIndex - secFlat.designPerformanceIndex;
-  // Max cumulative secondary = 5 (FW) + 3 (RS) = 8
+  // Max cumulative secondary AIMING credit = 5 (FW) + 3 (RS) = 8 displayed = 80 raw.
+  const secAimingBoth = secBoth.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const secAimingFlat = secFlat.contributions?.find((c) => c.key === "p17")?.aimingPoints ?? 0;
+  const secAimingDelta = secAimingBoth - secAimingFlat;
   check(
-    "cumulative secondary improvement ≤ +8 (5 + 3)",
-    secDelta <= 8,
-    `Δ=${secDelta}`,
+    "cumulative secondary AIMING credit ≤ +8 (5 + 3, excluding coverage)",
+    secAimingDelta <= 80.1,
+    `aiming Δ=${secAimingDelta.toFixed(2)} raw (${(secAimingDelta / 10).toFixed(2)} displayed)`,
   );
   // Front-wide-only secondary Δ was 3 (test 3); cumulative must exceed it.
   check("cumulative secondary improvement > front-wide-only (3)", secDelta > 3, `Δ=${secDelta}`);
