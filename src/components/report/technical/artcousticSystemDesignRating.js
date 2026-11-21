@@ -36,6 +36,11 @@ import { isAuthoritativeBassContract } from "@/components/room/bass/completedBas
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 import { getEffectiveAssumedLevel, normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
+// Pure helper for the ASDR continuous P17 off-axis improvement contribution.
+// Turns the per-seat coverage-quality margin (supplied on the P17 seat input
+// by buildDesignRatingInput) into a bounded additive bonus on P17's ASDR
+// multiplier. RP22 P17 levels and thresholds are untouched.
+import { computeP17ContinuousBonus } from "./p17ContinuousCoverageBonus";
 // THE ONE canonical ASDR table — the same bytes the reports, the highlights and the
 // proposal writer rank by. Imported and re-exported, never copied.
 import { PARAM_WEIGHTS, LEVEL_MULTIPLIERS, TOTAL_WEIGHT } from '../../../../shared/canonicalParameterWeights.js';
@@ -450,7 +455,17 @@ function scoreSeatParam(key, input) {
     case "p9": scored = scoreP9(norm.rawValue); break;
     case "p10": scored = scoreP10(norm.rawValue); break;
     case "p16": scored = scoreP16(norm.rawValue); break;
-    case "p17": scored = scoreP17(norm.rawValue); break;
+    case "p17": {
+      scored = scoreP17(norm.rawValue);
+      // Continuous ASDR contribution: the margin between the average per-speaker
+      // coverage quality and the limiting speaker's quality, supplied on the
+      // P17 seat input by buildDesignRatingInput. Zero when no evidence.
+      const p17Margin = (typeof input === "object" && input && Number.isFinite(input.p17ContinuousMargin))
+        ? Number(input.p17ContinuousMargin)
+        : 0;
+      scored.continuousBonus = computeP17ContinuousBonus(scored.level, p17Margin);
+      break;
+    }
     case "screen": scored = scoreScreen(norm.rawValue); break;
     default: return { state: "provisional", level: null, multiplier: null, reason: "unknown-seat-param" };
   }
@@ -458,7 +473,13 @@ function scoreSeatParam(key, input) {
   if (scored.provisional || scored.level == null) {
     return { state: "provisional", level: null, multiplier: null, reason: "no-genuine-calculated-grade" };
   }
-  return { state: "scored", level: scored.level, multiplier: multiplierForLevel(scored.level), reason: null };
+  return {
+    state: "scored",
+    level: scored.level,
+    multiplier: multiplierForLevel(scored.level),
+    continuousBonus: scored.continuousBonus || 0,
+    reason: null,
+  };
 }
 
 /**
@@ -647,7 +668,19 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
     } else {
       // ASDR uses the highest valid achieved level in THIS seating group.
       // Missing/provisional seats never contribute; individual RP22 grades stay intact.
+      // P17 also carries a continuous coverage-quality bonus: the seat is
+      // selected by its EFFECTIVE multiplier (base level multiplier plus the
+      // bounded continuous bonus, capped at the L4 maximum of 12), so genuine
+      // aiming improvements can raise the ASDR contribution without changing
+      // the discrete RP22 level. Only P17 sets a non-zero continuousBonus; for
+      // every other seat-scope parameter the effective multiplier equals the
+      // base level multiplier, so selection is unchanged.
       const scopedSeatIds = (authority?.seatIds || []).filter((id) => seatIdSet.has(id));
+      const effectiveMultiplier = (sa) => {
+        const base = multiplierForLevel(sa.level);
+        if (base == null) return null;
+        return Math.min(12, base + (sa.continuousBonus || 0));
+      };
       let selected = null;
       for (const id of scopedSeatIds) {
         const sa = param.seats?.[id];
@@ -655,11 +688,11 @@ function calculateRoomDesignRatingCore(authority, scopeSeatIds) {
           if (sa?.state === "provisional") hasProvisional = true;
           continue;
         }
-        if (!selected || multiplierForLevel(sa.level) > multiplierForLevel(selected.level)) selected = sa;
+        if (!selected || effectiveMultiplier(sa) > effectiveMultiplier(selected)) selected = sa;
       }
       if (!selected) continue;
       resultLevel = selected.level;
-      multiplier = multiplierForLevel(resultLevel);
+      multiplier = effectiveMultiplier(selected);
     }
 
     const earnedPoints = multiplier * weight;
@@ -821,7 +854,12 @@ export function calculateSeatDesignRating(authority, seatId) {
         hasProvisional = true; // diagnostic only
         continue;
       }
-      actualPoints += (seatAuth.multiplier ?? 0) * weight;
+      // P17 continuous bonus: the seat's effective multiplier is its base level
+      // multiplier plus the bounded continuous coverage-quality bonus, capped at
+      // the L4 maximum of 12. Only P17 sets a non-zero continuousBonus; for every
+      // other seat-scope parameter the effective multiplier equals the base.
+      const seatMultiplier = Math.min(12, (seatAuth.multiplier ?? 0) + (seatAuth.continuousBonus || 0));
+      actualPoints += seatMultiplier * weight;
       maximumAvailablePoints += 12 * weight;
       applicableWeight += weight;
       assessedWeight += weight;
