@@ -127,7 +127,7 @@ export function normalizeCompetitor(record) {
   // Power authority hierarchy (highest priority first):
   //   1. Published continuous / IEC / AES rating
   //   2. Recommended amplifier maximum
-  //   3. 50% of published peak power (provisional — always LIMITED DATA)
+  //   3. 50% of published peak power (provisional — GOOD with sensitivity, LIMITED without)
   // Nothing is invented: when none of the three is published the row stays
   // ungradeable. The peak fallback is a provisional estimate and is never
   // represented as manufacturer-published capability.
@@ -240,7 +240,9 @@ export function normalizeCompetitor(record) {
   // is not a published power rating, so it can never reach confidence A.
   if (!powerIsPublishedRating && dataConfidence === 'A') dataConfidence = 'B';
   // A provisional peak-assumed result is an estimate — never A or B. It is
-  // always held at C (ADI estimate) and the adequacy stays LIMITED DATA.
+  // always held at C (ADI estimate) for the confidence letter. Its data
+  // adequacy is GOOD when sensitivity is published (a credible calculation
+  // is then possible) and LIMITED when it is not — see classifyDataAdequacy.
   if (powerIsPeakAssumed) dataConfidence = 'C';
   // An estimated-continuous-from-peak SPL rests on a published figure plus a
   // Sound Proof engineering assumption (−6 dB). It is never A — it is a

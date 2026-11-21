@@ -57,7 +57,9 @@ test("Sonance R1: no published max SPL → LIMITED DATA", () => {
 // Simulate the normalised record the comparison produces from the Sonance R1
 // extraction: sensitivity 90 dB @ 2.83V/1m, 8 Ω, 150 W power handling, space
 // unstated → Half Space assumed. No published maximum SPL, so the capability
-// is calculated from sensitivity + power handling — LIMITED DATA.
+// is calculated from sensitivity + power handling. With sensitivity and a
+// valid power authority published, a credible amplifier-dependent calculation
+// is possible — GOOD DATA, not LIMITED.
 const rec = {
   p12_p13_eligible: true,
   max_spl_authority_type: "none",
@@ -67,7 +69,7 @@ const rec = {
   sensitivity_reference: "2.83V/1m",
 };
 const adequacy = classifyDataAdequacy(rec);
-assert.equal(adequacy.key, "INCOMPLETE", "no published max SPL → LIMITED DATA even with power handling captured");
+assert.equal(adequacy.key, "GOOD", "sensitivity + power handling, no max SPL → GOOD DATA (credible calculation)");
 });
 
 test("Sonance R1: measurement space unstated resolves to Half Space assumed (no +6 dB correction)", () => {
@@ -114,9 +116,9 @@ test("Sonance R2: Power Handling min/max range with 200W max is reported as powe
 
 test("Sonance R2: no published max SPL → LIMITED DATA", () => {
   // Sonance R2 publishes sensitivity, impedance and power handling but no
-  // maximum SPL. The capability is calculated from sensitivity + power, so
-  // the comparison depends on estimated rather than directly published
-  // performance — LIMITED DATA, not GOOD.
+  // maximum SPL. The capability is calculated from sensitivity + power. With
+  // sensitivity and a valid power authority published, a credible
+  // amplifier-dependent calculation is possible — GOOD DATA, not LIMITED.
   const rec = {
     p12_p13_eligible: true,
     max_spl_authority_type: "none",
@@ -125,7 +127,7 @@ test("Sonance R2: no published max SPL → LIMITED DATA", () => {
     max_spl_space_provenance: "half_space_assumed",
     sensitivity_reference: "2.83V/1m",
   };
-  assert.equal(classifyDataAdequacy(rec).key, "INCOMPLETE");
+  assert.equal(classifyDataAdequacy(rec).key, "GOOD");
 });
 
 // ---------------------------------------------------------------------------

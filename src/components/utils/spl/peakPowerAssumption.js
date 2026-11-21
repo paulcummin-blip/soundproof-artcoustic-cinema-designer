@@ -5,8 +5,11 @@
 // When a manufacturer publishes peak power handling but does not publish
 // continuous power handling OR a recommended amplifier maximum, Sound Proof
 // assumes continuous-equivalent power at 50% of the published peak rating.
-// The resulting P12/P13 level is a PROVISIONAL ESTIMATE and is always
-// classified LIMITED DATA — never GOOD or FULL.
+// The resulting P12/P13 level is a PROVISIONAL ESTIMATE. Its data-adequacy
+// class is GOOD DATA when the manufacturer also publishes sensitivity (a
+// credible amplifier-dependent calculation is then possible and any
+// published maximum SPL cap is respected), and LIMITED DATA when
+// sensitivity is missing. It is never FULL DATA.
 //
 // This is the LAST tier in the power authority hierarchy:
 //   1. Published continuous / IEC / AES power  (manufacturer-published rating)
