@@ -47,21 +47,58 @@ export const ACCOUNT_MANAGEMENT_THRESHOLDS = {
 export const DAY_MS = 86400000;
 
 /**
- * Transparent action categories shown in the dealer table.
- * These are NOT numeric scores — they are human-readable labels that
- * describe why a dealer appears in the management view.
+ * Opportunity categories shown in the dealer table. These are NOT numeric
+ * scores — they are human-readable labels. Follow-ups Due is separate and
+ * date-driven (never assigned here).
  */
-export const ACTION_CATEGORIES = {
-  FOLLOW_UP_DUE: 'Follow-up due',
-  DEVELOPING_OPPORTUNITY: 'Developing opportunity',
+export const OPPORTUNITY_CATEGORIES = {
+  OVERLOOKED: 'Overlooked',
+  NEEDS_ATTENTION: 'Need Attention',
+  EMERGING: 'Emerging',
+  NO_CURRENT_OPPORTUNITY: 'No current opportunity',
   INSUFFICIENT_EVIDENCE: 'Insufficient evidence',
   NO_OPPORTUNITY: 'No opportunity detected',
 };
 
-/** Display order for categories (lowest number = highest priority). */
-export const CATEGORY_PRIORITY = {
-  FOLLOW_UP_DUE: 1,
-  DEVELOPING_OPPORTUNITY: 2,
-  INSUFFICIENT_EVIDENCE: 3,
-  NO_OPPORTUNITY: 4,
+/** Manual category values stored in DealerCategoryOverride. */
+export const MANUAL_CATEGORY_VALUES = {
+  OVERLOOKED: 'overlooked',
+  NEEDS_ATTENTION: 'needs_attention',
+  EMERGING: 'emerging',
+  NO_CURRENT_OPPORTUNITY: 'no_current_opportunity',
+};
+
+/** Display labels for manual category values. */
+export const MANUAL_CATEGORY_LABELS = {
+  overlooked: 'Overlooked',
+  needs_attention: 'Need Attention',
+  emerging: 'Emerging',
+  no_current_opportunity: 'No current opportunity',
+};
+
+/** Map manual category value to opportunity category label. */
+export const MANUAL_TO_CATEGORY = {
+  overlooked: 'Overlooked',
+  needs_attention: 'Need Attention',
+  emerging: 'Emerging',
+  no_current_opportunity: 'No current opportunity',
+};
+
+/** Summary box filter keys. */
+export const FILTER_KEYS = {
+  ALL: 'all',
+  OVERLOOKED: 'overlooked',
+  NEEDS_ATTENTION: 'needs_attention',
+  EMERGING: 'emerging',
+  FOLLOW_UPS_DUE: 'follow_ups_due',
+};
+
+/** Display order for opportunity categories (lowest = highest priority). */
+export const OPPORTUNITY_CATEGORY_PRIORITY = {
+  OVERLOOKED: 1,
+  NEEDS_ATTENTION: 2,
+  EMERGING: 3,
+  NO_CURRENT_OPPORTUNITY: 4,
+  INSUFFICIENT_EVIDENCE: 5,
+  NO_OPPORTUNITY: 6,
 };

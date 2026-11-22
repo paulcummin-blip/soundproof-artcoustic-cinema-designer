@@ -20,8 +20,10 @@ import { buildEmergingOpportunities } from './emergingOpportunities';
 import {
   ACCOUNT_MANAGEMENT_THRESHOLDS,
   DAY_MS,
-  ACTION_CATEGORIES,
-  CATEGORY_PRIORITY,
+  OPPORTUNITY_CATEGORIES,
+  OPPORTUNITY_CATEGORY_PRIORITY,
+  MANUAL_TO_CATEGORY,
+  FILTER_KEYS,
 } from './accountManagementConfig';
 
 const THRESHOLDS = ACCOUNT_MANAGEMENT_THRESHOLDS;
@@ -81,52 +83,93 @@ function hasPassedInactivityThreshold(families) {
 }
 
 /**
- * Classify a dealer's signals into a transparent action category.
+ * Classify a dealer's signals into a system opportunity category.
+ * Follow-up due is NOT a category here — it is a separate date-driven flag.
  *
- * Four categories, clearly distinguished:
- *   Follow-up due        — awaiting follow-up with a due (or missing) date.
- *   Developing opportunity — at least one signal passed the thresholds.
- *   Insufficient evidence — has projects but all signals were filtered out.
- *   No opportunity detected — no projects and no signals at all.
+ *   Overlooked            — overlooked signal passed thresholds.
+ *   Need Attention        — needs_attention signal passed thresholds.
+ *   Emerging              — emerging signal passed thresholds.
+ *   No current opportunity — manual override only (not system-generated).
+ *   Insufficient evidence  — has projects but all signals filtered out.
+ *   No opportunity detected — no projects and no signals.
  */
-function classifyDealer(signals, followUpRecord, hasFamilies) {
-  // 1. Follow-up due — awaiting follow-up with a next_contact_date that has
-  //    arrived or passed (or no date set at all).
-  if (followUpRecord && followUpRecord.status === 'awaiting_follow_up') {
-    const nextDate = followUpRecord.next_contact_date;
-    if (nextDate) {
-      const nextTs = timeOf(nextDate);
-      if (nextTs !== null && nextTs <= Date.now() + DAY_MS) {
-        return ACTION_CATEGORIES.FOLLOW_UP_DUE;
-      }
-    }
-    if (!nextDate) return ACTION_CATEGORIES.FOLLOW_UP_DUE;
-  }
+function classifySystemCategory(signals, hasFamilies) {
+  const hasOverlooked = signals.some((s) => s.opportunityType === 'overlooked');
+  const hasAttention = signals.some((s) => s.opportunityType === 'needs_attention');
+  const hasEmerging = signals.some((s) => s.opportunityType === 'emerging');
 
-  // 2. Developing opportunity — at least one signal survived the thresholds.
-  if (signals.length > 0) return ACTION_CATEGORIES.DEVELOPING_OPPORTUNITY;
+  if (hasEmerging) return OPPORTUNITY_CATEGORIES.EMERGING;
+  if (hasOverlooked) return OPPORTUNITY_CATEGORIES.OVERLOOKED;
+  if (hasAttention) return OPPORTUNITY_CATEGORIES.NEEDS_ATTENTION;
+  if (hasFamilies) return OPPORTUNITY_CATEGORIES.INSUFFICIENT_EVIDENCE;
+  return OPPORTUNITY_CATEGORIES.NO_OPPORTUNITY;
+}
 
-  // 3. Insufficient evidence — has projects but signals were filtered out.
-  if (hasFamilies) return ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE;
+/**
+ * Determine whether a follow-up is currently due (date-driven only).
+ * A follow-up is due when status is awaiting_follow_up and the next
+ * contact date has arrived or passed (or no date is set at all).
+ */
+function isFollowUpDue(followUpRecord) {
+  if (!followUpRecord || followUpRecord.status !== 'awaiting_follow_up') return false;
+  const nextDate = followUpRecord.next_contact_date;
+  if (!nextDate) return true; // awaiting with no date = due
+  const nextTs = timeOf(nextDate);
+  if (nextTs === null) return true;
+  return nextTs <= Date.now() + DAY_MS;
+}
 
-  // 4. No opportunity detected — no projects, no signals.
-  return ACTION_CATEGORIES.NO_OPPORTUNITY;
+/**
+ * Build a compact project summary for the expanded dealer row.
+ */
+function buildProjectSummary(families) {
+  const list = safeArray(families);
+  if (list.length === 0) return null;
+  const dated = list.filter((f) => timeOf(f?.createdDate) !== null);
+  const latestDate = dated.length > 0
+    ? dated.map((f) => timeOf(f.createdDate)).sort((a, b) => b - a)[0]
+    : null;
+  const liveValue = list
+    .filter((f) => f?.liveValue !== null && Number.isFinite(Number(f?.liveValue)))
+    .reduce((s, f) => s + Number(f.liveValue), 0);
+  const quotedValue = list
+    .filter((f) => f?.quotedValue !== null && Number.isFinite(Number(f?.quotedValue)))
+    .reduce((s, f) => s + Number(f.quotedValue), 0);
+  return {
+    count: list.length,
+    latestDate,
+    liveValue: liveValue > 0 ? liveValue : null,
+    quotedValue: quotedValue > 0 ? quotedValue : null,
+    projectNames: list.slice(0, 5).map((f) => f?.name || 'Unnamed').filter(Boolean),
+    projects: list.map((f) => ({
+      id: f?.id,
+      name: f?.name,
+      client: f?.client,
+      config: f?.variations?.find((v) => v?.isActive)?.format || null,
+      liveValue: f?.liveValue ?? null,
+      quotedValue: f?.quotedValue ?? null,
+      published: !!f?.variations?.find((v) => v?.isActive)?.publicationSummary,
+      createdDate: f?.createdDate || null,
+    })),
+  };
 }
 
 /**
  * Pick the most relevant observation for the table's summary column.
  * Uses the same priority as classifyDealer.
  */
-function pickPrimaryObservation(signals, followUpRecord, category, hasFamilies) {
-  if (category === ACTION_CATEGORIES.FOLLOW_UP_DUE && followUpRecord) {
-    return followUpRecord.observation || followUpRecord.conversation_notes || 'Follow-up due';
+function pickPrimaryObservation(signals, manualOverride, systemCategory, hasFamilies) {
+  // Manual override reason takes priority if present
+  if (manualOverride) {
+    return manualOverride.reason
+      || `Manually assigned: ${MANUAL_TO_CATEGORY[manualOverride.manual_category] || manualOverride.manual_category}`;
   }
   const priority = ['emerging', 'overlooked', 'needs_attention'];
   for (const type of priority) {
     const signal = signals.find((s) => s.opportunityType === type && !s.opportunityKey.includes('insufficient_evidence'));
     if (signal) return signal.observation;
   }
-  if (category === ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE) {
+  if (systemCategory === OPPORTUNITY_CATEGORIES.INSUFFICIENT_EVIDENCE) {
     return hasFamilies
       ? 'Has project history but no signals passed the action thresholds.'
       : 'No recorded signals';
@@ -157,6 +200,7 @@ export function buildDealerSummary({
   auditRecords,
   followUpsByKey,
   followUpsByAccount,
+  categoryOverridesByAccount,
   sectorTab = 'all_dealers',
 }) {
   const approvalDateMap = buildApprovalDateMap(auditRecords);
@@ -270,9 +314,19 @@ export function buildDealerSummary({
     const followUpRecord = accountFollowUps
       .sort((a, b) => (timeOf(b?.created_date) || 0) - (timeOf(a?.created_date) || 0))[0] || null;
 
-    const hasFamilies = (familiesByAccount.get(entry.accountId) || []).length > 0;
-    const category = classifyDealer(entry.signals, followUpRecord, hasFamilies);
-    const primaryObservation = pickPrimaryObservation(entry.signals, followUpRecord, category, hasFamilies);
+    const dealerFamilies = familiesByAccount.get(entry.accountId) || [];
+    const hasFamilies = dealerFamilies.length > 0;
+    const manualOverride = (categoryOverridesByAccount || new Map()).get(entry.accountId) || null;
+    const systemCategory = classifySystemCategory(entry.signals, hasFamilies);
+    const followUpDue = isFollowUpDue(followUpRecord);
+
+    // Effective opportunity category: manual override takes precedence
+    const opportunityCategory = manualOverride
+      ? (MANUAL_TO_CATEGORY[manualOverride.manual_category] || systemCategory)
+      : systemCategory;
+    const opportunitySource = manualOverride ? 'manual' : 'system';
+
+    const primaryObservation = pickPrimaryObservation(entry.signals, manualOverride, systemCategory, hasFamilies);
 
     // Signal labels for the table
     const signalLabels = entry.signals.map((s) => {
@@ -282,35 +336,50 @@ export function buildDealerSummary({
       return 'Emerging';
     });
 
+    // Sort priority: follow-up due dealers first, then by opportunity category
+    const categoryPriority = (followUpDue ? 0 : 1) * 100 +
+      (OPPORTUNITY_CATEGORY_PRIORITY[
+        Object.keys(OPPORTUNITY_CATEGORIES).find((k) => OPPORTUNITY_CATEGORIES[k] === opportunityCategory)
+      ] || 99);
+
     dealers.push({
       accountId: entry.accountId,
       dealerName: entry.dealerName,
       sectorKey: entry.sectorKey,
       territory: entry.territory,
       dealerGroup: entry.dealerGroup,
+      accountType: account?.account_type || null,
       signals: entry.signals,
       signalLabels: [...new Set(signalLabels)],
-      category,
-      categoryPriority: CATEGORY_PRIORITY[category] || 99,
+      opportunityCategory,
+      opportunitySource,
+      systemCategory,
+      manualOverride,
+      followUpDue,
+      categoryPriority,
       primaryObservation,
       followUpRecord,
       followUpStatus: followUpRecord?.status || null,
       nextContactDate: followUpRecord?.next_contact_date || null,
+      projectSummary: buildProjectSummary(dealerFamilies),
     });
   }
 
-  // Sort: follow-up due first, then by category priority, then by dealer name
+  // Sort: follow-up due first, then by opportunity category priority, then by name
   dealers.sort((a, b) => {
     if (a.categoryPriority !== b.categoryPriority) return a.categoryPriority - b.categoryPriority;
     return String(a.dealerName).localeCompare(String(b.dealerName));
   });
 
-  // Summary counts for the four cards at the top — signal-type counts.
+  // Summary counts for the four cards. Overlooked/Need Attention/Emerging count
+  // by opportunity category. Follow-ups Due counts dealers with a due follow-up
+  // (date-driven, independent of opportunity category — a dealer can be both
+  // Emerging and have a follow-up due).
   const summaryCounts = {
-    overlooked: dealers.filter((d) => d.signalLabels.includes('Relationship')).length,
-    needingAttention: dealers.filter((d) => d.signalLabels.includes('Onboarding')).length,
-    emerging: dealers.filter((d) => d.signalLabels.includes('Emerging')).length,
-    followUpsDue: dealers.filter((d) => d.category === ACTION_CATEGORIES.FOLLOW_UP_DUE).length,
+    overlooked: dealers.filter((d) => d.opportunityCategory === OPPORTUNITY_CATEGORIES.OVERLOOKED).length,
+    needingAttention: dealers.filter((d) => d.opportunityCategory === OPPORTUNITY_CATEGORIES.NEEDS_ATTENTION).length,
+    emerging: dealers.filter((d) => d.opportunityCategory === OPPORTUNITY_CATEGORIES.EMERGING).length,
+    followUpsDue: dealers.filter((d) => d.followUpDue).length,
   };
 
   return { dealers, summaryCounts };

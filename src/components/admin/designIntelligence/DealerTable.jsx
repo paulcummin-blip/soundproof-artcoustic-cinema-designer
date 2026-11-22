@@ -13,19 +13,22 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ChevronUp, Phone, Clock, ArrowUpRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Clock, ArrowUpRight } from 'lucide-react';
 import { BRAND, Pill, Button, Th, Td, TABLE_WRAP, TABLE } from '@/components/admin/intelligence/IntelligenceUi';
 import { formatDate, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
-import { ACCOUNT_MANAGEMENT_THRESHOLDS, ACTION_CATEGORIES } from '@/lib/commercial/designIntelligence/accountManagementConfig';
+import { ACCOUNT_MANAGEMENT_THRESHOLDS, OPPORTUNITY_CATEGORIES, FILTER_KEYS } from '@/lib/commercial/designIntelligence/accountManagementConfig';
 import { SECTOR_TABS } from '@/lib/commercial/designIntelligence/sectorScope';
+import EnhancedDealerDetail from './EnhancedDealerDetail';
 
 const PAGE_SIZE = ACCOUNT_MANAGEMENT_THRESHOLDS.dealerTablePageSize;
 
 const CATEGORY_TONES = {
-  [ACTION_CATEGORIES.FOLLOW_UP_DUE]: 'bad',
-  [ACTION_CATEGORIES.DEVELOPING_OPPORTUNITY]: 'good',
-  [ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE]: 'warn',
-  [ACTION_CATEGORIES.NO_OPPORTUNITY]: 'neutral',
+  [OPPORTUNITY_CATEGORIES.OVERLOOKED]: 'neutral',
+  [OPPORTUNITY_CATEGORIES.NEEDS_ATTENTION]: 'warn',
+  [OPPORTUNITY_CATEGORIES.EMERGING]: 'good',
+  [OPPORTUNITY_CATEGORIES.NO_CURRENT_OPPORTUNITY]: 'neutral',
+  [OPPORTUNITY_CATEGORIES.INSUFFICIENT_EVIDENCE]: 'neutral',
+  [OPPORTUNITY_CATEGORIES.NO_OPPORTUNITY]: 'neutral',
 };
 
 const FOLLOWUP_STATUS_LABELS = {
@@ -42,10 +45,10 @@ const FOLLOWUP_STATUS_TONES = {
 
 const COLUMNS = [
   { key: 'dealerName', label: 'Dealer', sortable: true },
-  { key: 'sectorKey', label: 'Sector', sortable: true },
+  { key: 'opportunityCategory', label: 'Category', sortable: true },
   { key: 'signalLabels', label: 'Signals', sortable: false },
   { key: 'primaryObservation', label: 'Most relevant observation', sortable: false },
-  { key: 'followUpStatus', label: 'Follow-up', sortable: true },
+  { key: 'followUpDue', label: 'Follow-up', sortable: true },
   { key: 'nextContactDate', label: 'Next contact', sortable: true },
 ];
 
@@ -54,28 +57,48 @@ function sectorLabel(key) {
   return tab ? tab.label : key || 'Unclassified';
 }
 
-export default function DealerTable({ dealers, followUpsByKey, onLogFollowUp, onSelectDealer }) {
+export default function DealerTable({ dealers, categoryFilter, onLogFollowUp, onSelectDealer, onChangeCategory }) {
   const [sortKey, setSortKey] = useState('categoryPriority');
   const [sortDir, setSortDir] = useState('asc');
   const [expandedId, setExpandedId] = useState(null);
   const [page, setPage] = useState(0);
 
+  // Filter dealers by the active category filter
+  const filtered = useMemo(() => {
+    if (!categoryFilter || categoryFilter === FILTER_KEYS.ALL) return dealers;
+    if (categoryFilter === FILTER_KEYS.FOLLOW_UPS_DUE) {
+      return dealers.filter((d) => d.followUpDue);
+    }
+    // Map filter key to opportunity category label
+    const filterMap = {
+      [FILTER_KEYS.OVERLOOKED]: OPPORTUNITY_CATEGORIES.OVERLOOKED,
+      [FILTER_KEYS.NEEDS_ATTENTION]: OPPORTUNITY_CATEGORIES.NEEDS_ATTENTION,
+      [FILTER_KEYS.EMERGING]: OPPORTUNITY_CATEGORIES.EMERGING,
+    };
+    const targetCategory = filterMap[categoryFilter];
+    if (!targetCategory) return dealers;
+    return dealers.filter((d) => d.opportunityCategory === targetCategory);
+  }, [dealers, categoryFilter]);
+
   const sorted = useMemo(() => {
-    const list = [...dealers];
+    const list = [...filtered];
     list.sort((a, b) => {
       let aVal, bVal;
       if (sortKey === 'categoryPriority') {
         aVal = a.categoryPriority;
         bVal = b.categoryPriority;
+      } else if (sortKey === 'opportunityCategory') {
+        aVal = a.opportunityCategory || 'zzz';
+        bVal = b.opportunityCategory || 'zzz';
       } else if (sortKey === 'signalLabels') {
         aVal = (a.signalLabels || []).join(', ');
         bVal = (b.signalLabels || []).join(', ');
       } else if (sortKey === 'nextContactDate') {
         aVal = a.nextContactDate || '9999';
         bVal = b.nextContactDate || '9999';
-      } else if (sortKey === 'followUpStatus') {
-        aVal = a.followUpStatus || 'zzz';
-        bVal = b.followUpStatus || 'zzz';
+      } else if (sortKey === 'followUpDue') {
+        aVal = a.followUpDue ? 0 : 1;
+        bVal = b.followUpDue ? 0 : 1;
       } else {
         aVal = String(a[sortKey] || '');
         bVal = String(b[sortKey] || '');
@@ -152,7 +175,9 @@ export default function DealerTable({ dealers, followUpsByKey, onLogFollowUp, on
           {pageDealers.length === 0 && (
             <tr>
               <Td colSpan={COLUMNS.length + 2} align="center" style={{ padding: 24, color: BRAND.muted }}>
-                No dealers with actionable signals in this sector.
+                {categoryFilter && categoryFilter !== FILTER_KEYS.ALL
+                  ? 'No dealers match the selected opportunity filter in this sector.'
+                  : 'No dealers in this sector.'}
               </Td>
             </tr>
           )}
@@ -183,8 +208,22 @@ export default function DealerTable({ dealers, followUpsByKey, onLogFollowUp, on
                     <Pill tone="neutral">{sectorLabel(dealer.sectorKey)}</Pill>
                   </Td>
                   <Td>
-                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                      <Pill tone={CATEGORY_TONES[dealer.category] || 'neutral'}>{dealer.category}</Pill>
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <Pill tone={CATEGORY_TONES[dealer.opportunityCategory] || 'neutral'}>
+                        {dealer.opportunityCategory}
+                      </Pill>
+                      <span style={{
+                        fontSize: 9,
+                        fontWeight: 600,
+                        color: dealer.opportunitySource === 'manual' ? BRAND.warn : BRAND.muted,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.03em',
+                      }}>
+                        {dealer.opportunitySource === 'manual' ? 'M' : 'S'}
+                      </span>
+                      {dealer.followUpDue && (
+                        <Pill tone="bad">Due</Pill>
+                      )}
                       {dealer.signalLabels.map((label, i) => (
                         <span key={i} style={{
                           fontSize: 10,
@@ -202,7 +241,9 @@ export default function DealerTable({ dealers, followUpsByKey, onLogFollowUp, on
                     </div>
                   </Td>
                   <Td align="right">
-                    {dealer.followUpStatus ? (
+                    {dealer.followUpDue ? (
+                      <Pill tone="bad">Due</Pill>
+                    ) : dealer.followUpStatus ? (
                       <Pill tone={FOLLOWUP_STATUS_TONES[dealer.followUpStatus] || 'neutral'}>
                         {FOLLOWUP_STATUS_LABELS[dealer.followUpStatus] || dealer.followUpStatus}
                       </Pill>
@@ -241,7 +282,11 @@ export default function DealerTable({ dealers, followUpsByKey, onLogFollowUp, on
                 {isExpanded && (
                   <tr>
                     <Td colSpan={COLUMNS.length + 2} style={{ padding: 0, borderBottom: `2px solid ${BRAND.border}` }}>
-                      <ExpandedDealerDetail dealer={dealer} onLogFollowUp={onLogFollowUp} />
+                      <EnhancedDealerDetail
+                        dealer={dealer}
+                        onLogFollowUp={onLogFollowUp}
+                        onChangeCategory={onChangeCategory}
+                      />
                     </Td>
                   </tr>
                 )}
@@ -283,128 +328,6 @@ export default function DealerTable({ dealers, followUpsByKey, onLogFollowUp, on
               Next
             </Button>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Inline expandable detail for a single dealer row.
- * Shows all signals with observations, suggested questions, and follow-up controls.
- */
-function ExpandedDealerDetail({ dealer, onLogFollowUp }) {
-  const signals = dealer.signals || [];
-  const hasSignals = signals.length > 0;
-
-  // For follow-up, use the first signal as the opportunity reference
-  const primarySignal = signals[0] || {
-    opportunityKey: `manual:${dealer.accountId}`,
-    opportunityType: 'needs_attention',
-    accountId: dealer.accountId,
-    dealerName: dealer.dealerName,
-    observation: dealer.primaryObservation,
-    reason: 'No specific signal — see dealer drill-down for details.',
-    suggestedQuestion: null,
-  };
-
-  return (
-    <div style={{
-      background: '#FAFAF8',
-      padding: '14px 18px',
-      display: 'grid',
-      gap: 10,
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.accent, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {dealer.category}
-        </div>
-        <Button variant="secondary" onClick={() => onLogFollowUp(primarySignal, dealer.followUpRecord)}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Phone size={12} /> {dealer.followUpRecord ? 'Update follow-up' : 'Log follow-up'}
-          </span>
-        </Button>
-      </div>
-
-      {!hasSignals && dealer.followUpRecord && (
-        <div style={{
-          fontSize: 12,
-          color: BRAND.subtext,
-          background: BRAND.card,
-          border: `1px solid ${BRAND.border}`,
-          borderRadius: 8,
-          padding: 10,
-          lineHeight: 1.5,
-        }}>
-          <strong style={{ color: BRAND.text }}>Recorded observation:</strong> {dealer.followUpRecord.observation}
-          {dealer.followUpRecord.conversation_notes && (
-            <div style={{ marginTop: 4, fontStyle: 'italic', color: BRAND.muted }}>
-              "{dealer.followUpRecord.conversation_notes}"
-            </div>
-          )}
-        </div>
-      )}
-
-      {hasSignals && signals.map((signal) => (
-        <div key={signal.opportunityKey} style={{
-          background: BRAND.card,
-          border: `1px solid ${BRAND.border}`,
-          borderRadius: 8,
-          padding: 10,
-          display: 'grid',
-          gap: 6,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: BRAND.accent, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              {signal.opportunityType.replace(/_/g, ' ')}
-            </span>
-            <Pill tone="neutral">{signal.opportunityKey.split(':').slice(2).join(':') || signal.opportunityType}</Pill>
-          </div>
-          <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.5 }}>
-            <strong style={{ color: BRAND.text }}>Observed:</strong> {signal.observation}
-          </div>
-          <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.5 }}>
-            <strong style={{ color: BRAND.text }}>Why:</strong> {signal.reason}
-          </div>
-          {signal.suggestedQuestion && (
-            <div style={{
-              fontSize: 12,
-              color: BRAND.info,
-              lineHeight: 1.5,
-              background: BRAND.infoBg,
-              borderRadius: 6,
-              padding: '5px 8px',
-            }}>
-              <strong>Suggested question:</strong> {signal.suggestedQuestion}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-            <Button variant="secondary" onClick={() => onLogFollowUp(signal, null)}>
-              Log follow-up for this signal
-            </Button>
-          </div>
-        </div>
-      ))}
-
-      {dealer.followUpRecord && (
-        <div style={{
-          background: BRAND.warnBg,
-          border: `1px solid ${BRAND.border}`,
-          borderRadius: 8,
-          padding: 10,
-          fontSize: 12,
-          color: BRAND.subtext,
-          lineHeight: 1.5,
-        }}>
-          <strong style={{ color: BRAND.text }}>Existing follow-up:</strong>{' '}
-          Status: {FOLLOWUP_STATUS_LABELS[dealer.followUpRecord.status] || dealer.followUpRecord.status}
-          {dealer.followUpRecord.contact_date && ` · Last contact: ${formatDate(dealer.followUpRecord.contact_date)}`}
-          {dealer.followUpRecord.next_contact_date && ` · Next: ${formatDate(dealer.followUpRecord.next_contact_date)}`}
-          {dealer.followUpRecord.discovered_reason && (
-            <div style={{ marginTop: 4, fontStyle: 'italic' }}>
-              Discovered: "{dealer.followUpRecord.discovered_reason}"
-            </div>
-          )}
         </div>
       )}
     </div>

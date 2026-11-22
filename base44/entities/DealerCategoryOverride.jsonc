@@ -1,0 +1,67 @@
+{
+  "name": "DealerCategoryOverride",
+  "type": "object",
+  "description": "Admin-only manual opportunity category override for a dealer in the Account Management dashboard. When present, the manual_category takes precedence over the system-generated category in the dealer table. Follow-ups Due remains date-driven and is never set here. Admin-only: no dealer or app-user access. Changing a category here does not alter dealer sector, Sound Proof eligibility, login permissions, Project Tokens, promotions, project status, or commercial pipeline values.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the dealer Account this override applies to. One override per account."
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Denormalized account name at the time of assignment, for display without a join."
+    },
+    "manual_category": {
+      "type": "string",
+      "enum": [
+        "overlooked",
+        "needs_attention",
+        "emerging",
+        "no_current_opportunity"
+      ],
+      "description": "The manually assigned opportunity category. 'overlooked' = relationship review warranted. 'needs_attention' = onboarding follow-up needed. 'emerging' = developing activity. 'no_current_opportunity' = admin reviewed and found nothing to act on now."
+    },
+    "reason": {
+      "type": "string",
+      "nullable": true,
+      "description": "Short reason for the manual classification, recorded by the admin."
+    },
+    "assigned_by": {
+      "type": "string",
+      "description": "Name or email of the admin who assigned or last changed this category."
+    },
+    "assigned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the manual category was assigned or last changed."
+    }
+  },
+  "required": [
+    "account_id",
+    "manual_category",
+    "assigned_by",
+    "assigned_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

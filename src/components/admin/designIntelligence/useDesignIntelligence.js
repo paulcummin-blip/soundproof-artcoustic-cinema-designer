@@ -9,14 +9,18 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { loadConsolidatedData } from '@/lib/commercial/designIntelligence/loadConsolidatedData';
 import { buildConsolidatedReport } from '@/lib/commercial/designIntelligence/buildConsolidatedReport';
 import { buildDealerSummary } from '@/lib/commercial/designIntelligence/buildDealerSummary';
 import { filterFamiliesBySector, sectorCounts, groupByDealer } from '@/lib/commercial/designIntelligence/sectorScope';
 import { isInternalAccount } from '@/lib/commercial/designIntelligence/internalAccountFilter';
 import { useDealerFollowUps } from './useDealerFollowUps';
+import { useDealerCategoryOverrides } from './useDealerCategoryOverrides';
+import { FILTER_KEYS } from '@/lib/commercial/designIntelligence/accountManagementConfig';
 
 export function useDesignIntelligence() {
+  const { user } = useAuth();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,8 +29,11 @@ export function useDesignIntelligence() {
   const [viewMode, setViewMode] = useState('account_management');
   const [refreshKey, setRefreshKey] = useState(0);
   const [followUpDialog, setFollowUpDialog] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState(FILTER_KEYS.ALL);
+  const [changeCategoryDialog, setChangeCategoryDialog] = useState(null);
 
   const followUps = useDealerFollowUps();
+  const categoryOverrides = useDealerCategoryOverrides();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,9 +80,41 @@ export function useDesignIntelligence() {
       auditRecords: report.auditRecords || [],
       followUpsByKey: followUps.followUpsByKey,
       followUpsByAccount: followUps.followUpsByAccount,
+      categoryOverridesByAccount: categoryOverrides.overridesByAccount,
       sectorTab,
     });
-  }, [report, scopedFamilies, accounts, accountsById, followUps.followUpsByKey, followUps.followUpsByAccount, sectorTab]);
+  }, [report, scopedFamilies, accounts, accountsById, followUps.followUpsByKey, followUps.followUpsByAccount, categoryOverrides.overridesByAccount, sectorTab]);
+
+  // Add noOpportunity and insufficientEvidence counts for the "All Dealers" card
+  const dealerSummaryWithAll = useMemo(() => {
+    if (!dealerSummary.dealers.length) return dealerSummary;
+    return {
+      ...dealerSummary,
+      summaryCounts: {
+        ...dealerSummary.summaryCounts,
+        noOpportunity: dealerSummary.dealers.filter((d) =>
+          d.opportunityCategory === 'No opportunity detected').length,
+        insufficientEvidence: dealerSummary.dealers.filter((d) =>
+          d.opportunityCategory === 'Insufficient evidence').length,
+      },
+    };
+  }, [dealerSummary]);
+
+  const handleChangeCategory = useCallback((dealer) => {
+    setChangeCategoryDialog({ dealer });
+  }, []);
+
+  const handleSaveCategoryOverride = useCallback(async (data) => {
+    return categoryOverrides.saveOverride({
+      ...data,
+      assigned_by: user?.email || user?.full_name || 'admin',
+      assigned_at: new Date().toISOString(),
+    });
+  }, [categoryOverrides, user]);
+
+  const handleRemoveCategoryOverride = useCallback(async (accountId) => {
+    return categoryOverrides.removeOverride(accountId);
+  }, [categoryOverrides]);
 
   const handleLogFollowUp = useCallback((opportunity, existing) => {
     setFollowUpDialog({ opportunity, existing });
@@ -112,7 +151,15 @@ export function useDesignIntelligence() {
     setFollowUpDialog,
     handleLogFollowUp,
     handleSaveFollowUp,
-    dealerSummary,
+    dealerSummary: dealerSummaryWithAll,
+    categoryFilter,
+    setCategoryFilter,
+    changeCategoryDialog,
+    setChangeCategoryDialog,
+    handleChangeCategory,
+    handleSaveCategoryOverride,
+    handleRemoveCategoryOverride,
+    categoryOverrides,
     priceContext: report?.priceContext || {},
   };
 }

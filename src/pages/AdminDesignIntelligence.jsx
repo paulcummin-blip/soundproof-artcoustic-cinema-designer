@@ -24,6 +24,7 @@ import DealerDrillDown from '@/components/admin/designIntelligence/DealerDrillDo
 import DealerSummaryCounts from '@/components/admin/designIntelligence/DealerSummaryCounts';
 import DealerTable from '@/components/admin/designIntelligence/DealerTable';
 import FollowUpDialog from '@/components/admin/designIntelligence/FollowUpDialog';
+import ChangeCategoryDialog from '@/components/admin/designIntelligence/ChangeCategoryDialog';
 import ProjectActivitySection from '@/components/admin/designIntelligence/ProjectActivitySection';
 import ProjectValuesSection from '@/components/admin/designIntelligence/ProjectValuesSection';
 import RoomSizesSection from '@/components/admin/designIntelligence/RoomSizesSection';
@@ -47,6 +48,9 @@ export default function AdminDesignIntelligence() {
     followUps, followUpDialog, setFollowUpDialog,
     handleLogFollowUp, handleSaveFollowUp,
     dealerSummary,
+    categoryFilter, setCategoryFilter,
+    changeCategoryDialog, setChangeCategoryDialog,
+    handleChangeCategory, handleSaveCategoryOverride, handleRemoveCategoryOverride,
     report, priceContext,
   } = useDesignIntelligence();
 
@@ -136,12 +140,65 @@ export default function AdminDesignIntelligence() {
         />
       )}
 
+      {changeCategoryDialog && (
+        <ChangeCategoryDialog
+          dealer={changeCategoryDialog.dealer}
+          currentOverride={changeCategoryDialog.dealer?.manualOverride}
+          onClose={() => setChangeCategoryDialog(null)}
+          onSave={handleSaveCategoryOverride}
+          onRemoveAuto={handleRemoveCategoryOverride}
+        />
+      )}
+
       {selectedDealer ? (
         <DealerDrillDown dealer={selectedDealer} onBack={() => setSelectedDealerId(null)} />
       ) : viewMode === 'account_management' ? (
         <div style={{ display: 'grid', gap: 16 }}>
-          {/* Summary counts */}
-          <DealerSummaryCounts counts={dealerSummary.summaryCounts} />
+          {/* Summary counts — clickable to filter the table */}
+          <DealerSummaryCounts
+            counts={dealerSummary.summaryCounts}
+            activeFilter={categoryFilter}
+            onFilterChange={setCategoryFilter}
+          />
+
+          {/* Active filter indicator */}
+          {categoryFilter && categoryFilter !== 'all' && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              color: BRAND.subtext,
+            }}>
+              <span>Filtered by:</span>
+              <Pill tone="neutral">
+                {categoryFilter === 'follow_ups_due' ? 'Follow-ups Due'
+                  : categoryFilter === 'overlooked' ? 'Overlooked'
+                  : categoryFilter === 'needs_attention' ? 'Need Attention'
+                  : categoryFilter === 'emerging' ? 'Emerging'
+                  : categoryFilter}
+              </Pill>
+              <span>({dealerSummary.dealers.filter((d) => {
+                if (categoryFilter === 'follow_ups_due') return d.followUpDue;
+                const map = { overlooked: 'Overlooked', needs_attention: 'Need Attention', emerging: 'Emerging' };
+                return d.opportunityCategory === map[categoryFilter];
+              }).length} dealers)</span>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('all')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: BRAND.primary,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  textDecoration: 'underline',
+                }}
+              >
+                Show all
+              </button>
+            </div>
+          )}
 
           {/* Threshold reference */}
           <div style={{
@@ -162,9 +219,10 @@ export default function AdminDesignIntelligence() {
           {/* Compact dealer table */}
           <DealerTable
             dealers={dealerSummary.dealers}
-            followUpsByKey={followUps.followUpsByKey}
+            categoryFilter={categoryFilter}
             onLogFollowUp={handleLogFollowUp}
             onSelectDealer={setSelectedDealerId}
+            onChangeCategory={handleChangeCategory}
           />
 
           {dealerSummary.dealers.length === 0 && (
