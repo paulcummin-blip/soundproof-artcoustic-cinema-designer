@@ -3,20 +3,29 @@
  * -----------------------------
  * The consolidated Commercial & Design Intelligence page.
  *
- * Reuses the existing Commercial Intelligence and Project Intelligence
- * authorities — no third reporting system. Loads data once, builds the
- * joined report, and presents seven reporting sections filtered by the
- * selected sector. Admin can drill down to a dealer and open a project.
+ * PRIMARY VIEW: Account Management — four actionable panels:
+ *   Overlooked Opportunities, Accounts Needing Attention,
+ *   Emerging Opportunities, My Follow-ups.
  *
- * Read-only: this page performs no writes.
+ * SECONDARY VIEW: Commercial & Design Intelligence — the existing seven
+ * reporting sections preserved as supporting evidence and drill-downs.
+ *
+ * Read-only except for DealerFollowUp records (admin-only entity).
+ * No dealer, project, or account records are altered.
  */
 
 import React from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Phone, BarChart3 } from 'lucide-react';
 import { BRAND, Button, Pill } from '@/components/admin/intelligence/IntelligenceUi';
 import useDesignIntelligence from '@/components/admin/designIntelligence/useDesignIntelligence';
 import SectorSelector from '@/components/admin/designIntelligence/SectorSelector';
+import DealerDrillDown from '@/components/admin/designIntelligence/DealerDrillDown';
+import OverlookedOpportunitiesPanel from '@/components/admin/designIntelligence/OverlookedOpportunitiesPanel';
+import AccountsNeedingAttentionPanel from '@/components/admin/designIntelligence/AccountsNeedingAttentionPanel';
+import EmergingOpportunitiesPanel from '@/components/admin/designIntelligence/EmergingOpportunitiesPanel';
+import MyFollowUpsPanel from '@/components/admin/designIntelligence/MyFollowUpsPanel';
+import FollowUpDialog from '@/components/admin/designIntelligence/FollowUpDialog';
 import ProjectActivitySection from '@/components/admin/designIntelligence/ProjectActivitySection';
 import ProjectValuesSection from '@/components/admin/designIntelligence/ProjectValuesSection';
 import RoomSizesSection from '@/components/admin/designIntelligence/RoomSizesSection';
@@ -24,24 +33,21 @@ import SystemConfigsSection from '@/components/admin/designIntelligence/SystemCo
 import ProductDemandSection from '@/components/admin/designIntelligence/ProductDemandSection';
 import EngineeringPerformanceSection from '@/components/admin/designIntelligence/EngineeringPerformanceSection';
 import DealerOpportunitiesSection from '@/components/admin/designIntelligence/DealerOpportunitiesSection';
-import DealerDrillDown from '@/components/admin/designIntelligence/DealerDrillDown';
+import { SECTOR_TABS } from '@/lib/commercial/designIntelligence/sectorScope';
 
 export default function AdminDesignIntelligence() {
   const { user, isLoadingAuth } = useAuth();
   const isAdmin = user?.role === 'admin';
   const {
-    loading,
-    error,
-    reload,
-    sectorTab,
-    setSectorTab,
-    selectedDealerId,
-    setSelectedDealerId,
-    counts,
-    scopedFamilies,
-    selectedDealer,
-    report,
-    priceContext,
+    loading, error, reload,
+    sectorTab, setSectorTab,
+    selectedDealerId, setSelectedDealerId,
+    viewMode, setViewMode,
+    counts, scopedFamilies, selectedDealer,
+    accounts, accountsById,
+    followUps, followUpDialog, setFollowUpDialog,
+    handleLogFollowUp, handleSaveFollowUp,
+    report, priceContext,
   } = useDesignIntelligence();
 
   if (isLoadingAuth) {
@@ -50,18 +56,11 @@ export default function AdminDesignIntelligence() {
 
   if (!isAdmin) {
     return (
-      <div style={{
-        padding: 48, textAlign: 'center', color: BRAND.subtext,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-      }}>
+      <div style={{ padding: 48, textAlign: 'center', color: BRAND.subtext, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <div style={{ fontSize: 32 }}>🔒</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: BRAND.text }}>Access Denied</div>
         <div style={{ fontSize: 14 }}>Commercial & Design Intelligence is restricted to admin users.</div>
-        <a href="/admin" style={{
-          marginTop: 8, padding: '10px 20px', borderRadius: 10,
-          background: BRAND.primary, color: '#FFFFFF',
-          fontSize: 14, textDecoration: 'none',
-        }}>Back to Admin</a>
+        <a href="/admin" style={{ marginTop: 8, padding: '10px 20px', borderRadius: 10, background: BRAND.primary, color: '#FFFFFF', fontSize: 14, textDecoration: 'none' }}>Back to Admin</a>
       </div>
     );
   }
@@ -78,44 +77,30 @@ export default function AdminDesignIntelligence() {
   if (error) {
     return (
       <div style={{ padding: 24 }}>
-        <div style={{
-          padding: 24, textAlign: 'center', color: BRAND.bad,
-          border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.card,
-        }}>
+        <div style={{ padding: 24, textAlign: 'center', color: BRAND.bad, border: `1px solid ${BRAND.border}`, borderRadius: 12, background: BRAND.card }}>
           {error}
-          <button
-            onClick={reload}
-            style={{ marginLeft: 12, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            Try again
-          </button>
+          <button onClick={reload} style={{ marginLeft: 12, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}>Try again</button>
         </div>
       </div>
     );
   }
 
+  const sectorLabel = SECTOR_TABS.find((t) => t.key === sectorTab)?.label || 'All Dealers';
+  const proposalEvents = report?.commercial?.proposalEvents || [];
+
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: '100vh', color: BRAND.text }}>
-      <header style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 16,
-        marginBottom: 18,
-        flexWrap: 'wrap',
-      }}>
+      <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Commercial & Design Intelligence</h1>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            Consolidated sector overview, project activity, values, room sizes, configurations, product demand, engineering performance and dealer opportunities
+            {viewMode === 'account_management'
+              ? 'Account management: which dealer deserves a call, why, and what to ask them'
+              : 'Supporting evidence: sector overview, values, room sizes, configurations, product demand and engineering performance'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{
-            padding: '6px 14px', borderRadius: 999,
-            background: '#213428', color: '#fff',
-            fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
-          }}>ADMIN</span>
+          <span style={{ padding: '6px 14px', borderRadius: 999, background: '#213428', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>ADMIN</span>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Reload
@@ -124,29 +109,75 @@ export default function AdminDesignIntelligence() {
         </div>
       </header>
 
+      {/* View mode toggle */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        <ViewModeButton active={viewMode === 'account_management'} onClick={() => setViewMode('account_management')}>
+          <Phone size={14} /> Account Management
+        </ViewModeButton>
+        <ViewModeButton active={viewMode === 'intelligence'} onClick={() => setViewMode('intelligence')}>
+          <BarChart3 size={14} /> Commercial & Design Intelligence
+        </ViewModeButton>
+      </div>
+
+      {/* Sector filter — visible in both views */}
       <div style={{ marginBottom: 18 }}>
         <SectorSelector
           activeKey={sectorTab}
           counts={counts}
-          onSelect={(key) => {
-            setSectorTab(key);
-            setSelectedDealerId(null);
-          }}
+          onSelect={(key) => { setSectorTab(key); setSelectedDealerId(null); }}
         />
       </div>
 
-      {selectedDealer ? (
-        <DealerDrillDown
-          dealer={selectedDealer}
-          onBack={() => setSelectedDealerId(null)}
+      {followUpDialog && (
+        <FollowUpDialog
+          opportunity={followUpDialog.opportunity}
+          existing={followUpDialog.existing}
+          onClose={() => setFollowUpDialog(null)}
+          onSave={handleSaveFollowUp}
         />
+      )}
+
+      {selectedDealer ? (
+        <DealerDrillDown dealer={selectedDealer} onBack={() => setSelectedDealerId(null)} />
+      ) : viewMode === 'account_management' ? (
+        <div style={{ display: 'grid', gap: 16 }}>
+          {scopedFamilies.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: BRAND.muted, border: `1px dashed ${BRAND.border}`, borderRadius: 12 }}>
+              No projects in this sector.
+            </div>
+          ) : (
+            <>
+              <OverlookedOpportunitiesPanel
+                families={scopedFamilies}
+                accountsById={accountsById}
+                followUpsByKey={followUps.followUpsByKey}
+                onLogFollowUp={handleLogFollowUp}
+                sectorLabel={sectorLabel}
+              />
+              <AccountsNeedingAttentionPanel
+                families={scopedFamilies}
+                accounts={accounts}
+                accountsById={accountsById}
+                followUpsByKey={followUps.followUpsByKey}
+                onLogFollowUp={handleLogFollowUp}
+                sectorLabel={sectorLabel}
+              />
+              <EmergingOpportunitiesPanel
+                families={scopedFamilies}
+                proposalEvents={proposalEvents}
+                accountsById={accountsById}
+                followUpsByKey={followUps.followUpsByKey}
+                onLogFollowUp={handleLogFollowUp}
+                sectorLabel={sectorLabel}
+              />
+              <MyFollowUpsPanel followUps={followUps.followUps} sectorLabel={sectorLabel} />
+            </>
+          )}
+        </div>
       ) : (
         <div style={{ display: 'grid', gap: 16 }}>
           {scopedFamilies.length === 0 ? (
-            <div style={{
-              padding: 32, textAlign: 'center', color: BRAND.muted,
-              border: `1px dashed ${BRAND.border}`, borderRadius: 12,
-            }}>
+            <div style={{ padding: 32, textAlign: 'center', color: BRAND.muted, border: `1px dashed ${BRAND.border}`, borderRadius: 12 }}>
               No projects in this sector.
             </div>
           ) : (
@@ -169,11 +200,35 @@ export default function AdminDesignIntelligence() {
       )}
 
       <div style={{ marginTop: 18, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Pill tone="neutral">Read-only</Pill>
-        <Pill tone="neutral">One project = one commercial family</Pill>
-        <Pill tone="neutral">Live value and quoted value are never combined</Pill>
-        <Pill tone="neutral">Variations are separate from project counts</Pill>
+        <Pill tone="neutral">Read-only except follow-up records</Pill>
+        <Pill tone="neutral">Evidence-backed observations only</Pill>
+        <Pill tone="neutral">No black-box scores</Pill>
+        {viewMode === 'account_management' && <Pill tone="neutral">No dealer or project records altered</Pill>}
       </div>
     </div>
+  );
+}
+
+function ViewModeButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '8px 14px',
+        borderRadius: 8,
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        border: `1px solid ${active ? BRAND.primary : BRAND.border}`,
+        background: active ? BRAND.primary : BRAND.card,
+        color: active ? '#FFFFFF' : BRAND.text,
+      }}
+    >
+      {children}
+    </button>
   );
 }

@@ -1,0 +1,116 @@
+{
+  "name": "DealerFollowUp",
+  "type": "object",
+  "description": "Lightweight administrator-only follow-up record for the Commercial & Design Intelligence account-management view. Each record captures one conversation or observation follow-up against a dealer (and optionally a specific project), linked to the opportunity signal that triggered it. Admin-only: no dealer or app-user access. This is not a CRM \u2014 it supplements the existing Account.notes and AccountUserAudit with a structured, dated, status-tracked record that the intelligence dashboard reads to show follow-up status and next contact dates.",
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "ID of the dealer Account this follow-up relates to."
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Denormalized account name at the time of the follow-up, for display without a join."
+    },
+    "project_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional Project ID when this follow-up relates to a specific project rather than the dealer overall."
+    },
+    "project_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Denormalized project name when project_id is set."
+    },
+    "opportunity_key": {
+      "type": "string",
+      "description": "Stable identifier of the opportunity signal that triggered this follow-up (e.g. 'overlooked:{accountId}', 'attention:{accountId}:no_activation', 'emerging:{accountId}:increasing_creation'). Links the follow-up to the signal so the dashboard can show status against the opportunity."
+    },
+    "opportunity_type": {
+      "type": "string",
+      "enum": [
+        "overlooked",
+        "needs_attention",
+        "emerging",
+        "project_follow_up"
+      ],
+      "description": "Which of the four opportunity categories this follow-up belongs to."
+    },
+    "observation": {
+      "type": "string",
+      "description": "What Sound Proof actually observed (the recorded evidence), copied from the opportunity signal at creation time so the follow-up remains readable even if the underlying data changes."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why the observation may warrant attention, as understood by the admin at the time."
+    },
+    "suggested_question": {
+      "type": "string",
+      "description": "The suggested question to ask the dealer, copied from the opportunity signal."
+    },
+    "conversation_notes": {
+      "type": "string",
+      "nullable": true,
+      "description": "Notes from the actual conversation with the dealer, recorded by the admin after the call or meeting."
+    },
+    "discovered_reason": {
+      "type": "string",
+      "nullable": true,
+      "description": "The actual reason discovered in conversation, if different from the initial observation. Recorded by the admin."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "relevant",
+        "dismissed",
+        "awaiting_follow_up"
+      ],
+      "default": "awaiting_follow_up",
+      "description": "Follow-up status. relevant = the opportunity is real and worth pursuing. dismissed = the admin determined it is not relevant. awaiting_follow_up = no conversation has happened yet or a further follow-up is needed."
+    },
+    "contact_date": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the admin contacted (or attempted to contact) the dealer about this opportunity."
+    },
+    "next_contact_date": {
+      "type": "string",
+      "format": "date",
+      "nullable": true,
+      "description": "Date of the next planned contact. Shown on the dashboard to prioritise upcoming follow-ups."
+    },
+    "created_by_name": {
+      "type": "string",
+      "description": "Denormalized name/email of the admin who created this follow-up."
+    }
+  },
+  "required": [
+    "account_id",
+    "opportunity_key",
+    "opportunity_type",
+    "observation",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
