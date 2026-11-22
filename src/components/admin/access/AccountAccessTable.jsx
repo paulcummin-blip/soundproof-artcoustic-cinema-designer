@@ -25,7 +25,7 @@ const MIN_WIDTH = 1320;
 
 const HEADERS = [
   { label: "Dealer", title: "Dealer account and primary admin email", align: "left" },
-  { label: "Access", title: "Account access state (Active, Not Activated, Suspended)", align: "left" },
+  { label: "Access", title: "Sound Proof eligibility (Approved / Not Approved) and activation state (Not Activated, Invitation Pending, Active, Suspended, Expired)", align: "left" },
   { label: "2026 Turnover", title: "Eligible turnover from the Partner Portal — newest source snapshot", align: "right" },
   { label: "Earned", title: "Credits awarded through UK turnover rewards", align: "right" },
   { label: "Purchased", title: "Credits purchased by the dealer", align: "right" },
@@ -78,7 +78,8 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
         </div>
 
         {list.map((row, index) => {
-          const access = row.accessState || { label: "—", tone: "muted" };
+          const eligibility = row.eligibilityState || { label: "—", tone: "muted" };
+          const activation = row.activationState || { label: "—", tone: "muted" };
           const promoLabel = row.promotion?.status || "None";
           const promoExpiry = row.promotion?.expiryDisplay;
           return (
@@ -100,9 +101,18 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
                 </div>
               </div>
 
-              {/* Access */}
-              <div>
-                <AccessPill label={access.label} tone={access.tone} />
+              {/* Access — eligibility over activation, stacked compactly. */}
+              <div className="flex flex-col items-start gap-1">
+                <AccessPill
+                  label={eligibility.label}
+                  tone={eligibility.tone}
+                  title="Sound Proof eligibility — approved by admin"
+                />
+                <AccessPill
+                  label={activation.label}
+                  tone={activation.tone}
+                  title="Activation state — account status and membership"
+                />
               </div>
 
               {/* 2026 Turnover */}

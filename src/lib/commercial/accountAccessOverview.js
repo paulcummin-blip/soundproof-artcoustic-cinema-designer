@@ -142,6 +142,44 @@ export function combinedAccessState(account, members) {
 }
 
 /**
+ * Sound Proof eligibility for the account-access table.
+ * Derived solely from the existing Account.soundproof_eligible flag set by
+ * manageSoundProofAccess. "Approved" = admin has approved the dealer to join
+ * Sound Proof; "Not Approved" = not yet approved. Eligibility never starts the
+ * 90-day term, activates the account, or sends an invitation.
+ */
+export function soundproofEligibilityState(account) {
+  const isEligible = account?.soundproof_eligible === true;
+  return {
+    label: isEligible ? "Approved" : "Not Approved",
+    tone: isEligible ? "ok" : "muted",
+  };
+}
+
+/**
+ * Sound Proof activation state for the account-access table. A finer-grained
+ * view than combinedAccessState: distinguishes Invitation Pending (invited but
+ * no acceptance yet) and Expired (past access expiry) from Not Activated and
+ * Active, so an approved-but-not-activated dealer reads distinctly from one
+ * that is already live. Uses only existing Account fields and membership
+ * status — no new database flags.
+ */
+export function soundproofActivationState(account, members) {
+  if (account?.status === "suspended") return { label: "Suspended", tone: "danger" };
+  const expiry = account?.soundproof_access_expires_at;
+  if (expiry && (account?.status === "active" || account?.status === "trial")) {
+    if (new Date(expiry).getTime() < Date.now()) return { label: "Expired", tone: "warn" };
+  }
+  if (account?.status === "inactive") return { label: "Not Activated", tone: "muted" };
+  // status active or trial, not expired — distinguish by membership state.
+  const occupied = occupiedMembers(members);
+  if (occupied.length === 0) return { label: "Not Activated", tone: "muted" };
+  const hasActiveMember = occupied.some((m) => (m.status || "pending") === "active");
+  if (!hasActiveMember) return { label: "Invitation Pending", tone: "warn" };
+  return { label: "Active", tone: "ok" };
+}
+
+/**
  * Last reliable account activity — the latest of project creates/updates,
  * account-use audit events and the account's last_access_at. A turnover sync
  * timestamp is deliberately never used: it is not genuine account activity.
@@ -384,6 +422,8 @@ export function buildAccessRows({
       lastLogin: account.last_access_at || null,
       lastActivity: resolveLastActivity(projects, auditsByAccount?.get(account.id) || [], account.last_access_at || null),
       accessState: combinedAccessState(account, members),
+      eligibilityState: soundproofEligibilityState(account),
+      activationState: soundproofActivationState(account, members),
       credits: buildCreditDetail(ledgerEntries),
       projectCount: projects.length,
       promoProjects: promoByAccount?.get(account.id) || 0,
