@@ -53,17 +53,15 @@ export const DAY_MS = 86400000;
  */
 export const ACTION_CATEGORIES = {
   FOLLOW_UP_DUE: 'Follow-up due',
-  NEW_OPPORTUNITY: 'New opportunity',
-  RELATIONSHIP_REVIEW: 'Relationship review',
-  ONBOARDING_FOLLOW_UP: 'Onboarding follow-up',
+  DEVELOPING_OPPORTUNITY: 'Developing opportunity',
   INSUFFICIENT_EVIDENCE: 'Insufficient evidence',
+  NO_OPPORTUNITY: 'No opportunity detected',
 };
 
 /** Display order for categories (lowest number = highest priority). */
 export const CATEGORY_PRIORITY = {
   FOLLOW_UP_DUE: 1,
-  NEW_OPPORTUNITY: 2,
-  RELATIONSHIP_REVIEW: 3,
-  ONBOARDING_FOLLOW_UP: 4,
-  INSUFFICIENT_EVIDENCE: 5,
+  DEVELOPING_OPPORTUNITY: 2,
+  INSUFFICIENT_EVIDENCE: 3,
+  NO_OPPORTUNITY: 4,
 };

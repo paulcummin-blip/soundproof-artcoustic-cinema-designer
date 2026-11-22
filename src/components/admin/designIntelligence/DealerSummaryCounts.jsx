@@ -8,13 +8,11 @@
 import React from 'react';
 import { BRAND } from '@/components/admin/intelligence/IntelligenceUi';
 import { formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
-import { ACTION_CATEGORIES } from '@/lib/commercial/designIntelligence/accountManagementConfig';
-
 const CARDS = [
-  { key: 'overlooked', label: 'Overlooked Opportunities', category: ACTION_CATEGORIES.RELATIONSHIP_REVIEW, tone: BRAND.accent, bg: '#F6F0EA' },
-  { key: 'needingAttention', label: 'Accounts Needing Attention', category: ACTION_CATEGORIES.ONBOARDING_FOLLOW_UP, tone: BRAND.warn, bg: BRAND.warnBg },
-  { key: 'emerging', label: 'Emerging Opportunities', category: ACTION_CATEGORIES.NEW_OPPORTUNITY, tone: BRAND.good, bg: BRAND.goodBg },
-  { key: 'followUpsDue', label: 'Follow-ups Due', category: ACTION_CATEGORIES.FOLLOW_UP_DUE, tone: BRAND.bad, bg: BRAND.badBg },
+  { key: 'overlooked', label: 'Overlooked', subtitle: 'Relationship reviews', tone: BRAND.accent, bg: '#F6F0EA' },
+  { key: 'needingAttention', label: 'Need Attention', subtitle: 'Onboarding follow-ups', tone: BRAND.warn, bg: BRAND.warnBg },
+  { key: 'emerging', label: 'Emerging', subtitle: 'Developing opportunities', tone: BRAND.good, bg: BRAND.goodBg },
+  { key: 'followUpsDue', label: 'Follow-ups Due', subtitle: 'Due now', tone: BRAND.bad, bg: BRAND.badBg },
 ];
 
 export default function DealerSummaryCounts({ counts }) {
@@ -58,7 +56,7 @@ export default function DealerSummaryCounts({ counts }) {
             fontSize: 11,
             color: BRAND.muted,
           }}>
-            {card.category}
+            {card.subtitle}
           </div>
         </div>
       ))}

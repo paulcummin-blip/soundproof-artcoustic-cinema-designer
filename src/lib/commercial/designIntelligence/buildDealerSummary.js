@@ -82,12 +82,16 @@ function hasPassedInactivityThreshold(families) {
 
 /**
  * Classify a dealer's signals into a transparent action category.
- * Priority: Follow-up due > New opportunity > Relationship review >
- * Onboarding follow-up > Insufficient evidence.
+ *
+ * Four categories, clearly distinguished:
+ *   Follow-up due        — awaiting follow-up with a due (or missing) date.
+ *   Developing opportunity — at least one signal passed the thresholds.
+ *   Insufficient evidence — has projects but all signals were filtered out.
+ *   No opportunity detected — no projects and no signals at all.
  */
-function classifyDealer(signals, followUpRecord) {
-  // 1. Follow-up due — has an awaiting follow-up with a next_contact_date
-  //    that has arrived or passed.
+function classifyDealer(signals, followUpRecord, hasFamilies) {
+  // 1. Follow-up due — awaiting follow-up with a next_contact_date that has
+  //    arrived or passed (or no date set at all).
   if (followUpRecord && followUpRecord.status === 'awaiting_follow_up') {
     const nextDate = followUpRecord.next_contact_date;
     if (nextDate) {
@@ -96,35 +100,24 @@ function classifyDealer(signals, followUpRecord) {
         return ACTION_CATEGORIES.FOLLOW_UP_DUE;
       }
     }
-    // Awaiting follow-up without a specific date still counts as due
     if (!nextDate) return ACTION_CATEGORIES.FOLLOW_UP_DUE;
   }
 
-  const hasEmerging = signals.some((s) => s.opportunityType === 'emerging' && s.opportunityKey.includes('increasing'));
-  const hasOverlooked = signals.some((s) => s.opportunityType === 'overlooked');
-  const hasAttention = signals.some((s) => s.opportunityType === 'needs_attention');
-  const hasInsufficient = signals.some((s) => s.opportunityKey.includes('insufficient_evidence'));
+  // 2. Developing opportunity — at least one signal survived the thresholds.
+  if (signals.length > 0) return ACTION_CATEGORIES.DEVELOPING_OPPORTUNITY;
 
-  // 2. New opportunity — emerging activity
-  if (hasEmerging) return ACTION_CATEGORIES.NEW_OPPORTUNITY;
+  // 3. Insufficient evidence — has projects but signals were filtered out.
+  if (hasFamilies) return ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE;
 
-  // 3. Relationship review — overlooked engagement
-  if (hasOverlooked) return ACTION_CATEGORIES.RELATIONSHIP_REVIEW;
-
-  // 4. Onboarding follow-up — needs attention (not activated, no projects)
-  if (hasAttention) return ACTION_CATEGORIES.ONBOARDING_FOLLOW_UP;
-
-  // 5. Insufficient evidence
-  if (hasInsufficient || signals.length === 0) return ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE;
-
-  return ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE;
+  // 4. No opportunity detected — no projects, no signals.
+  return ACTION_CATEGORIES.NO_OPPORTUNITY;
 }
 
 /**
  * Pick the most relevant observation for the table's summary column.
  * Uses the same priority as classifyDealer.
  */
-function pickPrimaryObservation(signals, followUpRecord, category) {
+function pickPrimaryObservation(signals, followUpRecord, category, hasFamilies) {
   if (category === ACTION_CATEGORIES.FOLLOW_UP_DUE && followUpRecord) {
     return followUpRecord.observation || followUpRecord.conversation_notes || 'Follow-up due';
   }
@@ -133,9 +126,12 @@ function pickPrimaryObservation(signals, followUpRecord, category) {
     const signal = signals.find((s) => s.opportunityType === type && !s.opportunityKey.includes('insufficient_evidence'));
     if (signal) return signal.observation;
   }
-  const insufficient = signals.find((s) => s.opportunityKey.includes('insufficient_evidence'));
-  if (insufficient) return insufficient.observation;
-  return 'No recorded signals';
+  if (category === ACTION_CATEGORIES.INSUFFICIENT_EVIDENCE) {
+    return hasFamilies
+      ? 'Has project history but no signals passed the action thresholds.'
+      : 'No recorded signals';
+  }
+  return 'No project activity recorded.';
 }
 
 /**
@@ -274,8 +270,9 @@ export function buildDealerSummary({
     const followUpRecord = accountFollowUps
       .sort((a, b) => (timeOf(b?.created_date) || 0) - (timeOf(a?.created_date) || 0))[0] || null;
 
-    const category = classifyDealer(entry.signals, followUpRecord);
-    const primaryObservation = pickPrimaryObservation(entry.signals, followUpRecord, category);
+    const hasFamilies = (familiesByAccount.get(entry.accountId) || []).length > 0;
+    const category = classifyDealer(entry.signals, followUpRecord, hasFamilies);
+    const primaryObservation = pickPrimaryObservation(entry.signals, followUpRecord, category, hasFamilies);
 
     // Signal labels for the table
     const signalLabels = entry.signals.map((s) => {
@@ -308,11 +305,11 @@ export function buildDealerSummary({
     return String(a.dealerName).localeCompare(String(b.dealerName));
   });
 
-  // Summary counts for the four cards at the top
+  // Summary counts for the four cards at the top — signal-type counts.
   const summaryCounts = {
-    overlooked: dealers.filter((d) => d.category === ACTION_CATEGORIES.RELATIONSHIP_REVIEW).length,
-    needingAttention: dealers.filter((d) => d.category === ACTION_CATEGORIES.ONBOARDING_FOLLOW_UP).length,
-    emerging: dealers.filter((d) => d.category === ACTION_CATEGORIES.NEW_OPPORTUNITY).length,
+    overlooked: dealers.filter((d) => d.signalLabels.includes('Relationship')).length,
+    needingAttention: dealers.filter((d) => d.signalLabels.includes('Onboarding')).length,
+    emerging: dealers.filter((d) => d.signalLabels.includes('Emerging')).length,
     followUpsDue: dealers.filter((d) => d.category === ACTION_CATEGORIES.FOLLOW_UP_DUE).length,
   };
 
