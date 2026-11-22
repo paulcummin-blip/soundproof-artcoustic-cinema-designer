@@ -13,9 +13,15 @@ const BRAND = {
 };
 
 /**
- * Clean expired-access screen shown when authError.type === 'account_expired'.
- * The dealer's 90-day Sound Proof access term has passed.
- * No operational renewal button is shown until the Lovable integration exists.
+ * Expiry screen shown when authError.type === 'account_expired'.
+ *
+ * The dealer's shared 90-day Sound Proof access term has passed. Access is
+ * blocked at the account level (soundproof_access_expires_at), not the
+ * individual user's last login, so every seat on the account sees the same
+ * state. Projects, designs and memberships are preserved untouched; access is
+ * restored through the existing account authority once the dealer renews via
+ * the verified Partner Portal renewal process. No in-app renewal button is
+ * provided — renewal must go through the Artcoustic Dealer Portal.
  */
 export default function AccountExpiredScreen() {
   const { logout } = useAuth();
@@ -26,7 +32,7 @@ export default function AccountExpiredScreen() {
       background: BRAND.bg, padding: 24,
     }}>
       <div style={{
-        maxWidth: 420, textAlign: "center",
+        maxWidth: 460, textAlign: "center",
         background: BRAND.card, border: `1px solid ${BRAND.border}`,
         borderRadius: 16, padding: "40px 32px",
       }}>
@@ -42,11 +48,20 @@ export default function AccountExpiredScreen() {
             <polyline points="12 6 12 12 16 14" />
           </svg>
         </div>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: BRAND.text, marginBottom: 8 }}>
-          Renew Access
+        <h1 style={{
+          margin: 0, fontSize: 20, fontWeight: 700, color: BRAND.text, marginBottom: 12,
+          fontFamily: "Didact Gothic, sans-serif",
+        }}>
+          Your Sound Proof licence has expired
         </h1>
-        <p style={{ margin: 0, fontSize: 14, color: BRAND.subtext, lineHeight: 1.5, marginBottom: 24 }}>
-          Your Sound Proof access has expired.
+        <p style={{ margin: 0, fontSize: 14, color: BRAND.subtext, lineHeight: 1.6, marginBottom: 8 }}>
+          Your 90-day access period has ended.
+        </p>
+        <p style={{ margin: 0, fontSize: 14, color: BRAND.subtext, lineHeight: 1.6, marginBottom: 8 }}>
+          To renew your licence and continue using Sound Proof, please visit your secure Artcoustic Dealer Portal.
+        </p>
+        <p style={{ margin: 0, fontSize: 14, color: BRAND.subtext, lineHeight: 1.6, marginBottom: 28 }}>
+          Your existing projects and designs will be preserved and available again once your licence is renewed.
         </p>
         <button
           onClick={() => logout(true)}
@@ -54,6 +69,7 @@ export default function AccountExpiredScreen() {
             padding: "10px 24px", borderRadius: 10,
             background: BRAND.btn, color: BRAND.btnText,
             fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
+            fontFamily: "Didact Gothic, sans-serif",
           }}
         >
           Sign out
