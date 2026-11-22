@@ -38,10 +38,10 @@ export default function PurchaseProjects() {
       }}
     >
       <h1 style={{ fontSize: 28, marginBottom: 8, color: "#1B1A1A" }}>
-        Professional Projects
+        Project Tokens
       </h1>
       <p style={{ color: "#3E4349", marginBottom: 28, fontSize: 14, maxWidth: 640 }}>
-        Professional Projects permanently unlock the full Sound Proof professional feature set for that cinema project and do not expire.
+        1 Project Token creates 1 new cinema project, with up to 5 design variations. Project Tokens do not expire.
       </p>
 
       {/* P3: Promotion-active restrained message — no purchase taken */}
@@ -61,14 +61,14 @@ export default function PurchaseProjects() {
             Promotion Live
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#1B1A1A", marginBottom: 8 }}>
-            Unlimited Professional Project access
+            Unlimited project creation
           </div>
           <div style={{ fontSize: 14, color: "#3E4349", lineHeight: 1.5 }}>
-            You currently have unlimited Professional Project access
+            You currently have unlimited project creation
             {promoEndsAt ? ` until ${formatPromotionEndDate(promoEndsAt)}` : ''}.
           </div>
           <div style={{ fontSize: 14, color: "#3E4349", lineHeight: 1.5, marginTop: 8 }}>
-            Your banked Professional Projects ({capacityLoading ? '…' : bankedCapacity}) will remain available after the promotion ends.
+            Your Project Tokens ({capacityLoading ? '…' : bankedCapacity}) won&rsquo;t be used during this promotion and will remain available afterwards.
           </div>
         </div>
       )}
@@ -97,7 +97,7 @@ export default function PurchaseProjects() {
               }}
             >
               <div style={{ fontSize: 17, fontWeight: 700, color: "#1B1A1A" }}>
-                {pack.count} Professional Projects
+                {pack.count} Project Tokens
               </div>
               <div style={{ fontSize: 24, fontWeight: 700, color: "#1B1A1A" }}>
                 {pack.price}
@@ -135,9 +135,9 @@ export default function PurchaseProjects() {
             maxWidth: 640,
           }}
         >
-          Online purchasing is being prepared.
+          Online Project Token purchases are coming soon.
           <br />
-          Please contact Sound Proof if you need additional Professional Projects during the pilot.
+          Please contact Artcoustic if you need additional tokens.
         </div>
       )}
 
@@ -153,7 +153,7 @@ export default function PurchaseProjects() {
           maxWidth: 640,
         }}
       >
-        Professional Projects may also be added to eligible Artcoustic dealer accounts through the Sound Proof rewards programme.
+        Project Tokens may also be added to eligible Artcoustic dealer accounts through the Sound Proof rewards programme.
       </div>
 
       <button

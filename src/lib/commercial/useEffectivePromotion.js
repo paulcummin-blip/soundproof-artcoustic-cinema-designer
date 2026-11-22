@@ -116,3 +116,24 @@ export function formatPromotionEndDate(iso) {
     return '';
   }
 }
+
+/**
+ * Format an ISO ends_at timestamp as a full dealer-facing date.
+ * e.g. "28 February 2027". Used for the Unlimited Projects promotion line.
+ * @param {string|null} iso
+ * @returns {string}
+ */
+export function formatPromotionEndDateLong(iso) {
+  if (!iso) return '';
+  try {
+    const endMs = new Date(iso).getTime();
+    if (!Number.isFinite(endMs)) return '';
+    const d = new Date(endMs - 1);
+    if (isNaN(d.getTime())) return '';
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  } catch (_e) {
+    return '';
+  }
+}

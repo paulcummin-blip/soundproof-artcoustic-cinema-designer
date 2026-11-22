@@ -820,23 +820,6 @@ export default function ProjectsPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-            {showCapacityIndicator && !promotionEffective && (
-              <button
-                type="button"
-                onClick={() => navigate('/PurchaseProjects')}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  border: `1px solid ${BRAND.border}`,
-                  background: BRAND.card,
-                  color: BRAND.subtext,
-                  cursor: "pointer",
-                  fontSize: 14,
-                }}
-              >
-                Buy Projects
-              </button>
-            )}
             <button
               type="button"
               onClick={openDialog}

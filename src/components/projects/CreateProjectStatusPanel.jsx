@@ -15,10 +15,10 @@ export default function CreateProjectStatusPanel({ status, onPurchaseProjects, o
       <div className="space-y-6 font-body py-4">
         <div className="text-center space-y-2">
           <h3 className="text-lg font-bold text-[#1B1A1A]">
-            You're out of Professional Projects
+            You're out of Project Tokens
           </h3>
           <p className="text-sm text-[#3E4349]">
-            Purchase additional projects to start a new professional design.
+            Purchase additional Project Tokens to start a new cinema project.
           </p>
         </div>
         <div className="flex justify-center gap-3">
@@ -33,7 +33,7 @@ export default function CreateProjectStatusPanel({ status, onPurchaseProjects, o
             onClick={onPurchaseProjects}
             style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
           >
-            Purchase Projects
+            Purchase Project Tokens
           </Button>
         </div>
       </div>
