@@ -65,6 +65,124 @@ const QUESTION_ID_TO_DECISION = {
   overhead_speaker_reason: DESIGN_DECISION.OVERHEADS_COUNT,
 };
 
+// ── Canonical subwoofer arrangement fingerprint ──────────────────────────────
+//
+// Subwoofer questions can carry different question IDs (front_rear
+// distribution, single_wall arrangement, or the legacy count_rationale)
+// while describing the same underlying arrangement decision.  To compare a
+// saved answer against a current question across different question IDs,
+// the subwoofer decision uses a CANONICAL arrangement fingerprint that
+// encodes the material aspects: arrangement type, total count, and
+// front/rear split.  This fingerprint is the same regardless of which
+// question ID triggered it.
+//
+// Format: subarr:{type}:{count}:{front}:{rear}
+//
+// Legacy saved items carry dc1-{hash}-{length} fingerprints computed with
+// a different formula and cannot be directly compared with the canonical
+// format.  For those, a compatibility rule extracts the subwoofer count
+// from the saved question text and compares it against the current count.
+// If the count matches the arrangement is treated as unchanged; if it
+// differs the design materially changed.  If the count cannot be extracted
+// equivalence cannot be established and the item is NOT silently treated
+// as current.
+//
+// The fingerprint is insensitive to minor position adjustments (it
+// captures count and distribution, not exact coordinates) while remaining
+// sensitive to material changes (count or arrangement type).  Subwoofer
+// quantity alone does not determine performance — two well-positioned
+// subs may outperform four poorly placed ones — but a change in count
+// alongside a change in arrangement type is a strong signal that the
+// design materially changed and the saved explanation should be
+// reconsidered.
+
+/**
+ * Build a canonical subwoofer arrangement fingerprint.
+ *
+ * @param {Object} sig — { type, count, front, rear }
+ * @returns {string} the canonical fingerprint
+ */
+export function canonicalSubwooferFingerprint({ type, count, front, rear }) {
+  return `subarr:${type}:${count}:${front}:${rear}`;
+}
+
+/**
+ * Parse a canonical subwoofer fingerprint into its components.
+ * Returns null if the fingerprint is not in the canonical subarr: format.
+ *
+ * @param {string} fingerprint
+ * @returns {{type: string, count: number, front: number, rear: number}|null}
+ */
+export function parseSubwooferSignature(fingerprint) {
+  if (typeof fingerprint !== 'string') return null;
+  const match = fingerprint.match(/^subarr:(\w+):(\d+):(\d+):(\d+)$/);
+  if (!match) return null;
+  return {
+    type: match[1],
+    count: parseInt(match[2], 10),
+    front: parseInt(match[3], 10),
+    rear: parseInt(match[4], 10),
+  };
+}
+
+/**
+ * Extract the subwoofer count from a saved question's text.
+ * Looks for a pattern like "4 subwoofers" or "2 subwoofers".
+ * Returns null if the count cannot be determined.
+ *
+ * @param {string} questionText
+ * @returns {number|null}
+ */
+export function extractSubwooferCountFromQuestionText(questionText) {
+  if (typeof questionText !== 'string') return null;
+  const match = questionText.match(/\b(\d+)\s+subwoofer/i);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Compare a saved subwoofer arrangement item against a current subwoofer
+ * question, across different question IDs.
+ *
+ * Used by partitionByDecisionCurrency when the saved item's question ID
+ * differs from the current question's ID but both map to the same
+ * subwoofers_arrangement decision.
+ *
+ * Returns 'current' (arrangement materially unchanged, suppress),
+ * 'stale' (arrangement materially changed, re-ask), or 'unknown'
+ * (equivalence cannot be established — caller treats as stale per the
+ * requirement: do not silently treat as current).
+ *
+ * @param {Object} savedItem — the saved context item
+ * @param {string|null} currentFingerprint — the current question's fingerprint
+ * @returns {'current'|'stale'|'unknown'}
+ */
+export function compareSubwooferArrangementAcrossIds(savedItem, currentFingerprint) {
+  const currentSig = parseSubwooferSignature(currentFingerprint);
+  if (!currentSig) return 'unknown';
+
+  // Try to parse the saved fingerprint as a canonical signature.
+  const savedSig = parseSubwooferSignature(savedItem?.decision_fingerprint);
+  if (savedSig) {
+    // Both canonical: full comparison of type, count, and front/rear split.
+    if (savedSig.type === currentSig.type
+      && savedSig.count === currentSig.count
+      && savedSig.front === currentSig.front
+      && savedSig.rear === currentSig.rear) {
+      return 'current';
+    }
+    return 'stale';
+  }
+
+  // Saved fingerprint is legacy (dc1- format). Use the compatibility rule:
+  // extract the count from the saved question text and compare against the
+  // current count from the canonical fingerprint.
+  const savedCount = extractSubwooferCountFromQuestionText(savedItem?.question);
+  if (savedCount === null) return 'unknown';
+
+  if (savedCount === currentSig.count) return 'current';
+  return 'stale';
+}
+
 /**
  * The decision key for a question ID. Unlisted IDs map to themselves, so an
  * AI-discovered or future question is its own decision and is never silently
@@ -94,4 +212,8 @@ export default {
   DESIGN_DECISION,
   decisionKeyForQuestionId,
   decisionKeyForQuestion,
+  canonicalSubwooferFingerprint,
+  parseSubwooferSignature,
+  extractSubwooferCountFromQuestionText,
+  compareSubwooferArrangementAcrossIds,
 };

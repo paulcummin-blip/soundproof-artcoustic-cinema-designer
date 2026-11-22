@@ -37,6 +37,7 @@ import { readSeatBoundaryGeometry } from '../seatingBoundaryPrinciple.js';
 import {
   decisionKeyForQuestion,
   decisionKeyForQuestionId,
+  canonicalSubwooferFingerprint,
 } from './designContextDecisionIdentity.js';
 
 /** The maximum number of questions discovery may return. */
@@ -217,11 +218,11 @@ function checkSubwooferArrangement(state, project = null) {
       question_id: 'subwoofer_single_wall_arrangement',
       question: `All ${enabled.length} subwoofers are placed near the ${side} wall. Is there a particular reason for this arrangement rather than distributing them around the room?`,
       area: CONTEXT_AREA.SUBWOOFERS,
-      decision_fingerprint: decisionFingerprint(CONTEXT_AREA.SUBWOOFERS, {
+      decision_fingerprint: canonicalSubwooferFingerprint({
+        type: 'single_wall',
         count: enabled.length,
         front: frontCount,
         rear: rearCount,
-        arrangement: 'single_wall',
       }),
     };
   }
@@ -235,11 +236,11 @@ function checkSubwooferArrangement(state, project = null) {
       question_id: 'subwoofer_front_rear_distribution',
       question: `The ${enabled.length} subwoofers are distributed across the front and rear of the room. Is there a particular reason for this distribution?`,
       area: CONTEXT_AREA.SUBWOOFERS,
-      decision_fingerprint: decisionFingerprint(CONTEXT_AREA.SUBWOOFERS, {
+      decision_fingerprint: canonicalSubwooferFingerprint({
+        type: 'front_rear',
         count: enabled.length,
         front: frontCount,
         rear: rearCount,
-        arrangement: 'front_rear',
       }),
     };
   }
@@ -445,7 +446,8 @@ export async function discoverAiQuestions({
     '- Each question asks WHY a meaningful design decision was made, never WHAT was designed.',
     '- Only ask about decisions whose explanation would materially improve the client-facing narrative: unusual seating positions, genuinely significant screen-size compromises, unconventional speaker positioning, or a specific unusual subwoofer arrangement or constraint.',
     '- Do not generate a question merely because a configuration option exists. Ordinary choices (standard baffle mounting, a common channel layout, a typical subwoofer count) are not design decisions that need explanation.',
-    '- Using multiple subwoofers to manage room modes, reduce the severity of bass peaks and nulls, and improve bass consistency across listening positions is standard engineering practice. Do not ask the designer to explain why multiple subwoofers are used. Only ask about a specific unusual arrangement or an architectural constraint (for example, subwoofers located in unusual positions because of cabinetry).',
+    '- Subwoofer quantity alone does not determine performance. Two well-positioned subwoofers may be preferable to four poorly positioned ones. Do not routinely ask the designer to explain why two, four or another number of subwoofers was selected — this is normal cinema design judgement, not an unusual decision requiring clarification.',
+    '- Using multiple subwoofers to manage room modes, reduce the severity of bass peaks and nulls, and improve bass consistency across listening positions is standard engineering practice. Only ask about a specific unusual arrangement or an architectural constraint (for example, subwoofers located in unusual positions because of cabinetry).',
     '- Never assume a motivation. The question must ask the designer for their reason.',
     '- Never invent a design constraint or speculate about a reason the designer did not record.',
     '- Never claim that a particular bass improvement has been achieved unless the engineering results support it. Do not state that room modes have been smoothed, peaks reduced, or consistency improved unless measured results are cited.',

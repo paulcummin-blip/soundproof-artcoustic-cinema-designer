@@ -217,6 +217,8 @@ export function confirmedQuestionIds(items) {
 import {
   decisionKeyForQuestionId,
   decisionKeyForQuestion,
+  compareSubwooferArrangementAcrossIds,
+  DESIGN_DECISION,
 } from './designContextDecisionIdentity.js';
 
 /**
@@ -305,11 +307,29 @@ export function partitionByDecisionCurrency(savedItems, currentQuestions) {
         stale.push(item);
       }
     } else {
-      // The question ID changed but the decision is the same. The
-      // fingerprints were computed under different question IDs and are
-      // not comparable. Respect the designer's existing answer rather
-      // than reconfirming it: the decision was already explained.
-      current.push(item);
+      // The question ID changed but the decision is the same.
+      if (dk === DESIGN_DECISION.SUBWOOFER_ARRANGEMENT) {
+        // For the subwoofer decision, compare canonical arrangement
+        // signatures across question IDs to detect material changes.
+        // This distinguishes an unchanged arrangement (Case A/C/D: suppress)
+        // from a materially changed one (Case B: re-ask).
+        const comparison = compareSubwooferArrangementAcrossIds(
+          item,
+          info.fingerprint,
+        );
+        if (comparison === 'current') {
+          current.push(item);
+        } else {
+          // 'stale' or 'unknown': do not silently treat as current.
+          // Re-ask so ADI can reconsider whether the saved explanation
+          // remains relevant after the material change.
+          stale.push(item);
+        }
+      } else {
+        // For other decisions, fingerprints may not be comparable across
+        // question IDs. Respect the designer's existing answer.
+        current.push(item);
+      }
     }
   }
   return { current, stale };

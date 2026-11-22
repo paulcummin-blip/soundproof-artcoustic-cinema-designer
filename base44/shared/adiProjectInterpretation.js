@@ -502,7 +502,7 @@ export function buildProjectInterpretation(params = {}) {
   }: the coverage approach is the layout the evidence states, and no coverage result is claimed that the spatial evidence does not carry.`;
   const bassText = `${
     subCount > 0 ? `${subCount} subwoofer${subCount === 1 ? '' : 's'}` : 'The subwoofer arrangement'
-  }${strategyText ? `, ${strategyText}` : ''}: seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority.`;
+  }${strategyText ? `, ${strategyText}` : ''}: the arrangement has been selected to provide the best practical low-frequency performance across the seating area, balancing acoustic performance with the room's physical and installation constraints. Seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority.`;
 
   const emphasis = typeof clientBrief === 'string' && clientBrief.trim() ? clientBrief.trim() : null;
 
@@ -718,6 +718,7 @@ export function formatInterpretationForPrompt(interpretation) {
     'HOW TO USE THIS:',
     '- Where the copy explains the reasoning behind the design, use the reasoning recorded above and never a reason it does not record.',
     '- What the design contains is a fact and never a reason: never explain a layout, a channel count, an overhead count or a subwoofer count as a choice, and where no designer reason is recorded above, state the design and its result and write no reason.',
+    '- Subwoofer quantity alone does not determine performance: two well-positioned subwoofers may be preferable to four poorly positioned ones. Do not automatically describe more subwoofers as better. Describe the arrangement as selected for the best practical low-frequency performance across the seating area, and never claim measured or guaranteed bass uniformity that the engineering results do not support.',
     '- The RP22 design context above is established professional practice, not this project\'s reason: use it to explain why a principle matters for this room, and never to state why the designer chose a configuration. It never turns a channel, overhead or subwoofer count into a reason.',
     '- Write the story first, then support it with the results that matter for this room.',
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',

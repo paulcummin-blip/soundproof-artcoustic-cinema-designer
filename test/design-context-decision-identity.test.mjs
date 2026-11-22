@@ -168,7 +168,7 @@ describe('Dixon saved answers suppress equivalent questions', () => {
     // the same underlying decision.
     const saved = [{
       question_id: 'subwoofer_count_rationale',
-      question: 'Why this subwoofer count and arrangement?',
+      question: 'What is the engineering justification for installing 2 subwoofers in this layout?',
       area: 'subwoofers',
       status: CONTEXT_STATUS.ANSWERED,
       answer: 'Two front subs for headroom and modal smoothing.',
@@ -185,8 +185,11 @@ describe('Dixon saved answers suppress equivalent questions', () => {
     });
 
     // The saved answer suppresses the equivalent question despite the
-    // different question ID.
-    expect(stale).toEqual([]); // not stale: question ID changed, can't compare
+    // different question ID. The legacy fingerprint compatibility rule
+    // extracts the count (2) from the saved question text and matches it
+    // against the current count (2), so the arrangement is treated as
+    // unchanged.
+    expect(stale).toEqual([]);
     expect(toAsk.map((q) => q.question_id)).not.toContain('subwoofer_single_wall_arrangement');
   });
 
@@ -198,7 +201,7 @@ describe('Dixon saved answers suppress equivalent questions', () => {
       ),
       {
         question_id: 'subwoofer_count_rationale',
-        question: 'Why this subwoofer count and arrangement?',
+        question: 'What is the engineering justification for installing 2 subwoofers in this layout?',
         area: 'subwoofers',
         status: CONTEXT_STATUS.ANSWERED,
         answer: 'Two front subs for headroom and modal smoothing.',

@@ -88,7 +88,7 @@ function dixonSavedItems() {
     },
     {
       question_id: 'subwoofer_count_rationale',
-      question: 'Why this subwoofer count and arrangement?',
+      question: 'What is the engineering justification for installing 2 subwoofers in this layout?',
       area: 'subwoofers',
       status: 'answered',
       answer: 'Two front subs for headroom and modal smoothing.',
@@ -252,7 +252,7 @@ describe('Existing answer recognition', () => {
     expect(ids).toContain('subwoofer_front_rear_distribution');
     const dist = questions.find((q) => q.question_id === 'subwoofer_front_rear_distribution');
     expect(dist.area).toBe('subwoofers');
-    expect(dist.decision_fingerprint).toMatch(/^dc1-/);
+    expect(dist.decision_fingerprint).toMatch(/^subarr:/);
   });
 
   it('still recognises all-on-one-wall arrangements', () => {
