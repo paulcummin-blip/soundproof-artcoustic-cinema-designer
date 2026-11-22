@@ -3,9 +3,9 @@
  * -----------------------------
  * The consolidated Commercial & Design Intelligence page.
  *
- * PRIMARY VIEW: Account Management — four actionable panels:
- *   Overlooked Opportunities, Accounts Needing Attention,
- *   Emerging Opportunities, My Follow-ups.
+ * PRIMARY VIEW: Account Management — four summary counts + one compact,
+ * sortable, deduplicated dealer table with expandable detail rows.
+ * Scales to 300+ dealers.
  *
  * SECONDARY VIEW: Commercial & Design Intelligence — the existing seven
  * reporting sections preserved as supporting evidence and drill-downs.
@@ -21,10 +21,8 @@ import { BRAND, Button, Pill } from '@/components/admin/intelligence/Intelligenc
 import useDesignIntelligence from '@/components/admin/designIntelligence/useDesignIntelligence';
 import SectorSelector from '@/components/admin/designIntelligence/SectorSelector';
 import DealerDrillDown from '@/components/admin/designIntelligence/DealerDrillDown';
-import OverlookedOpportunitiesPanel from '@/components/admin/designIntelligence/OverlookedOpportunitiesPanel';
-import AccountsNeedingAttentionPanel from '@/components/admin/designIntelligence/AccountsNeedingAttentionPanel';
-import EmergingOpportunitiesPanel from '@/components/admin/designIntelligence/EmergingOpportunitiesPanel';
-import MyFollowUpsPanel from '@/components/admin/designIntelligence/MyFollowUpsPanel';
+import DealerSummaryCounts from '@/components/admin/designIntelligence/DealerSummaryCounts';
+import DealerTable from '@/components/admin/designIntelligence/DealerTable';
 import FollowUpDialog from '@/components/admin/designIntelligence/FollowUpDialog';
 import ProjectActivitySection from '@/components/admin/designIntelligence/ProjectActivitySection';
 import ProjectValuesSection from '@/components/admin/designIntelligence/ProjectValuesSection';
@@ -34,6 +32,7 @@ import ProductDemandSection from '@/components/admin/designIntelligence/ProductD
 import EngineeringPerformanceSection from '@/components/admin/designIntelligence/EngineeringPerformanceSection';
 import DealerOpportunitiesSection from '@/components/admin/designIntelligence/DealerOpportunitiesSection';
 import { SECTOR_TABS } from '@/lib/commercial/designIntelligence/sectorScope';
+import { ACCOUNT_MANAGEMENT_THRESHOLDS } from '@/lib/commercial/designIntelligence/accountManagementConfig';
 
 export default function AdminDesignIntelligence() {
   const { user, isLoadingAuth } = useAuth();
@@ -47,6 +46,7 @@ export default function AdminDesignIntelligence() {
     accounts, accountsById,
     followUps, followUpDialog, setFollowUpDialog,
     handleLogFollowUp, handleSaveFollowUp,
+    dealerSummary,
     report, priceContext,
   } = useDesignIntelligence();
 
@@ -86,7 +86,6 @@ export default function AdminDesignIntelligence() {
   }
 
   const sectorLabel = SECTOR_TABS.find((t) => t.key === sectorTab)?.label || 'All Dealers';
-  const proposalEvents = report?.commercial?.proposalEvents || [];
 
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: '100vh', color: BRAND.text }}>
@@ -141,37 +140,37 @@ export default function AdminDesignIntelligence() {
         <DealerDrillDown dealer={selectedDealer} onBack={() => setSelectedDealerId(null)} />
       ) : viewMode === 'account_management' ? (
         <div style={{ display: 'grid', gap: 16 }}>
-          {scopedFamilies.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: BRAND.muted, border: `1px dashed ${BRAND.border}`, borderRadius: 12 }}>
-              No projects in this sector.
+          {/* Summary counts */}
+          <DealerSummaryCounts counts={dealerSummary.summaryCounts} />
+
+          {/* Threshold reference */}
+          <div style={{
+            fontSize: 11,
+            color: BRAND.muted,
+            display: 'flex',
+            gap: 12,
+            flexWrap: 'wrap',
+            padding: '0 2px',
+          }}>
+            <span>Thresholds:</span>
+            <span>Not activated: {ACCOUNT_MANAGEMENT_THRESHOLDS.approvedNotActivatedDays}d after approval</span>
+            <span>· No projects: {ACCOUNT_MANAGEMENT_THRESHOLDS.activatedNoProjectsDays}d after activation</span>
+            <span>· No activity: {ACCOUNT_MANAGEMENT_THRESHOLDS.noActivityMinDays}–{ACCOUNT_MANAGEMENT_THRESHOLDS.noActivityMaxDays}d</span>
+            <span>· Emerging: {ACCOUNT_MANAGEMENT_THRESHOLDS.emergingMinRecentProjects}+ recent projects</span>
+          </div>
+
+          {/* Compact dealer table */}
+          <DealerTable
+            dealers={dealerSummary.dealers}
+            followUpsByKey={followUps.followUpsByKey}
+            onLogFollowUp={handleLogFollowUp}
+            onSelectDealer={setSelectedDealerId}
+          />
+
+          {dealerSummary.dealers.length === 0 && (
+            <div style={{ padding: 24, textAlign: 'center', color: BRAND.muted, border: `1px dashed ${BRAND.border}`, borderRadius: 12 }}>
+              No dealers with actionable signals in {sectorLabel}. Internal and unclassified accounts are excluded.
             </div>
-          ) : (
-            <>
-              <OverlookedOpportunitiesPanel
-                families={scopedFamilies}
-                accountsById={accountsById}
-                followUpsByKey={followUps.followUpsByKey}
-                onLogFollowUp={handleLogFollowUp}
-                sectorLabel={sectorLabel}
-              />
-              <AccountsNeedingAttentionPanel
-                families={scopedFamilies}
-                accounts={accounts}
-                accountsById={accountsById}
-                followUpsByKey={followUps.followUpsByKey}
-                onLogFollowUp={handleLogFollowUp}
-                sectorLabel={sectorLabel}
-              />
-              <EmergingOpportunitiesPanel
-                families={scopedFamilies}
-                proposalEvents={proposalEvents}
-                accountsById={accountsById}
-                followUpsByKey={followUps.followUpsByKey}
-                onLogFollowUp={handleLogFollowUp}
-                sectorLabel={sectorLabel}
-              />
-              <MyFollowUpsPanel followUps={followUps.followUps} sectorLabel={sectorLabel} />
-            </>
           )}
         </div>
       ) : (
@@ -203,6 +202,7 @@ export default function AdminDesignIntelligence() {
         <Pill tone="neutral">Read-only except follow-up records</Pill>
         <Pill tone="neutral">Evidence-backed observations only</Pill>
         <Pill tone="neutral">No black-box scores</Pill>
+        <Pill tone="neutral">Internal accounts excluded</Pill>
         {viewMode === 'account_management' && <Pill tone="neutral">No dealer or project records altered</Pill>}
       </div>
     </div>

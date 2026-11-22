@@ -14,6 +14,7 @@
 
 import { safeArray, text } from '../projectReporting/reportingUtils';
 import { floorAreaOf } from './roomSizeAnalysis';
+import { isCommercialDealerAccount } from './internalAccountFilter';
 
 /**
  * Build "needs attention" opportunity signals.
@@ -35,8 +36,9 @@ export function buildAccountsNeedingAttention(families, accounts, accountsById) 
   const opportunities = [];
 
   for (const account of safeArray(accounts)) {
-    const type = text(account.account_type).toLowerCase();
-    if (type === 'admin' || type === 'internal') continue;
+    // Only confirmed commercial dealers — excludes internal, admin,
+    // professional, and unclassified (null dealer_group) accounts.
+    if (!isCommercialDealerAccount(account)) continue;
 
     const group = text(account.dealer_group).toUpperCase();
     const isPremium = group === 'PREMIUM_PARTNER';

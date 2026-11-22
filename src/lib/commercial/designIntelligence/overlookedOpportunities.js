@@ -16,6 +16,7 @@
 
 import { safeArray, text } from '../projectReporting/reportingUtils';
 import { floorAreaOf, hasValidRoomDims } from './roomSizeAnalysis';
+import { isCommercialDealerAccount } from './internalAccountFilter';
 
 const MIN_PROJECTS_FOR_ENGAGEMENT = 2;
 
@@ -34,9 +35,11 @@ export function buildOverlookedOpportunities(families, accountsById) {
     if (!family.accountId) continue;
     const account = accountsById?.get(family.accountId);
     if (!account) continue;
-    // Only non-Premium Partner, non-internal dealer accounts
+    // Only confirmed commercial dealers — excludes internal, admin,
+    // professional, and unclassified (null dealer_group) accounts.
+    if (!isCommercialDealerAccount(account)) continue;
+    // Only non-Premium Partner dealers (Premium Partners are in their own sector)
     if (text(account.dealer_group).toUpperCase() === 'PREMIUM_PARTNER') continue;
-    if (text(account.account_type).toLowerCase() === 'admin' || text(account.account_type).toLowerCase() === 'internal') continue;
 
     if (!byAccount.has(family.accountId)) {
       byAccount.set(family.accountId, {

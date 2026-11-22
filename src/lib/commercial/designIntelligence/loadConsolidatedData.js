@@ -14,18 +14,25 @@
 import { loadProjectIntelligenceData, loadAllPages } from '../projectReporting/loadProjectIntelligenceData';
 
 export async function loadConsolidatedData() {
-  const [piData, ledgerRes] = await Promise.all([
+  const [piData, ledgerRes, auditRes] = await Promise.all([
     loadProjectIntelligenceData(),
     loadAllPages('CapacityLedger'),
+    // AccountUserAudit provides the authoritative approval/activation dates
+    // needed for the configurable thresholds in the Account Management view.
+    loadAllPages('AccountUserAudit', {
+      action: { $in: ['SOUNDPROOF_ELIGIBILITY_SET', 'SOUNDPROOF_ENABLE', 'SOUNDPROOF_TERM_STARTED'] },
+    }),
   ]);
 
   return {
     ...piData,
     ledgerEntries: ledgerRes.items,
+    auditRecords: auditRes.items,
     truncation: {
       ...piData.truncation,
       ledger: ledgerRes.truncated,
-      any: piData.truncation.any || ledgerRes.truncated,
+      audit: auditRes.truncated,
+      any: piData.truncation.any || ledgerRes.truncated || auditRes.truncated,
     },
   };
 }

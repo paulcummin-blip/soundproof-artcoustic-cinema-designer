@@ -14,6 +14,7 @@
  */
 
 import { safeArray, text, timeOf } from '../projectReporting/reportingUtils';
+import { isCommercialDealerAccount } from './internalAccountFilter';
 
 const RECENT_MONTHS = 3;
 const COMPARISON_MONTHS = 6;
@@ -37,8 +38,7 @@ export function buildEmergingOpportunities(families, proposalEvents, accountsByI
     if (!family.accountId) continue;
     const account = accountsById?.get(family.accountId);
     if (!account) continue;
-    const type = text(account.account_type).toLowerCase();
-    if (type === 'admin' || type === 'internal') continue;
+    if (!isCommercialDealerAccount(account)) continue;
 
     if (!byAccount.has(family.accountId)) {
       byAccount.set(family.accountId, {
@@ -53,6 +53,8 @@ export function buildEmergingOpportunities(families, proposalEvents, accountsByI
     }
     byAccount.get(family.accountId).projects.push(family);
   }
+
+  // Also filter accounts that have no families but may appear in proposal events
 
   // Group proposal events by account
   const proposalsByAccount = new Map();
