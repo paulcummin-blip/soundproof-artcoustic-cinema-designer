@@ -1,7 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { discoverDesignContextQuestions } from '../../shared/designContext/designContextDiscovery.js';
-import { confirmedQuestionIds, partitionByCurrency, CONTEXT_STATUS } from '../../shared/designContext/designContextModel.js';
+import { confirmedDecisions, partitionByDecisionCurrency } from '../../shared/designContext/designContextModel.js';
+import { decisionKeyForQuestion } from '../../shared/designContext/designContextDecisionIdentity.js';
 
 /**
  * Discover the design context questions for a project version.
@@ -55,20 +56,20 @@ export default async function(req) {
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
     });
 
-    // Build the current fingerprints map from the discovery.
-    const currentFingerprints = new Map(
-      allQuestions.map((q) => [q.question_id, q.decision_fingerprint || null]),
-    );
+    // Partition saved items into current and stale using decision-level
+    // identity: a saved answer under one question ID suppresses an equivalent
+    // question about the same underlying decision, even when the question ID
+    // differs.
+    const { current: currentSaved, stale: staleSaved } = partitionByDecisionCurrency(savedItems, allQuestions);
 
-    // Partition saved items into current and stale.
-    const { current: currentSaved, stale: staleSaved } = partitionByCurrency(savedItems, currentFingerprints);
+    // Suppress questions about decisions that have a confirmed saved answer.
+    const suppress = confirmedDecisions(currentSaved);
 
-    // Suppress questions that have been answered or confirmed as no-reason with
-    // a matching decision fingerprint.
-    const suppress = confirmedQuestionIds(currentSaved);
-
-    // The questions to ask: those not suppressed.
-    const questionsToAsk = allQuestions.filter((q) => !suppress.has(q.question_id));
+    // The questions to ask: those whose decision has not been confirmed.
+    const questionsToAsk = allQuestions.filter((q) => {
+      const dk = decisionKeyForQuestion(q);
+      return !dk || !suppress.has(dk);
+    });
 
     // The saved items to show for review (both current and stale).
     const savedForReview = [...currentSaved, ...staleSaved].map((item) => ({

@@ -37,6 +37,7 @@
 import { toNumber } from '../adiNarrativeFacts.js';
 import { groundedReason } from '../proposalWriter/writerBriefReasoning.js';
 import { rp22QuestionDecision } from '../rp22DesignContext.js';
+import { decisionKeyForQuestionId } from '../designContext/designContextDecisionIdentity.js';
 
 /** The hard limit: never more than three questions in one preparation. */
 export const MAX_CLARIFICATION_QUESTIONS = 3;
@@ -203,8 +204,13 @@ export function buildClarificationQuestions({ versions = [], material = '', aske
     .filter((entry) => entry?.facts?.available === true && entry?.snapshot);
   if (sources.length === 0) return [];
 
-  const asked = new Set((Array.isArray(askedQuestionIds) ? askedQuestionIds : [])
-    .map((id) => String(id || '').trim())
+  // Decision-level suppression: a question already answered or passed in
+  // this preparation — or an equivalent question about the same underlying
+  // decision — is not asked again. The decision identity is shared with the
+  // Design Context review so the two surfaces can never disagree about which
+  // questions are equivalent.
+  const askedDecisions = new Set((Array.isArray(askedQuestionIds) ? askedQuestionIds : [])
+    .map((id) => decisionKeyForQuestionId(String(id || '').trim()))
     .filter(Boolean));
   // A request the brief makes is not a recorded reason, so it never suppresses
   // a question: the reason is still missing until the designer states one.
@@ -213,7 +219,8 @@ export function buildClarificationQuestions({ versions = [], material = '', aske
   const out = [];
   for (const candidate of [...QUESTION_CANDIDATES].sort((a, b) => a.priority - b.priority)) {
     if (out.length >= MAX_CLARIFICATION_QUESTIONS) break;
-    if (asked.has(candidate.question_id)) continue;
+    const dk = decisionKeyForQuestionId(candidate.question_id);
+    if (dk && askedDecisions.has(dk)) continue;
     // The RP22 design context decides two of these before any other check: an
     // acoustic-treatment reason is not asked at the design stage at all, and a
     // reference position the frozen evidence already declares is not asked for

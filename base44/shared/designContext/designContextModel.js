@@ -207,6 +207,114 @@ export function confirmedQuestionIds(items) {
   );
 }
 
+// ── Decision-level identity ──────────────────────────────────────────────────
+//
+// Different question IDs can describe the same underlying design decision.
+// The decision identity module maps question IDs to decision keys so a saved
+// answer for one ID suppresses equivalent questions about the same decision,
+// and a single review never presents two questions about the same decision.
+
+import {
+  decisionKeyForQuestionId,
+  decisionKeyForQuestion,
+} from './designContextDecisionIdentity.js';
+
+/**
+ * The decision keys that have been answered or confirmed as no-reason, and
+ * should not be asked again. This is the decision-level equivalent of
+ * {@link confirmedQuestionIds}: a current question about any of these
+ * decisions is suppressed, regardless of its question ID.
+ *
+ * @param {Array<Object>} items — saved context items
+ * @returns {Set<string>} the decision keys to suppress
+ */
+export function confirmedDecisions(items) {
+  return new Set(
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item?.status === CONTEXT_STATUS.ANSWERED || item?.status === CONTEXT_STATUS.NO_REASON)
+      .map((item) => decisionKeyForQuestionId(item?.question_id))
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Partition saved items into current and stale, using decision-level identity.
+ *
+ * A saved item is matched against the current questions by its DECISION KEY,
+ * not by its question ID. This means a saved answer under
+ * `subwoofer_count_rationale` suppresses a current question about
+ * `subwoofer_front_rear_distribution` when both describe the same subwoofer
+ * arrangement decision.
+ *
+ * Fingerprint comparison is used only when the saved item's question ID is
+ * STILL a current question ID (the exact same question reappeared). In that
+ * case, a matching fingerprint means the design is unchanged (current); a
+ * mismatch means the design materially changed (stale, re-ask).
+ *
+ * When the saved item's question ID is NOT a current question ID but its
+ * decision key matches a current question, the item is treated as current:
+ * the fingerprints were computed under different question IDs and are not
+ * comparable, so the designer's existing answer is respected rather than
+ * needlessly reconfirmed.
+ *
+ * @param {Array<Object>} savedItems — the saved context items
+ * @param {Array<Object>} currentQuestions — the questions discovery found
+ * @returns {{current: Array, stale: Array}}
+ */
+export function partitionByDecisionCurrency(savedItems, currentQuestions) {
+  const list = Array.isArray(savedItems) ? savedItems : [];
+  const questions = Array.isArray(currentQuestions) ? currentQuestions : [];
+
+  // Map: decision_key -> { fingerprint, question_ids: Set<string> }
+  const byDecision = new Map();
+  for (const q of questions) {
+    if (!q?.question_id) continue;
+    const dk = decisionKeyForQuestion(q);
+    if (!dk) continue;
+    const existing = byDecision.get(dk);
+    if (existing) {
+      existing.question_ids.add(q.question_id);
+    } else {
+      byDecision.set(dk, {
+        fingerprint: q.decision_fingerprint || null,
+        question_ids: new Set([q.question_id]),
+      });
+    }
+  }
+
+  const current = [];
+  const stale = [];
+  for (const item of list) {
+    if (!item?.question_id) continue;
+    const dk = decisionKeyForQuestionId(item.question_id);
+    const info = dk ? byDecision.get(dk) : null;
+    if (!info) {
+      // No current question about this decision. The saved item is
+      // preserved but irrelevant: nothing to suppress or re-ask.
+      current.push(item);
+      continue;
+    }
+    if (info.question_ids.has(item.question_id)) {
+      // The exact same question ID reappeared. Compare fingerprints to
+      // detect a material change in the design (existing behaviour).
+      const savedFp = item.decision_fingerprint || null;
+      const currentFp = info.fingerprint;
+      if (!savedFp || !currentFp || savedFp === currentFp) {
+        current.push(item);
+      } else {
+        stale.push(item);
+      }
+    } else {
+      // The question ID changed but the decision is the same. The
+      // fingerprints were computed under different question IDs and are
+      // not comparable. Respect the designer's existing answer rather
+      // than reconfirming it: the decision was already explained.
+      current.push(item);
+    }
+  }
+  return { current, stale };
+}
+
 /**
  * The context record as it is stored: one record per project version.
  *
@@ -244,7 +352,9 @@ export default {
   normaliseContextItems,
   mergeContextItems,
   partitionByCurrency,
+  partitionByDecisionCurrency,
   recordedIntentFromContext,
   confirmedQuestionIds,
+  confirmedDecisions,
   buildContextRecord,
 };

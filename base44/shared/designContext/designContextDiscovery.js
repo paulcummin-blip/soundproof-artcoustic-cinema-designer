@@ -34,6 +34,10 @@
  */
 
 import { readSeatBoundaryGeometry } from '../seatingBoundaryPrinciple.js';
+import {
+  decisionKeyForQuestion,
+  decisionKeyForQuestionId,
+} from './designContextDecisionIdentity.js';
 
 /** The maximum number of questions discovery may return. */
 export const MAX_DISCOVERY_QUESTIONS = 3;
@@ -348,13 +352,19 @@ const DETERMINISTIC_CHECKS = [
 export function discoverDeterministicQuestions(version, project = null) {
   const state = readDesignState(version);
   const questions = [];
-  const seen = new Set();
+  const seenIds = new Set();
+  const seenDecisions = new Set();
   for (const check of DETERMINISTIC_CHECKS) {
     if (questions.length >= MAX_DISCOVERY_QUESTIONS) break;
     try {
       const question = check(state, project);
-      if (!question || !question.question_id || seen.has(question.question_id)) continue;
-      seen.add(question.question_id);
+      if (!question || !question.question_id || seenIds.has(question.question_id)) continue;
+      // Never present two questions about the same underlying decision in
+      // one review, even if they carry different question IDs.
+      const dk = decisionKeyForQuestion(question);
+      if (dk && seenDecisions.has(dk)) continue;
+      seenIds.add(question.question_id);
+      if (dk) seenDecisions.add(dk);
       questions.push(question);
     } catch {
       // A check that fails is simply no question from that check.
@@ -433,10 +443,12 @@ export async function discoverAiQuestions({
     'Rules:',
     '- Each question must be grounded in the actual project facts above. Never invent a fact.',
     '- Each question asks WHY a meaningful design decision was made, never WHAT was designed.',
-    '- Only ask about decisions whose explanation would materially improve the client-facing narrative: unusual seating positions, genuinely significant screen-size compromises, unconventional speaker positioning, or purposeful subwoofer distribution.',
+    '- Only ask about decisions whose explanation would materially improve the client-facing narrative: unusual seating positions, genuinely significant screen-size compromises, unconventional speaker positioning, or a specific unusual subwoofer arrangement or constraint.',
     '- Do not generate a question merely because a configuration option exists. Ordinary choices (standard baffle mounting, a common channel layout, a typical subwoofer count) are not design decisions that need explanation.',
+    '- Using multiple subwoofers to manage room modes, reduce the severity of bass peaks and nulls, and improve bass consistency across listening positions is standard engineering practice. Do not ask the designer to explain why multiple subwoofers are used. Only ask about a specific unusual arrangement or an architectural constraint (for example, subwoofers located in unusual positions because of cabinetry).',
     '- Never assume a motivation. The question must ask the designer for their reason.',
     '- Never invent a design constraint or speculate about a reason the designer did not record.',
+    '- Never claim that a particular bass improvement has been achieved unless the engineering results support it. Do not state that room modes have been smoothed, peaks reduced, or consistency improved unless measured results are cited.',
     '- Three questions is a maximum, not a target. Zero questions is acceptable when nothing meaningful needs clarification.',
     '- Keep each question to one or two sentences in plain professional English.',
     '- Do not repeat questions already asked: ' + (existingIds || 'none'),
@@ -469,14 +481,24 @@ export async function discoverAiQuestions({
     const raw = Array.isArray(response?.questions) ? response.questions : [];
     const validAreas = new Set(Object.values(CONTEXT_AREA));
     const out = [];
-    const seen = new Set(deterministicQuestions.map((q) => q.question_id));
+    const seenIds = new Set(deterministicQuestions.map((q) => q.question_id));
+    const seenDecisions = new Set(
+      deterministicQuestions
+        .map((q) => decisionKeyForQuestion(q))
+        .filter(Boolean),
+    );
     for (const entry of raw) {
       if (out.length >= max) break;
       const questionId = asText(entry?.question_id);
       const question = asText(entry?.question);
-      if (!questionId || !question || seen.has(questionId)) continue;
+      if (!questionId || !question || seenIds.has(questionId)) continue;
+      // Never let the AI ask about a decision a deterministic check already
+      // covered, even when it uses a different question ID.
+      const dk = decisionKeyForQuestionId(questionId);
+      if (dk && seenDecisions.has(dk)) continue;
       const area = asText(entry?.area);
-      seen.add(questionId);
+      seenIds.add(questionId);
+      if (dk) seenDecisions.add(dk);
       out.push({
         question_id: questionId,
         question,
@@ -516,7 +538,23 @@ export async function discoverDesignContextQuestions({
     invokeLLM,
   });
 
-  return [...deterministic, ...aiQuestions].slice(0, MAX_DISCOVERY_QUESTIONS);
+  // Final safety net: never present two questions about the same underlying
+  // decision in one review, across deterministic and AI. Deterministic
+  // questions take priority (they were already ordered and deduped).
+  const combined = [...deterministic, ...aiQuestions];
+  const seenIds = new Set();
+  const seenDecisions = new Set();
+  const out = [];
+  for (const q of combined) {
+    if (out.length >= MAX_DISCOVERY_QUESTIONS) break;
+    if (!q?.question_id || seenIds.has(q.question_id)) continue;
+    const dk = decisionKeyForQuestion(q);
+    if (dk && seenDecisions.has(dk)) continue;
+    seenIds.add(q.question_id);
+    if (dk) seenDecisions.add(dk);
+    out.push(q);
+  }
+  return out;
 }
 
 export default discoverDesignContextQuestions;
