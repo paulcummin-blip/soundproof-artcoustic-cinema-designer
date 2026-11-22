@@ -9,10 +9,9 @@
         body { margin: 0; padding: 0; }
         .brand-logo {
             display: block;
-            width: auto;
-            height: auto;
+            width: 100%;
             max-width: 440px;
-            max-height: 112px;
+            height: auto;
             margin: 0 auto;
             border: 0;
         }
@@ -21,15 +20,28 @@
             margin-right: auto;
             text-align: center;
         }
+        .about-box,
+        .invite-wrap,
+        .content-card,
+        .footer-cell p {
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .invite-btn {
+            box-sizing: border-box;
+        }
         @media only screen and (max-width: 600px) {
-            .outer-cell { padding: 16px 12px 0 !important; }
-            .email-shell { width: 100% !important; }
-            .brand-header { padding: 28px 24px !important; }
-            .brand-logo { max-width: 280px !important; max-height: 72px !important; }
-            .content-wrap { padding: 20px 16px 24px !important; }
-            .content-card { padding: 28px 22px !important; }
+            .outer-cell { padding: 12px 10px 0 !important; }
+            .email-shell { width: 100% !important; max-width: 100% !important; border-radius: 6px !important; }
+            .brand-header { padding: 24px 18px 22px !important; }
+            .brand-logo { max-width: 260px !important; height: auto !important; }
+            .content-wrap { padding: 16px 10px 20px !important; }
+            .content-card { padding: 24px 18px !important; }
+            .about-box { padding: 20px 16px !important; }
             .mobile-text { font-size: 16px !important; line-height: 1.5 !important; }
-            .footer-cell { padding: 22px 16px 28px !important; }
+            .invite-btn { display: block !important; width: 100% !important; box-sizing: border-box !important; padding: 14px 16px !important; font-size: 15px !important; text-align: center !important; }
+            .footer-cell { padding: 20px 14px 26px !important; }
+            .footer-cell p { max-width: 100% !important; }
         }
     </style>
 <!--[if !mso]><!--><link href="https://fonts.googleapis.com/css2?family=Didact+Gothic:wght@400;500;600;700&display=swap" rel="stylesheet" type="text/css"><!--<![endif]--></head>
@@ -49,7 +61,7 @@
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" align="center">
                                 <tr>
                                     <td style="text-align:center;vertical-align:middle;">
-                                        <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg" alt="Sound Proof" class="brand-logo" style="display:block;width:auto;height:auto;max-width:440px;max-height:112px;margin:0 auto;border:0;" />
+                                        <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg" alt="Sound Proof" class="brand-logo" style="display:block;width:100%;max-width:440px;height:auto;margin:0 auto;border:0;" />
                                         <div class="header-caption" style="margin-top:16px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#1B1A1A;">
                                             Professional Home Cinema Engineering
                                         </div>
@@ -78,7 +90,7 @@
 
                                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:28px 0;">
                                             <tr>
-                                                <td style="background-color:#F3F0EB;border-radius:8px;padding:24px;text-align:left;border:1px solid #DCDBD6;">
+                                                <td class="about-box" style="background-color:#F3F0EB;border-radius:8px;padding:24px;text-align:left;border:1px solid #DCDBD6;">
                                                     <p style="margin:0 0 8px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:16px;font-weight:700;color:#213428;">About Sound Proof</p>
                                                     <p style="margin:0;color:#3E4349;font-size:14px;line-height:20px;">Design and optimise home cinema with Artcoustic speakers. Real-time acoustic calculations, Dolby Atmos layouts, and CEDIA RP22 compliance.</p>
                                                 </td>
@@ -86,10 +98,10 @@
                                         </table>
 
                                         <!-- Secure registration button: app primary colour (dark green) -->
-                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:30px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="invite-wrap" style="margin:30px 0;">
                                             <tr>
                                                 <td style="text-align:center;">
-                                                    <a href="{{action_url}}" style="background-color:#213428;color:#FFFFFF;text-decoration:none;display:inline-block;padding:14px 34px;border-radius:8px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:16px;font-weight:600;border:1px solid #213428;">
+                                                    <a href="{{action_url}}" class="invite-btn" style="background-color:#213428;color:#FFFFFF;text-decoration:none;display:inline-block;width:auto;max-width:100%;box-sizing:border-box;padding:14px 34px;border-radius:8px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:16px;font-weight:600;border:1px solid #213428;">
                                                         Accept your invitation
                                                     </a>
                                                 </td>
