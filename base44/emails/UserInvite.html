@@ -11,14 +11,21 @@
             display: block;
             width: auto;
             height: auto;
-            max-width: 220px;
-            max-height: 56px;
+            max-width: 440px;
+            max-height: 112px;
+            margin: 0 auto;
             border: 0;
+        }
+        .header-caption {
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
         }
         @media only screen and (max-width: 600px) {
             .outer-cell { padding: 16px 12px 0 !important; }
             .email-shell { width: 100% !important; }
             .brand-header { padding: 28px 24px !important; }
+            .brand-logo { max-width: 280px !important; max-height: 72px !important; }
             .content-wrap { padding: 20px 16px 24px !important; }
             .content-card { padding: 28px 22px !important; }
             .mobile-text { font-size: 16px !important; line-height: 1.5 !important; }
@@ -38,15 +45,15 @@
 
                     <!-- Brand header: Sound Proof wordmark + Artcoustic credit, dark green accent line -->
                     <tr>
-                        <td class="brand-header" style="padding:34px 44px 30px;background-color:#FFFFFF;text-align:left;border-bottom:3px solid #213428;">
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <td class="brand-header" style="padding:38px 44px 30px;background-color:#FFFFFF;text-align:center;border-bottom:3px solid #213428;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" align="center">
                                 <tr>
-                                    <td style="vertical-align:middle;">
-                                        <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg" alt="Sound Proof" class="brand-logo" style="display:block;width:auto;height:auto;max-width:220px;max-height:56px;border:0;" />
-                                        <div style="margin-top:10px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#1B1A1A;">
+                                    <td style="text-align:center;vertical-align:middle;">
+                                        <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg" alt="Sound Proof" class="brand-logo" style="display:block;width:auto;height:auto;max-width:440px;max-height:112px;margin:0 auto;border:0;" />
+                                        <div class="header-caption" style="margin-top:16px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#1B1A1A;">
                                             Professional Home Cinema Engineering
                                         </div>
-                                        <div style="margin-top:2px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:9px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:#625143;">
+                                        <div class="header-caption" style="margin-top:4px;font-family:'Didact Gothic', Helvetica, Arial, sans-serif;font-size:9px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:#625143;">
                                             Powered by Artcoustic Design Intelligence (ADI)
                                         </div>
                                     </td>
