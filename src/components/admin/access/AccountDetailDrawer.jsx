@@ -1,5 +1,5 @@
 import React from "react";
-import { Ban, Coins, ExternalLink, Undo2 } from "lucide-react";
+import { Coins, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -9,6 +9,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import AccessPill from "@/components/admin/access/AccessPill";
+import AccountDrawerAccessSection from "@/components/admin/access/AccountDrawerAccessSection";
 import AccountDrawerCredits from "@/components/admin/access/AccountDrawerCredits";
 import AccountDrawerEvents from "@/components/admin/access/AccountDrawerEvents";
 import AccountDrawerMembers from "@/components/admin/access/AccountDrawerMembers";
@@ -43,13 +44,13 @@ export default function AccountDetailDrawer({
   onRescind,
   onReinstate,
   onPromotionsChanged,
+  onAccessChanged,
   allAccounts,
   allLedgerEntries,
 }) {
   if (!row) return null;
 
   const account = row.account;
-  const isSuspended = account.status === "suspended";
   const links = row.links || [];
 
   return (
@@ -90,17 +91,6 @@ export default function AccountDetailDrawer({
               <Coins className="h-3.5 w-3.5" />
               Add free credits
             </Button>
-            {isSuspended ? (
-              <Button variant="outline" size="sm" onClick={() => onReinstate?.(row)} className="gap-2">
-                <Undo2 className="h-3.5 w-3.5" />
-                Reinstate access
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => onRescind?.(row)} className="gap-2 text-[#8F2F2F]">
-                <Ban className="h-3.5 w-3.5" />
-                Rescind access
-              </Button>
-            )}
             <a
               href={`/admin/accounts/${encodeURIComponent(account.id)}`}
               className="inline-flex h-8 items-center gap-2 rounded-md border border-[#DCDBD6] px-3 text-xs font-semibold text-[#1B1A1A] no-underline hover:bg-slate-50"
@@ -109,6 +99,14 @@ export default function AccountDetailDrawer({
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
+
+          {/* Sound Proof Access — eligibility, status, expiry, users, controls */}
+          <AccountDrawerAccessSection
+            row={row}
+            onRescind={onRescind}
+            onReinstate={onReinstate}
+            onAccessChanged={onAccessChanged}
+          />
 
           {/* Summary */}
           <div className="grid gap-2 sm:grid-cols-3">

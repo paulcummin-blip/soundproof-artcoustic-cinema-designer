@@ -12,9 +12,10 @@ import {
 
 /**
  * Confirmation for the only two access-changing actions on this page.
- * Both use the existing Account.status field — no second access model:
- *   rescind  → status "suspended" (Sound Proof access disabled, everything kept)
- *   reinstate → status "active"
+ * Both route through the existing manageSoundProofAccess authority:
+ *   rescind  → "suspend" (status "suspended", linked-user flags cleared, audited)
+ *   reinstate → "restore" (status "active"; users re-enabled only if the
+ *               90-day term has not expired)
  *
  * Props: open, onOpenChange, row, mode ("rescind" | "reinstate"), onConfirm, busy, error
  */
@@ -51,8 +52,8 @@ export default function RescindAccessDialog({
             )}
             <span className="block text-[12px] text-[#625143]">
               {isRescind
-                ? "This only disables Sound Proof access. The dealer account, Partner Portal identity, users, memberships, credits and all projects are preserved."
-                : "The account status returns to active. No users, memberships, credits or projects are changed."}
+                ? "This suspends Sound Proof access through the secure authority: account status, linked-user flags and audit events are updated together. The dealer account, Partner Portal identity, memberships, credits and all projects are preserved."
+                : "This restores access through the secure authority. If the 90-day term has expired, users are not re-enabled until the term is renewed. No credits or projects are changed."}
             </span>
           </AlertDialogDescription>
         </AlertDialogHeader>

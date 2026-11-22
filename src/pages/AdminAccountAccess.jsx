@@ -196,9 +196,19 @@ export default function AdminAccountAccess() {
     setAccessBusy(true);
     setAccessError(null);
     try {
-      await base44.entities.Account.update(accessChange.row.account.id, {
-        status: accessChange.mode === "rescind" ? "suspended" : "active",
+      // Route through the existing secure authority — never a direct
+      // Account.update. The authority synchronises account status, linked-user
+      // flags, expiry rules and audit events as one consistent operation.
+      const action = accessChange.mode === "rescind" ? "suspend" : "restore";
+      const res = await base44.functions.invoke("manageSoundProofAccess", {
+        action,
+        account_id: accessChange.row.account.id,
       });
+      const data = res?.data || {};
+      if (!data.ok) {
+        const failed = (data.results || []).find((r) => !r.ok);
+        throw new Error(failed?.error || data.error || "The access change could not be completed.");
+      }
       setAccessChange(null);
       setRefreshKey((key) => key + 1);
     } catch (err) {
@@ -357,6 +367,7 @@ export default function AdminAccountAccess() {
         onRescind={(row) => { setAccessError(null); setAccessChange({ row, mode: "rescind" }); }}
         onReinstate={(row) => { setAccessError(null); setAccessChange({ row, mode: "reinstate" }); }}
         onPromotionsChanged={() => setRefreshKey((key) => key + 1)}
+        onAccessChanged={() => setRefreshKey((key) => key + 1)}
         allAccounts={allAccounts}
         allLedgerEntries={allLedgerEntries}
       />
