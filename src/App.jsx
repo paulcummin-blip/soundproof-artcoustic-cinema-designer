@@ -26,6 +26,7 @@ import AdminDesignIntentPreview from './pages/AdminDesignIntentPreview';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminProjectIntelligence from './pages/AdminProjectIntelligence';
+import AdminDesignIntelligence from './pages/AdminDesignIntelligence';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
 import AdminSpeakerDatabase from './pages/AdminSpeakerDatabase';
 import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
@@ -151,6 +152,7 @@ const AuthenticatedApp = () => {
         <Route path="/DealerBranding" element={<AccessGate capability="soundProof"><DealerBranding /></AccessGate>} />
         <Route path="/admin" element={<AccessGate masterAdmin><AdminDashboard /></AccessGate>} />
         <Route path="/admin/commercial-intelligence" element={<AccessGate masterAdmin><AdminCommercialIntelligence /></AccessGate>} />
+        <Route path="/admin/design-intelligence" element={<AccessGate masterAdmin><AdminDesignIntelligence /></AccessGate>} />
         <Route path="/admin/accounts" element={<AccessGate masterAdmin><AdminAccounts /></AccessGate>} />
         <Route path="/admin/accounts/:accountId" element={<AccessGate masterAdmin><AccountDashboard /></AccessGate>} />
         <Route path="/admin/access" element={<AccessGate masterAdmin><AdminAccountAccess /></AccessGate>} />

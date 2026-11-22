@@ -20,16 +20,23 @@ const BRAND = {
 
 const COMMERCIAL_INTELLIGENCE_CARDS = [
   {
-    title: "Commercial Intelligence",
-    description: "Sector-based overview, proposal activity, UK commercial outcomes and verified pipeline value.",
+    title: "Commercial & Design Intelligence",
+    description: "Consolidated sector overview, project activity, values, room sizes, configurations, product demand, engineering performance and dealer opportunities.",
     status: "Ready",
+    count: "7 sections · 4 sector views",
+    href: "/admin/design-intelligence",
+  },
+  {
+    title: "Commercial Intelligence (legacy)",
+    description: "Sector-based overview, proposal activity, UK commercial outcomes and verified pipeline value.",
+    status: "Legacy",
     count: "Sectors · Pipeline · Outcomes",
     href: "/admin/commercial-intelligence",
   },
   {
-    title: "Project Intelligence",
+    title: "Project Intelligence (legacy)",
     description: "Artcoustic product forecast, demand and export. Projects are counted once; design versions are shown as variations.",
-    status: "Ready",
+    status: "Legacy",
     count: "Projects counted once",
     href: "/admin/project-intelligence",
   },
