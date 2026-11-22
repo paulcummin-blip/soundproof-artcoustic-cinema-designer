@@ -5,11 +5,14 @@
 // The panel MUST always fit inside the viewport: the user can always see its
 // top, scroll its full content, and dismiss it without scrolling the page
 // beneath it. To do that the panel is positioned with `position: fixed` and
-// measured against the viewport on every open:
-//   • it flips above the trigger when there is more room above than below;
-//   • its maxHeight is clamped to the available space (never the hard-coded
-//     500 px that used to push it off the bottom of laptop screens);
+// re-measured against the viewport on every open and on every scroll/resize:
+//   • it opens immediately to the RIGHT of the ⓘ button (≈10 px gap), top
+//     aligned with the button, and flips to the LEFT when there is no room;
+//   • its maxHeight is clamped to the space from its top to the viewport
+//     floor, so a tall panel scrolls internally instead of running off-screen;
 //   • it is clamped horizontally inside the viewport;
+//   • it repositions on page/section scroll so it stays anchored to its
+//     trigger (it closes only if the trigger itself scrolls out of view);
 //   • on narrow screens (< 640 px) it becomes a centred modal with its own
 //     scroll and backdrop, so it never overflows a phone-width column.
 //
@@ -59,47 +62,74 @@ export default function SpeakerInfo({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Measure and position the popover (fixed) whenever it opens on a wide screen.
-  useLayoutEffect(() => {
-    if (!open || isNarrow) {
-      setPopoverStyle(null);
-      return;
-    }
+  // Recompute the popover position so it stays anchored to its trigger.
+  // Opens to the right of the ⓘ button (≈10 px gap), top-aligned with the
+  // button; flips to the left when there is no room on the right; clamps inside
+  // the viewport; and scrolls internally when taller than the available space.
+  const reposition = useCallback(() => {
     if (typeof window === "undefined") return;
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const spaceBelow = vh - rect.bottom - VIEWPORT_MARGIN;
-    const spaceAbove = rect.top - VIEWPORT_MARGIN;
-    const placeBelow = spaceBelow >= spaceAbove || spaceBelow >= 280;
-    const available = placeBelow ? spaceBelow : spaceAbove;
-    const maxHeight = Math.max(120, Math.min(available, vh - 2 * VIEWPORT_MARGIN));
-    const width = Math.min(PANEL_WIDTH, vw - 2 * VIEWPORT_MARGIN);
-    let left = rect.right - width;
-    if (left < VIEWPORT_MARGIN) left = VIEWPORT_MARGIN;
-    if (left + width > vw - VIEWPORT_MARGIN) left = vw - VIEWPORT_MARGIN - width;
-    if (left < VIEWPORT_MARGIN) left = VIEWPORT_MARGIN;
+    // If the trigger has scrolled fully out of view, dismiss rather than float.
+    if (rect.bottom < 0 || rect.top > vh) {
+      setOpen(false);
+      setPopoverStyle(null);
+      return;
+    }
+    const gap = 10; // px between button and panel
+    const margin = VIEWPORT_MARGIN;
+    const width = Math.min(PANEL_WIDTH, vw - 2 * margin);
+    // Horizontal: prefer the right of the button; flip left when it won't fit.
+    let left = rect.right + gap;
+    if (left + width > vw - margin) left = rect.left - gap - width;
+    if (left < margin) left = margin;
+    if (left + width > vw - margin) left = vw - margin - width;
+    // Vertical: align the panel top with the button top, clamped so the panel
+    // always has at least 120 px of scrollable height inside the viewport.
+    const minSpace = 120;
+    let top = Math.max(margin, Math.min(rect.top, vh - margin - minSpace));
+    const maxHeight = Math.max(minSpace, vh - margin - top);
     setPopoverStyle({
       position: "fixed",
       left,
-      top: placeBelow ? rect.bottom + 8 : Math.max(VIEWPORT_MARGIN, rect.top - maxHeight - 8),
+      top,
       width,
       maxHeight,
       overflowY: "auto",
       zIndex: 100,
     });
-  }, [open, isNarrow]);
+  }, []);
 
-  // Close the popover when the page scrolls or the viewport shrinks, so it never
-  // detaches from its trigger. The centred modal is unaffected (it is fixed).
+  // Position the popover whenever it opens on a wide screen.
+  useLayoutEffect(() => {
+    if (!open || isNarrow) {
+      setPopoverStyle(null);
+      return;
+    }
+    reposition();
+  }, [open, isNarrow, reposition]);
+
+  // Keep the popover anchored to its trigger while the page or comparison
+  // section scrolls, and while the viewport resizes. rAF-throttled so it
+  // tracks smoothly without thrashing layout. The centred modal is unaffected.
   useEffect(() => {
     if (!open || isNarrow) return undefined;
-    const close = () => setOpen(false);
-    window.addEventListener("scroll", close, true);
-    return () => window.removeEventListener("scroll", close, true);
-  }, [open, isNarrow]);
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(reposition);
+    };
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open, isNarrow, reposition]);
 
   if (!hasContent) return <div />;
 
