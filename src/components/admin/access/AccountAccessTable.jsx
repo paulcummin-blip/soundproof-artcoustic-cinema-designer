@@ -79,7 +79,7 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
 
         {list.map((row, index) => {
           const eligibility = row.eligibilityState || { label: "—", tone: "muted" };
-          const activation = row.activationState || { label: "—", tone: "muted" };
+          const activationPill = row.activationPill || row.activationState || { label: "—", tone: "muted" };
           const promoLabel = row.promotion?.status || "None";
           const promoExpiry = row.promotion?.expiryDisplay;
           return (
@@ -109,9 +109,9 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
                   title="Sound Proof eligibility — approved by admin"
                 />
                 <AccessPill
-                  label={activation.label}
-                  tone={activation.tone}
-                  title="Activation state — account status and membership"
+                  label={activationPill.label}
+                  tone={activationPill.tone}
+                  title="Activation state with countdown — account status, membership and audit history"
                 />
               </div>
 

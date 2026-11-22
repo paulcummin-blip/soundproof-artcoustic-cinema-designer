@@ -60,6 +60,7 @@ export const EMPTY_FILTERS = {
   projects: "all",
   promotion: "all",
   activity: "all",
+  followUp: "all",
 };
 
 // ---------------------------------------------------------------- grouping
@@ -177,6 +178,118 @@ export function soundproofActivationState(account, members) {
   const hasActiveMember = occupied.some((m) => (m.status || "pending") === "active");
   if (!hasActiveMember) return { label: "Invitation Pending", tone: "warn" };
   return { label: "Active", tone: "ok" };
+}
+
+// ---------------------------------------------------------------- access timing
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * The date eligibility was granted in its current eligible state, read from the
+ * existing SOUNDPROOF_ELIGIBILITY_SET audit trail. No historical date is ever
+ * invented: if no audit record exists, this returns null and the surface shows
+ * "Not Started". Only audited eligibility grants produce a countdown.
+ */
+export function eligibilityGrantedAt(audits, currentlyEligible) {
+  if (!currentlyEligible) return null;
+  const eligAudits = (Array.isArray(audits) ? audits : [])
+    .filter((a) => a?.action === "SOUNDPROOF_ELIGIBILITY_SET")
+    .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
+  const granted = eligAudits.find(
+    (a) => a?.after_access_level === "eligible" || a?.details?.new_eligible === true
+  );
+  return granted?.occurred_at || null;
+}
+
+/**
+ * Whole days remaining until the access expiry, for activated dealers.
+ * Returns null when there is no expiry. May be negative once the term has
+ * passed (the activation state already reads "Expired" in that case).
+ */
+export function daysUntilExpiry(account) {
+  const expiry = account?.soundproof_access_expires_at;
+  if (!expiry) return null;
+  const ms = new Date(expiry).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  return Math.ceil(ms / MS_PER_DAY);
+}
+
+/**
+ * Whole days since eligibility was granted, for approved dealers who have not
+ * yet activated. Returns null when no audited grant date exists (the surface
+ * shows no counter — a historical date is never invented), and null for
+ * dealers who are already active, suspended or expired.
+ */
+export function daysAwaitingActivation({ activationLabel, eligible, grantedAt }) {
+  if (!eligible) return null;
+  if (!["Not Activated", "Invitation Pending"].includes(activationLabel)) return null;
+  if (!grantedAt) return null;
+  const ms = Date.now() - new Date(grantedAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 0;
+  return Math.floor(ms / MS_PER_DAY);
+}
+
+/**
+ * The most recent audit occurrence_at for a given action, or null. Used to
+ * date the current suspension from the SOUNDPROOF_SUSPEND audit trail. A
+ * historical date is never invented: no audit means no counter.
+ */
+export function mostRecentAuditDate(audits, action) {
+  const matches = (Array.isArray(audits) ? audits : [])
+    .filter((a) => a?.action === action)
+    .map((a) => a?.occurred_at)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  return matches[0] || null;
+}
+
+function wholeDaysSince(date) {
+  if (!date) return null;
+  const ms = Date.now() - new Date(date).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 0;
+  return Math.floor(ms / MS_PER_DAY);
+}
+
+/**
+ * Activation pill with the relevant countdown baked into the label, for the
+ * account-access table. Keeps eligibility as a separate pill.
+ *   Active             → "Active · Xd left" (warn within 14 days)
+ *   Not Activated      → "Not Activated · Xd waiting" (only when approved)
+ *   Invitation Pending → "Invitation Pending · Xd waiting"
+ *   Expired            → "Expired · Xd ago"
+ *   Suspended          → "Suspended · Xd suspended" (when a suspension audit exists)
+ * No historical date is ever invented: where no audited date exists the pill
+ * shows the base state alone.
+ */
+export function buildActivationPill(account, members, audits) {
+  const base = soundproofActivationState(account, members);
+  const label = base.label;
+  const tone = base.tone;
+
+  if (label === "Active") {
+    const days = daysUntilExpiry(account);
+    if (days === null) return { label, tone };
+    return { label: `${label} · ${days}d left`, tone: days <= 14 ? "warn" : tone };
+  }
+  if (label === "Expired") {
+    const ago = wholeDaysSince(account?.soundproof_access_expires_at);
+    return ago !== null ? { label: `${label} · ${ago}d ago`, tone } : { label, tone };
+  }
+  if (label === "Suspended") {
+    const suspendedAt = mostRecentAuditDate(audits, "SOUNDPROOF_SUSPEND");
+    const ago = wholeDaysSince(suspendedAt);
+    return ago !== null ? { label: `${label} · ${ago}d suspended`, tone } : { label, tone };
+  }
+  if (label === "Not Activated" || label === "Invitation Pending") {
+    const eligible = account?.soundproof_eligible === true;
+    if (!eligible) return { label, tone };
+    const grantedAt = eligibilityGrantedAt(audits, true);
+    const days = daysAwaitingActivation({ activationLabel: label, eligible, grantedAt });
+    return days !== null
+      ? { label: `${label} · ${days}d waiting`, tone }
+      : { label, tone };
+  }
+  return { label, tone };
 }
 
 /**
@@ -424,6 +537,8 @@ export function buildAccessRows({
       accessState: combinedAccessState(account, members),
       eligibilityState: soundproofEligibilityState(account),
       activationState: soundproofActivationState(account, members),
+      activationPill: buildActivationPill(account, members, auditsByAccount?.get(account.id) || []),
+      daysRemaining: daysUntilExpiry(account),
       credits: buildCreditDetail(ledgerEntries),
       projectCount: projects.length,
       promoProjects: promoByAccount?.get(account.id) || 0,
@@ -454,10 +569,27 @@ export function applyAccessFilters(rows, filters) {
   const projects = filters?.projects || "all";
   const promotion = filters?.promotion || "all";
   const activity = filters?.activity || "all";
+  const followUp = filters?.followUp || "all";
 
   return (Array.isArray(rows) ? rows : []).filter((row) => {
     if (group !== "all" && row.group !== group) return false;
     if (status !== "all" && (row.account.status || "") !== status) return false;
+
+    // Follow-up quick-filter — surfaces dealers needing attention across the
+    // eligibility/activation lifecycle. Uses the base activation label (without
+    // the countdown) so the filter is stable regardless of the pill counter.
+    const activationLabel = row.activationState?.label || "";
+    if (followUp === "approved_awaiting") {
+      if (!(row.eligibilityState?.label === "Approved" && activationLabel === "Not Activated")) return false;
+    } else if (followUp === "invitation_pending") {
+      if (activationLabel !== "Invitation Pending") return false;
+    } else if (followUp === "expiring_14") {
+      if (!(activationLabel === "Active" && row.daysRemaining !== null && row.daysRemaining >= 0 && row.daysRemaining <= 14)) return false;
+    } else if (followUp === "expired") {
+      if (activationLabel !== "Expired") return false;
+    } else if (followUp === "suspended") {
+      if (activationLabel !== "Suspended") return false;
+    }
 
     if (credits === "available" && !(row.credits.available > 0)) return false;
     if (credits === "none" && row.credits.available > 0) return false;

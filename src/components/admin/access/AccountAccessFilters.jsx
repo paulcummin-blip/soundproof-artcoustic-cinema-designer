@@ -50,6 +50,15 @@ const ACTIVITY_OPTIONS = [
   { value: "unlimited_promo", label: "Unlimited promotion active" },
 ];
 
+const FOLLOWUP_OPTIONS = [
+  { value: "all", label: "Follow-up: any" },
+  { value: "approved_awaiting", label: "Approved, awaiting activation" },
+  { value: "invitation_pending", label: "Invitation pending" },
+  { value: "expiring_14", label: "Expiring within 14 days" },
+  { value: "expired", label: "Expired" },
+  { value: "suspended", label: "Suspended" },
+];
+
 function FilterSelect({ label, value, options, onChange }) {
   return (
     <label className="flex flex-col gap-1">
@@ -139,6 +148,12 @@ export default function AccountAccessFilters({
           value={filters.activity}
           options={ACTIVITY_OPTIONS}
           onChange={(value) => onChange({ activity: value })}
+        />
+        <FilterSelect
+          label="Follow-up"
+          value={filters.followUp}
+          options={FOLLOWUP_OPTIONS}
+          onChange={(value) => onChange({ followUp: value })}
         />
 
         <div className="flex items-center gap-2 pb-0.5">
