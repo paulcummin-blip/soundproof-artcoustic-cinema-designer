@@ -88,7 +88,7 @@ const SIDEBAR_MAX_WIDTH = 480;
 const menuItems = [
   { title: "Projects", url: "/Projects", icon: Layers3, capability: "soundProof" },
   { title: "System Designer", url: "/RoomDesigner", icon: Home, capability: "soundProof" },
-  { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof", adminOnly: true },
+  { title: "RP22 Speaker Capability", url: "/SPLCalculator", icon: Calculator, capability: "soundProof" },
   { title: "Project Library", url: "/ProjectProposalAssets", icon: Images, capability: "soundProof" },
   { title: "Proposal Centre", url: "/ProposalCentre", icon: Presentation, capability: "soundProof" },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
