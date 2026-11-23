@@ -678,7 +678,7 @@ export default function SPLCalculatorPage() {
             <div style={{ fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>Reference only</div>
           </div>
 
-          <p style={{ fontSize: 13, color: BRAND.subtext, lineHeight: 1.55, marginBottom: 14, marginTop: 0 }}>
+          <p style={{ fontSize: 13, color: BRAND.subtext, lineHeight: 1.55, marginBottom: 14, marginTop: 0, fontWeight: 700 }}>
             P12 and P13 do not determine on their own whether a loudspeaker sounds good or is the right choice for a system. They are, however, important indicators of the system's dynamic range capability and whether the loudspeakers can deliver the required SPL at the listening position.
           </p>
 
