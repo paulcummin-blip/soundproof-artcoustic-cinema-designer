@@ -58,6 +58,7 @@ export function verifyFrozenBassAuthority(rows, publication, isAuthoritative = n
     if (!cbf || typeof cbf !== 'object') continue;
     const contract = cbf[bassFp];
     if (!contract || typeof contract !== 'object') continue;
+    if (row.status !== 'complete' && !['ready', 'complete'].includes(contract.job?.status)) continue;
     const contractResultFp = contract?.job?.resultFingerprint || null;
     if (contractResultFp !== bassFp) continue;
     matchingContract = contract;
