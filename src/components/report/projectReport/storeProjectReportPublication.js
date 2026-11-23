@@ -1,3 +1,4 @@
+import { boundedExportRead } from '@/components/library/issuedDocument/issuedExportDurability';
 /**
  * storeProjectReportPublication.js
  * ---------------------------------
@@ -170,7 +171,7 @@ export async function storeProjectReportPublication({
   if (speakerDesignParams?.groups?.length > 0 && speakerDesignParams?.projectId) {
     tasks.push({
       key: PUBLICATION_DOCUMENT.SPEAKER_DESIGN,
-      promise: storeCompanionDocument({ params: speakerDesignParams }),
+      promise: boundedExportRead(() => storeCompanionDocument({ params: speakerDesignParams }), 'Speaker Design storage', 180000),
     });
   }
 
