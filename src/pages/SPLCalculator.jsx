@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -22,6 +22,11 @@ import DataQualityGuide from "@/components/spl/DataQualityGuide";
 import CompetitorPriceManager from "@/components/spl/CompetitorPriceManager";
 
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
+import {
+  STEINWAY_LOCKED_AMPLIFIER_POWER_W,
+  STEINWAY_LOCKED_AMPLIFIER_NOTE,
+  isSteinwayLockedAmplifierRecord,
+} from "@/components/utils/spl/steinwayLockedAmplifier";
 
 const BRAND = {
   bg: "#F8F8F7",
@@ -251,6 +256,10 @@ export default function SPLCalculatorPage() {
   const [selectedCompetitorIds, setSelectedCompetitorIds] = useState([""]);
   const [loadingCompetitors, setLoadingCompetitors] = useState(true);
 
+  // Preserves the user's amplifier-power value while a Steinway Lyngdorf locked
+  // amplifier speaker is selected. Set on entering the lock, restored on exit.
+  const savedAmpPowerRef = useRef(null);
+
   useEffect(() => {
     loadDims(activeId || null);
   }, [activeId, loadDims]);
@@ -425,6 +434,28 @@ export default function SPLCalculatorPage() {
     [selectedCompetitorIds, candidateById],
   );
 
+  // Steinway Lyngdorf / Steinway & Sons locked-amplifier rule. When any selected
+  // competitor is a Steinway locked-amp speaker, the shared amplifier-power
+  // control is locked to the manufacturer's specified 400 W and manual editing
+  // is disabled. The user's previous value is preserved and restored as soon as
+  // the selection no longer includes a Steinway speaker.
+  const steinwayLockedActive = useMemo(
+    () => selectedCompetitors.some(isSteinwayLockedAmplifierRecord),
+    [selectedCompetitors],
+  );
+
+  useEffect(() => {
+    if (steinwayLockedActive) {
+      if (savedAmpPowerRef.current === null) {
+        savedAmpPowerRef.current = ampPower;
+      }
+      setAmpPower(String(STEINWAY_LOCKED_AMPLIFIER_POWER_W));
+    } else if (savedAmpPowerRef.current !== null) {
+      setAmpPower(savedAmpPowerRef.current);
+      savedAmpPowerRef.current = null;
+    }
+  }, [steinwayLockedActive]);
+
   const competitorResults = useMemo(
     () => selectedCompetitors.map((record) => ({ record, result: competitorResultFor(record) })),
     [selectedCompetitors, competitorResultFor],
@@ -506,9 +537,14 @@ export default function SPLCalculatorPage() {
             <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
               Amplifier power available
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                <input value={ampPower} onChange={(e) => setAmpPower(e.target.value)} inputMode="numeric" style={{ width: "100%", border: `2px solid #A6A29A`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text }} />
+                <input value={ampPower} onChange={(e) => setAmpPower(e.target.value)} inputMode="numeric" disabled={steinwayLockedActive} style={{ width: "100%", border: `2px solid ${steinwayLockedActive ? BRAND.accent : "#A6A29A"}`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text, background: steinwayLockedActive ? BRAND.soft : "#FFF", cursor: steinwayLockedActive ? "not-allowed" : "text" }} />
                 <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>W</span>
               </div>
+              {steinwayLockedActive && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#7A5C00", lineHeight: 1.4, border: `1px solid ${BRAND.accent}`, borderRadius: 8, padding: "8px 10px", background: "#FCFBF6" }}>
+                  {STEINWAY_LOCKED_AMPLIFIER_NOTE}
+                </div>
+              )}
             </label>
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext, marginBottom: 8 }}>RP22 target basis</div>
