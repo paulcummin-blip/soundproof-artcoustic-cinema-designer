@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const schema = JSON.parse(readFileSync(new URL('../base44/entities/Project.jsonc', import.meta.url), 'utf8'));
-const dealer = { id: 'dealer-1', role: 'user', data: { account_id: 'tenant-a', access_level: 'FULL_ACCESS' } };
+const dealer = { id: 'dealer-1', role: 'user', data: { account_id: 'tenant-a', access_level: 'FULL_ACCESS', soundproof_access_enabled: true } };
 const admin = { id: 'admin-1', role: 'admin', data: {} };
 
 function valueAt(object, path) {
