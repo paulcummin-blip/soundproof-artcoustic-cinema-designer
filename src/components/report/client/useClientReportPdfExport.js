@@ -15,7 +15,7 @@
  * html2canvas, no jsPDF, no raster screenshots.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useSyncExternalStore } from "react";
 import { buildProjectReportTitle } from "@/components/report/reportPdfTitle";
 import {
   applyPrintDocumentTitle,
@@ -105,9 +105,19 @@ export function useClientReportPdfExport({
     status: "idle",
     failed: [],
   });
-  const [exportProgress, setExportProgress] = useState(null);
+  // Progress subscribers repaint only the small label, never all report pages.
+  const progressStoreRef = useRef(null);
+  if (!progressStoreRef.current) {
+    let current = null;
+    const listeners = new Set();
+    progressStoreRef.current = {
+      getSnapshot: () => current,
+      subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
+      set: value => { current = value; listeners.forEach(listener => listener()); },
+    };
+  }
   const updateProgress = useCallback((progress) => {
-    setExportProgress(progress);
+    progressStoreRef.current.set(progress);
     console.info('[ReportExport]', progress.stage, progress.message);
   }, []);
   const printingRef = useRef(false);
@@ -387,5 +397,10 @@ export function useClientReportPdfExport({
     }
   }, []);
 
-  return { exporting, error, exportProgress, handleExport, publication, retryMissing, PUBLICATION_DOCUMENT };
+  return { exporting, error, progressStore: progressStoreRef.current, handleExport, publication, retryMissing, PUBLICATION_DOCUMENT };
+}
+
+export function ReportExportProgress({ store }) {
+  const progress = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  return progress?.message || 'Preparing report storage…';
 }

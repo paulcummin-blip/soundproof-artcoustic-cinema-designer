@@ -26,7 +26,7 @@ async function exportFixture(store, snapshotFailure = false, retry = async () =>
   let prints = 0, closes = 0;
   const mocks = {
     react: { useState: value => { const i = values.length; values.push(value); return [value, next => { values[i] = typeof next === 'function' ? next(values[i]) : next; }]; },
-      useCallback: fn => fn, useRef: value => ({current:value}), useEffect() {} },
+      useSyncExternalStore: (subscribe,getSnapshot) => getSnapshot(), useCallback: fn => fn, useRef: value => ({current:value}), useEffect() {} },
     '@/components/report/reportPdfTitle': { buildProjectReportTitle: () => 'Sound Proof Technical Report - Audit - Original Design' },
     '@/components/report/printDocumentTitle': { applyPrintDocumentTitle() {}, restorePrintDocumentTitle() {} },
     '@/components/report/reportPrintWindow': { findReportPrintNode: () => ({}), openReportPrintWindow: () => ({}),

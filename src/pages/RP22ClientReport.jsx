@@ -25,7 +25,7 @@ import { selectClientP5SeatResults } from "@/components/report/client/selectClie
 import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
-import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import { useClientReportPdfExport, ReportExportProgress } from "@/components/report/client/useClientReportPdfExport";
 import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
 import { useDesignContextReview } from "@/components/adi/designContext/useDesignContextReview";
 import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
@@ -738,7 +738,7 @@ export default function RP22ClientReport() {
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
-  const { exporting, exportProgress, error: exportError, handleExport: rawHandleExport, publication, retryMissing } = useClientReportPdfExport({
+  const { exporting, progressStore, error: exportError, handleExport: rawHandleExport, publication, retryMissing } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
     // other identity segment: the filename never depends on the report's frozen
@@ -1167,7 +1167,7 @@ export default function RP22ClientReport() {
 
       {publication.status !== 'idle' && (
         <div className="client-report-screen-only" role="status" style={{ padding: '12px 32px', background: '#F8F8F7', color: '#213428' }}>
-          {publication.status === 'storing' && (exportProgress?.message || 'Preparing report storage…')}
+          {publication.status === 'storing' && <ReportExportProgress store={progressStore} />}
           {publication.status === 'complete' && 'Report saved to Documents & Assets.'}
           {publication.status === 'incomplete' && publication.failed.map((failure) => (
             <div key={failure.key} style={{ marginBottom: 8 }}>
