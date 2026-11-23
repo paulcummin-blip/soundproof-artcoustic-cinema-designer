@@ -39,6 +39,10 @@ import {
   decisionKeyForQuestionId,
   canonicalSubwooferFingerprint,
 } from './designContextDecisionIdentity.js';
+import {
+  readVerifiedDesignFacts,
+  questionContradictsFacts,
+} from './designContextFacts.js';
 
 /** The maximum number of questions discovery may return. */
 export const MAX_DISCOVERY_QUESTIONS = 3;
@@ -405,12 +409,7 @@ export async function discoverAiQuestions({
   if (deterministicQuestions.length >= MAX_DISCOVERY_QUESTIONS) return [];
 
   const state = readDesignState(version);
-  const roomDims = readRoomDims(state, project);
-  const seats = readSeatingPositions(state);
-  const subs = Array.isArray(state.subwooferInstances)
-    ? state.subwooferInstances
-    : (Array.isArray(state.subwoofers) ? state.subwoofers : []);
-  const enabledSubs = subs.filter((s) => s?.enabled !== false);
+  const verifiedFacts = readVerifiedDesignFacts(version, project);
 
   // The facts given to the AI are deliberately limited to design decisions
   // whose WHY is not established by the engineering data AND whose explanation
@@ -419,16 +418,23 @@ export async function discoverAiQuestions({
   // the existence of an option is not itself a meaningful design decision.
   // The AI is never asked to invent a design constraint or speculate about
   // a reason the designer did not record.
+  //
+  // seating_rows is the VERIFIED row count, read from the actual rowNumber
+  // values the seats record (falling back to geometry clustering, and null
+  // where neither is available). It is never inferred from the seat count.
+  const room = verifiedFacts.room;
   const facts = {
-    room: roomDims.widthM !== null && roomDims.lengthM !== null
-      ? `${roomDims.widthM}m x ${roomDims.lengthM}m x ${roomDims.heightM ?? '?'}m`
+    room: room.widthM !== null && room.lengthM !== null
+      ? `${room.widthM}m x ${room.lengthM}m x ${room.heightM ?? '?'}m`
       : 'dimensions not recorded',
-    seating_rows: seats.length > 0 ? Math.ceil(seats.length / 3) : 0,
-    seat_count: seats.length,
-    subwoofer_count: enabledSubs.length,
-    dolby_config: asText(state.dolbyLayout || state.dolbyPreset) || 'not recorded',
-    overhead_model: asText(state.overheadGlobalModel) || 'not recorded',
-    acoustic_treatment: state.acousticTreatmentEnabled === true ? 'enabled' : 'not enabled',
+    seating_rows: verifiedFacts.seating_rows === null
+      ? 'not recorded'
+      : verifiedFacts.seating_rows,
+    seat_count: verifiedFacts.seat_count,
+    subwoofer_count: verifiedFacts.subwoofer_count,
+    dolby_config: verifiedFacts.dolby_config || 'not recorded',
+    overhead_model: verifiedFacts.overhead_model || 'not recorded',
+    acoustic_treatment: verifiedFacts.acoustic_treatment ? 'enabled' : 'not enabled',
   };
 
   const existingIds = deterministicQuestions.map((q) => q.question_id).join(', ');
@@ -450,6 +456,7 @@ export async function discoverAiQuestions({
     '- Using multiple subwoofers to manage room modes, reduce the severity of bass peaks and nulls, and improve bass consistency across listening positions is standard engineering practice. Only ask about a specific unusual arrangement or an architectural constraint (for example, subwoofers located in unusual positions because of cabinetry).',
     '- Never assume a motivation. The question must ask the designer for their reason.',
     '- Never invent a design constraint or speculate about a reason the designer did not record.',
+    '- Use only the project facts above for any figure you state. The seating_rows and seat_count facts are the verified counts for this design; do not infer a row count from the seat count or state a different number. Where a fact is "not recorded", do not state a figure for it.',
     '- Never claim that a particular bass improvement has been achieved unless the engineering results support it. Do not state that room modes have been smoothed, peaks reduced, or consistency improved unless measured results are cited.',
     '- Three questions is a maximum, not a target. Zero questions is acceptable when nothing meaningful needs clarification.',
     '- Keep each question to one or two sentences in plain professional English.',
@@ -499,14 +506,26 @@ export async function discoverAiQuestions({
       const dk = decisionKeyForQuestionId(questionId);
       if (dk && seenDecisions.has(dk)) continue;
       const area = asText(entry?.area);
-      seenIds.add(questionId);
-      if (dk) seenDecisions.add(dk);
-      out.push({
+      // Factual validation: reject questions that contradict the verified
+      // design facts (seating rows, seat count, subwoofer count, room
+      // dimensions), or that assert a count the facts cannot verify. A
+      // question asking only for a reason makes no verifiable claim and
+      // always passes.
+      const candidate = {
         question_id: questionId,
         question,
         area: validAreas.has(area) ? area : CONTEXT_AREA.LAYOUT,
         decision_fingerprint: decisionFingerprint(area || CONTEXT_AREA.LAYOUT, { ai: true, question_id: questionId }),
-      });
+      };
+      const contradiction = questionContradictsFacts(candidate, verifiedFacts);
+      if (contradiction) {
+        // Drop the question rather than display an unsupported or
+        // contradictory factual claim to the designer.
+        continue;
+      }
+      seenIds.add(questionId);
+      if (dk) seenDecisions.add(dk);
+      out.push(candidate);
     }
     return out;
   } catch {
