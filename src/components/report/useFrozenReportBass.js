@@ -1,27 +1,36 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-
+import { subscribeProjectAnalysisCacheInvalidation } from '@/components/state/projectReadCache';
 import selectFrozenReportBass from './frozenReportBass';
-/** Graphs follow the report's publication pointer, never the current bass store. */
+
+const empty = { contract: null, authoritative: false, hydrationSettled: false };
+/** Read only the exact frozen publication. Durable saves notify this reader. */
 export default function useFrozenReportBass(projectId, versionId, publication) {
-  const [state, setState] = useState({ contract: null, authoritative: false, hydrationSettled: false });
+  const [state, setState] = useState(empty);
+  const [attempt, setAttempt] = useState(0);
+  const fingerprint = publication?.provenance?.bass_fingerprint;
+  const key = projectId + '::' + versionId + '::' + fingerprint;
+  useEffect(() => subscribeProjectAnalysisCacheInvalidation(projectId, versionId, () => setAttempt(n => n + 1)),
+    [projectId, versionId]);
   useEffect(() => {
     let cancelled = false;
     if (!projectId || !versionId || !publication) return;
-    setState({ contract: null, authoritative: false, hydrationSettled: false });
+    setState({ ...empty, key, currentFingerprint: fingerprint });
+    // Select the needed fields only: publications and target banks can be many MB.
     base44.entities.ProjectAnalysisCache.filter({ project_id: projectId, version_id: versionId },
-      { limit: 50 }).then(page => {
-      if (!cancelled) {
-        const result = selectFrozenReportBass(page.items, publication);
-        console.info('[frozen-bass-read]', JSON.stringify({ responseShape: Array.isArray(page) ? 'array' : Object.keys(page || {}), rowCount: page?.items?.length, rows: page?.items?.map(row => ({id:row.id,status:row.status,keys:Object.keys(row.completed_by_fingerprint || {})})), publicationFingerprint: publication?.provenance?.bass_fingerprint, retained: !!publication?.bass_evidence, source: result.source, reason: result.verificationReason }));
-        setState(result);
-      }
-    }).catch(error => {
-      console.warn('[frozen-bass-read-failed]', error?.message);
-      if (!cancelled) setState({ contract: null, authoritative: false, hydrationSettled: true, authorityStatus: 'ERROR', error: error.message });
-    });
+      '-updated_date', 100, 0, ['id', 'project_id', 'version_id', 'status', 'current_fingerprint', 'completed_by_fingerprint'])
+      .then(rows => {
+        if (!Array.isArray(rows) || rows.length === 100) throw new Error('Saved bass evidence could not be completely read.');
+        if (!cancelled) {
+          const result = selectFrozenReportBass(rows, publication);
+          setState({ ...result, key });
+          if (!result.authoritative) console.warn('[frozen-bass-read]', result.verificationReason);
+        }
+      }).catch(error => {
+        if (!cancelled) setState({ ...empty, key, currentFingerprint: fingerprint, hydrationSettled: true,
+          authorityStatus: 'ERROR', verificationReason: 'read-failed', error: error.message });
+      });
     return () => { cancelled = true; };
-  }, [projectId, versionId, publication]);
-  return state.currentFingerprint === publication?.provenance?.bass_fingerprint
-    ? state : { contract: null, authoritative: false, hydrationSettled: false };
+  }, [projectId, versionId, publication, attempt, fingerprint, key]);
+  return state.key === key ? state : empty;
 }
