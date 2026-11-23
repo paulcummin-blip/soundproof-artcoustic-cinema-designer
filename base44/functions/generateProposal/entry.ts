@@ -37,6 +37,8 @@ import { loadCacheRecord, findPublication } from '../../shared/publishedEngineer
 // authority requires refreshed Project Report evidence before generation.
 import { proposalEvidenceMoveIsSafe } from '../../shared/designIdentityComparison.js';
 import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshotCanonical.js';
+import { recordProposalGenerationIncident } from '../../shared/systemHealth/incidentRecorder.js';
+import { buildDealerFailureMessage, isRecoveryAvailable, FAILURE_TYPE } from '../../shared/systemHealth/incidentMessages.js';
 
 // ── ONE proposal readiness authority ──
 // The gate below is decided by the SAME per-version rule the Step 5 table shows
@@ -66,6 +68,9 @@ export default async function(req) {
   let base44 = null;
   let proposal = null;
   let sectionRecords = [];
+  let incidentContext = null;
+  let requestProjectId = null;
+  let requestAccountId = null;
 
   try {
     base44 = createClientFromRequest(req);
@@ -127,6 +132,8 @@ export default async function(req) {
     // still resolved and checked, because it is what the proposal, its sections
     // and its generation record are scoped to.
     const effectiveAccountId = project.account_id;
+    requestProjectId = project_id;
+    requestAccountId = effectiveAccountId;
     if (!effectiveAccountId) {
       return Response.json({ error: 'Project account is missing.' }, { status: 409 });
     }
@@ -546,6 +553,13 @@ export default async function(req) {
       // A refusal read nothing, sent nothing and wrote nothing: the reason is the
       // whole outcome and it is reported as it stands.
       console.error(`[generateProposal] approved writer refused | code=${attempt.code} | ${attempt.message}`);
+      incidentContext = {
+        failureType: FAILURE_TYPE.WRITER_REFUSAL,
+        errorCode: attempt.code || 'WRITER_REFUSAL',
+        generationId: null,
+        recoveryAttempted: false,
+        recoverySuccessful: false,
+      };
       throw new Error(attempt.message);
     }
 
@@ -584,6 +598,17 @@ export default async function(req) {
         + `status=${attempt.status} provider=${attempt.provider || 'none'} violations=${violations.length} `
         + `first=${violations[0]?.code || 'none'} section=${violations[0]?.section || 'none'}`,
       );
+      incidentContext = {
+        failureType: FAILURE_TYPE.DRAFT_REJECTED,
+        errorCode: 'DRAFT_REJECTED',
+        generationId: auditRecord.generation_id,
+        violationCodes: violations.map((v) => v?.code).filter(Boolean),
+        recoveryAttempted: attempt.correction?.attempted === true,
+        recoverySuccessful: attempt.correction?.succeeded === true,
+        recoverySummary: attempt.correction?.attempted
+          ? (attempt.correction?.succeeded ? 'Bounded wording correction succeeded.' : 'Bounded wording correction attempted but failed.')
+          : 'No automatic recovery available.',
+      };
       throw new Error(WRITER_DRAFT_REJECTED_MESSAGE);
     }
 
@@ -615,6 +640,14 @@ export default async function(req) {
         `[generateProposal] validated copy could not be published | report_type=${resolvedType} `
         + `unmapped=${unmapped.join(', ') || 'none'} bodies=${bodies.length}`,
       );
+      incidentContext = {
+        failureType: FAILURE_TYPE.SECTION_MAPPING_FAILED,
+        errorCode: 'SECTION_MAPPING_FAILED',
+        generationId: attempt.record.generation_id,
+        unmappedSections: unmapped,
+        recoveryAttempted: false,
+        recoverySuccessful: false,
+      };
       throw new Error(
         `The validated copy could not be published into a ${resolvedType} report, so no proposal was saved.`,
       );
@@ -682,10 +715,39 @@ export default async function(req) {
     const cleanupSucceeded = proposal?.id
       ? await rollbackCreatedProposal(base44, proposal.id, sectionRecords)
       : true;
+
+    // ── Record a system health incident (fail-open) ──
+    // The incident is recorded AFTER cleanup so the proposal_id reflects
+    // whether the proposal survived. If recording fails, the original error
+    // is still returned without an incident reference.
+    let incidentResult = null;
+    if (base44 && incidentContext) {
+      try {
+        incidentResult = await recordProposalGenerationIncident(base44, {
+          project_id: requestProjectId || null,
+          account_id: requestAccountId || null,
+          proposal_id: cleanupSucceeded ? null : (proposal?.id || null),
+          error: error?.message || 'Proposal generation failed.',
+          incidentContext,
+        });
+      } catch (recordingErr) {
+        // Fail-open: the original error is still returned.
+        console.error(`[generateProposal] incident recording failed: ${recordingErr?.message || recordingErr}`);
+      }
+    }
+
+    const failureType = incidentContext?.failureType || FAILURE_TYPE.UNEXPECTED_ERROR;
+    const errorCode = incidentContext?.errorCode || 'UNEXPECTED_ERROR';
+    const dealerMessage = buildDealerFailureMessage(failureType, errorCode);
+    const recoveryAvailable = isRecoveryAvailable(failureType, errorCode);
+
     return Response.json({
-      error: error?.message || 'Proposal generation failed.',
+      error: dealerMessage,
       cleanup_succeeded: cleanupSucceeded,
       proposal_id: cleanupSucceeded ? null : proposal?.id || null,
+      incident_reference: incidentResult?.reference || null,
+      incident_recorded: incidentResult?.recorded === true,
+      recovery_available: recoveryAvailable,
     }, { status: 500 });
   }
 }

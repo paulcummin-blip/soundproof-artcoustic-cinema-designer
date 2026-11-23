@@ -5,6 +5,8 @@ import { getDatasetPlatformStats } from "@/components/admin/datasets/datasetMana
 import { getProductStats } from "@/components/admin/system-health/productDatasetStats";
 import StatSection from "@/components/admin/system-health/StatSection";
 import ExportTimingSection from "@/components/admin/system-health/ExportTimingSection";
+import IncidentsSection from "@/components/admin/system-health/IncidentsSection";
+import AlertRecipientSettings from "@/components/admin/system-health/AlertRecipientSettings";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -141,6 +143,10 @@ export default function AdminSystemHealth() {
           { label: "Products linked to measured datasets", value: productStats.linked },
         ]}
       />
+
+      <AlertRecipientSettings />
+
+      <IncidentsSection />
 
       <ExportTimingSection />
 

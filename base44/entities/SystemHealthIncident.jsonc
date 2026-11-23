@@ -1,0 +1,163 @@
+{
+  "name": "SystemHealthIncident",
+  "type": "object",
+  "description": "Admin-only central incident record for the Sound Proof System Health & Error Intelligence system. One record per grouped operational failure. Repeated occurrences of the same underlying problem (same grouping fingerprint) increment the occurrence_count rather than creating a duplicate. Never stores proposal text, client briefs, passwords, tokens, secrets or confidential content. Created by trusted backend functions (e.g. generateProposal on failure) via the service role; read, updated and deleted by administrators only. Recovery attempts are recorded separately from permanent incident resolution: a recovery can restore a dealer's work while the underlying defect remains open for investigation.",
+  "properties": {
+    "incident_reference": {
+      "type": "string",
+      "description": "Unique human-readable reference (e.g. INC-261123-A1B2C3). Generated at creation time. Shown to the dealer only after the record is successfully persisted."
+    },
+    "first_detected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this incident was first detected."
+    },
+    "last_detected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this incident was most recently detected. Updated on each repeated occurrence."
+    },
+    "component": {
+      "type": "string",
+      "description": "The system component that failed (e.g. proposal_generation)."
+    },
+    "operation": {
+      "type": "string",
+      "description": "The specific operation that failed (e.g. generateProposal)."
+    },
+    "error_code": {
+      "type": "string",
+      "description": "A stable machine-readable error code (e.g. DRAFT_REJECTED, SECTION_MAPPING_FAILED, PROVIDER_FAILED, UNEXPECTED_ERROR)."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Incident severity. critical = system broken (unexpected error, provider failure). high = content quality failure (draft rejected by validator). medium = structural failure (section mapping). low = pre-condition failure (writer refusal)."
+    },
+    "account_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The affected dealer account ID, when available. Null for internal/admin operations."
+    },
+    "project_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The affected project ID, when available."
+    },
+    "proposal_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The affected proposal ID, when a proposal was created before the failure."
+    },
+    "diagnostic_summary": {
+      "type": "string",
+      "description": "Safe, sanitized diagnostic summary. Contains only error codes, violation codes, section types and operation names. Never contains proposal text, client names, project names, credentials or confidential content."
+    },
+    "proposal_generation_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Reference to the existing ProposalGeneration audit record for this failure, when one was created. Allows an administrator to navigate from the incident to the full generation audit without duplicating sensitive content in the incident record."
+    },
+    "grouping_fingerprint": {
+      "type": "string",
+      "description": "Stable fingerprint used to group repeated occurrences of the same underlying problem. Computed from component + operation + error_code + sorted violation codes. Two failures with the same fingerprint are the same incident."
+    },
+    "occurrence_count": {
+      "type": "number",
+      "default": 1,
+      "description": "How many times this grouped incident has been detected. Incremented on each repeated occurrence instead of creating a duplicate record."
+    },
+    "recovery_attempted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether an automatic recovery was attempted for this incident (e.g. the bounded wording correction in the proposal writer). True even when the recovery failed."
+    },
+    "recovery_successful": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the automatic recovery succeeded. False when no recovery was attempted or the recovery failed."
+    },
+    "recovery_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Short description of the recovery attempt and its outcome. Null when no recovery was attempted."
+    },
+    "incident_status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "investigating",
+        "resolved",
+        "dismissed"
+      ],
+      "default": "open",
+      "description": "The incident's lifecycle status. open = newly detected. investigating = an admin is looking into it. resolved = the underlying defect is fixed. dismissed = the admin determined no action is needed. Recovery success is tracked separately (recovery_successful) and does not automatically resolve the incident."
+    },
+    "admin_notes": {
+      "type": "string",
+      "nullable": true,
+      "description": "Administrator's investigation notes. Added through the manageSystemHealthIncident function."
+    },
+    "notification_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sent",
+        "failed",
+        "not_required",
+        "skipped"
+      ],
+      "default": "pending",
+      "description": "The status of the email alert to nominated administrators. pending = not yet attempted. sent = email delivered. failed = email could not be sent. not_required = no recipients configured or alerts disabled. skipped = severity too low for an alert."
+    },
+    "notification_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the alert email was successfully sent. Null when no email was sent."
+    },
+    "notification_error": {
+      "type": "string",
+      "nullable": true,
+      "description": "The error message when the alert email failed to send. Null when the email was sent or not required."
+    }
+  },
+  "required": [
+    "incident_reference",
+    "first_detected_at",
+    "last_detected_at",
+    "component",
+    "operation",
+    "error_code",
+    "severity",
+    "grouping_fingerprint",
+    "incident_status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

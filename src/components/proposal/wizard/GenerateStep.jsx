@@ -34,7 +34,18 @@ const STEPS = [
   GENERATION_PHASE.READY,
 ];
 
-export default function GenerateStep({ phase = GENERATION_PHASE.PREPARING, error, onRetry, onBack, backLabel = 'Back to Proposal Centre' }) {
+export default function GenerateStep({
+  phase = GENERATION_PHASE.PREPARING,
+  error,
+  onRetry,
+  onBack,
+  backLabel = 'Back to Proposal Centre',
+  incidentReference = null,
+  incidentRecorded = false,
+  recoveryAvailable = false,
+  onRewriteWithAdi = null,
+  onEditManually = null,
+}) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -45,15 +56,44 @@ export default function GenerateStep({ phase = GENERATION_PHASE.PREPARING, error
           {GENERATION_PHASE.FAILED}
         </h3>
         <p role="alert" className="text-sm text-[#8A3A3A] mt-3 mb-2 max-w-md">{error}</p>
-        <p className="text-sm text-[#8A8477] mb-8 max-w-md">{PHASE_DETAIL[GENERATION_PHASE.FAILED]}</p>
+        <p className="text-sm text-[#8A8477] mb-4 max-w-md">{PHASE_DETAIL[GENERATION_PHASE.FAILED]}</p>
+
+        {incidentRecorded && incidentReference && (
+          <p className="text-xs text-[#625143] mb-6 max-w-md">
+            Incident {incidentReference} has been reported for investigation.
+          </p>
+        )}
+        {!incidentRecorded && (
+          <p className="text-xs text-[#8A8477] mb-6 max-w-md">
+            The issue could not be automatically reported. Please try again or contact support if it persists.
+          </p>
+        )}
+
         <div className="flex items-center gap-4">
-          {onRetry && (
+          {recoveryAvailable && onRewriteWithAdi ? (
+            <button
+              onClick={onRewriteWithAdi}
+              className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
+              style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              Rewrite with ADI
+            </button>
+          ) : onRetry ? (
             <button
               onClick={onRetry}
               className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
               style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
             >
               Try Again
+            </button>
+          ) : null}
+          {onEditManually && (
+            <button
+              onClick={onEditManually}
+              className="px-5 py-2.5 text-xs uppercase tracking-[0.14em] text-[#213428] border border-[#213428] hover:bg-[#F5F4F0] transition-colors"
+              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+            >
+              Edit Manually
             </button>
           )}
           <button

@@ -133,6 +133,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [incidentInfo, setIncidentInfo] = useState({ reference: null, recorded: false, recoveryAvailable: false });
   // Which of the four generation states is on screen: preparing, writing,
   // opening the editor, ready. Null when Step 5 has not started.
   const [generationPhase, setGenerationPhase] = useState(null);
@@ -603,6 +604,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       }
       setGenerationPhase(GENERATION_PHASE.FAILED);
       setError(errorData?.error || err?.message || 'Generation failed. Please try again.');
+      setIncidentInfo({
+        reference: errorData?.incident_reference || null,
+        recorded: errorData?.incident_recorded === true,
+        recoveryAvailable: errorData?.recovery_available === true,
+      });
       setGenerating(false);
     } finally {
       generationInFlightRef.current = false;
@@ -638,6 +644,10 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           setGenerating(false);
           setGenerationPhase(null);
         }}
+        incidentReference={incidentInfo.reference}
+        incidentRecorded={incidentInfo.recorded}
+        recoveryAvailable={incidentInfo.recoveryAvailable}
+        onRewriteWithAdi={incidentInfo.recoveryAvailable ? handleGenerate : null}
       /></div>
     );
   }
