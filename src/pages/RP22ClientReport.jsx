@@ -25,7 +25,8 @@ import { selectClientP5SeatResults } from "@/components/report/client/selectClie
 import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
-import { useClientReportPdfExport, ReportExportProgress } from "@/components/report/client/useClientReportPdfExport";
+import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import ReportExportProgressPanel from "@/components/report/client/ReportExportProgressPanel";
 import useAutoDesignIntent, { AUTO_INTENT } from "@/components/report/projectReport/useAutoDesignIntent";
 import { useDesignContextReview } from "@/components/adi/designContext/useDesignContextReview";
 import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
@@ -1166,16 +1167,11 @@ export default function RP22ClientReport() {
       </div>
 
       {publication.status !== 'idle' && (
-        <div className="client-report-screen-only" role="status" style={{ padding: '12px 32px', background: '#F8F8F7', color: '#213428' }}>
-          {publication.status === 'storing' && <ReportExportProgress store={progressStore} />}
-          {publication.status === 'complete' && 'Report saved to Documents & Assets.'}
-          {publication.status === 'incomplete' && publication.failed.map((failure) => (
-            <div key={failure.key} style={{ marginBottom: 8 }}>
-              <span>Document could not be stored: {failure.error} </span>
-              <Button type="button" size="sm" onClick={() => retryMissing(failure.key)}>Retry storage</Button>
-            </div>
-          ))}
-        </div>
+        <ReportExportProgressPanel
+          store={progressStore}
+          publication={publication}
+          onRetryMissing={retryMissing}
+        />
       )}
 
       {/* ── Body — active pages drive both screen and print ── */}
