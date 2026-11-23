@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { readOnlyAccountEntities, resolveAccountAccessReadOnly } from '../../shared/accountAccessReadOnly.js';
 import { buildSingleSummaryPrompt, buildComparisonSummaryPrompt } from '../../shared/aiSummaryPromptBuilder.js';
 
 /**
@@ -39,6 +40,17 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Require current account authority before reading the payload or invoking AI.
+    // This check cannot activate an account, claim a seat or start its term.
+    const accessContext = await resolveAccountAccessReadOnly({
+      base44,
+      entities: readOnlyAccountEntities(base44.asServiceRole.entities),
+      sessionUser: user,
+    });
+    if (accessContext?.allowed !== true || accessContext.capabilities?.soundProof !== true) {
+      return Response.json({ error: 'Sound Proof access is required.', reason: accessContext?.reason || 'FORBIDDEN' }, { status: 403 });
+    }
 
     const body = await req.json();
     const { summaryType, payload, comparisonPayloads, versionLabels } = body;
