@@ -228,6 +228,11 @@ export default async function(req) {
         // same door the version's own published-engineering read uses.
         { authorityEntities: base44.asServiceRole.entities });
     } catch (error) {
+      await failOperation(base44, {
+        operation_id: request_id,
+        error_code: 'EVIDENCE_READ_FAILED',
+        diagnostic_summary: `Evidence read failed: ${String(error?.message || '').slice(0, 150)}`,
+      });
       return Response.json({ error: error.message }, { status: 409 });
     }
     engineering_snapshot = suppliedSnapshots[0].snapshot;
@@ -261,6 +266,11 @@ export default async function(req) {
         return !evidence || evidence.available !== true;
       });
       if (missingEvidence.length > 0) {
+        await failOperation(base44, {
+          operation_id: request_id,
+          error_code: 'COMPARISON_EVIDENCE_MISSING',
+          diagnostic_summary: `Comparison evidence missing for versions: ${missingEvidence.join(', ')}`,
+        });
         return Response.json({
           error: 'Comparison evidence could not be built for both selected versions. Create a current Project Report for each version, then try again.',
           missing_version_ids: missingEvidence,
@@ -272,6 +282,11 @@ export default async function(req) {
       // table's heading, so a table that cannot be built fails visibly here with
       // the reason instead of producing an empty section.
       if (comparisonTable.rows.length === 0) {
+        await failOperation(base44, {
+          operation_id: request_id,
+          error_code: 'COMPARISON_TABLE_EMPTY',
+          diagnostic_summary: 'Comparison table could not be built: no rows.',
+        });
         return Response.json({
           error: 'Comparison evidence could not be built for both selected versions. Create a current Project Report for each version, then try again.',
           comparison_versions: comparisonTable.versions,
@@ -373,6 +388,11 @@ export default async function(req) {
       // Name every blocked version and what it is ACTUALLY missing, from the same
       // authority the client's readiness table reads, so the panel and the gate
       // can never contradict one another.
+      await failOperation(base44, {
+        operation_id: request_id,
+        error_code: 'READINESS_GATE_FAILED',
+        diagnostic_summary: `Readiness gate blocked: ${readinessGate.message || PROPOSAL_SOURCE_REQUIRED_MESSAGE}`.slice(0, 200),
+      });
       return Response.json({
         error: readinessGate.message || PROPOSAL_SOURCE_REQUIRED_MESSAGE,
         source_blockers: readinessGate.rows

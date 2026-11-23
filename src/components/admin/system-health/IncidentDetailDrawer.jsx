@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import IncidentStatusBadge, { NotificationStatusBadge, SeverityBadge } from './IncidentStatusBadge';
 
@@ -29,6 +29,35 @@ export default function IncidentDetailDrawer({ incident, onClose, onUpdated }) {
   const [updating, setUpdating] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState(null);
+  const [identity, setIdentity] = useState({ dealerName: null, projectName: null, clientName: null, loading: false });
+
+  // Resolve the account (dealer) and project names when the drawer opens.
+  // Never invents identity information — unresolved values stay null.
+  useEffect(() => {
+    if (!incident) return;
+    let cancelled = false;
+    setIdentity({ dealerName: null, projectName: null, clientName: null, loading: true });
+    (async () => {
+      const result = { dealerName: null, projectName: null, clientName: null };
+      try {
+        if (incident.account_id) {
+          const acctPage = await base44.entities.Account.filter({ id: incident.account_id }, { limit: 1 });
+          const acct = (acctPage?.items || [])[0] || null;
+          if (acct?.name) result.dealerName = acct.name;
+        }
+      } catch { /* fail-open */ }
+      try {
+        if (incident.project_id) {
+          const projPage = await base44.entities.Project.filter({ id: incident.project_id }, { limit: 1 });
+          const proj = (projPage?.items || [])[0] || null;
+          if (proj?.name) result.projectName = proj.name;
+          if (proj?.client_name) result.clientName = proj.client_name;
+        }
+      } catch { /* fail-open */ }
+      if (!cancelled) setIdentity({ ...result, loading: false });
+    })();
+    return () => { cancelled = true; };
+  }, [incident?.id]);
 
   if (!incident) return null;
 
@@ -117,8 +146,22 @@ export default function IncidentDetailDrawer({ incident, onClose, onUpdated }) {
           <DetailRow label="First detected" value={formatTime(incident.first_detected_at)} />
           <DetailRow label="Last detected" value={formatTime(incident.last_detected_at)} />
           <DetailRow label="Occurrences" value={String(incident.occurrence_count || 1)} />
-          <DetailRow label="Account ID" value={incident.account_id || '—'} />
-          <DetailRow label="Project ID" value={incident.project_id || '—'} />
+          <DetailRow
+            label="Dealer"
+            value={identity.loading
+              ? 'Resolving…'
+              : identity.dealerName
+                ? `${identity.dealerName} (${incident.account_id?.slice(0, 12)}…)`
+                : (incident.account_id || '—')}
+          />
+          <DetailRow
+            label="Project"
+            value={identity.loading
+              ? 'Resolving…'
+              : identity.projectName
+                ? `${identity.projectName}${identity.clientName ? ` (${identity.clientName})` : ''}`
+                : (incident.project_id || '—')}
+          />
           <DetailRow label="Proposal ID" value={incident.proposal_id || '—'} />
           <DetailRow label="Generation audit" value={incident.proposal_generation_id || '—'} />
         </div>

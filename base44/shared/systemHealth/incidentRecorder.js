@@ -136,10 +136,14 @@ async function readAlertConfig(serviceClient) {
  * Build the HTML body for the alert email. Uses the Sound Proof brand colors.
  * Never includes proposal text, client names or credentials.
  */
-function buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary }) {
+function buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity }) {
   const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
   const severityColor = severity === 'critical' ? '#B23A3A' : (severity === 'high' ? '#625143' : '#3E4349');
   const incidentUrl = `https://soundproofcinemadesigner.com/admin/system-health?incident=${encodeURIComponent(reference)}`;
+  const dealerName = identity?.dealerName || 'Unknown';
+  const projectName = identity?.projectName || 'Unknown';
+  const clientName = identity?.clientName || null;
+  const projectDisplay = clientName ? `${projectName} (${clientName})` : projectName;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -205,6 +209,8 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
                             <tr><td style="padding:4px 0;color:#625143;width:110px;font-weight:600;">Component:</td><td style="padding:4px 0;color:#1B1A1A;">${component}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Operation:</td><td style="padding:4px 0;color:#1B1A1A;">${operation}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Severity:</td><td style="padding:4px 0;color:${severityColor};font-weight:700;">${severityLabel}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Dealer:</td><td style="padding:4px 0;color:#1B1A1A;">${dealerName}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Project:</td><td style="padding:4px 0;color:#1B1A1A;">${projectDisplay}</td></tr>
                           </table>
                         </td>
                       </tr>
@@ -256,10 +262,36 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
 }
 
 /**
+ * Resolve the account (dealer) and project names when the IDs are known.
+ * Returns { dealerName, projectName, clientName } with null for any value
+ * that cannot be resolved. Never invents identity information.
+ */
+async function resolveIncidentIdentity(serviceClient, { account_id, project_id }) {
+  const identity = { dealerName: null, projectName: null, clientName: null };
+  if (!account_id && !project_id) return identity;
+  try {
+    if (account_id) {
+      const acctResult = await serviceClient.asServiceRole.entities.Account.filter({ id: account_id }, { limit: 1 });
+      const acct = (Array.isArray(acctResult) ? acctResult : (acctResult?.items || []))[0] || null;
+      if (acct?.name) identity.dealerName = acct.name;
+    }
+    if (project_id) {
+      const projResult = await serviceClient.asServiceRole.entities.Project.filter({ id: project_id }, { limit: 1 });
+      const proj = (Array.isArray(projResult) ? projResult : (projResult?.items || []))[0] || null;
+      if (proj?.name) identity.projectName = proj.name;
+      if (proj?.client_name) identity.clientName = proj.client_name;
+    }
+  } catch {
+    // Fail-open: identity resolution must not block the notification.
+  }
+  return identity;
+}
+
+/**
  * Send an alert email to the nominated recipients. Deduplicated: only called
  * for new incidents (first occurrence). Returns the notification status.
  */
-async function sendAlertNotification(serviceClient, { reference, component, operation, severity, diagnosticSummary }) {
+async function sendAlertNotification(serviceClient, { reference, component, operation, severity, diagnosticSummary, identity }) {
   const config = await readAlertConfig(serviceClient);
 
   if (!config.enabled) {
@@ -273,7 +305,7 @@ async function sendAlertNotification(serviceClient, { reference, component, oper
   }
 
   const subject = `Sound Proof Incident ${reference}: ${operation} failed (${severity})`;
-  const html = buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary });
+  const html = buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity });
 
   let lastError = null;
   for (const recipient of config.recipients) {
@@ -399,8 +431,12 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
     });
 
     // Send the alert email (fail-open).
+    const identity = await resolveIncidentIdentity(serviceClient, {
+      account_id: account_id || null,
+      project_id: project_id || null,
+    });
     const notificationResult = await sendAlertNotification(serviceClient, {
-      reference, component, operation, severity, diagnosticSummary,
+      reference, component, operation, severity, diagnosticSummary, identity,
     });
 
     // Update the notification status on the incident.
@@ -511,8 +547,9 @@ export async function recordSystemIncident(serviceClient, details) {
     });
 
     // Send the alert email (fail-open). Only sent for critical/high severity.
+    const identity = await resolveIncidentIdentity(serviceClient, { account_id, project_id });
     const notificationResult = await sendAlertNotification(serviceClient, {
-      reference, component, operation, severity, diagnostic_summary,
+      reference, component, operation, severity, diagnosticSummary: diagnostic_summary, identity,
     });
 
     await serviceClient.asServiceRole.entities.SystemHealthIncident.update(incident.id, {
