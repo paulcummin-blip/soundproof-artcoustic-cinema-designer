@@ -96,3 +96,37 @@ test('corrupt retained curve cannot pass a complete contract check',()=>{
  pub.bass_evidence=copy(pub.bass_evidence);pub.bass_evidence.graphPayload.postEqRspCurve[0].spl=null;
  assert.equal(frozenReportBass([p],pub).authoritative,false);
 });
+
+test('same-fingerprint target promotion cannot erase saved room curves',async()=>{
+ const {state,entity}=db();const rich=payload();
+ rich.completed_by_fingerprint[rich.current_fingerprint].graphPayload.roomResponseCurve=[{frequency:20,spl:95}];
+ rich.completed_by_fingerprint[rich.current_fingerprint].graphPayload.perSeatRoomResponseCurves=[{seatId:'seat',responseData:[{frequency:20,spl:95}]}];
+ await persistBassAuthorityDurably(entity,rich);
+ await persistBassAuthorityDurably(entity,payload());
+ assert.equal(state.rows[0].completed_by_fingerprint[rich.current_fingerprint].graphPayload.roomResponseCurve.length,1);
+ assert.equal(state.rows[0].completed_by_fingerprint[rich.current_fingerprint].graphPayload.perSeatRoomResponseCurves.length,1);
+});
+test('cold hydration restores missing supplemental curves only from the exact retained calculation',async()=>{
+ const {buildHydratedPersistedWrapper}=await import('../src/components/room/bass/completedBassResultPersistence.js');
+ const row=payload();const rich=copy(row.completed_by_fingerprint[row.current_fingerprint]);
+ rich.graphPayload.roomResponseCurve=[{frequency:20,spl:95}];
+ const pub={provenance:{bass_fingerprint:row.current_fingerprint},bass_evidence:{fingerprint:row.current_fingerprint,graphPayload:rich.graphPayload}};
+ row.engineering_publications={eng:pub};
+ assert.equal(buildHydratedPersistedWrapper(row).completedByFingerprint[row.current_fingerprint].graphPayload.roomResponseCurve.length,1);
+ pub.bass_evidence.fingerprint='different-acoustic-input';
+ assert.equal(buildHydratedPersistedWrapper(row).completedByFingerprint[row.current_fingerprint].graphPayload.roomResponseCurve,undefined);
+});
+test('different post-EQ result prevents supplemental-curve borrowing despite matching key',async()=>{
+ const {retainCompletedBassGraphEvidence}=await import('../src/components/room/bass/completedBassResultPersistence.js');
+ const c=contract();const prior=copy(c);prior.graphPayload.postEqRspCurve[0].spl=80;prior.graphPayload.roomResponseCurve=[{frequency:20,spl:95}];
+ assert.equal(retainCompletedBassGraphEvidence(c,prior),c);
+});
+test('both cache writers share one serialized critical section',async()=>{
+ const {withBassCacheWriteLock}=await import('../src/components/room/bass/bassCacheWriteLock.js');
+ const events=[];let release;
+ const first=withBassCacheWriteLock('p::v',async()=>{events.push('first-start');await new Promise(r=>{release=r;});events.push('first-end');});
+ const second=withBassCacheWriteLock('p::v',async()=>events.push('second-start'));
+ for(let i=0;i<10&&!release;i++)await Promise.resolve();
+ assert.deepEqual(events,['first-start']);release();await Promise.all([first,second]);
+ assert.deepEqual(events,['first-start','first-end','second-start']);
+});
