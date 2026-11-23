@@ -37,6 +37,7 @@ function genId() { return 'rec-' + Math.random().toString(36).slice(2, 10); }
 
 export const base44 = {
   entities: {
+    Project: { async filter(query) { return [{ id: query.id, account_id: 'test-owner' }]; } },
     ProjectAnalysisCache: {
       async filter(query) {
         const projectId = query?.project_id;
