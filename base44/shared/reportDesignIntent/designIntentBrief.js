@@ -51,7 +51,7 @@ export const DESIGN_INTENT_TARGET_WORDS = '130 to 175';
 export const DESIGN_INTENT_WORD_LIMIT = 200;
 
 /** Identifies this report-only wording revision without changing the proposal writer. */
-export const DESIGN_INTENT_BRIEF_VERSION = 'design-intent-brief-2026-11-18';
+export const DESIGN_INTENT_BRIEF_VERSION = 'design-intent-brief-2026-11-23-context-coverage';
 
 /**
  * THE DESIGN INTENT CONTENT BRIEF.

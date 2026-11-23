@@ -148,9 +148,8 @@ export async function buildReportDesignIntentAttempt({
   // ── THE SAVED DESIGNER CONTEXT for this version ──
   // The designer's own explanations of design decisions the engineering evidence
   // does not establish. Read with the designer's session so the same access that
-  // governs the context governs this read. A context that cannot be read is simply
-  // no recorded intent at all: the attempt continues and the writer describes the
-  // arrangement without inventing a motivation, exactly as before.
+  // governs the context governs this read. An unreadable or changed context blocks
+  // generation; it must never be mistaken for an intentionally empty context.
   let contextRecord;
   try { contextRecord = await readContextRecord(entities, projectId, versionId); }
   catch { return blocked('design_context_unverified', 409, 'The saved design answers could not be verified. Please retry saving before generating.'); }
