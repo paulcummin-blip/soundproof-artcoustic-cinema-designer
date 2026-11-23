@@ -42,7 +42,7 @@ test('calculation and placement preview precede existing acknowledgement', () =>
 });
 test('changed design needs calculation and retains prior evidence', () => {
   const stale = { ...current.completedBassAuthority, authorityStatus:'STALE', currentFingerprint:'cal:b' };
-  assert.equal(resolve({ ...current, completedBassAuthority:stale, durable }).code, 'needs_calculation');
+  assert.equal(resolve({ ...current, completedBassAuthority:stale, durable }).code, 'update_required');
   assert.equal(stale.contract.job.resultFingerprint, 'cal:a');
 });
 test('a blocked save is named as a save failure, and stays retryable', () => {
@@ -182,7 +182,7 @@ test('failed publication with a recorded error is a save failure with its reason
 test('stale design fingerprint needs calculation', () => {
   const stale = { ...current.completedBassAuthority, authorityStatus: 'STALE', currentFingerprint: 'cal:b' };
   const state = resolve({ ...current, completedBassAuthority: stale, preflightReady: false });
-  assert.equal(state.code, 'needs_calculation');
+  assert.equal(state.code, 'update_required');
 });
 
 test('bass calculation still in progress is Calculating', () => {

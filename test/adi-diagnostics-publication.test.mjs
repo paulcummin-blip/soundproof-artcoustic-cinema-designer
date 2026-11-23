@@ -97,14 +97,11 @@ test("completed, failed and cancelled history preserves compact object diagnosti
   }
 });
 
-test("plan completion waits for the exact run's durable version acknowledgement", async () => {
-  let completed = false;
-  const waiting = m.waitForOptimiserPlanSave("p", "v", "new-run", 100).then(at => { completed = true; return at; });
+test("acknowledgement alone cannot save a missing or superseded optimiser run", async () => {
   m.acknowledgeOptimiserPlanSave("p", "v", { run: { runId: "old-run" } });
-  await Promise.resolve(); assert.equal(completed, false);
+  await assert.rejects(m.waitForOptimiserPlanSave("p", "v", "new-run", 100), /no longer the current run/);
   m.acknowledgeOptimiserPlanSave("p", "v", { run: { runId: "new-run" } });
-  assert.ok(await waiting);
-  await assert.rejects(m.waitForOptimiserPlanSave("p", "v", "never-saved", 5), /not acknowledged/);
+  await assert.rejects(m.waitForOptimiserPlanSave("p", "v", "new-run", 100), /no longer the current run/);
 });
 
 test('recommendation lost acknowledgement reconciles and retry makes no duplicate write',async()=>{
