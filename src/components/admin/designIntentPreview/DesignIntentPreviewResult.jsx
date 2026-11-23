@@ -174,6 +174,10 @@ export default function DesignIntentPreviewResult({ data }) {
         </div>
       </Card>
 
+      <Card title="Saved reason coverage">
+        <Block label="Coverage validation" value={generation.design_context_coverage} />
+        <Block label="Bounded correction" value={generation.correction} />
+      </Card>
       <Card title="Prompt and contract">
         <Row
           label="Prompt version"
