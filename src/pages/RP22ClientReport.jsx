@@ -502,7 +502,12 @@ export default function RP22ClientReport() {
   const PUBLISH_CURRENT_ASSESSMENT_ACTION = "Update the Project Report to publish the current assessment and refresh the report evidence.";
   const COMPLETE_ASSESSMENT_ACTION = "Complete the missing assessment items in Room Designer, then create the Project Report.";
 
-  const readinessBase = assessmentIncomplete
+  // Missing keys during hydration are unknown, not unfinished calculations.
+  // A missing historical publication is a publication problem even when its
+  // absent summary makes the completeness reader list every parameter.
+  const readinessBase = hydrating || !savedReport.resolved
+    ? derivedReadiness
+    : assessmentIncomplete && !publicationStale
     ? {
         ...derivedReadiness,
         state: REPORT_STATE.NOT_READY,
