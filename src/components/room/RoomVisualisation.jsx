@@ -79,6 +79,9 @@ import { useCheckpointedCommits } from "@/components/room/bass/bda/bdaCheckpoint
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
 import { useMlpDragHandler } from "@/components/room/rv/hooks/useMlpDragHandler";
+import { useRoomElementAndProjectorDrag } from "@/components/room/rv/hooks/useRoomElementAndProjectorDrag";
+import { useCustomWallDrag } from "@/components/room/rv/hooks/useCustomWallDrag";
+import RvCustomWallLayer from "@/components/room/rv/render/RvCustomWallLayer";
 import RvMlpMarker from "@/components/room/rv/render/RvMlpMarker";
 import { subscribeMlpGrab, getMlpGrab, setMlpGrab } from "@/components/state/mlpGrabStore";
 import { clearSeatDragLive } from "@/components/state/seatDragLiveStore";
@@ -1288,103 +1291,19 @@ const byId = useEntitiesById({
   // to be computed here is what made a drag look like an activation of
   // Dimensions: dimensions are a completed-click result in Dimensions mode only.
 
-  // Room Element drag — wall-constrained or ceiling X/Y movement, with live guides
-  // Receives the canonical room-space target from the shared move handler: the
-  // pointer was converted once and the grab offset applied once, upstream.
-  const handleRoomElementDrag = useCallback((elementId, roomPos) => {
-    if (!onSetRoomElements) return;
-    const el = Array.isArray(roomElements)
-      ? roomElements.find(re => String(re?.id) === String(elementId))
-      : null;
-    if (!el) return;
-    if (el.type === 'skylight') {
-      const rect = skylightRectM(el, { widthM, lengthM });
-      // Clamp the whole opening, preserving size. An oversized opening stays
-      // centred on that axis because it cannot fit without being resized.
-      const clampCentre = (value, span, roomSpan) => span > roomSpan
-        ? roomSpan / 2
-        : Math.max(span / 2, Math.min(roomSpan - span / 2, value));
-      const x = clampCentre(roomPos.x, rect.w, widthM);
-      const y = clampCentre(roomPos.y, rect.h, lengthM);
-      setRoomElementDragInfo({
-        visible: true, surface: 'ceiling',
-        rectM: { x: x - rect.w / 2, y: y - rect.h / 2, w: rect.w, h: rect.h },
-      });
-      onSetRoomElements(prev =>
-        (Array.isArray(prev) ? prev : []).map(re =>
-          String(re?.id) === String(elementId) ? { ...re, x_m: x, y_m: y } : re
-        )
-      );
-      return;
-    }
-    const wall = String(el?.wall || 'front').toLowerCase();
-    const isFrontRear = wall === 'front' || wall === 'rear';
-    const elLen = Number(el?.length_m) || 0.9;
-    const wallLength = isFrontRear ? widthM : lengthM;
-    // The drag guide and the written pos_m both come from this one room point.
-    const raw = isFrontRear ? roomPos.x : roomPos.y;
-    const clamped = Math.max(0, Math.min(wallLength - elLen, raw - elLen / 2));
-    const distA = clamped;
-    const distB = Math.max(0, wallLength - elLen - clamped);
-    setRoomElementDragInfo({
-      visible: true, wall, posM: clamped, lengthM: elLen,
-      distA, distB,
-      labelA: isFrontRear ? 'Left Distance' : 'Front Distance',
-      labelB: isFrontRear ? 'Right Distance' : 'Rear Distance',
-    });
-    onSetRoomElements(prev =>
-      (Array.isArray(prev) ? prev : []).map(re =>
-        String(re?.id) === String(elementId)
-          ? { ...re, pos_m: clamped, x_m: clamped, y_m: clamped }
-          : re
-      )
-    );
-  }, [onSetRoomElements, roomElements, widthM, lengthM]);
+  // Room Element + Projector drag handlers — extracted to keep this file
+  // within the size limit. Custom Wall drag lives in useCustomWallDrag.
+  const { handleRoomElementDrag, handleProjectorDrag } = useRoomElementAndProjectorDrag({
+    onSetRoomElements, roomElements, widthM, lengthM, screenFrontPlaneM,
+    setRoomElementDragInfo, setProjectorDragInfo,
+  });
 
-  // Projector drag — Y-axis only, clamped to room bounds
-  // Receives the canonical room-space target from the shared move handler.
-  // Y-axis only. The grab offset is already applied upstream, never here.
-  const handleProjectorDrag = useCallback((projectorId, roomPos) => {
-    if (!onSetRoomElements) return;
-    const rawY = roomPos.y;
-    const projEl = Array.isArray(roomElements)
-      ? roomElements.find(e => e?.type === 'projector')
-      : null;
-    const bodyD = Number(projEl?.body_depth_m) || 0.517;
-    const halfD = bodyD / 2;
-    const clampedY = Math.max(halfD, Math.min(lengthM - halfD, rawY));
-
-    // Live drag guides. Throw distance is measured from the projector FRONT
-    // FACE (side closest to the screen) to the SCREEN PLANE. Rear wall
-    // distance is measured from the REAR FACE to the REAR WALL. Side wall
-    // distances remain from the projector centre to the side walls.
-    const lensX = Number(projEl?.x_lens_m) || (widthM / 2);
-    const screenY = Number.isFinite(Number(screenFrontPlaneM)) ? Number(screenFrontPlaneM) : 0;
-    const screenAtFront = screenY <= lengthM / 2;
-    const frontFaceY = screenAtFront ? (clampedY - halfD) : (clampedY + halfD);
-    const rearFaceY = screenAtFront ? (clampedY + halfD) : (clampedY - halfD);
-    const rearWallY = screenAtFront ? lengthM : 0;
-    const throwDist = Math.max(0, Math.abs(frontFaceY - screenY));
-    const rearWallDist = Math.max(0, Math.abs(rearFaceY - rearWallY));
-    setProjectorDragInfo({
-      visible: true,
-      x: lensX, y: clampedY, widthM, lengthM,
-      distLeft: lensX,
-      distRight: Math.max(0, widthM - lensX),
-      screenY,
-      frontFaceY,
-      rearFaceY,
-      rearWallY,
-      throwDist,
-      rearWallDist,
-    });
-
-    onSetRoomElements(prev =>
-      (Array.isArray(prev) ? prev : []).map(el =>
-        el?.type === 'projector' ? { ...el, y_lens_m: clampedY } : el
-      )
-    );
-  }, [onSetRoomElements, roomElements, lengthM, widthM, screenFrontPlaneM]);
+  // Custom Wall drag — whole-wall translate + endpoint snapping. Visual only.
+  const {
+    handleCustomWallDrag,
+    selectedWallId, setSelectedWallId,
+    snapIndicators, clearSnapIndicators,
+  } = useCustomWallDrag({ roomElements, onSetRoomElements, widthM, lengthM });
 
   // ── ONE effective speaker position source ─────────────────────────────────
   // While a speaker is being dragged, its transient draft position IS the
@@ -1621,6 +1540,7 @@ const byId = useEntitiesById({
     handleProjectorDrag,
     handleRoomElementDrag,
     handleMlpDrag,
+    handleCustomWallDrag,
     mlpDragActiveRef,
   });
 
@@ -1667,9 +1587,10 @@ const byId = useEntitiesById({
       draftSeatsRef.current = null;
       draftSpeakersRef.current = null;
       setDragState({ dragging: false, draggedItemId: null, dragType: null });
+      clearSnapIndicators();
       releaseDragCapture(gesture);
     }
-  }, [_handleMouseUpRaw, clearSeatSnap, clearSeatDragBaseline]);
+  }, [_handleMouseUpRaw, clearSeatSnap, clearSeatDragBaseline, clearSnapIndicators]);
 
   useEffect(() => {
     if (!dragging || dragType !== "sub") setSubSnapState(null);
@@ -2501,6 +2422,9 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         liveImpactMode={liveImpactMode}
         roomElementDragInfo={roomElementDragInfo}
         projectorDragInfo={projectorDragInfo}
+        customWallSelectedId={selectedWallId}
+        onSelectCustomWall={setSelectedWallId}
+        customWallSnapIndicators={snapIndicators}
         projectorThrowWarning={{
           ...projectorThrowWarning,
           lensX: projectorPosition?.lensX ?? null,

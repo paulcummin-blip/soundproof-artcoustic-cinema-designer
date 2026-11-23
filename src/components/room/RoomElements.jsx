@@ -9,6 +9,8 @@ import { Plus, Trash2, ChevronDown } from 'lucide-react';
 import { sanitizeProjectorElement } from '@/components/utils/projectorSanitise';
 import { fmtM } from '@/components/utils/formatMetres';
 import StepperInput from '@/components/ui/StepperInput';
+import CustomWallEditor from '@/components/room/customWall/CustomWallEditor';
+import { createCustomWall, isCustomWall, CUSTOM_WALL_TYPE } from '@/components/room/customWall/customWallGeometry';
 
 export default function RoomElements({ elements = [], onChange, roomDims }) {
   const [drafts, setDrafts] = React.useState({});  // eslint-disable-line
@@ -116,6 +118,34 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     };
 
     onChange([...(elements || []), newElement]);
+  };
+
+  const addCustomWall = () => {
+    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 4.5;
+    const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 6.0;
+    const newId = makeId();
+    newlyCreatedIdsRef.current.add(newId);
+    const newElement = createCustomWall({
+      cx: roomW / 2,
+      cy: roomL / 2,
+      lengthM: 2,
+      thicknessM: 0.10,
+      label: `Custom Wall ${(elements || []).filter(isCustomWall).length + 1}`,
+    });
+    newElement.id = newId;
+    onChange([...(elements || []), newElement]);
+  };
+
+  const updateCustomWall = (id, patch) => {
+    onChange((elements || []).map((el) => (el.id === id ? { ...el, ...patch } : el)));
+  };
+  const deleteCustomWall = (id) => {
+    onChange((elements || []).filter((el) => el.id !== id));
+  };
+  const duplicateCustomWallEl = (id, copy) => {
+    if (!copy) return;
+    newlyCreatedIdsRef.current.add(copy.id);
+    onChange([...(elements || []), copy]);
   };
 
   const addProjector = () => {
@@ -295,9 +325,38 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
           </span>
           <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#213428' }} />
         </button>
+
+        <button
+          type="button"
+          onClick={addCustomWall}
+          className="group flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-all duration-150 border-[#DCDBD6] bg-white hover:bg-[#F9F8F6] hover:border-[#5B5148] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5B5148] focus-visible:ring-offset-1 active:translate-y-[1px]"
+          aria-label="Create Custom Wall"
+          title="Add a visual custom wall segment"
+        >
+          <span className="text-xs font-semibold" style={{ color: '#5B5148', letterSpacing: 0.3 }}>
+            CREATE CUSTOM WALL
+          </span>
+          <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#5B5148' }} />
+        </button>
       </div>
 
-      {(elements || []).map((element) => {
+      {/* Custom Wall editor — shown for the first custom_wall element so its
+          controls are accessible from the Room Elements panel. Selection from
+          the Plan View is handled via a shared store; this provides a fallback
+          editing surface inline. */}
+      {(elements || []).filter(isCustomWall).map((wall) => (
+        <CustomWallEditor
+          key={`editor-${wall.id}`}
+          wall={wall}
+          widthM={Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0}
+          lengthM={Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0}
+          onUpdate={updateCustomWall}
+          onDelete={deleteCustomWall}
+          onDuplicate={duplicateCustomWallEl}
+        />
+      ))}
+
+      {(elements || []).filter((el) => !isCustomWall(el)).map((element) => {
           const wall = normaliseWallValue(element?.wall);
           const isFrontOrRear = wall === 'front' || wall === 'rear';
 

@@ -170,6 +170,27 @@ export function useMouseDownHandler({
         return;
       }
 
+      // Custom Wall drag — whole-wall or endpoint. Visual only; no acoustic effect.
+      if (type === 'customWall' || type === 'customWallEndpoint1' || type === 'customWallEndpoint2') {
+        const el = Array.isArray(roomElements)
+          ? roomElements.find(re => String(re?.id) === String(id))
+          : null;
+        if (!el) return;
+        if (type === 'customWall') {
+          const midX = (Number(el.p1?.x) + Number(el.p2?.x)) / 2;
+          const midY = (Number(el.p1?.y) + Number(el.p2?.y)) / 2;
+          dragOffsetRoomRef.current = { x: midX - cursorRoom.x, y: midY - cursorRoom.y };
+        } else {
+          const which = type === 'customWallEndpoint1' ? 'p1' : 'p2';
+          const pt = el[which] || { x: 0, y: 0 };
+          dragOffsetRoomRef.current = { x: Number(pt.x) - cursorRoom.x, y: Number(pt.y) - cursorRoom.y };
+        }
+        beginDrag();
+        setDragWarning({ show: false });
+        rsDragLockRef.current = null;
+        return;
+      }
+
       // Room element drag (wall elements and ceiling openings)
       if (type === 'roomElement') {
         const el = Array.isArray(roomElements)

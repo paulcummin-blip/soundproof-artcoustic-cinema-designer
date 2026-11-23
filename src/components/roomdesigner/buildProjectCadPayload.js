@@ -158,7 +158,7 @@ export function adaptRoomElementsForCad(roomElements, roomDims) {
   if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) return [];
 
   return (Array.isArray(roomElements) ? roomElements : [])
-    .filter((el) => el && el.type !== "projector")
+    .filter((el) => el && el.type !== "projector" && el.type !== "custom_wall")
     .map((el) => {
       const wall = wallForCad(el.wall);
       const alongWallM = Number(el.length_m ?? el.lengthM ?? el.width);

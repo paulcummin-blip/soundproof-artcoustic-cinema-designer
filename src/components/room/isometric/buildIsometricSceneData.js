@@ -261,6 +261,7 @@ export function buildRoomElementMeshData({ roomElements, roomDims }) {
   const out = [];
   for (const el of roomElements) {
     if (!el || el?.type === "projector") continue; // projector handled separately
+    if (el?.type === "custom_wall") continue; // visual-only overlay — no 3D mesh in this phase
     const type = el?.type || "element";
 
     // Ceiling skylight: a thin opening flush at ceiling height.

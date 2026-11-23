@@ -18,6 +18,7 @@ export function useRoomCanvasMouseMove({
   handleProjectorDrag,
   handleRoomElementDrag,
   handleMlpDrag,
+  handleCustomWallDrag,
   mlpDragActiveRef,
 }) {
   const handleMouseMove = useCallback((e) => {
@@ -57,11 +58,13 @@ export function useRoomCanvasMouseMove({
       handleProjectorDrag?.(draggedItemId, targetRoomPos);
     } else if (dragType === 'roomElement') {
       handleRoomElementDrag?.(draggedItemId, targetRoomPos);
+    } else if (dragType === 'customWall' || dragType === 'customWallEndpoint1' || dragType === 'customWallEndpoint2') {
+      handleCustomWallDrag?.(draggedItemId, targetRoomPos, dragType);
     }
   }, [
     activeDragRef, setDragWarning, svgRef, scale, viewOffsetPx, dragOffsetRoomRef,
     roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
-    handleRoomElementDrag, handleMlpDrag, setDragState, mlpDragActiveRef,
+    handleRoomElementDrag, handleCustomWallDrag, handleMlpDrag, setDragState, mlpDragActiveRef,
   ]);
   return { handleMouseMove };
 }

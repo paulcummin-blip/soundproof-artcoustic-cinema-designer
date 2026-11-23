@@ -1105,6 +1105,19 @@ function RoomDesignerWithState() {
     const safe = Array.isArray(next) ? next : [];
 
     const normalised = safe.map((e, idx) => {
+      // Custom walls use endpoint geometry (p1/p2), not wall/pos_m. Pass through
+      // without normalisation so their visual geometry is preserved verbatim.
+      if (e?.type === 'custom_wall') {
+        return {
+          ...e,
+          _id: e?._id ?? idx + 1,
+          p1: { x: Number(e?.p1?.x) || 0, y: Number(e?.p1?.y) || 0 },
+          p2: { x: Number(e?.p2?.x) || 0, y: Number(e?.p2?.y) || 0 },
+          thickness_m: Math.max(0.02, Number(e?.thickness_m) || 0.10),
+          restriction: e?.restriction === 'on' ? 'on' : 'off',
+        };
+      }
+
       const wall = String(e?.wall || 'front');
 
       const L = Number.isFinite(Number(e?.length_m)) ? Number(e.length_m) : 0.9;

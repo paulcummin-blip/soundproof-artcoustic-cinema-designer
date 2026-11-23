@@ -62,7 +62,7 @@ export function generateBestSubLayoutCandidateSet(roomDims, sourceHeights, roomE
     make("front-rear-pairs-third-4", "Front + rear 1/3 points", "Front + rear", "Front and rear third points", [{ x: t1, y: front, placement: "front" }, { x: t3, y: front, placement: "front" }, { x: t1, y: rear, placement: "rear" }, { x: t3, y: rear, placement: "rear" }]),
     make("front-rear-centres-4", "Front + rear centres", "Front + rear", "Front and rear wall centres", [{ x: cx1, y: front, placement: "front" }, { x: cx2, y: front, placement: "front" }, { x: cx1, y: rear, placement: "rear" }, { x: cx2, y: rear, placement: "rear" }]),
   ];
-  const openings = (Array.isArray(roomElements) ? roomElements : []).filter((element) => element?.type === "door");
+  const openings = (Array.isArray(roomElements) ? roomElements : []).filter((element) => element?.type === "door"); // custom_wall excluded — visual only, never an acoustic opening
   const blocked = (item) => openings.some((opening) => {
     const openingWall = opening.wall === "back" ? "rear" : opening.wall;
     if (openingWall !== item.placement) return false;

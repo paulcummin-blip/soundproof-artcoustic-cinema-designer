@@ -29,7 +29,9 @@ export function computeBestSubLayoutFingerprint({ roomDims, seatingPositions, rs
       rear: Number.isFinite(Number(sourceHeights?.rear)) ? Number(sourceHeights.rear) : C.fallbackSourceHeightM,
     },
     physics: physicsOptions || {},
-    roomElements: roomElements || [],
+    // Custom walls are visual-only overlays — exclude from the bass
+    // fingerprint so adding/moving them never changes bass results.
+    roomElements: (Array.isArray(roomElements) ? roomElements : []).filter((el) => el?.type !== "custom_wall"),
     currentSubs: currentSubs || [],
     cabinetHalfExtents: cabinetHalfExtents || null,
   };

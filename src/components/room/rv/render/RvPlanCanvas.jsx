@@ -12,6 +12,7 @@ import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
 import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import RvModalZonesOverlay from "@/components/room/rv/render/RvModalZonesOverlay";
 import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
+import RvCustomWallLayer from "@/components/room/rv/render/RvCustomWallLayer";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay";
 import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
@@ -180,6 +181,9 @@ export default function RvPlanCanvas({
   isPostDrag = false,
   roomElementDragInfo,
   projectorDragInfo,
+  customWallSelectedId,
+  onSelectCustomWall,
+  customWallSnapIndicators,
   projectorThrowWarning,
   mlpDragInfo,
   dragType,
@@ -437,6 +441,25 @@ export default function RvPlanCanvas({
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} heightM={heightM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} handleMouseDown={handleMouseDown} />
+
+            {/* Layer 6b: Custom Walls — visual architectural overlays only */}
+            <RvCustomWallLayer
+              hasRoomRect={hasRoomRect}
+              roomElements={roomElements}
+              widthM={widthM}
+              lengthM={lengthM}
+              scale={scale}
+              toPx={toPx}
+              meterToCanvasX={meterToCanvasX}
+              meterToCanvasY={meterToCanvasY}
+              placedSpeakers={placedSpeakers}
+              getModelDimsM={getModelDimsM}
+              getCanonicalRole={getCanonicalRole}
+              handleMouseDown={handleMouseDown}
+              selectedWallId={customWallSelectedId}
+              onSelectWall={onSelectCustomWall}
+              snapIndicators={customWallSnapIndicators}
+            />
 
             {/* Room Element drag dimension lines moved outside RvZoomGroup — see below */}
 
