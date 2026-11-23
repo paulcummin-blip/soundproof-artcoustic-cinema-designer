@@ -2,6 +2,7 @@ import { base44 } from "@/api/base44Client";
 import { invalidateProjectAnalysisCacheRead, readProjectRecord } from "@/components/state/projectReadCache";
 import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
 import { persistBassAuthorityDurably } from "./durableBassWrite";
+import { withBassCacheWriteLock } from "./bassCacheWriteLock";
 
 /**
  * Coalesced ProjectAnalysisCache writes for the completed bass authority.
@@ -105,7 +106,7 @@ async function flushQueuedBassAuthorityWrite(key) {
     try {
       const project = await readProjectRecord(projectId);
       if (!project) throw new Error("The owning project could not be verified.");
-      const receipt = await persistBassAuthorityDurably(base44.entities.ProjectAnalysisCache, payload, { accountId: project.account_id });
+      const receipt = await withBassCacheWriteLock(key, () => persistBassAuthorityDurably(base44.entities.ProjectAnalysisCache, payload, { accountId: project.account_id }));
       invalidateProjectAnalysisCacheRead(projectId, versionId);
       publishBassReconciliationStatus(projectId, versionId, {
         writeSucceeded: true, writeError: null, writeFailedFingerprint: null,

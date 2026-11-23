@@ -1,3 +1,5 @@
+import { withBassCacheWriteLock } from './bassCacheWriteLock';
+import { canonicalSavedValue } from './durableBassWrite';
 // p14TargetCache.js — Persistent P14 background target cache.
 //
 // Stores compact authoritative bass contracts for precomputed P14 target
@@ -20,7 +22,7 @@ import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { safeConsole } from "@/components/utils/safeConsole";
 import { bassCacheKey, bassDbFilter } from "./bassCacheKey";
-import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead } from "@/components/state/projectReadCache";
+import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead, readProjectRecord } from "@/components/state/projectReadCache";
 
 const cacheByProject = new Map();
 const listeners = new Set();
@@ -500,14 +502,21 @@ export function flushTargetCachePersistence(projectId, versionId) {
   const snapshot = JSON.parse(JSON.stringify(ensureCache(projectId, versionId)));
   const signature = JSON.stringify(snapshot);
   dirtyProjects.delete(key);
-  if (persistedSignatures.get(key) === signature) {
-    return writeQueues.get(key) || Promise.resolve();
-  }
 
   const dbFilter = bassDbFilter(projectId, versionId);
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
     try {
-      const record = await readProjectAnalysisCacheRecord(projectId, versionId);
+      await withBassCacheWriteLock(key, async () => {
+      const entity = base44.entities.ProjectAnalysisCache;
+      const fields = ['id', 'project_id', 'version_id', 'account_id', 'target_cache', 'completed_cache_version', 'instance_authority_version', 'metric_schema_version'];
+      const read = async () => {
+        const rows = await entity.filter(dbFilter, '-updated_date', 100, 0, fields);
+        if (!Array.isArray(rows) || rows.length === 100) throw new Error('Target-cache records could not be completely read.');
+        return rows;
+      };
+      const record = (await read())[0] || null;
+      const project = await readProjectRecord(projectId);
+      if (!project) throw new Error('The owning project could not be verified.');
       const payload = {
         ...dbFilter,
         completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
@@ -515,11 +524,22 @@ export function flushTargetCachePersistence(projectId, versionId) {
         metric_schema_version: RP22_BASS_METRIC_SCHEMA_VERSION,
         target_cache: snapshot,
       };
-      if (record?.id) {
-        await base44.entities.ProjectAnalysisCache.update(record.id, payload);
-      } else {
-        await base44.entities.ProjectAnalysisCache.create(payload);
+      if (!record?.account_id && project.account_id) payload.account_id = project.account_id;
+      const matches = row => row?.project_id === projectId && row?.version_id === versionId
+        && Object.entries(payload).every(([field, value]) => canonicalSavedValue(row[field]) === canonicalSavedValue(value));
+      if (!matches(record)) {
+        let response = null;
+        let writeError = null;
+        try {
+          response = record?.id ? await entity.update(record.id, payload) : await entity.create(payload);
+          if (response?.error || response?.success === false) writeError = new Error(response?.message || 'Target cache save refused.');
+        } catch (error) { writeError = error; }
+        const id = record?.id || response?.id;
+        const rows = await read();
+        if (!rows.some(row => (!id || row.id === id) && matches(row)))
+          throw new Error('Target cache save has no verified durable readback' + (writeError ? ': ' + writeError.message : '.'));
       }
+      });
       persistedSignatures.set(key, signature);
       invalidateProjectAnalysisCacheRead(projectId, versionId);
       // Write succeeded — clear any previous failure record for this project.
