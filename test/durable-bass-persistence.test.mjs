@@ -130,3 +130,17 @@ test('both cache writers share one serialized critical section',async()=>{
  assert.deepEqual(events,['first-start']);release();await Promise.all([first,second]);
  assert.deepEqual(events,['first-start','first-end','second-start']);
 });
+
+import { restorePublicationBassGraphEvidence } from '../src/lib/bassEvidencePublication.js';
+test('report read restores omitted curves from exact saved calculation without mutating frozen publication',()=>{
+ const full=contract();full.graphPayload.roomResponseCurve=[{frequency:20,spl:99}];
+ const evidence=resolveBassEvidenceForPublication(payload(full),full.job.resultFingerprint);
+ const pub={provenance:{bass_fingerprint:full.job.resultFingerprint},bass_evidence:copy(evidence)};
+ pub.bass_evidence.graphPayload.roomResponseCurve=[];
+ const record={engineering_publications:{older:{...pub,bass_evidence:evidence}}};
+ const restored=restorePublicationBassGraphEvidence(pub,record);
+ assert.equal(restored.bass_evidence.graphPayload.roomResponseCurve.length,1);
+ assert.equal(pub.bass_evidence.graphPayload.roomResponseCurve.length,0);
+ record.engineering_publications.older.bass_evidence.graphPayload.postEqRspCurve[0].spl+=0.001;
+ assert.equal(restorePublicationBassGraphEvidence(pub,record),pub);
+});

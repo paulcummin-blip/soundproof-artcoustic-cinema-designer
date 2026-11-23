@@ -23,7 +23,7 @@ export default function useFrozenReportBass(projectId, versionId, publication) {
         if (!Array.isArray(rows) || rows.length === 100) throw new Error('Saved bass evidence could not be completely read.');
         if (!cancelled) {
           const result = selectFrozenReportBass(rows, publication);
-          console.info('[frozen-bass-evidence]', JSON.stringify({ key, source: result.source, reason: result.verificationReason, publication: publication.fingerprint, curves: Object.fromEntries(['roomResponseCurve','physicalRawResponseCurve','postEqRspCurve','sourceCapabilityCurves'].map(k => [k, result.contract?.graphPayload?.[k]?.length || 0])) }));
+          console.info('[frozen-bass-evidence]', JSON.stringify({ key, source: result.source, reason: result.verificationReason, publication: publication.engineering_fingerprint, curves: Object.fromEntries(['roomResponseCurve','physicalRawResponseCurve','postEqRspCurve','sourceCapabilityCurves'].map(k => [k, result.contract?.graphPayload?.[k]?.length || 0])) }));
           setState({ ...result, key });
           if (!result.authoritative) console.warn('[frozen-bass-read]', result.verificationReason);
         }

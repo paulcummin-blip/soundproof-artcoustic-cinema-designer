@@ -1,3 +1,4 @@
+import { restorePublicationBassGraphEvidence } from '../../shared/bassEvidencePublication.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import {
@@ -137,7 +138,7 @@ export default async function(req) {
     });
 
     return Response.json({
-      publication: cleanPublicationForResponse(publication),
+      publication: cleanPublicationForResponse(restorePublicationBassGraphEvidence(publication, cacheRecord)),
       status: 'published',
       version: {
         id: version.id,

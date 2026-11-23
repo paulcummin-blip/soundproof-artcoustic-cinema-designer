@@ -125,3 +125,32 @@ export function syntheticContractFromRetainedEvidence(publication) {
     fingerprints: retained.authorityContract?.fingerprints || { calibration: retained.calibrationFingerprint },
   };
 }
+/** Restore omitted display curves from the very same saved calculation, without
+ * changing a publication, recalculating, or borrowing another design's result. */
+export function restorePublicationBassGraphEvidence(publication, cacheRecord) {
+  const fp = publication?.provenance?.bass_fingerprint;
+  const retained = publication?.bass_evidence;
+  if (!fp || retained?.fingerprint !== fp || !retained.graphPayload?.postEqRspCurve?.length) return publication;
+  let graph = retained.graphPayload;
+  const candidates = [
+    cacheRecord?.completed_by_fingerprint?.[fp],
+    ...Object.values(cacheRecord?.engineering_publications || {})
+      .filter(p => p?.provenance?.bass_fingerprint === fp && p?.bass_evidence?.fingerprint === fp)
+      .map(p => ({ job: { resultFingerprint: fp }, graphPayload: p.bass_evidence.graphPayload })),
+  ];
+  for (const candidate of candidates) {
+    const other = candidate?.graphPayload;
+    if (candidate?.job?.resultFingerprint !== fp || !Array.isArray(other?.postEqRspCurve)
+      || other.postEqRspCurve.length !== graph.postEqRspCurve.length
+      || !graph.postEqRspCurve.every((point, i) =>
+        Number.isFinite(point.frequency) && Number.isFinite(point.spl)
+        && point.frequency === other.postEqRspCurve[i]?.frequency
+        && point.spl === other.postEqRspCurve[i]?.spl)) continue;
+    for (const key of ['roomResponseCurve', 'perSeatRoomResponseCurves']) {
+      if (!graph[key]?.length && other[key]?.length) graph = { ...graph, [key]: other[key] };
+    }
+  }
+  return graph === retained.graphPayload ? publication : {
+    ...publication, bass_evidence: { ...retained, graphPayload: graph },
+  };
+}
