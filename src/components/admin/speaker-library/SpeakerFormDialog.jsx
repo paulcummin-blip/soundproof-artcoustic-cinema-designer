@@ -21,6 +21,7 @@ import {
   formFromRow,
   saveSpeakerComparison,
 } from "./saveSpeakerComparison";
+import ReadWithAdiDialog from "@/components/spl/ReadWithAdiDialog";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -62,6 +63,7 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [specEvidence, setSpecEvidence] = useState(null);
+  const [readSourceOpen, setReadSourceOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -111,6 +113,20 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
   };
 
   const canReadWithAdi = hasValue(values.source_url) && Boolean(onReadWithAdi);
+
+  // Candidate for the in-form Read Source dialog. Built from the row being
+  // edited plus the current (possibly unsaved) manufacturer/model and URL, so
+  // ADI can read a webpage the admin just typed or a PDF uploaded against the
+  // saved product, without requiring a source URL to already exist.
+  const readCandidate = row?.productId ? {
+    id: row.key,
+    manufacturer: values.manufacturer,
+    model: values.model,
+    productId: row.productId,
+    specificationId: row.specificationId,
+    priceRecordId: row.rowId,
+    record: { ...(row.record || {}), source_url: values.source_url || row.record?.source_url || "" },
+  } : null;
 
   const preview = useMemo(() => {
     if (!open || result) return null;
@@ -282,6 +298,11 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
               <button type="button" onClick={onClose} disabled={saving} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 9, padding: "9px 16px", background: "#FFF", color: BRAND.text, fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
                 Cancel
               </button>
+              {row?.productId && (
+                <button type="button" onClick={() => setReadSourceOpen(true)} disabled={saving} style={{ border: `1px solid ${BRAND.green}`, borderRadius: 9, padding: "9px 16px", background: "#FFF", color: BRAND.green, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer" }}>
+                  Read Source
+                </button>
+              )}
               {canReadWithAdi && (
                 <button type="button" onClick={() => submit(true)} disabled={saving} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${BRAND.green}`, borderRadius: 9, padding: "9px 16px", background: "#FFF", color: BRAND.green, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer" }}>
                   {saving ? "Saving…" : "Save & Read with ADI"}
@@ -293,6 +314,13 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
             </>
           )}
         </DialogFooter>
+        <ReadWithAdiDialog
+          open={readSourceOpen}
+          onClose={() => setReadSourceOpen(false)}
+          candidate={readCandidate}
+          actorName={actorName}
+          onSaved={() => { setReadSourceOpen(false); onSaved?.(); }}
+        />
       </DialogContent>
     </Dialog>
   );

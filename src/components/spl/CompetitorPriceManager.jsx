@@ -575,15 +575,13 @@ export default function CompetitorPriceManager({ onPriceSaved = null }) {
                       })()}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                      {sourceUrlOf(candidate) && (
-                        <button
-                          type="button"
-                          title={hasTechnicalValues(candidate.record) ? "Refresh from source" : "Read source"}
-                          onClick={() => openReadWithAdi(candidate)}
-                          style={iconBtn}
-                          aria-label={hasTechnicalValues(candidate.record) ? "Refresh from source" : "Read source"}
-                        ><Sparkles size={14} /></button>
-                      )}
+                      <button
+                        type="button"
+                        title={hasTechnicalValues(candidate.record) ? "Refresh from source" : "Read source"}
+                        onClick={() => openReadWithAdi(candidate)}
+                        style={iconBtn}
+                        aria-label={hasTechnicalValues(candidate.record) ? "Refresh from source" : "Read source"}
+                      ><Sparkles size={14} /></button>
                       <button type="button" title="Edit speaker" onClick={() => openEdit(candidate)} style={iconBtn}><Pencil size={14} /></button>
                       <button type="button" title="Remove speaker" onClick={() => askDelete(candidate)} style={iconBtn}><Trash2 size={14} /></button>
                       {savedId === candidate.id && (
