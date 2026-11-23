@@ -105,7 +105,7 @@ export default function useDesignIntentPreview(initialProjectId = null) {
     setVersionId(next);
   }, []);
 
-  const runPreview = useCallback(async () => {
+  const runPreview = useCallback(async (samples = null) => {
     if (!projectId || !versionId || busy) return;
     setBusy(true);
     setError(null);
@@ -113,6 +113,7 @@ export default function useDesignIntentPreview(initialProjectId = null) {
       const response = await base44.functions.invoke('previewReportDesignIntent', {
         project_id: projectId,
         version_id: versionId,
+        ...(Array.isArray(samples) ? { coverage_samples: samples } : {}),
       });
       setPreview(response?.data || null);
     } catch (e) {
