@@ -55,3 +55,34 @@ test('a second report identity is retained independently',async()=>{
  const f=setup();f.entry.issued.projectId='doran';f.entry.issued.versionId='second';f.entry.issued.selectedVersionIds=['second'];f.entry.pageCount=28;
  const row=await saveIssuedArtifact(f.args);assert.equal(row.project_id,'doran');assert.equal(row.version_id,'second');assert.equal(row.page_count,28);
 });
+
+test('reload recovers an already committed record with no PDF blob or duplicate write',async()=>{
+ const f=setup();await saveIssuedArtifact(f.args);
+ const restored={...f.entry,blob:null,uploadOperation:undefined,recordOperation:undefined};
+ assert.equal((await saveIssuedArtifact({...f.args,entry:restored})).id,'saved');
+ assert.equal(f.calls.upload,1);assert.equal(f.calls.create,1);
+});
+test('reload with an uncertain record save checks only; it cannot create another row',async()=>{
+ const f=setup();f.entry.fileUri='private/pdf';f.entry.blob=null;f.entry.recordStarted=true;
+ await assert.rejects(saveIssuedArtifact(f.args),/previous asset save/);
+ assert.equal(f.calls.create,0);assert.equal(f.calls.upload,0);
+});
+test('reload with an unknown upload path cannot automatically upload again',async()=>{
+ const f=setup();f.entry.uploadStarted=true;
+ await assert.rejects(saveIssuedArtifact(f.args),/no confirmed file path/);
+ assert.equal(f.calls.upload,0);
+});
+test('pending recovery metadata survives module reload without persisting PDF bytes',async()=>{
+ const memory=new Map();
+ globalThis.window={sessionStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)}};
+ const first=await import('../src/components/library/issuedDocument/pendingIssuedExportStore.js?initial');
+ const key=first.holdPendingExport({identity:{projectId:'dixon',versionId:'original',documentType:'project'},filename:'report.pdf',blob:new Blob(['private report'])});
+ first.updatePendingExport(key,{fileUri:'private/pdf',recordStarted:true,pageCount:42});
+ assert.equal([...memory.values()][0].includes('private report'),false);
+ const cold=await import('../src/components/library/issuedDocument/pendingIssuedExportStore.js?cold');
+ assert.equal(cold.peekPendingExport(key).fileUri,'private/pdf');
+ assert.equal(cold.peekPendingExport(key).recordStarted,true);
+ assert.equal(cold.peekPendingExport(key).blob,null);
+ cold.clearPendingExport(key);assert.equal([...memory.values()][0],'[]');
+ delete globalThis.window;
+});

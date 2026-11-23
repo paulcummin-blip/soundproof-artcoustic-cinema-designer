@@ -3,6 +3,9 @@ import { buildIssuedDocumentRow } from './issuedDocumentRowPayload.js';
 // A deadline ends the UI wait, not the request. Retain the original promise:
 // retry must observe/reconcile it, never issue a second uncertain write.
 export async function awaitExportOperation(entry, key, start, timeoutMs = 45000) {
+  const previous = entry[key];
+  const rejectedStatus = previous?.error?.response?.status || previous?.error?.status || previous?.error?.cause?.response?.status || previous?.error?.cause?.status;
+  if (previous?.state === 'rejected' && [400, 401, 403, 404, 422].includes(rejectedStatus)) entry[key] = null;
   if (!entry[key]) {
     const operation = { state: 'pending' };
     entry[key] = operation;
