@@ -1125,7 +1125,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       canonicalMetricAuthority: canonicalMetricAuthorityResult.authority,
       canonicalMetricDiagnostics: canonicalMetricAuthorityResult.diagnostics,
     };
-  }, [selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.p18TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, requested.selectedP18RequiredExtensionHz, scopeId, completedFingerprint]);
+  }, [canonicalRoomResponseCurve, perSeatRawCurves, selectionAttempt.result, cacheKey, lifecycle.resultFingerprint, lifecycle.cacheStatus, lifecycle.cacheRejectionReason, calibrationFingerprint, sources, designEqSystemLimits.usableLfHz, requested.p14TargetBasis, requested.p18TargetBasis, requested.requestedLevel, requested.selectedP14TargetDb, requested.selectedP14RequiredExtensionHz, requested.selectedP18RequiredExtensionHz, scopeId, completedFingerprint]);
   // Record candidate-selection-accepted only after the pool contains a valid
   // selectable result. Guard with a Set so unrelated React renders do not
   // overwrite or duplicate the stage for the same token.

@@ -469,6 +469,23 @@ export function bassContractMatchesRequestedP14(contract, requested) {
   return cDb === rDb && cBasis === rBasis && cLevel === rLevel;
 }
 
+/** Preserve already-calculated supplemental curves during same-result cache promotion.
+ * No cross-fingerprint borrowing, recalculation, or replacement of populated evidence.
+ */
+export function retainCompletedBassGraphEvidence(contract, previous) {
+  const fp = contract?.job?.resultFingerprint;
+  const nextGraph = contract?.graphPayload;
+  const oldGraph = previous?.graphPayload;
+  if (!fp || previous?.job?.resultFingerprint !== fp || !nextGraph || !oldGraph
+    || !nextGraph.postEqRspCurve?.length || !oldGraph.postEqRspCurve?.length
+    || buildCurveSignature(nextGraph.postEqRspCurve) !== buildCurveSignature(oldGraph.postEqRspCurve)) return contract;
+  let graph = nextGraph;
+  for (const key of ['roomResponseCurve', 'perSeatRoomResponseCurves']) {
+    if (!nextGraph[key]?.length && oldGraph[key]?.length) graph = { ...graph, [key]: oldGraph[key] };
+  }
+  return graph === nextGraph ? contract : { ...contract, graphPayload: graph };
+}
+
 export function buildPersistedBassAuthority(existing, currentFingerprint, contract = null, forceUpdating = false) {
   const compatibleExisting = existing
     && existing.version === COMPLETED_BASS_CACHE_VERSION
@@ -481,7 +498,7 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
   // Re-compacting a compact contract would lose the graphPayload because
   // buildGraphPayload reads from finalOptimisedBassResponse which is absent.
   const isAlreadyCompact = contract && !contract.finalOptimisedBassResponse && contract.graphPayload;
-  const compact = isAlreadyCompact ? contract : compactCompletedBassContract(contract);
+  let compact = isAlreadyCompact ? contract : compactCompletedBassContract(contract);
   if (compact) {
     // Preserve the recommendation field from the existing snapshot.
     // publishRecommendation attaches the Recommendation Engine output to the
@@ -490,6 +507,7 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
     // contract (which has no recommendation) and lose the recommendation —
     // causing ADI to fall to "No further engineering changes" on refresh.
     const existingSnapshot = completedByFingerprint[compact.job.resultFingerprint];
+    compact = retainCompletedBassGraphEvidence(compact, existingSnapshot);
     if (existingSnapshot?.recommendation) {
       completedByFingerprint[compact.job.resultFingerprint] = {
         ...compact,
@@ -566,13 +584,20 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
  */
 export function buildHydratedPersistedWrapper(record) {
   if (!record) return null;
+  const completed = { ...(record.completed_by_fingerprint || {}) };
+  for (const publication of Object.values(record.engineering_publications || {})) {
+    const evidence = publication?.bass_evidence;
+    const fp = publication?.provenance?.bass_fingerprint;
+    if (fp && evidence?.fingerprint === fp && completed[fp]) completed[fp] = retainCompletedBassGraphEvidence(
+      completed[fp], { job: { resultFingerprint: fp }, graphPayload: evidence.graphPayload });
+  }
   return {
     version: record.completed_cache_version,
     instanceAuthorityVersion: record.instance_authority_version,
     metricSchemaVersion: record.metric_schema_version,
     currentFingerprint: record.current_fingerprint,
     status: record.status,
-    completedByFingerprint: record.completed_by_fingerprint,
+    completedByFingerprint: completed,
   };
 }
 

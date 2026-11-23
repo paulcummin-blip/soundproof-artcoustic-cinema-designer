@@ -28,8 +28,8 @@ export async function persistBassAuthorityDurably(entity, payload, { accountId =
   const before = await read();
   // Reuse the freshest durable row, not a captured null/old row from before a queued write.
   const target = before[0] || null;
-  const completed = Object.assign({}, ...before.slice().reverse().map(row => row.completed_by_fingerprint || {}),
-    payload.completed_by_fingerprint || {});
+  const completed = Object.assign({}, payload.completed_by_fingerprint || {},
+    ...before.slice().reverse().map(row => row.completed_by_fingerprint || {}));
   const bounded = buildPersistedBassAuthority({
     version: payload.completed_cache_version, instanceAuthorityVersion: payload.instance_authority_version,
     metricSchemaVersion: payload.metric_schema_version, currentFingerprint: fp, completedByFingerprint: completed,

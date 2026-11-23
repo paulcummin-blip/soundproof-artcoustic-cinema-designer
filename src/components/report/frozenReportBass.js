@@ -47,7 +47,12 @@ export default function frozenReportBass(rows, publication) {
     verification = { verified: false, reason: 'verification-error', contract: null };
   }
 
-  if (verification.verified) contract = verification.contract;
+  if (verification.verified) {
+    contract = fromRetained
+      ? { ...verification.contract, graphPayload: retainedContract.graphPayload, assessmentEnvelope: retainedContract.assessmentEnvelope }
+      : verification.contract;
+    if (!isAuthoritativeBassContract(contract)) verification = { verified: false, reason: 'retained-contract-not-authoritative' };
+  }
   return {
     contract,
     authoritative: verification.verified,

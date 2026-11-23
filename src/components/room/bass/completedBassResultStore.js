@@ -7,6 +7,7 @@ import {
   bassContractMatchesRequestedP14,
   buildPersistedBassAuthority,
   buildHydratedPersistedWrapper,
+  retainCompletedBassGraphEvidence,
   compactCompletedBassContract,
   isCompletedBassContract,
   isStructurallyCompleteBassContract,
@@ -140,6 +141,8 @@ function authoritySignature(a) {
     // Recommendation is part of the published snapshot. A cold-load compact
     // contract without it must not suppress hydration of the saved decision.
     rec: a.contract?.recommendation || null,
+    roomCurvePoints: a.contract?.graphPayload?.roomResponseCurve?.length || 0,
+    seatRoomCurves: a.contract?.graphPayload?.perSeatRoomResponseCurves?.length || 0,
     sc2: a.structurallyComplete,
     au: a.authoritative,
     ex: a.exportable,
@@ -194,7 +197,7 @@ function setMemory(projectId, versionId, authority) {
 export function publishCompletedBassContract(projectId, versionId, contract) {
   assertNotAuthoritativeReadOnly('publishCompletedBassContract', 'publish-completed-bass');
   if (!isStructurallyCompleteBassContract(contract)) return false;
-  const compact = compactCompletedBassContract(contract);
+  const compact = retainCompletedBassGraphEvidence(compactCompletedBassContract(contract), memoryByProject.get(projectKey(projectId, versionId))?.contract);
   const authoritative = isAuthoritativeBassContract(compact);
   const exportable = authoritative;
   const publicationRejectionReason = !authoritative
@@ -235,6 +238,7 @@ export function publishCachedCompactBassContract(projectId, versionId, compactCo
   if (expectedFingerprint && resultFingerprint !== expectedFingerprint) return false;
   if (requestedP14Identity && !bassContractMatchesRequestedP14(compactContract, requestedP14Identity)) return false;
   const key = projectKey(projectId, versionId);
+  compactContract = retainCompletedBassGraphEvidence(compactContract, memoryByProject.get(key)?.contract);
   setMemory(projectId, versionId, {
     projectId: key,
     status: "complete",
