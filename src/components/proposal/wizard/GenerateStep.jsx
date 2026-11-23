@@ -46,6 +46,19 @@ export default function GenerateStep({
   onRewriteWithAdi = null,
   onEditManually = null,
 }) {
+  // Show a calm "taking longer than expected" message after 120 seconds,
+  // without claiming the operation has failed. The watchdog handles the
+  // actual stall detection on the backend.
+  const [takingLonger, setTakingLonger] = React.useState(false);
+  React.useEffect(() => {
+    if (error || phase === GENERATION_PHASE.READY) {
+      setTakingLonger(false);
+      return;
+    }
+    const timer = setTimeout(() => setTakingLonger(true), 120000);
+    return () => clearTimeout(timer);
+  }, [error, phase]);
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -119,6 +132,11 @@ export default function GenerateStep({
         {phase}
       </h3>
       <p className="text-sm text-[#8A8477] mt-3 max-w-md">{PHASE_DETAIL[phase] || PHASE_DETAIL[GENERATION_PHASE.PREPARING]}</p>
+      {takingLonger && (
+        <p className="text-xs text-[#625143] mt-4 max-w-md">
+          This is taking longer than expected. Your project and design information are safe. You can continue to wait or go back and try again.
+        </p>
+      )}
       <ol className="mt-8 space-y-2 text-left">
         {STEPS.map((step, index) => (
           <li

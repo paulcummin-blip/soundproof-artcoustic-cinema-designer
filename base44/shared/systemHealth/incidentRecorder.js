@@ -425,4 +425,113 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
   }
 }
 
+/**
+ * Record a general system incident (not specific to proposal generation).
+ * Used by the watchdog for confirmed stalled operations. Reuses the same
+ * grouping, email and notification logic as recordProposalGenerationIncident.
+ *
+ * @param {Object} serviceClient
+ * @param {Object} details
+ * @param {string} [details.component] — e.g. 'operation_monitoring'
+ * @param {string} [details.operation] — e.g. 'proposal_generation'
+ * @param {string} [details.error_code]
+ * @param {string} [details.severity] — 'critical' | 'high' | 'medium' | 'low'
+ * @param {string} [details.account_id]
+ * @param {string} [details.project_id]
+ * @param {string} [details.diagnostic_summary]
+ * @returns {Promise<Object|null>} incident result or null if recording failed
+ */
+export async function recordSystemIncident(serviceClient, details) {
+  const {
+    component = 'operation_monitoring',
+    operation = 'unknown',
+    error_code = 'UNKNOWN',
+    severity = 'medium',
+    account_id = null,
+    project_id = null,
+    diagnostic_summary = '',
+  } = details;
+
+  const fingerprint = computeIncidentFingerprint({
+    component, operation, errorCode: error_code, violationCodes: [],
+  });
+
+  const now = new Date().toISOString();
+
+  try {
+    // Find existing open/incidenting incident with same fingerprint (grouping).
+    const existingResult = await serviceClient.asServiceRole.entities.SystemHealthIncident.filter(
+      { grouping_fingerprint: fingerprint, incident_status: { $in: ['open', 'investigating'] } },
+      { sort: '-last_detected_at', limit: 1 },
+    );
+    const existingIncident = (Array.isArray(existingResult) ? existingResult : (existingResult?.items || []))[0] || null;
+
+    if (existingIncident) {
+      // Increment occurrence count — no duplicate record, no duplicate email.
+      await serviceClient.asServiceRole.entities.SystemHealthIncident.update(
+        existingIncident.id,
+        {
+          last_detected_at: now,
+          occurrence_count: (existingIncident.occurrence_count || 1) + 1,
+        },
+      );
+      return {
+        recorded: true,
+        reference: existingIncident.incident_reference,
+        incident_id: existingIncident.id,
+        created: false,
+        notification_status: existingIncident.notification_status,
+      };
+    }
+
+    // Create a new incident.
+    const reference = generateIncidentReference();
+    const incident = await serviceClient.asServiceRole.entities.SystemHealthIncident.create({
+      incident_reference: reference,
+      first_detected_at: now,
+      last_detected_at: now,
+      component,
+      operation,
+      error_code,
+      severity,
+      account_id: account_id || null,
+      project_id: project_id || null,
+      proposal_id: null,
+      diagnostic_summary,
+      proposal_generation_id: null,
+      grouping_fingerprint: fingerprint,
+      occurrence_count: 1,
+      recovery_attempted: false,
+      recovery_successful: false,
+      recovery_summary: null,
+      incident_status: 'open',
+      notification_status: 'pending',
+      notification_sent_at: null,
+      notification_error: null,
+    });
+
+    // Send the alert email (fail-open). Only sent for critical/high severity.
+    const notificationResult = await sendAlertNotification(serviceClient, {
+      reference, component, operation, severity, diagnostic_summary,
+    });
+
+    await serviceClient.asServiceRole.entities.SystemHealthIncident.update(incident.id, {
+      notification_status: notificationResult.status,
+      notification_sent_at: notificationResult.sent_at,
+      notification_error: notificationResult.error,
+    });
+
+    return {
+      recorded: true,
+      reference,
+      incident_id: incident.id,
+      created: true,
+      notification_status: notificationResult.status,
+    };
+  } catch (recordingError) {
+    console.error(`[incidentRecorder] failed to record system incident: ${recordingError?.message || recordingError}`);
+    return null;
+  }
+}
+
 export default recordProposalGenerationIncident;

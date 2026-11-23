@@ -1,0 +1,165 @@
+{
+  "name": "MonitoredOperation",
+  "type": "object",
+  "description": "Durable operation lifecycle record for Sound Proof System Health monitoring. Tracks critical operations (proposal generation, report export) from start through completion or failure. Created and updated by trusted backend functions via the service role. Admin and account-scoped dealer read access. Never stores proposal text, client briefs, credentials or confidential content \u2014 only safe diagnostic codes, stage names and operation identifiers.",
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "description": "Unique operation identifier. For proposal generation, this is the request_id. For report export, a client-generated UUID."
+    },
+    "operation_type": {
+      "type": "string",
+      "enum": [
+        "proposal_generation",
+        "report_export"
+      ],
+      "description": "The type of operation being monitored."
+    },
+    "account_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The dealer account ID, when available. Used for RLS."
+    },
+    "project_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The project ID, when available."
+    },
+    "version_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The project version ID, when available."
+    },
+    "proposal_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The proposal ID, when a proposal was created before the operation completed."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the operation started."
+    },
+    "last_progress_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the operation last reported meaningful progress. Null until the first progress report."
+    },
+    "current_stage": {
+      "type": "string",
+      "description": "The current stage of the operation (e.g. preparing_evidence, writing_proposal, validating, saving, capturing, uploading, verifying, completed)."
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "running",
+        "suspected_stalled",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "default": "running",
+      "description": "The operation's lifecycle state. running = in progress. suspected_stalled = watchdog detected no recent progress but has not confirmed failure. completed = successfully finished. failed = encountered a known error or the watchdog confirmed a stall. cancelled = abandoned by the dealer."
+    },
+    "error_code": {
+      "type": "string",
+      "nullable": true,
+      "description": "Safe machine-readable error code when the operation failed."
+    },
+    "diagnostic_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Safe diagnostic summary. Contains only error codes, stage names and operation identifiers. Never contains proposal text, client names or credentials."
+    },
+    "incident_reference": {
+      "type": "string",
+      "nullable": true,
+      "description": "Reference of the linked SystemHealthIncident, when one was created for this operation's failure."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the operation was marked completed. Null until completion."
+    },
+    "cancelled_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the operation was cancelled. Null until cancellation."
+    },
+    "watchdog_notified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether an incident and alert email have already been sent for this operation's stall or failure. Prevents duplicate emails on repeated watchdog checks."
+    }
+  },
+  "required": [
+    "operation_id",
+    "operation_type",
+    "started_at",
+    "current_stage",
+    "state"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "data.soundproof_access_enabled": true
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

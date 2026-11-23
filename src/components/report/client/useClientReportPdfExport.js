@@ -40,6 +40,7 @@ import {
   retryPublicationDocument,
   PUBLICATION_DOCUMENT,
 } from "@/components/report/projectReport/storeProjectReportPublication";
+import { base44 } from "@/api/base44Client";
 
 // Version metadata is optional — only present when the project has a saved
 // named design version. The filename helper appends it when meaningful.
@@ -142,7 +143,9 @@ export function useClientReportPdfExport({
     progressStoreRef.current.set(progress);
     if (exportTimingsRef.current) exportTimingsRef.current.mark(progress.stage, progress.message);
     console.info('[ReportExport]', progress.stage, progress.message);
-  }, []);
+    // Report stage change to the backend watchdog (fire-and-forget).
+    reportOperation('progress', { stage: progress.stage });
+  }, [reportOperation]);
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
   // The last export's store-only flag, held so a targeted retry re-stores without
@@ -157,6 +160,17 @@ export function useClientReportPdfExport({
   // only the document that failed — from the SAME saved authority, without
   // regenerating the one that succeeded or re-running the whole export.
   const lastExportRef = useRef(null);
+  // Monitored operation ID for the current export, so progress is reported to
+  // the backend watchdog. Null when no export is in flight.
+  const operationIdRef = useRef(null);
+  const reportOperation = useCallback((action, payload = {}) => {
+    if (!operationIdRef.current) return;
+    base44.functions.invoke('manageMonitoredOperation', {
+      action,
+      operation_id: operationIdRef.current,
+      ...payload,
+    }).catch(() => {});
+  }, []);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
@@ -189,6 +203,18 @@ export function useClientReportPdfExport({
     if (activePageCount === 0) return;
 
     storeOnlyRef.current = storeOnly;
+
+    // ── Start operation monitoring (fire-and-forget, fail-open) ──
+    operationIdRef.current = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `rpt-${Date.now()}`;
+    reportOperation('start', {
+      operation_type: 'report_export',
+      account_id: issuedDocument?.accountId || null,
+      project_id: issuedDocument?.projectId || null,
+      version_id: issuedDocument?.versionId || null,
+      initial_stage: 'readiness',
+    });
 
     const title = buildProjectReportTitle(
       projectName,
@@ -285,12 +311,15 @@ export function useClientReportPdfExport({
       exportTimingsRef.current?.mark('storage_result', outcome.complete ? 'complete' : 'incomplete');
       if (outcome.complete) {
         setPublication({ status: "complete", failed: [] });
+        reportOperation('complete');
       } else if (outcome.failed.length > 0) {
         setPublication({ status: "incomplete", failed: outcome.failed });
         setError(outcome.failed.map(item => item.error).join(' ') || 'Document storage is incomplete. Retry storage.');
+        reportOperation('fail', { error_code: 'STORAGE_FAILED', diagnostic_summary: 'Document storage incomplete.' });
       } else {
         setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
         setError('The Technical Report was not stored. Retry storage.');
+        reportOperation('fail', { error_code: 'STORAGE_FAILED', diagnostic_summary: 'Technical Report not stored.' });
       }
     };
 
@@ -382,6 +411,7 @@ export function useClientReportPdfExport({
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");
+      reportOperation('fail', { error_code: 'PRINT_PREPARATION_FAILED', diagnostic_summary: 'Print preparation failed.' });
       closeReportPrintWindow(printWindowRef.current);
       printWindowRef.current = null;
       exportTimingsRef.current?.mark('print_error', 'Print preparation failed');
@@ -392,6 +422,7 @@ export function useClientReportPdfExport({
       const message = failure?.message || 'Report preparation failed. Retry storage.';
       setError(message);
       setPublication({ status: 'incomplete', failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: message }] });
+      reportOperation('fail', { error_code: 'EXPORT_FAILED', diagnostic_summary: 'Report preparation failed.' });
       closeReportPrintWindow(printWindowRef.current);
       printWindowRef.current = null;
       exportTimingsRef.current?.mark('export_error', message);

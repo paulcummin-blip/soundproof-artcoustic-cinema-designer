@@ -39,6 +39,7 @@ import { proposalEvidenceMoveIsSafe } from '../../shared/designIdentityCompariso
 import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshotCanonical.js';
 import { recordProposalGenerationIncident } from '../../shared/systemHealth/incidentRecorder.js';
 import { buildDealerFailureMessage, isRecoveryAvailable, FAILURE_TYPE } from '../../shared/systemHealth/incidentMessages.js';
+import { startOperation, reportOperationProgress, completeOperation, failOperation, OPERATION_TYPE } from '../../shared/systemHealth/operationMonitor.js';
 
 // ── ONE proposal readiness authority ──
 // The gate below is decided by the SAME per-version rule the Step 5 table shows
@@ -140,6 +141,15 @@ export default async function(req) {
     if (account_id && account_id !== effectiveAccountId) {
       return Response.json({ error: 'Project account does not match the active account.' }, { status: 403 });
     }
+
+    // ── Start operation monitoring (fail-open) ──
+    await startOperation(base44, {
+      operation_id: request_id,
+      operation_type: OPERATION_TYPE.PROPOSAL_GENERATION,
+      account_id: effectiveAccountId,
+      project_id: requestProjectId,
+      initial_stage: 'preparing_evidence',
+    });
 
     // ── Resolve version IDs ──
     // New proposals pass selected_version_ids[] and proposal_type.
@@ -525,6 +535,7 @@ export default async function(req) {
     // contract is reported as a failed generation and nothing is saved.
     const generatedAt = new Date().toISOString();
     const writerConfig = await readWriterConfig(base44);
+    await reportOperationProgress(base44, { operation_id: request_id, stage: 'writing_proposal' });
     const attempt = await runProposalCopyGeneration({
       proposal,
       projectId: project_id,
@@ -586,6 +597,8 @@ export default async function(req) {
     await base44.entities.ProposalGeneration.create(
       generationEntityPayload({ record: auditRecord, accountId: effectiveAccountId }),
     );
+
+    await reportOperationProgress(base44, { operation_id: request_id, stage: 'validating' });
 
     if (attempt.valid !== true) {
       // The draft arrived and broke the writer's own contract. It is never
@@ -675,6 +688,8 @@ export default async function(req) {
       ? mergeHighlightRows(selectHighlightRows(engineering_snapshot), null)
       : null;
 
+    await reportOperationProgress(base44, { operation_id: request_id, stage: 'saving' });
+
     await Promise.all(sectionRecords.map((section) => {
       const html = bodyByType.get(section.section_type);
       // A section with no validated copy is not part of the document. Presented
@@ -702,6 +717,8 @@ export default async function(req) {
 
     // ── Update Proposal status ──
     await base44.entities.Proposal.update(proposal.id, { status: 'generated' });
+
+    await completeOperation(base44, { operation_id: request_id, proposal_id: proposal.id });
 
     const completedProposal = { ...proposal, status: 'generated' };
     return Response.json({
@@ -740,6 +757,16 @@ export default async function(req) {
     const errorCode = incidentContext?.errorCode || 'UNEXPECTED_ERROR';
     const dealerMessage = buildDealerFailureMessage(failureType, errorCode);
     const recoveryAvailable = isRecoveryAvailable(failureType, errorCode);
+
+    // ── Mark the monitored operation as failed (fail-open) ──
+    if (base44) {
+      await failOperation(base44, {
+        operation_id: request_id,
+        error_code: errorCode,
+        diagnostic_summary: `Failure type: ${failureType}. Error code: ${errorCode}.`,
+        incident_reference: incidentResult?.reference || null,
+      });
+    }
 
     return Response.json({
       error: dealerMessage,

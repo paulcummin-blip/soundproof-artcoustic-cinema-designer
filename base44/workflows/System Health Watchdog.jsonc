@@ -1,0 +1,44 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/5 * * * *",
+      "one_time_date": null,
+      "timezone": "Europe/London",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "system_health_watchdog",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_watchdog": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "runSystemHealthWatchdog"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Check for stalled operations",
+            "description": "Detects operations that started but never completed or failed"
+          }
+        }
+      }
+    ]
+  },
+  "name": "System Health Watchdog",
+  "description": "Checks for stalled operations every 5 minutes. Marks suspected stalls, confirms failures after a grace period, and raises incidents for confirmed critical/high-severity failures. Only inspects and updates monitoring records \u2014 never restarts operations or modifies business data."
+}
