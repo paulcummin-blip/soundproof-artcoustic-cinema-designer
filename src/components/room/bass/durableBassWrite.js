@@ -39,6 +39,9 @@ export async function persistBassAuthorityDurably(entity, payload, { accountId =
   const matches = row => row?.project_id === query.project_id && row?.version_id === query.version_id
     && Object.entries(write).every(([key, value]) => same(row[key], value));
   // A fresh read is a valid no-op receipt; a session signature or old object is not.
+  const currentClaims = before.filter(row => row.status === 'complete' && row.current_fingerprint === fp);
+  if (currentClaims.some(row => desired && !same(row.completed_by_fingerprint?.[fp], desired) && row.id !== target?.id))
+    throw new Error('Conflicting completed bass records exist for the same fingerprint.');
   if (target && matches(target)) return { row: target, disposition: 'verified-existing', fingerprint: fp };
   let writeError = null;
   let response = null;

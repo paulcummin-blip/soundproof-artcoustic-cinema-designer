@@ -59,6 +59,12 @@ export function resolveBassEvidenceForPublication(cacheRecord, bassFingerprint) 
   if (!graphPayloadIsUsable(graphPayload)) return null;
   return {
     schema_version: BASS_EVIDENCE_SCHEMA_VERSION,
+    // Retain the authority proof with the already-frozen graph. Do not duplicate
+    // graph/recommendation payloads. Readers re-run the real contract validator.
+    authorityContract: {
+      ...contract, graphPayload: undefined, recommendation: undefined,
+      bassResult: contract.bassResult ? { ...contract.bassResult, recommendation: undefined, EQPrediction: undefined } : null,
+    },
     fingerprint: bassFingerprint,
     graphPayload,
     // Compact-contract fields buildFinishedGraphOptimisationResult reads
@@ -106,12 +112,13 @@ export function syntheticContractFromRetainedEvidence(publication) {
   if (!hasRetainedBassEvidence(publication)) return null;
   const retained = publication.bass_evidence;
   return {
+    ...(retained.authorityContract || {}),
     graphPayload: retained.graphPayload,
     assessmentEnvelope: retained.assessmentEnvelope,
-    bassResult: { seatResults: { P20: retained.bassResultSeatResultsP20 || [] } },
+    bassResult: retained.authorityContract?.bassResult || { seatResults: { P20: retained.bassResultSeatResultsP20 || [] } },
     selectedCandidateId: retained.selectedCandidateId,
     requestedP14TargetDb: retained.requestedP14TargetDb,
-    job: { resultFingerprint: retained.jobResultFingerprint },
-    fingerprints: { calibration: retained.calibrationFingerprint },
+    job: retained.authorityContract?.job || { resultFingerprint: retained.jobResultFingerprint },
+    fingerprints: retained.authorityContract?.fingerprints || { calibration: retained.calibrationFingerprint },
   };
 }

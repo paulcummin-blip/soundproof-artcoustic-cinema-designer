@@ -28,6 +28,7 @@ function curveKeysMatch(a, b) {
     const pa = a[i];
     const pb = b[i];
     if (!pa || !pb) return false;
+    if (![pa.frequency, pb.frequency, pa.spl, pb.spl].every(v => typeof v === 'number' && Number.isFinite(v))) return false;
     if (Math.abs(Number(pa.frequency) - Number(pb.frequency)) > 0.001) return false;
     if (Math.abs(Number(pa.spl) - Number(pb.spl)) > 0.001) return false;
   }
@@ -52,7 +53,7 @@ export function verifyFrozenBassAuthority(rows, publication, isAuthoritative = n
   // 1. Find the matching complete cache contract for this fingerprint.
   let matchingContract = null;
   for (const row of cacheRows) {
-    if (!row || row.status !== 'complete') continue;
+    if (!row) continue; // A frozen report may reference a completed contract after the live design moved on.
     const cbf = row.completed_by_fingerprint;
     if (!cbf || typeof cbf !== 'object') continue;
     const contract = cbf[bassFp];
@@ -63,6 +64,12 @@ export function verifyFrozenBassAuthority(rows, publication, isAuthoritative = n
     break;
   }
 
+  if (!matchingContract && publication?.bass_evidence?.authorityContract) {
+    const retained = publication.bass_evidence;
+    matchingContract = { ...retained.authorityContract, graphPayload: retained.graphPayload };
+    if (retained.fingerprint !== bassFp || matchingContract.job?.resultFingerprint !== bassFp)
+      return { verified: false, reason: 'retained-fingerprint-mismatch', contract: null };
+  }
   if (!matchingContract) {
     return { verified: false, reason: 'no-matching-complete-contract', contract: null };
   }

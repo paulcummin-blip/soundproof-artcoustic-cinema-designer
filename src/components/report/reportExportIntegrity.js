@@ -76,7 +76,7 @@ export function validateReportExportIntegrity({
 
   // 3. The bass authority is current and authoritative.
   if (!completedBassAuthority?.authoritative || completedBassAuthority?.authorityStatus !== 'AUTHORITATIVE') {
-    issues.push('Bass authority is not current or authoritative.');
+    issues.push('Bass authority is not current or authoritative' + (completedBassAuthority?.error || completedBassAuthority?.verificationReason ? ': ' + (completedBassAuthority.error || completedBassAuthority.verificationReason) : '.'));
     categories.bassAuthority = false;
   }
   if (!completedBassAuthority?.contract) {

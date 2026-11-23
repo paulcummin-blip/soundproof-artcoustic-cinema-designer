@@ -34,7 +34,7 @@ export default function frozenReportBass(rows, publication) {
   // The retained contract is for graph rendering; the cache contract is
   // used for authority verification. Use the retained contract for the
   // graph if available, fall back to the cache contract.
-  const contract = retainedContract || cacheContract;
+  let contract = retainedContract || cacheContract;
   const fromRetained = !!retainedContract;
 
   // Verify against the matching complete saved cache contract and authority
@@ -47,6 +47,7 @@ export default function frozenReportBass(rows, publication) {
     verification = { verified: false, reason: 'verification-error', contract: null };
   }
 
+  if (verification.verified) contract = verification.contract;
   return {
     contract,
     authoritative: verification.verified,
