@@ -325,7 +325,10 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
   const previousKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
   const previous = peekPendingExport(previousKey);
   if (previous?.blob || previous?.fileUri || previous?.uploadOperation) {
-    if (previous.issued?.versionId === identity?.versionId && previous.compositionHtml === snapshot?.nodeHtml) {
+    const resolved = typeof identity.resolveSource === 'function' ? await boundedExportRead(identity.resolveSource, 'Report identity') : {};
+    const nextIdentity = { ...identity, ...resolved };
+    const sameSource = ['versionId', 'selectedVersionIds', 'sourceRecordId', 'sourceFingerprints'].every(key => JSON.stringify(previous.issued?.[key] ?? null) === JSON.stringify(nextIdentity[key] ?? null));
+    if (sameSource && previous.compositionHtml === snapshot?.nodeHtml) {
       const record = await persistHeldPdf(previousKey, onProgress);
       notifyIssuedExportStored(record.project_id);
       return { record, pendingKey: previousKey };
