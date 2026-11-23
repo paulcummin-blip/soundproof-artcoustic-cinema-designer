@@ -39,6 +39,7 @@ export default function AdminDesignIntentPreview() {
 
   const preview = useDesignIntentPreview(activeProjectId || null);
   const hasResult = Boolean(preview.preview);
+  const [samples, setSamples] = React.useState('');
 
   if (isLoadingAuth) {
     return <div style={{ padding: 48, textAlign: 'center', fontFamily: FONT_BODY, color: '#3E4349' }}>Checking access…</div>;
@@ -129,7 +130,17 @@ export default function AdminDesignIntentPreview() {
         <p style={{ marginTop: 16, fontFamily: FONT_BODY, fontSize: 13, color: '#8B4A2B' }}>{preview.error}</p>
       )}
 
-      <DesignIntentPreviewResult data={preview.preview} />
+      <details style={{ marginTop:16 }}>
+        <summary>Admin coverage validation (read-only)</summary>
+        <p>Paste a JSON array of narrative samples to test against this version’s saved reasons. Nothing is saved.</p>
+        <textarea aria-label="Coverage samples JSON" value={samples} onChange={e=>setSamples(e.target.value)}
+          disabled={preview.busy} style={{ width:'100%', minHeight:120 }} />
+        <button type="button" disabled={preview.busy || !preview.versionId}
+          onClick={()=>{ try { const list=JSON.parse(samples); if (!Array.isArray(list)) throw Error(); preview.runPreview(list); }
+            catch { setSamples('["Enter a complete narrative sample here"]'); } }}>Validate samples</button>
+      </details>
+      {preview.preview?.coverage_samples && <pre style={{ whiteSpace:'pre-wrap' }}>{JSON.stringify(preview.preview,null,2)}</pre>}
+      {!preview.preview?.coverage_samples && <DesignIntentPreviewResult data={preview.preview} />}
     </div>
   );
 }
