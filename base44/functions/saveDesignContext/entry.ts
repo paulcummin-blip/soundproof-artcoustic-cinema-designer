@@ -3,6 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import {
   normaliseContextItems,
+  normaliseProjectContext,
   mergeContextItems,
   buildContextRecord,
 } from '../../shared/designContext/designContextModel.js';
@@ -24,7 +25,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { project_id, version_id, context_items } = body || {};
+    const { project_id, version_id, context_items, project_context } = body || {};
     if (!project_id || !version_id) {
       return Response.json({ error: 'project_id and version_id are required.' }, { status: 400 });
     }
@@ -49,6 +50,9 @@ export default async function(req) {
 
     const now = new Date().toISOString();
     const incomingItems = normaliseContextItems(context_items, { user, now });
+    // The optional free-text Project Context is normalised once and persisted
+    // alongside the items. It never overwrites or discards existing answers.
+    const incomingProjectContext = normaliseProjectContext(project_context);
 
     // Read the existing record, if any.
     const existing = await readContextRecord(base44.entities, project_id, version_id);
@@ -63,6 +67,7 @@ export default async function(req) {
       versionId: version_id,
       accountId,
       items: mergedItems,
+      projectContext: incomingProjectContext,
       now,
       user,
     });
@@ -71,6 +76,7 @@ export default async function(req) {
     if (existing?.id) {
       saved = await base44.entities.DesignContext.update(existing.id, {
         context_items: mergedItems,
+        project_context: incomingProjectContext,
         updated_at: now,
         updated_by: user?.full_name || user?.email || null,
       });
@@ -82,7 +88,9 @@ export default async function(req) {
       return Response.json({ ok:false, saved:false, error:'Saving your answers was unsuccessful. Please retry saving.' }, { status:409 });
     }
     const confirmed = await readContextRecord(base44.entities, project_id, version_id);
-    if (!confirmed || confirmed.updated_at !== now || !persistedContextContains(confirmed, mergedItems)) {
+    const confirmedProjectContext = normaliseProjectContext(confirmed?.project_context);
+    if (!confirmed || confirmed.updated_at !== now || !persistedContextContains(confirmed, mergedItems)
+      || confirmedProjectContext !== incomingProjectContext) {
       return Response.json({ ok: false, saved: false, error: 'Your answers could not be verified after saving. Please retry saving.' }, { status: 409 });
     }
     return Response.json({
@@ -92,6 +100,7 @@ export default async function(req) {
       context_revision: contextRevision(confirmed),
       record_id: saved?.id || existing?.id || null,
       item_count: mergedItems.length,
+      project_context: confirmedProjectContext,
     });
   } catch (error) {
     return Response.json({ error: error?.message || 'The design context could not be saved.' }, { status: 500 });

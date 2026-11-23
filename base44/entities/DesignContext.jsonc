@@ -1,7 +1,7 @@
 {
   "name": "DesignContext",
   "type": "object",
-  "description": "Version-scoped designer context: the designer's own explanations of design decisions whose reasons are not established by engineering data. One record per project version. Only answered items and explicit no-reason confirmations are stored; skipped questions are never persisted, so a skipped question may be asked again on a future generation. Each item carries a decision-specific input fingerprint so that a material change to the relevant design inputs triggers reconfirmation rather than silent reuse. Read by both the Technical Report Design Intent generation and the Client Proposal generation, so confirmed human answers take priority over inferred motivations in both documents. Written only by the saveDesignContext backend function. Never carries client names, project titles, personal data or engineering results \u2014 only the designer's explanation of a design decision.",
+  "description": "Version-scoped designer context: the designer's own explanations of design decisions whose reasons are not established by engineering data, plus an optional free-text Project Context the designer may supply. One record per project version. Only answered items and explicit no-reason confirmations are stored; skipped questions are never persisted, so a skipped question may be asked again on a future generation. Each item carries a decision-specific input fingerprint so that a material change to the relevant design inputs triggers reconfirmation rather than silent reuse. The optional project_context is a free-text field stored alongside the items and never overwrites or discards existing answers. Read by both the Technical Report Design Intent generation and the Client Proposal generation, so confirmed human answers take priority over inferred motivations in both documents. Written only by the saveDesignContext backend function. Never carries client names, project titles, personal data or engineering results \u2014 only the designer's explanation of a design decision and the optional project context.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -22,6 +22,11 @@
       "items": {
         "type": "object"
       }
+    },
+    "project_context": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional free-text Project Context the designer may supply at the bottom of the Design Context dialog ('Anything else ADI should know about this project?'). Accepts substantial free-text input describing the client's priorities, how the room will be used, architectural constraints or design choices that are not obvious from the plans. Saved against the exact project and version, available during subsequent report generation, and remains editable when returning to the dialog. Never overwrites or discards existing question answers. Null when the designer has supplied none. It is semantic input for the writer, never a source of figures, levels, products or performance claims."
     },
     "updated_at": {
       "type": "string",

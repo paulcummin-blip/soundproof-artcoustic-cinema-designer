@@ -9,6 +9,7 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
   const [questions, setQuestions] = useState([]);
   const [savedItems, setSavedItems] = useState([]);
   const [draftRows, setDraftRows] = useState(null);
+  const [projectContext, setProjectContext] = useState('');
   const [error, setError] = useState(null);
   const resolverRef = useRef(null);
   const pendingRef = useRef(null);
@@ -51,6 +52,7 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
         discoveredRef.current = true;
         setQuestions(data.questions || []);
         setSavedItems(data.saved_items || []);
+        setProjectContext(typeof data.project_context === 'string' ? data.project_context : '');
         if (!(data.questions || []).length && !(data.saved_items || []).length) {
           const revision = await saveAndVerifyDesignContext({ base44, projectId, versionId });
           if (!resolverRef.current) return;
@@ -71,7 +73,7 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
     return pending;
   }, [projectId, versionId]);
 
-  const proceed = useCallback(async rows => {
+  const proceed = useCallback(async (rows, projectContextText = null) => {
     if (savingRef.current || !resolverRef.current) return;
     if (!discoveredRef.current) { void discoverRef.current?.(); return; }
     savingRef.current = true;
@@ -84,10 +86,11 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
         status: row.status, answer: row.status === 'answered' ? (row.answer || '').trim() : null,
         decision_fingerprint: row.decision_fingerprint }));
     try {
-      const revision = await saveAndVerifyDesignContext({ base44, projectId, versionId, items });
+      const revision = await saveAndVerifyDesignContext({ base44, projectId, versionId, items, projectContext: projectContextText });
       if (!resolverRef.current) return;
       confirmedRevisionRef.current = revision;
       skippedQuestionIdsRef.current = skippedIds;
+      setProjectContext(typeof projectContextText === 'string' ? projectContextText.trim() : (projectContext || ''));
       clearDraft();
       setStatus('idle');
       finish({ contextRevision: revision, skippedQuestionIds: skippedIds });
@@ -98,7 +101,7 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
     } finally {
       savingRef.current = false;
     }
-  }, [projectId, versionId]);
+  }, [projectId, versionId, projectContext]);
 
   const cancel = useCallback(() => {
     if (savingRef.current) return;
@@ -115,7 +118,7 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
   const dialogPropsRef = useRef(null);
   dialogPropsRef.current = {
     open: status !== 'idle', isDiscovering: status === 'discovering', isSaving: status === 'saving',
-    questions, savedItems, draftRows, error, onProceed: proceed, onCancel: cancel,
+    questions, savedItems, draftRows, projectContext, error, onProceed: proceed, onCancel: cancel,
   };
   const Dialog = React.useMemo(() => function DesignContextDialogBound() {
     return React.createElement(DesignContextDialog, dialogPropsRef.current);

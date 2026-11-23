@@ -88,6 +88,7 @@ export default async function(req) {
       ok: true,
       questions: questionsToAsk,
       saved_items: savedForReview,
+      project_context: typeof savedRecord?.project_context === 'string' ? savedRecord.project_context.trim() : null,
       has_questions: questionsToAsk.length > 0,
       has_saved: savedForReview.length > 0,
     });

@@ -35,8 +35,8 @@ import React from 'react';
 import ProjectReportSummaryOpening from '@/components/report/projectReport/ProjectReportSummaryOpening';
 import ProjectReportOpeningBlock from '@/components/report/projectReport/ProjectReportOpeningBlock';
 import ProjectReportFactsGrid from '@/components/report/projectReport/ProjectReportFactsGrid';
-import RegenerateDesignIntentControl from '@/components/report/projectReport/RegenerateDesignIntentControl';
-import { useRegenerateDesignIntent } from '@/components/report/projectReport/useRegenerateDesignIntent';
+import EditDesignIntentControl from '@/components/report/projectReport/EditDesignIntentControl';
+import { useEditDesignIntent } from '@/components/report/projectReport/useEditDesignIntent';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
 import { AUTO_INTENT } from '@/components/report/projectReport/useAutoDesignIntent';
 import {
@@ -134,16 +134,23 @@ export default function ProjectReportDesignSummary({
   projectId = null,
   versionId = null,
   hasAcceptedNarrative = false,
+  // The full saved Design Intent narrative record (snapshot.payload.design_intent),
+  // so the Edit flow can preserve the original generated text for recovery and
+  // keep the evidence fingerprints the edited wording is pinned to.
+  savedDesignIntentRecord = null,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
 
-  // The deliberate Regenerate Design Intent flow. The action sits beside the
-  // Design Intent heading; the comparison dialog commits only the reviewed
-  // narrative and leaves every other report field untouched. Before generating,
-  // the context review step asks the designer about design decisions whose
-  // reasons the engineering evidence does not establish.
-  const regenerate = useRegenerateDesignIntent({ projectId, versionId, hasAcceptedNarrative });
-  const ContextDialog = regenerate.ContextDialog;
+  // The Edit Design Intent flow. The action sits beside the Design Intent
+  // heading; the dialog saves the designer's edited wording directly against
+  // the correct Project Report and design version (only the Design Intent field
+  // is touched) and the report reloads. No provider is called.
+  const editIntent = useEditDesignIntent({
+    projectId,
+    versionId,
+    savedDesignIntentRecord: savedDesignIntentRecord,
+    hasAcceptedNarrative,
+  });
 
   const widthM = Number(roomDims?.widthM);
   const lengthM = Number(roomDims?.lengthM);
@@ -227,18 +234,19 @@ export default function ProjectReportDesignSummary({
             sentence={summaryOpening}
             print={print}
             headingAction={!print ? (
-              <RegenerateDesignIntentControl
-                status={regenerate.status}
-                hasAcceptedNarrative={regenerate.hasAcceptedNarrative}
-                isBusy={regenerate.isBusy}
-                isReviewing={regenerate.isReviewing}
-                newText={regenerate.newText}
-                error={regenerate.error}
+              <EditDesignIntentControl
+                status={editIntent.status}
+                hasAcceptedNarrative={editIntent.hasAcceptedNarrative}
+                isBusy={editIntent.isBusy}
+                isEditing={editIntent.isEditing}
+                draft={editIntent.draft}
+                error={editIntent.error}
                 existingText={summaryOpening}
-                onGenerate={regenerate.generate}
-                onKeepExisting={regenerate.keepExisting}
-                onCommit={regenerate.commit}
-                onDismissError={regenerate.dismissError}
+                onOpen={editIntent.open}
+                onDraftChange={editIntent.setDraft}
+                onSave={editIntent.save}
+                onCancel={editIntent.cancel}
+                onDismissError={editIntent.dismissError}
               />
             ) : null}
           />
@@ -286,9 +294,6 @@ export default function ProjectReportDesignSummary({
         </div>
       )}
 
-      {/* The pre-generation context review dialog. Shown when the designer
-          clicks Regenerate Design Intent, before the writer is called. */}
-      {!print && ContextDialog && <ContextDialog />}
     </div>
   );
 }

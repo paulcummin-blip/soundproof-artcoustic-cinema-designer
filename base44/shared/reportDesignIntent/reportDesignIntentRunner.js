@@ -233,6 +233,12 @@ export async function runReportDesignIntent({
   // intent, so the writer can explain WHY a decision was made without inventing
   // a motivation. Empty where no context has been saved.
   recordedIntent = [],
+  // The optional free-text Project Context the designer supplied. Carried to the
+  // interpretation as additional recorded intent (semantic input the writer may
+  // use to explain the project), but NOT added to required_saved_reasons, so the
+  // coverage gate never hard-blocks a generation on a free-text note. Null when
+  // the designer supplied none.
+  projectContext = null,
   // PREPARE ONLY: build the frozen pack and the scoped writer input and stop,
   // making no provider call and writing nothing. It exists so a caller that needs
   // the very same evidence and the very same contract for another purpose — the
@@ -301,6 +307,13 @@ export async function runReportDesignIntent({
       }
     }
 
+    // The optional Project Context is carried to the interpretation as
+    // additional recorded intent, so the writer can use it to explain the
+    // project. It is NOT added to required_saved_reasons, so the coverage
+    // gate never hard-blocks a generation on a free-text note.
+    const interpretationIntent = (typeof projectContext === 'string' && projectContext.trim())
+      ? [...(Array.isArray(recordedIntent) ? recordedIntent : []), `project_context: ${projectContext.trim()}`]
+      : (Array.isArray(recordedIntent) ? recordedIntent : []);
     writerInput = buildDesignIntentWriterInput({
       pack,
       designContext: buildIntentDesignContext({
@@ -309,12 +322,13 @@ export async function runReportDesignIntent({
         versions,
         clientBrief,
         designerNotes,
-        recordedIntent,
+        recordedIntent: interpretationIntent,
         pack,
       }),
       geometryContext: geometry,
       visualContext: visual,
       recordedDesignReasons: recordedIntent,
+      projectContext: (typeof projectContext === 'string' && projectContext.trim()) ? projectContext.trim() : null,
     });
     assertWriterInputCarriesNoLiveState(writerInput);
 

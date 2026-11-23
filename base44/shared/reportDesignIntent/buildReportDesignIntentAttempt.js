@@ -172,6 +172,12 @@ export async function buildReportDesignIntentAttempt({
     ? allContextItems.filter((item) => !skipSet.has(String(item?.question_id || '')))
     : allContextItems;
   const recordedIntent = recordedIntentFromContext(contextItems);
+  // The optional free-text Project Context the designer supplied at the bottom
+  // of the Design Context dialog. Carried to the writer as semantic input, never
+  // as a source of figures or performance claims, and never overwrites the
+  // per-question answers above.
+  const projectContext = (typeof contextRecord?.project_context === 'string'
+    && contextRecord.project_context.trim()) ? contextRecord.project_context.trim() : null;
 
   // ── The writer's own switch, before any evidence is read ──
   const configResult = await authorityEntities.SystemConfig.filter({}, { limit: 1 });
@@ -205,6 +211,8 @@ export async function buildReportDesignIntentAttempt({
     // intent, so the writer can explain WHY a decision was made without
     // inventing a motivation.
     recordedIntent,
+    // The optional free-text Project Context. Semantic input for the writer only.
+    projectContext,
     readEvidence: evidenceReader || (async ({ versionIds }) => {
       const page = await entities.ProjectVersion.filter(
         { project_id: projectId, id: { $in: versionIds } },

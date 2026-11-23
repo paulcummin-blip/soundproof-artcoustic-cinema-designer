@@ -731,6 +731,7 @@ export function useProjectReportPages({
           projectId={projectId}
           versionId={versionId}
           hasAcceptedNarrative={savedDesignIntent?.status === 'accepted'}
+          savedDesignIntentRecord={savedDesignIntent}
         />
       ),
     };

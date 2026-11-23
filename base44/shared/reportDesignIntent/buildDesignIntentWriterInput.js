@@ -67,6 +67,7 @@ export function buildDesignIntentWriterInput({
   geometryContext = null,
   visualContext = null,
   recordedDesignReasons = null,
+  projectContext = null,
 } = {}) {
   const full = buildWriterInput({
     pack,
@@ -99,6 +100,7 @@ export function buildDesignIntentWriterInput({
       section: DESIGN_INTENT_SECTION,
       rule: DESIGN_INTENT_SCOPE_RULE,
       ...(Array.isArray(recordedDesignReasons) ? { required_saved_reasons: recordedDesignReasons.filter(reason => typeof reason === 'string' && reason.trim()) } : {}),
+      ...(typeof projectContext === 'string' && projectContext.trim() ? { project_context: projectContext.trim() } : {}),
     },
     section_structure: {
       ...(core.section_structure || {}),

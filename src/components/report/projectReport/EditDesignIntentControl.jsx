@@ -1,23 +1,23 @@
 /**
- * RegenerateDesignIntentControl.jsx
- * --------------------------------
- * The deliberate Regenerate Design Intent action for a saved Project Report.
+ * EditDesignIntentControl.jsx
+ * ---------------------------
+ * The Edit Design Intent action for a saved Project Report.
  *
  * Renders a small action beside the Design Intent heading (screen only — never
- * in the printed PDF), and a comparison dialog when a new narrative has been
- * generated. The designer reviews the new wording against the existing one and
- * chooses:
+ * in the printed PDF). Clicking it opens the currently accepted Design Intent
+ * in an editable text field. The designer edits the wording and chooses:
  *
- *   Use New Version  → commits the reviewed narrative to the snapshot (only the
- *                      Design Intent field is touched), then the report reloads.
- *   Keep Existing    → discards the new narrative; the report is unchanged.
+ *   Save   → persists the edited text against the correct Project Report and
+ *            design version (only the Design Intent field is touched), then
+ *            the report reloads. No provider is called.
+ *   Cancel → discards the edits; the report is unchanged.
  *
- * Available only when the Project Report already contains an accepted narrative.
- * A generation or validation failure retains the existing narrative and shows
- * the reason. Existing PDF assets are never touched by this control.
+ * Available only when the Project Report already contains an accepted
+ * narrative. A save failure retains the designer's entries and shows the
+ * reason. Existing PDF assets are never touched by this control.
  */
 import React from 'react';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { Edit3, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -35,79 +35,31 @@ const BRAND = '#213428';
 const MUTED = '#625143';
 const RULE = '#DCDBD6';
 
-/** Render the narrative's paragraphs, exactly as the report's own opening does. */
-function NarrativeParagraphs({ text }) {
-  const paragraphs = String(text || '')
-    .split(/\n\s*\n/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return paragraphs.map((paragraph, index) => (
-    <p
-      key={index}
-      style={{
-        margin: index === 0 ? 0 : '10px 0 0 0',
-        fontSize: 13,
-        lineHeight: 1.6,
-        color: '#3E4349',
-        fontFamily: FONT_BODY,
-      }}
-    >
-      {paragraph}
-    </p>
-  ));
-}
-
-function Column({ label, children, highlighted = false }) {
-  return (
-    <div style={{
-      flex: 1,
-      minWidth: 0,
-      padding: 16,
-      background: '#FFFFFF',
-      border: `1px solid ${RULE}`,
-      borderLeft: highlighted ? `4px solid ${BRAND}` : `1px solid ${RULE}`,
-      borderRadius: 8,
-    }}>
-      <div style={{
-        fontFamily: FONT_HEADING,
-        fontSize: 10,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: MUTED,
-        marginBottom: 8,
-      }}>
-        {label}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-export default function RegenerateDesignIntentControl({
+export default function EditDesignIntentControl({
   status,
   hasAcceptedNarrative = false,
   isBusy = false,
-  isReviewing = false,
-  newText = null,
+  isEditing = false,
+  draft = '',
   error = null,
   existingText = null,
-  onGenerate = null,
-  onKeepExisting = null,
-  onCommit = null,
+  onOpen = null,
+  onDraftChange = null,
+  onSave = null,
+  onCancel = null,
   onDismissError = null,
 }) {
   if (!hasAcceptedNarrative) return null;
 
-  const generating = status === 'generating';
-  const committing = status === 'committing';
+  const saving = status === 'saving';
 
   return (
     <>
       <button
         type="button"
-        onClick={onGenerate}
+        onClick={onOpen}
         disabled={isBusy}
-        title="Regenerate the Design Intent using the improved writer"
+        title="Edit the finished Design Intent text"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -124,14 +76,11 @@ export default function RegenerateDesignIntentControl({
           whiteSpace: 'nowrap',
         }}
       >
-        <RefreshCw
-          className={generating ? 'animate-spin' : ''}
-          style={{ width: 12, height: 12, color: BRAND }}
-        />
-        {generating ? 'Generating…' : 'Regenerate Design Intent'}
+        <Edit3 style={{ width: 12, height: 12, color: BRAND }} />
+        Edit Design Intent
       </button>
 
-      {error && !isReviewing && (
+      {error && !isEditing && (
         <div
           role="alert"
           style={{
@@ -153,7 +102,7 @@ export default function RegenerateDesignIntentControl({
             <AlertCircle style={{ width: 16, height: 16, color: '#8A1A1A', flexShrink: 0, marginTop: 1 }} />
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: '#8A1A1A' }}>
-                Could not regenerate the Design Intent.
+                Could not save the edited Design Intent.
               </div>
               <div style={{ fontSize: 12, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>
                 {error}
@@ -180,27 +129,38 @@ export default function RegenerateDesignIntentControl({
         </div>
       )}
 
-      <Dialog open={isReviewing} onOpenChange={(open) => { if (!open && !committing) onKeepExisting?.(); }}>
+      <Dialog open={isEditing} onOpenChange={(open) => { if (!open && !saving) onCancel?.(); }}>
         <DialogContent style={{ maxWidth: 780, fontFamily: FONT_BODY }}>
           <DialogHeader>
             <DialogTitle style={{ fontFamily: FONT_HEADING, color: BRAND, fontWeight: 300 }}>
-              Regenerate Design Intent
+              Edit Design Intent
             </DialogTitle>
             <DialogDescription style={{ fontFamily: FONT_BODY, color: MUTED }}>
-              Review the newly generated wording against the existing Design Intent. The existing narrative stays in place until you choose to use the new version.
+              Edit the finished Design Intent text directly. Saving stores your wording against this report and design version; the engineering evidence, RP22 results, drawings and other report sections are all preserved. The original generated text is retained for recovery.
             </DialogDescription>
           </DialogHeader>
 
-          <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-            <Column label="Existing Design Intent">
-              <NarrativeParagraphs text={existingText} />
-            </Column>
-            <Column label="New Version" highlighted>
-              <NarrativeParagraphs text={newText} />
-            </Column>
-          </div>
+          <textarea
+            value={draft}
+            onChange={(e) => onDraftChange?.(e.target.value)}
+            disabled={saving}
+            style={{
+              width: '100%',
+              minHeight: 260,
+              padding: 14,
+              fontSize: 13.5,
+              lineHeight: 1.6,
+              fontFamily: FONT_BODY,
+              color: '#1B1A1A',
+              background: '#FAFAF8',
+              border: `1px solid ${RULE}`,
+              borderRadius: 8,
+              resize: 'vertical',
+              outline: 'none',
+            }}
+          />
 
-          {error && isReviewing && (
+          {error && isEditing && (
             <div style={{
               marginTop: 12,
               padding: '10px 12px',
@@ -219,8 +179,8 @@ export default function RegenerateDesignIntentControl({
           <DialogFooter style={{ marginTop: 16 }}>
             <button
               type="button"
-              onClick={onKeepExisting}
-              disabled={committing}
+              onClick={onCancel}
+              disabled={saving}
               style={{
                 fontFamily: FONT_BODY,
                 fontSize: 13,
@@ -229,16 +189,16 @@ export default function RegenerateDesignIntentControl({
                 border: `1px solid ${BRAND}`,
                 borderRadius: 6,
                 padding: '8px 18px',
-                cursor: committing ? 'not-allowed' : 'pointer',
-                opacity: committing ? 0.6 : 1,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.6 : 1,
               }}
             >
-              Keep Existing
+              Cancel
             </button>
             <button
               type="button"
-              onClick={onCommit}
-              disabled={committing}
+              onClick={onSave}
+              disabled={saving}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -250,12 +210,12 @@ export default function RegenerateDesignIntentControl({
                 border: `1px solid ${BRAND}`,
                 borderRadius: 6,
                 padding: '8px 18px',
-                cursor: committing ? 'progress' : 'pointer',
-                opacity: committing ? 0.7 : 1,
+                cursor: saving ? 'progress' : 'pointer',
+                opacity: saving ? 0.7 : 1,
               }}
             >
-              {committing && <RefreshCw className="animate-spin" style={{ width: 14, height: 14 }} />}
-              {committing ? 'Saving…' : 'Use New Version'}
+              {saving && <Edit3 className="animate-spin" style={{ width: 14, height: 14 }} />}
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </DialogFooter>
         </DialogContent>

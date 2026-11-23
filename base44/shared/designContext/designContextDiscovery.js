@@ -334,10 +334,15 @@ function checkFloatingScreenWall(state) {
 }
 
 /** The deterministic checks, in priority order. */
+// Acoustic treatment and subwoofer arrangement are deliberately NOT asked
+// here. Acoustic treatment is supporting evidence already explained by the
+// report; using distributed subwoofers to manage room modes and improve bass
+// consistency is standard engineering practice already covered by RP22
+// evidence. The questions that remain are project-specific human intent:
+// unusual seating positions, single-row layouts in large rooms, and
+// architectural construction choices.
 const DETERMINISTIC_CHECKS = [
   checkSeatingForwardOfRearWall,
-  checkSubwooferArrangement,
-  checkAcousticTreatment,
   checkSingleRowInLargeRoom,
   checkFloatingScreenWall,
 ];
@@ -458,7 +463,11 @@ export async function discoverAiQuestions({
     '- Never invent a design constraint or speculate about a reason the designer did not record.',
     '- Use only the project facts above for any figure you state. The seating_rows and seat_count facts are the verified counts for this design; do not infer a row count from the seat count or state a different number. Where a fact is "not recorded", do not state a figure for it.',
     '- Never claim that a particular bass improvement has been achieved unless the engineering results support it. Do not state that room modes have been smoothed, peaks reduced, or consistency improved unless measured results are cited.',
-    '- Three questions is a maximum, not a target. Zero questions is acceptable when nothing meaningful needs clarification.',
+    '- NEVER ask about acoustic treatment strategy, the absence of treatment, or treatment quantity. Treatment is supporting evidence already explained by the report, not a design decision that needs a reason.',
+    '- NEVER ask why distributed subwoofers are used, or ask the designer to explain a standard subwoofer count. Using multiple subwoofers to manage room modes and improve bass consistency is standard engineering practice already covered by RP22 evidence; only a specific unusual arrangement or an architectural constraint (for example subwoofers located in cabinetry) warrants a question.',
+    '- NEVER ask about generic room modes, generic acoustic principles, or technical calculations Sound Proof already performs. The questions are about project-specific human intent: the room\'s intended use, client priorities, reasons for unusual seating or layout choices, and architectural or installation constraints.',
+    '- NEVER ask about a decision whose reason RP22 evidence or standard engineering already establishes.',
+    '- Three questions is a maximum, not a target. Zero questions is acceptable when nothing meaningful needs clarification. Do not generate a question merely to fill an available slot.',
     '- Keep each question to one or two sentences in plain professional English.',
     '- Do not repeat questions already asked: ' + (existingIds || 'none'),
     '',

@@ -219,6 +219,7 @@ export default function DesignContextDialog({
   questions = [],
   savedItems = [],
   draftRows = null,
+  projectContext = '',
   error = null,
   onProceed = null,
   onCancel = null,
@@ -227,6 +228,13 @@ export default function DesignContextDialog({
   // Saved items that are not in the current questions list are shown as
   // review-only rows (the designer can edit them).
   const [rows, setRows] = React.useState([]);
+  // The optional free-text Project Context. Synced from the saved value when
+  // the dialog opens, and never overwrites or discards the question answers.
+  const [projectContextDraft, setProjectContextDraft] = React.useState('');
+  React.useEffect(() => {
+    if (!open) return;
+    setProjectContextDraft(typeof projectContext === 'string' ? projectContext : '');
+  }, [open, projectContext]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -302,9 +310,9 @@ export default function DesignContextDialog({
 
   const handleProceed = React.useCallback(() => {
     if (typeof onProceed === 'function') {
-      onProceed(rows);
+      onProceed(rows, projectContextDraft);
     }
-  }, [rows, onProceed]);
+  }, [rows, projectContextDraft, onProceed]);
 
   const hasQuestions = rows.length > 0;
 
@@ -341,6 +349,55 @@ export default function DesignContextDialog({
             ))}
           </fieldset>
         )}
+
+        {/* The optional free-text Project Context. Saved alongside the
+            question answers against the exact project and version, available
+            during report generation, editable on return, and never overwrites
+            or discards existing answers. */}
+        <div style={{
+          marginTop: 16,
+          padding: 16,
+          background: '#FAFAF8',
+          border: `1px solid ${RULE}`,
+          borderRadius: 8,
+        }}>
+          <div style={{
+            fontFamily: FONT_HEADING,
+            fontSize: 13,
+            fontWeight: 500,
+            color: BRAND,
+            marginBottom: 4,
+          }}>
+            Anything else ADI should know about this project?
+          </div>
+          <div style={{
+            fontSize: 11.5,
+            color: MUTED,
+            fontFamily: FONT_BODY,
+            marginBottom: 10,
+            lineHeight: 1.5,
+          }}>
+            Tell ADI about the client's priorities, how the room will be used, architectural constraints or design choices that aren't obvious from the plans.
+          </div>
+          <textarea
+            value={projectContextDraft}
+            onChange={(e) => setProjectContextDraft(e.target.value)}
+            placeholder="Optional. e.g. The room is primarily for family film nights with occasional sport and music; the client wants the bar area behind the seating kept open for social use..."
+            style={{
+              width: '100%',
+              minHeight: 80,
+              padding: '8px 10px',
+              fontSize: 13,
+              fontFamily: FONT_BODY,
+              color: '#3E4349',
+              background: '#FFFFFF',
+              border: `1px solid ${RULE}`,
+              borderRadius: 6,
+              resize: 'vertical',
+              outline: 'none',
+            }}
+          />
+        </div>
 
         {error && <p role="alert" style={{ color: '#8B4A2B', fontSize: 13 }}>{error}</p>}
         <DialogFooter style={{ marginTop: 16 }}>

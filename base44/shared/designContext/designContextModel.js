@@ -347,11 +347,18 @@ export function partitionByDecisionCurrency(savedItems, currentQuestions) {
  * @param {Object} [input.user]
  * @returns {Object} the record body for entity create/update
  */
+/** Normalise the optional free-text Project Context supplied at the bottom of the
+ *  dialog. Returns a trimmed string or null. Never affects question answers. */
+export function normaliseProjectContext(value) {
+  return asText(value);
+}
+
 export function buildContextRecord({
   projectId = null,
   versionId = null,
   accountId = null,
   items = [],
+  projectContext = null,
   now = null,
   user = null,
 } = {}) {
@@ -360,6 +367,7 @@ export function buildContextRecord({
     version_id: versionId,
     account_id: accountId,
     context_items: items,
+    project_context: normaliseProjectContext(projectContext),
     updated_at: now,
     updated_by: user?.full_name || user?.email || null,
   };
@@ -370,6 +378,7 @@ export default {
   CONTEXT_STATUS,
   DESIGN_CONTEXT_VERSION,
   normaliseContextItems,
+  normaliseProjectContext,
   mergeContextItems,
   partitionByCurrency,
   partitionByDecisionCurrency,
