@@ -88,6 +88,7 @@ describe('the preview is structurally incapable of writing', () => {
     expect(imports).toEqual([
       'npm:@base44/sdk@0.8.52',
       '../../shared/reportDesignIntent/buildReportDesignIntentAttempt.js',
+      '../../shared/reportDesignIntent/designIntentCoverage.js',
       '../../shared/reportDesignIntent/readOnlyEntities.js',
     ]);
     // The save wrapper is the one module that may write, and the preview cannot reach
