@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildReportDesignIntentAttempt } from '../../shared/reportDesignIntent/buildReportDesignIntentAttempt.js';
+import { reviewDesignIntentCoverage, requiredDesignReasons } from '../../shared/reportDesignIntent/designIntentCoverage.js';
 import { readOnlyEntities } from '../../shared/reportDesignIntent/readOnlyEntities.js';
 
 /**
@@ -40,6 +41,11 @@ export default async function(req) {
     const projectId = body?.project_id || null;
     const versionId = body?.version_id || null;
 
+    const samples = body?.coverage_samples;
+    if (samples !== undefined && (!Array.isArray(samples) || samples.length < 1 || samples.length > 8
+      || samples.some(s => typeof s !== 'string' || !s.trim() || s.length > 6000))) {
+      return Response.json({ error: 'Supply one to eight narrative samples, at most 6000 characters each.' }, { status: 400 });
+    }
     const guarded = readOnlyEntities(base44.entities);
     const guardedService = readOnlyEntities(base44.asServiceRole.entities);
 
@@ -55,6 +61,7 @@ export default async function(req) {
       // resolved exactly as production resolves it for this login.
       isMasterAdmin: true,
       now: new Date().toISOString(),
+      prepareOnly: Array.isArray(samples),
     });
 
     // The boundary, reported on every response: the reads that were made, and the
@@ -75,6 +82,16 @@ export default async function(req) {
         reason: outcome.block.reason,
         boundary,
       }, { status: outcome.block.status });
+    }
+
+    if (Array.isArray(samples)) {
+      const results = [];
+      for (const text of samples) results.push({ text, coverage: await reviewDesignIntentCoverage({
+        input: outcome.writerInput, text, model: outcome.flag?.model,
+        invokeLLM: request => base44.integrations.Core.InvokeLLM(request),
+      }) });
+      return Response.json({ ok: true, dry_run: true, persisted: false, boundary,
+        required_reasons: requiredDesignReasons(outcome.writerInput), coverage_samples: results });
     }
 
     const { project, version, snapshot, generation } = outcome;
