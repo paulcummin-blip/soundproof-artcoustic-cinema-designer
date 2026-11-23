@@ -76,10 +76,10 @@ test('confirmed candidate complex-transfer path matches full applied-state recal
 });
 test('recommendation retry reads fresh exact fingerprint rather than cached stale row',async()=>{
  const src=read('src/components/recommendationEngine/recommendationPersistence.js').replace(/^import[^\n]*\n/gm,'').replace(/export /g,'').replace('setTimeout(resolve, ms)','setTimeout(resolve, 0)');
- let reads=0,writes=0,row={id:'cache',completed_by_fingerprint:{old:{job:{resultFingerprint:'old'}}}};
- const api=new Function('base44','readProjectAnalysisCacheRecord','invalidateProjectAnalysisCacheRead',src+';return {publishRecommendation};')(
+ let reads=0,writes=0,row={id:'cache',project_id:'p',version_id:'v',completed_by_fingerprint:{old:{job:{resultFingerprint:'old'}}}};
+ const api=new Function('base44','readProjectAnalysisCacheRecord','invalidateProjectAnalysisCacheRead','withBassCacheWriteLock','canonicalSavedValue',src+';return {publishRecommendation};')(
  {entities:{ProjectAnalysisCache:{update:async(id,payload)=>{writes++;row={...row,...payload};}}}},
- async(p,v,options)=>{reads++; if(options?.force && reads>1)row.completed_by_fingerprint.new??={job:{resultFingerprint:'new'}};return copy(row);},()=>{});
+ async(p,v,options)=>{reads++; if(options?.force && reads>1)row.completed_by_fingerprint.new??={job:{resultFingerprint:'new'}};return copy(row);},()=>{},async(key,work)=>work(),JSON.stringify);
  const rec={id:'confirmed',generatedAt:'fixture'};
  assert.equal(await api.publishRecommendation('p','v',rec,'new'),true);
  assert.equal(writes,1);assert.ok(reads>=2);
@@ -126,7 +126,7 @@ test('explicit historical read still rejects wrong returned publication',()=>{
 });
 test('durable reader retains requested identity for report gate',async()=>{
  const src=read('src/components/engineering/versionedEngineeringAuthority.js').replace(/^import[\s\S]*?;\n/gm,'').replace(/export /g,'');
- const api=new Function('base44','invalidateProjectVersionRead','invalidateProjectAnalysisCacheRead',src+';return {fetchDurablePublication};')(
+ const api=new Function('base44','invalidateProjectVersionRead','invalidateProjectAnalysisCacheRead','withBassCacheWriteLock','canonicalSavedValue',src+';return {fetchDurablePublication};')(
  {functions:{invoke:async(name,args)=>({data:{publication:{engineering_fingerprint:args.engineering_fingerprint||'eng:new'},version:{published_fingerprint:'eng:new'},status:'published'}})}},()=>{},()=>{});
  const result=await api.fetchDurablePublication('p','v',{engineeringFingerprint:'eng:old'});
  assert.equal(result.requestedEngineeringFingerprint,'eng:old');

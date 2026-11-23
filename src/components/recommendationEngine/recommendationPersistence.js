@@ -153,9 +153,9 @@ export async function publishRecommendation(
         for (let attempt = 0; attempt < boundedWrites; attempt += 1) {
           attemptsByProject.set(key, attempt + 1);
           const writeStarted = performance.now();
-          diagnostics.writes++;
           try {
             await withBassCacheWriteLock(key, async () => {
+              diagnostics.reads++;
               const fresh = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
               const current = fresh?.completed_by_fingerprint?.[resultFingerprint];
               if (!fresh?.id || !current) throw new Error('The completed bass snapshot disappeared before recommendation save.');
@@ -163,8 +163,10 @@ export async function publishRecommendation(
               if (canonicalSavedValue(fresh.completed_by_fingerprint) === canonicalSavedValue(expected)) return;
               let writeError = null;
               try {
+                diagnostics.writes++;
                 await base44.entities.ProjectAnalysisCache.update(fresh.id, { completed_by_fingerprint: expected });
               } catch (e) { writeError = e; }
+              diagnostics.reads++;
               const verified = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
               if (verified?.id !== fresh.id || verified.project_id !== projectId || verified.version_id !== versionId
                 || canonicalSavedValue(verified.completed_by_fingerprint) !== canonicalSavedValue(expected)) {

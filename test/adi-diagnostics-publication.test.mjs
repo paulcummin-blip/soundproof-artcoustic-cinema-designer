@@ -37,16 +37,17 @@ test.after(async () => { globalThis.setTimeout = realSetTimeout; delete globalTh
 
 test("same durable fingerprint writes once, records actual timings, then promotes memory", async () => {
   let writes = 0;
-  globalThis.__adiTest.read = async () => ({ id: "cache", completed_by_fingerprint: { durable: { result: 1 }, previous: { result: 2 } } });
+  let row = { id: "cache", project_id: "success", version_id: "v", completed_by_fingerprint: { durable: { result: 1 }, previous: { result: 2 } } };
+  globalThis.__adiTest.read = async () => structuredClone(row);
   globalThis.__adiTest.update = async (id, body) => {
     assert.equal(m.getRecommendation("success", "v").recommendation, null);
     assert.equal(body.completed_by_fingerprint.previous.result, 2);
-    writes++;
+    writes++; row = {...row, ...body};
   };
   m.beginRunTimings("success", "v", "run1");
   const r = await m.publishOptimiserRecommendation({ projectId: "success", versionId: "v", recommendation: { text: "new" }, plan: { run: { runId: "run1" } }, runFingerprint: "durable", savedFingerprint: "durable" });
   assert.equal(r.ok, true); assert.equal(writes, 1);
-  assert.equal(r.results[0].diagnostics.reads, 1);
+  assert.equal(r.results[0].diagnostics.reads, 3);
   assert.equal(r.results[0].diagnostics.writes, 1);
   assert.ok(r.results[0].diagnostics.totalMs >= r.results[0].diagnostics.readMs);
   assert.equal(m.getRecommendation("success", "v").recommendation.optimiserPlan.run.runId, "run1");
@@ -56,8 +57,9 @@ test("same durable fingerprint writes once, records actual timings, then promote
 
 test("historical wrong-key failure stays snapshot_missing even after second write succeeds", async () => {
   globalThis.setTimeout = (fn, ms, ...args) => realSetTimeout(fn, ms === 250 ? 0 : ms, ...args);
-  globalThis.__adiTest.read = async () => ({ id: "cache", completed_by_fingerprint: { durable: {} } });
-  globalThis.__adiTest.update = async () => {};
+  let row = { id: "cache", project_id: "partial", version_id: "v", completed_by_fingerprint: { durable: {} } };
+  globalThis.__adiTest.read = async () => structuredClone(row);
+  globalThis.__adiTest.update = async (id,body) => { row = {...row,...body}; };
   m.beginRunTimings("partial", "v", "run2");
   const r = await m.publishOptimiserRecommendation({ projectId: "partial", versionId: "v", recommendation: { text: "new" }, plan: {}, runFingerprint: "wrong-input-key", savedFingerprint: "durable" });
   assert.equal(r.ok, false); assert.equal(r.failure.category, "snapshot_missing");
@@ -70,8 +72,9 @@ test("historical wrong-key failure stays snapshot_missing even after second writ
 });
 
 test("refused save preserves the previous authoritative recommendation", async () => {
-  globalThis.__adiTest.read = async () => ({ id: "cache", completed_by_fingerprint: { durable: {} } });
-  globalThis.__adiTest.update = async () => {};
+  let row = { id: "cache", project_id: "refused", version_id: "v", completed_by_fingerprint: { durable: {} } };
+  globalThis.__adiTest.read = async () => structuredClone(row);
+  globalThis.__adiTest.update = async (id,body) => { row = {...row,...body}; };
   assert.equal(await m.publishRecommendation("refused", "v", { text: "previous" }, "durable"), true);
   globalThis.__adiTest.update = async () => { throw new Error("write denied"); };
   assert.equal(await m.publishRecommendation("refused", "v", { text: "new" }, "durable", { writeAttempts: 1 }), false);
@@ -101,4 +104,20 @@ test("plan completion waits for the exact run's durable version acknowledgement"
   m.acknowledgeOptimiserPlanSave("p", "v", { run: { runId: "new-run" } });
   assert.ok(await waiting);
   await assert.rejects(m.waitForOptimiserPlanSave("p", "v", "never-saved", 5), /not acknowledged/);
+});
+
+test('recommendation lost acknowledgement reconciles and retry makes no duplicate write',async()=>{
+ let row={id:'cache',project_id:'uncertain',version_id:'v',completed_by_fingerprint:{durable:{graphPayload:{roomResponseCurve:[1]}}}},writes=0;
+ globalThis.__adiTest.read=async()=>structuredClone(row);
+ globalThis.__adiTest.update=async(id,body)=>{writes++;row={...row,...body};throw Error('lost response');};
+ assert.equal(await m.publishRecommendation('uncertain','v',{text:'saved'},'durable'),true);
+ assert.equal(await m.publishRecommendation('uncertain','v',{text:'saved'},'durable'),true);
+ assert.equal(writes,1);
+ assert.deepEqual(row.completed_by_fingerprint.durable.graphPayload.roomResponseCurve,[1]);
+});
+test('recommendation success response without persistence does not promote memory',async()=>{
+ globalThis.__adiTest.read=async()=>({id:'cache',project_id:'no-commit',version_id:'v',completed_by_fingerprint:{durable:{}}});
+ globalThis.__adiTest.update=async()=>({success:true});
+ assert.equal(await m.publishRecommendation('no-commit','v',{text:'unsaved'},'durable',{writeAttempts:1}),false);
+ assert.equal(m.getRecommendation('no-commit','v').recommendation,null);
 });
