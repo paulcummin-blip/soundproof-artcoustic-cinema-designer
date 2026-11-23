@@ -420,7 +420,7 @@ export async function runReportDesignIntent({
   if (correctable) {
     const initialValidation = validation;
     const block = buildCorrectionPromptBlock({ initialOutput:canonicalDraft, violations:failures })
-      + '\nDESIGN INTENT ONLY: where a missing saved reason is flagged, add its complete causal meaning in natural prose, using the saved design_decisions. The whole decision_summary passage is flagged for that insertion. Keep all other supported meaning, evidence and section structure. Never convert an intended benefit into an achieved result. Remove generic filler if needed to fit the word limit.';
+      + '\nDESIGN INTENT ONLY: where a missing saved reason is flagged, add its complete causal meaning in natural prose, using design_intent_scope.required_saved_reasons. The whole decision_summary passage is flagged for that insertion. Keep all other supported meaning, evidence and section structure. Never convert an intended benefit into an achieved result. Remove generic filler if needed to fit the word limit.';
     const corrected = await callWriterProvider({
       invokeLLM, input:writerInput, model:flag?.model ?? null,
       fileUrls:visualContextSources(visual), correction:{ needed:true, block },
