@@ -289,6 +289,8 @@ export function resolveBassAuthorityState({
         attention: true,
       };
     }
+    if (durableWrite?.writePending === true && durableWrite.writePendingFingerprint === currentFingerprint)
+      return withCopy(BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED);
     // Completion is not engineering publication. A receipt must name this
     // engineering assessment AND the same completed bass calculation.
     const identityMatches = !!engineeringFingerprint

@@ -70,7 +70,7 @@ function describeWriteFailure(error, operation, payload) {
 export function queueBassAuthorityWrite(key, signature, record, payload) {
   if (!key || key === "free::free" || !payload) return Promise.resolve(null);
   const [projectId, versionId] = String(key).split("::");
-  publishBassReconciliationStatus(projectId, versionId, { writeAttempted: true, writeSucceeded: null, writeError: null });
+  publishBassReconciliationStatus(projectId, versionId, { writeAttempted: true, writePending: true, writePendingFingerprint: payload.current_fingerprint, writeSucceeded: null, writeError: null });
   let pending = pendingWrites.get(key);
   if (!pending) {
     pending = { record: null, payload: null, signature: null, resolvers: [], timer: null, firstQueuedAt: 0 };
@@ -109,7 +109,7 @@ async function flushQueuedBassAuthorityWrite(key) {
       const receipt = await withBassCacheWriteLock(key, () => persistBassAuthorityDurably(base44.entities.ProjectAnalysisCache, payload, { accountId: project.account_id }));
       invalidateProjectAnalysisCacheRead(projectId, versionId);
       publishBassReconciliationStatus(projectId, versionId, {
-        writeSucceeded: true, writeError: null, writeFailedFingerprint: null,
+        writePending: false, writeSucceeded: true, writeError: null, writeFailedFingerprint: null,
         writeDisposition: receipt.disposition, verifiedRecordId: receipt.row.id,
         verifiedFingerprint: receipt.fingerprint, verifiedAt: new Date().toISOString(),
       });
@@ -121,7 +121,7 @@ async function flushQueuedBassAuthorityWrite(key) {
       // the payload size are reported so the failure can be acted on.
       const operation = describeWriteOperation(record);
       publishBassReconciliationStatus(projectId, versionId, {
-        writeSucceeded: false,
+        writePending: false, writeSucceeded: false,
         writeOperation: operation,
         writeError: describeWriteFailure(e, operation, payload),
         writeResponse: describeWriteResponse(e),
