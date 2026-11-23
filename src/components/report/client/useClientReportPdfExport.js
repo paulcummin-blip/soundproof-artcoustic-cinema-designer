@@ -95,11 +95,6 @@ export function useClientReportPdfExport({
 }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
-  const [exportProgress, setExportProgress] = useState(null);
-  const updateProgress = useCallback((progress) => {
-    setExportProgress(progress);
-    console.info('[ReportExport]', progress.stage, progress.message);
-  }, []);
   // The publication state: both the Project Report PDF and the companion
   // Speaker Design PDF must land before the publication is treated as complete.
   //   idle       — no export has run yet
@@ -110,6 +105,11 @@ export function useClientReportPdfExport({
     status: "idle",
     failed: [],
   });
+  const [exportProgress, setExportProgress] = useState(null);
+  const updateProgress = useCallback((progress) => {
+    setExportProgress(progress);
+    console.info('[ReportExport]', progress.stage, progress.message);
+  }, []);
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
   // The last export's store-only flag, held so a targeted retry re-stores without

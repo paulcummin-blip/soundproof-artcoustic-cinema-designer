@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { boundedExportRead } from '../src/components/library/issuedDocument/issuedExportDurability.js';
 import { readWizardDraft, writeWizardDraft, clearWizardDraft } from '../src/components/proposal/wizard/proposalWizardDraft.js';
 import { resolveWorkflowStatus } from '../src/components/documentWorkflow/documentWorkflowStatus.js';
 
@@ -20,7 +21,7 @@ async function loadModule(path, mocks, globals = {}) {
   return source.namespace;
 }
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-async function exportFixture(store) {
+async function exportFixture(store, snapshotFailure = false, retry = async () => ({ok:true})) {
   const values = [];
   let prints = 0, closes = 0;
   const mocks = {
@@ -31,8 +32,8 @@ async function exportFixture(store) {
     '@/components/report/reportPrintWindow': { findReportPrintNode: () => ({}), openReportPrintWindow: () => ({}),
       printReportInWindow: async () => { prints++; return { printed:true }; }, closeReportPrintWindow: () => { closes++; } },
     '@/components/report/printReadiness': { PRINT_NOT_READY_MESSAGE:'Not ready', describePrintReadinessFailure: () => 'Not ready', preparePrintDocument: async () => ({ready:true}) },
-    '@/components/library/issuedDocument/recordIssuedExport': { snapshotIssuedComposition: () => ({nodeHtml:'<div>Audit</div>'}) },
-    '@/components/report/projectReport/storeProjectReportPublication': { storeProjectReportPublication: store, retryPublicationDocument: async () => ({ok:true}), PUBLICATION_DOCUMENT: {PROJECT_REPORT:'project_report',SPEAKER_DESIGN:'speaker_design'} }
+    '@/components/library/issuedDocument/recordIssuedExport': { snapshotIssuedComposition: () => { if(snapshotFailure) throw Error('Snapshot unavailable'); return {nodeHtml:'<div>Audit</div>'}; } },
+    '@/components/report/projectReport/storeProjectReportPublication': { storeProjectReportPublication: store, retryPublicationDocument: retry, PUBLICATION_DOCUMENT: {PROJECT_REPORT:'project_report',SPEAKER_DESIGN:'speaker_design'} }
   };
   const mod = await loadModule('src/components/report/client/useClientReportPdfExport.js', mocks, {
     window: {}, document: {body:{classList:{remove(){},add(){}}}},
@@ -67,6 +68,7 @@ test('Reported partial storage failure never counts as creation', async () => {
 test('A companion without a Technical Report composition cannot complete publication', async () => {
   let calls=0;
   const mod=await loadModule('src/components/report/projectReport/storeProjectReportPublication.js', {
+    '@/components/library/issuedDocument/issuedExportDurability':{boundedExportRead},
     '@/components/library/issuedDocument/recordIssuedExport':{storeIssuedDocument:async()=>{calls++;},retryIssuedExportStorage:async()=>({ok:true})},
     '@/components/library/issuedDocument/pendingIssuedExportStore':{clearPendingExport(){},pendingExportKey:()=>'',peekPendingExport:()=>null},
     '@/components/report/speakerDesign/ensureSpeakerDesignForVersion':{ensureSpeakerDesignForVersion:async()=>{calls++;return {status:'stored'};}},
@@ -101,6 +103,7 @@ test('Duplicate/missing/wrong-version files cannot create false readiness; final
 test('Storage retry registers the held PDF without recapturing or uploading it', async () => {
   let captures=0,retries=0;
   const mod=await loadModule('src/components/report/projectReport/storeProjectReportPublication.js', {
+    '@/components/library/issuedDocument/issuedExportDurability':{boundedExportRead},
     '@/components/library/issuedDocument/recordIssuedExport':{
       storeIssuedDocument:async()=>{captures++;},
       retryIssuedExportStorage:async key=>{retries++;assert.equal(key,'p1|project|Audit.pdf');return {ok:true};}
@@ -129,4 +132,20 @@ test('An old version-only entry resolves its actual project; mismatched links fa
     if(projectId) assert.match(resolved.error,/does not belong/);
     else { assert.equal(resolved.projectId,'doran');assert.equal(resolved.versionId,'v1');}
   }
+});
+
+
+test('Snapshot exception releases preparing state and exposes a recoverable error', async () => {
+  let writes=0;const f=await exportFixture(async()=>{writes++;},true);
+  await f.flow.handleExport({storeOnly:true});
+  assert.equal(writes,0);assert.equal(f.values[0],false);assert.equal(f.values[2].status,'incomplete');
+  assert.match(f.values[1],/Snapshot unavailable/);
+});
+test('Retry exceptions leave storing state and successful retry clears old error',async()=>{
+  let attempt=0;
+  const f=await exportFixture(async()=>({complete:false,failed:[{key:'project_report',error:'lost ack'}]}),false,async()=>{if(attempt++===0)throw Error('read failed');return {ok:true};});
+  await f.flow.handleExport({storeOnly:true});
+  await f.flow.retryMissing('project_report');assert.equal(f.values[2].status,'incomplete');
+  assert.match(f.values[2].failed[0].error,/read failed/);
+  await f.flow.retryMissing('project_report');assert.equal(f.values[2].status,'complete');assert.equal(f.values[1],null);
 });
