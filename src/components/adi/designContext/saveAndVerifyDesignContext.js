@@ -1,4 +1,4 @@
-import { contextRevision, persistedContextContains, readContextRecord } from '../../../../base44/shared/designContext/designContextPersistence.js';
+import { contextRevision, persistedContextContains, readContextRecord } from './designContextPersistence.js';
 /** Save, then independently read the saved answers. Never resolves success on an unverified write. */
 export async function saveAndVerifyDesignContext({ base44, projectId, versionId, items = [] }) {
   let acknowledgedRevision = null;
