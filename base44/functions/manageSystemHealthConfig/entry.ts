@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
@@ -90,6 +90,10 @@ export default async function(req) {
       updated_by: updatedBy,
     });
   } catch (error) {
-    return Response.json({ error: error?.message || 'Configuration update failed.' }, { status: 500 });
+    console.error('[manageSystemHealthConfig] error:', error?.message || error, error?.stack || '');
+    return Response.json({
+      error: error?.message || 'Configuration update failed.',
+      detail: error?.stack || null,
+    }, { status: 500 });
   }
 }

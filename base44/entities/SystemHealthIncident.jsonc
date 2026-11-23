@@ -1,7 +1,7 @@
 {
   "name": "SystemHealthIncident",
   "type": "object",
-  "description": "Admin-only central incident record for the Sound Proof System Health & Error Intelligence system. One record per grouped operational failure. Repeated occurrences of the same underlying problem (same grouping fingerprint) increment the occurrence_count rather than creating a duplicate. Never stores proposal text, client briefs, passwords, tokens, secrets or confidential content. Created by trusted backend functions (e.g. generateProposal on failure) via the service role; read, updated and deleted by administrators only. Recovery attempts are recorded separately from permanent incident resolution: a recovery can restore a dealer's work while the underlying defect remains open for investigation.",
+  "description": "Admin-only central incident record for the Sound Proof System Health & Error Intelligence system. One record per grouped operational failure. Repeated occurrences of the same underlying problem (same grouping fingerprint) increment the occurrence_count rather than creating a duplicate record. Never stores proposal text, client briefs, passwords, tokens, secrets or confidential content. Created by trusted backend functions (e.g. generateProposal on failure) via the service role; read, updated and deleted by administrators only. Recovery attempts are recorded separately from permanent incident resolution: a recovery can restore a dealer's work while the underlying defect remains open for investigation.",
   "properties": {
     "incident_reference": {
       "type": "string",
@@ -210,6 +210,12 @@
       "type": "string",
       "nullable": true,
       "description": "The error message when the alert email failed to send. Null when the email was sent or not required."
+    },
+    "test_run_id": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "TEST ISOLATION MARKER. Null for all production incidents. When non-null, the record was created by a diagnostic test run and carries the unique test-run identifier so cleanup can delete only that test run's records. Production incident recording always passes null (or omits this field). Cleanup must NEVER delete records where test_run_id is null. This field prevents diagnostic test cleanup from deleting real production incidents by ensuring test records are explicitly distinguishable from production records."
     }
   },
   "required": [

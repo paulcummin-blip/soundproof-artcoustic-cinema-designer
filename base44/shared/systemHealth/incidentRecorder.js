@@ -369,6 +369,7 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
     operation_id = null,
     data_committed = null,
     data_integrity_summary = null,
+    test_run_id = null,
     incidentContext = {},
   } = details;
 
@@ -469,6 +470,7 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
       notification_sent_at: null,
       notification_error: null,
       dealer_contacted: false,
+      test_run_id: test_run_id || null,
       ...enrichedFields,
     });
 
@@ -536,6 +538,7 @@ export async function recordSystemIncident(serviceClient, details) {
     stage_timeline = null,
     data_committed = null,
     data_integrity_summary = null,
+    test_run_id = null,
   } = details;
 
   const fingerprint = computeIncidentFingerprint({
@@ -614,6 +617,7 @@ export async function recordSystemIncident(serviceClient, details) {
       notification_sent_at: null,
       notification_error: null,
       dealer_contacted: false,
+      test_run_id: test_run_id || null,
       ...enrichedFields,
     });
 

@@ -120,6 +120,12 @@
       "type": "boolean",
       "default": false,
       "description": "Whether an incident and alert email have already been sent for this operation's stall or failure. Prevents duplicate emails on repeated watchdog checks."
+    },
+    "test_run_id": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "TEST ISOLATION MARKER. Null for all production monitored operations. When non-null, the record was created by a diagnostic test run and carries the unique test-run identifier so cleanup can delete only that test run's records. Production operation monitoring always passes null (or omits this field). Cleanup must NEVER delete records where test_run_id is null. This field prevents diagnostic test cleanup from deleting real production monitored operations."
     }
   },
   "required": [

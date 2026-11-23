@@ -70,6 +70,7 @@ export async function startOperation(serviceClient, {
   version_id = null,
   proposal_id = null,
   initial_stage = 'started',
+  test_run_id = null,
 }) {
   try {
     const now = new Date().toISOString();
@@ -93,6 +94,7 @@ export async function startOperation(serviceClient, {
       completed_at: null,
       cancelled_at: null,
       watchdog_notified: false,
+      test_run_id: test_run_id || null,
     });
     return { recorded: true, operation_id };
   } catch (err) {
