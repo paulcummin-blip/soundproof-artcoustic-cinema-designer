@@ -126,7 +126,7 @@ test('explicit historical read still rejects wrong returned publication',()=>{
 });
 test('durable reader retains requested identity for report gate',async()=>{
  const src=read('src/components/engineering/versionedEngineeringAuthority.js').replace(/^import[\s\S]*?;\n/gm,'').replace(/export /g,'');
- const api=new Function('base44','invalidateProjectVersionRead','invalidateProjectAnalysisCacheRead','withBassCacheWriteLock','canonicalSavedValue',src+';return {fetchDurablePublication};')(
+ const api=new Function('base44','invalidateProjectVersionRead','invalidateProjectAnalysisCacheRead',src+';return {fetchDurablePublication};')(
  {functions:{invoke:async(name,args)=>({data:{publication:{engineering_fingerprint:args.engineering_fingerprint||'eng:new'},version:{published_fingerprint:'eng:new'},status:'published'}})}},()=>{},()=>{});
  const result=await api.fetchDurablePublication('p','v',{engineeringFingerprint:'eng:old'});
  assert.equal(result.requestedEngineeringFingerprint,'eng:old');
@@ -134,8 +134,10 @@ test('durable reader retains requested identity for report gate',async()=>{
 });
 test('scoped bass flush completes before publication without flushing other versions',async()=>{
  const src=read('src/components/room/bass/bassAuthorityWriteQueue.js').replace(/^import[^\n]*\n/gm,'').replace(/export /g,'');
- const updates=[],api=new Function('base44','invalidateProjectAnalysisCacheRead','publishBassReconciliationStatus',src+';return {queueBassAuthorityWrite,flushBassAuthorityWrite,flushQueuedBassAuthorityWrites};')(
- {entities:{ProjectAnalysisCache:{update:async(id,payload)=>updates.push({id,...payload}),create:async()=>assert.fail('must update existing')}}},()=>{},()=>{});
+ const updates=[],api=new Function('base44','invalidateProjectAnalysisCacheRead','publishBassReconciliationStatus','readProjectRecord','persistBassAuthorityDurably','withBassCacheWriteLock',src+';return {queueBassAuthorityWrite,flushBassAuthorityWrite,flushQueuedBassAuthorityWrites};')(
+ {entities:{ProjectAnalysisCache:{}}},()=>{},()=>{},async()=>({id:'p',account_id:'owner'}),
+ async(entity,payload)=>{const id=payload.current_fingerprint==='new'?'row':'other';updates.push({id,...payload});return {row:{id},disposition:'verified-readback',fingerprint:payload.current_fingerprint};},
+ async(key,work)=>work());
  const pending=api.queueBassAuthorityWrite('p::v','new',{id:'row',current_fingerprint:'old'},{current_fingerprint:'new',status:'complete',completed_by_fingerprint:{new:{}}});
  const other=api.queueBassAuthorityWrite('p::other','other',{id:'other'},{current_fingerprint:'other',status:'complete',completed_by_fingerprint:{other:{}}});
  assert.equal(await api.flushBassAuthorityWrite('p','v'),true);assert.equal(await pending,true);
