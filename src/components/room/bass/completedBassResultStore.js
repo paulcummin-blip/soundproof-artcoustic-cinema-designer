@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
+import { canonicalSavedValue } from "./durableBassWrite";
 import { base44 } from "@/api/base44Client";
 import { INSTANCE_AUTHORITY_VERSION, RP22_BASS_METRIC_SCHEMA_VERSION } from "@/lib/bassAuthorityVersion";
 import {
@@ -425,7 +426,7 @@ export function syncCachedCompactBassAuthority(projectId, versionId, compactCont
   if (!compactContract || !isAuthoritativeBassContract(compactContract)) return Promise.resolve(null);
   if (!compactContract?.graphPayload?.postEqRspCurve?.length) return Promise.resolve(null);
   const currentFingerprint = compactContract.job?.resultFingerprint || null;
-  const signature = `cached:${currentFingerprint || ""}|${compactContract.selectedCandidateId || ""}`;
+  const signature = `cached:${currentFingerprint || ""}|${canonicalSavedValue(compactContract)}`;
   if (syncSignatures.get(key) === signature) return writeQueues.get(key) || Promise.resolve(null);
   syncSignatures.set(key, signature);
   const dbFilter = bassDbFilter(projectId, versionId);
@@ -552,7 +553,7 @@ export function syncPersistentBassAuthority(projectId, versionId, currentFingerp
   if (key === "free::free") return Promise.resolve(null);
   const isAlreadyCompact = contract && !contract.finalOptimisedBassResponse && contract.graphPayload;
   const completed = isAlreadyCompact ? contract : compactCompletedBassContract(contract);
-  const signature = `${currentFingerprint || ""}|${completed?.job?.resultFingerprint || ""}|${completed?.selectedCandidateId || ""}`;
+  const signature = `${currentFingerprint || ""}|${canonicalSavedValue(completed)}`;
   if (syncSignatures.get(key) === signature) return writeQueues.get(key) || Promise.resolve(null);
   syncSignatures.set(key, signature);
   const dbFilter = bassDbFilter(projectId, versionId);

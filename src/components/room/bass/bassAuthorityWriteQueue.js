@@ -21,6 +21,7 @@ import { withBassCacheWriteLock } from "./bassCacheWriteLock";
  */
 const WRITE_COALESCE_MS = 3000;
 const MAX_WRITE_DELAY_MS = 10000;
+const latestWrites = new Map();
 const pendingWrites = new Map();     // key -> latest unwritten authority
 const writeChains = new Map();       // key -> serialised in-flight write
 
@@ -79,6 +80,8 @@ export function queueBassAuthorityWrite(key, signature, record, payload) {
   pending.record = record;
   pending.payload = payload;
   pending.signature = signature;
+  pending.generation = (latestWrites.get(key) || 0) + 1;
+  latestWrites.set(key, pending.generation);
   const settled = new Promise((resolve) => pending.resolvers.push(resolve));
   const now = Date.now();
   if (!pending.firstQueuedAt) pending.firstQueuedAt = now;
@@ -100,7 +103,7 @@ async function flushQueuedBassAuthorityWrite(key) {
   if (!pending || !pending.payload) return writeChains.get(key) || true;
   pendingWrites.delete(key);
   if (pending.timer) clearTimeout(pending.timer);
-  const { record, payload, signature, resolvers } = pending;
+  const { record, payload, signature, resolvers, generation } = pending;
   const chain = (writeChains.get(key) || Promise.resolve()).then(async () => {
     const [projectId, versionId] = String(key).split("::");
     try {
@@ -108,7 +111,7 @@ async function flushQueuedBassAuthorityWrite(key) {
       if (!project) throw new Error("The owning project could not be verified.");
       const receipt = await withBassCacheWriteLock(key, () => persistBassAuthorityDurably(base44.entities.ProjectAnalysisCache, payload, { accountId: project.account_id }));
       invalidateProjectAnalysisCacheRead(projectId, versionId);
-      publishBassReconciliationStatus(projectId, versionId, {
+      if (latestWrites.get(key) === generation) publishBassReconciliationStatus(projectId, versionId, {
         writePending: false, writeSucceeded: true, writeError: null, writeFailedFingerprint: null,
         writeDisposition: receipt.disposition, verifiedRecordId: receipt.row.id,
         verifiedFingerprint: receipt.fingerprint, verifiedAt: new Date().toISOString(),
@@ -120,7 +123,7 @@ async function flushQueuedBassAuthorityWrite(key) {
       // never speculative — the failed operation, the server's own response and
       // the payload size are reported so the failure can be acted on.
       const operation = describeWriteOperation(record);
-      publishBassReconciliationStatus(projectId, versionId, {
+      if (latestWrites.get(key) === generation) publishBassReconciliationStatus(projectId, versionId, {
         writePending: false, writeSucceeded: false,
         writeOperation: operation,
         writeError: describeWriteFailure(e, operation, payload),
@@ -151,6 +154,7 @@ export function flushQueuedBassAuthorityWrites() {
 export function resetBassAuthorityWriteQueue() {
   for (const pending of pendingWrites.values()) if (pending.timer) clearTimeout(pending.timer);
   pendingWrites.clear();
+  latestWrites.clear();
   writeChains.clear();
 }
 

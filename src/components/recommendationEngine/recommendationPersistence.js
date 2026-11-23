@@ -15,6 +15,8 @@
 // ---------------------------------------------------------------------------
 
 import { base44 } from '@/api/base44Client';
+import { withBassCacheWriteLock } from '@/components/room/bass/bassCacheWriteLock';
+import { canonicalSavedValue } from '@/components/room/bass/durableBassWrite';
 import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead } from '@/components/state/projectReadCache';
 
 // In-memory cache for the current recommendation (per project+version)
@@ -148,17 +150,26 @@ export async function publishRecommendation(
 
       if (record && snapshot) {
         // ── 2. THE WRITE, bounded. A refusal is reported, never stormed. ──
-        const completedByFingerprint = record.completed_by_fingerprint || {};
         for (let attempt = 0; attempt < boundedWrites; attempt += 1) {
           attemptsByProject.set(key, attempt + 1);
           const writeStarted = performance.now();
           diagnostics.writes++;
           try {
-            await base44.entities.ProjectAnalysisCache.update(record.id, {
-              completed_by_fingerprint: {
-                ...completedByFingerprint,
-                [resultFingerprint]: { ...snapshot, recommendation },
-              },
+            await withBassCacheWriteLock(key, async () => {
+              const fresh = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
+              const current = fresh?.completed_by_fingerprint?.[resultFingerprint];
+              if (!fresh?.id || !current) throw new Error('The completed bass snapshot disappeared before recommendation save.');
+              const expected = { ...fresh.completed_by_fingerprint, [resultFingerprint]: { ...current, recommendation } };
+              if (canonicalSavedValue(fresh.completed_by_fingerprint) === canonicalSavedValue(expected)) return;
+              let writeError = null;
+              try {
+                await base44.entities.ProjectAnalysisCache.update(fresh.id, { completed_by_fingerprint: expected });
+              } catch (e) { writeError = e; }
+              const verified = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
+              if (verified?.id !== fresh.id || verified.project_id !== projectId || verified.version_id !== versionId
+                || canonicalSavedValue(verified.completed_by_fingerprint) !== canonicalSavedValue(expected)) {
+                throw writeError || new Error('Recommendation save could not be verified by durable readback.');
+              }
             });
             invalidateProjectAnalysisCacheRead(projectId, versionId);
             failureByProject.delete(key);
