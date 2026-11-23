@@ -54,8 +54,11 @@ export function matchesIssuedRow(row, expected) {
 export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = () => {}, update = () => {}, timeoutMs = 45000 }) {
   const progress = (stage, message) => { try { onProgress({ stage, message }); } catch { /* UI cannot change durability */ } };
   if (!entry.fileUri) {
+    if (entry.uploadStarted && !entry.uploadOperation) throw new Error('The previous upload has no confirmed file path after reload. Its outcome must be reconciled before another upload.');
     if (!entry.blob) throw new Error('The captured PDF is unavailable. No new export was started.');
     progress('upload', 'Uploading PDF to private storage…');
+    entry.uploadStarted = true;
+    update({ uploadStarted: true });
     const uploaded = await awaitExportOperation(entry, 'uploadOperation', async () => {
       const result = await api.upload(entry.blob, entry.filename);
       if (!result?.file_uri) throw new Error('Storage returned no file path. The upload outcome is uncertain; no automatic duplicate upload will be attempted.');
@@ -88,6 +91,9 @@ export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = 
     progress('complete', 'PDF and asset record verified.');
     return existing;
   }
+  if (entry.recordStarted && !entry.recordOperation) throw new Error('The previous asset save is not visible yet after reload. Retry checks for that record without creating another.');
+  entry.recordStarted = true;
+  update({ recordStarted: true });
   progress('record', 'Saving the Documents & Assets record…');
   try {
     await awaitExportOperation(entry, 'recordOperation', () => api.create(expected), timeoutMs);
@@ -97,7 +103,9 @@ export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = 
     if (reconciled) { progress('complete', 'Saved PDF recovered and verified.'); return reconciled; }
     const status = error?.response?.status || error?.status;
     // Explicit validation/permission rejection proves the write was refused.
-    if ([400, 401, 403, 404, 422].includes(status)) entry.recordOperation = null;
+    if ([400, 401, 403, 404, 422].includes(status)) {
+      entry.recordOperation = null; entry.recordStarted = false; update({ recordStarted: false });
+    }
     throw error;
   }
   const record = await read();

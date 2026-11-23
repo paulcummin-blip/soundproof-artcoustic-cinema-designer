@@ -218,7 +218,7 @@ export async function retryPublicationDocument({
     const filename = reportIdentity.filename?.endsWith('.pdf') ? reportIdentity.filename : `${reportIdentity.filename || 'export'}.pdf`;
     const key = pendingExportKey({ projectId: reportIdentity.projectId, documentType: reportIdentity.documentType, filename });
     const held = peekPendingExport(key);
-    if ((held?.blob || held?.fileUri || held?.uploadOperation) && held.issued?.versionId === reportIdentity.versionId) {
+    if ((held?.blob || held?.fileUri || held?.uploadOperation || held?.uploadStarted) && held.issued?.versionId === reportIdentity.versionId) {
       const result = await retryIssuedExportStorage(key, { onProgress });
       return { ok: result.ok, error: result.ok ? undefined : result.reason };
     }

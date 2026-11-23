@@ -11,7 +11,7 @@
  * a key built from the project, the document type and the filename.
  *
  * Held state, deliberately:
- *   - in memory only, for this session; nothing is persisted
+ *   - PDF bytes stay in memory; bounded recovery metadata survives a tab reload
  *   - the identity is the export's own (project, version, selected versions,
  *     source context) and is never re-resolved on retry, so a retry can never
  *     drift onto another version
@@ -22,6 +22,26 @@
 const MAX_HELD_ATTEMPTS = 5;
 
 const held = new Map();
+const RECOVERY_KEY = 'soundproof.pending-issued-export.v1';
+const metadataKeys = ['key', 'identity', 'issued', 'filename', 'pageCount', 'attemptStartedAt',
+  'fileUri', 'previewStatus', 'rendering', 'uploadStarted', 'recordStarted'];
+function persistRecovery() {
+  try {
+    if (typeof window === 'undefined') return;
+    window.sessionStorage.setItem(RECOVERY_KEY, JSON.stringify([...held.values()].map(entry =>
+      Object.fromEntries(metadataKeys.map(key => [key, entry[key]]))
+    )));
+  } catch { /* The in-session recovery remains available when storage is unavailable. */ }
+}
+try {
+  if (typeof window !== 'undefined') {
+    const records = JSON.parse(window.sessionStorage.getItem(RECOVERY_KEY) || '[]');
+    for (const record of records.slice(-MAX_HELD_ATTEMPTS)) {
+      if (record?.key && record?.issued?.projectId) held.set(record.key, { ...record, blob: null });
+    }
+  }
+} catch { /* Invalid recovery metadata never changes project records. */ }
+
 
 /** The key a failed export is held and retried under. */
 export function pendingExportKey({ projectId, documentType, filename } = {}) {
@@ -49,6 +69,7 @@ export function holdPendingExport({ identity = {}, filename = null, issued = nul
     const oldest = held.keys().next().value;
     held.delete(oldest);
   }
+  persistRecovery();
   return key;
 }
 
@@ -58,6 +79,7 @@ export function updatePendingExport(key, patch = {}) {
   if (!current) return null;
   const next = Object.assign(current, patch);
   held.set(key, next);
+  persistRecovery();
   return next;
 }
 
@@ -70,6 +92,7 @@ export function clearPendingExport(key) {
   const entry = held.get(key);
   if (entry) entry.blob = null;
   held.delete(key);
+  persistRecovery();
 }
 
 export function heldPendingExportCount() {
