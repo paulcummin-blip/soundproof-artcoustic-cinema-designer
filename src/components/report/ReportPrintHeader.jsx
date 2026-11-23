@@ -8,6 +8,7 @@ import {
   REPORT_LEADING_HEADING,
   REPORT_MASTHEAD_TITLE_LEAD,
 } from '@/components/report/typography/reportTypography';
+import { useStraplineLogoWidth } from '@/components/report/useStraplineLogoWidth';
 
 /**
  * The shared first-page report masthead — identical for the Technical Report
@@ -37,6 +38,13 @@ export default function ReportPrintHeader({
   titlePresence = 'standard',
 }) {
   const header = REPORT_PRINT_HEADER;
+  const { straplineRef, logoWidthPx } = useStraplineLogoWidth();
+  // When the strapline's rendered width is known, the logo is sized to match it
+  // exactly (height kept proportional via the logo's fixed aspect ratio). Until
+  // the measurement resolves, the CSS default (62 mm) applies.
+  const logoStyle = logoWidthPx
+    ? { width: `${logoWidthPx}px`, height: `${logoWidthPx / header.logoAspectRatio}px` }
+    : undefined;
   const lead = titlePresence === 'lead';
   const titleSize = lead ? REPORT_MASTHEAD_TITLE_LEAD : REPORT_PROFILES.a4.header;
   const ruleGapMm = lead ? 5.5 : 3;
@@ -54,8 +62,8 @@ export default function ReportPrintHeader({
           border-bottom: 1px solid #DCDBD6; margin-bottom: ${mastheadGapMm}mm;
         }
         .sound-proof-print-header > img {
-          width: ${header.logoWidthMm}mm !important;
-          height: ${header.logoWidthMm / header.logoAspectRatio}mm !important;
+          width: ${header.logoWidthMm}mm;
+          height: ${header.logoWidthMm / header.logoAspectRatio}mm;
           max-width: none !important; object-fit: contain; display: block;
           margin: 0 auto ${header.logoGapMm}mm !important;
         }
@@ -87,8 +95,8 @@ export default function ReportPrintHeader({
           color: #625143; margin: 0; text-align: center;
         }
       `}</style>
-      <img src={header.logoUrl} alt="Sound Proof" />
-      <div className="sound-proof-print-header__strapline">{REPORT_STRAPLINE.title}</div>
+      <img src={header.logoUrl} alt="Sound Proof" style={logoStyle} />
+      <div className="sound-proof-print-header__strapline"><span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span></div>
       <div className="sound-proof-print-header__strapline sound-proof-print-header__strapline--sub">{REPORT_STRAPLINE.sub}</div>
       <div className="sound-proof-print-header__rule" />
       <div className="sound-proof-print-header__title">{title}</div>

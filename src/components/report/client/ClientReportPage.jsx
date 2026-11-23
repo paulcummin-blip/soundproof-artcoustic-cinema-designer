@@ -30,6 +30,7 @@ import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScr
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import { getSeatGradeColors } from "@/components/report/client/visualReportSeatStyle";
 import ReportPrintHeader from '@/components/report/ReportPrintHeader';
+import { useStraplineLogoWidth } from '@/components/report/useStraplineLogoWidth';
 import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
 import { clientReportHeaderMeta } from '@/components/report/client/clientReportHeaderMeta';
 import ProjectReportDesignSummary from '@/components/report/projectReport/ProjectReportDesignSummary';
@@ -90,6 +91,7 @@ export default function ClientReportPage({
   // on screen and in the exported PDF, including the design version this report
   // documents.
   const metaLine = clientReportHeaderMeta(projectDetails, version);
+  const { straplineRef, logoWidthPx } = useStraplineLogoWidth();
 
   const sectionFirst = printData?.sectionFirst !== false;
   const sectionContinued = printData?.sectionContinued === true;
@@ -131,8 +133,8 @@ export default function ClientReportPage({
             meta={metaLine}
             className="client-report-print-only"
           />
-          <img className="client-report-screen-only" src={logoUrl} alt="Sound Proof" />
-          <div className="client-report-page__header-strapline client-report-screen-only">{REPORT_STRAPLINE.title}</div>
+          <img className="client-report-screen-only" src={logoUrl} alt="Sound Proof" style={logoWidthPx ? { width: `${logoWidthPx}px` } : undefined} />
+          <div className="client-report-page__header-strapline client-report-screen-only"><span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span></div>
           <div className="client-report-page__header-strapline client-report-page__header-strapline--sub client-report-screen-only">{REPORT_STRAPLINE.sub}</div>
           <div className="client-report-page__header-rule client-report-screen-only" />
           <div className="client-report-page__header-title client-report-screen-only">{reportTitle}</div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { REPORT_FONT_HEADING, reportRoleStyle } from '@/components/report/typography/reportTypography';
 import ReportPrintHeader from '@/components/report/ReportPrintHeader';
 import { REPORT_PRINT_HEADER, REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
+import { useStraplineLogoWidth } from '@/components/report/useStraplineLogoWidth';
 
 export const LOGO_URL = REPORT_PRINT_HEADER.logoUrl;
 
@@ -12,13 +13,14 @@ export const LOGO_URL = REPORT_PRINT_HEADER.logoUrl;
 // `title` is the report's own main headline, `meta` its project metadata line.
 // A report that passes no meta keeps the standalone cover presentation.
 export default function ReportCover({ variant = 'screen', project, title = 'RP22 Compliance Report', meta = null, className = '' }) {
+    const { straplineRef, logoWidthPx } = useStraplineLogoWidth();
     if (variant === 'print') {
         return <ReportPrintHeader title={title} project={project} meta={meta} className={className} />;
     }
 
     return (
         <div className={`flex flex-col items-center text-center mb-8 pb-6 ${className}`} style={{ borderBottom: '1px solid #DCDBD6' }}>
-            <img src={LOGO_URL} alt="Sound Proof" style={{ width: 148, objectFit: 'contain', marginBottom: 12 }} />
+            <img src={LOGO_URL} alt="Sound Proof" style={{ width: logoWidthPx || 148, objectFit: 'contain', marginBottom: 12 }} />
             <div
                 style={{
                     fontSize: 12,
@@ -29,7 +31,7 @@ export default function ReportCover({ variant = 'screen', project, title = 'RP22
                     fontFamily: REPORT_FONT_HEADING,
                 }}
             >
-                {REPORT_STRAPLINE.title}
+                <span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span>
             </div>
             <div
                 style={{
