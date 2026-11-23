@@ -1,6 +1,10 @@
 /** Shared content identity and read-back checks. No writes or engineering inputs. */
 const text = v => typeof v === 'string' ? v.trim() : '';
-export const contextRows = page => Array.isArray(page) ? page : (page?.items || []);
+export const contextRows = page => {
+  if (Array.isArray(page)) return page;
+  if (Array.isArray(page?.items)) return page.items;
+  throw new Error('The saved Design Context response could not be verified. Please retry saving.');
+};
 export function contextItemValue(item) {
   return { question_id: text(item?.question_id), status: text(item?.status),
     answer: item?.status === 'answered' ? text(item?.answer) : null,
@@ -23,5 +27,9 @@ export async function readContextRecord(entities, projectId, versionId) {
   const rows = contextRows(await entities.DesignContext.filter(
     { project_id: projectId, version_id: versionId }, { limit: 2 }));
   if (rows.length > 1) throw new Error('Multiple saved Design Context records were found. Generation has stopped.');
-  return rows[0] || null;
+  const record = rows[0] || null;
+  if (record && (record.project_id !== projectId || record.version_id !== versionId || !Array.isArray(record.context_items))) {
+    throw new Error('The saved Design Context does not match this design. Please retry saving.');
+  }
+  return record;
 }

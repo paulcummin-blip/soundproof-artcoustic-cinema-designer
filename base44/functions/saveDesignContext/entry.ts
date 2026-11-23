@@ -51,11 +51,7 @@ export default async function(req) {
     const incomingItems = normaliseContextItems(context_items, { user, now });
 
     // Read the existing record, if any.
-    const existingPage = await base44.entities.DesignContext.filter(
-      { project_id, version_id },
-      { limit: 1 },
-    );
-    const existing = (existingPage?.items || [])[0] || null;
+    const existing = await readContextRecord(base44.entities, project_id, version_id);
     const existingItems = Array.isArray(existing?.context_items) ? existing.context_items : [];
 
     // Merge: new items replace existing ones with the same question_id;
@@ -82,8 +78,11 @@ export default async function(req) {
       saved = await base44.entities.DesignContext.create(recordBody);
     }
 
+    if (!saved?.id || saved?.ok === false || saved?.success === false) {
+      return Response.json({ ok:false, saved:false, error:'Saving your answers was unsuccessful. Please retry saving.' }, { status:409 });
+    }
     const confirmed = await readContextRecord(base44.entities, project_id, version_id);
-    if (!confirmed || !persistedContextContains(confirmed, mergedItems)) {
+    if (!confirmed || confirmed.updated_at !== now || !persistedContextContains(confirmed, mergedItems)) {
       return Response.json({ ok: false, saved: false, error: 'Your answers could not be verified after saving. Please retry saving.' }, { status: 409 });
     }
     return Response.json({
