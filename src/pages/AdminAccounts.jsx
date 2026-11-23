@@ -11,6 +11,7 @@ import AccountGroupSection from "@/components/admin/commercial/AccountGroupSecti
 import DiagnosticsPanel from "@/components/admin/commercial/DiagnosticsPanel";
 import GlobalAccountUsersOverview from "@/components/admin/accounts/GlobalAccountUsersOverview";
 import TurnoverRewardSyncStatus from "@/components/admin/commercial/TurnoverRewardSyncStatus";
+import { markSectionSeen } from "@/lib/adminDashboardUnread";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -89,6 +90,11 @@ export default function AdminAccountsPage() {
           setCapacityMap(buildCapacityBreakdownMap(ledgerData));
           setPromotions(promoData || []);
           setPromotionUsage(promoUsageData || []);
+
+          // Mark Commercial Control Centre as seen for the current admin after
+          // the activity has loaded. Only updates the current admin's own
+          // last-seen timestamp.
+          markSectionSeen("commercial_control").catch(() => {});
         }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Failed to load accounts");

@@ -30,6 +30,7 @@ import AddCreditsDialog from "@/components/admin/access/AddCreditsDialog";
 import RescindAccessDialog from "@/components/admin/access/RescindAccessDialog";
 import ManagePromotionsDialog from "@/components/admin/access/ManagePromotionsDialog";
 import { Gift } from "lucide-react";
+import { markSectionSeen } from "@/lib/adminDashboardUnread";
 
 const GROUP_ACCENTS = {
   partners: "#213428",
@@ -140,6 +141,12 @@ export default function AdminAccountAccess() {
           promotionsByAccount: buildPromotionsByAccount(promotions || [], accounts || []),
           promoUsageByAccountAndPromo: buildPromoUsageByAccountAndPromo(promotionUsage || []),
         }));
+
+        // Mark Account Access as seen for the current admin after the activity
+        // has loaded. Only updates the current admin's own last-seen timestamp.
+        if (mounted) {
+          markSectionSeen("account_access").catch(() => {});
+        }
       } catch (err) {
         if (mounted) setLoadError(err?.message || "Accounts could not be loaded.");
       } finally {

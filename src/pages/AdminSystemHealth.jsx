@@ -7,6 +7,7 @@ import StatSection from "@/components/admin/system-health/StatSection";
 import ExportTimingSection from "@/components/admin/system-health/ExportTimingSection";
 import IncidentsSection from "@/components/admin/system-health/IncidentsSection";
 import AlertRecipientSettings from "@/components/admin/system-health/AlertRecipientSettings";
+import { markSectionSeen } from "@/lib/adminDashboardUnread";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -80,6 +81,14 @@ export default function AdminSystemHealth() {
 
   const datasetStats = useMemo(() => getDatasetPlatformStats(), []);
   const productStats = useMemo(() => getProductStats(), []);
+
+  // Mark System Health as seen for the current admin once the page has loaded.
+  // This updates only the current admin's own last-seen timestamp; it never
+  // alters incident records or incident status.
+  useEffect(() => {
+    if (!isAdmin) return;
+    markSectionSeen("system_health").catch(() => {});
+  }, [isAdmin]);
 
   if (isLoadingAuth) {
     return <div style={{ padding: 48, textAlign: "center", color: BRAND.subtext }}>Checking access…</div>;

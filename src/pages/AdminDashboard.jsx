@@ -3,6 +3,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import AdminSectionCard from "@/components/admin/AdminSectionCard";
 import GptWriterFlagCard from "@/components/admin/GptWriterFlagCard";
+import { useAdminDashboardUnread } from "@/lib/useAdminDashboardUnread";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -154,6 +155,27 @@ export default function AdminDashboard() {
   const isAdmin = user?.role === "admin";
 
   const [accountCount, setAccountCount] = useState(null);
+  const { counts: unreadCounts } = useAdminDashboardUnread(isAdmin);
+
+  // Map unread counts to the three target card titles.
+  const unreadForCard = (title) => {
+    if (title === "System Health") {
+      const c = unreadCounts.systemHealth;
+      if (c.loading || c.count === 0) return undefined;
+      return { count: c.count, label: c.count === 1 ? "new incident" : "new incidents", tone: "error" };
+    }
+    if (title === "Account Access & Credits") {
+      const c = unreadCounts.accountAccess;
+      if (c.loading || c.count === 0) return undefined;
+      return { count: c.count, label: c.count === 1 ? "new event" : "new events", tone: "activity" };
+    }
+    if (title === "Commercial Control Centre") {
+      const c = unreadCounts.commercialControl;
+      if (c.loading || c.count === 0) return undefined;
+      return { count: c.count, label: c.count === 1 ? "new project" : "new projects", tone: "activity" };
+    }
+    return undefined;
+  };
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -202,7 +224,7 @@ export default function AdminDashboard() {
       gap: 18,
     }}>
       {list.map(({ countKey, ...card }) => (
-        <AdminSectionCard key={card.title} {...card} />
+        <AdminSectionCard key={card.title} {...card} unread={unreadForCard(card.title)} />
       ))}
     </div>
   );

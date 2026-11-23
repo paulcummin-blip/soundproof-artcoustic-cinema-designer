@@ -184,6 +184,27 @@
           }
         }
       }
+    },
+    "system_health_last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "default": null,
+      "description": "Per-admin unread-state timestamp for the Admin Dashboard System Health card. Set to now when the admin opens the System Health page. The dashboard compares this against SystemHealthIncident.last_detected_at to show an unread flag. Per-user: only the current admin's own value is updated via base44.auth.updateMe. Never alters incident records or incident status."
+    },
+    "account_access_last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "default": null,
+      "description": "Per-admin unread-state timestamp for the Admin Dashboard Account Access & Credits card. Set to now when the admin opens the Account Access & Credits page. The dashboard compares this against qualifying AccountUserAudit.occurred_at and CapacityLedger.created_date values. Per-user. Never alters audit records or ledger entries."
+    },
+    "commercial_control_last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "default": null,
+      "description": "Per-admin unread-state timestamp for the Admin Dashboard Commercial Control Centre card. Set to now when the admin opens the Commercial Control Centre page. The dashboard compares this against Project.created_date for Professional projects. Per-user. Never alters project records."
     }
   }
 }
