@@ -78,7 +78,7 @@ export function useDesignContextReview({ projectId = null, versionId = null } = 
     setStatus('saving');
     setError(null);
     rememberDraft(rows);
-    const skippedIds = (rows || []).filter(row => row.status === 'skipped').map(row => row.question_id).filter(Boolean);
+    const skippedIds = (rows || []).filter(row => row.status === 'skipped' || row.status === 'unanswered').map(row => row.question_id).filter(Boolean);
     const items = (rows || []).filter(row => row.status === 'answered' || row.status === 'no_reason')
       .map(row => ({ question_id: row.question_id, question: row.question, area: row.area,
         status: row.status, answer: row.status === 'answered' ? (row.answer || '').trim() : null,

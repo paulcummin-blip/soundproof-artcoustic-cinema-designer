@@ -40,8 +40,8 @@ const RULE = '#DCDBD6';
 
 /** One question row with answer, no-reason, and skip controls. */
 function ContextQuestionRow({ item, index, onChange, registerAnswerRef }) {
-  const isSaved = item.status === 'answered' || item.status === 'no_reason';
-  const isSkipped = item.status === 'skipped' && !isSaved;
+  const isSaved = item.is_saved === true;
+  const isSkipped = item.status === 'skipped';
   const needsReconfirmation = item.needs_reconfirmation === true;
 
   const handleSkip = () => {
@@ -49,7 +49,7 @@ function ContextQuestionRow({ item, index, onChange, registerAnswerRef }) {
   };
 
   const handleUndoSkip = () => {
-    onChange(index, { status: 'skipped', answer: '' });
+    onChange(index, { status: 'unanswered', answer: '' });
     // Restore the textarea so the designer can type an answer.
   };
 
@@ -146,7 +146,7 @@ function ContextQuestionRow({ item, index, onChange, registerAnswerRef }) {
             <textarea
               ref={(el) => registerAnswerRef(index, el)}
               value={item.answer || ''}
-              onChange={(e) => onChange(index, { answer: e.target.value, status: e.target.value.trim() ? 'answered' : 'skipped' })}
+              onChange={(e) => onChange(index, { answer: e.target.value, status: e.target.value.trim() ? 'answered' : 'unanswered' })}
               placeholder="Type the designer's reason here, or skip for this generation..."
               style={{
                 width: '100%',
@@ -178,7 +178,7 @@ function ContextQuestionRow({ item, index, onChange, registerAnswerRef }) {
                 type="checkbox"
                 checked={item.status === 'no_reason'}
                 onChange={(e) => onChange(index, {
-                  status: e.target.checked ? 'no_reason' : 'skipped',
+                  status: e.target.checked ? 'no_reason' : 'unanswered',
                   answer: e.target.checked ? '' : (item.answer || ''),
                 })}
                 style={{ cursor: 'pointer' }}
@@ -241,7 +241,8 @@ export default function DesignContextDialog({
           question: q.question,
           area: q.area,
           decision_fingerprint: q.decision_fingerprint,
-          status: saved?.status || 'skipped',
+          status: saved?.status || 'unanswered',
+          is_saved: Boolean(saved),
           answer: saved?.answer || '',
           needs_reconfirmation: saved?.needs_reconfirmation || false,
           is_new: !saved,
@@ -256,19 +257,21 @@ export default function DesignContextDialog({
         answer: item.answer || '',
         needs_reconfirmation: item.needs_reconfirmation || false,
         is_review_only: true,
+        is_saved: true,
       })),
     ];
     setRows(merged.map(row => {
       const draft = Array.isArray(draftRows) ? draftRows.find(item => item.question_id === row.question_id
         && item.decision_fingerprint === row.decision_fingerprint) : null;
-      return draft ? { ...row, status: draft.status, answer: draft.answer } : row;
+      return draft ? { ...row, status: draft.status, answer: draft.answer,
+        is_saved: row.is_saved && row.status === draft.status && row.answer === draft.answer } : row;
     }));
   }, [open, questions, savedItems, draftRows]);
 
   const handleRowChange = React.useCallback((index, patch) => {
     setRows((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], ...patch };
+      next[index] = { ...next[index], ...patch, is_saved: false };
       return next;
     });
     // When a question is skipped, move focus to the next unanswered
