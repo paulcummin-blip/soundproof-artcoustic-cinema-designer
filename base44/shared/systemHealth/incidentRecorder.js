@@ -137,45 +137,119 @@ async function readAlertConfig(serviceClient) {
  * Never includes proposal text, client names or credentials.
  */
 function buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary }) {
-  const severityColor = severity === 'critical' ? '#B23A3A' : '#625143';
+  const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
+  const severityColor = severity === 'critical' ? '#B23A3A' : (severity === 'high' ? '#625143' : '#3E4349');
+  const incidentUrl = `https://soundproofcinemadesigner.com/admin/system-health?incident=${encodeURIComponent(reference)}`;
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:'Didact Gothic',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
-    <tr><td style="padding:24px;">
-      <table width="600" cellpadding="0" cellspacing="0" style="border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;">
-        <tr><td style="background:#ef4444;color:#000000;padding:16px 24px;font-size:15px;font-weight:700;">
-          Sound Proof System Health Alert
-        </td></tr>
-        <tr><td style="padding:24px;">
-          <p style="margin:0 0 12px;font-size:16px;font-weight:700;color:#0a0a0a;">
-            Incident ${reference}
-          </p>
-          <p style="margin:0 0 16px;font-size:14px;color:#737373;">
-            A significant operation failure has been recorded.
-          </p>
-          <table cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;color:#0a0a0a;">
-            <tr><td style="padding:4px 0;color:#737373;width:120px;">Component:</td><td style="padding:4px 0;">${component}</td></tr>
-            <tr><td style="padding:4px 0;color:#737373;">Operation:</td><td style="padding:4px 0;">${operation}</td></tr>
-            <tr><td style="padding:4px 0;color:#737373;">Severity:</td><td style="padding:4px 0;color:${severityColor};font-weight:700;">${severity}</td></tr>
-          </table>
-          <p style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#0a0a0a;">Diagnostic summary</p>
-          <p style="margin:0 0 16px;font-size:13px;color:#0a0a0a;background:#f5f5f5;padding:12px;border-radius:6px;">
-            ${diagnosticSummary}
-          </p>
-          <a href="https://soundproofcinemadesigner.com/admin/system-health"
-             style="display:inline-block;padding:10px 20px;background:#ef4444;color:#000000;text-decoration:none;border-radius:8px;font-size:13px;font-weight:700;">
-            View in System Health
-          </a>
-        </td></tr>
-        <tr><td style="padding:12px 24px;border-top:1px solid #e5e5e5;">
-          <p style="margin:0;font-size:11px;color:#737373;">
-            This is an automated alert from Sound Proof System Health. No client content or credentials are included in this notification.
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound Proof Incident ${reference}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; }
+    .brand-logo { display: block; width: 100%; max-width: 440px; height: auto; margin: 0 auto; border: 0; }
+    .header-caption { margin-left: auto; margin-right: auto; text-align: center; }
+    @media only screen and (max-width: 600px) {
+      .outer-cell { padding: 12px 10px 0 !important; }
+      .email-shell { width: 100% !important; max-width: 100% !important; border-radius: 6px !important; }
+      .brand-header { padding: 24px 18px 22px !important; }
+      .brand-logo { max-width: 260px !important; height: auto !important; }
+      .content-wrap { padding: 16px 10px 20px !important; }
+      .content-card { padding: 24px 18px !important; }
+    }
+  </style>
+  <!--[if !mso]><!--><link href="https://fonts.googleapis.com/css2?family=Didact+Gothic&display=swap" rel="stylesheet" type="text/css"><!--<![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#F3F0EB;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#F3F0EB;">
+    <tr>
+      <td align="center" class="outer-cell" style="padding:28px 20px 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" class="email-shell" style="width:600px;max-width:600px;background-color:#FFFFFF;border:1px solid #DCDBD6;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td class="brand-header" style="padding:38px 44px 30px;background-color:#FFFFFF;text-align:center;border-bottom:3px solid #213428;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" align="center">
+                <tr>
+                  <td style="text-align:center;vertical-align:middle;">
+                    <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg" alt="Sound Proof" class="brand-logo" style="display:block;width:100%;max-width:440px;height:auto;margin:0 auto;border:0;" />
+                    <div class="header-caption" style="margin-top:16px;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#1B1A1A;">
+                      Professional Home Cinema Engineering
+                    </div>
+                    <div class="header-caption" style="margin-top:4px;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:9px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:#625143;">
+                      Powered by Artcoustic Design Intelligence (ADI)
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td class="content-wrap" style="padding:28px 30px 34px;background-color:#FFFFFF;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #DCDBD6;border-radius:8px;background-color:#FFFFFF;">
+                <tr>
+                  <td class="content-card" style="padding:40px;">
+                    <h1 style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:22px;font-weight:700;color:#213428;margin:0 0 6px;line-height:1.25;text-align:center;">
+                      System Health Incident
+                    </h1>
+                    <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:14px;font-weight:600;color:#625143;margin:0 0 24px;text-align:center;letter-spacing:0.02em;">
+                      ${reference}
+                    </p>
+                    <p style="color:#1B1A1A;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:15px;margin:0 0 20px;line-height:1.5;font-weight:400;">
+                      A significant operation failure has been recorded in Sound Proof. The incident has been logged for administrator review.
+                    </p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;">
+                      <tr>
+                        <td style="background-color:#F3F0EB;border-radius:8px;padding:18px 22px;border:1px solid #DCDBD6;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:14px;color:#1B1A1A;">
+                            <tr><td style="padding:4px 0;color:#625143;width:110px;font-weight:600;">Component:</td><td style="padding:4px 0;color:#1B1A1A;">${component}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Operation:</td><td style="padding:4px 0;color:#1B1A1A;">${operation}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Severity:</td><td style="padding:4px 0;color:${severityColor};font-weight:700;">${severityLabel}</td></tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:13px;font-weight:700;color:#213428;margin:0 0 8px;">
+                      Diagnostic summary
+                    </p>
+                    <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:13px;color:#1B1A1A;background:#F3F0EB;padding:14px 16px;border-radius:8px;border:1px solid #DCDBD6;margin:0 0 24px;line-height:1.5;">
+                      ${diagnosticSummary}
+                    </p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:8px 0 28px;">
+                      <tr>
+                        <td style="text-align:center;">
+                          <a href="${incidentUrl}" style="background-color:#213428;color:#FFFFFF;text-decoration:none;display:inline-block;width:auto;max-width:100%;box-sizing:border-box;padding:14px 34px;border-radius:8px;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:15px;font-weight:600;border:1px solid #213428;">
+                            View in System Health
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:13px;color:#625143;margin:0 0 6px;line-height:1.5;">
+                      No client content, credentials or confidential information is included in this notification.
+                    </p>
+                    <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:15px;font-weight:700;color:#213428;margin:18px 0 4px;">
+                      The Sound Proof Team<br>Artcoustic
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#F3F0EB;">
+    <tr>
+      <td align="center" style="padding:24px 20px 32px;">
+        <p style="max-width:600px;margin:0;color:#737373;font-size:12px;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;line-height:18px;text-align:center;">
+          This is an automated system health alert from Sound Proof. Replies to this email address are not monitored.
+        </p>
+        <p style="max-width:600px;margin:6px 0 0;color:#737373;font-size:11px;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;line-height:16px;text-align:center;">
+          Sound Proof is an Artcoustic platform.
+        </p>
+      </td>
+    </tr>
   </table>
 </body>
 </html>`;

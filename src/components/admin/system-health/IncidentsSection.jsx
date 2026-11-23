@@ -80,6 +80,21 @@ export default function IncidentsSection() {
     loadIncidents();
   }, [loadIncidents]);
 
+  // Deep-link: auto-open the incident referenced in ?incident=INC-XXXX so
+  // alert emails link directly to the correct incident.
+  useEffect(() => {
+    if (incidents.length === 0 || selectedIncident) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('incident');
+      if (!ref) return;
+      const match = incidents.find((i) => i.incident_reference === ref);
+      if (match) setSelectedIncident(match);
+    } catch {
+      // URL parsing is best-effort.
+    }
+  }, [incidents, selectedIncident]);
+
   if (!isAdmin) return null;
 
   const filtered = incidents.filter((i) => matchesFilter(i, activeFilter));

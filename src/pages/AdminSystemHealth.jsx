@@ -144,9 +144,9 @@ export default function AdminSystemHealth() {
         ]}
       />
 
-      <AlertRecipientSettings />
-
       <IncidentsSection />
+
+      <AlertRecipientSettings />
 
       <ExportTimingSection />
 
