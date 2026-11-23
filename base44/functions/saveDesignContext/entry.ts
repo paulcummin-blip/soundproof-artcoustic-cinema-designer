@@ -1,3 +1,4 @@
+import { contextRevision, persistedContextContains, readContextRecord } from '../../shared/designContext/designContextPersistence.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import {
@@ -81,9 +82,15 @@ export default async function(req) {
       saved = await base44.entities.DesignContext.create(recordBody);
     }
 
+    const confirmed = await readContextRecord(base44.entities, project_id, version_id);
+    if (!confirmed || !persistedContextContains(confirmed, mergedItems)) {
+      return Response.json({ ok: false, saved: false, error: 'Your answers could not be verified after saving. Please retry saving.' }, { status: 409 });
+    }
     return Response.json({
       ok: true,
       saved: true,
+      verified: true,
+      context_revision: contextRevision(confirmed),
       record_id: saved?.id || existing?.id || null,
       item_count: mergedItems.length,
     });

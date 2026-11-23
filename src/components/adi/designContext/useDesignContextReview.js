@@ -1,188 +1,128 @@
-/**
- * useDesignContextReview.js
- * --------------------------
- * The hook that coordinates the pre-generation context review step.
- *
- * It discovers questions, shows the dialog, saves the designer's answers, and
- * resolves when the designer is done. It is used by the regenerate and
- * auto-generation flows to insert the context review BEFORE the writer is called.
- *
- * The hook returns:
- *   - dialogState: { open, isDiscovering, isSaving, questions, savedItems }
- *   - review(): discovers questions and opens the dialog
- *   - proceed(rows): saves the designer's answers and resolves the pending promise
- *   - cancel(): closes the dialog and resolves the pending promise with null
- *   - DesignContextDialog: the dialog component, pre-wired to the hook's state
- *
- * Usage:
- *   const contextReview = useDesignContextReview({ projectId, versionId });
- *   // Before generating:
- *   const proceed = await contextReview.review();
- *   if (!proceed) return; // designer cancelled
- *   // ... proceed with generation
- *   // Render the dialog in the component:
- *   <contextReview.Dialog />
- */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import DesignContextDialog from './DesignContextDialog';
+import { saveAndVerifyDesignContext } from './saveAndVerifyDesignContext';
 
-const STATUS = Object.freeze({
-  IDLE: 'idle',
-  DISCOVERING: 'discovering',
-  REVIEWING: 'reviewing',
-  SAVING: 'saving',
-});
-
+/** One review promise: it resolves true only after save acknowledgement AND read-back. */
 export function useDesignContextReview({ projectId = null, versionId = null } = {}) {
-  const [status, setStatus] = useState(STATUS.IDLE);
+  const [status, setStatus] = useState('idle');
   const [questions, setQuestions] = useState([]);
   const [savedItems, setSavedItems] = useState([]);
-  const resolverRef = React.useRef(null);
-  // Transient skip exclusions for the current generation only. When the
-  // designer skips a question that was previously answered, the saved answer
-  // is NOT deleted — it remains for future generations. The skip IDs are
-  // carried here so the caller can pass them to the generation function,
-  // which excludes them from the writer's recorded intent for this run.
-  const skippedQuestionIdsRef = React.useRef([]);
+  const [draftRows, setDraftRows] = useState(null);
+  const [error, setError] = useState(null);
+  const resolverRef = useRef(null);
+  const pendingRef = useRef(null);
+  const savingRef = useRef(false);
+  const discoveredRef = useRef(false);
+  const discoverRef = useRef(null);
+  const skippedQuestionIdsRef = useRef([]);
+  const confirmedRevisionRef = useRef(null);
+  const draftKey = 'soundproof-design-context-draft:' + projectId + ':' + versionId;
+  const readDraft = () => { try { return JSON.parse(window.sessionStorage.getItem(draftKey) || 'null'); } catch { return null; } };
+  const rememberDraft = rows => { try { window.sessionStorage.setItem(draftKey, JSON.stringify(rows)); } catch { /* answers remain in the open dialog */ } };
+  const clearDraft = () => { try { window.sessionStorage.removeItem(draftKey); } catch { /* no authority lives here */ } };
+  const finish = value => {
+    const resolve = resolverRef.current;
+    resolverRef.current = null;
+    pendingRef.current = null;
+    if (resolve) resolve(value);
+  };
 
-  const review = useCallback(async () => {
-    if (!projectId || !versionId) return true; // No review needed; proceed.
-    setStatus(STATUS.DISCOVERING);
-    setQuestions([]);
-    setSavedItems([]);
-    try {
-      const response = await base44.functions.invoke('discoverDesignContextQuestions', {
-        project_id: projectId,
-        version_id: versionId,
-      });
-      const data = response?.data || {};
-      if (data.ok !== true) {
-        // Discovery failed: proceed without context. The writer will use
-        // its default behaviour (describe the arrangement without inventing
-        // a motivation).
-        setStatus(STATUS.IDLE);
-        return true;
+  const review = useCallback(() => {
+    if (pendingRef.current) return pendingRef.current;
+    if (!projectId || !versionId) return Promise.resolve(false);
+    confirmedRevisionRef.current = null;
+    skippedQuestionIdsRef.current = [];
+    setError(null);
+    setDraftRows(readDraft());
+    setStatus('discovering');
+    const pending = new Promise(resolve => { resolverRef.current = resolve; });
+    pendingRef.current = pending;
+    discoveredRef.current = false;
+    const discover = async () => {
+      setStatus('discovering');
+      try {
+        const response = await base44.functions.invoke('discoverDesignContextQuestions', {
+          project_id: projectId, version_id: versionId,
+        });
+        if (!resolverRef.current) return;
+        const data = response?.data;
+        if (data?.ok !== true) throw new Error('Design Context could not be loaded. Please retry.');
+        discoveredRef.current = true;
+        setQuestions(data.questions || []);
+        setSavedItems(data.saved_items || []);
+        if (!(data.questions || []).length && !(data.saved_items || []).length) {
+          const revision = await saveAndVerifyDesignContext({ base44, projectId, versionId });
+          if (!resolverRef.current) return;
+          confirmedRevisionRef.current = revision;
+          setStatus('idle');
+          finish({ contextRevision: revision, skippedQuestionIds: [] });
+          return;
+        }
+        setStatus('reviewing');
+      } catch (err) {
+        // No successful review is manufactured after a read or save failure.
+        setError(err?.message || 'Design Context could not be loaded. Please retry.');
+        setStatus('reviewing');
       }
-      setQuestions(data.questions || []);
-      setSavedItems(data.saved_items || []);
-      // If there are no questions and no saved items, skip the dialog.
-      if (!(data.questions || []).length && !(data.saved_items || []).length) {
-        setStatus(STATUS.IDLE);
-        return true;
-      }
-      setStatus(STATUS.REVIEWING);
-      // Wait for the designer to proceed or cancel.
-      return new Promise((resolve) => {
-        resolverRef.current = resolve;
-      });
-    } catch {
-      // Discovery failed: proceed without context.
-      setStatus(STATUS.IDLE);
-      return true;
-    }
+    };
+    discoverRef.current = discover;
+    void discover();
+    return pending;
   }, [projectId, versionId]);
 
-  const proceed = useCallback(async (rows) => {
-    setStatus(STATUS.SAVING);
-    // Record the skipped question IDs for this generation. A skipped
-    // question's answer — even if previously saved — must not reach the
-    // writer for this generation. The saved answer is NOT deleted: it
-    // remains in storage for future generations unless the designer
-    // explicitly changes it.
-    const skippedIds = (Array.isArray(rows) ? rows : [])
-      .filter((row) => row.status === 'skipped')
-      .map((row) => row.question_id)
-      .filter(Boolean);
-    skippedQuestionIdsRef.current = skippedIds;
-
+  const proceed = useCallback(async rows => {
+    if (savingRef.current || !resolverRef.current) return;
+    if (!discoveredRef.current) { void discoverRef.current?.(); return; }
+    savingRef.current = true;
+    setStatus('saving');
+    setError(null);
+    rememberDraft(rows);
+    const skippedIds = (rows || []).filter(row => row.status === 'skipped').map(row => row.question_id).filter(Boolean);
+    const items = (rows || []).filter(row => row.status === 'answered' || row.status === 'no_reason')
+      .map(row => ({ question_id: row.question_id, question: row.question, area: row.area,
+        status: row.status, answer: row.status === 'answered' ? (row.answer || '').trim() : null,
+        decision_fingerprint: row.decision_fingerprint }));
     try {
-      // Build the items to save: only answered and no_reason items.
-      // Skipped items are not persisted.
-      const itemsToSave = (Array.isArray(rows) ? rows : [])
-        .filter((row) => row.status === 'answered' || row.status === 'no_reason')
-        .map((row) => ({
-          question_id: row.question_id,
-          question: row.question,
-          area: row.area,
-          status: row.status,
-          answer: row.status === 'answered' ? (row.answer || '').trim() : null,
-          decision_fingerprint: row.decision_fingerprint,
-        }));
-
-      if (itemsToSave.length > 0) {
-        await base44.functions.invoke('saveDesignContext', {
-          project_id: projectId,
-          version_id: versionId,
-          context_items: itemsToSave,
-        });
-      }
-    } catch {
-      // Save failed: proceed anyway. The generation can still run; the
-      // context just won't be persisted for reuse.
-    }
-    setStatus(STATUS.IDLE);
-    setQuestions([]);
-    setSavedItems([]);
-    if (resolverRef.current) {
-      resolverRef.current(true);
-      resolverRef.current = null;
+      const revision = await saveAndVerifyDesignContext({ base44, projectId, versionId, items });
+      if (!resolverRef.current) return;
+      confirmedRevisionRef.current = revision;
+      skippedQuestionIdsRef.current = skippedIds;
+      clearDraft();
+      setStatus('idle');
+      finish({ contextRevision: revision, skippedQuestionIds: skippedIds });
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Your answers could not be saved. Please retry saving.');
+      setStatus('reviewing');
+      // Keep both the dialog instance and its current answer rows intact.
+    } finally {
+      savingRef.current = false;
     }
   }, [projectId, versionId]);
 
   const cancel = useCallback(() => {
-    setStatus(STATUS.IDLE);
-    setQuestions([]);
-    setSavedItems([]);
-    if (resolverRef.current) {
-      resolverRef.current(false);
-      resolverRef.current = null;
-    }
+    if (savingRef.current) return;
+    setStatus('idle');
+    skippedQuestionIdsRef.current = [];
+    confirmedRevisionRef.current = null;
+    finish(false);
   }, []);
 
-  // If the component unmounts while a review is waiting on the designer
-  // (the page was navigated away, the report closed, etc.), the pending
-  // promise must not stay unresolved: the generation flow that called
-  // review() would otherwise hang forever. Resolving with false aborts the
-  // generation cleanly, exactly as a cancel does, so no generation promise
-  // is ever left dangling by navigation or unmounting.
-  useEffect(() => {
-    return () => {
-      if (resolverRef.current) {
-        resolverRef.current(false);
-        resolverRef.current = null;
-      }
-    };
-  }, []);
+  useEffect(() => () => { finish(false); }, [projectId, versionId]);
 
-  const Dialog = React.useMemo(() => function DesignContextDialogBound() {
-    return React.createElement(DesignContextDialog, {
-      open: status === STATUS.REVIEWING || status === STATUS.SAVING || status === STATUS.DISCOVERING,
-      isDiscovering: status === STATUS.DISCOVERING,
-      isSaving: status === STATUS.SAVING,
-      questions,
-      savedItems,
-      onProceed: proceed,
-      onCancel: cancel,
-    });
-  }, [status, questions, savedItems, proceed, cancel]);
-
-  // The skipped question IDs from the most recent review. Callers read
-  // this after `review()` resolves to pass temporary skip exclusions to
-  // the generation function. Cleared on cancel.
-  const getSkippedQuestionIds = useCallback(() => {
-    const ids = skippedQuestionIdsRef.current;
-    return Array.isArray(ids) ? [...ids] : [];
-  }, []);
-
-  return {
-    review,
-    proceed,
-    cancel,
-    getSkippedQuestionIds,
-    Dialog,
-    isReviewing: status === STATUS.REVIEWING || status === STATUS.DISCOVERING || status === STATUS.SAVING,
+  // Stable component identity: a saving/error transition must not remount the
+  // textareas and replace unsaved edits with the previously stored answers.
+  const dialogPropsRef = useRef(null);
+  dialogPropsRef.current = {
+    open: status !== 'idle', isDiscovering: status === 'discovering', isSaving: status === 'saving',
+    questions, savedItems, draftRows, error, onProceed: proceed, onCancel: cancel,
   };
+  const Dialog = React.useMemo(() => function DesignContextDialogBound() {
+    return React.createElement(DesignContextDialog, dialogPropsRef.current);
+  }, []);
+  const getSkippedQuestionIds = useCallback(() => [...skippedQuestionIdsRef.current], []);
+  const getConfirmedRevision = useCallback(() => confirmedRevisionRef.current, []);
+  return { review, proceed, cancel, Dialog, error, getSkippedQuestionIds, getConfirmedRevision,
+    isReviewing: status !== 'idle' };
 }
-
 export default useDesignContextReview;

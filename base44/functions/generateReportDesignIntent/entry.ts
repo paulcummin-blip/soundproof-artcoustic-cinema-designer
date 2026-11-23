@@ -33,7 +33,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { project_id, version_id, generate_only, skip_question_ids } = body || {};
+    const { project_id, version_id, generate_only, skip_question_ids, context_revision } = body || {};
     if (!project_id || !version_id) {
       return Response.json({ error: 'project_id and version_id are required.' }, { status: 400 });
     }
@@ -53,6 +53,7 @@ export default async function(req) {
 
     const coreInput = {
       entities: base44.entities,
+      expectedContextRevision: typeof context_revision === 'string' ? context_revision : null,
       authorityEntities: base44.asServiceRole.entities,
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
       projectId: project_id || null,

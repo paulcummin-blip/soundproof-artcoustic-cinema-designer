@@ -35,6 +35,7 @@ import { DESIGN_INTENT_REFUSAL, runReportDesignIntent } from './reportDesignInte
 import { buildReportGeometryContext } from './reportGeometryContext.js';
 import { buildReportVisualContext } from './reportVisualContext.js';
 import { buildDesignIntentGenerationReport } from './reportDesignIntentGenerationReport.js';
+import { contextRevision, readContextRecord } from '../designContext/designContextPersistence.js';
 import { recordedIntentFromContext } from '../designContext/designContextModel.js';
 
 /** Why a generation attempt could not be set up at all. */
@@ -102,6 +103,7 @@ export async function buildReportDesignIntentAttempt({
    * These IDs exclude it from the writer's recorded intent for this run.
    */
   skipQuestionIds = [],
+  expectedContextRevision = null,
 } = {}) {
   if (!projectId || !versionId) {
     return blocked(DESIGN_INTENT_ATTEMPT_BLOCK.INVALID_REQUEST, 400, 'project_id and version_id are required.');
@@ -149,10 +151,13 @@ export async function buildReportDesignIntentAttempt({
   // governs the context governs this read. A context that cannot be read is simply
   // no recorded intent at all: the attempt continues and the writer describes the
   // arrangement without inventing a motivation, exactly as before.
-  const contextPage = await entities.DesignContext
-    .filter({ project_id: projectId, version_id: versionId }, { limit: 1 })
-    .catch(() => null);
-  const contextRecord = (contextPage?.items || [])[0] || null;
+  let contextRecord;
+  try { contextRecord = await readContextRecord(entities, projectId, versionId); }
+  catch { return blocked('design_context_unverified', 409, 'The saved design answers could not be verified. Please retry saving before generating.'); }
+  const confirmedContextRevision = contextRevision(contextRecord);
+  if (expectedContextRevision && expectedContextRevision !== confirmedContextRevision) {
+    return blocked('design_context_changed', 409, 'The saved design answers changed. Please review and save them again before generating.');
+  }
   const allContextItems = Array.isArray(contextRecord?.context_items) ? contextRecord.context_items : [];
   // Apply temporary skip exclusions: a question the designer skipped for this
   // generation has its previously saved answer excluded from the writer's
@@ -267,6 +272,16 @@ export async function buildReportDesignIntentAttempt({
     };
   }
 
+  // A context change during writing must never publish a narrative for another revision.
+  if (attempt.ok) {
+    let current;
+    try { current = await readContextRecord(entities, projectId, versionId); }
+    catch { return blocked('design_context_unverified', 409, 'The saved design answers could not be verified after writing. Nothing was accepted.'); }
+    if (contextRevision(current) !== confirmedContextRevision) {
+      return blocked('design_context_changed', 409, 'The saved design answers changed during writing. Nothing was accepted.');
+    }
+    attempt.record.context_revision = confirmedContextRevision;
+  }
   return {
     ok: true,
     project,

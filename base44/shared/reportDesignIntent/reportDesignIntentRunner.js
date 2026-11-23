@@ -38,6 +38,9 @@ import {
   interpretationView,
 } from '../proposalWriter/writerDesignContext.js';
 import { assertWriterInputCarriesNoLiveState } from '../proposalWriter/writerPromptBuilder.js';
+import { reviewDesignIntentCoverage, CONTEXT_COVERAGE_MISSING } from './designIntentCoverage.js';
+import { isEligibleForWordingCorrection } from '../proposalWriter/writerCorrectionPolicy.js';
+import { buildCorrectionPromptBlock } from '../proposalWriter/writerCorrectionPrompt.js';
 import { callWriterProvider } from '../proposalWriter/writerProvider.js';
 import { validateWriterOutput, parseWriterOutput } from '../proposalWriter/writerOutputValidator.js';
 import { validatorProvenance } from '../proposalWriter/validatorProvenance.js';
@@ -352,7 +355,7 @@ export async function runReportDesignIntent({
   // 4. The provider call. A timeout, a refusal or an empty answer is a result. The
   // pictures, where there are any, are attached to this one call: no second model is
   // asked to look at them, and no image is ever uploaded, copied or re-stored.
-  const provider = await callWriterProvider({
+  let provider = await callWriterProvider({
     invokeLLM,
     input: writerInput,
     model: flag?.model ?? null,
@@ -393,8 +396,49 @@ export async function runReportDesignIntent({
   // draft is normalised here, the validator is given that normalised draft, and
   // the accepted text is read from the SAME object, so one response can never be
   // read two ways.
-  const canonicalDraft = canonicalDesignIntentDraft(provider.output);
-  const validation = validate({ input: writerInput, output: canonicalDraft });
+  let canonicalDraft = canonicalDesignIntentDraft(provider.output);
+  let validation = validate({ input: writerInput, output: canonicalDraft });
+  let coverage = null;
+  let correction = null;
+  const checkCoverage = async () => {
+    if (validation?.valid !== true) return;
+    coverage = await reviewDesignIntentCoverage({
+      input: writerInput, text: designIntentTextFromOutput(canonicalDraft) || '',
+      invokeLLM, model: flag?.model ?? null,
+    });
+    if (!coverage.valid) validation = { ...validation, valid:false,
+      violations:[...(validation.violations || []), ...coverage.violations] };
+  };
+  await checkCoverage();
+
+  // Reuse the existing bounded correction call: one correction, same model,
+  // same frozen input, followed by ALL engineering and coverage checks again.
+  const failures = validation?.violations || [];
+  const correctable = failures.length > 0 && failures.every(entry =>
+    entry.code === CONTEXT_COVERAGE_MISSING || isEligibleForWordingCorrection([entry]).eligible);
+  if (correctable) {
+    const initialValidation = validation;
+    const block = buildCorrectionPromptBlock({ initialOutput:canonicalDraft, violations:failures })
+      + '\nDESIGN INTENT ONLY: where a missing saved reason is flagged, add its complete causal meaning in natural prose, using the saved design_decisions. The whole decision_summary passage is flagged for that insertion. Keep all other supported meaning, evidence and section structure. Never convert an intended benefit into an achieved result. Remove generic filler if needed to fit the word limit.';
+    const corrected = await callWriterProvider({
+      invokeLLM, input:writerInput, model:flag?.model ?? null,
+      fileUrls:visualContextSources(visual), correction:{ needed:true, block },
+    });
+    correction = { attempted:true, initial_validation:initialValidation, succeeded:false };
+    if (corrected.received && !corrected.provider_error) {
+      provider = corrected;
+      canonicalDraft = canonicalDesignIntentDraft(provider.output);
+      validation = validate({ input:writerInput, output:canonicalDraft });
+      coverage = null;
+      await checkCoverage();
+      correction.succeeded = validation?.valid === true;
+    } else {
+      validation = { ...initialValidation, valid:false, violations:[{
+        code:'design_intent_correction_failed', section:'decision_summary',
+        detail:'The writer could not complete the required correction. No narrative was accepted.',
+      }] };
+    }
+  }
   // The validator reports the sections it READ — their word counts and citations —
   // and hands no prose back, so `validation.output` does not exist. A validator
   // that does normalise an output is still honoured first, exactly as before.
@@ -438,6 +482,8 @@ export async function runReportDesignIntent({
       // displayed, nothing is read back out of either, and the caller alone
       // decides who may be shown them.
       validation: validation || null,
+      coverage,
+      correction,
       draft: provider.output ?? null,
       provider_identity: providerIdentity,
       visual_fingerprint: visualFingerprintOf(visual),
@@ -483,8 +529,13 @@ export async function runReportDesignIntent({
     generatedBy: user?.full_name || user?.email || null,
   });
 
+  record.design_context_coverage = coverage;
+  record.correction = correction;
   return {
     ok: true,
+    coverage,
+    correction,
+    validation,
     code: null,
     reason: null,
     detail: null,

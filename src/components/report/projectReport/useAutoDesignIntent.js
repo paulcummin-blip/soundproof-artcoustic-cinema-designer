@@ -38,6 +38,7 @@ const EVIDENCE_KEYS = ['engineeringFingerprint', 'calculationFingerprint', 'seat
 
 const storage = createIntentStorage(() => window.localStorage);
 const inFlight = new Set();
+const reviewing = new Set();
 const listeners = new Set();
 const keyOf = (projectId, versionId) => `adi_auto_intent_v3:${projectId}:${versionId}`;
 const genKeyOf = (key) => `${key}:generation`;
@@ -134,7 +135,8 @@ export default function useAutoDesignIntent({ projectId, versionId, enabled = fa
   const key = keyOf(projectId, versionId);
 
   const run = useCallback(async (generation) => {
-    if (!projectId || !versionId || inFlight.has(key)) return;
+    if (!projectId || !versionId || inFlight.has(key) || reviewing.has(key)) return;
+    let confirmedContextRevision = null;
     // The pre-generation context review step. If a callback is supplied, it
     // runs before the writer is called. The designer may answer, skip, or
     // cancel. If the callback returns false, the generation is skipped.
@@ -142,15 +144,18 @@ export default function useAutoDesignIntent({ projectId, versionId, enabled = fa
     // temporary skip exclusions to the generation function.
     let effectiveSkipIds = Array.isArray(skipQuestionIds) ? [...skipQuestionIds] : [];
     if (typeof onBeforeGenerate === 'function') {
+      reviewing.add(key);
       try {
         const proceed = await onBeforeGenerate();
         if (proceed === false) return;
+        confirmedContextRevision = proceed?.contextRevision || null;
         if (proceed && typeof proceed === 'object' && Array.isArray(proceed.skippedQuestionIds)) {
           effectiveSkipIds = proceed.skippedQuestionIds;
         }
-      } catch {
-        // A failed review proceeds without context, exactly as before.
-      }
+      } catch (error) {
+        setStatus(key, AUTO_INTENT.FAILED, generation, 'Your design answers could not be verified. Retry saving before generating.');
+        return;
+      } finally { reviewing.delete(key); }
     }
     inFlight.add(key);
     setStatus(key, AUTO_INTENT.RUNNING, generation);
@@ -160,6 +165,7 @@ export default function useAutoDesignIntent({ projectId, versionId, enabled = fa
       const response = await base44.functions.invoke('generateReportDesignIntent', {
         project_id: projectId,
         version_id: versionId,
+        context_revision: confirmedContextRevision,
         ...(effectiveSkipIds.length > 0 ? { skip_question_ids: effectiveSkipIds } : {}),
       });
       const data = response?.data || {};

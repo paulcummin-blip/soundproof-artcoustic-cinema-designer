@@ -602,14 +602,15 @@ export default function RP22ClientReport() {
       return raw.split(',').map((id) => id.trim()).filter(Boolean);
     } catch { return []; }
   }, []);
+  const urlContextRevision = React.useMemo(() => new URLSearchParams(window.location.search).get('ctxRev'), []);
   const onBeforeGenerateCallback = React.useCallback(async () => {
     // When skip exclusions were carried from the Document Workflow panel's
     // review, the designer already reviewed: do not open the dialog again.
-    if (urlSkipCtx.length > 0) return { skippedQuestionIds: urlSkipCtx };
+    if (urlContextRevision) return { skippedQuestionIds: urlSkipCtx, contextRevision: urlContextRevision };
     const proceed = await autoContextReview.review();
     if (!proceed) return false;
-    return { skippedQuestionIds: autoContextReview.getSkippedQuestionIds() };
-  }, [autoContextReview, urlSkipCtx]);
+    return { skippedQuestionIds: autoContextReview.getSkippedQuestionIds(), contextRevision: proceed.contextRevision };
+  }, [autoContextReview, urlSkipCtx, urlContextRevision]);
   const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({
     projectId,
     versionId: authority.versionId,

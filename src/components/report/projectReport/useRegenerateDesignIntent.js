@@ -64,6 +64,7 @@ export function useRegenerateDesignIntent({ projectId = null, versionId = null, 
         project_id: projectId,
         version_id: versionId,
         generate_only: true,
+        context_revision: proceed.contextRevision || contextReview.getConfirmedRevision(),
         ...(skipQuestionIds.length > 0 ? { skip_question_ids: skipQuestionIds } : {}),
       });
       const data = response?.data || {};

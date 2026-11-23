@@ -160,6 +160,8 @@ export function buildDesignIntentGenerationReport({
     reason: accepted ? null : (attempt?.reason ?? null),
     detail: accepted ? null : (attempt?.detail ?? null),
     validation_result: attempt?.validation ?? null,
+    design_context_coverage: attempt?.coverage ?? null,
+    correction: attempt?.correction ?? null,
     validation_errors: attempt?.validation_errors || [],
     // The draft the validator refused. Evidence of what happened, never copy, and
     // never saved anywhere by the caller that reports it.

@@ -218,6 +218,8 @@ export default function DesignContextDialog({
   isSaving = false,
   questions = [],
   savedItems = [],
+  draftRows = null,
+  error = null,
   onProceed = null,
   onCancel = null,
 }) {
@@ -256,8 +258,12 @@ export default function DesignContextDialog({
         is_review_only: true,
       })),
     ];
-    setRows(merged);
-  }, [open, questions, savedItems]);
+    setRows(merged.map(row => {
+      const draft = Array.isArray(draftRows) ? draftRows.find(item => item.question_id === row.question_id
+        && item.decision_fingerprint === row.decision_fingerprint) : null;
+      return draft ? { ...row, status: draft.status, answer: draft.answer } : row;
+    }));
+  }, [open, questions, savedItems, draftRows]);
 
   const handleRowChange = React.useCallback((index, patch) => {
     setRows((prev) => {
@@ -333,6 +339,7 @@ export default function DesignContextDialog({
           </div>
         )}
 
+        {error && <p role="alert" style={{ color: '#8B4A2B', fontSize: 13 }}>{error}</p>}
         <DialogFooter style={{ marginTop: 16 }}>
           <button
             type="button"
@@ -371,7 +378,7 @@ export default function DesignContextDialog({
               opacity: (isSaving || isDiscovering) ? 0.7 : 1,
             }}
           >
-            {isSaving ? 'Saving...' : 'Continue'}
+            {isSaving ? 'Saving...' : error ? 'Retry Save' : 'Continue'}
           </button>
         </DialogFooter>
       </DialogContent>
