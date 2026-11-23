@@ -314,6 +314,7 @@ export async function runReportDesignIntent({
       }),
       geometryContext: geometry,
       visualContext: visual,
+      recordedDesignReasons: recordedIntent,
     });
     assertWriterInputCarriesNoLiveState(writerInput);
 
