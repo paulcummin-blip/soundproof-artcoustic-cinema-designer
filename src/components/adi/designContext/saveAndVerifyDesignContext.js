@@ -1,11 +1,17 @@
 import { contextRevision, persistedContextContains, readContextRecord } from './designContextPersistence.js';
-const trimContext = v => typeof v === 'string' ? v.trim() : null;
+// Normalise the optional Project Context exactly as the server does (normaliseProjectContext/asText):
+// a non-string or empty/whitespace value becomes null, so an empty field never mismatches a stored null.
+const normaliseOptionalText = v => {
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
 /** Save, then independently read the saved answers. Never resolves success on an unverified write.
  *  The optional free-text Project Context is saved alongside the items and verified the same way;
  *  it never overwrites or discards existing question answers. A non-empty project_context forces a
  *  save even when there are no items, so the designer's note is never lost. */
 export async function saveAndVerifyDesignContext({ base44, projectId, versionId, items = [], projectContext = null }) {
-  const normalisedContext = trimContext(projectContext);
+  const normalisedContext = normaliseOptionalText(projectContext);
   let acknowledgedRevision = null;
   if (items.length || normalisedContext !== null) {
     const response = await base44.functions.invoke('saveDesignContext', {
@@ -20,7 +26,7 @@ export async function saveAndVerifyDesignContext({ base44, projectId, versionId,
   }
   const record = await readContextRecord(base44.entities, projectId, versionId);
   const revision = contextRevision(record);
-  const confirmedContext = trimContext(record?.project_context);
+  const confirmedContext = normaliseOptionalText(record?.project_context);
   if (!persistedContextContains(record, items) || confirmedContext !== normalisedContext
     || (acknowledgedRevision && revision !== acknowledgedRevision)) {
     throw new Error('The saved answers could not be verified. Your entries are still here; please retry saving.');
