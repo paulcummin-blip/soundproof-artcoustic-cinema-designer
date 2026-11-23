@@ -82,6 +82,13 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
           const activationPill = row.activationPill || row.activationState || { label: "—", tone: "muted" };
           const promoLabel = row.promotion?.status || "None";
           const promoExpiry = row.promotion?.expiryDisplay;
+          // Fully activated = Approved eligibility AND a genuinely Active,
+          // unexpired access term. Uses the existing authoritative access state
+          // already on the row — no new flag. Only these dealers get the green
+          // name box; approved-but-not-activated, suspended and expired do not.
+          const fullyActivated =
+            row.eligibilityState?.label === "Approved" &&
+            row.activationState?.label === "Active";
           return (
             <div
               key={row.account.id}
@@ -92,9 +99,23 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
             >
               {/* Dealer */}
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold text-[#1B1A1A]">
-                  {row.account.name || "Unnamed account"}
-                </div>
+                {fullyActivated ? (
+                  <div
+                    className="inline-block max-w-full truncate rounded-md border px-2 py-0.5 text-[13px] font-semibold"
+                    style={{
+                      backgroundColor: "#EEF4F0",
+                      borderColor: "#BBD3C4",
+                      color: "#213428",
+                    }}
+                    title={row.account.name || "Unnamed account"}
+                  >
+                    {row.account.name || "Unnamed account"}
+                  </div>
+                ) : (
+                  <div className="truncate text-[13px] font-semibold text-[#1B1A1A]">
+                    {row.account.name || "Unnamed account"}
+                  </div>
+                )}
                 <div className="truncate text-[11px] text-[#625143]">
                   {accountTypeLabel(row.account)}
                   {row.primaryEmail ? ` · ${row.primaryEmail}` : ""}
