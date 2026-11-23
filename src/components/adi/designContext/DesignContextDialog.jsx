@@ -326,7 +326,7 @@ export default function DesignContextDialog({
             No context questions for this design. You can proceed directly.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8, maxHeight: 420, overflowY: 'auto' }}>
+          <fieldset disabled={isSaving} style={{ border: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8, maxHeight: 420, overflowY: 'auto' }}>
             {rows.map((row, index) => (
               <ContextQuestionRow
                 key={row.question_id}
@@ -336,7 +336,7 @@ export default function DesignContextDialog({
                 registerAnswerRef={registerAnswerRef}
               />
             ))}
-          </div>
+          </fieldset>
         )}
 
         {error && <p role="alert" style={{ color: '#8B4A2B', fontSize: 13 }}>{error}</p>}
