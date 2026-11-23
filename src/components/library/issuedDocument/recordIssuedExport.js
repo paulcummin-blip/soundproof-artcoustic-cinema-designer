@@ -24,6 +24,8 @@
  */
 
 import React from 'react';
+import { saveIssuedArtifact, boundedExportRead } from './issuedExportDurability';
+import { resolveIssuedDocumentUrl } from './issuedDocumentActions';
 import { base44 } from '@/api/base44Client';
 import { captureCompositionToPdf, captureStylesMarkup } from '@/components/library/compositionCapture';
 import { notifyIssuedExportStored } from '@/components/library/issuedExportSignal';
@@ -151,7 +153,7 @@ function normalizeFilename(filename) {
  * printed, and state what is being issued.
  * @throws {ExportStorageError} stage identity | composition | capture
  */
-async function captureIssuedDocument({ identity, snapshot }) {
+async function captureIssuedDocument({ identity, snapshot, onProgress }) {
   // A caller may resolve its source identity (versions, fingerprints, source
   // state at export) asynchronously — in the background, never on the click.
   const resolved = typeof identity.resolveSource === 'function' ? (await identity.resolveSource()) || {} : {};
@@ -197,7 +199,7 @@ async function captureIssuedDocument({ identity, snapshot }) {
 
   let captured;
   try {
-    captured = await captureCompositionToPdf(snapshot);
+    captured = await captureCompositionToPdf({ ...snapshot, onProgress });
   } catch (error) {
     throw new ExportStorageError({
       stage: EXPORT_STORAGE_STAGE.CAPTURE,
@@ -265,26 +267,44 @@ async function uploadIssuedPdf({ blob, filename }) {
  * @throws {ExportStorageError} stage asset_record — the file is already stored
  * at this point, so the failure records that a stored file has no Library row.
  */
-async function insertIssuedRow({ issued, filename, pageCount, fileUri, previewStatus = null, rendering = null, attemptKind = 'initial' }) {
-  try {
-    // The record is built by the one payload authority: the project's own
-    // ownership account when it has one, and the field omitted — never sent as
-    // null — when an admin-owned project has no owning account.
-    return await base44.entities.ProjectAssetExport.create(buildIssuedDocumentRow({
-      issued,
-      filename,
-      pageCount,
-      fileUri,
-      previewStatus,
-      rendering,
-    }));
-  } catch (error) {
-    // The rejection is kept exactly as it came back — its code, its message and
-    // the class of rejection — alongside what the attempt had already achieved.
-    // Nothing about the attempt changes: the file stays uploaded, no record
-    // exists, and the diagnostic is what makes the rejection readable.
-    throw buildAssetRecordFailure({ error, issued, fileUri, attemptKind });
+async function verifyStoredPdf(fileUri, expectedBlob) {
+  const url = await resolveIssuedDocumentUrl({ file_uri: fileUri });
+  if (!url) throw new Error('The saved PDF could not be opened for verification. Retry storage.');
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('The saved PDF could not be read from storage. Retry storage.');
+  const actual = await response.blob();
+  await assertPdfArtifact(actual);
+  if (expectedBlob) {
+    if (actual.size !== expectedBlob.size) throw new Error('The stored PDF size differs from the captured report.');
+    const [a, b] = await Promise.all([actual.arrayBuffer(), expectedBlob.arrayBuffer()]);
+    const [ah, bh] = await Promise.all([crypto.subtle.digest('SHA-256', a), crypto.subtle.digest('SHA-256', b)]);
+    if (new Uint8Array(ah).some((value, index) => value !== new Uint8Array(bh)[index])) {
+      throw new Error('The stored PDF bytes differ from the captured report.');
+    }
   }
+}
+
+async function persistHeldPdf(pendingKey, onProgress) {
+  const entry = peekPendingExport(pendingKey);
+  if (!entry) throw new Error(RETRY_UNAVAILABLE_REASON);
+  return saveIssuedArtifact({
+    entry, onProgress, verifyFile: verifyStoredPdf,
+    update: patch => updatePendingExport(pendingKey, patch),
+    api: {
+      upload: (blob, filename) => uploadIssuedPdf({ blob, filename }),
+      find: query => base44.entities.ProjectAssetExport.filter(query, { limit: 2 }),
+      create: row => base44.entities.ProjectAssetExport.create(row),
+    },
+  });
+}
+
+const awaitedSaves = new Map();
+export function storeIssuedDocument(parameters) {
+  const key = exportAttemptKey(parameters.identity);
+  if (awaitedSaves.has(key)) return awaitedSaves.get(key);
+  const promise = storeIssuedDocumentOnce(parameters).finally(() => awaitedSaves.delete(key));
+  awaitedSaves.set(key, promise);
+  return promise;
 }
 
 /**
@@ -295,14 +315,19 @@ async function insertIssuedRow({ issued, filename, pageCount, fileUri, previewSt
  *
  * @returns {Promise<{record: Object, pendingKey: string}>}
  */
-export async function storeIssuedDocument({ identity, snapshot, attemptKind = 'initial' }) {
+async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
+  const previousKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
+  const previous = peekPendingExport(previousKey);
+  if (previous?.blob || previous?.fileUri || previous?.uploadOperation) {
+    throw new Error('A previous export needs reconciliation. Use Retry storage before starting another export.');
+  }
   const pendingKey = holdPendingExport({
     identity,
     filename: normalizeFilename(identity?.filename),
     retryExport: identity?.retryExport || null,
   });
 
-  const { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus } = await captureIssuedDocument({ identity, snapshot });
+  const { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus } = await boundedExportRead(() => captureIssuedDocument({ identity, snapshot, onProgress }), 'Report capture', 130000);
   updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus });
 
   // THE PDF IS VERIFIED BEFORE IT IS STORED — and only the PDF. A document exists
@@ -320,20 +345,7 @@ export async function storeIssuedDocument({ identity, snapshot, attemptKind = 'i
     });
   }
 
-  const stored = await uploadIssuedPdf({ blob, filename });
-  // The uploaded file's own path is held with the attempt, so a failure at the
-  // record step is retried against THIS file instead of uploading a second copy
-  // of the same PDF.
-  updatePendingExport(pendingKey, { fileUri: stored.file_uri });
-  const record = await insertIssuedRow({
-    issued,
-    filename,
-    pageCount,
-    fileUri: stored.file_uri,
-    previewStatus,
-    rendering,
-    attemptKind,
-  });
+  const record = await persistHeldPdf(pendingKey, onProgress);
 
   notifyIssuedExportStored(record?.project_id || issued.projectId);
   return { record, pendingKey };
@@ -480,86 +492,24 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
  * attempt started — an older export of the same document is a different copy,
  * not this one.
  */
-async function findStoredAttempt(entry) {
-  const { issued, filename, attemptStartedAt } = entry;
-  if (!issued?.projectId || !issued?.documentType || !filename) return null;
-  const page = await base44.entities.ProjectAssetExport.filter(
-    {
-      project_id: issued.projectId,
-      document_type: issued.documentType,
-      filename,
-      version_id: issued.versionId || null,
-      exported_at: { $gte: attemptStartedAt },
-    },
-    { limit: 1, fields: ['id', 'filename', 'document_type', 'project_id'] },
-  );
-  const items = Array.isArray(page) ? page : page?.items || [];
-  return items[0] || null;
+const retriesInFlight = new Map();
+export function retryIssuedExportStorage(pendingKey, { onProgress } = {}) {
+  if (retriesInFlight.has(pendingKey)) return retriesInFlight.get(pendingKey);
+  const promise = retryHeld(pendingKey, onProgress).finally(() => retriesInFlight.delete(pendingKey));
+  retriesInFlight.set(pendingKey, promise);
+  return promise;
 }
 
-/**
- * Retry storing a failed attempt in the Project Library.
- *
- * The identity is the one the attempt was exported under, so the stored row can
- * only ever carry the viewed version. The held PDF is stored as it is; when
- * nothing is held the caller's own export action is run again, and the button
- * offering it says so.
- *
- * @returns {Promise<{ok: boolean, reason?: string, alreadyStored?: boolean, regenerated?: boolean, filename?: string}>}
- */
-export async function retryIssuedExportStorage(pendingKey) {
+async function retryHeld(pendingKey, onProgress) {
   const entry = peekPendingExport(pendingKey);
   if (!entry) return { ok: false, reason: RETRY_UNAVAILABLE_REASON };
-
-  // A previous attempt may have landed after all (the write succeeded and the
-  // response did not). That is success — and it is not stored a second time.
   try {
-    const existing = await findStoredAttempt(entry);
-    if (existing) {
-      clearPendingExport(pendingKey);
-      announceStored(entry.issued, existing);
-      return { ok: true, alreadyStored: true, filename: existing.filename };
-    }
-  } catch {
-    // A probe that cannot read is not a duplicate. Storing is still attempted.
-  }
-
-  if (!entry.blob) {
-    if (typeof entry.retryExport !== 'function') {
-      return { ok: false, reason: RETRY_UNAVAILABLE_REASON };
-    }
-    // Nothing held: the document is exported again, and that export stores it.
-    clearPendingExport(pendingKey);
-    entry.retryExport();
-    return { ok: true, regenerated: true };
-  }
-
-  try {
-    // When only the Library record step failed, the PDF is already stored
-    // privately: that exact file is reused, so the retry records the document
-    // that was issued instead of uploading a duplicate of it.
-    const fileUri = entry.fileUri
-      || (await uploadIssuedPdf({ blob: entry.blob, filename: entry.filename })).file_uri;
-    const record = await insertIssuedRow({
-      issued: entry.issued,
-      filename: entry.filename,
-      pageCount: entry.pageCount,
-      fileUri,
-      attemptKind: 'retry',
-    });
+    const record = await persistHeldPdf(pendingKey, onProgress);
     clearPendingExport(pendingKey);
     announceStored(entry.issued, record);
-    return { ok: true, filename: record.filename };
+    return { ok: true, record, filename: record.filename };
   } catch (error) {
-    const identified = asExportStorageError(error);
-    writeExportStorageDiagnostic(buildExportStorageDiagnostic({
-      failure: identified,
-      identity: { ...entry.issued, filename: entry.filename },
-      filename: entry.filename,
-      storagePath: identified.storagePath,
-      partial: identified.partial,
-    }));
-    return { ok: false, reason: exportStorageReason(identified), stage: identified.stage };
+    return { ok: false, reason: error?.detail || error?.message || exportStorageReason(asExportStorageError(error)) };
   }
 }
 

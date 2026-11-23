@@ -376,7 +376,7 @@ export function captureCompositionToPdf(input) {
   return withCaptureDeadline((signal) => captureComposition(input, signal));
 }
 
-async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null }, signal) {
+async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null, onProgress = () => {} }, signal) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
@@ -498,6 +498,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
       pages,
       signal,
       rasterPage: async (page, index) => {
+        onProgress({ stage: 'capture', message: `Capturing report page ${index + 1} of ${pages.length}…` });
         const scale = scaleOf(page);
         const { canvas, dataUrl } = await rasterisePage(page, {
           pageNumber: index + 1,
@@ -525,6 +526,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
       failure.captureDiagnostics = { operation: proposalRoot ? 'proposal_incomplete_capture' : 'report_incomplete_capture', resilience };
       throw failure;
     }
+    onProgress({ stage: 'assemble', message: `Assembling PDF (${pageRasters.length} pages)…` });
     let pageCount = 0;
     for (let index = 0; index < pageRasters.length; index += 1) {
       const raster = pageRasters[index];

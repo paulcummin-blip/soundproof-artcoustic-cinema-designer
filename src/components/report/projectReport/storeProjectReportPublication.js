@@ -40,7 +40,6 @@ export const PUBLICATION_DOCUMENT = Object.freeze({
 /** A human-readable reason for a storage failure, from the ExportStorageError. */
 function describeError(error) {
   if (!error) return 'The document could not be stored.';
-  if (error.reason) return error.reason;
   if (error.detail) return String(error.detail);
   return error.message || 'The document could not be stored.';
 }
@@ -62,9 +61,9 @@ function logFailure(error, identity, filename) {
  * Store the Project Report PDF through the existing awaited storage pipeline.
  * Returns { ok, record } on success or { ok: false, error } on failure.
  */
-async function storeReportDocument({ identity, snapshot }) {
+async function storeReportDocument({ identity, snapshot, onProgress }) {
   try {
-    const { record, pendingKey } = await storeIssuedDocument({ identity, snapshot });
+    const { record, pendingKey } = await storeIssuedDocument({ identity, snapshot, onProgress });
     clearPendingExport(pendingKey);
     return { ok: true, record };
   } catch (error) {
@@ -153,6 +152,7 @@ export async function storeProjectReportPublication({
   speakerDesignParams = null,
   projectId = null,
   versionId = null,
+  onProgress,
 } = {}) {
   // A companion alone is never a completed Technical Report publication.
   if (!reportIdentity?.documentType || !reportSnapshot?.nodeHtml) {
@@ -163,7 +163,7 @@ export async function storeProjectReportPublication({
   if (reportIdentity?.documentType && reportSnapshot?.nodeHtml) {
     tasks.push({
       key: PUBLICATION_DOCUMENT.PROJECT_REPORT,
-      promise: storeReportDocument({ identity: reportIdentity, snapshot: reportSnapshot }),
+      promise: storeReportDocument({ identity: reportIdentity, snapshot: reportSnapshot, onProgress }),
     });
   }
 
@@ -175,7 +175,10 @@ export async function storeProjectReportPublication({
   }
 
   const results = await Promise.all(
-    tasks.map(async (task) => ({ key: task.key, ...(await task.promise) })),
+    tasks.map(async (task) => {
+      try { return { key: task.key, ...(await task.promise) }; }
+      catch (error) { return { key: task.key, ok: false, error: describeError(error) }; }
+    }),
   );
 
   const stored = results.filter((r) => r.ok).map((r) => r.key);
@@ -205,6 +208,7 @@ export async function retryPublicationDocument({
   reportIdentity = null,
   reportSnapshot = null,
   speakerDesignParams = null,
+  onProgress,
 } = {}) {
   if (key === PUBLICATION_DOCUMENT.PROJECT_REPORT) {
     if (!reportIdentity?.documentType || !reportSnapshot?.nodeHtml) {
@@ -213,11 +217,11 @@ export async function retryPublicationDocument({
     const filename = reportIdentity.filename?.endsWith('.pdf') ? reportIdentity.filename : `${reportIdentity.filename || 'export'}.pdf`;
     const key = pendingExportKey({ projectId: reportIdentity.projectId, documentType: reportIdentity.documentType, filename });
     const held = peekPendingExport(key);
-    if (held?.blob && held.issued?.versionId === reportIdentity.versionId) {
-      const result = await retryIssuedExportStorage(key);
+    if ((held?.blob || held?.fileUri || held?.uploadOperation) && held.issued?.versionId === reportIdentity.versionId) {
+      const result = await retryIssuedExportStorage(key, { onProgress });
       return { ok: result.ok, error: result.ok ? undefined : result.reason };
     }
-    return storeReportDocument({ identity: reportIdentity, snapshot: reportSnapshot });
+    return storeReportDocument({ identity: reportIdentity, snapshot: reportSnapshot, onProgress });
   }
   if (key === PUBLICATION_DOCUMENT.SPEAKER_DESIGN) {
     if (!speakerDesignParams?.groups?.length || !speakerDesignParams?.projectId) {

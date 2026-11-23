@@ -56,7 +56,7 @@ export function holdPendingExport({ identity = {}, filename = null, issued = nul
 export function updatePendingExport(key, patch = {}) {
   const current = held.get(key);
   if (!current) return null;
-  const next = { ...current, ...patch };
+  const next = Object.assign(current, patch);
   held.set(key, next);
   return next;
 }
