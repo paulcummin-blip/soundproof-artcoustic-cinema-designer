@@ -8,7 +8,7 @@ export const CONTEXT_COVERAGE_MISSING = 'design_context_coverage_missing';
 export const CONTEXT_COVERAGE_UNVERIFIED = 'design_context_coverage_unverified';
 export function requiredDesignReasons(input) {
   if (input?.design_intent_scope?.section !== 'decision_summary') return [];
-  return (input?.design_interpretation?.view?.design_decisions || [])
+  return (input?.design_intent_scope?.required_saved_reasons ?? input?.design_interpretation?.view?.design_decisions ?? [])
     .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim());
 }
 const schema = { type: 'object', properties: { reasons: { type: 'array', items: {
