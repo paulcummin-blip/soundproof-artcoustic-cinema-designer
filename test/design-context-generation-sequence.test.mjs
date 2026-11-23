@@ -20,6 +20,7 @@ const before=()=>new Promise((resolve,reject)=>{resolveReview=resolve;rejectRevi
 function Host(){api=useIntent({projectId:'isolated-sequence',versionId:'v',enabled:true,onBeforeGenerate:before});return null;}
 try{
 await act(async()=>{view=Renderer.create(React.createElement(Host));});
+await act(async()=>{await new Promise(resolve=>setTimeout(resolve,650));});
 assert.equal(calls.length,0,'no writer before save completes');
 await act(async()=>{rejectReview(Error('save unsuccessful'));});
 assert.equal(calls.length,0,'no writer after unsuccessful save');assert.equal(api.status,'failed');
