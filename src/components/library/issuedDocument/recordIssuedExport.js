@@ -291,15 +291,7 @@ async function persistHeldPdf(pendingKey, onProgress) {
     api: {
       upload: (blob, filename) => uploadIssuedPdf({ blob, filename }),
       find: query => base44.entities.ProjectAssetExport.filter(query, { limit: 2 }),
-      create: async row => {
-        const result = await base44.entities.ProjectAssetExport.create(row);
-        // TEMPORARY AUDIT: discard only this audit copy's acknowledgement.
-        if (import.meta.env.DEV && entry.issued.projectId === '6b045dc1b4ba3f476c41dc6c' && new URLSearchParams(window.location.search).get('exportAckAudit') === 'lost') {
-          console.info('[ReportExportAudit] Simulated lost acknowledgement after asset creation', result?.id);
-          throw new Error('Simulated lost save acknowledgement');
-        }
-        return result;
-      },
+      create: row => base44.entities.ProjectAssetExport.create(row),
     },
   });
 }
