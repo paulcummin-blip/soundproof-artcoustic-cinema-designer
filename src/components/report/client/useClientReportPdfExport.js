@@ -95,6 +95,11 @@ export function useClientReportPdfExport({
 }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
+  const [exportProgress, setExportProgress] = useState(null);
+  const updateProgress = useCallback((progress) => {
+    setExportProgress(progress);
+    console.info('[ReportExport]', progress.stage, progress.message);
+  }, []);
   // The publication state: both the Project Report PDF and the companion
   // Speaker Design PDF must land before the publication is treated as complete.
   //   idle       — no export has run yet
@@ -178,6 +183,8 @@ export function useClientReportPdfExport({
     // before the publication is treated as complete: if either fails, the
     // publication reads incomplete and a targeted retry re-stores only the
     // document that failed — never the one that succeeded.
+    try {
+    updateProgress({ stage: 'readiness', message: 'Preparing the completed report pages…' });
     const reportSnapshot = issuedDocument?.documentType
       ? snapshotIssuedComposition(issuedDocument.documentType)
       : null;
@@ -222,6 +229,7 @@ export function useClientReportPdfExport({
       reportIdentity,
       reportSnapshot,
       speakerDesignParams,
+      onProgress: updateProgress,
       projectId: issuedDocument?.projectId || null,
       versionId: issuedDocument?.versionId || null,
     }).catch((error) => ({
@@ -239,7 +247,7 @@ export function useClientReportPdfExport({
       setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
     }
     if (!outcome.complete) {
-      setError('Document creation is incomplete. Retry storage before downloading the report.');
+      setError(outcome.failed.map(item => item.error).join(' ') || 'Document creation is incomplete. Retry storage.');
       if (!storeOnly) {
         closeReportPrintWindow(printWindowRef.current);
         printWindowRef.current = null;
@@ -327,6 +335,14 @@ export function useClientReportPdfExport({
       printWindowRef.current = null;
       cleanup();
     }
+    } catch (failure) {
+      const message = failure?.message || 'Report preparation failed. Retry storage.';
+      setError(message);
+      setPublication({ status: 'incomplete', failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: message }] });
+      closeReportPrintWindow(printWindowRef.current);
+      printWindowRef.current = null;
+      cleanup();
+    }
   }, [exporting, publication.status, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, speakerDesignCompanion, cleanup]);
 
   retryExportRef.current = handleExport;
@@ -342,12 +358,14 @@ export function useClientReportPdfExport({
       status: "storing",
       failed: prev.failed.filter((entry) => entry.key !== documentKey),
     }));
+    setError(null);
     const result = await retryPublicationDocument({
       key: documentKey,
       reportIdentity: last.reportIdentity,
       reportSnapshot: last.reportSnapshot,
       speakerDesignParams: last.speakerDesignParams,
-    });
+      onProgress: updateProgress,
+    }).catch(error => ({ ok: false, error: error?.message || 'Storage recovery failed. Retry storage.' }));
     if (result.ok) {
       // Re-evaluate the remaining failures: if none remain, the publication is
       // complete; otherwise the incomplete state persists for the other document.
@@ -369,5 +387,5 @@ export function useClientReportPdfExport({
     }
   }, []);
 
-  return { exporting, error, handleExport, publication, retryMissing, PUBLICATION_DOCUMENT };
+  return { exporting, error, exportProgress, handleExport, publication, retryMissing, PUBLICATION_DOCUMENT };
 }

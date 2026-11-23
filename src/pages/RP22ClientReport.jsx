@@ -738,7 +738,7 @@ export default function RP22ClientReport() {
   ]);
 
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
-  const { exporting, error: exportError, handleExport: rawHandleExport, publication, retryMissing } = useClientReportPdfExport({
+  const { exporting, exportProgress, error: exportError, handleExport: rawHandleExport, publication, retryMissing } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
     // The project name is read from the authoritative Project record, like every
     // other identity segment: the filename never depends on the report's frozen
@@ -1167,7 +1167,7 @@ export default function RP22ClientReport() {
 
       {publication.status !== 'idle' && (
         <div className="client-report-screen-only" role="status" style={{ padding: '12px 32px', background: '#F8F8F7', color: '#213428' }}>
-          {publication.status === 'storing' && 'Saving report to Documents & Assets…'}
+          {publication.status === 'storing' && (exportProgress?.message || 'Preparing report storage…')}
           {publication.status === 'complete' && 'Report saved to Documents & Assets.'}
           {publication.status === 'incomplete' && publication.failed.map((failure) => (
             <div key={failure.key} style={{ marginBottom: 8 }}>
