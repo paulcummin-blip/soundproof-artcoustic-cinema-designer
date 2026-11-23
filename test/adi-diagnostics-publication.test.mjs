@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { existsSync } from "node:fs";
 
 const dir = await mkdtemp(path.join(tmpdir(), "adi-diagnostics-test-"));
 globalThis.__adiTest = { read: async () => null, update: async () => {} };
@@ -17,14 +18,14 @@ await build({
     export * from "./src/components/room/bass/optimiserPlan/optimiserRunHistory.js";
     export * from "./src/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
   `, resolveDir: process.cwd() },
-  bundle: true, platform: "node", format: "esm", outfile: output, logLevel: "silent",
+  loader: { ".jsx": "jsx" }, bundle: true, platform: "node", format: "esm", outfile: output, logLevel: "silent",
   plugins: [{
     name: "isolated-persistence",
     setup(b) {
       b.onResolve({ filter: /^@\/api\/base44Client$/ }, () => ({ path: "api", namespace: "mock" }));
       b.onResolve({ filter: /^@\/components\/state\/projectReadCache$/ }, () => ({ path: "reads", namespace: "mock" }));
       b.onResolve({ filter: /^@\/components\/recommendationEngine$/ }, () => ({ path: path.resolve("src/components/recommendationEngine/recommendationPersistence.js") }));
-      b.onResolve({ filter: /^@\// }, args => ({ path: path.resolve("src", args.path.slice(2) + (path.extname(args.path) ? "" : ".js")) }));
+      b.onResolve({ filter: /^@\// }, args => { const base=path.resolve("src",args.path.slice(2)); return {path:[base,base+".js",base+".jsx",base+"/index.js"].find(existsSync)||base}; });
       b.onLoad({ filter: /.*/, namespace: "mock" }, args => ({ contents: args.path === "api"
         ? "export const base44={entities:{ProjectAnalysisCache:{update:(...args)=>globalThis.__adiTest.update(...args)}}};"
         : "export const readProjectAnalysisCacheRecord=(...args)=>globalThis.__adiTest.read(...args); export const invalidateProjectAnalysisCacheRead=()=>{};" }));
