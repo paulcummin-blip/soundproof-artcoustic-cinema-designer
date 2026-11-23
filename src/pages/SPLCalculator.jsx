@@ -669,6 +669,10 @@ export default function SPLCalculatorPage() {
             <div style={{ fontSize: 11, color: BRAND.hint, textTransform: "uppercase", letterSpacing: "0.07em" }}>Reference only</div>
           </div>
 
+          <p style={{ fontSize: 13, color: BRAND.subtext, lineHeight: 1.55, marginBottom: 14, marginTop: 0 }}>
+            P12 and P13 do not determine on their own whether a loudspeaker sounds good or is the right choice for a system. They are, however, important indicators of the system's dynamic range capability and whether the loudspeakers can deliver the required SPL at the listening position.
+          </p>
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
             <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: 16, background: "#FFF" }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: BRAND.text, marginBottom: 5 }}>P12 · Screen speakers SPL capability at RSP</div>
