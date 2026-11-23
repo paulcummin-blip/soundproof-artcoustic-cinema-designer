@@ -215,4 +215,7 @@ test('scope preserves exact project/version and dispatches only its registered p
   assert.equal(calls,1);
   assert.equal(readEngineeringPublishTrigger('p','other'),null);
   unregister(); assert.equal(readEngineeringPublishTrigger('p','v'),null);
+});test('pending durable readback cannot borrow an earlier Current acknowledgement', () => {
+  const state=resolve({...current,publicationAttempt:acknowledged,durable,durableWrite:{writePending:true,writePendingFingerprint:'cal:a'}});
+  assert.equal(state.code,'calculated_not_published');
 });
