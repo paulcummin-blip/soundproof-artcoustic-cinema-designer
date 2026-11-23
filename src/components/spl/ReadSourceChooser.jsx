@@ -137,6 +137,14 @@ export default function ReadSourceChooser({ candidate, websiteUrl, onChooseWebsi
               {removing ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />} Remove
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => onChoosePdf?.(datasheet.fileUri, datasheet.fileName)}
+            disabled={disabled}
+            style={{ marginTop: 8, width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, border: `1px solid ${BRAND.green}`, borderRadius: 8, padding: "8px 12px", background: "#FFF", color: BRAND.green, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: disabled ? "not-allowed" : "pointer" }}
+          >
+            <FileText size={14} /> Read attached datasheet
+          </button>
         </div>
       )}
 

@@ -117,6 +117,14 @@ export function normalizeCompetitor(record) {
   // Half-space sensitivity: apply sensitivity space correction once
   const halfSensitivity = oneW !== null ? oneW + sensitivityBasis.correctionDb : null;
 
+  // Manufacturer-locked amplification system (e.g. Steinway Lyngdorf). This is
+  // an explicit authority carried from the source specification — never
+  // inferred from manufacturer name or a recommended amplifier figure. When a
+  // locked system has a valid max SPL limit, the comparison grades from that
+  // limit directly, without requiring sensitivity or impedance.
+  const lockedSystem = record.locked_amplification_system === true;
+  const lockedAmpPowerW = num(record.locked_amplifier_power_w);
+
   const rawContinuous = num(record.published_max_continuous_spl_db_1m);
   const rawPeak = num(record.published_max_peak_spl_db_1m);
 
@@ -140,13 +148,20 @@ export function normalizeCompetitor(record) {
   const powerIsPeakAssumed = powerFromRating === null
     && powerFromAmpRecommendation === null
     && powerFromPeakAssumed !== null;
-  const power = powerFromRating ?? powerFromAmpRecommendation ?? powerFromPeakAssumed;
+  // Locked-system amplifier power is the power authority when no continuous
+  // rating or recommended amplifier maximum is published. It is only used for
+  // locked systems — never for ordinary passive speakers.
+  const powerFromLocked = lockedSystem && lockedAmpPowerW !== null ? lockedAmpPowerW : null;
+
+  const power = powerFromRating ?? powerFromAmpRecommendation ?? powerFromLocked ?? powerFromPeakAssumed;
   const powerIsPublishedRating = powerFromRating !== null;
   const powerAuthority = powerIsPublishedRating
     ? (ratingLabel || 'Continuous')
     : powerFromAmpRecommendation !== null
       ? 'Manufacturer recommended amplifier maximum'
-      : powerIsPeakAssumed ? PEAK_ASSUMPTION_LABEL : null;
+      : powerFromLocked !== null
+        ? 'Manufacturer-locked amplifier'
+        : powerIsPeakAssumed ? PEAK_ASSUMPTION_LABEL : null;
 
   // Published SPL values get the max-SPL space correction applied once (independently)
   const continuous = rawContinuous !== null ? rawContinuous + maxSplBasis.correctionDb : null;
@@ -182,19 +197,28 @@ export function normalizeCompetitor(record) {
   const rawCalculated = oneW !== null && power !== null ? oneW + 10 * Math.log10(power) : null;
   const calculated = halfSensitivity !== null && power !== null ? halfSensitivity + 10 * Math.log10(power) : null;
 
+  // Locked-system eligibility: a manufacturer-locked amplification system with a
+  // valid max SPL limit is gradeable from that limit directly. Sensitivity,
+  // impedance and power are NOT required — the published max SPL (or its
+  // estimated continuous from peak) is the capability authority. This path is
+  // only available when locked_amplification_system is explicitly true, so an
+  // ordinary passive speaker with missing sensitivity can never qualify through
+  // it.
+  const lockedEligible = lockedSystem && halfspaceMaxSplLimit !== null;
+
   // Gradeable when either a published continuous SPL exists, or the capability can
   // be calculated from sensitivity plus a stated power authority. A row with
   // neither a power rating nor a recommended amplifier maximum — and no published
   // SPL — stays ungradeable rather than being estimated.
   const warnings = [
-    sensitivity === null && continuous === null ? 'Missing sensitivity' : null,
-    voltageDb === null && continuous === null ? 'Sensitivity reference or impedance needs confirmation' : null,
-    power === null && continuous === null
+    !lockedEligible && sensitivity === null && continuous === null ? 'Missing sensitivity' : null,
+    !lockedEligible && voltageDb === null && continuous === null ? 'Sensitivity reference or impedance needs confirmation' : null,
+    !lockedEligible && power === null && continuous === null
       ? 'Missing continuous/AES power, recommended amplifier maximum and published peak power'
       : null,
   ].filter(Boolean);
 
-  const eligible = warnings.length === 0;
+  const eligible = warnings.length === 0 || lockedEligible;
 
   // --- where the graded SPL figure came from ------------------------------
   // A populated continuous SPL field is never on its own taken as measured
@@ -299,6 +323,8 @@ export function normalizeCompetitor(record) {
 
   return {
     ...record,
+    locked_amplification_system: lockedSystem,
+    locked_amplifier_power_w: lockedAmpPowerW,
     normalized_sensitivity_db_1w_1m: oneW,
     voltage_to_1w_correction_db: voltageDb,
     sensitivity_space_correction_db: sensitivityBasis.correctionDb,
@@ -322,7 +348,9 @@ export function normalizeCompetitor(record) {
     // P12/P13 prediction: the published max SPL is a ceiling, but without
     // sensitivity there is no defensible power-to-output curve. The comparison
     // must not invent sensitivity or produce definitive grades from it.
-    missing_sensitivity_with_power_rating: oneW === null && powerFromRating !== null,
+    // A locked system is never in this category — it grades from its published
+    // max SPL directly, not from a sensitivity-based power curve.
+    missing_sensitivity_with_power_rating: lockedEligible ? false : (oneW === null && powerFromRating !== null),
     published_peak_power_w: powerIsPeakAssumed ? publishedPeak : null,
     assumed_continuous_power_w: powerIsPeakAssumed ? power : null,
     calculated_max_continuous_spl_db_1m: rawCalculated,
@@ -372,6 +400,10 @@ export function competitorMetaForComparison(record) {
   // no SPL or grade is produced. The published max SPL remains available as
   // manufacturer information in the comparison info panel.
   if (n.missing_sensitivity_with_power_rating === true) return null;
+  // Locked-system path: pass null sensitivity so the engine uses the max SPL
+  // hard cap directly as the 1 m capability. The existing distance and
+  // room-support calculations apply from there. No amplifier-dependent
+  // sensitivity curve is created.
   return {
     id: `competitor:${record.id}`,
     model: `${record.manufacturer} ${record.model}`,

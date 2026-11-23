@@ -96,6 +96,16 @@
       "type": "number",
       "description": "Upper bound of the manufacturer recommended amplifier power range, in watts. Used as a ceiling on effective amplifier power for SPL capability calculations, and as the stated power authority when the manufacturer publishes no power rating. Null when not specified."
     },
+    "locked_amplification_system": {
+      "type": "boolean",
+      "default": false,
+      "description": "RP22 comparison: explicit authority that this speaker is part of a manufacturer-locked amplification system (e.g. Steinway Lyngdorf / Steinway & Sons). When true, the comparison uses the manufacturer's fixed amplifier power (locked_amplifier_power_w) and the published maximum SPL directly, without requiring conventional sensitivity or impedance. Carried from the source SpeakerSpecification through the comparison row mapping. Never inferred from manufacturer name or a recommended amplifier figure alone."
+    },
+    "locked_amplifier_power_w": {
+      "type": "number",
+      "nullable": true,
+      "description": "RP22 comparison: the fixed manufacturer amplifier power in watts for a locked amplification system. Used as the comparison amplifier power and as the power authority when no continuous power rating is published. Null when the speaker is not a locked system, or when the locked system's amplifier power has not been recorded."
+    },
     "source_url": {
       "type": "string"
     },

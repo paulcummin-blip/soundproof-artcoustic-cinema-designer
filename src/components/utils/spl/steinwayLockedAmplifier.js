@@ -38,6 +38,12 @@ function normalisedIsSteinway(manufacturer) {
 
 export function isSteinwayLockedAmplifierRecord(record) {
   if (!record) return false;
+  // Explicit locked-system authority takes precedence — the flag is carried
+  // from the source specification through the comparison row, so any genuine
+  // manufacturer-locked system is recognised regardless of manufacturer name.
+  if (record.locked_amplification_system === true) return true;
+  // Fallback: canonical manufacturer-name identification for Steinway Lyngdorf
+  // / Steinway & Sons records that do not yet carry the explicit flag.
   return normalisedIsSteinway(record.manufacturer);
 }
 
@@ -45,4 +51,18 @@ export function isSteinwayLockedAmplifierCandidate(candidate) {
   if (!candidate) return false;
   return isSteinwayLockedAmplifierRecord(candidate.record)
     || normalisedIsSteinway(candidate.manufacturer);
+}
+
+/**
+ * The fixed manufacturer amplifier power for a locked-system speaker. Returns
+ * the record's locked_amplifier_power_w when set, falling back to the canonical
+ * 400 W for Steinway Lyngdorf / Steinway & Sons records identified by name.
+ * @param {object} record comparison row or candidate record
+ * @returns {number} amplifier power in watts
+ */
+export function getLockedAmplifierPowerW(record) {
+  if (record?.locked_amplifier_power_w && Number.isFinite(Number(record.locked_amplifier_power_w))) {
+    return Number(record.locked_amplifier_power_w);
+  }
+  return STEINWAY_LOCKED_AMPLIFIER_POWER_W;
 }

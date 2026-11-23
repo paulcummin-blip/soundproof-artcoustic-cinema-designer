@@ -252,6 +252,23 @@ export default function SpeakerFormDialog({ open, onClose, row, actorName, onSav
               <input style={inputStyle} value={values.price} onChange={set("price")} inputMode="decimal" placeholder="Not set" />
             </Field>
 
+            <Field label="Manufacturer-locked amplification system" wide hint="Tick when the speaker is part of a manufacturer-locked amplification system (e.g. Steinway Lyngdorf). The comparison uses the fixed amplifier power and published maximum SPL directly, without requiring sensitivity or impedance. Never tick for ordinary passive speakers.">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: BRAND.text, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={values.locked_system === true}
+                  onChange={(e) => setValues((prev) => ({ ...prev, locked_system: e.target.checked }))}
+                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                />
+                This speaker uses a manufacturer-locked amplification system
+              </label>
+            </Field>
+            {values.locked_system === true && (
+              <Field label="Locked amplifier power (W)" hint="The manufacturer's fixed amplifier power for this system (e.g. 400 W). Used as the comparison amplifier power.">
+                <input style={inputStyle} value={values.locked_amp_w} onChange={set("locked_amp_w")} inputMode="decimal" placeholder="e.g. 400" />
+              </Field>
+            )}
+
             <div style={{ gridColumn: "1 / -1", fontSize: 12, color: BRAND.hint }}>
               {preview?.basis
                 ? `The comparison will use ${preview.basis} W · ${preview.label}.`

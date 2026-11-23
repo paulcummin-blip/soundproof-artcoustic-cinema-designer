@@ -148,6 +148,16 @@
       "type": "number",
       "description": "RP22 comparison: the peak power figure when the manufacturer states one. Blank when not published."
     },
+    "locked_amplification_system": {
+      "type": "boolean",
+      "default": false,
+      "description": "RP22 comparison: explicit authority that this speaker is part of a manufacturer-locked amplification system (e.g. Steinway Lyngdorf / Steinway & Sons). When true, the comparison uses the manufacturer's fixed amplifier power (locked_amplifier_power_w) and the published maximum SPL directly, without requiring conventional sensitivity or impedance. Never inferred from manufacturer name or a recommended amplifier figure alone \u2014 must be set explicitly by an administrator."
+    },
+    "locked_amplifier_power_w": {
+      "type": "number",
+      "nullable": true,
+      "description": "RP22 comparison: the fixed manufacturer amplifier power in watts for a locked amplification system (e.g. 400 W for Steinway Lyngdorf Model A). Used as the comparison amplifier power and as the power authority when no continuous power rating is published. Null when the speaker is not a locked system, or when the locked system's amplifier power has not been recorded."
+    },
     "frequency_response_low_hz": {
       "type": "number",
       "description": "Acoustic: Lowest frequency response in Hz. Valid range 10-200 Hz."

@@ -212,6 +212,11 @@ export function buildComparisonRow({ product, specification, manufacturerName })
     vertical_coverage_deg: present(spec.vertical_dispersion_deg) ? spec.vertical_dispersion_deg : null,
     recommended_amp_min_w: present(spec.recommended_amp_min_w) ? spec.recommended_amp_min_w : null,
     recommended_amp_max_w: present(spec.recommended_amp_max_w) ? spec.recommended_amp_max_w : null,
+    // Locked-system authority: carried explicitly so the comparison normalizer
+    // can grade a manufacturer-locked amplification system from its published
+    // maximum SPL without requiring conventional sensitivity or impedance.
+    locked_amplification_system: spec.locked_amplification_system === true,
+    locked_amplifier_power_w: present(spec.locked_amplifier_power_w) ? spec.locked_amplifier_power_w : null,
     source_url: product_.official_product_url || spec.source_date && product_.official_product_url || product_.official_product_url || "",
     datasheet_url: spec.datasheet_url || product_.official_pdf_url || "",
     date_checked: spec.source_date || new Date().toISOString().split("T")[0],

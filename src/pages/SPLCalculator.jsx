@@ -26,6 +26,7 @@ import {
   STEINWAY_LOCKED_AMPLIFIER_POWER_W,
   STEINWAY_LOCKED_AMPLIFIER_NOTE,
   isSteinwayLockedAmplifierRecord,
+  getLockedAmplifierPowerW,
 } from "@/components/utils/spl/steinwayLockedAmplifier";
 
 const BRAND = {
@@ -444,17 +445,25 @@ export default function SPLCalculatorPage() {
     [selectedCompetitors],
   );
 
+  // The fixed amplifier power for the selected locked-system speaker. Comes
+  // from the record's locked_amplifier_power_w when set, falling back to the
+  // canonical 400 W for Steinway-by-name records without the explicit flag.
+  const lockedPowerW = useMemo(() => {
+    const lockedRecord = selectedCompetitors.find(isSteinwayLockedAmplifierRecord);
+    return lockedRecord ? getLockedAmplifierPowerW(lockedRecord) : STEINWAY_LOCKED_AMPLIFIER_POWER_W;
+  }, [selectedCompetitors]);
+
   useEffect(() => {
     if (steinwayLockedActive) {
       if (savedAmpPowerRef.current === null) {
         savedAmpPowerRef.current = ampPower;
       }
-      setAmpPower(String(STEINWAY_LOCKED_AMPLIFIER_POWER_W));
+      setAmpPower(String(lockedPowerW));
     } else if (savedAmpPowerRef.current !== null) {
       setAmpPower(savedAmpPowerRef.current);
       savedAmpPowerRef.current = null;
     }
-  }, [steinwayLockedActive]);
+  }, [steinwayLockedActive, lockedPowerW]);
 
   const competitorResults = useMemo(
     () => selectedCompetitors.map((record) => ({ record, result: competitorResultFor(record) })),

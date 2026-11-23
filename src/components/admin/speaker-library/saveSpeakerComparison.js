@@ -70,6 +70,8 @@ export function emptySpeakerForm() {
     max_spl_basis: "manufacturer unspecified",
     measurement_space: "unspecified",
     price: "",
+    locked_system: false,
+    locked_amp_w: "",
   };
 }
 
@@ -108,6 +110,9 @@ export function formFromRow(row) {
       ? spec.measurement_space
       : (record.measurement_space_basis === "Half Space" ? "half-space" : record.measurement_space_basis === "Full Space" ? "free-space" : "unspecified"),
     price: row.price ?? "",
+    locked_system: spec.locked_amplification_system === true || record.locked_amplification_system === true,
+    locked_amp_w: hasValue(spec.locked_amplifier_power_w) ? spec.locked_amplifier_power_w
+      : (hasValue(record.locked_amplifier_power_w) ? record.locked_amplifier_power_w : ""),
   };
 }
 
@@ -260,6 +265,21 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
   if (peakPower !== null) {
     patch.power_handling_peak_w = peakPower;
     authority.power_handling_peak_w = "Official Product Page";
+  }
+
+  // Manufacturer-locked amplification system. Explicit authority — never
+  // inferred from manufacturer name or a recommended amplifier figure alone.
+  // The admin sets this checkbox when the speaker is part of a locked system
+  // (e.g. Steinway Lyngdorf). The locked amplifier power is the fixed
+  // comparison amplifier power for such systems.
+  if (values.locked_system === true) {
+    patch.locked_amplification_system = true;
+    authority.locked_amplification_system = "Official Product Page";
+    const lockedW = numberOrNull(values.locked_amp_w);
+    if (lockedW !== null) {
+      patch.locked_amplifier_power_w = lockedW;
+      authority.locked_amplifier_power_w = "Official Product Page";
+    }
   }
 
   return { patch, authority };
