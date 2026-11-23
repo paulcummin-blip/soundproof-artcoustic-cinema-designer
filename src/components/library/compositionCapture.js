@@ -376,7 +376,7 @@ export function captureCompositionToPdf(input) {
   return withCaptureDeadline((signal) => captureComposition(input, signal));
 }
 
-async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null, onProgress = () => {} }, signal) {
+async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null, onProgress = () => {}, captureMode = 'batched', telemetry = null }, signal) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
@@ -494,11 +494,14 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
       ...pagePixelSize(element),
       preferredScale: RENDER_SCALE,
     });
+    telemetry?.beginCapture();
     const { rasters: pageRasters, diagnostics: resilience } = await collectPageRasters({
       pages,
       signal,
+      batchSize: captureMode === 'sequential' ? 1 : 2,
       rasterPage: async (page, index) => {
         onProgress({ stage: 'capture', message: `Capturing report page ${index + 1} of ${pages.length}…` });
+        const pageStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const scale = scaleOf(page);
         const { canvas, dataUrl } = await rasterisePage(page, {
           pageNumber: index + 1,
@@ -511,6 +514,8 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
         // The encoded PNG is retained; release its GPU/bitmap allocation now.
         canvas.width = 0;
         canvas.height = 0;
+        const pageEnd = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        telemetry?.recordPage(index + 1, pageEnd - pageStart);
         return raster;
       },
       rasterAll: () => rasteriseCompositionPages(pageContainer, pages, {
@@ -519,6 +524,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
         windowHeight: viewport.height,
       }),
     });
+    telemetry?.endCapture();
 
     signal.throwIfAborted();
     if ((proposalRoot || bodyClass === 'client-report-printing') && pageRasters.some((raster) => !raster)) {
@@ -527,6 +533,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
       throw failure;
     }
     onProgress({ stage: 'assemble', message: `Assembling PDF (${pageRasters.length} pages)…` });
+    telemetry?.beginAssembly();
     let pageCount = 0;
     for (let index = 0; index < pageRasters.length; index += 1) {
       const raster = pageRasters[index];
@@ -581,6 +588,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     // preview, a thumbnail, a canvas dimension, a page screenshot and a page
     // count are NOT part of this check and never block storage.
     const blob = pdf.output('blob');
+    telemetry?.endAssembly();
     const artifact = await assertPdfArtifact(blob);
 
     return {

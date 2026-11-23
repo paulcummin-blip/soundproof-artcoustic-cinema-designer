@@ -60,7 +60,7 @@ export function isZeroSizePageFailure(error) {
  *   decides whether a document exists: the caller holds the PDF, and a
  *   composition with no painted sheet still returns.
  */
-export async function collectPageRasters({ pages, rasterPage, rasterAll = null, signal = null }) {
+export async function collectPageRasters({ pages, rasterPage, rasterAll = null, signal = null, batchSize = 1 }) {
   const list = Array.isArray(pages) ? pages : [];
   const rasters = new Array(list.length).fill(null);
   const diagnostics = {
@@ -75,28 +75,41 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null, 
   };
   const unresolved = [];
 
-  for (let index = 0; index < list.length; index += 1) {
+  // Bounded batch: when batchSize > 1, up to that many pages are rasterised
+  // concurrently per batch. The existing sequential path (batchSize = 1) is
+  // preserved as the default and as the fallback for any batch that fails.
+  const batch = Math.max(1, Math.min(Number(batchSize) || 1, list.length || 1));
+  for (let i = 0; i < list.length; i += batch) {
     signal?.throwIfAborted();
-    try {
-      const raster = await rasterPage(list[index], index);
-      if (!raster?.dataUrl) {
-        throw pageCaptureFailure(
-          new Error('The page produced no image data.'),
-          { pageNumber: index + 1, operation: RESILIENCE_OPERATION.PAGE, heading: null },
-        );
-      }
-      rasters[index] = raster;
-      if (Number.isFinite(raster.scale)) diagnostics.scales.push({ page: index + 1, scale: raster.scale });
-    } catch (error) {
-      signal?.throwIfAborted();
-      // A page that measures nothing is not a failed page — it paints nothing, so
-      // it is left out of the stored copy and said so.
-      if (isZeroSizePageFailure(error)) {
-        diagnostics.skipped.push({ page: index + 1, reason: 'page_measures_nothing' });
-        continue;
-      }
-      unresolved.push({ index, error });
+    const promises = [];
+    for (let j = i; j < Math.min(i + batch, list.length); j += 1) {
+      const index = j;
+      promises.push(
+        Promise.resolve()
+          .then(() => rasterPage(list[index], index))
+          .then((raster) => {
+            if (!raster?.dataUrl) {
+              throw pageCaptureFailure(
+                new Error('The page produced no image data.'),
+                { pageNumber: index + 1, operation: RESILIENCE_OPERATION.PAGE, heading: null },
+              );
+            }
+            rasters[index] = raster;
+            if (Number.isFinite(raster.scale)) diagnostics.scales.push({ page: index + 1, scale: raster.scale });
+          })
+          .catch((error) => {
+            // A page that measures nothing is not a failed page — it paints nothing, so
+            // it is left out of the stored copy and said so.
+            if (isZeroSizePageFailure(error)) {
+              diagnostics.skipped.push({ page: index + 1, reason: 'page_measures_nothing' });
+              return;
+            }
+            unresolved.push({ index, error });
+          }),
+      );
     }
+    await Promise.all(promises);
+    signal?.throwIfAborted();
   }
 
   signal?.throwIfAborted();

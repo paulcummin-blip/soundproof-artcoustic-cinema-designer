@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { getDatasetPlatformStats } from "@/components/admin/datasets/datasetManagerHelpers";
 import { getProductStats } from "@/components/admin/system-health/productDatasetStats";
 import StatSection from "@/components/admin/system-health/StatSection";
+import ExportTimingSection from "@/components/admin/system-health/ExportTimingSection";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -140,6 +141,8 @@ export default function AdminSystemHealth() {
           { label: "Products linked to measured datasets", value: productStats.linked },
         ]}
       />
+
+      <ExportTimingSection />
 
       <div style={{
         background: BRAND.card, border: `1px solid ${BRAND.border}`,

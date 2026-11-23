@@ -28,6 +28,7 @@ import { saveIssuedArtifact, boundedExportRead } from './issuedExportDurability'
 import { resolveIssuedDocumentUrl } from './issuedDocumentActions';
 import { base44 } from '@/api/base44Client';
 import { captureCompositionToPdf, captureStylesMarkup } from '@/components/library/compositionCapture';
+import { createCaptureTelemetry, recordExportTiming } from '@/components/library/capturePerformanceTelemetry';
 import { notifyIssuedExportStored } from '@/components/library/issuedExportSignal';
 import { assertPdfArtifact } from '@/components/library/pdfArtifactAuthority';
 import ExportStorageFailureActions from './ExportStorageFailureActions';
@@ -151,7 +152,7 @@ function normalizeFilename(filename) {
  * printed, and state what is being issued.
  * @throws {ExportStorageError} stage identity | composition | capture
  */
-async function captureIssuedDocument({ identity, snapshot, onProgress }) {
+async function captureIssuedDocument({ identity, snapshot, onProgress, telemetry = null, captureMode = 'batched' }) {
   // A caller may resolve its source identity (versions, fingerprints, source
   // state at export) asynchronously — in the background, never on the click.
   const resolved = typeof identity.resolveSource === 'function' ? (await identity.resolveSource()) || {} : {};
@@ -197,7 +198,7 @@ async function captureIssuedDocument({ identity, snapshot, onProgress }) {
 
   let captured;
   try {
-    captured = await captureCompositionToPdf({ ...snapshot, onProgress });
+    captured = await captureCompositionToPdf({ ...snapshot, onProgress, telemetry, captureMode });
   } catch (error) {
     throw new ExportStorageError({
       stage: EXPORT_STORAGE_STAGE.CAPTURE,
@@ -282,7 +283,7 @@ async function verifyStoredPdf(fileUri, expectedBlob) {
   }
 }
 
-async function persistHeldPdf(pendingKey, onProgress) {
+async function persistHeldPdf(pendingKey, onProgress, telemetry = null) {
   const entry = peekPendingExport(pendingKey);
   if (!entry) throw new Error(RETRY_UNAVAILABLE_REASON);
   return saveIssuedArtifact({
@@ -293,6 +294,7 @@ async function persistHeldPdf(pendingKey, onProgress) {
       find: query => base44.entities.ProjectAssetExport.filter(query, { limit: 2 }),
       create: row => base44.entities.ProjectAssetExport.create(row),
     },
+    telemetry,
   });
 }
 
@@ -314,6 +316,7 @@ export function storeIssuedDocument(parameters) {
  * @returns {Promise<{record: Object, pendingKey: string}>}
  */
 async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
+  const telemetry = createCaptureTelemetry();
   const previousKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
   const previous = peekPendingExport(previousKey);
   if (previous?.blob || previous?.fileUri || previous?.uploadOperation || previous?.uploadStarted) {
@@ -321,8 +324,9 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
     const nextIdentity = { ...identity, ...resolved };
     const sameSource = ['versionId', 'selectedVersionIds', 'sourceRecordId', 'sourceFingerprints'].every(key => JSON.stringify(previous.issued?.[key] ?? null) === JSON.stringify(nextIdentity[key] ?? null));
     if (sameSource && previous.compositionHtml === snapshot?.nodeHtml) {
-      const record = await persistHeldPdf(previousKey, onProgress);
+      const record = await persistHeldPdf(previousKey, onProgress, telemetry);
       notifyIssuedExportStored(record.project_id);
+      recordExportTiming(telemetry.summary({ documentType: identity?.documentType, filename: previous?.filename || normalizeFilename(identity?.filename), status: 'reused' }));
       return { record, pendingKey: previousKey };
     }
     throw new Error('A previous export needs reconciliation. Use Retry storage before starting another export.');
@@ -334,7 +338,7 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
   });
 
   updatePendingExport(pendingKey, { compositionHtml: snapshot?.nodeHtml });
-  const { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus } = await boundedExportRead(() => captureIssuedDocument({ identity, snapshot, onProgress }), 'Report capture', 130000);
+  const { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus } = await boundedExportRead(() => captureIssuedDocument({ identity, snapshot, onProgress, telemetry, captureMode: 'batched' }), 'Report capture', 130000);
   updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus });
 
   // THE PDF IS VERIFIED BEFORE IT IS STORED — and only the PDF. A document exists
@@ -343,6 +347,7 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
   try {
     await assertPdfArtifact(blob);
   } catch (error) {
+    recordExportTiming(telemetry.summary({ documentType: issued?.documentType, filename, status: 'capture_failed' }));
     throw new ExportStorageError({
       stage: EXPORT_STORAGE_STAGE.CAPTURE,
       reasonCode: 'invalid_pdf_artifact',
@@ -352,10 +357,15 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
     });
   }
 
-  const record = await persistHeldPdf(pendingKey, onProgress);
-
-  notifyIssuedExportStored(record?.project_id || issued.projectId);
-  return { record, pendingKey };
+  try {
+    const record = await persistHeldPdf(pendingKey, onProgress, telemetry);
+    notifyIssuedExportStored(record?.project_id || issued.projectId);
+    recordExportTiming(telemetry.summary({ documentType: issued?.documentType, filename, pageCount, status: 'complete' }));
+    return { record, pendingKey };
+  } catch (error) {
+    recordExportTiming(telemetry.summary({ documentType: issued?.documentType, filename, pageCount, status: 'storage_failed' }));
+    throw error;
+  }
 }
 
 /**

@@ -54,7 +54,7 @@ export function matchesIssuedRow(row, expected) {
 }
 
 /** Uses only the existing private-file and ProjectAssetExport authorities. */
-export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = () => {}, update = () => {}, timeoutMs = 45000 }) {
+export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = () => {}, update = () => {}, timeoutMs = 45000, telemetry = null }) {
   const progress = (stage, message) => { try { onProgress({ stage, message }); } catch { /* UI cannot change durability */ } };
   if (!entry.fileUri) {
     if (entry.uploadStarted && !entry.uploadOperation) throw new Error('The previous upload has no confirmed file path after reload. Its outcome must be reconciled before another upload.');
@@ -62,6 +62,7 @@ export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = 
     progress('upload', 'Uploading PDF to private storage…');
     entry.uploadStarted = true;
     update({ uploadStarted: true });
+    telemetry?.beginUpload();
     const uploaded = await awaitExportOperation(entry, 'uploadOperation', async () => {
       const result = await api.upload(entry.blob, entry.filename);
       if (!result?.file_uri) throw new Error('Storage returned no file path. The upload outcome is uncertain; no automatic duplicate upload will be attempted.');
@@ -70,6 +71,7 @@ export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = 
       return result;
     }, timeoutMs * 2);
     entry.fileUri = uploaded.file_uri;
+    telemetry?.endUpload();
   }
   const expected = buildIssuedDocumentRow({
     issued: entry.issued, filename: entry.filename, pageCount: entry.pageCount,
@@ -89,7 +91,9 @@ export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = 
   };
   const existing = await read(); // A failed read is NEVER permission to write.
   progress('verify_file', 'Verifying the stored PDF…');
+  telemetry?.beginVerify();
   await boundedExportRead(() => verifyFile(entry.fileUri, entry.blob), 'Stored PDF', timeoutMs);
+  telemetry?.endVerify();
   if (existing) {
     progress('complete', 'PDF and asset record verified.');
     return existing;
