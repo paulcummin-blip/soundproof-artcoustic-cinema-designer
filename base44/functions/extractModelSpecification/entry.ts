@@ -31,6 +31,12 @@ const ALLOWED_FIELDS = [
   'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance',
   'frequency_response_tolerance_db', 'max_continuous_spl_db', 'max_peak_spl_db', 'max_spl_basis',
   'measurement_space',
+  // Manufacturer-locked amplification system (e.g. Steinway Lyngdorf). When the
+  // source explicitly identifies the manufacturer's own amplifier system, the
+  // comparison grades from the published max SPL directly without requiring
+  // sensitivity or impedance. The per-channel wattage is the fixed comparison
+  // amplifier power — never the summed channel total.
+  'locked_amplification_system', 'locked_amplifier_power_w',
 ];
 
 // Only these fields are numbers. Everything else is copied verbatim as text,
@@ -42,6 +48,7 @@ const NUMERIC_FIELDS = new Set([
   'program_power_w',
   'frequency_response_low_hz', 'frequency_response_high_hz', 'frequency_response_tolerance_db',
   'max_continuous_spl_db', 'max_peak_spl_db',
+  'locked_amplifier_power_w',
 ]);
 
 const ENUMS = {
@@ -135,6 +142,9 @@ Process the COMPLETE specification table before returning. Do not stop after the
       `STANDARD IDENTIFIERS ARE NOT VALUES. A specification standard identifier such as "CTA 426-B", "AES75", "IEC 60268-5", "EN 60268-5", "ANSI", "EIA" or "CEA" is the NAME of a measurement standard, never a power or SPL figure. Never extract the number inside a standard identifier as a wattage or dB value. "Continuous power handling (CTA 426-B): 225 W" means the continuous power is 225 W — 426 is part of the standard name, not the wattage. "Maximum peak SPL (AES75): 117 dB" means the max SPL is 117 dB — 75 is part of the standard name, not the SPL. Always read the number that appears next to the engineering unit (W, watts, dB), never the number inside a standard name.`,
       `MULTIPLE IMPEDANCE RANGES. When the source states different recommended amplifier ranges for different impedances (e.g. "110–450 W into 4 Ω" and "50–225 W into 8 Ω"), report the range matching the speaker's nominal impedance as recommended_amp_min_w and recommended_amp_max_w, and add the other range(s) to potential_unmapped with the impedance noted in the concept (e.g. concept "Recommended amplifier 50-225 W into 8 Ω"). Never confuse a 4 Ω range with an 8 Ω range, and never substitute one impedance's amplifier range for another.`,
       `UNMAPPED CONCEPTS. If you notice a P12/P13-relevant specification concept from the checklist above in the source that you cannot map to any allowed field — for example a "Power Handling" row you are unsure how to classify, or a sensitivity figure with an unfamiliar basis — add it to the potential_unmapped array with the concept name and the exact raw text. This flags it for human review rather than silently dropping it. An empty potential_unmapped array is correct when every concept you found was mapped.`,
+      `MANUFACTURER-LOCKED AMPLIFICATION SYSTEM. Some loudspeakers are designed for or require a manufacturer-locked amplification system (e.g. Steinway Lyngdorf, Steinway & Sons). When the source EXPLICITLY identifies the manufacturer's own amplifier system — for example "Amplification: Model A2 Amplifier / 4 × 400 watts", "Steinway Lyngdorf amplification", "Powered by Steinway Lyngdorf amplifier", or names a specific manufacturer amplifier model — set locked_amplification_system to "true" and extract the PER-CHANNEL amplifier power as locked_amplifier_power_w.`,
+      `PER-CHANNEL POWER, NOT SUMMED. When the amplifier power is stated as N × M watts (e.g. "4 × 400 watts", "2 × 400 W", "4x400W"), extract M (the per-channel wattage, 400) as locked_amplifier_power_w — NOT the summed total (1600). The comparison uses the per-channel power as the fixed amplifier authority. Return only the per-channel number as the value (e.g. "400"), and preserve the full original wording (e.g. "4 × 400 watts") in raw_text.`,
+      `LOCKED SYSTEM REQUIRES SOURCE EVIDENCE. Never infer locked-system status from the manufacturer name alone. The source itself must explicitly identify the manufacturer's own amplification system — a named manufacturer amplifier model, or a statement that the speaker uses or requires the manufacturer's amplifier. Do not set locked_amplification_system to "true" for ordinary passive speakers that merely state a "Recommended amplifier" range. When the source does not explicitly establish a locked amplification system, leave locked_amplification_system blank and do not report locked_amplifier_power_w.`,
     ],
   });
 }

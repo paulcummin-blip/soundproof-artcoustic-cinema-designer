@@ -69,15 +69,41 @@ export const READINESS_LEVELS = {
 // evidence quality are supporting metadata — they remain visible as
 // informational gaps but do not prevent a GOOD DATA calculation from
 // sensitivity + power.
+// A manufacturer-locked amplification system (e.g. Steinway Lyngdorf) grades
+// from its published maximum SPL directly, without requiring sensitivity,
+// impedance or a conventional power authority. When locked_amplification_system
+// is true and a max SPL (continuous or peak) is present, the critical capability
+// inputs are satisfied by the locked-system authority.
 export const COMPARISON_FIELDS = [
-  { key: "sensitivity_db", label: "Sensitivity", critical: true, resolve: (s) => present(s.sensitivity_db) },
-  { key: "sensitivity_basis", label: "Sensitivity basis", critical: true, resolve: (s) => present(s.sensitivity_basis) || sensitivityBasisAssumptionApplies(s) },
-  { key: "nominal_impedance_ohm", label: "Nominal impedance", critical: true, resolve: (s) => present(s.nominal_impedance_ohm) },
+  {
+    key: "sensitivity_db",
+    label: "Sensitivity",
+    critical: true,
+    resolve: (s) => present(s.sensitivity_db)
+      || (s.locked_amplification_system === true && (present(s.max_continuous_spl_db) || present(s.max_peak_spl_db))),
+  },
+  {
+    key: "sensitivity_basis",
+    label: "Sensitivity basis",
+    critical: true,
+    resolve: (s) => present(s.sensitivity_basis)
+      || sensitivityBasisAssumptionApplies(s)
+      || (s.locked_amplification_system === true && (present(s.max_continuous_spl_db) || present(s.max_peak_spl_db))),
+  },
+  {
+    key: "nominal_impedance_ohm",
+    label: "Nominal impedance",
+    critical: true,
+    resolve: (s) => present(s.nominal_impedance_ohm)
+      || (s.locked_amplification_system === true && (present(s.max_continuous_spl_db) || present(s.max_peak_spl_db))),
+  },
   {
     key: "power_authority",
     label: "Power authority or published max SPL",
     critical: true,
-    resolve: (s) => resolvePowerAuthority(s).value !== null || present(s.max_continuous_spl_db),
+    resolve: (s) => resolvePowerAuthority(s).value !== null
+      || present(s.max_continuous_spl_db)
+      || (s.locked_amplification_system === true && (present(s.max_continuous_spl_db) || present(s.max_peak_spl_db))),
   },
   {
     key: "frequency_response",

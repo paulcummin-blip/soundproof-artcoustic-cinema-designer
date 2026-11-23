@@ -35,6 +35,8 @@ export const FIELD_LABEL = {
   max_peak_spl_db: "Max peak SPL (dB)",
   max_spl_basis: "Max SPL basis",
   measurement_space: "Measurement space",
+  locked_system: "Manufacturer-locked amplification",
+  locked_amp_w: "Locked amplifier power (W)",
 };
 
 export const PROPOSAL_FIELDS = [
@@ -52,6 +54,8 @@ export const PROPOSAL_FIELDS = [
   "max_peak_spl_db",
   "max_spl_basis",
   "measurement_space",
+  "locked_system",
+  "locked_amp_w",
 ];
 
 // The P12/P13 acceptance subset: the fields the Read Source review surface
@@ -77,6 +81,8 @@ const SPEC_TO_FORM = {
   max_peak_spl_db: "max_peak_spl_db",
   max_spl_basis: "max_spl_basis",
   measurement_space: "measurement_space",
+  locked_amplification_system: "locked_system",
+  locked_amplifier_power_w: "locked_amp_w",
 };
 
 function mapMaxSplBasis(v) {
@@ -142,6 +148,16 @@ export function extractionToFound(raw) {
     let val = byField[specKey].value;
     if (formKey === "max_spl_basis") val = mapMaxSplBasis(val);
     if (formKey === "measurement_space") val = mapMeasurementSpace(val);
+    // locked_amplification_system comes from the extraction as a text value
+    // ("true"/"false"). Convert to a boolean so the form and buildSpecPatch
+    // receive the correct type. When the source does not establish a locked
+    // system (value "false"), skip it entirely — "not a locked system" is the
+    // default and is never proposed as a value to accept.
+    if (formKey === "locked_system") {
+      const s = String(val ?? "").trim().toLowerCase();
+      val = s === "true" || s === "yes" || s === "1";
+      if (!val) continue;
+    }
     // §6: a peak / short-term SPL figure is useful evidence but is NOT continuous
     // capability. When the source labels the basis peak, do not propose the SPL
     // value as max_spl_db (continuous) — leave the continuous field blank so the
@@ -325,6 +341,8 @@ export function displayValue(formKey, value) {
     return `${value} Hz`;
   }
   if (formKey === "frequency_response_tolerance_db") return `±${value} dB`;
+  if (formKey === "locked_system") return value === true ? "Yes" : "No";
+  if (formKey === "locked_amp_w") return `${value} W`;
   return String(value);
 }
 
@@ -366,7 +384,12 @@ export function fieldLabelFor(key, info) {
 
 /** Whether a proposal field is a conflicting existing value (current non-blank). */
 export function isConflict(currentForm, key, info) {
-  return Boolean(info[key]) && hasValue(currentForm[key]);
+  if (!Boolean(info[key])) return false;
+  // locked_system defaults to false (the blank state). Only an existing true
+  // value counts as a conflict — proposing "true" over a blank "false" is a
+  // new fill, not an overwrite.
+  if (key === "locked_system") return currentForm[key] === true;
+  return hasValue(currentForm[key]);
 }
 
 /** Build the audit evidence object stored on the specification. */

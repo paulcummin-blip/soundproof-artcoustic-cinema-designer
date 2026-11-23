@@ -467,6 +467,26 @@ export default function ReadWithAdiDialog({ open, onClose, candidate, actorName,
               );
             })()}
 
+            {info.locked_system && info.locked_system.value === true && (
+              <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.green}55`, borderRadius: 10, background: `${BRAND.green}0a` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.green }}>
+                  Fixed manufacturer-locked amplification recognised
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.text, marginTop: 4 }}>
+                  Fixed {info.locked_system.category || "manufacturer-locked"} amplification:{" "}
+                  {hasValue(info.locked_amp_w?.value) ? `${info.locked_amp_w.value} W` : "per-channel power not stated"}
+                </div>
+                {(info.locked_system.quote || info.locked_amp_w?.quote) && (
+                  <div style={{ fontSize: 10, color: BRAND.hint, marginTop: 4, fontStyle: "italic" }}>
+                    “{(info.locked_amp_w?.quote || info.locked_system.quote || "").slice(0, 180)}{(info.locked_amp_w?.quote || info.locked_system.quote || "").length > 180 ? "…" : ""}”
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: BRAND.subtext, marginTop: 4 }}>
+                  The comparison uses the per-channel amplifier power and the published maximum SPL directly, without requiring sensitivity or impedance. The published maximum SPL follows the existing peak/continuous rule.
+                </div>
+              </div>
+            )}
+
             {info.potential_unmapped && info.potential_unmapped.length > 0 && (
               <div style={{ marginTop: 8, padding: "10px 12px", border: `1px solid ${BRAND.amber}55`, borderRadius: 10, background: `${BRAND.amber}0a` }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: BRAND.amber }}>

@@ -535,37 +535,39 @@ export default function SPLCalculatorPage() {
         </div>
 
         <div style={{ background: BRAND.panel, border: `2px solid #9A968D`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "220px 220px 280px", justifyContent: "start", gap: 14, alignItems: "end" }}>
-            <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
-              Speaker to RSP distance
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                <input value={distance} onChange={(e) => setDistance(e.target.value)} inputMode="decimal" style={{ width: "100%", border: `2px solid #A6A29A`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text }} />
-                <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>m</span>
-              </div>
-            </label>
-            <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
-              Amplifier power available
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                <input value={ampPower} onChange={(e) => setAmpPower(e.target.value)} inputMode="numeric" disabled={steinwayLockedActive} style={{ width: "100%", border: `2px solid ${steinwayLockedActive ? BRAND.accent : "#A6A29A"}`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text, background: steinwayLockedActive ? BRAND.soft : "#FFF", cursor: steinwayLockedActive ? "not-allowed" : "text" }} />
-                <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>W</span>
-              </div>
-              {steinwayLockedActive && (
-                <div style={{ marginTop: 8, fontSize: 12, color: "#7A5C00", lineHeight: 1.4, border: `1px solid ${BRAND.accent}`, borderRadius: 8, padding: "8px 10px", background: "#FCFBF6" }}>
-                  {STEINWAY_LOCKED_AMPLIFIER_NOTE}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "14px 32px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "220px 220px 280px", justifyContent: "start", gap: 14, alignItems: "end" }}>
+              <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
+                Speaker to RSP distance
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <input value={distance} onChange={(e) => setDistance(e.target.value)} inputMode="decimal" style={{ width: "100%", border: `2px solid #A6A29A`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text }} />
+                  <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>m</span>
                 </div>
-              )}
-            </label>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext, marginBottom: 8 }}>RP22 target basis</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {[
-                  ["minimum", "Minimum"],
-                  ["recommended", "Recommended"],
-                ].map(([value, label]) => (
-                  <button key={value} type="button" onClick={() => setBasis(value)} style={{ flex: 1, padding: "14px 12px", borderRadius: 9, border: `2px solid ${basis === value ? BRAND.text : "#A6A29A"}`, background: basis === value ? BRAND.text : "#FFF", color: basis === value ? "#FFF" : BRAND.text, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>{label}</button>
-                ))}
+              </label>
+              <label style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext }}>
+                Amplifier power available
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <input value={ampPower} onChange={(e) => setAmpPower(e.target.value)} inputMode="numeric" disabled={steinwayLockedActive} style={{ width: "100%", border: `2px solid ${steinwayLockedActive ? BRAND.accent : "#A6A29A"}`, borderRadius: 9, padding: "14px 13px", fontSize: 18, fontWeight: 600, color: BRAND.text, background: steinwayLockedActive ? BRAND.soft : "#FFF", cursor: steinwayLockedActive ? "not-allowed" : "text" }} />
+                  <span style={{ color: BRAND.hint, fontSize: 15, fontWeight: 600 }}>W</span>
+                </div>
+              </label>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: BRAND.subtext, marginBottom: 8 }}>RP22 target basis</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[
+                    ["minimum", "Minimum"],
+                    ["recommended", "Recommended"],
+                  ].map(([value, label]) => (
+                    <button key={value} type="button" onClick={() => setBasis(value)} style={{ flex: 1, padding: "14px 12px", borderRadius: 9, border: `2px solid ${basis === value ? BRAND.text : "#A6A29A"}`, background: basis === value ? BRAND.text : "#FFF", color: basis === value ? "#FFF" : BRAND.text, cursor: "pointer", fontSize: 14, fontWeight: 600 }}>{label}</button>
+                  ))}
+                </div>
               </div>
             </div>
+            {steinwayLockedActive && (
+              <div style={{ flex: "0 1 300px", alignSelf: "center", fontSize: 12, color: "#7A5C00", lineHeight: 1.4, border: `1px solid ${BRAND.accent}`, borderRadius: 8, padding: "10px 12px", background: "#FCFBF6" }}>
+                {STEINWAY_LOCKED_AMPLIFIER_NOTE}
+              </div>
+            )}
           </div>
         </div>
 

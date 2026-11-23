@@ -254,6 +254,14 @@ export function buildSpecPatch(values, today, adiEvidence = null) {
   if (peakSpl !== null) {
     patch.max_peak_spl_db = peakSpl;
     authority.max_peak_spl_db = "Official Product Page";
+    // When only a peak SPL is published (no continuous SPL), still carry the
+    // max_spl_basis so the comparison normalizer can distinguish published_peak
+    // (manufacturer explicitly said "peak") from assumed_peak (basis not stated).
+    if (maxSpl === null) {
+      const peakBasis = SPL_BASIS_VALUES.has(values.max_spl_basis) ? values.max_spl_basis : "manufacturer unspecified";
+      patch.max_spl_basis = peakBasis;
+      authority.max_spl_basis = "Official Product Page";
+    }
   }
 
   // Peak power handling is saved independently of continuous and recommended
