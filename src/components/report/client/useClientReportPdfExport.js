@@ -52,6 +52,27 @@ const PRINT_BODY_CLASS = "client-report-printing";
 /** The report root paints a light page backdrop on screen; print on white. */
 const PRINT_WINDOW_CSS = "@media print {\n    .client-report-root { background: #FFFFFF !important; min-height: 0 !important; }\n  }";
 
+/**
+ * Lightweight diagnostic timings for one export. Records elapsed milliseconds
+ * for each stage without logging any project content — only stage names and
+ * messages the pipeline already reports.
+ */
+function createExportTimings() {
+  const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const marks = [];
+  return {
+    mark(stage, message) {
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      marks.push({ stage, message: String(message || '').slice(0, 120), elapsed_ms: Math.round(now - start) });
+    },
+    report() {
+      if (marks.length === 0) return;
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      console.info('[ReportExport] timings summary', { total_ms: Math.round(now - start), stages: marks });
+    },
+  };
+}
+
 function decodeLogo(url) {
   return new Promise((resolve) => {
     if (!url || typeof Image === "undefined") {
@@ -116,8 +137,10 @@ export function useClientReportPdfExport({
       set: value => { current = value; listeners.forEach(listener => listener()); },
     };
   }
+  const exportTimingsRef = useRef(null);
   const updateProgress = useCallback((progress) => {
     progressStoreRef.current.set(progress);
+    if (exportTimingsRef.current) exportTimingsRef.current.mark(progress.stage, progress.message);
     console.info('[ReportExport]', progress.stage, progress.message);
   }, []);
   const printingRef = useRef(false);
@@ -173,6 +196,9 @@ export function useClientReportPdfExport({
       { dealerName, clientName, projectReference }
     );
 
+    exportTimingsRef.current = createExportTimings();
+    exportTimingsRef.current.mark('start', 'Export started');
+
     // Open the app-owned print window FIRST, synchronously, while the browser
     // still treats this as a user gesture. The window is opened on the report
     // filename, so the saved PDF is named by the report itself.
@@ -181,6 +207,10 @@ export function useClientReportPdfExport({
     // without invoking window.print().
     if (!storeOnly) {
       printWindowRef.current = openReportPrintWindow(title);
+      exportTimingsRef.current.mark(
+        printWindowRef.current ? 'print_window_opened' : 'print_window_blocked',
+        printWindowRef.current ? 'App-owned print window opened' : 'Print window blocked — in-place fallback',
+      );
     }
 
     printingRef.current = true;
@@ -248,36 +278,45 @@ export function useClientReportPdfExport({
       complete: false,
     }));
 
-    const outcome = await publicationPromise;
-    if (outcome.complete) {
-      setPublication({ status: "complete", failed: [] });
-    } else if (outcome.failed.length > 0) {
-      setPublication({ status: "incomplete", failed: outcome.failed });
-    } else {
-      setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
-    }
-    if (!outcome.complete) {
-      setError(outcome.failed.map(item => item.error).join(' ') || 'Document creation is incomplete. Retry storage.');
-      if (!storeOnly) {
-        closeReportPrintWindow(printWindowRef.current);
-        printWindowRef.current = null;
+    // Handle the storage outcome — for store-only exports this is awaited; for
+    // browser-print exports it runs in parallel so the print dialog opens
+    // without waiting for page rasterisation, upload and verification.
+    const handleStorageOutcome = (outcome) => {
+      exportTimingsRef.current?.mark('storage_result', outcome.complete ? 'complete' : 'incomplete');
+      if (outcome.complete) {
+        setPublication({ status: "complete", failed: [] });
+      } else if (outcome.failed.length > 0) {
+        setPublication({ status: "incomplete", failed: outcome.failed });
+        setError(outcome.failed.map(item => item.error).join(' ') || 'Document storage is incomplete. Retry storage.');
+      } else {
+        setPublication({ status: "incomplete", failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: 'The Technical Report was not stored.' }] });
+        setError('The Technical Report was not stored. Retry storage.');
       }
+    };
+
+    // Store-only mode: await storage completion; no browser print dialogue.
+    if (storeOnly) {
+      const outcome = await publicationPromise;
+      handleStorageOutcome(outcome);
+      exportTimingsRef.current?.report();
       cleanup();
       return;
     }
 
-    // Store-only mode: the PDF has been captured, validated and stored through
-    // the issued-document pipeline. No browser print dialogue is opened.
-    if (storeOnly) {
-      cleanup();
-      return;
-    }
+    // Non-store-only: handle the storage outcome asynchronously while the
+    // browser print proceeds in parallel. The print is never delayed by
+    // storage, and a storage failure is reported without aborting the print.
+    publicationPromise.then((outcome) => {
+      handleStorageOutcome(outcome);
+      exportTimingsRef.current?.report();
+    });
 
     try {
       // 1. Wait for fonts
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
+      exportTimingsRef.current?.mark('fonts_ready', 'Fonts ready');
 
       // 2. Wait for logo to decode — abort if the required logo fails to load
       const logoReady = await decodeLogo(logoUrl);
@@ -302,6 +341,7 @@ export function useClientReportPdfExport({
           onDone: cleanup,
         });
         if (result.printed) {
+          exportTimingsRef.current?.mark('print_dialog', 'Print dialog opened (app-owned window)');
           printWindowRef.current = null;
           return;
         }
@@ -338,11 +378,14 @@ export function useClientReportPdfExport({
       }, PRINT_TIMEOUT_MS);
 
       // 6. Trigger print
+      exportTimingsRef.current?.mark('print_dialog', 'Print dialog opened (in-place fallback)');
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");
       closeReportPrintWindow(printWindowRef.current);
       printWindowRef.current = null;
+      exportTimingsRef.current?.mark('print_error', 'Print preparation failed');
+      exportTimingsRef.current?.report();
       cleanup();
     }
     } catch (failure) {
@@ -351,6 +394,8 @@ export function useClientReportPdfExport({
       setPublication({ status: 'incomplete', failed: [{ key: PUBLICATION_DOCUMENT.PROJECT_REPORT, error: message }] });
       closeReportPrintWindow(printWindowRef.current);
       printWindowRef.current = null;
+      exportTimingsRef.current?.mark('export_error', message);
+      exportTimingsRef.current?.report();
       cleanup();
     }
   }, [exporting, publication.status, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, speakerDesignCompanion, cleanup]);
