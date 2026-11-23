@@ -448,7 +448,8 @@ export function syncCachedCompactBassAuthority(projectId, versionId, compactCont
       };
       // Await the durable outcome; promotion itself has already notified readers.
       publishBassReconciliationStatus(projectId, versionId, { writeAttempted: true });
-      await queueBassAuthorityWrite(key, signature, record, payload);
+      const saved = await queueBassAuthorityWrite(key, signature, record, payload);
+      if (!saved) syncSignatures.delete(key);
       const resolved = resolvePersistedBassAuthority(key, persisted);
       if (resolved?.authoritative) {
         return setMemory(projectId, versionId, resolved);
@@ -523,7 +524,7 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
       // Coalesced write (see queueBassAuthorityWrite): a stale mark is often
       // re-synced while the design is still settling, and every one of those
       // used to be an entity write.
-      queueBassAuthorityWrite(key, signature, record, payload);
+      queueBassAuthorityWrite(key, signature, record, payload).then(saved => { if (!saved) syncSignatures.delete(key); });
 
       const live = memoryByProject.get(key);
       if (
@@ -574,7 +575,7 @@ export function syncPersistentBassAuthority(projectId, versionId, currentFingerp
     // Coalesced: the current authority is re-published as each background target
     // settles, so the row is written at the end of that burst — and only when it
     // does not already hold this authority.
-    queueBassAuthorityWrite(key, signature, record, payload);
+    queueBassAuthorityWrite(key, signature, record, payload).then(saved => { if (!saved) syncSignatures.delete(key); });
     const resolved = resolvePersistedBassAuthority(key, persisted);
     if (!completed && resolved && !resolved.authoritative) {
       return memoryByProject.get(key) || resolved;

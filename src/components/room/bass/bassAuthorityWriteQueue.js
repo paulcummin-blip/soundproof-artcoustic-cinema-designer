@@ -1,6 +1,7 @@
 import { base44 } from "@/api/base44Client";
-import { invalidateProjectAnalysisCacheRead } from "@/components/state/projectReadCache";
+import { invalidateProjectAnalysisCacheRead, readProjectRecord } from "@/components/state/projectReadCache";
 import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
+import { persistBassAuthorityDurably } from "./durableBassWrite";
 
 /**
  * Coalesced ProjectAnalysisCache writes for the completed bass authority.
@@ -21,17 +22,6 @@ const WRITE_COALESCE_MS = 3000;
 const MAX_WRITE_DELAY_MS = 10000;
 const pendingWrites = new Map();     // key -> latest unwritten authority
 const writeChains = new Map();       // key -> serialised in-flight write
-const writtenSignatures = new Map(); // key -> signature written this session
-
-/** Cheap identity of the authority a row holds — enough to skip a no-op write. */
-function rowAuthoritySignature(row) {
-  if (!row) return null;
-  const snapshots = row.completed_by_fingerprint;
-  const keys = snapshots && typeof snapshots === "object"
-    ? Object.keys(snapshots).sort().join(",")
-    : "";
-  return `${row.current_fingerprint || ""}|${row.status || ""}|${keys}`;
-}
 
 /** The exact entity operation the write performs, named so a failure is actionable. */
 function describeWriteOperation(record) {
@@ -78,22 +68,8 @@ function describeWriteFailure(error, operation, payload) {
 
 export function queueBassAuthorityWrite(key, signature, record, payload) {
   if (!key || key === "free::free" || !payload) return Promise.resolve(null);
-  // The row already holds this authority: writing it again would spend write
-  // budget on nothing, and that is the common case when a burst re-publishes
-  // the state that was written a moment ago.
-  const rowSignature = rowAuthoritySignature(record);
-  if (rowSignature && rowSignature === rowAuthoritySignature(payload)) {
-    writtenSignatures.set(key, signature);
-    const [projectId, versionId] = String(key).split("::");
-    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeFailedFingerprint: null, writeDisposition: "already-persisted" });
-    return Promise.resolve(true);
-  }
-  if (writtenSignatures.get(key) === signature) {
-    const [projectId, versionId] = String(key).split("::");
-    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeFailedFingerprint: null, writeDisposition: "already-persisted" });
-    return Promise.resolve(true);
-  }
-
+  const [projectId, versionId] = String(key).split("::");
+  publishBassReconciliationStatus(projectId, versionId, { writeAttempted: true, writeSucceeded: null, writeError: null });
   let pending = pendingWrites.get(key);
   if (!pending) {
     pending = { record: null, payload: null, signature: null, resolvers: [], timer: null, firstQueuedAt: 0 };
@@ -127,13 +103,15 @@ async function flushQueuedBassAuthorityWrite(key) {
   const chain = (writeChains.get(key) || Promise.resolve()).then(async () => {
     const [projectId, versionId] = String(key).split("::");
     try {
-      if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
-      else await base44.entities.ProjectAnalysisCache.create(payload);
+      const project = await readProjectRecord(projectId);
+      if (!project) throw new Error("The owning project could not be verified.");
+      const receipt = await persistBassAuthorityDurably(base44.entities.ProjectAnalysisCache, payload, { accountId: project.account_id });
       invalidateProjectAnalysisCacheRead(projectId, versionId);
-      writtenSignatures.set(key, signature);
-      // Runtime proof: the authority reached the database, and the shared read
-      // cache was invalidated so the next report read sees it.
-      publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeFailedFingerprint: null });
+      publishBassReconciliationStatus(projectId, versionId, {
+        writeSucceeded: true, writeError: null, writeFailedFingerprint: null,
+        writeDisposition: receipt.disposition, verifiedRecordId: receipt.row.id,
+        verifiedFingerprint: receipt.fingerprint, verifiedAt: new Date().toISOString(),
+      });
       return true;
     } catch (e) {
       // The promotion did not persist: the in-memory authority stays current for
@@ -170,9 +148,9 @@ export function flushQueuedBassAuthorityWrites() {
 
 /** Test-only: forget all queue state. */
 export function resetBassAuthorityWriteQueue() {
+  for (const pending of pendingWrites.values()) if (pending.timer) clearTimeout(pending.timer);
   pendingWrites.clear();
   writeChains.clear();
-  writtenSignatures.clear();
 }
 
 // A pending write must not be lost when the page closes mid-burst.

@@ -10,6 +10,13 @@ import { base44 } from "@/api/base44Client";
 const projectReads = new Map();
 const versionReads = new Map();
 const analysisReads = new Map();
+const analysisInvalidationListeners = new Map();
+export function subscribeProjectAnalysisCacheInvalidation(projectId, versionId, listener) {
+  const key = pairKey(projectId, versionId);
+  const listeners = analysisInvalidationListeners.get(key) || new Set();
+  listeners.add(listener); analysisInvalidationListeners.set(key, listeners);
+  return () => { listeners.delete(listener); if (!listeners.size) analysisInvalidationListeners.delete(key); };
+}
 
 const counters = {
   Project: 0,
@@ -91,7 +98,9 @@ export function invalidateProjectVersionRead(versionId) {
 }
 
 export function invalidateProjectAnalysisCacheRead(projectId, versionId) {
-  analysisReads.delete(pairKey(projectId, versionId));
+  const key = pairKey(projectId, versionId);
+  analysisReads.delete(key);
+  for (const listener of analysisInvalidationListeners.get(key) || []) listener();
 }
 
 export function getSharedProjectReadDiagnostics() {

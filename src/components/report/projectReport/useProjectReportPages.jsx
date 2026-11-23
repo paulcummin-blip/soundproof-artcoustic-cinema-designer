@@ -686,7 +686,7 @@ export function useProjectReportPages({
       ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId, overheadLayerInstalled]);
+  }, [p19Graph, p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId, overheadLayerInstalled]);
 
   // ── The Project Report's composition ────────────────────────────────────
   // The document is an EDIT of the two reports, not a third one: the merged
