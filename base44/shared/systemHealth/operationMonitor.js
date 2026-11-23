@@ -83,9 +83,12 @@ export async function startOperation(serviceClient, {
       started_at: now,
       last_progress_at: now,
       current_stage: initial_stage,
+      stage_timeline: [{ stage: initial_stage, timestamp: now }],
       state: 'running',
       error_code: null,
       diagnostic_summary: null,
+      data_committed: null,
+      data_integrity_summary: null,
       incident_reference: null,
       completed_at: null,
       cancelled_at: null,
@@ -112,9 +115,12 @@ export async function reportOperationProgress(serviceClient, { operation_id, sta
     if (!record) return { recorded: false, error: 'Operation not found' };
 
     const now = new Date().toISOString();
+    const timeline = Array.isArray(record.stage_timeline) ? record.stage_timeline : [];
+    timeline.push({ stage, timestamp: now });
     await serviceClient.asServiceRole.entities.MonitoredOperation.update(record.id, {
       current_stage: stage,
       last_progress_at: now,
+      stage_timeline: timeline,
       ...(record.state === 'suspected_stalled' ? { state: 'running' } : {}),
     });
     return { recorded: true, operation_id, stage };
@@ -128,7 +134,7 @@ export async function reportOperationProgress(serviceClient, { operation_id, sta
  * Mark an operation as completed. Only call after the stored artifact has
  * passed verification.
  */
-export async function completeOperation(serviceClient, { operation_id, proposal_id = null }) {
+export async function completeOperation(serviceClient, { operation_id, proposal_id = null, data_committed = null, data_integrity_summary = null }) {
   try {
     const existing = await serviceClient.asServiceRole.entities.MonitoredOperation.filter(
       { operation_id },
@@ -144,6 +150,8 @@ export async function completeOperation(serviceClient, { operation_id, proposal_
       last_progress_at: now,
       completed_at: now,
       ...(proposal_id ? { proposal_id } : {}),
+      ...(data_committed !== null ? { data_committed } : {}),
+      ...(data_integrity_summary !== null ? { data_integrity_summary } : {}),
     });
     return { recorded: true, operation_id };
   } catch (err) {
@@ -160,6 +168,8 @@ export async function failOperation(serviceClient, {
   error_code,
   diagnostic_summary = null,
   incident_reference = null,
+  data_committed = null,
+  data_integrity_summary = null,
 }) {
   try {
     const existing = await serviceClient.asServiceRole.entities.MonitoredOperation.filter(
@@ -175,6 +185,8 @@ export async function failOperation(serviceClient, {
       diagnostic_summary,
       incident_reference,
       last_progress_at: new Date().toISOString(),
+      ...(data_committed !== null ? { data_committed } : {}),
+      ...(data_integrity_summary !== null ? { data_integrity_summary } : {}),
     });
     return { recorded: true, operation_id };
   } catch (err) {

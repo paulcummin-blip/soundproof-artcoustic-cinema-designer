@@ -30,6 +30,7 @@
 
 import { computeIncidentFingerprint } from './incidentFingerprint.js';
 import { FAILURE_TYPE } from './incidentMessages.js';
+import { classifyCause, determineUserImpact, readOperationDiagnostics } from './incidentDiagnostics.js';
 
 /**
  * Generate a unique incident reference: INC-YYMMDD-XXXXXX.
@@ -136,7 +137,7 @@ async function readAlertConfig(serviceClient) {
  * Build the HTML body for the alert email. Uses the Sound Proof brand colors.
  * Never includes proposal text, client names or credentials.
  */
-function buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity }) {
+function buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity, user_blocked, workaround_available, cause_classification }) {
   const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
   const severityColor = severity === 'critical' ? '#B23A3A' : (severity === 'high' ? '#625143' : '#3E4349');
   const incidentUrl = `https://soundproofcinemadesigner.com/admin/system-health?incident=${encodeURIComponent(reference)}`;
@@ -144,6 +145,15 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
   const projectName = identity?.projectName || 'Unknown';
   const clientName = identity?.clientName || null;
   const projectDisplay = clientName ? `${projectName} (${clientName})` : projectName;
+  const blockedLabel = user_blocked === true ? 'Yes — user cannot proceed without a fix'
+    : user_blocked === false ? 'No — user can retry'
+    : 'Unknown';
+  const workaroundLabel = workaround_available === true ? 'Yes — retry is available'
+    : workaround_available === false ? 'No workaround available'
+    : 'Unknown';
+  const causeLabel = cause_classification === 'confirmed' ? 'Confirmed'
+    : cause_classification === 'suspected' ? 'Suspected'
+    : 'Unknown';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -211,6 +221,9 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Severity:</td><td style="padding:4px 0;color:${severityColor};font-weight:700;">${severityLabel}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Dealer:</td><td style="padding:4px 0;color:#1B1A1A;">${dealerName}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Project:</td><td style="padding:4px 0;color:#1B1A1A;">${projectDisplay}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Cause:</td><td style="padding:4px 0;color:#1B1A1A;">${causeLabel}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">User blocked:</td><td style="padding:4px 0;color:#1B1A1A;">${blockedLabel}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Workaround:</td><td style="padding:4px 0;color:#1B1A1A;">${workaroundLabel}</td></tr>
                           </table>
                         </td>
                       </tr>
@@ -291,7 +304,7 @@ async function resolveIncidentIdentity(serviceClient, { account_id, project_id }
  * Send an alert email to the nominated recipients. Deduplicated: only called
  * for new incidents (first occurrence). Returns the notification status.
  */
-async function sendAlertNotification(serviceClient, { reference, component, operation, severity, diagnosticSummary, identity }) {
+async function sendAlertNotification(serviceClient, { reference, component, operation, severity, diagnosticSummary, identity, user_blocked, workaround_available, cause_classification }) {
   const config = await readAlertConfig(serviceClient);
 
   if (!config.enabled) {
@@ -305,7 +318,7 @@ async function sendAlertNotification(serviceClient, { reference, component, oper
   }
 
   const subject = `Sound Proof Incident ${reference}: ${operation} failed (${severity})`;
-  const html = buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity });
+  const html = buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity, user_blocked, workaround_available, cause_classification });
 
   let lastError = null;
   for (const recipient of config.recipients) {
@@ -353,6 +366,9 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
     account_id = null,
     proposal_id = null,
     error = '',
+    operation_id = null,
+    data_committed = null,
+    data_integrity_summary = null,
     incidentContext = {},
   } = details;
 
@@ -370,6 +386,30 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
 
   const diagnosticSummary = buildDiagnosticSummary(incidentContext, error);
   const now = new Date().toISOString();
+
+  // Read enriched diagnostics from the MonitoredOperation when linked.
+  const opDiagnostics = operation_id
+    ? await readOperationDiagnostics(serviceClient, operation_id)
+    : null;
+
+  // Classify the cause and determine user impact from the error code.
+  const { cause_classification, cause_summary } = classifyCause(errorCode, component);
+  const { user_blocked, workaround_available } = determineUserImpact(errorCode, component);
+
+  const enrichedFields = {
+    operation_id: operation_id || null,
+    operation_started_at: opDiagnostics?.operation_started_at || null,
+    operation_last_progress_at: opDiagnostics?.operation_last_progress_at || null,
+    operation_failed_at: now,
+    stage_failed: opDiagnostics?.stage_failed || null,
+    stage_timeline: opDiagnostics?.stage_timeline || null,
+    data_committed: data_committed ?? opDiagnostics?.data_committed ?? null,
+    data_integrity_summary: data_integrity_summary || opDiagnostics?.data_integrity_summary || null,
+    cause_classification,
+    cause_summary,
+    user_blocked,
+    workaround_available,
+  };
 
   try {
     // Find an existing open or investigating incident with the same fingerprint.
@@ -428,6 +468,8 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
       notification_status: 'pending',
       notification_sent_at: null,
       notification_error: null,
+      dealer_contacted: false,
+      ...enrichedFields,
     });
 
     // Send the alert email (fail-open).
@@ -437,6 +479,7 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
     });
     const notificationResult = await sendAlertNotification(serviceClient, {
       reference, component, operation, severity, diagnosticSummary, identity,
+      user_blocked, workaround_available, cause_classification,
     });
 
     // Update the notification status on the incident.
@@ -486,6 +529,13 @@ export async function recordSystemIncident(serviceClient, details) {
     account_id = null,
     project_id = null,
     diagnostic_summary = '',
+    operation_id = null,
+    operation_started_at = null,
+    operation_last_progress_at = null,
+    stage_failed = null,
+    stage_timeline = null,
+    data_committed = null,
+    data_integrity_summary = null,
   } = details;
 
   const fingerprint = computeIncidentFingerprint({
@@ -493,6 +543,25 @@ export async function recordSystemIncident(serviceClient, details) {
   });
 
   const now = new Date().toISOString();
+
+  // Classify the cause and determine user impact from the error code.
+  const { cause_classification, cause_summary } = classifyCause(error_code, component);
+  const { user_blocked, workaround_available } = determineUserImpact(error_code, component);
+
+  const enrichedFields = {
+    operation_id: operation_id || null,
+    operation_started_at: operation_started_at || null,
+    operation_last_progress_at: operation_last_progress_at || null,
+    operation_failed_at: now,
+    stage_failed: stage_failed || null,
+    stage_timeline: stage_timeline || null,
+    data_committed: data_committed ?? null,
+    data_integrity_summary: data_integrity_summary || null,
+    cause_classification,
+    cause_summary,
+    user_blocked,
+    workaround_available,
+  };
 
   try {
     // Find existing open/incidenting incident with same fingerprint (grouping).
@@ -544,12 +613,15 @@ export async function recordSystemIncident(serviceClient, details) {
       notification_status: 'pending',
       notification_sent_at: null,
       notification_error: null,
+      dealer_contacted: false,
+      ...enrichedFields,
     });
 
     // Send the alert email (fail-open). Only sent for critical/high severity.
     const identity = await resolveIncidentIdentity(serviceClient, { account_id, project_id });
     const notificationResult = await sendAlertNotification(serviceClient, {
       reference, component, operation, severity, diagnosticSummary: diagnostic_summary, identity,
+      user_blocked, workaround_available, cause_classification,
     });
 
     await serviceClient.asServiceRole.entities.SystemHealthIncident.update(incident.id, {

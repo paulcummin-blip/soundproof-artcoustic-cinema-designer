@@ -60,6 +60,13 @@ export default async function(req) {
               account_id: op.account_id || null,
               project_id: op.project_id || null,
               diagnostic_summary: diagnostic,
+              operation_id: op.operation_id,
+              operation_started_at: op.started_at || null,
+              operation_last_progress_at: op.last_progress_at || null,
+              stage_failed: op.current_stage || null,
+              stage_timeline: Array.isArray(op.stage_timeline) ? op.stage_timeline : null,
+              data_committed: op.data_committed ?? null,
+              data_integrity_summary: op.data_integrity_summary || null,
             });
 
             await base44.asServiceRole.entities.MonitoredOperation.update(op.id, {

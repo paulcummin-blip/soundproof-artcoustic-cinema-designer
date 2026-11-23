@@ -1,7 +1,7 @@
 {
   "name": "MonitoredOperation",
   "type": "object",
-  "description": "Durable operation lifecycle record for Sound Proof System Health monitoring. Tracks critical operations (proposal generation, report export) from start through completion or failure. Created and updated by trusted backend functions via the service role. Admin and account-scoped dealer read access. Never stores proposal text, client briefs, credentials or confidential content \u2014 only safe diagnostic codes, stage names and operation identifiers.",
+  "description": "Durable operation lifecycle record for Sound Proof System Health monitoring. Tracks critical operations (proposal generation, report export) from start through completion or failure. Created and updated by trusted backend functions via the service role. Admin and account-scoped dealer read access. Never stores proposal text, client briefs, credentials or confidential content \u2014 only safe diagnostic codes, stage names, timestamps and operation identifiers.",
   "properties": {
     "operation_id": {
       "type": "string",
@@ -50,6 +50,23 @@
       "type": "string",
       "description": "The current stage of the operation (e.g. preparing_evidence, writing_proposal, validating, saving, capturing, uploading, verifying, completed)."
     },
+    "stage_timeline": {
+      "type": "array",
+      "nullable": true,
+      "description": "Safe timeline of meaningful stage transitions. Each entry: {stage, timestamp}. Appended to on each reportOperationProgress call. Contains only stage names and timestamps, never proposal text or client data. Null when no progress has been reported (only the initial stage exists).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
     "state": {
       "type": "string",
       "enum": [
@@ -71,6 +88,16 @@
       "type": "string",
       "nullable": true,
       "description": "Safe diagnostic summary. Contains only error codes, stage names and operation identifiers. Never contains proposal text, client names or credentials."
+    },
+    "data_committed": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "Whether the operation committed any durable data before completing or failing. True = a proposal, report or other record was saved. False = all data was rolled back or no data was written. Null = unknown (not yet reported)."
+    },
+    "data_integrity_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Safe plain-text summary of what was saved, rolled back or remains uncertain. Contains only operation outcomes. Never contains proposal text, client names or credentials. Null when the data integrity state has not been reported."
     },
     "incident_reference": {
       "type": "string",

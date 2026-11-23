@@ -19,15 +19,15 @@
     },
     "component": {
       "type": "string",
-      "description": "The system component that failed (e.g. proposal_generation)."
+      "description": "The system component that failed (e.g. proposal_generation, operation_monitoring, report_export)."
     },
     "operation": {
       "type": "string",
-      "description": "The specific operation that failed (e.g. generateProposal)."
+      "description": "The specific operation that failed (e.g. generateProposal, report_export)."
     },
     "error_code": {
       "type": "string",
-      "description": "A stable machine-readable error code (e.g. DRAFT_REJECTED, SECTION_MAPPING_FAILED, PROVIDER_FAILED, UNEXPECTED_ERROR)."
+      "description": "A stable machine-readable error code (e.g. DRAFT_REJECTED, SECTION_MAPPING_FAILED, PROVIDER_FAILED, OPERATION_STALLED, UNEXPECTED_ERROR)."
     },
     "severity": {
       "type": "string",
@@ -37,7 +37,7 @@
         "medium",
         "low"
       ],
-      "description": "Incident severity. critical = system broken (unexpected error, provider failure). high = content quality failure (draft rejected by validator). medium = structural failure (section mapping). low = pre-condition failure (writer refusal)."
+      "description": "Incident severity. critical = system broken (unexpected error, provider failure). high = content quality failure (draft rejected by validator). medium = structural failure (section mapping, stalled operation). low = pre-condition failure (writer refusal)."
     },
     "account_id": {
       "type": "string",
@@ -53,6 +53,91 @@
       "type": "string",
       "nullable": true,
       "description": "The affected proposal ID, when a proposal was created before the failure."
+    },
+    "operation_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Correlation ID linking this incident to its MonitoredOperation record. For proposal generation this is the request_id. For report export it is the client-generated UUID. Null when the incident was not associated with a monitored operation."
+    },
+    "operation_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the monitored operation started. Copied from the MonitoredOperation record at incident creation time. Null when no monitored operation is linked."
+    },
+    "operation_last_progress_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the monitored operation last reported meaningful progress before the failure. Copied from the MonitoredOperation. Null when no progress was reported or no monitored operation is linked."
+    },
+    "operation_failed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the failure was detected. For watchdog-confirmed stalls, this is the watchdog run time. For direct failures, this is the catch-block time. Null when the failure time is unknown."
+    },
+    "stage_failed": {
+      "type": "string",
+      "nullable": true,
+      "description": "The stage at which the operation stopped (e.g. preparing_evidence, writing_proposal, validating, saving, capturing, uploading, verifying). Null when the stage is unknown."
+    },
+    "stage_timeline": {
+      "type": "array",
+      "nullable": true,
+      "description": "Safe timeline of meaningful stage transitions recorded by the monitored operation. Each entry: {stage, timestamp}. Contains only stage names and timestamps, never proposal text or client data. Null when no timeline was recorded.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "data_committed": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "Whether the failed operation committed any durable data before failing. True = a proposal, report or other record was saved. False = all data was rolled back. Null = unknown (no monitored operation linked)."
+    },
+    "data_integrity_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Safe plain-text summary of what was saved, rolled back or remains uncertain. Contains only operation outcomes (e.g. 'Proposal and all sections were rolled back. No durable data was committed.'). Never contains proposal text, client names or credentials. Null when the data integrity state is unknown."
+    },
+    "cause_classification": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "suspected",
+        "unknown"
+      ],
+      "default": "unknown",
+      "description": "How well the cause is established by the recorded evidence. confirmed = the error code directly states the cause (DRAFT_REJECTED, PROVIDER_FAILED, SECTION_MAPPING_FAILED). suspected = the evidence is circumstantial (OPERATION_STALLED \u2014 no progress does not prove the cause). unknown = the error is unexpected and the cause has not been determined. Never set to confirmed based on a successful retry \u2014 a retry succeeding only proves the failure is intermittent, not that the cause is fixed."
+    },
+    "cause_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Plain-text statement of what the recorded evidence shows about the cause. Distinguishes what is confirmed from what is suspected. Never states a cause the evidence does not support. Null when no cause summary has been recorded."
+    },
+    "dealer_contacted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether an administrator has contacted the affected dealer about this incident. Set manually by an admin through the manageSystemHealthIncident function."
+    },
+    "user_blocked": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "Whether the affected user remains blocked from their work as a result of this incident. True = the user cannot proceed without a fix or workaround. False = the user can continue (e.g. they can retry, or the failure is non-blocking). Null = unknown. Never set to true unless the evidence supports it."
+    },
+    "workaround_available": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "Whether a genuine workaround is available for the affected user. True only when the actual recovery path supports it (e.g. retry available for DRAFT_REJECTED). False = no workaround exists. Null = unknown. Never set to true unless the recovery path supports it."
     },
     "diagnostic_summary": {
       "type": "string",

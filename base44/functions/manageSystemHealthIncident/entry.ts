@@ -73,7 +73,34 @@ export default async function(req) {
       return Response.json({ ok: true, incident_id, admin_notes: updatedNotes });
     }
 
-    return Response.json({ error: 'action must be update_status or add_note.' }, { status: 400 });
+    if (action === 'mark_dealer_contacted') {
+      const incident = await base44.entities.SystemHealthIncident.get(incident_id).catch(() => null);
+      if (!incident?.id) return Response.json({ error: 'Incident not found.' }, { status: 404 });
+      await base44.entities.SystemHealthIncident.update(incident_id, {
+        dealer_contacted: body.contacted !== false,
+      });
+      return Response.json({ ok: true, incident_id, dealer_contacted: body.contacted !== false });
+    }
+
+    if (action === 'set_user_blocked') {
+      const incident = await base44.entities.SystemHealthIncident.get(incident_id).catch(() => null);
+      if (!incident?.id) return Response.json({ error: 'Incident not found.' }, { status: 404 });
+      await base44.entities.SystemHealthIncident.update(incident_id, {
+        user_blocked: body.blocked === true ? true : (body.blocked === false ? false : null),
+      });
+      return Response.json({ ok: true, incident_id });
+    }
+
+    if (action === 'set_workaround') {
+      const incident = await base44.entities.SystemHealthIncident.get(incident_id).catch(() => null);
+      if (!incident?.id) return Response.json({ error: 'Incident not found.' }, { status: 404 });
+      await base44.entities.SystemHealthIncident.update(incident_id, {
+        workaround_available: body.available === true ? true : (body.available === false ? false : null),
+      });
+      return Response.json({ ok: true, incident_id });
+    }
+
+    return Response.json({ error: 'action must be update_status, add_note, mark_dealer_contacted, set_user_blocked or set_workaround.' }, { status: 400 });
   } catch (error) {
     return Response.json({ error: error?.message || 'Incident management failed.' }, { status: 500 });
   }

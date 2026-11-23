@@ -765,6 +765,11 @@ export default async function(req) {
           account_id: requestAccountId || null,
           proposal_id: cleanupSucceeded ? null : (proposal?.id || null),
           error: error?.message || 'Proposal generation failed.',
+          operation_id: request_id,
+          data_committed: !cleanupSucceeded,
+          data_integrity_summary: cleanupSucceeded
+            ? 'Proposal and all sections were rolled back. No durable data was committed.'
+            : 'Proposal record or sections could not be fully rolled back. Partial data may remain and requires admin review.',
           incidentContext,
         });
       } catch (recordingErr) {
@@ -785,6 +790,10 @@ export default async function(req) {
         error_code: errorCode,
         diagnostic_summary: `Failure type: ${failureType}. Error code: ${errorCode}.`,
         incident_reference: incidentResult?.reference || null,
+        data_committed: !cleanupSucceeded,
+        data_integrity_summary: cleanupSucceeded
+          ? 'Proposal and all sections were rolled back. No durable data was committed.'
+          : 'Proposal record or sections could not be fully rolled back. Partial data may remain and requires admin review.',
       });
     }
 
