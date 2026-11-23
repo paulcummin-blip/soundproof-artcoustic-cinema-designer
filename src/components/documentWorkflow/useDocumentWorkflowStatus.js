@@ -62,7 +62,6 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
         const version = versionId
           ? versions.find((v) => v?.id === versionId)
           : versions[0] || null;
-        console.info('[DocumentWorkflowRead]', JSON.stringify({projectId, versionId, selectedId:version?.id, published:version?.published_fingerprint, versions:versions.map(v=>v.id), exports:asItems(exportPage).map(e=>({id:e.id,version:e.version_id,fp:e.source_fingerprints?.engineeringFingerprint}))}));
         setEngineeringFingerprint(version?.published_fingerprint || null);
       } catch (err) {
         console.warn('[useDocumentWorkflowStatus] read failed:', err);

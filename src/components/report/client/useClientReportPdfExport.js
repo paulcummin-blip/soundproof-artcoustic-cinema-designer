@@ -352,7 +352,7 @@ export function useClientReportPdfExport({
   // re-running the whole export.
   const retryMissing = useCallback(async (documentKey) => {
     const last = lastExportRef.current;
-    if (!last) return;
+    if (!last) return retryExportRef.current?.({ storeOnly: storeOnlyRef.current });
     setPublication((prev) => ({
       ...prev,
       status: "storing",

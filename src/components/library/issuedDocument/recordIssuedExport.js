@@ -47,7 +47,6 @@ import {
   updatePendingExport,
 } from './pendingIssuedExportStore';
 import { writeExportStorageDiagnostic } from './exportStorageDiagnosticLog';
-import { buildIssuedDocumentRow } from './issuedDocumentRowPayload';
 import { resolveIssuedDocumentAccountId } from './issuedDocumentOwnership';
 import { readProjectOwnership } from './projectOwnershipRead';
 import { isProjectLibraryRecordFailure } from './projectLibraryStorageDiagnostics';
@@ -59,7 +58,6 @@ import {
   asExportStorageError,
   backendErrorCode,
   backendErrorMessage,
-  buildAssetRecordFailure,
   buildExportStorageDiagnostic,
   buildStorageNotice,
   classifyUploadFailure,
@@ -319,6 +317,11 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
   const previousKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
   const previous = peekPendingExport(previousKey);
   if (previous?.blob || previous?.fileUri || previous?.uploadOperation) {
+    if (previous.issued?.versionId === identity?.versionId && previous.compositionHtml === snapshot?.nodeHtml) {
+      const record = await persistHeldPdf(previousKey, onProgress);
+      notifyIssuedExportStored(record.project_id);
+      return { record, pendingKey: previousKey };
+    }
     throw new Error('A previous export needs reconciliation. Use Retry storage before starting another export.');
   }
   const pendingKey = holdPendingExport({
@@ -327,6 +330,7 @@ async function storeIssuedDocumentOnce({ identity, snapshot, onProgress }) {
     retryExport: identity?.retryExport || null,
   });
 
+  updatePendingExport(pendingKey, { compositionHtml: snapshot?.nodeHtml });
   const { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus } = await boundedExportRead(() => captureIssuedDocument({ identity, snapshot, onProgress }), 'Report capture', 130000);
   updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics, rendering, previewStatus });
 
