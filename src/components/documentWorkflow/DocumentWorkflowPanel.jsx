@@ -125,7 +125,11 @@ export default function DocumentWorkflowPanel({
     const proceed = await contextReview.review();
     if (!proceed) return;
     navigateToReportRenderer({
-      updateReport: trState === WORKFLOW_STATE.OUTDATED,
+      // Create / Create New / Retry are explicit generation requests, even
+      // when deleting the issued PDF left an older ReportSnapshot behind.
+      // Read current published evidence through the existing update flow.
+      // Opening an issued PDF remains the separate openStoredPdf action.
+      updateReport: true,
       autoStore: true,
       regenerateIntent: true,
       skipQuestionIds: contextReview.getSkippedQuestionIds(),
