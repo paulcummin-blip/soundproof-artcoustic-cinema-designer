@@ -26,7 +26,8 @@ import {
   Menu,
   X,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Building2
 } from "lucide-react";
 import { readRoomDimsMissingIndicator } from "@/components/state/designReviewHandoff";
 
@@ -52,7 +53,7 @@ import DealerHero from "@/components/ui/HeroBanner";
 import BrandBar from "@/components/ui/BrandBar";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
-import { hasCapability, isStrictMasterAdmin } from "@/lib/accountAccess";
+import { hasCapability, isStrictMasterAdmin, isRicherSoundsAdmin } from "@/lib/accountAccess";
 
 
 // Content-driven sidebar width for the Live RP22 Performance Summary panel.
@@ -562,6 +563,36 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <Database className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-brand-primary' : 'text-brand-text-muted group-hover:text-brand-text-label'} group-hover:-translate-y-[1px]`} />
                       <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>Admin Dashboard</span>
+                    </a>
+                  </div>
+                );
+              })()}
+
+              {/* Richer Sounds delegated administration — visible to active 93
+                  members who are not platform admins. Master admins reach it via
+                  the Admin Dashboard. */}
+              {!isAdmin && isRicherSoundsAdmin(user) && workspaceNavOpen && (() => {
+                const currentPath = typeof window !== "undefined" ? (window.location?.pathname || "") : "";
+                const isActive = currentPath === "/admin/richer-sounds";
+                return (
+                  <div className="mb-4 mt-2">
+                    <div className="text-xs font-medium text-brand-text-label mb-1 px-3" style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#625143' }}>
+                      Richer Sounds
+                    </div>
+                    <a
+                      href="/admin/richer-sounds"
+                      className={`
+                        group flex items-center gap-3 px-3 py-2 rounded-md text-sm
+                        border transition-all duration-200 ease-out cursor-pointer select-none
+                        ${isActive
+                          ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-md'
+                          : 'text-brand-text-muted border-transparent bg-transparent'}
+                        hover:bg-white hover:border-[#D9D5CE] hover:text-brand-text-label
+                        hover:shadow-md hover:-translate-y-[2px] active:translate-y-0 active:shadow-sm
+                      `}
+                    >
+                      <Building2 className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-brand-primary' : 'text-brand-text-muted group-hover:text-brand-text-label'} group-hover:-translate-y-[1px]`} />
+                      <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>RS Admin</span>
                     </a>
                   </div>
                 );

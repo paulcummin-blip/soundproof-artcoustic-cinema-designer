@@ -267,8 +267,40 @@ function tradingNumberForAccount(links, isMaster) {
 }
 
 /**
+ * Paginate an entity filter call (page form) until all matching records are
+ * gathered. Bounds the total to maxRecords to protect memory and rate limits.
+ */
+async function fetchAll(service, entityName, query, sort, maxRecords = 2000) {
+  const records = [];
+  let cursor = undefined;
+  for (let page = 0; page < 20; page += 1) {
+    const options = { sort, limit: 500 };
+    if (cursor) options.cursor = cursor;
+    const result = await service.entities[entityName].filter(query, options);
+    const items = Array.isArray(result?.items) ? result.items : (Array.isArray(result) ? result : []);
+    records.push(...items);
+    if (!result?.has_more || records.length >= maxRecords) break;
+    cursor = result.next_cursor;
+  }
+  return records;
+}
+
+function groupByAccount(records) {
+  const map = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    const id = record?.account_id;
+    if (!id) continue;
+    if (!map.has(id)) map.set(id, []);
+    map.get(id).push(record);
+  }
+  return map;
+}
+
+/**
  * Assemble the full read payload for the Richer Sounds admin page.
- * Reads only RICHER_SOUNDS accounts and their related records, via service role.
+ * Reads only RICHER_SOUNDS accounts and their related records, via service
+ * role. Uses batched $in queries (one per entity type, paginated) rather than
+ * per-account calls, so a 53-account estate costs ~7 entity reads not ~320.
  */
 export async function assembleRicherSoundsAdminData(service, masterAccountId) {
   const accounts = await service.entities.Account.filter(
@@ -278,35 +310,39 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
   );
   const accountList = Array.isArray(accounts) ? accounts : [];
   const accountIds = accountList.map((a) => a.id);
+  if (accountIds.length === 0) {
+    return { masterAccount: null, accounts: [], transfers: [], activity: [], unresolvedMappingCount: 0 };
+  }
 
-  const [membershipsAll, usersAll, linksAll, projectsAll, auditsAll, ledgerAll, transfersAll] =
-    await Promise.all([
-      Promise.all(accountIds.map((id) =>
-        service.entities.AccountMembership.filter({ account_id: id }, 'created_date', 100).catch(() => []))),
-      Promise.all(accountIds.map((id) =>
-        service.entities.User.filter({ account_id: id }, 'created_date', 50).catch(() => []))),
-      Promise.all(accountIds.map((id) =>
-        service.entities.ExternalAccountLink.filter({ account_id: id }, 'created_date', 20).catch(() => []))),
-      Promise.all(accountIds.map((id) =>
-        service.entities.Project.filter({ account_id: id }, 'updated_date', 100).catch(() => []))),
-      Promise.all(accountIds.map((id) =>
-        service.entities.AccountUserAudit.filter({ account_id: id }, 'occurred_at', 50).catch(() => []))),
-      Promise.all(accountIds.map((id) =>
-        service.entities.CapacityLedger.filter({ account_id: id }, 'created_date', 500).catch(() => []))),
-      service.entities.CreditTransfer
-        .filter({ direction: 'forward' }, 'created_date', 200)
-        .catch(() => []),
-    ]);
+  const inQuery = { account_id: { $in: accountIds } };
+  const [
+    membershipsAll, usersAll, linksAll, projectsAll, auditsAll, ledgerAll, transfersAll,
+  ] = await Promise.all([
+    fetchAll(service, 'AccountMembership', inQuery, 'created_date', 1000),
+    fetchAll(service, 'User', inQuery, 'created_date', 500),
+    fetchAll(service, 'ExternalAccountLink', inQuery, 'created_date', 500),
+    fetchAll(service, 'Project', inQuery, 'updated_date', 1000),
+    fetchAll(service, 'AccountUserAudit', inQuery, 'occurred_at', 1500),
+    fetchAll(service, 'CapacityLedger', inQuery, 'created_date', 3000),
+    fetchAll(service, 'CreditTransfer', { direction: 'forward' }, 'created_date', 500),
+  ]);
+
+  const membersByAccount = groupByAccount(membershipsAll);
+  const usersByAccount = groupByAccount(usersAll);
+  const linksByAccount = groupByAccount(linksAll);
+  const projectsByAccount = groupByAccount(projectsAll);
+  const auditsByAccount = groupByAccount(auditsAll);
+  const ledgerByAccount = groupByAccount(ledgerAll);
 
   const rows = [];
   for (let i = 0; i < accountList.length; i += 1) {
     const account = accountList[i];
-    const members = Array.isArray(membershipsAll[i]) ? membershipsAll[i] : [];
-    const users = Array.isArray(usersAll[i]) ? usersAll[i] : [];
-    const links = Array.isArray(linksAll[i]) ? linksAll[i] : [];
-    const projects = Array.isArray(projectsAll[i]) ? projectsAll[i] : [];
-    const audits = Array.isArray(auditsAll[i]) ? auditsAll[i] : [];
-    const ledger = Array.isArray(ledgerAll[i]) ? ledgerAll[i] : [];
+    const members = membersByAccount.get(account.id) || [];
+    const users = usersByAccount.get(account.id) || [];
+    const links = linksByAccount.get(account.id) || [];
+    const projects = projectsByAccount.get(account.id) || [];
+    const audits = auditsByAccount.get(account.id) || [];
+    const ledger = ledgerByAccount.get(account.id) || [];
     const isMaster = account.id === masterAccountId;
     const admin = primaryMember(members);
     const mappingStatus = mappingStatusForAccount(account.id, links, masterAccountId);
@@ -327,6 +363,7 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
       lastActivity: resolveLastActivity(projects, audits, account.last_access_at || null),
       primaryEmail: admin?.email || account.contact_email || null,
       members: members.map((m) => ({
+        id: m.id,
         email: normaliseEmail(m.email),
         full_name: m.full_name || null,
         is_account_admin: m.is_account_admin === true,
