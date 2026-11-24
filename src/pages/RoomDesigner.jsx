@@ -2114,7 +2114,7 @@ function RoomDesignerWithState() {
           onRecommendationsChange={setDesignRecommendations}
         />
       )}
-      <div className="flex flex-col bg-[#F8F8F7]" style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden" }}>
+      <div className="flex flex-col bg-[#F8F8F7]" style={{ height: "100%", minHeight: 0 }}>
         <style>{`
           .brand-btn{
             background:#213428 !important;
