@@ -3,14 +3,21 @@ import { useCallback, useEffect, useRef } from "react";
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 4.0;
 
+// elementFromPoint uses the rendered, clipped viewport, not the oversized
+// layout rectangle. It also excludes menus and controls covering the SVG.
+export function isVisiblePlanPoint(svg, x, y) {
+  if (!svg || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const hit = svg.ownerDocument.elementFromPoint(x, y);
+  return !!hit && (hit === svg || svg.contains(hit));
+}
+
 /**
  * Direct mouse/trackpad zoom for the Plan View.
  *
- * Attaches a non-passive wheel listener to the plan container so browser
- * pinch gestures over the plan zoom the drawing (centred on the pointer).
- * Ordinary two-finger trackpad scrolling is left unconsumed so it scrolls
- * normally; only a recognised pinch (wheel event with ctrlKey === true)
- * triggers zoom, and only when the pointer is inside the visible SVG.
+ * Wheel and pinch gestures zoom only over the visible drawing. Browser
+ * hit-testing respects every clipping/scrolling ancestor and any overlay;
+ * the full SVG rectangle alone does not describe its visible viewport.
+ * Outside the drawing, ordinary scrolling remains unconsumed.
  *
  * Zoom range: 0.6×–4.0×. Drag-pan (via usePanZoomHandlers) is independent of
  * zoom: the drawing can be repositioned by dragging empty plan space at any
@@ -40,29 +47,23 @@ export function usePlanWheelZoom({
     const el = planBoundsRef.current;
     if (!el) return;
 
+    const doc = el.ownerDocument;
+    // A wheel sequence can retain its initial target/coordinates after the
+    // pointer moves. Independently observe pointer movement, including exits
+    // from this document, so that a latched sequence cannot keep zooming.
+    let pointer = null;
+    const onPointerMove = (event) => { pointer = { x: event.clientX, y: event.clientY }; };
+    const onPointerOut = (event) => { if (!event.relatedTarget) pointer = { outside: true }; };
+    const onBlur = () => { pointer = { outside: true }; };
+
     const onWheel = (e) => {
-      // Only a browser-recognised pinch gesture should zoom the drawing.
-      // Browsers expose trackpad pinch as a wheel event with ctrlKey === true;
-      // ordinary two-finger scrolling fires wheel events with ctrlKey === false.
-      // Do not infer intent from delta speed or magnitude.
-      if (!e.ctrlKey) return;
-
-      // Zoom only when the pointer is inside the visible SVG drawing.
-      // The planBoundsRef wrapper can extend beyond the SVG (padding, gutters,
-      // overflow), so an SVG-rectangle hit test keeps zoom inside the drawing
-      // and lets normal scrolling continue everywhere else.
       const svgEl = svgRef?.current;
-      if (!svgEl) return;
+      if (!svgEl || !isVisiblePlanPoint(svgEl, e.clientX, e.clientY)) return;
+      if (pointer && (pointer.outside || !isVisiblePlanPoint(svgEl, pointer.x, pointer.y))) return;
       const svgRect = svgEl.getBoundingClientRect();
-      if (!svgRect || svgRect.width <= 0 || svgRect.height <= 0) return;
-      const insideSvg =
-        e.clientX >= svgRect.left &&
-        e.clientX <= svgRect.right &&
-        e.clientY >= svgRect.top &&
-        e.clientY <= svgRect.bottom;
-      if (!insideSvg) return;
+      if (svgRect.width <= 0 || svgRect.height <= 0) return;
 
-      // Consume the pinch gesture over the visible drawing — prevents page
+      // Consume wheel/pinch only over the visible drawing — prevents page
       // scroll and browser pinch-zoom while zooming.
       e.preventDefault();
       e.stopPropagation();
@@ -78,7 +79,7 @@ export function usePlanWheelZoom({
       const worldX = (px - curPanX) / curZoom;
       const worldY = (py - curPanY) / curZoom;
 
-      // Smooth exponential zoom for pinch gestures (ctrlKey === true).
+      // Original wheel/pinch sensitivity and pointer anchoring.
       const factor = Math.exp(-e.deltaY * 0.001);
       const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, curZoom * factor));
 
@@ -101,8 +102,16 @@ export function usePlanWheelZoom({
       setPanY(newPanY);
     };
 
+    doc.addEventListener("pointermove", onPointerMove, true);
+    doc.addEventListener("pointerout", onPointerOut, true);
+    doc.defaultView?.addEventListener("blur", onBlur);
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      doc.removeEventListener("pointermove", onPointerMove, true);
+      doc.removeEventListener("pointerout", onPointerOut, true);
+      doc.defaultView?.removeEventListener("blur", onBlur);
+    };
   }, [planBoundsRef, svgRef, setZoom, setPanX, setPanY]);
 
   // Temporary read-only wheel audit; removed after runtime validation.
