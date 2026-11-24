@@ -1,9 +1,10 @@
+import {reportClientFailure} from "@/components/systemHealth/clientExperienceMonitor";
 import React from 'react';
 
 export class ErrorBoundary extends React.Component {
   constructor(props){ super(props); this.state = { error: null }; }
   static getDerivedStateFromError(error){ return { error }; }
-  componentDidCatch(error, info){ /* no console in Base44, but UI shows */ }
+  componentDidCatch(error, info){ reportClientFailure({code:"RENDER_FAILED",operation:"room-designer",error,stack:info?.componentStack}); }
   render(){
     if (this.state.error) {
       return (

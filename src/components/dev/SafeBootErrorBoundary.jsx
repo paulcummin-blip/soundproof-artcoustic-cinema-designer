@@ -1,3 +1,4 @@
+import {reportClientFailure} from "@/components/systemHealth/clientExperienceMonitor";
 import React from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
@@ -50,6 +51,7 @@ export class SafeBootErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ error, errorInfo });
+    reportClientFailure({code:"RENDER_FAILED",operation:"application-root",error,stack:errorInfo?.componentStack});
 
     if (typeof window !== "undefined") {
       window.__APP_DEBUG = window.__APP_DEBUG || [];

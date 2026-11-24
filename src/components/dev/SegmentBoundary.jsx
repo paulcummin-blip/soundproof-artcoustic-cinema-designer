@@ -1,3 +1,4 @@
+import {reportClientFailure} from "@/components/systemHealth/clientExperienceMonitor";
 import React from "react";
 
 // Accept only nodes React can render safely
@@ -48,6 +49,7 @@ export class SegmentBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    reportClientFailure({code:"RENDER_FAILED",operation:String(this.props.name || "segment"),error,stack:info?.componentStack});
     // eslint-disable-next-line no-console
     console.error(
       `[SegmentBoundary] '${String(this.props.name)}' crashed:`,
@@ -60,6 +62,16 @@ export class SegmentBoundary extends React.Component {
         `[SegmentBoundary] ${String(this.props.name)} → ${error?.message || error}`
       );
       if (info?.componentStack) window.__APP_DEBUG.push(info.componentStack);
+    }
+  }
+
+  componentDidMount() { this.reportRejectedChildren(); }
+  componentDidUpdate() { this.reportRejectedChildren(); }
+  reportRejectedChildren() {
+    if (!this.state.hasError && !isRenderableNode(this.props.children)) {
+      const value=this.props.children;
+      reportClientFailure({code:"RENDER_VALUE_REJECTED",operation:String(this.props.name || "segment"),
+        detail:`Rejected child type: ${typeof value}; array: ${Array.isArray(value)}; React element: ${React.isValidElement(value)}.`});
     }
   }
 

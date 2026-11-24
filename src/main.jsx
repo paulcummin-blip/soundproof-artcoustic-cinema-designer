@@ -1,11 +1,16 @@
+import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
+import {installGlobalExperienceMonitoring} from "@/components/systemHealth/clientExperienceMonitor";
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
+const stopExperienceMonitoring = installGlobalExperienceMonitoring();
+if (import.meta.hot) import.meta.hot.dispose(stopExperienceMonitoring);
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   // <React.StrictMode>
-  <App />
+  <SafeBootErrorBoundary><App /></SafeBootErrorBoundary>
   // </React.StrictMode>,
 )
 
