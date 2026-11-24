@@ -62,6 +62,37 @@ export function usePlanWheelZoom({
     const onPointerOut = (event) => { if (!event.relatedTarget) pointer = { outside: true }; };
     const onBlur = () => { pointer = { outside: true }; };
 
+    // Temporary preview-only runtime audit; observes events without changing them.
+    const auditEnabled = new URLSearchParams(doc.defaultView.location.search).has('planZoomAudit');
+    let auditMouse = null;
+    let auditPointer = null;
+    const describe = node => node ? {tag: node.tagName, id: node.id, cls: typeof node.className === 'string' ? node.className : null, text: node.tagName === 'BUTTON' ? node.textContent?.slice(0,70) : undefined} : null;
+    const auditMove = event => {
+      const value = {x:event.clientX,y:event.clientY,type:event.type,hit:describe(doc.elementFromPoint(event.clientX,event.clientY))};
+      if (event.type === 'mousemove') auditMouse = value; else auditPointer = value;
+    };
+    const auditSamples = [];
+    const auditWheel = event => {
+      const svg = svgRef.current;
+      const before = {...stateRef.current};
+      const sample = {time:Date.now(),wheel:{x:event.clientX,y:event.clientY,delta:event.deltaY,ctrl:event.ctrlKey,target:describe(event.target),path:event.composedPath().slice(0,6).map(describe)},pointer, auditPointer,auditMouse,hover:describe(doc.querySelector(':hover:last-child')),hit:describe(doc.elementFromPoint(event.clientX,event.clientY)),svg:svg?.getBoundingClientRect().toJSON(),wrapper:el.getBoundingClientRect().toJSON(),before};
+      doc.defaultView.requestAnimationFrame(() => {
+        sample.after = {...stateRef.current};
+        sample.transform = svg?.querySelector('[data-rv-zoom-group]')?.getAttribute('transform');
+        sample.viewBox = svg?.getAttribute('viewBox');
+        sample.prevented = event.defaultPrevented;
+        auditSamples.push(sample); if (auditSamples.length > 30) auditSamples.shift();
+        el.dataset.planZoomAudit = JSON.stringify(auditSamples);
+        console.info('[PLAN_ZOOM_AUDIT]', JSON.stringify(sample));
+      });
+    };
+    if (auditEnabled) {
+      doc.addEventListener('mousemove', auditMove, true);
+      doc.addEventListener('pointermove', auditMove, true);
+      doc.addEventListener('wheel', auditWheel, true);
+      el.dataset.planZoomAudit = '[]';
+    }
+
     const onWheel = (e) => {
       const svgEl = svgRef?.current;
       if (!svgEl || !isVisiblePlanPoint(svgEl, e.clientX, e.clientY)) return;
@@ -116,6 +147,12 @@ export function usePlanWheelZoom({
     doc.defaultView?.addEventListener("blur", onBlur);
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => {
+      if (auditEnabled) {
+        doc.removeEventListener('mousemove', auditMove, true);
+        doc.removeEventListener('pointermove', auditMove, true);
+        doc.removeEventListener('wheel', auditWheel, true);
+        delete el.dataset.planZoomAudit;
+      }
       el.removeEventListener("wheel", onWheel);
       doc.removeEventListener("pointermove", onPointerMove, true);
       doc.removeEventListener("pointerout", onPointerOut, true);
