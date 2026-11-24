@@ -13,10 +13,12 @@ import {
   RP22_BASS_METRIC_SCHEMA_VERSION,
 } from "../base44/shared/bassAuthorityVersion.js";
 
+import {buildCanonicalBassResult} from "../src/components/room/bass/canonicalBassResult.js";
+
 const FINGERPRINT = "cal:v5:11129291fdd69043-schema:28-metric:3";
 
 function buildAuthoritativeSnapshot() {
-  return {
+  const contract = {
     version: BASS_ANALYSIS_CONTRACT_VERSION,
     instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
     metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
@@ -68,9 +70,11 @@ function buildAuthoritativeSnapshot() {
     requestedP14Level: 2,
     requestedP18ExtensionHz: 22.941,
     metricPublication: { canonicalMetricPublicationValid: true },
-    provenance: { source: "optimiser", realSeatCount: 2 },
+    provenance: { source: "optimiser", realSeatCount: 2, primarySeatIds: ["seat-r1-c1"] },
     graphPayload: { postEqRspCurve: [{ frequency: 20, spl: 100 }] },
   };
+  contract.bassResult = buildCanonicalBassResult(contract, contract.graphPayload);
+  return contract;
 }
 
 function buildRecord(snapshot) {

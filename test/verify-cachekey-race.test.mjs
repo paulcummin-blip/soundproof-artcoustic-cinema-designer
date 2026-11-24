@@ -764,3 +764,14 @@ test("verify scheduling: settings reverted during publication wait returns setti
   assert.equal(result.reason, "settings-reverted");
   assert.equal(result.dispatchFingerprint, "cal:v1:after");
 });
+test("crossover-only commit reuses unchanged subwoofer key and waits for integration settings",async()=>{
+ const target={instances:clone(beforeInstances),crossover:clone(afterCrossover)};
+ const owner=makeOwner({preCommitCacheKey:"cal:integration-only",neverAdvance:true,settleTo:target,authoritativeSettleTo:buildAuthoritativeSettings(beforeInstances,afterCrossover),initialAuthority:buildAuthority("cal:integration-only")});
+ const result=await verifyRecalculationScheduling({sharedRef:owner.sharedRef,phaseRef:owner.phaseRef,readLiveSettings:owner.readLiveSettings,targetSettings:target,preCommitCacheKey:"cal:integration-only",identityGuard:()=>true,authoritativeSettingsMatch:()=>recommendationSettingsMatch(owner.sharedRef.current?.authoritative,{crossover:afterCrossover,tuning:beforeTuning}),noOp:true,waitForPublication:waitForPublication(owner),sleep:realSleep,settlePollMs:5,cachePollMs:5,settleTimeoutMs:2000,cacheAdvanceTimeoutMs:2000});
+ assert.equal(result.ok,true);assert.equal(owner.getOnCalculateCalls(),0);assert.equal(result.dispatchFingerprint,"cal:integration-only");
+});
+test("cold integration preparation can dispatch once without invalidating the subwoofer key",async()=>{
+ const owner=makeOwner({preCommitCacheKey:"cal:cold-integration",neverAdvance:true,settleTo:before,authoritativeSettleTo:buildAuthoritativeSettings(beforeInstances,beforeCrossover),initialAuthority:buildAuthority("cal:cold-integration")});
+ const result=await verifyRecalculationScheduling({sharedRef:owner.sharedRef,phaseRef:owner.phaseRef,readLiveSettings:owner.readLiveSettings,targetSettings:before,preCommitCacheKey:"cal:cold-integration",identityGuard:()=>true,authoritativeSettingsMatch:()=>true,noOp:true,allowReuseExisting:false,waitForPublication:waitForPublication(owner),sleep:realSleep,settlePollMs:5,cachePollMs:5,settleTimeoutMs:2000,cacheAdvanceTimeoutMs:2000});
+ assert.equal(result.ok,true);assert.equal(owner.getOnCalculateCalls(),1);assert.equal(result.dispatchFingerprint,"cal:cold-integration");
+});
