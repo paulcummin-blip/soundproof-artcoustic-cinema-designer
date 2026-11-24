@@ -97,6 +97,7 @@ export async function verifyRecalculationScheduling({
   identityGuard,
   authoritativeSettingsMatch,
   noOp = false,
+  allowReuseExisting = true,
   waitForPublication,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   settleTimeoutMs = 15000,
@@ -144,7 +145,7 @@ export async function verifyRecalculationScheduling({
     const job = authority?.contract?.job || {};
     const noActiveCalc = sharedRef.current?.calculationInProgress !== true;
     const settingsStillTarget = settingsEqual(readLiveSettings(), targetSettings);
-    if (noActiveCalc && authOk() && settingsStillTarget
+    if (allowReuseExisting && noActiveCalc && authOk() && settingsStillTarget
         && authority?.authorityStatus === "AUTHORITATIVE"
         && contractStructurallyComplete(authority?.contract)
         && job.resultFingerprint === cur && job.currentJobFingerprint === cur) {

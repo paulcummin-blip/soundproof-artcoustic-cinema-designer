@@ -1,3 +1,4 @@
+import { evaluateCurrentIntegration } from "./evaluateCurrentIntegration";
 // OptimiseAndCalculate.jsx
 // Unified Optimise & Calculate workflow component.
 //
@@ -21,7 +22,7 @@ import { clone, stable, electronicContextFromUi, physicalContext, prepareElectro
 import { withElectronicPersistence } from "./electronicPersistence.js";
 import { resolveCalibrationAutoApply } from "./adiCalibrationAutoApplyAuthority.js";
 import { validateCandidateForRun, canonicalLevel } from "../improveBassV2/confirmedCandidateValidity.js";
-import { recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification.js";
+import { comparisonResultsMatch, recommendationResultMatches, recommendationSettingsMatch } from "./crossoverApplicationVerification.js";
 import { authoritativeElectronicsMatchLive } from "./authoritativeElectronicsMatch.js";
 import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison.js";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -322,7 +323,8 @@ export default function OptimiseAndCalculate({
           preCommitCacheKey,
           identityGuard:()=>{const live=liveElectronicRef.current;return !!live && live.projectId===projectId && live.versionId===versionId && !!io.current();},
           authoritativeSettingsMatch:()=>recommendationSettingsMatch(sharedRef.current?.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning}),
-          noOp:settingsEqual(before,after),
+          noOp:stable(before.instances) === stable(after.instances),
+          allowReuseExisting:!receipt.integrationResponseBasis || sharedRef.current?.authoritative?.status === "ready",
           waitForPublication:(ref,phRef)=>waitForCurrentPublication(ref,phRef),
         });
         const writeDiag=(d)=>{const rec={phase:"recalculating",...d,preCommitCacheKey,
@@ -346,7 +348,10 @@ export default function OptimiseAndCalculate({
           return false;
         }
         const settingsMatch=recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning});
-        const resultMatch=recommendationResultMatches(state.completedBassAuthority,expected);
+        const actualResult = receipt.integrationResponseBasis === "combined-lcr-sub"
+          ? evaluateCurrentIntegration(state.authoritative)
+          : extractAuthorityForComparison(state.completedBassAuthority);
+        const resultMatch=comparisonResultsMatch(actualResult,expected);
         if(!settingsMatch||!resultMatch){
           writeDiag({settingsMatch,resultMatch,targetCacheKey,
             reason:!settingsMatch?"settings-mismatch":"result-mismatch"});
@@ -355,7 +360,7 @@ export default function OptimiseAndCalculate({
         // A successful restore verify must NEVER erase the failed-apply
         // diagnostics the catch block reads — restore writes its own ref.
         if(restoring)restoringDiagnosticsRef.current=null;else verifyDiagnosticsRef.current=null;
-        return {fingerprint:state.cacheKey,levels:resultLevels(extractAuthorityForComparison(state.completedBassAuthority))};
+        return {fingerprint:state.cacheKey,levels:resultLevels(actualResult),integrationIdentity:state.authoritative.integrationIdentity};
       };
       return executeElectronicTransaction({before,after,receipt,persist:io.persist,readback:io.readback,commit,verify,guard});
     });
@@ -1152,6 +1157,7 @@ export default function OptimiseAndCalculate({
           schemaVersion:1,projectId,versionId,runId:activeRun.runId,candidateId:candidate.candidateId,
           inputIdentity:result.inputIdentityAuthority,baselineCacheKey:candidate.baselineCacheKey,
           physicalContext:physicalContext(context),before:prepared.before,
+          integrationResponseBasis: candidate.responseBasis || (context.integrationContext ? "combined-lcr-sub" : "sub-only"),
           after:{instances:prepared.instances,crossover:prepared.crossover},
           beforeResult:comparisonReceipt(baseline),expectedResult:comparisonReceipt(candidate),
           beforeEffectiveTuning:clone(sharedRef.current.authoritative.sources.map(s=>({sourceId:s.id,...s.tuning}))),

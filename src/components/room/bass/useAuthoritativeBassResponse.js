@@ -8,7 +8,6 @@ export { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEn
 import { captureCombinedIntegrationTransfers } from "./combinedIntegrationEngine";
 import { buildCombinedSystemResponse } from "./combinedSystemResponse";
 import { buildLcrIntegrationSources } from "./lcrIntegrationSources";
-import { usesAppliedAdiIntegration } from "./bassAssessmentBasis";
 import {
   resolveSharedCrossoverLimits,
   normaliseCrossoverConfig,
@@ -236,7 +235,9 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   // Ordinary bass assessment owns subwoofer-only evidence. Merely having LCR
   // speakers (or opening ADI) must not silently opt it into integration.
   // ADI's explicit apply transaction keeps its combined verification path.
-  const assessCombined = integration.enabled && usesAppliedAdiIntegration(splConfig?.bassAdiReceipt);
+  // Published bass always assesses the subwoofer system. ADI evaluates the
+  // separate combined speaker/crossover response within its own run.
+  const assessCombined = false;
   const integrationIdentity = useMemo(() => integration.enabled
     ? { version: "combined-lcr-sub-v1", sources: lcrSources, crossover } : null,
     [integration.enabled, lcrSources, crossover]);

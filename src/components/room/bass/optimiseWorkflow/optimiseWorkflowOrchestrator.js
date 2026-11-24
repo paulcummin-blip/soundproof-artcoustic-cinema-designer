@@ -98,7 +98,7 @@ export async function runOptimisation(opts) {
     speakerSources: shared.authoritative.lcrSources,
     crossover: shared.authoritative.crossover,
     physics: shared.authoritative.physics,
-    identity: shared.authoritative.fingerprintInputs?.combinedResponseIdentity,
+    identity: shared.authoritative.integrationIdentity,
   } : null;
 
   // Derive P14 target parameters from the shared bass results

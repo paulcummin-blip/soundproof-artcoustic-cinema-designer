@@ -928,6 +928,31 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         savedCurrentRawTransfer = currentRawTransfer;
         savedEffectiveBaseline = effectiveBaseline;
 
+        // The published assessment remains the subwoofer-system result. ADI's
+        // crossover search needs a separate, measured combined-system control
+        // with the installed tuning. Never compare combined candidates against
+        // a sub-only baseline or replace the published subwoofer evidence.
+        if (integrationContext) {
+          const integrated = await runInWorker(worker, "confirmation", {
+            rawTransfer: currentRawTransfer, tuning: effectiveBaseline,
+            tuningVariant: "delay-polarity-trim", crossover: integrationContext.crossover,
+            p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis, correctabilityAssessment,
+          }, controller.signal);
+          if (isStale()) return { status: "stale", snapshot };
+          const current = integrated && bindConfirmation(integrated, effectiveBaseline, currentFinalist, "current");
+          const checked = current && validateCandidateForRun(current, validationContext);
+          if (!checked?.valid || integrated.responseBasis !== "combined-lcr-sub") {
+            return { status: "blocked", code: "ADI_INTEGRATION_BASELINE_UNAVAILABLE",
+              error: "ADI could not verify the current speaker/subwoofer integration. Your saved subwoofer results are unchanged. Check the crossover settings and run ADI again.",
+              baselineParity: buildPersistedBaselineParity(baselineParity), snapshot };
+          }
+          existingAuthority = checked.result;
+          snapshot.responseBasis = "combined-lcr-sub";
+          snapshot.publishedSubwooferBaseline = extractAuthorityForComparison(currentAuthority);
+          snapshot.integrationIdentity = integrationContext.identity;
+        }
+
+
         // PHASE: search a physical unity-gain first-order all-pass control in
         // 5-degree steps at 80 Hz. Each retained proxy minimum is confirmed
         // through the same canonical EQ/P18/P19/P20 chain as every other lever.

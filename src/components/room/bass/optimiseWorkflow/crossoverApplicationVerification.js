@@ -1,7 +1,10 @@
 import { extractAuthorityForComparison } from "../improveBassV2/currentAuthorityComparison";
 
 export function recommendationResultMatches(authority, expected, tolerance = 0.1) {
-  const actual = extractAuthorityForComparison(authority);
+  return comparisonResultsMatch(extractAuthorityForComparison(authority), expected, tolerance);
+}
+
+export function comparisonResultsMatch(actual, expected, tolerance = 0.1) {
   if (!actual || !expected) return false;
   for (const field of ["achievedP19VariationDb","achievedP20VariationDb","p14AchievedDb","achievedP18Hz"]) {
     if (![actual[field], expected[field]].every(Number.isFinite) || Math.abs(actual[field]-expected[field]) > tolerance) return false;

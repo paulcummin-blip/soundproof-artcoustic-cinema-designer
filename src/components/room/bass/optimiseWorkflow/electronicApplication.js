@@ -164,7 +164,7 @@ export async function executeElectronicTransaction({before,after,receipt,persist
     const verified=await verify(after);
     ensure();
     if(!verified)throw new Error("Canonical recalculation did not reproduce the confirmed candidate.");
-    const finalReceipt={...receipt,status:"verified",verifiedAt:new Date().toISOString(),resultFingerprint:verified.fingerprint,afterLevels:verified.levels};
+    const finalReceipt={...receipt,status:"verified",verifiedAt:new Date().toISOString(),resultFingerprint:verified.fingerprint,integrationIdentity:verified.integrationIdentity || null,afterLevels:verified.levels};
     await persist(after,finalReceipt);
     ensure();
     const saved=await readback();
