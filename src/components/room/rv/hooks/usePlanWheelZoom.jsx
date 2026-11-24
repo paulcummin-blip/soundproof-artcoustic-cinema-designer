@@ -21,6 +21,7 @@ const MAX_ZOOM = 4.0;
  */
 export function usePlanWheelZoom({
   planBoundsRef,
+  svgRef,
   zoom,
   panX,
   panY,
@@ -39,13 +40,28 @@ export function usePlanWheelZoom({
     if (!el) return;
 
     const onWheel = (e) => {
-      // Always consume wheel events over the plan — prevents page scroll and
-      // browser pinch-zoom while the pointer is over the drawing.
+      // Zoom only when the pointer is inside the visible SVG drawing.
+      // The planBoundsRef wrapper can extend beyond the SVG (padding, gutters,
+      // overflow), so an SVG-rectangle hit test keeps zoom inside the drawing
+      // and lets normal scrolling continue everywhere else.
+      const svgEl = svgRef?.current;
+      if (!svgEl) return;
+      const svgRect = svgEl.getBoundingClientRect();
+      if (!svgRect || svgRect.width <= 0 || svgRect.height <= 0) return;
+      const insideSvg =
+        e.clientX >= svgRect.left &&
+        e.clientX <= svgRect.right &&
+        e.clientY >= svgRect.top &&
+        e.clientY <= svgRect.bottom;
+      if (!insideSvg) return;
+
+      // Consume wheel events only over the visible drawing — prevents page
+      // scroll and browser pinch-zoom while zooming.
       e.preventDefault();
       e.stopPropagation();
 
       const { zoom: curZoom, panX: curPanX, panY: curPanY } = stateRef.current;
-      const rect = el.getBoundingClientRect();
+      const rect = svgRect;
       if (!rect || rect.width <= 0 || rect.height <= 0) return;
 
       const px = e.clientX - rect.left;
@@ -81,7 +97,7 @@ export function usePlanWheelZoom({
 
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [planBoundsRef, setZoom, setPanX, setPanY]);
+  }, [planBoundsRef, svgRef, setZoom, setPanX, setPanY]);
 
   const resetView = useCallback(() => {
     setZoom(1);

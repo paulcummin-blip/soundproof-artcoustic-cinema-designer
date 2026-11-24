@@ -1147,6 +1147,7 @@ const byId = useEntitiesById({
   // Direct mouse/trackpad wheel zoom (replaces click-to-zoom toolbar controls)
   const { resetView, isNonDefault: viewIsNonDefault } = usePlanWheelZoom({
     planBoundsRef,
+    svgRef,
     zoom,
     panX,
     panY,
