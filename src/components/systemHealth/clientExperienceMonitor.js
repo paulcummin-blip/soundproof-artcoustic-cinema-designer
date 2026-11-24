@@ -1,6 +1,7 @@
 import {safeDiagnostic,safeRoute,requestFailureWarrantsAlert} from '../../../base44/shared/systemHealth/clientIncidentPolicy.js';
 let transport=null, context={}, queue=[], sending=false, timer=null;
 const recent=new Map();
+const handledErrors=new WeakSet();
 const storageKey='soundproof-pending-ux-incidents-v1';
 const browser=()=>typeof window!=='undefined';
 function persist(){try{if(browser())sessionStorage.setItem(storageKey,JSON.stringify(queue.slice(-20)));}catch{}}
@@ -25,8 +26,9 @@ export async function flushExperienceIncidents(){
 }
 export function reportClientFailure({code,operation='application',error,detail,stack,...scope}={}){
  try{
+  if(error && typeof error === "object") handledErrors.add(error);
   const current={...context,...scope};
-  const payload={error_code:code,operation,project_id:current.projectId||null,version_id:current.versionId||null,
+  const payload={error_code:code,operation,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
    page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
    error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
    component_stack:safeDiagnostic(stack || error?.stack || '',1800)};
@@ -69,9 +71,9 @@ export function installGlobalExperienceMonitoring(){
  const onError=e=>{
   if(e.filename&&/^(chrome|moz)-extension:/.test(e.filename))return;
   if(!e.error&&!e.message)return;
-  reportClientFailure({code:'UNHANDLED_ERROR',operation:'browser',error:e.error,detail:e.message});
+  setTimeout(()=>{if(!e.error||!handledErrors.has(e.error))reportClientFailure({code:'UNHANDLED_ERROR',operation:'browser',error:e.error,detail:e.message});},250);
  };
- const onReject=e=>{if(!requestFailureWarrantsAlert(e.reason))return;reportClientFailure({code:'UNHANDLED_REJECTION',operation:'async-action',error:e.reason});};
+ const onReject=e=>{if((e.reason && typeof e.reason==='object' && handledErrors.has(e.reason)) || !requestFailureWarrantsAlert(e.reason))return;reportClientFailure({code:'UNHANDLED_REJECTION',operation:'async-action',error:e.reason});};
  let last=performance.now(),visible=document.visibilityState==='visible';
  const visibility=()=>{last=performance.now();visible=document.visibilityState==='visible';};
  const heartbeat=setInterval(()=>{const now=performance.now(),delay=now-last;last=now;

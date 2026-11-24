@@ -1,3 +1,4 @@
+import SegmentBoundary from "@/components/dev/SegmentBoundary";
 import {useCanonicalProject} from "@/components/state/projectHydrationStore";
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
@@ -11,6 +12,8 @@ const BRAND = {
   btnText: '#FFFFFF',
 };
 
+function ControlledScreenFailure(){throw new Error("Controlled screen recovery test. No project data was changed.");}
+
 export default function AlertRecipientSettings() {
   const project = useCanonicalProject();
   const [enabled, setEnabled] = useState(false);
@@ -19,6 +22,7 @@ export default function AlertRecipientSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [screenTest,setScreenTest]=useState(null);
   const [testResult, setTestResult] = useState(null);
   const [error, setError] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
@@ -207,11 +211,19 @@ export default function AlertRecipientSettings() {
             style={{ padding: '10px 20px', fontSize: 12, border: `1px solid ${BRAND.border}`, borderRadius: 6, background: 'white', color: BRAND.text, cursor: testing ? 'default' : 'pointer' }}>
             {testing ? 'Sending test…' : 'Send test alert'}
           </button>
+          <button type="button" disabled={testing || saving} onClick={()=>setScreenTest(`ux-test-${crypto.randomUUID()}`)}
+            style={{padding:'10px 16px',fontSize:12,border:`1px solid ${BRAND.border}`,borderRadius:6,background:'white'}}>
+            Test screen recovery alert
+          </button>
           {savedAt && !error && (
             <span style={{ fontSize: 12, color: '#213428' }}>✓ Saved at {savedAt}</span>
           )}
         </div>
 
+        {screenTest && <div style={{marginTop:12,fontSize:12}}>
+          <p>Controlled screen test. The test panel below deliberately fails; the rest of the page stays usable. Check System Health for the recorded incident.</p>
+          <SegmentBoundary key={screenTest} name="controlled-screen-test" incidentContext={{projectId:project.projectId,versionId:project.identity?.activeVersionId,testRunId:screenTest}}><ControlledScreenFailure /></SegmentBoundary>
+        </div>}
         {testResult && <p role="status" style={{ fontSize: 12, color: '#213428' }}>{testResult}</p>}
 
         {error && (

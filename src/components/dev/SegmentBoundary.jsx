@@ -49,7 +49,7 @@ export class SegmentBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    reportClientFailure({code:"RENDER_FAILED",operation:String(this.props.name || "segment"),error,stack:info?.componentStack});
+    reportClientFailure({code:"RENDER_FAILED",operation:String(this.props.name || "segment"),error,stack:info?.componentStack,...this.props.incidentContext});
     // eslint-disable-next-line no-console
     console.error(
       `[SegmentBoundary] '${String(this.props.name)}' crashed:`,
@@ -71,7 +71,7 @@ export class SegmentBoundary extends React.Component {
     if (!this.state.hasError && !isRenderableNode(this.props.children)) {
       const value=this.props.children;
       reportClientFailure({code:"RENDER_VALUE_REJECTED",operation:String(this.props.name || "segment"),
-        detail:`Rejected child type: ${typeof value}; array: ${Array.isArray(value)}; React element: ${React.isValidElement(value)}.`});
+        ...this.props.incidentContext,detail:`Rejected child type: ${typeof value}; array: ${Array.isArray(value)}; React element: ${React.isValidElement(value)}.`});
     }
   }
 

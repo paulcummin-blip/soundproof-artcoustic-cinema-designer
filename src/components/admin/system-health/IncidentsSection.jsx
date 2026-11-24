@@ -68,7 +68,7 @@ export default function IncidentsSection() {
         {},
         { sort: '-last_detected_at', limit: 50 },
       );
-      setIncidents(page?.items || []);
+      setIncidents(Array.isArray(page) ? page : page?.items || []);
     } catch (err) {
       setError(err?.message || 'Failed to load incidents.');
     } finally {
@@ -207,6 +207,7 @@ export default function IncidentsSection() {
                 <div style={{ fontWeight: 600, fontSize: 11 }}>{incident.incident_reference}</div>
                 <div style={{ fontSize: 12 }}>
                   <div style={{ fontWeight: 600 }}>{incident.operation || '—'}</div>
+                  <div style={{fontSize:11,marginTop:3}}>{[incident.account_name,incident.project_name,incident.client_name,incident.version_name].filter(Boolean).join(' · ') || (incident.test_run_id ? 'Administrator test' : 'Open for identity details')}</div>
                   <div style={{ fontSize: 10, color: BRAND.subtext, marginTop: 2 }}>
                     {incident.error_code?.replace(/_/g, ' ') || '—'}
                   </div>

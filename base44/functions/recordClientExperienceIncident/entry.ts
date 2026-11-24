@@ -33,11 +33,12 @@ export default async function(req) {
   const operation=String(body.operation||'application').replace(/[^a-zA-Z0-9_.:-]/g,'').slice(0,100)||'application';
   const detail=safeDiagnostic(body.error_detail);
   const stack=safeDiagnostic(body.component_stack,1800);
+  const testRunId=user.role==='admin' && /^ux-test-[a-zA-Z0-9-]{5,80}$/.test(String(body.test_run_id||'')) ? body.test_run_id : null;
   const result=await recordSystemIncident(base44,{
-   component:'user_experience',operation,error_code:code,severity:'high',
+   component:'user_experience',operation:testRunId?'controlled_alert_test':operation,error_code:code,severity:'high',
    account_id:accountId,project_id:projectId,version_id:versionId,page_path:route,
    error_detail:detail,component_stack:stack,
-   diagnostic_summary:CLIENT_FAILURES[code], grouping_scope:[route,operation].join('::'),
+   test_run_id:testRunId,diagnostic_summary:(testRunId?'CONTROLLED TEST — '+operation+'. ':'')+CLIENT_FAILURES[code], grouping_scope:[route,operation,testRunId||''].join('::'),
    stage_failed:operation, data_integrity_summary:'Monitoring did not change project data. Completion of the interrupted action has not been verified.',
   });
   return Response.json(result||{recorded:false,fail_open:true});
