@@ -52,14 +52,23 @@ export function usePlanWheelZoom({
     // pointer moves. Independently observe pointer movement, including exits
     // from this document, so that a latched sequence cannot keep zooming.
     let pointer = null;
-    const onPointerMove = (event) => { pointer = { x: event.clientX, y: event.clientY }; };
+    const onPointerMove = (event) => {
+      pointer = {
+        x: event.clientX,
+        y: event.clientY,
+        overDrawing: isVisiblePlanPoint(svgRef.current, event.clientX, event.clientY),
+      };
+    };
     const onPointerOut = (event) => { if (!event.relatedTarget) pointer = { outside: true }; };
     const onBlur = () => { pointer = { outside: true }; };
 
     const onWheel = (e) => {
       const svgEl = svgRef?.current;
       if (!svgEl || !isVisiblePlanPoint(svgEl, e.clientX, e.clientY)) return;
-      if (pointer && (pointer.outside || !isVisiblePlanPoint(svgEl, pointer.x, pointer.y))) return;
+      // Do not begin zoom just because page scrolling slides the drawing
+      // underneath a pointer that was over a toolbar/control.
+      if (pointer && (pointer.outside || !pointer.overDrawing ||
+          !isVisiblePlanPoint(svgEl, pointer.x, pointer.y))) return;
       const svgRect = svgEl.getBoundingClientRect();
       if (svgRect.width <= 0 || svgRect.height <= 0) return;
 
