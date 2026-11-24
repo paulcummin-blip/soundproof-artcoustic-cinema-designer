@@ -115,6 +115,34 @@ export const connectionLine = (parameter, level, text) => ({
   level: level || null,
   text: text || null,
 });
+/**
+ * The overheads schedule row's engineering connection.
+ *
+ * P10 (Upper Speaker SPL Difference) is the overhead layer's own RP22 result.
+ * It is seat-scoped, so the connection states the AUTHORITATIVE PRIMARY SEATING
+ * result published for P10 — the limiting primary seat, read from the
+ * publication's parameter index `scopes.primary` — never a room-wide figure and
+ * never the all-seat floor. The "(primary seating)" wording preserves that
+ * assessment scope on the page.
+ *
+ * When P10 has not been assessed at the primary seating (no published primary
+ * result, or a neutral dash/N/A) the row keeps its existing descriptive
+ * system-role statement. No level is hardcoded and no result is invented.
+ */
+function buildOverheadsConnection(engineeringSummary, dolbyConfig) {
+  const primaryScope = engineeringSummary?.parameter_index?.['P10']?.scopes?.primary;
+  const level = levelLabel(primaryScope?.level);
+  if (level) {
+    const value = statedParameterValue(primaryScope, 10);
+    return [connectionLine(
+      'RP22 P10',
+      level,
+      `Overhead speaker level matching (primary seating)${value ? ` · ${value}` : ''}`,
+    )];
+  }
+  return [connectionLine(null, null, `Overhead layer completing the ${String(dolbyConfig || 'immersive').trim()} field`)];
+}
+
 export function buildSpecificationConnections({
   productsSelected = null,
   engineeringSummary = null,
@@ -159,7 +187,7 @@ export function buildSpecificationConnections({
         : [connectionLine(null, null, 'Surround and wide coverage around the seats')])
       : [],
     overheads: overheadTotal > 0
-      ? [connectionLine(null, null, `Overhead layer completing the ${String(dolbyConfig || 'immersive').trim()} field`)]
+      ? buildOverheadsConnection(engineeringSummary, dolbyConfig)
       : [],
     subwoofers: subTotal > 0
       ? [
