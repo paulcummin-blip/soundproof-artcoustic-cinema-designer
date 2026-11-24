@@ -156,3 +156,19 @@ test("calculated status cannot publish without complete canonical P19/P20 seat e
   assert.equal(resolved.authorityStatus, "NOT_VERIFIED");
   assert.equal(resolved.authoritative, false);
 });
+// Regression: a stale pointer and an evicted completed map must retain the
+// previous bank result as a preview, without granting it current authority.
+test("stale result retained from target bank after completed-map eviction", () => {
+  const snapshot = buildAuthoritativeSnapshot();
+  const record = buildRecord(snapshot);
+  record.current_fingerprint = "cal:new-design";
+  record.status = "stale";
+  record.completed_by_fingerprint = {};
+  const resolved = resolvePersistedBassAuthority("project::version", buildHydratedPersistedWrapper(record), {
+    bankTargets: { "minimum-L2": snapshot },
+  });
+  assert.equal(resolved.contract, snapshot);
+  assert.equal(resolved.authorityStatus, "STALE");
+  assert.equal(resolved.currentFingerprint, "cal:new-design");
+  assert.equal(resolved.status, "stale");
+});

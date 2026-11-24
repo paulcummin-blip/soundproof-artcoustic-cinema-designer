@@ -536,7 +536,7 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
         live?.authorityStatus === BASS_AUTHORITY_STATUS.STALE
         && live?.currentFingerprint === currentFingerprint
       ) {
-        return setMemory(projectId, versionId, resolvePersistedBassAuthority(key, persisted));
+        return setMemory(projectId, versionId, resolvePersistedBassAuthority(key, persisted, { bankTargets: parseTargetCacheBank(record?.target_cache).targets }));
       }
       return live || null;
     } catch (e) {
