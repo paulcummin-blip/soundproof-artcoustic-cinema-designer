@@ -194,7 +194,7 @@ export default function RoomDesignerControlsPanel({
   return (
     <aside className="relative z-30" style={{ minWidth: 0, minHeight: 0, flex: 1, display: "flex", flexDirection: "column" }}>
       <div
-        style={{ flex: 1, minHeight: 0, overflow: "auto", paddingRight: 8, paddingBottom: 12 }}
+        style={{ flex: 1, minHeight: 0, overflow: "auto", overscrollBehaviorY: "var(--split-controls-overscroll, auto)", paddingRight: 8, paddingBottom: 12 }}
         className="space-y-3">
 
         <RoomDimensionReflowBanner />
