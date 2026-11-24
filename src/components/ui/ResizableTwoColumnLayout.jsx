@@ -287,6 +287,7 @@ export default function ResizableTwoColumnLayout({
         position: "sticky",
         top: stickyInset,
         height: viewportHeight ?? undefined,
+        "--split-controls-overscroll": "contain",
         columnGap: gap,
         overflowX: "hidden",
         overflowY: "hidden",
