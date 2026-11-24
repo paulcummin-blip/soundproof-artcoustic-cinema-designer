@@ -36,7 +36,8 @@ function uuidLike(value) {
 
 /**
  * Resolve the Custom Install - 93 master account dynamically.
- * Returns { account, link, accountId } or null.
+ * Returns { account, link, accountId } or null. Uses one batched $in query for
+ * accounts and one for portal links, not per-account calls.
  */
 export async function resolveRicherSoundsMasterAccount(service) {
   const accounts = await service.entities.Account.filter(
@@ -46,19 +47,17 @@ export async function resolveRicherSoundsMasterAccount(service) {
   );
   if (!Array.isArray(accounts) || accounts.length === 0) return null;
   const accountIds = accounts.map((a) => a.id);
-  // Fetch active Partner Portal links for every Richer Sounds account in one
-  // batched set of filter calls (bounded by account count, typically < 60).
-  const linkBatches = await Promise.all(
-    accountIds.map((id) =>
-      service.entities.ExternalAccountLink
-        .filter({ account_id: id, source_system: PORTAL_SOURCE_SYSTEM }, 'created_date', 50)
-        .catch(() => []),
-    ),
+  const links = await fetchAll(
+    service,
+    'ExternalAccountLink',
+    { account_id: { $in: accountIds }, source_system: PORTAL_SOURCE_SYSTEM },
+    'created_date',
+    500,
   );
-  for (let i = 0; i < accounts.length; i += 1) {
-    const account = accounts[i];
-    const links = Array.isArray(linkBatches[i]) ? linkBatches[i] : [];
-    const masterLink = links.find((link) =>
+  const linksByAccount = groupByAccount(links);
+  for (const account of accounts) {
+    const accountLinks = linksByAccount.get(account.id) || [];
+    const masterLink = accountLinks.find((link) =>
       link?.active !== false
       && String(link?.external_account_number || '').trim() === RICHER_SOUNDS_MASTER_TRADING_NUMBER
       && Boolean(String(link?.portal_dealer_account_id || '').trim()),
@@ -315,11 +314,12 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
   }
 
   const inQuery = { account_id: { $in: accountIds } };
+  // The User entity does not support batched filter, and the RS page draws its
+  // user list from AccountMembership, so users are not fetched here.
   const [
-    membershipsAll, usersAll, linksAll, projectsAll, auditsAll, ledgerAll, transfersAll,
+    membershipsAll, linksAll, projectsAll, auditsAll, ledgerAll, transfersAll,
   ] = await Promise.all([
     fetchAll(service, 'AccountMembership', inQuery, 'created_date', 1000),
-    fetchAll(service, 'User', inQuery, 'created_date', 500),
     fetchAll(service, 'ExternalAccountLink', inQuery, 'created_date', 500),
     fetchAll(service, 'Project', inQuery, 'updated_date', 1000),
     fetchAll(service, 'AccountUserAudit', inQuery, 'occurred_at', 1500),
@@ -328,7 +328,6 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
   ]);
 
   const membersByAccount = groupByAccount(membershipsAll);
-  const usersByAccount = groupByAccount(usersAll);
   const linksByAccount = groupByAccount(linksAll);
   const projectsByAccount = groupByAccount(projectsAll);
   const auditsByAccount = groupByAccount(auditsAll);
@@ -338,7 +337,6 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
   for (let i = 0; i < accountList.length; i += 1) {
     const account = accountList[i];
     const members = membersByAccount.get(account.id) || [];
-    const users = usersByAccount.get(account.id) || [];
     const links = linksByAccount.get(account.id) || [];
     const projects = projectsByAccount.get(account.id) || [];
     const audits = auditsByAccount.get(account.id) || [];
@@ -369,10 +367,6 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
         is_account_admin: m.is_account_admin === true,
         status: m.status || 'pending',
         access_level: m.access_level || 'FULL_ACCESS',
-      })),
-      users: users.map((u) => ({
-        id: u.id, email: normaliseEmail(u.email), full_name: u.full_name || null,
-        access_level: u.access_level || 'FULL_ACCESS', disabled: u.disabled === true,
       })),
       projects: projects.map((p) => ({
         id: p.id, name: p.name, client_name: p.client_name || null,
@@ -434,7 +428,7 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
   }
   // Project creations from ledger PROJECT_ACTIVATION entries.
   for (let i = 0; i < accountList.length; i += 1) {
-    const ledger = Array.isArray(ledgerAll[i]) ? ledgerAll[i] : [];
+    const ledger = ledgerByAccount.get(accountList[i].id) || [];
     for (const entry of ledger) {
       if (entry?.transaction_type === 'PROJECT_ACTIVATION') {
         activity.push({
