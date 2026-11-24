@@ -62,7 +62,7 @@ export function electronicContextFromUi({shared,appState,subwooferInstances,room
     rspMode:appState?.rspMode || null, designatedRspSeatId:appState?.designatedRspSeatId || null,
     integrationContext:a.combinedAuthorityEnabled ? {
       roomDims, seatingPositions, rspPosition:a.rspPosition, speakerSources:a.lcrSources,
-      crossover:a.crossover, physics:a.physics, identity:a.fingerprintInputs?.combinedResponseIdentity,
+      crossover:a.crossover, physics:a.physics, identity:a.integrationIdentity ?? a.fingerprintInputs?.combinedResponseIdentity,
     } : null,
   });
 }

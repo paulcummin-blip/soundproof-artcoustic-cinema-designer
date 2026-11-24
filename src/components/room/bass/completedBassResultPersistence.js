@@ -414,6 +414,7 @@ export function compactCompletedBassContract(contract, { graphPayloadTimings = n
     fingerprints: contract.fingerprints,
     job: { ...contract.job, status: "complete" },
     productAnalysis: { status: "complete", parameters: contract.productAnalysis?.parameters || {} },
+    responseBasis: contract.selectedCandidate?.responseBasis || contract.responseBasis || null,
     selectedMode: contract.selectedMode,
     selectedCandidateId: contract.selectedCandidateId,
     selectedCandidate: {
@@ -688,8 +689,9 @@ export function resolvePersistedBassAuthority(projectId, persisted, { bankTarget
   // the contract remains visible — matching the in-memory store semantics.
   // There is no second `staleContract` authority path.
   const fallbackContract = !current
-    ? Object.values(validSnapshots)
-        .filter((snapshot) => isStructurallyCompleteBassContract(snapshot))
+    ? [...Object.values(validSnapshots), ...Object.values(bankTargets || {})]
+        .filter((snapshot) => snapshot?.instanceAuthorityVersion === INSTANCE_AUTHORITY_VERSION
+          && isStructurallyCompleteBassContract(snapshot))
         .sort((left, right) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))[0] || null
     : null;
   const contract = current || fallbackContract;

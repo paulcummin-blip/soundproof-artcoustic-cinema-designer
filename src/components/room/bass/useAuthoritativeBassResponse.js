@@ -8,6 +8,7 @@ export { simulateAuthoritativeBassResponse } from "./authoritativeBassResponseEn
 import { captureCombinedIntegrationTransfers } from "./combinedIntegrationEngine";
 import { buildCombinedSystemResponse } from "./combinedSystemResponse";
 import { buildLcrIntegrationSources } from "./lcrIntegrationSources";
+import { usesAppliedAdiIntegration } from "./bassAssessmentBasis";
 import {
   resolveSharedCrossoverLimits,
   normaliseCrossoverConfig,
@@ -232,6 +233,13 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       : { enabled: false, speakerSources: [] }),
     [lcrSources],
   );
+  // Ordinary bass assessment owns subwoofer-only evidence. Merely having LCR
+  // speakers (or opening ADI) must not silently opt it into integration.
+  // ADI's explicit apply transaction keeps its combined verification path.
+  const assessCombined = integration.enabled && usesAppliedAdiIntegration(splConfig?.bassAdiReceipt);
+  const integrationIdentity = useMemo(() => integration.enabled
+    ? { version: "combined-lcr-sub-v1", sources: lcrSources, crossover } : null,
+    [integration.enabled, lcrSources, crossover]);
   // The LCR signature identifies the combined model's own geometry. It is
   // part of the calibration identity. Crossover edits reuse geometry but
   // invalidate published combined results until manually recalculated.
@@ -598,7 +606,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
   const subOnlyResponseCurves = useMemo(() =>
     buildAuthoritativeResponseCurves(simulationResults?.seatResponses), [simulationResults]);
   const { rspRawCurve, perSeatRawCurves } = useMemo(() => {
-    if (!integration.enabled) return subOnlyResponseCurves;
+    if (!assessCombined) return subOnlyResponseCurves;
     if (!combinedSystem?.available) return { rspRawCurve: [], perSeatRawCurves: [] };
     return {
       rspRawCurve: combinedSystem.combinedBySeat.rsp || [],
@@ -607,7 +615,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
         responseData: combinedSystem.combinedBySeat[seat.id] || [],
       })),
     };
-  }, [integration.enabled, combinedSystem, subOnlyResponseCurves, seatingPositions]);
+  }, [assessCombined, combinedSystem, subOnlyResponseCurves, seatingPositions]);
   const designEqSystemLimits = useMemo(() => {
     const usable = sources.map((sub) => MODELS.find((model) => model.key === normaliseModelKey(sub.modelKey))?.approvedUsableLfHzMinus6dB).filter(Number.isFinite);
     return {
@@ -637,8 +645,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention,
     reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
     splConfig, optimisationTransitionHz,
-    combinedResponseIdentity: integration.enabled
-      ? { version: "combined-lcr-sub-v1", sources: lcrSources, crossover } : null,
+    combinedResponseIdentity: assessCombined ? integrationIdentity : null,
     houseCurveFingerprint: computeHouseCurveFingerprint(ARTCOUSTIC_HOUSE_CURVE),
     assessmentStartHz: 20, assessmentEndHz: 200,
     activeFitProfile: null,
@@ -657,7 +664,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     disableModalPropagationPhase, mute68HzAxialMode, debugDisableModalContribution, rewParityFieldMode,
     overrideConstantAxialQ, overrideAbsorptionAxialQ, debugMode200Multiplier, debugModalPhaseConvention,
     reflectionGainScale, debugModalHSign, rewParityModalMagnitudeScale, modalCoherenceMode, highOrderAxialScale,
-    splConfig, optimisationTransitionHz, requested, productCapabilities, integration.enabled, lcrSources, crossover]);
+    splConfig, optimisationTransitionHz, requested, productCapabilities, assessCombined, integrationIdentity]);
   const fingerprints = useMemo(() => {
     if (analysisBlocked) return null;
     return {
@@ -671,13 +678,13 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       baseDesign: computeBaseDesignFingerprint(fingerprintInputs),
     };
   }, [fingerprintInputs, analysisBlocked]);
-  const payload = useMemo(() => ({ cancellationComplexTransfers: combinedSystem?.rspComplexTransfers || null, responseBasis: integration.enabled ? "combined-lcr-sub" : "sub-only", crossover: integration.enabled ? crossover : null, rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves, selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel, p18TargetBasis: requested.p18TargetBasis, selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz }), [combinedSystem, crossover, integration.enabled, rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.p18TargetBasis, requested.selectedP18RequiredExtensionHz]);
+  const payload = useMemo(() => ({ cancellationComplexTransfers: assessCombined ? combinedSystem?.rspComplexTransfers || null : null, responseBasis: assessCombined ? "combined-lcr-sub" : "sub-only", crossover: assessCombined ? crossover : null, rawCurve: rspRawCurve, activeSubs: sources, usableLfHz: designEqSystemLimits.usableLfHz, transitionHz: optimisationTransitionHz, correctionEndHz: 200, perSeatRawCurves, selectedP14TargetDb: requested.selectedP14TargetDb, p14TargetBasis: requested.p14TargetBasis, p14TargetLevel: requested.requestedLevel, p18TargetBasis: requested.p18TargetBasis, selectedP18RequiredExtensionHz: requested.selectedP18RequiredExtensionHz }), [combinedSystem, crossover, assessCombined, rspRawCurve, sources, designEqSystemLimits.usableLfHz, optimisationTransitionHz, perSeatRawCurves, requested.selectedP14TargetDb, requested.p14TargetBasis, requested.requestedLevel, requested.p18TargetBasis, requested.selectedP18RequiredExtensionHz]);
   const inputsValid = !!rspPosition && seatingPositions.length > 0 && rspRawCurve.length > 0 && sources.length > 0 && [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM].every((value) => Number(value) > 0);
   const blockedReason = analysisBlocked
     ? (instanceStatus === INSTANCE_STATUS.ERROR ? "subwoofer_instance_error" : "subwoofer_instances_uninitialised")
     : simulationState.request === simulationRequest && simulationState.status === "error"
       ? simulationState.error || "authoritative_simulation_error"
-      : simulationReady && integration.enabled && !combinedSystem?.available
+      : simulationReady && assessCombined && !combinedSystem?.available
         ? "combined_response_unavailable"
         : null;
   const hasManualRequest = !!analysisRequestId && !!analysisRequestFingerprint && analysisRequestFingerprint === fingerprints?.geometry;
@@ -698,7 +705,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     rspRawCurve, perSeatRawCurves, perSourceRspComplexTransfers,
     canonicalRoomResponseCurve,
     crossover, setCrossover, crossoverLimits, lcrSources, combinedSystem, integrationTransfers,
-    combinedAuthorityEnabled: integration.enabled, subOnlyResponseCurves,
+    combinedAuthorityEnabled: integration.enabled, integrationIdentity, assessCombined, subOnlyResponseCurves,
     designEqSystemLimits, optimisationTransitionHz, requested,
     fingerprintInputs, fingerprints, payload, inputsValid, physics, runSimulation,
     autoAlignEnabled, setAutoAlignEnabled, autoAlignDelays, roomDamping, setRoomDamping,
