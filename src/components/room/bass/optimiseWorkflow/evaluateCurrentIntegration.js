@@ -9,7 +9,7 @@ export function evaluateCurrentIntegration(authoritative) {
   return evaluateStage2Confirmation({
     rspRawCurve: a.combinedSystem.combinedBySeat.rsp,
     perSeatRawCurves: a.seatingPositions.map(s => ({seatId:s.id,
-      isPrimary:s.priority === "primary", responseData:a.combinedSystem.combinedBySeat[s.id] || []})),
+      isPrimary:s.priority !== "secondary", responseData:a.combinedSystem.combinedBySeat[s.id] || []})),
     sources:a.sources, usableLfHz:a.designEqSystemLimits.usableLfHz,
     transitionHz:a.optimisationTransitionHz, seatPriorityMap:[...buildSeatPriorityMap(a.seatingPositions)],
     perSourceRspComplexTransfers:a.perSourceRspComplexTransfers,

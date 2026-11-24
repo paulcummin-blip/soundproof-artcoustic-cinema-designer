@@ -1,3 +1,4 @@
+import { adiIntegrationNeedsReview } from "../bassAssessmentBasis";
 import { evaluateCurrentIntegration } from "./evaluateCurrentIntegration";
 // OptimiseAndCalculate.jsx
 // Unified Optimise & Calculate workflow component.
@@ -270,6 +271,8 @@ export default function OptimiseAndCalculate({
     frontSubsCfg,rearSubsCfg,amplifierPowerPerSubW:resolvedAmplifierPowerPerSubW};
   const performElectronicUpdate=async receipt=>{
     const before=receipt.before,after=receipt.after;
+    const verifyIntegration = receipt.integrationResponseBasis === "combined-lcr-sub" ||
+      (!receipt.integrationResponseBasis && !!receipt.physicalContext?.integrationContext);
     // PER-COMMIT preCommitCacheKey: the cacheKey is captured immediately before
     // EACH commit (apply and restore) inside commit(), not once before the
     // transaction. A single key captured once is the BASELINE; using it for the
@@ -324,7 +327,7 @@ export default function OptimiseAndCalculate({
           identityGuard:()=>{const live=liveElectronicRef.current;return !!live && live.projectId===projectId && live.versionId===versionId && !!io.current();},
           authoritativeSettingsMatch:()=>recommendationSettingsMatch(sharedRef.current?.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning}),
           noOp:stable(before.instances) === stable(after.instances),
-          allowReuseExisting:!receipt.integrationResponseBasis || sharedRef.current?.authoritative?.status === "ready",
+          allowReuseExisting:!verifyIntegration || sharedRef.current?.authoritative?.status === "ready",
           waitForPublication:(ref,phRef)=>waitForCurrentPublication(ref,phRef),
         });
         const writeDiag=(d)=>{const rec={phase:"recalculating",...d,preCommitCacheKey,
@@ -348,7 +351,7 @@ export default function OptimiseAndCalculate({
           return false;
         }
         const settingsMatch=recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning});
-        const actualResult = receipt.integrationResponseBasis === "combined-lcr-sub"
+        const actualResult = verifyIntegration
           ? evaluateCurrentIntegration(state.authoritative)
           : extractAuthorityForComparison(state.completedBassAuthority);
         const resultMatch=comparisonResultsMatch(actualResult,expected);
@@ -1663,6 +1666,13 @@ export default function OptimiseAndCalculate({
 
   return (
     <div className="space-y-3">
+      {adiIntegrationNeedsReview(appState?.splConfig?.bassAdiReceipt, shared?.authoritative?.integrationIdentity) && !adiWorkflowRunning && (
+        <p className="rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-3 text-[12px] text-[#3E4349]" role="status">
+          Speaker or crossover settings have changed since ADI checked their integration.
+          Run ADI again to review the integration. Your subwoofer assessment remains available.
+        </p>
+      )}
+
       {/* ── Run ADI Bass Optimiser / progress ──
            Presentation only, driven by the ADI WORKFLOW state — never by
            hasCurrentResult or the stale lifecycle state:
