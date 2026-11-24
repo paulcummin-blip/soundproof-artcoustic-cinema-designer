@@ -36,15 +36,19 @@ export function reportClientFailure({code,operation='application',error,detail,s
   queue.push({payload,at:Date.now(),userId:context.userId||null});queue=queue.slice(-20);persist();void flushExperienceIncidents();
  }catch{/* Monitoring must never break the user's action. */}
 }
-const excluded=/^(recordClientExperienceIncident|recordReportReadinessIncident|manageMonitoredOperation|manageSystemHealthConfig)$/;
+const excluded=/^(recordClientExperienceIncident|recordReportReadinessIncident|manageMonitoredOperation|manageSystemHealthConfig|generateProposal)$/;
 export function instrumentClientExperience(client){
  const wrap=(fn,owner,operation)=>function(...args){
   const scope=getExperienceContext();
   // Capture only operation names; never request arguments, form values or files.
+  const operationId=typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : `ux-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let monitorStart=null;
+  const slow=setTimeout(()=>{if(transport)monitorStart=transport('manageMonitoredOperation',{action:'start',operation_id:operationId,operation_type:'client_request',project_id:scope.projectId||null,version_id:scope.versionId||null,initial_stage:operation}).catch(()=>null);},15000);
+  const finish=()=>{clearTimeout(slow);clearTimeout(timeout);if(monitorStart)void monitorStart.then(r=>{if(r?.data?.recorded)return transport('manageMonitoredOperation',{action:'complete',operation_id:operationId});}).catch(()=>{});};
   const timeout=setTimeout(()=>reportClientFailure({code:'DATA_REQUEST_STALLED',operation,...scope,detail:'Request has not settled after 120 seconds.'}),120000);
-  let result;try{result=fn.apply(owner,args);}catch(error){clearTimeout(timeout);throw error;}
-  return Promise.resolve(result).then(value=>{clearTimeout(timeout);return value;},error=>{
-   clearTimeout(timeout);
+  let result;try{result=fn.apply(owner,args);}catch(error){finish();throw error;}
+  return Promise.resolve(result).then(value=>{finish();return value;},error=>{
+   finish();
    if(requestFailureWarrantsAlert(error))reportClientFailure({code:'DATA_REQUEST_FAILED',operation,...scope,error,
     detail:`Request failed. HTTP status: ${error?.response?.status||error?.status||'unavailable'}. ${safeDiagnostic(error?.message,300)}`});
    throw error;
@@ -56,7 +60,7 @@ export function instrumentClientExperience(client){
  }});
  const entities=new Proxy(client.entities,{get(target,entity){
   const api=Reflect.get(target,entity);if(!api||typeof api!=='object')return api;
-  return new Proxy(api,{get(owner,method){const fn=Reflect.get(owner,method);return typeof fn==='function'?wrap(fn,owner,`data:${String(entity)}.${String(method)}`):fn;}});
+  return new Proxy(api,{get(owner,method){const fn=Reflect.get(owner,method);return typeof fn==='function' && /^(get|list|filter|create|update|delete|bulkCreate|deleteMany|updateMany|importEntities|bulkDelete)$/.test(String(method))?wrap(fn,owner,`data:${String(entity)}.${String(method)}`):typeof fn==='function'?fn.bind(owner):fn;}});
  }});
  return new Proxy(client,{get(target,key){if(key==='functions')return functionClient;if(key==='entities')return entities;return Reflect.get(target,key);}});
 }

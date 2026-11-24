@@ -1,3 +1,4 @@
+import {recordSystemIncident} from "./incidentRecorder.js";
 /**
  * operationMonitor.js (shared)
  * ----------------------------
@@ -22,6 +23,7 @@
 export const OPERATION_TYPE = Object.freeze({
   PROPOSAL_GENERATION: 'proposal_generation',
   REPORT_EXPORT: 'report_export',
+  CLIENT_REQUEST: 'client_request',
 });
 
 /**
@@ -35,6 +37,7 @@ export const OPERATION_TYPE = Object.freeze({
  * Report export: 15 min suspected, 30 min confirmed (PDF capture can be slow).
  */
 export const STALL_THRESHOLDS = Object.freeze({
+  client_request: { suspected_ms: 120000, confirmed_ms: 180000 },
   proposal_generation: { suspected_ms: 10 * 60 * 1000, confirmed_ms: 20 * 60 * 1000 },
   report_export: { suspected_ms: 15 * 60 * 1000, confirmed_ms: 30 * 60 * 1000 },
 });
@@ -49,6 +52,7 @@ export function stallSeverity(operationType) {
     case OPERATION_TYPE.PROPOSAL_GENERATION:
       return 'high';
     case OPERATION_TYPE.REPORT_EXPORT:
+    case OPERATION_TYPE.CLIENT_REQUEST:
       return 'high';
     default:
       return 'medium';
@@ -70,6 +74,7 @@ export async function startOperation(serviceClient, {
   version_id = null,
   proposal_id = null,
   initial_stage = 'started',
+  initiated_by = null,
   test_run_id = null,
 }) {
   try {
@@ -77,6 +82,7 @@ export async function startOperation(serviceClient, {
     await serviceClient.asServiceRole.entities.MonitoredOperation.create({
       operation_id,
       operation_type,
+      initiated_by,
       account_id,
       project_id,
       version_id,
@@ -181,6 +187,16 @@ export async function failOperation(serviceClient, {
     const record = extractRecord(existing);
     if (!record) return { recorded: false, error: 'Operation not found' };
 
+    if (!incident_reference) {
+      const incident = await recordSystemIncident(serviceClient, {
+        component:'operation_monitoring',operation:record.operation_type,error_code:error_code || 'UNEXPECTED_ERROR',severity:'high',
+        account_id:record.account_id,project_id:record.project_id,version_id:record.version_id,
+        diagnostic_summary:diagnostic_summary || 'The monitored operation failed.',
+        operation_id,stage_failed:record.current_stage,stage_timeline:record.stage_timeline,
+        data_committed,data_integrity_summary,
+      });
+      incident_reference=incident?.reference || null;
+    }
     await serviceClient.asServiceRole.entities.MonitoredOperation.update(record.id, {
       state: 'failed',
       error_code: error_code || 'UNKNOWN',

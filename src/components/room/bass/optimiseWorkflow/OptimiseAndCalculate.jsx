@@ -353,7 +353,7 @@ export default function OptimiseAndCalculate({
         }
         const settingsMatch=recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning});
         const actualResult = verifyIntegration
-          ? evaluateCurrentIntegration(state.authoritative)
+          ? evaluateCurrentIntegration(state.authoritative, receipt.confirmationCorrectability)
           : extractAuthorityForComparison(state.completedBassAuthority);
         const resultMatch=comparisonResultsMatch(actualResult,expected);
         if(!settingsMatch||!resultMatch){
@@ -1161,6 +1161,7 @@ export default function OptimiseAndCalculate({
           schemaVersion:1,projectId,versionId,runId:activeRun.runId,candidateId:candidate.candidateId,
           inputIdentity:result.inputIdentityAuthority,baselineCacheKey:candidate.baselineCacheKey,
           physicalContext:physicalContext(context),before:prepared.before,
+          confirmationCorrectability:candidate.confirmationCorrectability || null,
           integrationResponseBasis: candidate.responseBasis || (context.integrationContext ? "combined-lcr-sub" : "sub-only"),
           after:{instances:prepared.instances,crossover:prepared.crossover},
           beforeResult:comparisonReceipt(baseline),expectedResult:comparisonReceipt(candidate),

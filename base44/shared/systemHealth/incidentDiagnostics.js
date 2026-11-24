@@ -31,6 +31,13 @@ export function classifyCause(errorCode, component = '') {
 
   // Direct failures where the error code states the cause.
   const confirmedCauses = {
+    CONTROLLED_ALERT_TEST:'Controlled administrator test; no dealer failure occurred.',
+    RENDER_FAILED:'A React render boundary caught an exception. The stack identifies the affected component; the underlying defect needs investigation.',
+    RENDER_VALUE_REJECTED:'The render boundary rejected a non-renderable child. Its JavaScript type is recorded.',
+    DATA_REQUEST_FAILED:'An application data request returned an error; the operation and HTTP status are recorded.',
+    PROJECT_LOAD_FAILED:'The project opening authority reported a failed restore stage.',
+    BASS_CALCULATION_FAILED:'The bass calculation authority reported a failure or timeout.',
+    ADI_OPTIMISATION_FAILED:'The ADI workflow reported a failure or timeout.',
     REPORT_SAVED_EVIDENCE_REJECTED: 'The report readiness gate rejected saved engineering evidence after loading completed. The recorded fingerprints identify the disagreement; its underlying cause requires investigation.',
     REPORT_EVIDENCE_READ_FAILED: 'Saved engineering evidence could not be read or restored for the report.',
     DRAFT_REJECTED: 'The proposal writer produced a draft that failed the validation contract. The violation codes are recorded in the diagnostic summary.',
@@ -52,7 +59,7 @@ export function classifyCause(errorCode, component = '') {
 
   // Circumstantial evidence: the watchdog detected no progress, but the
   // underlying cause is not confirmed by an error response.
-  if (code === 'OPERATION_STALLED') {
+  if (['OPERATION_STALLED','DATA_REQUEST_STALLED','PROJECT_LOAD_STALLED','UI_UNRESPONSIVE'].includes(code)) {
     return {
       cause_classification: 'suspected',
       cause_summary: 'The operation stopped reporting progress. The watchdog confirmed no progress for the stall threshold duration. The underlying cause (provider failure, browser crash, network loss, or code defect) has not been confirmed by an error response.',
@@ -77,6 +84,9 @@ export function classifyCause(errorCode, component = '') {
 export function determineUserImpact(errorCode, component = '') {
   const code = errorCode || 'UNKNOWN';
 
+  if (code === 'CONTROLLED_ALERT_TEST') return {user_blocked:false,workaround_available:null};
+  if (['RENDER_FAILED','RENDER_VALUE_REJECTED','PROJECT_LOAD_FAILED','BASS_CALCULATION_FAILED','ADI_OPTIMISATION_FAILED'].includes(code)) return {user_blocked:true,workaround_available:null};
+
   // Pre-condition failures: the user cannot proceed until the condition is
   // fixed. No workaround is available — they must regenerate the report or
   // fix the evidence.
@@ -92,7 +102,7 @@ export function determineUserImpact(errorCode, component = '') {
   // Watchdog stall: the user may or may not still be waiting. The operation
   // might still be running, or the browser may have crashed. We cannot
   // determine whether the user is blocked without more information.
-  if (code === 'OPERATION_STALLED') {
+  if (['OPERATION_STALLED','DATA_REQUEST_STALLED','PROJECT_LOAD_STALLED','UI_UNRESPONSIVE'].includes(code)) {
     return { user_blocked: null, workaround_available: null };
   }
 

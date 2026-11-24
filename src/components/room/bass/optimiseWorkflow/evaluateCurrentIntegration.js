@@ -2,7 +2,7 @@ import { evaluateStage2Confirmation, buildSeatPriorityMap } from "../stage2/stag
 
 // Read the actual, committed integration response through the existing ADI
 // confirmation authority. This never changes or republishes ordinary bass.
-export function evaluateCurrentIntegration(authoritative) {
+export function evaluateCurrentIntegration(authoritative, correctabilityAssessment = null) {
   const a = authoritative;
   if (!a?.combinedSystem?.available || a.status !== "ready") return null;
   const req = a.requested;
@@ -16,5 +16,5 @@ export function evaluateCurrentIntegration(authoritative) {
     cancellationComplexTransfers:a.combinedSystem.rspComplexTransfers,
     integrationTransfers:a.integrationTransfers, crossover:a.crossover,
   }, {p14TargetBasis:req.p14TargetBasis, p14TargetLevel:req.requestedLevel,
-    p14TargetDb:req.selectedP14TargetDb, p18TargetBasis:req.p18TargetBasis});
+    p14TargetDb:req.selectedP14TargetDb, p18TargetBasis:req.p18TargetBasis, correctabilityAssessment});
 }
