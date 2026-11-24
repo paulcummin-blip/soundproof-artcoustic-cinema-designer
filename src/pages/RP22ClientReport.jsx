@@ -1,3 +1,4 @@
+import useReportFailureMonitoring from '@/components/systemHealth/useReportFailureMonitoring';
 /**
  * RP22ClientReport
  * ----------------
@@ -1013,6 +1014,14 @@ export default function RP22ClientReport() {
     snapshotStatus: reportSnapshot.status,
     gateResult: readiness.state,
     blockReason: readiness.reason || authority.reportCompleteness?.reason || null,
+  });
+
+  useReportFailureMonitoring({
+    projectId, versionId: authority.versionId, reportType: 'project',
+    loading: authority.hydrating || savedReport.loading,
+    readFailed: authorityReadFailed,
+    blocked: authority.reportComplete === false,
+    hasSavedEvidence: !!authority.publication || !!engineeringSummary || !!reportSnapshot.saved,
   });
 
   const handleBackToProject = () => {

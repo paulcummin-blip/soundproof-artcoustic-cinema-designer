@@ -1,3 +1,4 @@
+import useReportFailureMonitoring from '@/components/systemHealth/useReportFailureMonitoring';
 import React, { useEffect, useState, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { frozenReportAppState } from '@/components/report/frozenReportAppState';
@@ -332,6 +333,14 @@ function RP22ReportInner({ embed = false, p19Graph = null, completedBassAuthorit
         && !reportAuthority.reportComplete;
     const reportDataIncompleteReason = reportAuthority.reportCompleteness?.reason
         || "Complete every project assessment before generating reports or proposals.";
+
+    useReportFailureMonitoring({
+        projectId: explicitProjectId, versionId: reportVersionId, reportType: 'technical',
+        loading: embed || reportHydrating || authorityResolving || bassReportPending,
+        readFailed: authorityReadFailed || bassRestoreFailed,
+        blocked: reportDataIncomplete,
+        hasSavedEvidence: !!reportAuthority.publication || !!reportAuthority.version?.published_fingerprint,
+    });
 
     // ── Saved report snapshot (Technical Report) ────────────────────────────
     // The saved report is recorded against this project version when it is
