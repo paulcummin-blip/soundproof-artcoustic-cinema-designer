@@ -28,9 +28,17 @@ export function usePlanResizeObserver({ planBoundsRef, setContainerW, setContain
       setContainerW((prev) => (prev === w ? prev : w));
       setContainerH((prev) => {
         const section = el.closest('section');
-        const toolbarHeight = section
+        let toolbarHeight = section
           ? Math.max(0, el.getBoundingClientRect().top - section.getBoundingClientRect().top)
           : 0;
+        // Focus/scrollIntoView can scroll an overflow-hidden ancestor. Its
+        // scroll offset is not a toolbar resize either.
+        let ancestor = el.parentElement;
+        while (section && ancestor) {
+          toolbarHeight += ancestor.scrollTop || 0;
+          if (ancestor === section) break;
+          ancestor = ancestor.parentElement;
+        }
         const next = section
           ? planFitHeight(win.innerHeight, toolbarHeight)
           : Math.max(420, h);
