@@ -105,6 +105,26 @@ export function usePlanWheelZoom({
     return () => el.removeEventListener("wheel", onWheel);
   }, [planBoundsRef, svgRef, setZoom, setPanX, setPanY]);
 
+  // Temporary read-only wheel audit; removed after runtime validation.
+  useEffect(() => {
+    const el = planBoundsRef.current;
+    const doc = el?.ownerDocument;
+    if (!doc) return;
+    const rect = (node) => node?.getBoundingClientRect().toJSON();
+    const describe = (node) => node?.tagName ? node.tagName + (node.getAttribute?.("class") ? "." + node.getAttribute("class") : "") : "window";
+    const record = (event) => {
+      const before = { ...stateRef.current };
+      const data = { x: event.clientX, y: event.clientY, deltaY: event.deltaY, ctrlKey: event.ctrlKey,
+        target: describe(event.target), path: event.composedPath().map(describe),
+        hit: describe(doc.elementFromPoint(event.clientX, event.clientY)),
+        wrapper: rect(el), svg: rect(svgRef.current), before,
+        scrolls: [...doc.querySelectorAll("*")].filter(n => n.scrollTop).map(n => ({node:describe(n),top:n.scrollTop})) };
+      requestAnimationFrame(() => console.info("[plan-wheel-audit]", JSON.stringify({...data, after:{...stateRef.current}, prevented:event.defaultPrevented})));
+    };
+    doc.addEventListener("wheel", record, {capture:true, passive:true});
+    return () => doc.removeEventListener("wheel",record,true);
+  }, [planBoundsRef, svgRef]);
+
   const resetView = useCallback(() => {
     setZoom(1);
     setPanX(0);
