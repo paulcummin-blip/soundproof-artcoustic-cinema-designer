@@ -539,10 +539,11 @@ export async function recordSystemIncident(serviceClient, details) {
     data_committed = null,
     data_integrity_summary = null,
     test_run_id = null,
+    grouping_scope = null,
   } = details;
 
   const fingerprint = computeIncidentFingerprint({
-    component, operation, errorCode: error_code, violationCodes: [],
+    component, operation, errorCode: error_code, violationCodes: grouping_scope ? [grouping_scope] : [],
   });
 
   const now = new Date().toISOString();

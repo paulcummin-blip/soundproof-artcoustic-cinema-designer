@@ -31,6 +31,8 @@ export function classifyCause(errorCode, component = '') {
 
   // Direct failures where the error code states the cause.
   const confirmedCauses = {
+    REPORT_SAVED_EVIDENCE_REJECTED: 'The report readiness gate rejected saved engineering evidence after loading completed. The recorded fingerprints identify the disagreement; its underlying cause requires investigation.',
+    REPORT_EVIDENCE_READ_FAILED: 'Saved engineering evidence could not be read or restored for the report.',
     DRAFT_REJECTED: 'The proposal writer produced a draft that failed the validation contract. The violation codes are recorded in the diagnostic summary.',
     SECTION_MAPPING_FAILED: 'The validated copy could not be mapped to the proposal section structure. The unmapped section types are recorded.',
     PROVIDER_FAILED: 'The AI provider returned an error or no response.',
@@ -78,7 +80,7 @@ export function determineUserImpact(errorCode, component = '') {
   // Pre-condition failures: the user cannot proceed until the condition is
   // fixed. No workaround is available — they must regenerate the report or
   // fix the evidence.
-  if (['WRITER_REFUSAL', 'EVIDENCE_READ_FAILED', 'READINESS_GATE_FAILED', 'COMPARISON_EVIDENCE_MISSING', 'COMPARISON_TABLE_EMPTY'].includes(code)) {
+  if (['REPORT_SAVED_EVIDENCE_REJECTED', 'REPORT_EVIDENCE_READ_FAILED', 'WRITER_REFUSAL', 'EVIDENCE_READ_FAILED', 'READINESS_GATE_FAILED', 'COMPARISON_EVIDENCE_MISSING', 'COMPARISON_TABLE_EMPTY'].includes(code)) {
     return { user_blocked: true, workaround_available: false };
   }
 

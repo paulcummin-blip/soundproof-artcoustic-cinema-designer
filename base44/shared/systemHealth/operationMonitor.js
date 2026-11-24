@@ -42,14 +42,14 @@ export const STALL_THRESHOLDS = Object.freeze({
 /**
  * Determine the severity of a confirmed stall for a given operation type.
  * Proposal generation stall = high (dealer is waiting, needs email alert).
- * Report export stall = medium (dealer can retry, no immediate alert).
+ * Report export stall = high (dealer cannot finish; alert the administrator).
  */
 export function stallSeverity(operationType) {
   switch (operationType) {
     case OPERATION_TYPE.PROPOSAL_GENERATION:
       return 'high';
     case OPERATION_TYPE.REPORT_EXPORT:
-      return 'medium';
+      return 'high';
     default:
       return 'medium';
   }
