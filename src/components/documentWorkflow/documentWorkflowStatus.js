@@ -115,7 +115,7 @@ function findAnyExport(exports, versionId, documentType) {
  * Resolve the state of one workflow step from stored records and in-session
  * generation signals.
  *
- * @returns {{state: string, record?: Object, reason?: string}}
+ * @returns {{state: string, record?: Object, reason?: string, freshnessReason?: string|null}}
  */
 export function resolveWorkflowStepState({
   exports = [],
@@ -124,6 +124,7 @@ export function resolveWorkflowStepState({
   engineeringFingerprint = null,
   isGenerating = false,
   generationError = null,
+  freshnessReason = null,
 }) {
   if (isGenerating) {
     return { state: WORKFLOW_STATE.GENERATING };
@@ -137,7 +138,7 @@ export function resolveWorkflowStepState({
   }
   const anyExport = findAnyExport(exports, versionId, documentType);
   if (anyExport) {
-    return { state: WORKFLOW_STATE.OUTDATED, record: anyExport };
+    return { state: WORKFLOW_STATE.OUTDATED, record: anyExport, freshnessReason };
   }
   return { state: WORKFLOW_STATE.NOT_CREATED };
 }
@@ -146,6 +147,9 @@ export function resolveWorkflowStepState({
  * The full workflow status for one version, from stored exports and the
  * Speaker Design in-session generation signal.
  *
+ * @param {Object} [options.freshnessReasons]  map of documentType → human-readable
+ *   reason for the OUTDATED state, computed from the saved and current
+ *   publications' frozen facts. Passed through unchanged to each step.
  * @returns {{loading: boolean, technicalReport, speakerDesign, proposalAvailable: boolean}}
  */
 export function resolveWorkflowStatus({
@@ -154,12 +158,14 @@ export function resolveWorkflowStatus({
   engineeringFingerprint = null,
   speakerDesignGenerating = false,
   speakerDesignError = null,
+  freshnessReasons = {},
 }) {
   const technicalReport = resolveWorkflowStepState({
     exports,
     versionId,
     documentType: TECHNICAL_REPORT_TYPE,
     engineeringFingerprint,
+    freshnessReason: freshnessReasons[TECHNICAL_REPORT_TYPE] || null,
   });
   const speakerDesign = resolveWorkflowStepState({
     exports,
@@ -168,6 +174,7 @@ export function resolveWorkflowStatus({
     engineeringFingerprint,
     isGenerating: speakerDesignGenerating,
     generationError: speakerDesignError,
+    freshnessReason: freshnessReasons[SPEAKER_DESIGN_TYPE] || null,
   });
   const proposalAvailable =
     technicalReport.state === WORKFLOW_STATE.READY
@@ -184,6 +191,7 @@ export function resolveWorkflowStatus({
     versionId,
     documentType: 'proposal',
     engineeringFingerprint,
+    freshnessReason: freshnessReasons.proposal || null,
   });
   return { technicalReport, speakerDesign, clientProposal, proposalAvailable };
 }

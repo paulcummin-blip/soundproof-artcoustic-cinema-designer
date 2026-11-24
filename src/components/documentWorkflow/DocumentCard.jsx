@@ -161,7 +161,9 @@ export default function DocumentCard({
         <p className="text-[10px] text-[#B23A3A] leading-snug">{reason}</p>
       )}
       {state === WORKFLOW_STATE.OUTDATED && (
-        <p className="text-[10px] text-[#B37A2B] leading-snug">The saved PDF is from an earlier design.</p>
+        <p className="text-[10px] text-[#B37A2B] leading-snug">
+          {reason || 'Document source could not be verified.'}
+        </p>
       )}
       {onOpen && (state === WORKFLOW_STATE.OUTDATED || state === WORKFLOW_STATE.FAILED) && (
         <button

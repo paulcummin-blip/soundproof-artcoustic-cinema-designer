@@ -176,6 +176,14 @@ export default function DocumentWorkflowPanel({
   if (trState !== WORKFLOW_STATE.READY) missingPrerequisites.push('Technical Report');
   if (sdState !== WORKFLOW_STATE.READY) missingPrerequisites.push('Speaker Design');
 
+  // The Outdated message is the meaningful freshness reason — the design
+  // changes between the saved and current publications. The Failed message is
+  // the generation error; the Not Available message is the missing-prerequisite
+  // note. These are mutually exclusive states, so each card receives the reason
+  // that applies to its current state.
+  const trDisplayReason = trState === WORKFLOW_STATE.OUTDATED ? technicalReport.freshnessReason : technicalReport.reason;
+  const sdDisplayReason = sdState === WORKFLOW_STATE.OUTDATED ? speakerDesign.freshnessReason : speakerDesign.reason;
+
   const trLabel = resolveStepDisplayLabel(WORKFLOW_STEP.TECHNICAL_REPORT, trState);
   const sdLabel = resolveStepDisplayLabel(WORKFLOW_STEP.SPEAKER_DESIGN, sdState);
   const cpLabel = resolveStepDisplayLabel(WORKFLOW_STEP.CLIENT_PROPOSAL, cpState, proposalAvailable);
@@ -193,6 +201,9 @@ export default function DocumentWorkflowPanel({
   const cpReason = cpIsUnavailable && missingPrerequisites.length > 0
     ? `Available once the ${missingPrerequisites.join(' and ')} have been created.`
     : null;
+  const cpDisplayReason = cpState === WORKFLOW_STATE.OUTDATED
+    ? (clientProposal?.freshnessReason || null)
+    : cpReason;
 
   return (
     <div className="space-y-2.5">
@@ -204,7 +215,7 @@ export default function DocumentWorkflowPanel({
           icon={FileText}
           state={trState}
           stateLabel={trLabel}
-          reason={technicalReport.reason}
+          reason={trDisplayReason}
           canAct={trCanAct}
           actLabel={trActLabel}
           onAct={handleTechnicalReportAct}
@@ -221,7 +232,7 @@ export default function DocumentWorkflowPanel({
           icon={Speaker}
           state={sdState}
           stateLabel={sdLabel}
-          reason={speakerDesign.reason}
+          reason={sdDisplayReason}
           canAct={sdCanAct}
           actLabel={sdActLabel}
           onAct={handleSpeakerDesignAct}
@@ -236,7 +247,7 @@ export default function DocumentWorkflowPanel({
         icon={Presentation}
         state={cpState}
         stateLabel={cpLabel}
-        reason={cpReason}
+        reason={cpDisplayReason}
         canAct={cpCanAct}
         actLabel={cpActLabel}
         onAct={handleClientProposalAct}
