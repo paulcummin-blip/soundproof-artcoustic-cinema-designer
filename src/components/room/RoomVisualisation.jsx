@@ -1144,7 +1144,7 @@ const byId = useEntitiesById({
     }
   }, [appState, getCanonicalRole]);
 
-  // Direct mouse/trackpad wheel zoom (replaces click-to-zoom toolbar controls)
+  // Plan navigation: scroll pans; pinch and the on-canvas buttons zoom.
   const { resetView, isNonDefault: viewIsNonDefault, zoomIn, zoomOut } = usePlanWheelZoom({
     planBoundsRef,
     svgRef,
