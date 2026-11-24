@@ -159,14 +159,9 @@ export function buildPillarOverview(liveSummary) {
 }
 
 // Format the hover detail line for a single limiting parameter.
+// Presentation only: the parameter number and its exact headline, matching the
+// Live RP22 Performance Summary. Seat numbers, row references and room-wide
+// labels are intentionally omitted. Each parameter appears once per pillar.
 export function formatLimiterDetail(limiter) {
-  const head = `P${limiter.paramId}. ${limiter.title}`;
-  if (limiter.scope === "Seat") {
-    const seats = (limiter.seats || [])
-      .map((s) => `Row ${s.row} Seat ${s.column}`)
-      .join(", ");
-    return seats ? `${head} — ${seats}` : `${head} — Seat`;
-  }
-  if (limiter.scope === "RSP") return `${head} — RSP (Reference Seat)`;
-  return `${head} — Room-wide`;
+  return `P${limiter.paramId}. ${limiter.title}`;
 }
