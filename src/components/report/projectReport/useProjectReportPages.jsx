@@ -55,10 +55,11 @@ import { buildReportVisualContext } from "@/shared/reportVisualContext";
 import { useProjectLibraryImages } from "@/components/library/useProjectLibraryImages";
 import { useReportDesignIntent } from "@/components/report/projectReport/useReportDesignIntent";
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
-import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
+import AdiPillarHighlightsPage from "@/components/report/projectReport/AdiPillarHighlightsPage";
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
-import { buildAdiDesignHighlights, productEntries } from "@/components/report/projectReport/adiDesignHighlights";
+import { productEntries } from "@/components/report/projectReport/adiDesignHighlights";
+import { buildAdiPillarHighlights } from "@/components/report/projectReport/adiPillarHighlights";
 import { buildViewingExperienceNarrative } from "@/components/report/projectReport/viewingExperienceAuthority";
 
 export function useProjectReportPages({
@@ -181,23 +182,19 @@ export function useProjectReportPages({
   // exists: a 5.1 system is a deliberate 5.1 system, not a missing immersive one.
   const overheadLayerInstalled = productEntries(productsSelected, 'overheads').length > 0;
 
-  // The ADI Design Highlights page's content: EXACTLY FOUR Key Performance themes
-  // — Spatial Resolution, Timbre Matching, Dynamic Range and Bass Performance —
-  // each grounded in this design's own frozen evidence: its published RP22 and
-  // RP23 results and their seat scope, the products specified and the architecture.
-  // The four themes are the page's whole content, and the list is already fitted to
-  // its page budget, so the Highlights page can never clip.
-  const adiHighlights = useMemo(() => buildAdiDesignHighlights({
+  // The ADI Design Highlights page's content: the THREE RP22 performance pillars
+  // — Spatial Resolution, Dynamic Range and Timbre Matching — each with the
+  // adaptively-selected parameters ADI ranked strongest from this design's own
+  // frozen engineering evidence. Seat-specific parameters show every assessed
+  // seat's own published level; a compact RP22 Performance Overview table sits at
+  // the foot of the page. The content is the page's whole composition.
+  const adiHighlights = useMemo(() => buildAdiPillarHighlights({
     engineeringSummary,
     productsSelected,
     seatingPositions,
     roomDims,
     dolbyConfig: projectDetails?.dolby_config,
-    // The design's own 7-channel bed choice, so a 7-bed layout names the layer it
-    // actually holds (rears or wides) instead of guessing.
     sevenBedLayoutType: projectDetails?.seven_bed_layout_type,
-    // How the design's display is named in ADI's own copy: a television or a
-    // projection screen, read from the saved design's own authority.
     displayType: resolveDisplayType(projectDetails),
   }), [engineeringSummary, productsSelected, seatingPositions, roomDims, projectDetails]);
 
@@ -746,7 +743,7 @@ export function useProjectReportPages({
         type: "adi-highlights",
         highlights: adiHighlights,
       },
-      visual: <AdiDesignHighlightsPage highlights={adiHighlights} />,
+      visual: <AdiPillarHighlightsPage highlights={adiHighlights} />,
     };
 
     // 03 SYSTEM & PRODUCTS — the equipment brought forward: the complete
@@ -756,11 +753,14 @@ export function useProjectReportPages({
     // already stated the per-row viewing result: the viewing story then belongs
     // with the geometry table whose figures it explains, rather than being
     // repeated on both pages. Null whenever page 2 states it.
+    // The redesigned Highlights page states RP22 performance pillars only; it no
+    // longer states the per-row viewing result, so the viewing experience is
+    // always developed here, beside the geometry table whose figures it explains.
     const viewingNarrative = buildViewingExperienceNarrative({
       projectDetails,
       seatingPositions,
       engineeringSummary,
-      statedOnHighlightsPage: adiHighlights.some((highlight) => highlight.id === "viewing-geometry"),
+      statedOnHighlightsPage: false,
     });
 
     const systemProductsPage = {

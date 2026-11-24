@@ -34,7 +34,7 @@ import { useStraplineLogoWidth } from '@/components/report/useStraplineLogoWidth
 import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
 import { clientReportHeaderMeta } from '@/components/report/client/clientReportHeaderMeta';
 import ProjectReportDesignSummary from '@/components/report/projectReport/ProjectReportDesignSummary';
-import AdiDesignHighlightsPage from '@/components/report/projectReport/AdiDesignHighlightsPage';
+import AdiPillarHighlightsPage from '@/components/report/projectReport/AdiPillarHighlightsPage';
 import ProjectReportSystemOverview from '@/components/report/projectReport/ProjectReportSystemOverview';
 import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
 
@@ -188,7 +188,7 @@ export default function ClientReportPage({
             design's own frozen engineering evidence. The list arrives already
             fitted to this page's budget, so it cannot clip. */}
         {printData?.type === "adi-highlights" && (
-          <AdiDesignHighlightsPage highlights={printData.highlights} print />
+          <AdiPillarHighlightsPage highlights={printData.highlights} print />
         )}
         {/* 03 System & Products — the equipment brought forward, each layer's
             own engineering job and the viewing geometry of every seating row. */}
