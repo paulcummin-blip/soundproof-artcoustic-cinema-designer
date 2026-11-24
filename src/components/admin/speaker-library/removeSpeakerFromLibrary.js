@@ -56,7 +56,7 @@ export async function describeRemoval(row) {
   return assessDanglingRowRemoval(row);
 }
 
-export async function removeSpeakerFromLibrary({ row, actorName }) {
+export async function removeSpeakerFromLibrary({ row, actorName, force = false }) {
   if (row.productId) {
     const specs = await loadProductSpecs(row.productId);
     const product = await resolveProduct(row);
@@ -67,6 +67,12 @@ export async function removeSpeakerFromLibrary({ row, actorName }) {
     const linkedCompetitorRows = await loadLinkedCompetitorRows({ product: { id: row.productId }, specs, identity });
     const assessment = assessRemoval(product, specs, linkedCompetitorRows);
     if (assessment.mode === "archive") {
+      // Administrator may choose permanent deletion when no genuine external
+      // dependency requires retention. Archive remains the default.
+      if (force && assessment.canForceDelete) {
+        const result = await deleteProduct({ product, specs, actorName, linkedCompetitorRows, force: true });
+        return { mode: "delete", ...result };
+      }
       const result = await archiveProduct({ product, specs, actorName, linkedCompetitorRows });
       return { mode: "archive", ...result };
     }
@@ -90,6 +96,10 @@ export async function removeSpeakerFromLibrary({ row, actorName }) {
     const linkedCompetitorRows = await loadLinkedCompetitorRows({ product, specs, identity });
     const productAssessment = assessRemoval(product, specs, linkedCompetitorRows);
     if (productAssessment.mode === "archive") {
+      if (force && productAssessment.canForceDelete) {
+        const result = await deleteProduct({ product, specs, actorName, linkedCompetitorRows, force: true });
+        return { mode: "delete", ...result };
+      }
       const result = await archiveProduct({ product, specs, actorName, linkedCompetitorRows });
       return { mode: "archive", ...result };
     }

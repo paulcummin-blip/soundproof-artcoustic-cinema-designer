@@ -75,8 +75,30 @@ export async function loadLinkedCompetitorRows({ product, specs, identity }) {
 }
 
 /**
+ * Resolve the genuine external dependencies that would actually require a
+ * product to be retained. These are records owned by OTHER parts of the app
+ * (saved report snapshots, published engineering, projects, proposals) that
+ * point at this product or one of its comparison rows — NOT the product's own
+ * owned records (specifications, data-quality rows, comparison rows, audit
+ * history), which travel with the product and are cleaned up together.
+ *
+ * No part of the app stores competitor-speaker IDs on projects, proposals or
+ * reports, so in practice this is empty. It exists so a future reference can
+ * be added in one place without re-deriving the whole deletion policy.
+ *
+ * Returns an array of human-readable dependency descriptions. An empty array
+ * means nothing requires retention and an administrator may permanently delete.
+ */
+export function describeGenuineDependencies(linkedCompetitorRows = []) {
+  // No cross-entity references exist in the current data model. The only
+  // records linked to this product are its own spec/comparison/audit rows,
+  // which are removed (or, for audit, retained) by deleteProduct itself.
+  return [];
+}
+
+/**
  * Decide what removing this product actually means, from its own records.
- * @returns {object} { mode: 'archive'|'delete', headline, detail, actionLabel, specs }
+ * @returns {object} { mode: 'archive'|'delete', headline, detail, actionLabel, specs, canForceDelete, forceDetail }
  */
 export function assessRemoval(product, specs, linkedCompetitorRows = []) {
   const list = Array.isArray(specs) ? specs : [];
@@ -90,6 +112,8 @@ export function assessRemoval(product, specs, linkedCompetitorRows = []) {
   );
 
   if (publishedSpec || approvedSpec || referencedRow) {
+    const dependencies = describeGenuineDependencies(linkedCompetitorRows);
+    const canForceDelete = dependencies.length === 0;
     return {
       mode: "archive",
       specs: list,
@@ -101,6 +125,13 @@ export function assessRemoval(product, specs, linkedCompetitorRows = []) {
           ? "It has a published comparison row with technical values. Archiving retires it from the comparison list and keeps every value for audit."
           : "It has an approved specification. Archiving retires it from the active list and keeps the approved data for audit.",
       actionLabel: "Archive product",
+      canForceDelete,
+      dependencies,
+      forceHeadline: `Permanently delete ${product?.model || "this product"}?`,
+      forceDetail: canForceDelete
+        ? "No other records depend on it. Permanent deletion removes the product, its specification, its data-quality rows and its RP22 comparison row. A change-history entry is kept for audit. This cannot be undone."
+        : `It cannot be permanently deleted because: ${dependencies.join("; ")}. Archive it instead.`,
+      forceActionLabel: "Delete permanently",
     };
   }
 
@@ -111,6 +142,8 @@ export function assessRemoval(product, specs, linkedCompetitorRows = []) {
     headline: "Delete this draft product?",
     detail: "It has no approved specification and has never been published to RP22, so it can be removed permanently together with its draft specification, sources, data-quality notes and any incomplete comparison row.",
     actionLabel: "Delete permanently",
+    canForceDelete: true,
+    dependencies: [],
   };
 }
 
@@ -157,17 +190,17 @@ export async function archiveProduct({ product, specs, actorName, linkedCompetit
  * published. Change history is written FIRST so the record of the removal
  * outlives the product it describes.
  */
-export async function deleteProduct({ product, specs, actorName, linkedCompetitorRows = [] }) {
+export async function deleteProduct({ product, specs, actorName, linkedCompetitorRows = [], force = false }) {
   const list = Array.isArray(specs) ? specs : [];
 
   await base44.entities.SpeakerChangeHistory.create({
     product_id: product.id,
     field_changed: "product",
     old_value: `${product.manufacturer_name || ""} ${product.model || ""}`.trim(),
-    new_value: "Deleted (draft product removed)",
+    new_value: force ? "Deleted (admin permanent removal)" : "Deleted (draft product removed)",
     source: actorName || "Manual Edit",
     change_type: "Removed",
-    change_reason: "Administrative",
+    change_reason: force ? "Administrative permanent deletion" : "Administrative",
   });
 
   // Delete linked shared competitor rows FIRST — they are the most reference-

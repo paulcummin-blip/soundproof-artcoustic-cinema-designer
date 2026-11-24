@@ -58,6 +58,8 @@ async function probeCandidate(candidate) {
       headline: removal?.headline || "",
       detail: removal?.detail || "",
       safe,
+      canForceDelete: removal?.canForceDelete === true && removal?.mode === "archive",
+      forceDetail: removal?.forceDetail || "",
       error: removal?.error || null,
     };
   } catch (e) {
@@ -84,6 +86,7 @@ export default function BulkDeleteCompetitorDialog({
   const [rows, setRows] = useState([]);
   const [removing, setRemoving] = useState(false);
   const [result, setResult] = useState(null);
+  const [forceDelete, setForceDelete] = useState(false);
 
   // Re-probe every time the dialog opens with a fresh selection.
   useEffect(() => {
@@ -92,6 +95,7 @@ export default function BulkDeleteCompetitorDialog({
       setResult(null);
       setProbing(false);
       setRemoving(false);
+      setForceDelete(false);
       return;
     }
     let cancelled = false;
@@ -110,13 +114,18 @@ export default function BulkDeleteCompetitorDialog({
 
   const safeRows = useMemo(() => rows.filter((r) => r.safe), [rows]);
   const skippedRows = useMemo(() => rows.filter((r) => !r.safe), [rows]);
+  const forceableRows = useMemo(() => skippedRows.filter((r) => r.canForceDelete), [skippedRows]);
 
   const handleConfirm = async () => {
     setRemoving(true);
     setResult(null);
     const removed = [];
     const failed = [];
-    for (const row of safeRows) {
+    const stillSkipped = [];
+    const targets = forceDelete
+      ? [...safeRows, ...forceableRows]
+      : safeRows;
+    for (const row of targets) {
       try {
         const probe = {
           productId: row.candidate.productId || null,
@@ -125,15 +134,20 @@ export default function BulkDeleteCompetitorDialog({
           manufacturer: row.candidate.manufacturer || "",
           model: row.candidate.model || "",
         };
-        await removeSpeakerFromLibrary({ row: probe, actorName });
+        await removeSpeakerFromLibrary({ row: probe, actorName, force: forceDelete && !row.safe });
         removed.push(row.label);
       } catch (e) {
         failed.push({ label: row.label, reason: e?.message || "Could not remove." });
       }
     }
-    setResult({ removed, failed, skipped: skippedRows });
+    if (!forceDelete) {
+      for (const row of skippedRows) stillSkipped.push(row);
+    } else {
+      for (const row of skippedRows) if (!row.canForceDelete) stillSkipped.push(row);
+    }
+    setResult({ removed, failed, skipped: stillSkipped });
     setRemoving(false);
-    onDone?.({ removedCount: removed.length, skippedCount: skippedRows.length, failedCount: failed.length });
+    onDone?.({ removedCount: removed.length, skippedCount: stillSkipped.length, failedCount: failed.length });
   };
 
   const handleClose = () => {
@@ -207,8 +221,21 @@ export default function BulkDeleteCompetitorDialog({
                   ))}
                 </ul>
                 <div style={{ fontSize: 12, color: BRAND.hint, marginTop: 6 }}>
-                  These speakers have approved or published data and are kept for audit. Remove them individually to archive.
+                  These speakers have approved or published data and are kept for audit by default. Remove them individually to archive.
                 </div>
+                {forceableRows.length > 0 && (
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 10, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={forceDelete}
+                      onChange={(e) => setForceDelete(e.target.checked)}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span style={{ fontSize: 12, color: BRAND.warn }}>
+                      Permanently delete the {forceableRows.length} referenced speaker{forceableRows.length === 1 ? "" : "s"} with no genuine dependencies instead of skipping them. This removes their product, specification, data-quality rows and comparison row, and cannot be undone.
+                    </span>
+                  </label>
+                )}
               </div>
             )}
           </div>
@@ -227,11 +254,13 @@ export default function BulkDeleteCompetitorDialog({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={removing || safeRows.length === 0}
-              style={{ border: 0, borderRadius: 8, padding: "8px 14px", background: BRAND.warn, color: "#FFF", cursor: "pointer", fontSize: 13, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6, opacity: removing || safeRows.length === 0 ? 0.5 : 1 }}
+              disabled={removing || (safeRows.length === 0 && !(forceDelete && forceableRows.length > 0))}
+              style={{ border: 0, borderRadius: 8, padding: "8px 14px", background: forceDelete ? BRAND.warn : BRAND.warn, color: "#FFF", cursor: "pointer", fontSize: 13, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6, opacity: removing ? 0.5 : 1 }}
             >
               {removing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              {removing ? "Removing…" : `Delete ${safeRows.length} of ${totalCount}`}
+              {removing ? "Removing…" : forceDelete
+                ? `Delete ${safeRows.length + forceableRows.length} of ${totalCount}`
+                : `Delete ${safeRows.length} of ${totalCount}`}
             </button>
           )}
         </DialogFooter>

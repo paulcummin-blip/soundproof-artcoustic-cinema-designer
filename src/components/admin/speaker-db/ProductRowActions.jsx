@@ -44,6 +44,7 @@ export default function ProductRowActions({ row, onChanged }) {
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
+  const [forceStage, setForceStage] = useState(null);
   const [message, setMessage] = useState("");
 
   const product = row.product || row;
@@ -92,17 +93,18 @@ export default function ProductRowActions({ row, onChanged }) {
     }
   };
 
-  const confirmRemoval = async () => {
+  const confirmRemoval = async (force = false) => {
     setBusy(true);
     try {
-      if (confirmation.mode === "archive") {
+      if (confirmation.mode === "archive" && !force) {
         await archiveProduct({ product, specs: confirmation.specs, actorName: user?.full_name || "Admin" });
         setMessage("Product archived");
       } else {
-        await deleteProduct({ product, specs: confirmation.specs, actorName: user?.full_name || "Admin" });
-        setMessage("Draft product deleted");
+        await deleteProduct({ product, specs: confirmation.specs, actorName: user?.full_name || "Admin", force });
+        setMessage(force ? "Product permanently deleted" : "Draft product deleted");
       }
       setConfirmation(null);
+      setForceStage(null);
       onChanged?.();
     } catch (error) {
       setMessage(error.message);
@@ -154,19 +156,60 @@ export default function ProductRowActions({ row, onChanged }) {
             padding: 24,
           }}
         >
-          <div style={{ width: "100%", maxWidth: 460, background: BRAND.card, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 20 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>{confirmation.headline}</div>
-            <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 8, lineHeight: 1.5 }}>{confirmation.detail}</div>
+          <div style={{ width: "100%", maxWidth: 480, background: BRAND.card, border: `1px solid ${BRAND.border}`, borderRadius: 14, padding: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>
+              {forceStage === "confirm" ? confirmation.forceHeadline : confirmation.headline}
+            </div>
+            <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 8, lineHeight: 1.5 }}>
+              {forceStage === "confirm" ? confirmation.forceDetail : confirmation.detail}
+            </div>
             <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 10 }}>
               {product.manufacturer_name} · {product.model}
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
-              <button type="button" style={{ ...BTN, padding: "8px 12px", fontSize: 12 }} onClick={() => setConfirmation(null)} disabled={busy}>
-                Cancel
-              </button>
+
+            {forceStage === "confirm" && (
+              <div style={{ marginTop: 12, padding: "10px 12px", background: "#FBEEEF", border: `1px solid ${BRAND.danger}33`, borderRadius: 8, fontSize: 12, color: BRAND.danger, lineHeight: 1.5 }}>
+                This permanently removes the product, its specification, its data-quality rows and its RP22 comparison row. This cannot be undone.
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18, flexWrap: "wrap" }}>
               <button
                 type="button"
-                onClick={confirmRemoval}
+                style={{ ...BTN, padding: "8px 12px", fontSize: 12 }}
+                onClick={() => { setConfirmation(null); setForceStage(null); }}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+
+              {confirmation.mode === "archive" && forceStage !== "confirm" && confirmation.canForceDelete && (
+                <button
+                  type="button"
+                  onClick={() => setForceStage("confirm")}
+                  disabled={busy}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 12px",
+                    borderRadius: 7,
+                    border: `1px solid ${BRAND.danger}55`,
+                    background: BRAND.card,
+                    color: BRAND.danger,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: busy ? "wait" : "pointer",
+                  }}
+                >
+                  <Trash2 size={13} />
+                  Delete permanently
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => (forceStage === "confirm" ? confirmRemoval(true) : confirmRemoval(false))}
                 disabled={busy}
                 style={{
                   display: "inline-flex",
@@ -175,15 +218,15 @@ export default function ProductRowActions({ row, onChanged }) {
                   padding: "8px 12px",
                   borderRadius: 7,
                   border: "none",
-                  background: confirmation.mode === "archive" ? BRAND.green : BRAND.danger,
+                  background: forceStage === "confirm" ? BRAND.danger : confirmation.mode === "archive" ? BRAND.green : BRAND.danger,
                   color: "#FFFFFF",
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: busy ? "wait" : "pointer",
                 }}
               >
-                {busy ? <Loader2 size={13} className="animate-spin" /> : confirmation.mode === "archive" ? <Archive size={13} /> : <Trash2 size={13} />}
-                {confirmation.actionLabel}
+                {busy ? <Loader2 size={13} className="animate-spin" /> : forceStage === "confirm" ? <Trash2 size={13} /> : confirmation.mode === "archive" ? <Archive size={13} /> : <Trash2 size={13} />}
+                {forceStage === "confirm" ? confirmation.forceActionLabel : confirmation.actionLabel}
               </button>
             </div>
           </div>
