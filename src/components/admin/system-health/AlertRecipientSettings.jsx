@@ -1,3 +1,4 @@
+import {useCanonicalProject} from "@/components/state/projectHydrationStore";
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 
@@ -11,6 +12,7 @@ const BRAND = {
 };
 
 export default function AlertRecipientSettings() {
+  const project = useCanonicalProject();
   const [enabled, setEnabled] = useState(false);
   const [recipients, setRecipients] = useState([]);
   const [newRecipient, setNewRecipient] = useState('');
@@ -74,7 +76,7 @@ export default function AlertRecipientSettings() {
     setError(null);
     setTestResult(null);
     try {
-      const response = await base44.functions.invoke('manageSystemHealthConfig', { action: 'test' });
+      const response = await base44.functions.invoke('manageSystemHealthConfig', { action: 'test', project_id:project.projectId || null, version_id:project.identity?.activeVersionId || null });
       const result = response?.data || {};
       if (!result.recorded || result.notification_status !== 'sent') {
         setError(`Test alert was not sent (${result.notification_status || 'recording failed'}). Check System Health for details.`);
@@ -185,6 +187,7 @@ export default function AlertRecipientSettings() {
           </button>
         </div>
 
+        <p style={{fontSize:12,color:BRAND.subtext}}>Test context: {project.identity?.name || 'No active project'}{project.identity?.clientName ? ` / ${project.identity.clientName}` : ''}. Uses saved recipients.</p>
         {/* Save */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button

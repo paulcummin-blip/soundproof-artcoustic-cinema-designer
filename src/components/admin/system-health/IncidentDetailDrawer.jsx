@@ -41,18 +41,18 @@ export default function IncidentDetailDrawer({ incident, onClose, onUpdated }) {
     let cancelled = false;
     setIdentity({ dealerName: null, projectName: null, clientName: null, loading: true });
     (async () => {
-      const result = { dealerName: null, projectName: null, clientName: null };
+      const result = { dealerName: incident.dealer_name || incident.account_name || null, projectName: incident.project_name || null, clientName: incident.client_name || null };
       try {
         if (incident.account_id) {
           const acctPage = await base44.entities.Account.filter({ id: incident.account_id }, { limit: 1 });
-          const acct = (acctPage?.items || [])[0] || null;
+          const acct = (Array.isArray(acctPage) ? acctPage : acctPage?.items || [])[0] || null;
           if (acct?.name) result.dealerName = acct.name;
         }
       } catch { /* fail-open */ }
       try {
         if (incident.project_id) {
           const projPage = await base44.entities.Project.filter({ id: incident.project_id }, { limit: 1 });
-          const proj = (projPage?.items || [])[0] || null;
+          const proj = (Array.isArray(projPage) ? projPage : projPage?.items || [])[0] || null;
           if (proj?.name) result.projectName = proj.name;
           if (proj?.client_name) result.clientName = proj.client_name;
         }

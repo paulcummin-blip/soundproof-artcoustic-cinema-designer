@@ -1,3 +1,4 @@
+import {reportClientFailure} from "@/components/systemHealth/clientExperienceMonitor";
 import { adiIntegrationNeedsReview } from "../bassAssessmentBasis";
 import { evaluateCurrentIntegration } from "./evaluateCurrentIntegration";
 // OptimiseAndCalculate.jsx
@@ -1663,6 +1664,11 @@ export default function OptimiseAndCalculate({
     if (!isBusy && !isComplete) return null;
     return buildStageDisplay(v2State);
   }, [v2State, isBusy, isComplete]);
+
+  useEffect(() => {
+    if (isError || isTimedOut) reportClientFailure({code:'ADI_OPTIMISATION_FAILED',operation:'adi-optimisation',
+      projectId,versionId,detail:workflowState?.error || (isTimedOut ? 'ADI timed out.' : 'ADI optimisation failed.')});
+  }, [isError,isTimedOut,projectId,versionId,workflowState?.error]);
 
   return (
     <div className="space-y-3">

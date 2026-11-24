@@ -1,3 +1,4 @@
+import ExperienceContext from "@/components/systemHealth/ExperienceContext";
 import './App.css'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -193,6 +194,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <NavigationTracker />
+          <ExperienceContext />
           <ProjectHydrationProvider>
             <AuthenticatedApp />
           </ProjectHydrationProvider>

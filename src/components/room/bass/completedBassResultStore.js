@@ -1,3 +1,4 @@
+import {reportClientFailure} from "@/components/systemHealth/clientExperienceMonitor";
 import { useEffect, useSyncExternalStore } from "react";
 import { canonicalSavedValue } from "./durableBassWrite";
 import { base44 } from "@/api/base44Client";
@@ -358,6 +359,7 @@ export function markBassAuthorityStale(projectId, versionId, currentFingerprint)
 
 export function markBassAuthorityFailed(projectId, versionId, currentFingerprint, errorMessage) {
   assertNotAuthoritativeReadOnly('markBassAuthorityFailed', 'mark-bass-failed');
+  reportClientFailure({code:'BASS_CALCULATION_FAILED',operation:'bass-calculation',projectId,versionId,detail:errorMessage});
   const previous = memoryByProject.get(projectKey(projectId, versionId)) || emptyAuthority(projectId, versionId);
   // Published Engineering Authority model: the published contract remains
   // visible even when recalculation fails. Only the authority status changes

@@ -1,3 +1,4 @@
+import { loadOwnedProject, loadOwnedProjectVersion } from "../../shared/publishedEngineeringRead.js";
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
@@ -51,9 +52,18 @@ export default async function(req) {
       }
       // One open test incident per five-minute window prevents repeated clicks
       // from flooding recipients. Use only the saved configuration.
-      const scope = `alert-test:${Math.floor(Date.now() / 300000)}`;
+      let projectId=null,versionId=null,accountId=null;
+      if (/^[a-f0-9]{24}$/.test(String(body.project_id || ''))) {
+        const owned = body.version_id
+          ? await loadOwnedProjectVersion(base44.asServiceRole,body.project_id,body.version_id,accessContext)
+          : await loadOwnedProject(base44.asServiceRole,body.project_id,accessContext);
+        projectId=owned.project.id;versionId=owned.version?.id || owned.project.active_version_id || null;
+        accountId=owned.projectAccountId;
+      }
+      const scope = `alert-test:${projectId || 'admin'}:${Math.floor(Date.now() / 300000)}`;
       const result = await recordSystemIncident(base44, {
         component: 'alert_delivery_test', operation: 'controlled_alert_test',
+        account_id:accountId, project_id:projectId, version_id:versionId, page_path:'/admin/system-health',
         error_code: 'CONTROLLED_ALERT_TEST', severity: 'high',
         grouping_scope: scope, test_run_id: scope,
         diagnostic_summary: 'CONTROLLED TEST requested by a master administrator. This checks the existing incident dashboard and email alert path. No dealer failure occurred and no project was changed.',

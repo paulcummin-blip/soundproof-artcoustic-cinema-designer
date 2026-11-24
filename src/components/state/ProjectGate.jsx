@@ -1,3 +1,4 @@
+import {reportClientFailure} from "@/components/systemHealth/clientExperienceMonitor";
 // ProjectGate.jsx
 // --------------------------------
 // Renders project-dependent content ONLY when the canonical hydration state
@@ -80,6 +81,21 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   // failed keeps it open too (with Retry). There is no continue-anyway path, which
   // is what stops a report or a proposal being opened on a half-restored authority.
   const opening = useProjectOpening(hydration.projectId || null);
+
+  React.useEffect(() => {
+    const failed = opening.checklist.filter(row => row.status === 'failed');
+    if (hydration.status === 'failed' || failed.length) {
+      reportClientFailure({code:'PROJECT_LOAD_FAILED',operation:'project-opening',
+        projectId:hydration.projectId,versionId:hydration.identity?.activeVersionId,
+        detail:failed.length ? `Failed restore stages: ${failed.map(row=>row.key || row.label).join(', ')}` : hydration.error});
+    }
+    if (!opening.holding || !hydration.projectId) return;
+    const timer=setTimeout(()=>reportClientFailure({code:'PROJECT_LOAD_STALLED',operation:'project-opening',
+      projectId:hydration.projectId,versionId:hydration.identity?.activeVersionId,
+      detail:`No opening progress for 120 seconds. Pending: ${opening.holdLabels.join(', ')}`}),120000);
+    return ()=>clearTimeout(timer);
+  }, [hydration.projectId,hydration.identity?.activeVersionId,hydration.status,hydration.error,
+    opening.holding, opening.phase, JSON.stringify(opening.checklist.map(row=>[row.key,row.status]))]);
 
   // One line per opening decision, so a support conversation can see exactly which
   // rows held the panel and what released it. No engineering values, no PII.

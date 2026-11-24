@@ -95,7 +95,7 @@ function describeSeverity(incident) {
   const sev = incident.severity || 'medium';
   const impact = {
     critical: 'Critical — the system is broken. The dealer cannot use the affected feature until the defect is fixed.',
-    high: 'High — the content quality failed. The dealer cannot use the generated output until it is corrected.',
+    high: 'High — the user experience was disrupted. Review the recorded impact and recovery options.',
     medium: 'Medium — a structural or operational failure. The dealer may be able to retry.',
     low: 'Low — a pre-condition was not met. The dealer needs to fix the condition before retrying.',
   };
@@ -134,8 +134,8 @@ function describeDataIntegrity(incident) {
  */
 export function buildDiagnosticBrief(incident, identity = {}) {
   const ref = safe(incident.incident_reference);
-  const dealerName = identity.dealerName || 'Unknown';
-  const projectName = identity.projectName || 'Unknown';
+  const dealerName = identity.dealerName || incident.dealer_name || incident.account_name || 'Unknown';
+  const projectName = identity.projectName || incident.project_name || 'Unknown';
   const clientName = identity.clientName ? ` (client: ${identity.clientName})` : '';
 
   const lines = [];
@@ -188,7 +188,14 @@ export function buildDiagnosticBrief(incident, identity = {}) {
   lines.push(describeDataIntegrity(incident));
   lines.push('');
   lines.push(`DEALER IMPACT`);
+  lines.push(`Account: ${safe(incident.account_name)} (${safe(incident.account_id)})`);
   lines.push(`Dealer: ${dealerName}`);
+  lines.push(`Project ID: ${safe(incident.project_id)}`);
+  lines.push(`Reference: ${safe(incident.project_reference)}`);
+  lines.push(`Version: ${safe(incident.version_name)} (${safe(incident.version_id)})`);
+  lines.push(`Page: ${safe(incident.page_path)}`);
+  if (incident.error_detail) lines.push(`Error detail: ${incident.error_detail}`);
+  if (incident.component_stack) lines.push(`Stack: ${incident.component_stack}`);
   lines.push(`Project: ${projectName}${clientName}`);
   lines.push(`User blocked: ${incident.user_blocked === true ? 'Yes' : incident.user_blocked === false ? 'No' : 'Unknown'}`);
   lines.push(`Workaround available: ${incident.workaround_available === true ? 'Yes' : incident.workaround_available === false ? 'No' : 'Unknown'}`);
