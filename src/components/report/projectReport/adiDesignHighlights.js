@@ -69,6 +69,7 @@ import {
   classifySpecTier,
   tierFloor,
   levelRank,
+  levelLabel,
   isStrength,
   isAssumedParameterKey,
 } from './adiHighlightImportance';
