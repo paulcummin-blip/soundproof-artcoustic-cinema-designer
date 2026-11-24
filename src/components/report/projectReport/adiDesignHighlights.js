@@ -119,25 +119,32 @@ export const connectionLine = (parameter, level, text) => ({
  * The overheads schedule row's engineering connection.
  *
  * P10 (Upper Speaker SPL Difference) is the overhead layer's own RP22 result.
- * It is seat-scoped, so the connection states the AUTHORITATIVE PRIMARY SEATING
- * result published for P10 — the limiting primary seat, read from the
- * publication's parameter index `scopes.primary` — never a room-wide figure and
- * never the all-seat floor. The "(primary seating)" wording preserves that
- * assessment scope on the page.
+ * It is read through the SAME authoritative published-parameter reader every
+ * other role uses (`parameter(summary, 10)` → `readPublishedParameter`), so the
+ * row inherits the publication's own applicability and assessment state rather
+ * than any channel-configuration guess:
  *
- * When P10 has not been assessed at the primary seating (no published primary
- * result, or a neutral dash/N/A) the row keeps its existing descriptive
- * system-role statement. No level is hardcoded and no result is invented.
+ *   · P10 not applicable (no height layer, or only one overhead row — e.g. a
+ *     .2 layout) is published with level "N/A", which `levelLabel` collapses to
+ *     null. The row then keeps its existing descriptive system-role statement.
+ *     No N/A, FAIL, "missing data" or "not assessed" is shown for a parameter
+ *     that does not apply to this design.
+ *   · P10 applicable but not yet assessed publishes no terminal result, so the
+ *     reader returns null and the same descriptive statement is kept — no
+ *     result is invented.
+ *   · P10 applicable and assessed publishes a real level (L1–L4) or a genuine
+ *     FAIL; the row states that result, including the actual FAIL.
+ *
+ * No overheads specified omits the row entirely (see buildSpecificationConnections).
  */
 function buildOverheadsConnection(engineeringSummary, dolbyConfig) {
-  const primaryScope = engineeringSummary?.parameter_index?.['P10']?.scopes?.primary;
-  const level = levelLabel(primaryScope?.level);
-  if (level) {
-    const value = statedParameterValue(primaryScope, 10);
+  const p10 = parameter(engineeringSummary, 10);
+  if (p10) {
+    const value = statedParameterValue(p10, 10);
     return [connectionLine(
       'RP22 P10',
-      level,
-      `Overhead speaker level matching (primary seating)${value ? ` · ${value}` : ''}`,
+      p10.level,
+      `Overhead speaker level matching${value ? ` · ${value}` : ''}`,
     )];
   }
   return [connectionLine(null, null, `Overhead layer completing the ${String(dolbyConfig || 'immersive').trim()} field`)];
