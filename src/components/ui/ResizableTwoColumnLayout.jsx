@@ -46,6 +46,7 @@ export default function ResizableTwoColumnLayout({
   const rightPanelRef = React.useRef(null);
   const [containerWidth, setContainerWidth] = React.useState(0);
   const [viewportHeight, setViewportHeight] = React.useState(null);
+  const [stickyInset, setStickyInset] = React.useState(0);
   const [requestedLeftWidth, setRequestedLeftWidth] = React.useState(initialLeftWidth);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isHovering, setIsHovering] = React.useState(false);
@@ -109,6 +110,14 @@ export default function ResizableTwoColumnLayout({
       const viewport = window.visualViewport;
       const top = viewport?.offsetTop || 0;
       const bottom = top + (viewport?.height || window.innerHeight);
+      // Sticky offsets are relative to the nearest scrolling ancestor, which
+      // itself can be above the viewport after the outer document scrolls.
+      let scroller = container.parentElement;
+      while (scroller && !/(auto|scroll|hidden)/.test(getComputedStyle(scroller).overflowY)) {
+        scroller = scroller.parentElement;
+      }
+      const inset = scroller ? Math.max(0, top - scroller.getBoundingClientRect().top - scroller.clientTop) : 0;
+      setStickyInset((previous) => previous === inset ? previous : inset);
       const available = Math.max(160, Math.floor(
         bottom - Math.max(top, container.getBoundingClientRect().top)
       ));
@@ -276,7 +285,7 @@ export default function ResizableTwoColumnLayout({
         gridTemplateColumns: `${effectiveLeftWidth}px ${dividerWidth}px minmax(${minRightWidth}px, 1fr)`,
         gridTemplateRows: "minmax(0, 1fr)",
         position: "sticky",
-        top: 0,
+        top: stickyInset,
         height: viewportHeight ?? undefined,
         columnGap: gap,
         overflowX: "hidden",
