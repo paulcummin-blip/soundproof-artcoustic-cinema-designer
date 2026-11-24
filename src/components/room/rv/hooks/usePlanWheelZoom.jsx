@@ -8,14 +8,20 @@ const MAX_ZOOM = 4.0;
 // pointer (or canvas centre for the buttons) stays fixed throughout, so the
 // drawing never shifts. A new zoom gesture cancels any in-flight settle.
 const SNAP_STEP = 0.05;
-const SETTLE_DELAY_MS = 120;    // quiet period after the last wheel tick
-const SETTLE_DURATION_MS = 180; // gentle ease-out deceleration
-const snapUp = z => Math.min(MAX_ZOOM, Math.ceil((z + 1e-9) / SNAP_STEP) * SNAP_STEP);
-const snapDown = z => Math.max(MIN_ZOOM, Math.floor((z - 1e-9) / SNAP_STEP) * SNAP_STEP);
-const isSnapped = z => {
+// Quiet period after the last zoom input before the gentle settle begins.
+const SETTLE_DELAY_MS = 500;
+// The settle eases towards the nearest 5% increment over ~700ms. The movement
+// is small (at most half a 5% step) and uses a smoothstep curve with zero
+// velocity at both ends, so the correction reads as a natural finish rather
+// than a visible snap.
+const SETTLE_DURATION_MS = 700;
+const snapNearest = z => {
   const r = Math.round(z / SNAP_STEP);
-  const v = r * SNAP_STEP;
-  return v >= MIN_ZOOM && v <= MAX_ZOOM && Math.abs(z - v) < 1e-6;
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, r * SNAP_STEP));
+};
+const isSnapped = z => {
+  const v = snapNearest(z);
+  return Math.abs(z - v) < 1e-6;
 };
 
 export function isVisiblePlanPoint(svg, x, y) {
@@ -32,9 +38,8 @@ export function usePlanWheelZoom({
   const stateRef = useRef({ zoom, panX, panY, viewOffsetPx });
   stateRef.current = { zoom, panX, panY, viewOffsetPx };
   const pointerRef = useRef(null);
-  // Settle state: last zoom anchor + direction, and the in-flight animation.
+  // Settle state: last zoom anchor and the in-flight animation.
   const gestureAnchorRef = useRef(null);
-  const gestureDirectionRef = useRef(null);
   const rafRef = useRef(null);
   const settleTimeoutRef = useRef(null);
 
@@ -79,7 +84,10 @@ export function usePlanWheelZoom({
   }, []);
 
   // Ease the zoom from its current value to targetZoom over SETTLE_DURATION_MS,
-  // keeping the anchor fixed. Ease-out cubic for a gentle deceleration.
+  // keeping the anchor fixed. Smoothstep (3t²−2t³) has zero velocity at both
+  // ends, so the correction starts gently, moves smoothly and decelerates to
+  // rest with no abrupt start or stop — the finishing correction is almost
+  // imperceptible. No overshoot, bounce or elastic terms are used.
   const animateZoomTo = useCallback((targetZoom, clientX, clientY) => {
     cancelSettle();
     const start = stateRef.current.zoom;
@@ -88,7 +96,7 @@ export function usePlanWheelZoom({
     const tick = (now) => {
       if (rafRef.current === null) return; // superseded/cancelled
       const t = Math.min(1, (now - t0) / SETTLE_DURATION_MS);
-      const eased = 1 - Math.pow(1 - t, 3);
+      const eased = t * t * (3 - 2 * t);
       applyZoomAt(start + (targetZoom - start) * eased, clientX, clientY);
       if (t < 1) {
         rafRef.current = requestAnimationFrame(tick);
@@ -99,17 +107,17 @@ export function usePlanWheelZoom({
     rafRef.current = requestAnimationFrame(tick);
   }, [applyZoomAt, cancelSettle]);
 
-  // After the gesture goes quiet, settle to the next 5% increment in the last
-  // direction. If already on an increment, nothing happens. Never reverses:
-  // 'in' only moves up, 'out' only moves down.
-  const requestSettle = useCallback((anchor, direction) => {
-    if (!anchor || !direction) return;
+  // After the gesture goes quiet for SETTLE_DELAY_MS, settle gently to the
+  // nearest 5% increment. If already on an increment, nothing happens. The
+  // anchor is preserved so the drawing never drifts.
+  const requestSettle = useCallback((anchor) => {
+    if (!anchor) return;
     if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
     settleTimeoutRef.current = setTimeout(() => {
       settleTimeoutRef.current = null;
       const z = stateRef.current.zoom;
       if (isSnapped(z)) return;
-      const target = direction === 'in' ? snapUp(z) : snapDown(z);
+      const target = snapNearest(z);
       animateZoomTo(target, anchor.x, anchor.y);
     }, SETTLE_DELAY_MS);
   }, [animateZoomTo]);
@@ -157,10 +165,9 @@ export function usePlanWheelZoom({
         const f = Math.exp(-e.deltaY * 0.001);
         zoomAt(f, p.x, p.y);
         gestureAnchorRef.current = { x: p.x, y: p.y };
-        gestureDirectionRef.current = f > 1 ? 'in' : f < 1 ? 'out' : gestureDirectionRef.current;
         // A new zoom gesture interrupts any in-flight settle, then re-arms it.
         cancelSettle();
-        requestSettle(gestureAnchorRef.current, gestureDirectionRef.current);
+        requestSettle(gestureAnchorRef.current);
       } else {
         const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
         const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
@@ -205,7 +212,6 @@ export function usePlanWheelZoom({
         zoomAt(f, pinch.x, pinch.y);
         panBy(next.x - pinch.x, next.y - pinch.y);
         gestureAnchorRef.current = { x: pinch.x, y: pinch.y };
-        gestureDirectionRef.current = f > 1 ? 'in' : f < 1 ? 'out' : gestureDirectionRef.current;
         cancelSettle();
       }
       pinch = next;
@@ -217,7 +223,7 @@ export function usePlanWheelZoom({
       pinch = null;
       if (!touches.size) {
         touchSequence = false;
-        requestSettle(gestureAnchorRef.current, gestureDirectionRef.current);
+        requestSettle(gestureAnchorRef.current);
       }
     };
     const onBlur = () => { invalidate(); touches.clear(); pinch = null; touchSequence = false; };
@@ -257,10 +263,12 @@ export function usePlanWheelZoom({
     const top = Math.max(a.top,b.top,0), bottom = Math.min(a.bottom,b.bottom,win.innerHeight);
     if (right <= left || bottom <= top) return;
     const cx = (left+right)/2, cy = (top+bottom)/2;
-    // Buttons ease to the next 5% increment, anchored at the visible canvas
-    // centre, using the same settle animation as gesture-driven zoom.
+    // Buttons ease to the next 5% increment in the requested direction,
+    // anchored at the visible canvas centre, using the same settle animation
+    // as gesture-driven zoom.
     const z = stateRef.current.zoom;
-    const target = direction > 0 ? snapUp(z) : snapDown(z);
+    const r = Math.round(z / SNAP_STEP) + direction;
+    const target = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, r * SNAP_STEP));
     animateZoomTo(target, cx, cy);
   }, [svgRef, planBoundsRef, animateZoomTo]);
 
