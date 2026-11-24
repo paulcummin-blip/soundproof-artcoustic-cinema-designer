@@ -6,10 +6,11 @@ const MAX_ZOOM = 4.0;
 /**
  * Direct mouse/trackpad zoom for the Plan View.
  *
- * Attaches a non-passive wheel listener to the plan container so wheel/pinch
- * events over the plan zoom the drawing (centred on the pointer) instead of
- * scrolling the page. Normal page scrolling continues outside the plan
- * because the listener is scoped to the plan element only.
+ * Attaches a non-passive wheel listener to the plan container so browser
+ * pinch gestures over the plan zoom the drawing (centred on the pointer).
+ * Ordinary two-finger trackpad scrolling is left unconsumed so it scrolls
+ * normally; only a recognised pinch (wheel event with ctrlKey === true)
+ * triggers zoom, and only when the pointer is inside the visible SVG.
  *
  * Zoom range: 0.6×–4.0×. Drag-pan (via usePanZoomHandlers) is independent of
  * zoom: the drawing can be repositioned by dragging empty plan space at any
@@ -40,6 +41,12 @@ export function usePlanWheelZoom({
     if (!el) return;
 
     const onWheel = (e) => {
+      // Only a browser-recognised pinch gesture should zoom the drawing.
+      // Browsers expose trackpad pinch as a wheel event with ctrlKey === true;
+      // ordinary two-finger scrolling fires wheel events with ctrlKey === false.
+      // Do not infer intent from delta speed or magnitude.
+      if (!e.ctrlKey) return;
+
       // Zoom only when the pointer is inside the visible SVG drawing.
       // The planBoundsRef wrapper can extend beyond the SVG (padding, gutters,
       // overflow), so an SVG-rectangle hit test keeps zoom inside the drawing
@@ -55,7 +62,7 @@ export function usePlanWheelZoom({
         e.clientY <= svgRect.bottom;
       if (!insideSvg) return;
 
-      // Consume wheel events only over the visible drawing — prevents page
+      // Consume the pinch gesture over the visible drawing — prevents page
       // scroll and browser pinch-zoom while zooming.
       e.preventDefault();
       e.stopPropagation();
@@ -71,8 +78,7 @@ export function usePlanWheelZoom({
       const worldX = (px - curPanX) / curZoom;
       const worldY = (py - curPanY) / curZoom;
 
-      // Smooth exponential zoom — works for mouse wheel (large deltaY) and
-      // trackpad pinch (ctrlKey=true, small deltaY).
+      // Smooth exponential zoom for pinch gestures (ctrlKey === true).
       const factor = Math.exp(-e.deltaY * 0.001);
       const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, curZoom * factor));
 
