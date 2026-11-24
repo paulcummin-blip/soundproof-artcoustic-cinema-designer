@@ -42,4 +42,3 @@ test('page scroll cannot start zoom by moving canvas under an outside pointer',(
 test('document exit and blur block retained wheel sequences',()=>{for(const action of ['exit','blur']){const h=setup();h.pointer(400,300);if(action==='exit')h.outside();else h.winListeners.get('blur')();assert.equal(h.wheel().prevented,false);}});
 test('resize/clipping changes are checked again on each event',()=>{const h=setup();h.pointer(400,300);h.visible(false);assert.equal(h.wheel().prevented,false);});
 test('cleanup removes every interaction listener',()=>{const h=setup();h.cleanup();assert.equal(h.listeners.size+h.winListeners.size+h.wheelListeners.size,0);});
-
