@@ -63,6 +63,7 @@ export function usePlanWheelZoom({
     const onBlur = () => { pointer = { outside: true }; };
 
     const onWheel = (e) => {
+      console.info("[plan-wheel-gate]", JSON.stringify({pointer, x:e.clientX, y:e.clientY, zoom:stateRef.current.zoom}));
       const svgEl = svgRef?.current;
       if (!svgEl || !isVisiblePlanPoint(svgEl, e.clientX, e.clientY)) return;
       // Do not begin zoom just because page scrolling slides the drawing
