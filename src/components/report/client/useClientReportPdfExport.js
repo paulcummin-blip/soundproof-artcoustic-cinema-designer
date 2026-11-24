@@ -139,6 +139,17 @@ export function useClientReportPdfExport({
     };
   }
   const exportTimingsRef = useRef(null);
+  // Monitored operation ID for the current export, so progress is reported to
+  // the backend watchdog. Null when no export is in flight.
+  const operationIdRef = useRef(null);
+  const reportOperation = useCallback((action, payload = {}) => {
+    if (!operationIdRef.current) return;
+    base44.functions.invoke('manageMonitoredOperation', {
+      action,
+      operation_id: operationIdRef.current,
+      ...payload,
+    }).catch(() => {});
+  }, []);
   const updateProgress = useCallback((progress) => {
     progressStoreRef.current.set(progress);
     if (exportTimingsRef.current) exportTimingsRef.current.mark(progress.stage, progress.message);
@@ -160,18 +171,6 @@ export function useClientReportPdfExport({
   // only the document that failed — from the SAME saved authority, without
   // regenerating the one that succeeded or re-running the whole export.
   const lastExportRef = useRef(null);
-  // Monitored operation ID for the current export, so progress is reported to
-  // the backend watchdog. Null when no export is in flight.
-  const operationIdRef = useRef(null);
-  const reportOperation = useCallback((action, payload = {}) => {
-    if (!operationIdRef.current) return;
-    base44.functions.invoke('manageMonitoredOperation', {
-      action,
-      operation_id: operationIdRef.current,
-      ...payload,
-    }).catch(() => {});
-  }, []);
-
   const cleanup = useCallback(() => {
     if (printingRef.current) {
       printingRef.current = false;
