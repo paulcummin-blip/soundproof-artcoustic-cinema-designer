@@ -47,6 +47,7 @@ import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
 import PriceSummary from "@/components/pricing/PriceSummary";
 import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import LiveRP22PerformanceSummary from "@/components/rp22/LiveRP22PerformanceSummary";
+import RP22PerformanceOverview from "@/components/rp22/RP22PerformanceOverview";
 import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
 import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
 import DealerHero from "@/components/ui/HeroBanner";
@@ -725,6 +726,7 @@ export default function Layout({ children, currentPageName }) {
                   roomDimsMissing={roomDimsMissing}
                   partialDesignRating={partialDesignRating}
                 />
+                <RP22PerformanceOverview liveSummary={liveRp22Summary} />
                 <div style={{ margin: '0 16px 12px 16px' }}>
                   <LiveRP22PerformanceSummary liveSummary={liveRp22Summary} />
                 </div>
