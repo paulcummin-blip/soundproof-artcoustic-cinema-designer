@@ -25,6 +25,15 @@ export function hasCapability(user, capability) {
   return user?.access_context?.capabilities?.[capability] === true;
 }
 
+// Richer Sounds delegated administration: true for Sound Proof master admins
+// and active members of the verified Custom Install - 93 master account. The
+// capability is injected server-side by resolveAccountAccess.
+export function isRicherSoundsAdmin(user) {
+  if (!user) return false;
+  if (isMasterAdmin(user)) return true;
+  return user?.access_context?.capabilities?.richerSoundsAdmin === true;
+}
+
 export function defaultPathForUser(user) {
   if (isMasterAdmin(user)) return "/Projects";
   if (hasCapability(user, "soundProof")) return "/Projects";

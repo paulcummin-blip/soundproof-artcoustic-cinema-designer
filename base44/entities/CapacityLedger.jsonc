@@ -15,13 +15,14 @@
         "UK_TURNOVER_REWARD",
         "DISTRIBUTOR_ALLOCATION",
         "DISTRIBUTOR_RECLAIM",
+        "RICHER_SOUNDS_TRANSFER",
         "PROMOTIONAL",
         "ADMIN_GRANT",
         "INTERNAL",
         "PROJECT_ACTIVATION",
         "REVERSAL"
       ],
-      "description": "Type of capacity transaction. TRIAL/PURCHASED/UK_TURNOVER_REWARD/PROMOTIONAL/ADMIN_GRANT/INTERNAL = credits (positive delta). PROJECT_ACTIVATION = consumption (delta=-1). DISTRIBUTOR_ALLOCATION/RECLAIM = paired transfers between distributor and dealer. REVERSAL = corrects a prior entry."
+      "description": "Type of capacity transaction. TRIAL/PURCHASED/UK_TURNOVER_REWARD/PROMOTIONAL/ADMIN_GRANT/INTERNAL = credits (positive delta). PROJECT_ACTIVATION = consumption (delta=-1). DISTRIBUTOR_ALLOCATION/RECLAIM = paired transfers between distributor and dealer. RICHER_SOUNDS_TRANSFER = paired transfers between the Custom Install - 93 master account and a Richer Sounds branch (source delta=-N, destination delta=+N, linked by transfer_id). REVERSAL = corrects a prior entry."
     },
     "delta": {
       "type": "number",
@@ -29,11 +30,11 @@
     },
     "idempotency_key": {
       "type": "string",
-      "description": "Unique deduplication key per transaction. Format examples: 'trial:{account_id}', 'activation:{project_id}', 'uk_turnover:{account_id}:{calendar_year}:{milestone_value}', '{transfer_id}:SOURCE', '{transfer_id}:TARGET'. Prevents double-crediting on re-sync."
+      "description": "Unique deduplication key per transaction. Format examples: 'trial:{account_id}', 'activation:{project_id}', 'uk_turnover:{account_id}:{calendar_year}:{milestone_value}', '{transfer_id}:SOURCE', '{transfer_id}:TARGET', 'rs_transfer:{transfer_id}:SOURCE', 'rs_transfer:{transfer_id}:TARGET'. Prevents double-crediting on re-sync."
     },
     "transfer_id": {
       "type": "string",
-      "description": "Shared UUID linking paired distributor transfer entries (allocation: distributor delta=-N, dealer delta=+N). Null for non-transfer transactions.",
+      "description": "Shared UUID linking paired transfer entries. For distributor transfers (allocation: distributor delta=-N, dealer delta=+N) and Richer Sounds transfers (93 delta=-N, branch delta=+N). Null for non-transfer transactions.",
       "nullable": true
     },
     "source_system": {
@@ -42,12 +43,12 @@
     },
     "source_ref": {
       "type": "object",
-      "description": "Structured reference to the source record. For distributor transfers: { distributor_account_id, target_account_id }. For turnover rewards: { turnover_record_id, milestone_value_gbp }. For activations: { project_id }.",
+      "description": "Structured reference to the source record. For distributor transfers: { distributor_account_id, target_account_id }. For Richer Sounds transfers: { transfer_id, source_account_id, destination_account_id }. For turnover rewards: { turnover_record_id, milestone_value_gbp }. For activations: { project_id }.",
       "properties": {}
     },
     "reason": {
       "type": "string",
-      "description": "Human-readable reason for this transaction (e.g. 'Trial credit', 'UK turnover reward \u00a310k milestone', 'Distributor allocation to Dealer A', 'Project activation')."
+      "description": "Human-readable reason for this transaction (e.g. 'Trial credit', 'UK turnover reward \u00a310k milestone', 'Distributor allocation to Dealer A', 'Richer Sounds transfer to Bristol - 24', 'Project activation')."
     },
     "reversal_of": {
       "type": "string",

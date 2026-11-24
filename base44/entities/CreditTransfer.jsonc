@@ -1,0 +1,135 @@
+{
+  "name": "CreditTransfer",
+  "type": "object",
+  "description": "Durable record for a Richer Sounds delegated credit transfer between the Custom Install - 93 master account and a Richer Sounds branch (or its reverse). One record per transfer operation. The two CapacityLedger legs (source debit and destination credit) carry the commercial authority; this record holds the operation state, actor, note and recovery metadata. Base44 entity writes are not transactional, so the state field tracks partial writes honestly: pending = reserved, no legs written; completed = both legs written; partial = source leg written but destination leg not (credits left the source but did not arrive); failed = no legs written; reversed = a master admin reversed it via a paired reverse transfer. Admin-only: read through the service role by readRicherSoundsAdmin; writes only by transferRicherSoundsCredits.",
+  "properties": {
+    "transfer_id": {
+      "type": "string",
+      "description": "Unique transfer identifier (UUID). Shared by both CapacityLedger legs via their idempotency keys (rs_transfer:{transfer_id}:SOURCE / :TARGET)."
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "forward",
+        "reverse"
+      ],
+      "default": "forward",
+      "description": "forward = 93 \u2192 branch (the normal delegated transfer). reverse = branch \u2192 93 (a master-admin-only reversal of a prior forward transfer)."
+    },
+    "source_account_id": {
+      "type": "string",
+      "description": "Account the credits are debited from. For a forward transfer this is the 93 master account; for a reverse it is the branch."
+    },
+    "source_account_name": {
+      "type": "string",
+      "description": "Denormalized source account name at transfer time."
+    },
+    "destination_account_id": {
+      "type": "string",
+      "description": "Account the credits are credited to. For a forward transfer this is the branch; for a reverse it is the 93 master account."
+    },
+    "destination_account_name": {
+      "type": "string",
+      "description": "Denormalized destination account name at transfer time."
+    },
+    "amount": {
+      "type": "number",
+      "description": "Positive integer credit amount transferred."
+    },
+    "actor_user_id": {
+      "type": "string",
+      "description": "Sound Proof user id of the member who performed the transfer."
+    },
+    "actor_email": {
+      "type": "string",
+      "description": "Email of the actor at transfer time."
+    },
+    "actor_is_master_admin": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when the actor was a Sound Proof master admin (Paul) rather than a 93 member. Master admins can perform and reverse transfers; 93 members can perform forward transfers only."
+    },
+    "note": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional actor-supplied note (e.g. 'Onboarding credit allocation'). Null when none."
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "partial",
+        "reversed",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Operation lifecycle. pending = record created, no legs written yet. completed = both CapacityLedger legs written. partial = source leg written, destination leg not (credits left source but did not arrive \u2014 needs admin reconciliation). failed = no legs written. reversed = a master admin created a paired reverse transfer."
+    },
+    "source_leg_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "CapacityLedger record id of the source debit leg. Null until written."
+    },
+    "destination_leg_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "CapacityLedger record id of the destination credit leg. Null until written."
+    },
+    "reversal_of": {
+      "type": "string",
+      "nullable": true,
+      "description": "transfer_id of the forward transfer this reverse transfer corrects. Null for forward transfers."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the transfer record was created."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the transfer reached completed state. Null until then."
+    },
+    "test_run_id": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "TEST ISOLATION MARKER. Null for production transfers. When non-null, created by a diagnostic test run. Production transfers always pass null. Cleanup must NEVER delete records where test_run_id is null."
+    }
+  },
+  "required": [
+    "transfer_id",
+    "direction",
+    "source_account_id",
+    "destination_account_id",
+    "amount",
+    "actor_user_id",
+    "actor_email",
+    "state",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

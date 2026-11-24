@@ -407,17 +407,41 @@ export async function resolveAccountAccess(base44, sessionUser, {
 
   }
 
+  // Richer Sounds delegated administration: an active member of the verified
+  // Custom Install - 93 master account (the RICHER_SOUNDS account whose active
+  // Partner Portal link carries trading number "93" with a stamped
+  // portal_dealer_account_id) gains a scoped capability. The check runs only
+  // for RICHER_SOUNDS accounts and fails open: any read error leaves the flag
+  // false and login is unaffected.
+  let richerSoundsAdmin = false;
+  try {
+    if (account?.dealer_group === 'RICHER_SOUNDS') {
+      const rsLinks = await service.entities.ExternalAccountLink.filter({ account_id: accountId });
+      richerSoundsAdmin = (Array.isArray(rsLinks) ? rsLinks : []).some((link) =>
+        link?.active !== false
+        && link?.source_system === 'ARTCOUSTIC_PARTNER_PORTAL'
+        && String(link?.external_account_number || '').trim() === '93'
+        && Boolean(String(link?.portal_dealer_account_id || '').trim())
+      );
+    }
+  } catch {
+    richerSoundsAdmin = false;
+  }
+
   return {
     allowed: true,
     reason: null,
     isMasterAdmin: false,
     isAccountAdmin,
     accessLevel,
-    capabilities: buildCapabilities({
-      isMasterAdmin: false,
-      isAccountAdmin,
-      accessLevel,
-    }),
+    capabilities: {
+      ...buildCapabilities({
+        isMasterAdmin: false,
+        isAccountAdmin,
+        accessLevel,
+      }),
+      richerSoundsAdmin,
+    },
     user: {
       ...publicUser(authoritativeUser),
       account_id: accountId,
