@@ -28,6 +28,7 @@ import AdminProjectLicensing from './pages/AdminProjectLicensing';
 import AdminProjectIntelligence from './pages/AdminProjectIntelligence';
 import AdminDesignIntelligence from './pages/AdminDesignIntelligence';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
+import AdminRicherSounds from './pages/AdminRicherSounds';
 import AdminSpeakerDatabase from './pages/AdminSpeakerDatabase';
 import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
 import AdminAddSpeaker from './pages/AdminAddSpeaker';
@@ -154,6 +155,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/commercial-intelligence" element={<AccessGate masterAdmin><AdminCommercialIntelligence /></AccessGate>} />
         <Route path="/admin/design-intelligence" element={<AccessGate masterAdmin><AdminDesignIntelligence /></AccessGate>} />
         <Route path="/admin/accounts" element={<AccessGate masterAdmin><AdminAccounts /></AccessGate>} />
+        <Route path="/admin/richer-sounds" element={<AccessGate masterAdmin capability="richerSoundsAdmin"><AdminRicherSounds /></AccessGate>} />
         <Route path="/admin/accounts/:accountId" element={<AccessGate masterAdmin><AccountDashboard /></AccessGate>} />
         <Route path="/admin/access" element={<AccessGate masterAdmin><AdminAccountAccess /></AccessGate>} />
         <Route path="/admin/system-health" element={<AccessGate masterAdmin><AdminSystemHealth /></AccessGate>} />
