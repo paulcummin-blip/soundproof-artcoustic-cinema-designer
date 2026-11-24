@@ -1145,7 +1145,7 @@ const byId = useEntitiesById({
   }, [appState, getCanonicalRole]);
 
   // Direct mouse/trackpad wheel zoom (replaces click-to-zoom toolbar controls)
-  const { resetView, isNonDefault: viewIsNonDefault } = usePlanWheelZoom({
+  const { resetView, isNonDefault: viewIsNonDefault, zoomIn, zoomOut } = usePlanWheelZoom({
     planBoundsRef,
     svgRef,
     zoom,
@@ -2294,6 +2294,8 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         handlePlanPointerDown={handlePlanPointerDown}
         lastPointerRef={lastPointerRef}
         onResetView={resetView}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
         showResetView={viewIsNonDefault}
         canvasStyle={canvasStyle}
         svgWSafe={svgWSafe}

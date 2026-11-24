@@ -39,6 +39,8 @@ export default function RvPlanCanvas({
   handlePlanPointerDown,
   lastPointerRef,
   onResetView,
+  onZoomIn,
+  onZoomOut,
   showResetView,
   canvasStyle,
   svgWSafe,
@@ -868,6 +870,18 @@ export default function RvPlanCanvas({
           }}
         >
           {overheadWarningText}
+        </div>
+      )}
+
+      {exportMode === 'default' && (
+        <div role="group" aria-label="Plan zoom controls"
+          onPointerDown={e => e.stopPropagation()}
+          style={{position:'absolute',top:8,right:8,zIndex:20,display:'flex',alignItems:'center',gap:4,background:'#fff',border:'1px solid #DCDBD6',borderRadius:6,padding:4,boxShadow:'0 1px 3px rgba(0,0,0,.08)'}}>
+          <button type="button" aria-label="Zoom out plan" title="Zoom out" onClick={onZoomOut}
+            disabled={zoom <= 0.6} style={{width:44,height:44,fontSize:24}}>−</button>
+          <output aria-label="Plan zoom" style={{minWidth:44,textAlign:'center',fontSize:12}}>{Math.round(zoom * 100)}%</output>
+          <button type="button" aria-label="Zoom in plan" title="Zoom in" onClick={onZoomIn}
+            disabled={zoom >= 4} style={{width:44,height:44,fontSize:24}}>+</button>
         </div>
       )}
 

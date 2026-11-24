@@ -3,175 +3,181 @@ import { useCallback, useEffect, useRef } from "react";
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 4.0;
 
-// elementFromPoint uses the rendered, clipped viewport, not the oversized
-// layout rectangle. It also excludes menus and controls covering the SVG.
 export function isVisiblePlanPoint(svg, x, y) {
   if (!svg || !Number.isFinite(x) || !Number.isFinite(y)) return false;
   const hit = svg.ownerDocument.elementFromPoint(x, y);
   return !!hit && (hit === svg || svg.contains(hit));
 }
 
-/**
- * Direct mouse/trackpad zoom for the Plan View.
- *
- * Wheel and pinch gestures zoom only over the visible drawing. Browser
- * hit-testing respects every clipping/scrolling ancestor and any overlay;
- * the full SVG rectangle alone does not describe its visible viewport.
- * Outside the drawing, ordinary scrolling remains unconsumed.
- *
- * Zoom range: 0.6×–4.0×. Drag-pan (via usePanZoomHandlers) is independent of
- * zoom: the drawing can be repositioned by dragging empty plan space at any
- * zoom level, and a pan offsets the one zoom transform on top of the zoom pan.
- *
- * Returns:
- *   resetView  — restores zoom=1, pan=0, viewOffset=0
- *   isNonDefault — true when the viewport differs from the fitted default
- */
+// All viewport movement remains local UI state, never design/engineering data.
 export function usePlanWheelZoom({
-  planBoundsRef,
-  svgRef,
-  zoom,
-  panX,
-  panY,
-  viewOffsetPx,
-  setZoom,
-  setPanX,
-  setPanY,
-  setViewOffsetPx,
+  planBoundsRef, svgRef, zoom, panX, panY, viewOffsetPx,
+  setZoom, setPanX, setPanY, setViewOffsetPx,
 }) {
-  // Refs to avoid stale closures in the non-passive wheel listener
-  const stateRef = useRef({ zoom, panX, panY });
-  stateRef.current = { zoom, panX, panY };
+  const stateRef = useRef({ zoom, panX, panY, viewOffsetPx });
+  stateRef.current = { zoom, panX, panY, viewOffsetPx };
+  const pointerRef = useRef(null);
+
+  const zoomAt = useCallback((factor, clientX, clientY) => {
+    const svg = svgRef.current;
+    const rect = svg?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    // Work in the SVG's own units, as do the existing drag/Measure conversions.
+    const point = svg.createSVGPoint();
+    point.x = clientX; point.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const local = point.matrixTransform(ctm.inverse());
+    const current = stateRef.current;
+    const offset = current.viewOffsetPx || { x: 0, y: 0 };
+    const px = local.x - offset.x;
+    const py = local.y - offset.y;
+    const worldX = (px - current.panX) / current.zoom;
+    const worldY = (py - current.panY) / current.zoom;
+    const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current.zoom * factor));
+    const nextPanX = px - worldX * nextZoom;
+    const nextPanY = py - worldY * nextZoom;
+    // Same exponential wheel sensitivity, range and point-under-pointer anchor.
+    // Do not clamp the anchor away after a scroll/pan; Reset view is always available.
+    stateRef.current = { ...current, zoom: nextZoom, panX: nextPanX, panY: nextPanY };
+    setZoom(nextZoom); setPanX(nextPanX); setPanY(nextPanY);
+  }, [svgRef, setZoom, setPanX, setPanY]);
+
+  const panBy = useCallback((dx, dy) => {
+    const svg = svgRef.current;
+    const ctm = svg?.getScreenCTM();
+    if (!ctm) return;
+    const a = svg.createSVGPoint(), b = svg.createSVGPoint();
+    a.x = 0; a.y = 0; b.x = dx; b.y = dy;
+    const inverse = ctm.inverse();
+    const start = a.matrixTransform(inverse), end = b.matrixTransform(inverse);
+    const current = stateRef.current;
+    const next = {
+      x: (current.viewOffsetPx?.x || 0) + end.x - start.x,
+      y: (current.viewOffsetPx?.y || 0) + end.y - start.y,
+    };
+    stateRef.current = { ...current, viewOffsetPx: next };
+    setViewOffsetPx(next);
+  }, [svgRef, setViewOffsetPx]);
 
   useEffect(() => {
     const el = planBoundsRef.current;
     if (!el) return;
-
-    const doc = el.ownerDocument;
-    // A wheel sequence can retain its initial target/coordinates after the
-    // pointer moves. Independently observe pointer movement, including exits
-    // from this document, so that a latched sequence cannot keep zooming.
-    let pointer = null;
-    const onPointerMove = (event) => {
-      pointer = {
-        x: event.clientX,
-        y: event.clientY,
-        overDrawing: isVisiblePlanPoint(svgRef.current, event.clientX, event.clientY),
-      };
+    const doc = el.ownerDocument, win = doc.defaultView;
+    const touches = new Map();
+    let pinch = null, cancelling = false, touchSequence = false;
+    const visible = (x, y) => isVisiblePlanPoint(svgRef.current, x, y);
+    const invalidate = () => { pointerRef.current = null; };
+    const trackPointer = e => {
+      if (e.pointerType === 'touch') return;
+      pointerRef.current = { x: e.clientX, y: e.clientY, overDrawing: visible(e.clientX, e.clientY) };
     };
-    const onPointerOut = (event) => { if (!event.relatedTarget) pointer = { outside: true }; };
-    const onBlur = () => { pointer = { outside: true }; };
-
-    // Temporary preview-only runtime audit; observes events without changing them.
-    const auditEnabled = new URLSearchParams(doc.defaultView.location.search).has('planZoomAudit');
-    let auditMouse = null;
-    let auditPointer = null;
-    const describe = node => node ? {tag: node.tagName, id: node.id, cls: typeof node.className === 'string' ? node.className : null, text: node.tagName === 'BUTTON' ? node.textContent?.slice(0,70) : undefined} : null;
-    const auditMove = event => {
-      const value = {x:event.clientX,y:event.clientY,type:event.type,hit:describe(doc.elementFromPoint(event.clientX,event.clientY))};
-      if (event.type === 'mousemove') auditMouse = value; else auditPointer = value;
+    const onOut = e => {
+      if (!e.relatedTarget || !svgRef.current?.contains(e.relatedTarget)) invalidate();
     };
-    const auditSamples = [];
-    const auditWheel = event => {
-      const svg = svgRef.current;
-      const before = {...stateRef.current};
-      const sample = {time:Date.now(),wheel:{x:event.clientX,y:event.clientY,delta:event.deltaY,ctrl:event.ctrlKey,target:describe(event.target),path:event.composedPath().slice(0,6).map(describe)},pointer, auditPointer,auditMouse,hover:describe(doc.querySelector(':hover:last-child')),hit:describe(doc.elementFromPoint(event.clientX,event.clientY)),svg:svg?.getBoundingClientRect().toJSON(),wrapper:el.getBoundingClientRect().toJSON(),before};
-      doc.defaultView.requestAnimationFrame(() => {
-        sample.after = {...stateRef.current};
-        sample.transform = svg?.querySelector('[data-rv-zoom-group]')?.getAttribute('transform');
-        sample.viewBox = svg?.getAttribute('viewBox');
-        sample.prevented = event.defaultPrevented;
-        auditSamples.push(sample); if (auditSamples.length > 30) auditSamples.shift();
-        el.dataset.planZoomAudit = JSON.stringify(auditSamples);
-        console.info('[PLAN_ZOOM_AUDIT]', JSON.stringify(sample));
-      });
-    };
-    if (auditEnabled) {
-      doc.addEventListener('mousemove', auditMove, true);
-      doc.addEventListener('pointermove', auditMove, true);
-      doc.addEventListener('wheel', auditWheel, true);
-      el.dataset.planZoomAudit = '[]';
-    }
-
-    const onWheel = (e) => {
-      const svgEl = svgRef?.current;
-      if (!svgEl || !isVisiblePlanPoint(svgEl, e.clientX, e.clientY)) return;
-      // Do not begin zoom just because page scrolling slides the drawing
-      // underneath a pointer that was over a toolbar/control.
-      if (pointer && (pointer.outside || !pointer.overDrawing ||
-          !isVisiblePlanPoint(svgEl, pointer.x, pointer.y))) return;
-      const svgRect = svgEl.getBoundingClientRect();
-      if (svgRect.width <= 0 || svgRect.height <= 0) return;
-
-      // Consume wheel/pinch only over the visible drawing — prevents page
-      // scroll and browser pinch-zoom while zooming.
+    const onWheel = e => {
+      const p = pointerRef.current;
+      // Fail closed: wheel coordinates/targets alone never establish ownership.
+      if (!p?.overDrawing || !visible(p.x, p.y) || !visible(e.clientX, e.clientY)) return;
       e.preventDefault();
       e.stopPropagation();
-
-      const { zoom: curZoom, panX: curPanX, panY: curPanY } = stateRef.current;
-      const rect = svgRect;
-      if (!rect || rect.width <= 0 || rect.height <= 0) return;
-
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
-
-      // World point under cursor (in unzoomed content coordinates)
-      const worldX = (px - curPanX) / curZoom;
-      const worldY = (py - curPanY) / curZoom;
-
-      // Original wheel/pinch sensitivity and pointer anchoring.
-      const factor = Math.exp(-e.deltaY * 0.001);
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, curZoom * factor));
-
-      // New pan to keep the world point under the cursor fixed
-      let newPanX = px - worldX * newZoom;
-      let newPanY = py - worldY * newZoom;
-
-      // Light pan clamp — prevent the plan from disappearing entirely
-      const panLimit = Math.max(rect.width, rect.height) * Math.max(0, newZoom - 1);
-      if (panLimit > 0) {
-        newPanX = Math.max(-panLimit, Math.min(panLimit, newPanX));
-        newPanY = Math.max(-panLimit, Math.min(panLimit, newPanY));
+      if (e.ctrlKey) {
+        // Browser trackpad pinch. Ordinary scrolling can never enter this path.
+        zoomAt(Math.exp(-e.deltaY * 0.001), p.x, p.y);
       } else {
-        newPanX = 0;
-        newPanY = 0;
+        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
+        const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+        const dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+        panBy(-dx * unit, -dy * unit);
       }
-
-      setZoom(newZoom);
-      setPanX(newPanX);
-      setPanY(newPanY);
     };
-
-    doc.addEventListener("pointermove", onPointerMove, true);
-    doc.addEventListener("pointerout", onPointerOut, true);
-    doc.defaultView?.addEventListener("blur", onBlur);
-    el.addEventListener("wheel", onWheel, { passive: false });
+    const stop = e => { e.preventDefault(); e.stopImmediatePropagation(); };
+    const pair = () => {
+      const points = [...touches.values()];
+      if (points.length !== 2 || points.some(p => !visible(p.x, p.y))) return null;
+      const [a,b] = points;
+      return { x:(a.x+b.x)/2, y:(a.y+b.y)/2, distance:Math.hypot(a.x-b.x,a.y-b.y) };
+    };
+    const onDown = e => {
+      if (e.pointerType !== 'touch' || !visible(e.clientX,e.clientY)) return;
+      touches.set(e.pointerId, {x:e.clientX,y:e.clientY,target:e.target});
+      if (touches.size < 2) return; // Existing single-touch selection/drag stays intact.
+      touchSequence = true;
+      pinch = pair();
+      invalidate();
+      // End a pending one-finger object/pan gesture before two-finger navigation.
+      cancelling = true;
+      for (const [id,p] of touches) {
+        p.target.dispatchEvent(new win.PointerEvent('pointercancel', {
+          bubbles:true, pointerId:id, pointerType:'touch', clientX:p.x, clientY:p.y,
+        }));
+      }
+      cancelling = false;
+      stop(e);
+    };
+    const onMove = e => {
+      if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, {...touches.get(e.pointerId),x:e.clientX,y:e.clientY});
+      if (!touchSequence) return;
+      stop(e);
+      const next = pair();
+      if (!next || !pinch) { pinch = null; return; }
+      if (pinch.distance > 0 && next.distance > 0) {
+        zoomAt(next.distance / pinch.distance, pinch.x, pinch.y);
+        panBy(next.x - pinch.x, next.y - pinch.y);
+      }
+      pinch = next;
+    };
+    const onEnd = e => {
+      if (cancelling || !touches.has(e.pointerId)) return;
+      touches.delete(e.pointerId);
+      if (touchSequence) stop(e);
+      pinch = null;
+      if (!touches.size) touchSequence = false;
+    };
+    const onBlur = () => { invalidate(); touches.clear(); pinch = null; touchSequence = false; };
+    // Capture on window sees pointer movement even when child controls stop bubbling.
+    win.addEventListener('pointermove', trackPointer, true);
+    win.addEventListener('mousemove', trackPointer, true);
+    win.addEventListener('pointerover', trackPointer, true);
+    win.addEventListener('pointerout', onOut, true);
+    win.addEventListener('blur', onBlur);
+    win.addEventListener('pointerdown', onDown, true);
+    win.addEventListener('pointermove', onMove, true);
+    win.addEventListener('pointerup', onEnd, true);
+    win.addEventListener('pointercancel', onEnd, true);
+    el.addEventListener('wheel', onWheel, {passive:false});
     return () => {
-      if (auditEnabled) {
-        doc.removeEventListener('mousemove', auditMove, true);
-        doc.removeEventListener('pointermove', auditMove, true);
-        doc.removeEventListener('wheel', auditWheel, true);
-        delete el.dataset.planZoomAudit;
-      }
-      el.removeEventListener("wheel", onWheel);
-      doc.removeEventListener("pointermove", onPointerMove, true);
-      doc.removeEventListener("pointerout", onPointerOut, true);
-      doc.defaultView?.removeEventListener("blur", onBlur);
+      invalidate();
+      win.removeEventListener('pointermove', trackPointer, true);
+      win.removeEventListener('mousemove', trackPointer, true);
+      win.removeEventListener('pointerover', trackPointer, true);
+      win.removeEventListener('pointerout', onOut, true);
+      win.removeEventListener('blur', onBlur);
+      win.removeEventListener('pointerdown', onDown, true);
+      win.removeEventListener('pointermove', onMove, true);
+      win.removeEventListener('pointerup', onEnd, true);
+      win.removeEventListener('pointercancel', onEnd, true);
+      el.removeEventListener('wheel', onWheel);
     };
-  }, [planBoundsRef, svgRef, setZoom, setPanX, setPanY]);
+  }, [planBoundsRef, svgRef, zoomAt, panBy]);
+
+  const zoomStep = useCallback(direction => {
+    const svg = svgRef.current, wrapper = planBoundsRef.current;
+    if (!svg || !wrapper) return;
+    const a = svg.getBoundingClientRect(), b = wrapper.getBoundingClientRect();
+    const win = wrapper.ownerDocument.defaultView;
+    const left = Math.max(a.left,b.left,0), right = Math.min(a.right,b.right,win.innerWidth);
+    const top = Math.max(a.top,b.top,0), bottom = Math.min(a.bottom,b.bottom,win.innerHeight);
+    if (right <= left || bottom <= top) return;
+    zoomAt(Math.exp(direction * 0.15), (left+right)/2, (top+bottom)/2);
+  }, [svgRef, planBoundsRef, zoomAt]);
 
   const resetView = useCallback(() => {
-    setZoom(1);
-    setPanX(0);
-    setPanY(0);
-    setViewOffsetPx({ x: 0, y: 0 });
-  }, [setZoom, setPanX, setPanY, setViewOffsetPx]);
-
-  const isNonDefault =
-    zoom !== 1 ||
-    panX !== 0 ||
-    panY !== 0 ||
-    (viewOffsetPx && (viewOffsetPx.x !== 0 || viewOffsetPx.y !== 0));
-
-  return { resetView, isNonDefault };
+    stateRef.current = {zoom:1,panX:0,panY:0,viewOffsetPx:{x:0,y:0}};
+    setZoom(1); setPanX(0); setPanY(0); setViewOffsetPx({x:0,y:0});
+  }, [setZoom,setPanX,setPanY,setViewOffsetPx]);
+  const isNonDefault = zoom !== 1 || panX !== 0 || panY !== 0 ||
+    !!(viewOffsetPx?.x || viewOffsetPx?.y);
+  return {resetView,isNonDefault,zoomIn:()=>zoomStep(1),zoomOut:()=>zoomStep(-1)};
 }
