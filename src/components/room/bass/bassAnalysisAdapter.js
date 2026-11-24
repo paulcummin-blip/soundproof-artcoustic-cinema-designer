@@ -119,6 +119,7 @@ function buildCandidateRef(candidate, collectDiagnostics = false) {
   const p20Level = Number.isFinite(candidate.achievedP20Level) ? Number(candidate.achievedP20Level) : null;
   return {
     id: candidate.candidateId || null,
+    responseBasis: candidate.responseBasis || null,
     designEqFitProfile: candidate.designEqFitProfile || "standard",
     startStrategy: candidate.startStrategy || null,
     selectedStart: candidate.selectedStart || null,
