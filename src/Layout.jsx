@@ -376,7 +376,7 @@ export default function Layout({ children, currentPageName }) {
         <AppStateProvider>
         <PartnerPortalIdentityProvider>
         {!isReportAutoPrint && <BrandIntroOverlay />}
-        <div className="flex min-h-screen w-full bg-brand-background">
+        <div className="flex h-screen w-full bg-brand-background overflow-hidden">
           {/* Mobile navigation open button */}
           {!isReportAutoPrint && isMobile && !mobileNavOpen && (
             <button
@@ -398,7 +398,7 @@ export default function Layout({ children, currentPageName }) {
           )}
           {!isReportAutoPrint && (
           <aside
-            className={`app-shell-sidebar border-r border-brand-border bg-brand-sidebar-bg flex flex-col transition-transform duration-200 ${
+            className={`app-shell-sidebar border-r border-brand-border bg-brand-sidebar-bg flex flex-col min-h-0 transition-transform duration-200 ${
               isMobile
                 ? `fixed top-0 left-0 h-full w-64 z-50 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`
                 : ''
@@ -483,7 +483,8 @@ export default function Layout({ children, currentPageName }) {
               </div>
             )}
 
-            <nav className="flex-1 px-3 py-2">
+            <div className="flex-1 overflow-y-auto min-h-0">
+            <nav className="px-3 py-2">
               <div className="mb-4">
                 <button
                   type="button"
@@ -732,6 +733,7 @@ export default function Layout({ children, currentPageName }) {
                 </div>
               </div>
             )}
+            </div>
             {!isMobile && (
               <SidebarResizeHandle
                 width={sidebarWidth}
