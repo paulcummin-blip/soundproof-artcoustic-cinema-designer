@@ -1,4 +1,4 @@
-import {safeDiagnostic,safeRoute,requestFailureWarrantsAlert} from '../../../base44/shared/systemHealth/clientIncidentPolicy.js';
+import {safeDiagnostic,safeRoute,requestFailureWarrantsAlert} from './clientIncidentPolicy.js';
 let transport=null, context={}, queue=[], sending=false, timer=null;
 const recent=new Map();
 const handledErrors=new WeakSet();
@@ -10,7 +10,7 @@ export function getExperienceContext(){return {...context};}
 export function configureExperienceTransport(invoke){
  transport=invoke;
  try{if(browser())queue=JSON.parse(sessionStorage.getItem(storageKey)||'[]').filter(x=>Date.now()-x.at<86400000).slice(-20);}catch{queue=[];}
- if(browser()){window.addEventListener('online',flushExperienceIncidents);timer=setInterval(flushExperienceIncidents,30000);}
+ if(browser() && !timer){window.addEventListener('online',flushExperienceIncidents);timer=setInterval(flushExperienceIncidents,30000);}
  void flushExperienceIncidents();
 }
 export async function flushExperienceIncidents(){
