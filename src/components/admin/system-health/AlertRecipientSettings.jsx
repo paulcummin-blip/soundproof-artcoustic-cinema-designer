@@ -16,6 +16,8 @@ export default function AlertRecipientSettings() {
   const [newRecipient, setNewRecipient] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [error, setError] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
 
@@ -65,6 +67,23 @@ export default function AlertRecipientSettings() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const sendTest = async () => {
+    setTesting(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      const response = await base44.functions.invoke('manageSystemHealthConfig', { action: 'test' });
+      const result = response?.data || {};
+      if (!result.recorded || result.notification_status !== 'sent') {
+        setError(`Test alert was not sent (${result.notification_status || 'recording failed'}). Check System Health for details.`);
+      } else {
+        setTestResult(`${result.reference}: email accepted for sending to the saved recipients. Check your inbox to confirm delivery.`);
+      }
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Test alert failed.');
+    } finally { setTesting(false); }
   };
 
   if (loading) {
@@ -181,10 +200,16 @@ export default function AlertRecipientSettings() {
           >
             {saving ? 'Saving…' : 'Save configuration'}
           </button>
+          <button type="button" onClick={sendTest} disabled={testing || saving}
+            style={{ padding: '10px 20px', fontSize: 12, border: `1px solid ${BRAND.border}`, borderRadius: 6, background: 'white', color: BRAND.text, cursor: testing ? 'default' : 'pointer' }}>
+            {testing ? 'Sending test…' : 'Send test alert'}
+          </button>
           {savedAt && !error && (
             <span style={{ fontSize: 12, color: '#213428' }}>✓ Saved at {savedAt}</span>
           )}
         </div>
+
+        {testResult && <p role="status" style={{ fontSize: 12, color: '#213428' }}>{testResult}</p>}
 
         {error && (
           <div style={{ marginTop: 10, padding: 10, background: '#FBEAEA', borderRadius: 8, fontSize: 12, color: '#B23A3A' }}>

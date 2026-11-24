@@ -1018,7 +1018,7 @@ export default function RP22ClientReport() {
 
   useReportFailureMonitoring({
     projectId, versionId: authority.versionId, reportType: 'project',
-    loading: authority.hydrating || savedReport.loading,
+    loading: hydrating || !savedReport.resolved,
     readFailed: authorityReadFailed,
     blocked: authority.reportComplete === false,
     hasSavedEvidence: !!authority.publication || !!engineeringSummary || !!reportSnapshot.saved,

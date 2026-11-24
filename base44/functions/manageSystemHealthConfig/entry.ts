@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
@@ -26,8 +27,8 @@ export default async function(req) {
     const body = await req.json().catch(() => ({}));
     const { action } = body;
 
-    if (action !== 'get' && action !== 'update') {
-      return Response.json({ error: 'action must be get or update.' }, { status: 400 });
+    if (!['get', 'update', 'test'].includes(action)) {
+      return Response.json({ error: 'action must be get, update or test.' }, { status: 400 });
     }
 
     const result = await base44.asServiceRole.entities.SystemConfig.filter({}, { limit: 1 });
@@ -41,6 +42,24 @@ export default async function(req) {
         updated_at: health.updated_at || null,
         updated_by: health.updated_by || null,
       });
+    }
+
+    if (action === 'test') {
+      const health = configRecord?.system_health || {};
+      if (health.alerts_enabled !== true || !health.alert_recipients?.length) {
+        return Response.json({ error: 'Save enabled alerts and at least one recipient before testing.' }, { status: 400 });
+      }
+      // One open test incident per five-minute window prevents repeated clicks
+      // from flooding recipients. Use only the saved configuration.
+      const scope = `alert-test:${Math.floor(Date.now() / 300000)}`;
+      const result = await recordSystemIncident(base44, {
+        component: 'alert_delivery_test', operation: 'controlled_alert_test',
+        error_code: 'CONTROLLED_ALERT_TEST', severity: 'high',
+        grouping_scope: scope, test_run_id: scope,
+        diagnostic_summary: 'CONTROLLED TEST requested by a master administrator. This checks the existing incident dashboard and email alert path. No dealer failure occurred and no project was changed.',
+        data_committed: false, data_integrity_summary: 'No project or engineering data changed.',
+      });
+      return Response.json(result || { recorded: false, notification_status: 'failed' });
     }
 
     // action === 'update'
