@@ -71,7 +71,7 @@ function buildAuthoritativeSnapshot() {
     requestedP18ExtensionHz: 22.941,
     metricPublication: { canonicalMetricPublicationValid: true },
     provenance: { source: "optimiser", realSeatCount: 2, primarySeatIds: ["seat-r1-c1"] },
-    graphPayload: { postEqRspCurve: [{ frequency: 20, spl: 100 }] },
+    graphPayload: { referenceEq: [{ frequency: 20, spl: 100 }], postEqRspCurve: [{ frequency: 20, spl: 100 }] },
   };
   contract.bassResult = buildCanonicalBassResult(contract, contract.graphPayload);
   return contract;

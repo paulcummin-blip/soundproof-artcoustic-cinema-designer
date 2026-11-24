@@ -2,6 +2,7 @@ import {safeDiagnostic,safeRoute,requestFailureWarrantsAlert} from './clientInci
 let transport=null, context={}, queue=[], sending=false, timer=null;
 const recent=new Map();
 const handledErrors=new WeakSet();
+const handledMessages=new Map();
 const storageKey='soundproof-pending-ux-incidents-v1';
 const browser=()=>typeof window!=='undefined';
 function persist(){try{if(browser())sessionStorage.setItem(storageKey,JSON.stringify(queue.slice(-20)));}catch{}}
@@ -26,9 +27,10 @@ export async function flushExperienceIncidents(){
 }
 export function reportClientFailure({code,operation='application',error,detail,stack,...scope}={}){
  try{
-  if(error && typeof error === "object") handledErrors.add(error);
+  if(error && typeof error === "object") {handledErrors.add(error);if(error.message)handledMessages.set(error.message,Date.now());}
+  if(handledMessages.size>100)handledMessages.delete(handledMessages.keys().next().value);
   const current={...context,...scope};
-  const payload={error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
+  const payload={runtime_environment:browser() && /preview|sandbox|localhost/.test(location.hostname)?"preview":"deployed",error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
    page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
    error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
    component_stack:safeDiagnostic(stack || error?.stack || '',1800)};
@@ -71,7 +73,7 @@ export function installGlobalExperienceMonitoring(){
  const onError=e=>{
   if(e.filename&&/^(chrome|moz)-extension:/.test(e.filename))return;
   if(!e.error&&!e.message)return;
-  setTimeout(()=>{if(!e.error||!handledErrors.has(e.error))reportClientFailure({code:'UNHANDLED_ERROR',operation:'browser',error:e.error,detail:e.message});},250);
+  setTimeout(()=>{if((!e.error||!handledErrors.has(e.error)) && Date.now()-(handledMessages.get(e.error?.message || e.message)||0)>2000)reportClientFailure({code:'UNHANDLED_ERROR',operation:'browser',error:e.error,detail:e.message});},1000);
  };
  const onReject=e=>{if((e.reason && typeof e.reason==='object' && handledErrors.has(e.reason)) || !requestFailureWarrantsAlert(e.reason))return;reportClientFailure({code:'UNHANDLED_REJECTION',operation:'async-action',error:e.reason});};
  let last=performance.now(),visible=document.visibilityState==='visible';

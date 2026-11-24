@@ -35,7 +35,7 @@ export default async function(req) {
   const stack=safeDiagnostic(body.component_stack,1800);
   const testRunId=user.role==='admin' && /^ux-test-[a-zA-Z0-9-]{5,80}$/.test(String(body.test_run_id||'')) ? body.test_run_id : null;
   const result=await recordSystemIncident(base44,{
-   component:'user_experience',operation:testRunId?'controlled_alert_test':operation,error_code:code,severity:'high',
+   runtime_environment:body.runtime_environment==='preview'?'preview':'deployed',component:'user_experience',operation:testRunId?'controlled_alert_test':operation,error_code:code,severity:'high',
    account_id:accountId,project_id:projectId,version_id:versionId,page_path:route,
    error_detail:detail,component_stack:stack,
    test_run_id:testRunId,diagnostic_summary:(testRunId?'CONTROLLED TEST — '+operation+'. ':'')+CLIENT_FAILURES[code], grouping_scope:[route,operation,testRunId||''].join('::'),

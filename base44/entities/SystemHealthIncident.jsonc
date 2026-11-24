@@ -3,6 +3,7 @@
   "type": "object",
   "description": "Admin-only central incident record for the Sound Proof System Health & Error Intelligence system. One record per grouped operational failure. Repeated occurrences of the same underlying problem (same grouping fingerprint) increment the occurrence_count rather than creating a duplicate record. Never stores proposal text, client briefs, passwords, tokens, secrets or confidential content. Created by trusted backend functions (e.g. generateProposal on failure) via the service role; read, updated and deleted by administrators only. Recovery attempts are recorded separately from permanent incident resolution: a recovery can restore a dealer's work while the underlying defect remains open for investigation.",
   "properties": {
+    "runtime_environment": {"type":"string","description":"Preview or deployed browser reporting the failure."},
     "incident_reference": {
       "type": "string",
       "description": "Unique human-readable reference (e.g. INC-261123-A1B2C3). Generated at creation time. Shown to the dealer only after the record is successfully persisted."

@@ -557,7 +557,7 @@ export async function recordSystemIncident(serviceClient, details) {
     data_integrity_summary = null,
     test_run_id = null,
     grouping_scope = null,
-    version_id = null, page_path = null, error_detail = null, component_stack = null,
+    version_id = null, page_path = null, error_detail = null, component_stack = null, runtime_environment = null,
   } = details;
 
   const identity = await resolveIncidentIdentity(serviceClient, {account_id, project_id, version_id});
@@ -572,7 +572,7 @@ export async function recordSystemIncident(serviceClient, details) {
   const { user_blocked, workaround_available } = determineUserImpact(test_run_id ? "CONTROLLED_ALERT_TEST" : error_code, component);
 
   const enrichedFields = {
-    version_id, page_path, error_detail, component_stack,
+    version_id, page_path, error_detail, component_stack, runtime_environment,
     account_name:identity.accountName, dealer_name:identity.dealerName, project_name:identity.projectName,
     client_name:identity.clientName, project_reference:identity.projectReference, version_name:identity.versionName,
     operation_id: operation_id || null,
@@ -646,7 +646,7 @@ export async function recordSystemIncident(serviceClient, details) {
 
     // Send the alert email (fail-open). Only sent for critical/high severity.
     const notificationResult = await sendAlertNotification(serviceClient, {
-      reference, component, operation, severity, diagnosticSummary: [diagnostic_summary, page_path && `Page: ${page_path}.`, error_detail && `Detail: ${error_detail}`, account_id && `Account ID: ${account_id}.`, project_id && `Project ID: ${project_id}.`, version_id && `Version ID: ${version_id}.`].filter(Boolean).join(" "), identity,
+      reference, component, operation, severity, diagnosticSummary: [runtime_environment && `Environment: ${runtime_environment}.`, diagnostic_summary, page_path && `Page: ${page_path}.`, error_detail && `Detail: ${error_detail}`, account_id && `Account ID: ${account_id}.`, project_id && `Project ID: ${project_id}.`, version_id && `Version ID: ${version_id}.`].filter(Boolean).join(" "), identity,
       user_blocked, workaround_available, cause_classification,
     });
 
