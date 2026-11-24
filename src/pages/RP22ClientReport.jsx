@@ -1,3 +1,4 @@
+import {narrativeIsCurrent} from '@/components/report/projectReport/reportNarrativeCurrent';
 import useReportFailureMonitoring from '@/components/systemHealth/useReportFailureMonitoring';
 /**
  * RP22ClientReport
@@ -816,7 +817,7 @@ export default function RP22ClientReport() {
   // simulated progress. A saved, complete report (an accepted narrative already
   // on its saved snapshot) opens without either generation stage.
   const savedNarrativeAccepted =
-    savedReport.saved?.payload?.design_intent?.status === 'accepted';
+    narrativeIsCurrent(savedReport.saved);
   const adiComplete = autoIntentStatus === AUTO_INTENT.COMPLETE;
   const adiRunning = autoIntentStatus === AUTO_INTENT.RUNNING;
   // ADI failure only counts when the assessment itself is ready (so the report
@@ -826,7 +827,7 @@ export default function RP22ClientReport() {
   // The report is fully ready to display once engineering/pages are ready AND
   // the ADI narrative is accepted — either just generated or reused from the
   // saved snapshot.
-  const reportFullyReady = reportReady && (adiComplete || savedNarrativeAccepted);
+  const reportFullyReady = reportReady && savedNarrativeAccepted;
   // Every export entry point must wait for both the narrative and drawings.
   const handleExport = useCallback(() => {
     if (!reportFullyReady || !exportIntegrity.ready || publication.status === 'storing') return;
