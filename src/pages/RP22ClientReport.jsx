@@ -614,7 +614,7 @@ export default function RP22ClientReport() {
     if (!proceed) return false;
     return { skippedQuestionIds: autoContextReview.getSkippedQuestionIds(), contextRevision: proceed.contextRevision };
   }, [autoContextReview, urlSkipCtx, urlContextRevision]);
-  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent } = useAutoDesignIntent({
+  const { status: autoIntentStatus, reason: autoIntentReason, retry: retryAutoIntent, verifiedCurrent: autoIntentVerified } = useAutoDesignIntent({
     projectId,
     versionId: authority.versionId,
     enabled: autoIntentEnabled,
@@ -827,7 +827,7 @@ export default function RP22ClientReport() {
   // The report is fully ready to display once engineering/pages are ready AND
   // the ADI narrative is accepted — either just generated or reused from the
   // saved snapshot.
-  const reportFullyReady = reportReady && savedNarrativeAccepted;
+  const reportFullyReady = reportReady && (savedNarrativeAccepted || autoIntentVerified);
   // Every export entry point must wait for both the narrative and drawings.
   const handleExport = useCallback(() => {
     if (!reportFullyReady || !exportIntegrity.ready || publication.status === 'storing') return;
