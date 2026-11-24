@@ -93,7 +93,7 @@ export const PARAM_HUMAN_TITLES = {
   8: "Upfiring / Elevation Speakers",
   9: "Vertical Angle Between Upper Speakers",
   10: "Upper Speaker SPL Difference",
-  11: "Speakers Outside Zones",
+  11: "Surround Speakers Outside Zones",
   12: "Screen SPL Capability",
   13: "Non-Screen SPL Capability",
   14: "LFE SPL Capability",
