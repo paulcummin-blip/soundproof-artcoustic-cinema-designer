@@ -45,6 +45,7 @@ export default function ResizableTwoColumnLayout({
   const leftPanelRef = React.useRef(null);
   const rightPanelRef = React.useRef(null);
   const [containerWidth, setContainerWidth] = React.useState(0);
+  const [viewportHeight, setViewportHeight] = React.useState(null);
   const [requestedLeftWidth, setRequestedLeftWidth] = React.useState(initialLeftWidth);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isHovering, setIsHovering] = React.useState(false);
@@ -98,21 +99,52 @@ export default function ResizableTwoColumnLayout({
     const container = containerRef.current;
     if (!container) return undefined;
 
+    // The app shell is content-sized, so percentage heights cannot establish
+    // the workspace viewport. Measure actual visible space instead. Sticky
+    // positioning keeps the split toolbar at the viewport top when the page
+    // header is scrolled away; the drawing retains its own scroll container.
     const measure = () => {
       const next = container.clientWidth;
       setContainerWidth((previous) => (previous === next ? previous : next));
+      const viewport = window.visualViewport;
+      const top = viewport?.offsetTop || 0;
+      const bottom = top + (viewport?.height || window.innerHeight);
+      const available = Math.max(160, Math.floor(
+        bottom - Math.max(top, container.getBoundingClientRect().top)
+      ));
+      setViewportHeight((previous) => previous === available ? previous : available);
+    };
+    let frame = 0;
+    const scheduleMeasure = (event) => {
+      // Scrolling a panel must never resize it or move its neighbour.
+      if (event?.type === "scroll" && event.target instanceof Node &&
+          container.contains(event.target)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
     };
 
     measure();
-
-    if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", measure);
-      return () => window.removeEventListener("resize", measure);
+    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("scroll", scheduleMeasure, true);
+    window.visualViewport?.addEventListener("resize", scheduleMeasure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleMeasure);
+    observer?.observe(container);
+    if (container.parentElement) {
+      observer?.observe(container.parentElement);
+      // Header/asset drawer changes can move the split without resizing its
+      // content-sized parent, so observe the preceding layout siblings too.
+      for (const sibling of container.parentElement.children) {
+        if (sibling === container) break;
+        observer?.observe(sibling);
+      }
     }
-
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure, true);
+      window.visualViewport?.removeEventListener("resize", scheduleMeasure);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -223,7 +255,7 @@ export default function ResizableTwoColumnLayout({
           padding: paddingX,
           overflowX: "hidden",
           overflowY: "auto",
-          flex: "1 1 0",
+          flex: "0 0 auto",
           minWidth: 0,
           minHeight: 0,
         }}
@@ -242,12 +274,15 @@ export default function ResizableTwoColumnLayout({
       style={{
         display: "grid",
         gridTemplateColumns: `${effectiveLeftWidth}px ${dividerWidth}px minmax(${minRightWidth}px, 1fr)`,
-        gridTemplateRows: "1fr",
+        gridTemplateRows: "minmax(0, 1fr)",
+        position: "sticky",
+        top: 0,
+        height: viewportHeight ?? undefined,
         columnGap: gap,
         overflowX: "hidden",
         overflowY: "hidden",
         padding: paddingX,
-        flex: "1 1 0",
+        flex: "0 0 auto",
         minWidth: 0,
         minHeight: 0,
       }}
