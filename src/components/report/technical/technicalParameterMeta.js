@@ -91,7 +91,7 @@ export const PARAM_HUMAN_TITLES = {
   6: "Surround SPL Difference",
   7: "Wide Speaker Deviation",
   8: "Upfiring / Elevation Speakers",
-  9: "Vertical Angle Between Uppers",
+  9: "Vertical Angle Between Upper Speakers",
   10: "Upper Speaker SPL Difference",
   11: "Speakers Outside Zones",
   12: "Screen SPL Capability",
