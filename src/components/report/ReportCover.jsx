@@ -31,7 +31,7 @@ export default function ReportCover({ variant = 'screen', project, title = 'RP22
                     fontFamily: REPORT_FONT_HEADING,
                 }}
             >
-                <span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span>
+                <span style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span>
             </div>
             <div
                 style={{
@@ -44,7 +44,7 @@ export default function ReportCover({ variant = 'screen', project, title = 'RP22
                     fontFamily: REPORT_FONT_HEADING,
                 }}
             >
-                {REPORT_STRAPLINE.sub}
+                <span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.sub}</span>
             </div>
             <div style={{ width: 64, height: 1, backgroundColor: '#C1B6AD', marginTop: 14, marginBottom: 14 }} />
             {/* Same header role as the printed cover, so the on-screen header

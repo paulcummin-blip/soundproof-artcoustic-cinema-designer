@@ -96,8 +96,8 @@ export default function ReportPrintHeader({
         }
       `}</style>
       <img src={header.logoUrl} alt="Sound Proof" style={logoStyle} />
-      <div className="sound-proof-print-header__strapline"><span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span></div>
-      <div className="sound-proof-print-header__strapline sound-proof-print-header__strapline--sub">{REPORT_STRAPLINE.sub}</div>
+      <div className="sound-proof-print-header__strapline"><span style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.title}</span></div>
+      <div className="sound-proof-print-header__strapline sound-proof-print-header__strapline--sub"><span ref={straplineRef} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{REPORT_STRAPLINE.sub}</span></div>
       <div className="sound-proof-print-header__rule" />
       <div className="sound-proof-print-header__title">{title}</div>
       {metaLine ? <div className="sound-proof-print-header__meta">{metaLine}</div> : null}

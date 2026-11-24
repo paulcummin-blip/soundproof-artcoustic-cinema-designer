@@ -1,12 +1,13 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 
 /**
- * Measures the rendered width of the strapline title text so the Sound Proof
- * logo can be sized to match it exactly — preserving the logo's original aspect
- * ratio and centring the logo and both branding lines on the same vertical axis.
+ * Measures the rendered width of the second branding line (the "Powered by
+ * Artcoustic Design Intelligence (ADI)" strapline) so the Sound Proof logo can
+ * be sized to match it exactly — preserving the logo's original aspect ratio
+ * and centring the logo and both branding lines on the same vertical axis.
  *
  * The cover component attaches the returned ref to an inline `<span>` wrapping
- * the title text. The hook reads the span's `offsetWidth` (the text's true
+ * the sub-strapline text. The hook reads the span's `offsetWidth` (the text's true
  * rendered width, independent of the surrounding block) and re-measures once
  * web fonts have settled, so the logo matches the final typeset width rather
  * than a fallback-face width.
