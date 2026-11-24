@@ -32,3 +32,8 @@ test('queued incident preserves initiating project/version and deduplicates rere
  reportClientFailure({code:'RENDER_FAILED',operation:'test',projectId:'project-a',versionId:'version-a',pagePath:'/RoomDesigner'});
  await flushExperienceIncidents();assert.equal(sent.length,1);
 });
+
+test('browser and server diagnostic policies stay identical',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ assert.equal(await readFile(new URL('../src/components/systemHealth/clientIncidentPolicy.js',import.meta.url),'utf8'),await readFile(new URL('../base44/shared/systemHealth/clientIncidentPolicy.js',import.meta.url),'utf8'));
+});

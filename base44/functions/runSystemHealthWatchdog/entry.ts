@@ -31,7 +31,7 @@ export default async function(req) {
     // Find all running and suspected_stalled operations.
     const page = await base44.asServiceRole.entities.MonitoredOperation.filter(
       { state: { $in: ['running', 'suspected_stalled'] } },
-      { sort: '-started_at', limit: 100 },
+      'started_at', 200,
     );
     const operations = Array.isArray(page) ? page : page?.items || [];
     results.checked = operations.length;

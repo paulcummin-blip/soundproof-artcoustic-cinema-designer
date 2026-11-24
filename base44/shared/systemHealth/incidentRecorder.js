@@ -569,7 +569,7 @@ export async function recordSystemIncident(serviceClient, details) {
 
   // Classify the cause and determine user impact from the error code.
   const { cause_classification, cause_summary } = classifyCause(error_code, component);
-  const { user_blocked, workaround_available } = determineUserImpact(error_code, component);
+  const { user_blocked, workaround_available } = determineUserImpact(test_run_id ? "CONTROLLED_ALERT_TEST" : error_code, component);
 
   const enrichedFields = {
     version_id, page_path, error_detail, component_stack,

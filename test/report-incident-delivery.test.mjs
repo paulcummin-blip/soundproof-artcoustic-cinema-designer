@@ -8,7 +8,7 @@ function fixture({failEmail=false}={}) {
    create:async data=>{const row={...data,id:String(rows.length+1)};rows.push(row);return row;},
    update:async(id,patch)=>Object.assign(rows.find(x=>x.id===id),patch)},
   SystemConfig:{filter:async()=>[{system_health:{alerts_enabled:true,alert_recipients:['owner@example.test']}}]},
-  Account:{get:async()=>({name:'Test dealer'})},Project:{get:async()=>({name:'Test project'})}
+  Account:{filter:async()=>[{name:'Test dealer'}]},Project:{filter:async()=>[{name:'Test project',client_name:'Client A',project_reference:'Cinema Room',account_id:'account-a'}]},ProjectVersion:{filter:async()=>[{name:'Original Design'}]}
  }},integrations:{Core:{SendEmail:async msg=>{if(failEmail)throw Error('provider unavailable');mail.push(msg);}}}};
  return {client,rows,mail};
 }
@@ -25,4 +25,15 @@ test('different project/version retains a separately actionable incident',async(
 test('email failure is visible on the saved incident and does not throw',async()=>{
  const f=fixture({failEmail:true});const result=await recordSystemIncident(f.client,details);
  assert.equal(result.recorded,true);assert.equal(result.notification_status,'failed');assert.equal(f.rows[0].notification_error,'provider unavailable');
+});
+
+test('verified account, project, client, reference and version are saved and included in email',async()=>{
+ const f=fixture();await recordSystemIncident(f.client,{...details,account_id:'account-a',project_id:'project-a',version_id:'version-a',error_detail:'Known rendering failure'});
+ for(const value of ['Test dealer','Test project','Client A','Cinema Room','Original Design','project-a','version-a','Known rendering failure'])assert.ok(f.mail[0].html.includes(value),value);
+ assert.equal(f.rows[0].account_name,'Test dealer');assert.equal(f.rows[0].version_name,'Original Design');
+});
+test('names are escaped in email and controlled tests do not claim a dealer is blocked',async()=>{
+ const f=fixture();f.client.asServiceRole.entities.Project.filter=async()=>[{name:'<script>bad</script>',account_id:'account-a'}];
+ await recordSystemIncident(f.client,{...details,project_id:'project-a',test_run_id:'ux-test-12345',operation:'controlled_alert_test',error_code:'RENDER_FAILED'});
+ assert.ok(!f.mail[0].html.includes('<script>'));assert.ok(f.mail[0].html.includes('&lt;script&gt;'));assert.equal(f.rows[0].user_blocked,false);
 });
