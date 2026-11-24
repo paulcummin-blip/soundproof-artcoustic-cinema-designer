@@ -149,9 +149,9 @@ test("old snapshot metric schema is rejected inside a current envelope", () => {
   assert.equal(resolved.contract, null);
 });
 
-test("calculated status cannot publish without complete canonical P19/P20 seat evidence", () => {
+test("calculated status cannot publish without complete canonical P20 seat evidence", () => {
   const snapshot = buildAuthoritativeSnapshot();
-  snapshot.selectedCandidate.perSeatP19Results = [];
+  snapshot.selectedCandidate.perSeatP20Results = [];
   const resolved = resolvePersistedBassAuthority(
     "disposable-yarm",
     buildHydratedPersistedWrapper(buildRecord(snapshot)),

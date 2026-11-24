@@ -242,8 +242,8 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
     ? { version: "combined-lcr-sub-v1", sources: lcrSources, crossover } : null,
     [integration.enabled, lcrSources, crossover]);
   // The LCR signature identifies the combined model's own geometry. It is
-  // part of the calibration identity. Crossover edits reuse geometry but
-  // invalidate published combined results until manually recalculated.
+  // separate from the subwoofer calibration identity. Crossover edits reuse
+  // geometry and prompt ADI review without invalidating ordinary bass.
   const integrationSignature = useMemo(
     () => lcrSources
       .map((source) => `${source.id}:${source.modelKey}:${source.x.toFixed(3)}:${source.y.toFixed(3)}:${source.z.toFixed(3)}`)

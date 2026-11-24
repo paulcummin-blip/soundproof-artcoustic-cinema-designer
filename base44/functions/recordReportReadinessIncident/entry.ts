@@ -42,6 +42,7 @@ export default async function(req) {
       'No design, calculation or report asset was changed by this incident recorder.',
     ].join(' ');
     const result = await recordSystemIncident(base44, {
+      runtime_environment:body.runtime_environment==='preview'?'preview':'deployed',
       component: 'report_readiness', operation: `${reportType}_report`, error_code: code,
       severity: 'high', account_id: owned.projectAccountId, project_id: projectId, version_id:versionId,
       grouping_scope: `${projectId}::${versionId}`,

@@ -7,7 +7,15 @@ const storageKey='soundproof-pending-ux-incidents-v1';
 const browser=()=>typeof window!=='undefined';
 function persist(){try{if(browser())sessionStorage.setItem(storageKey,JSON.stringify(queue.slice(-20)));}catch{}}
 export function setExperienceContext(value){context={...value};}
-export function getExperienceContext(){return {...context};}
+export function getExperienceContext(){
+ if(!browser())return {...context};
+ const pagePath=location.pathname;
+ const scoped=/^\/(RoomDesigner|RP22Report|RP22ClientReport|DesignReview|ProjectProposalAssets|ProposalCentre|ProposalEditor|proposal)(\/|$)/.test(pagePath);
+ const params=new URLSearchParams(location.search);
+ const projectId=scoped?(params.get('project')||params.get('projectId')||(context.pagePath===pagePath?context.projectId:null)):null;
+ const versionId=scoped?(params.get('version')||params.get('versionId')||(projectId===context.projectId?context.versionId:null)):null;
+ return {...context,pagePath,projectId,versionId};
+}
 export function configureExperienceTransport(invoke){
  transport=invoke;
  try{if(browser())queue=JSON.parse(sessionStorage.getItem(storageKey)||'[]').filter(x=>Date.now()-x.at<86400000).slice(-20);}catch{queue=[];}
@@ -21,7 +29,7 @@ export async function flushExperienceIncidents(){
   const item=queue[0];
   if(item.userId&&context.userId&&item.userId!==context.userId){queue.shift();persist();return;}
   const response=await transport(item.payload.report_type ? 'recordReportReadinessIncident' : 'recordClientExperienceIncident',item.payload);
-  if(response?.data?.recorded || response?.recorded){queue.shift();persist();}
+  if(response?.data?.recorded || response?.recorded || response?.data?.reason==='no_saved_assessment' || response?.reason==='no_saved_assessment'){queue.shift();persist();}
  }catch(e){if([400,403].includes(e?.response?.status)){queue.shift();persist();}}
  finally{sending=false;}
 }
@@ -29,7 +37,7 @@ export function reportClientFailure({code,operation='application',error,detail,s
  try{
   if(error && typeof error === "object") {handledErrors.add(error);if(error.message)handledMessages.set(error.message,Date.now());}
   if(handledMessages.size>100)handledMessages.delete(handledMessages.keys().next().value);
-  const current={...context,...scope};
+  const current={...getExperienceContext(),...scope};
   const payload={runtime_environment:browser() && /preview|sandbox|localhost/.test(location.hostname)?"preview":"deployed",error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
    page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
    error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
