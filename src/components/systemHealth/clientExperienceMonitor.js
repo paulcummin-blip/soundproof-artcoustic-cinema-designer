@@ -19,7 +19,7 @@ export async function flushExperienceIncidents(){
  try{
   const item=queue[0];
   if(item.userId&&context.userId&&item.userId!==context.userId){queue.shift();persist();return;}
-  const response=await transport('recordClientExperienceIncident',item.payload);
+  const response=await transport(item.payload.report_type ? 'recordReportReadinessIncident' : 'recordClientExperienceIncident',item.payload);
   if(response?.data?.recorded || response?.recorded){queue.shift();persist();}
  }catch(e){if([400,403].includes(e?.response?.status)){queue.shift();persist();}}
  finally{sending=false;}
@@ -28,11 +28,11 @@ export function reportClientFailure({code,operation='application',error,detail,s
  try{
   if(error && typeof error === "object") handledErrors.add(error);
   const current={...context,...scope};
-  const payload={error_code:code,operation,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
+  const payload={error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
    page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
    error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
    component_stack:safeDiagnostic(stack || error?.stack || '',1800)};
-  const key=[payload.error_code,payload.operation,payload.project_id,payload.version_id,payload.page_path].join('::');
+  const key=[payload.error_code,payload.operation,payload.report_type,payload.project_id,payload.version_id,payload.page_path].join('::');
   if(Date.now()-(recent.get(key)||0)<300000)return;
   recent.set(key,Date.now());if(recent.size>200)recent.delete(recent.keys().next().value);
   queue.push({payload,at:Date.now(),userId:context.userId||null});queue=queue.slice(-20);persist();void flushExperienceIncidents();
@@ -83,3 +83,5 @@ export function installGlobalExperienceMonitoring(){
  window.addEventListener('error',onError);window.addEventListener('unhandledrejection',onReject);document.addEventListener('visibilitychange',visibility);
  return()=>{clearInterval(heartbeat);window.removeEventListener('error',onError);window.removeEventListener('unhandledrejection',onReject);document.removeEventListener('visibilitychange',visibility);};
 }
+
+if(import.meta.hot)import.meta.hot.dispose(()=>{if(timer)clearInterval(timer);if(browser())window.removeEventListener('online',flushExperienceIncidents);});
