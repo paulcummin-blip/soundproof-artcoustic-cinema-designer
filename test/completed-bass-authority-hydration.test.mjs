@@ -63,7 +63,7 @@ function buildAuthoritativeSnapshot() {
       officialP19WorstFrequencyHz: 35.0,
       p20WorstSeatId: "seat-r2-c1",
       p20WorstFrequencyHz: 48.5,
-      p19TargetIdentity: "practical-calibration-target",
+      p19TargetIdentity: "house-curve-target",
     },
     requestedP14TargetDb: 112,
     requestedP14Basis: "minimum",
