@@ -49,10 +49,31 @@ export default function SpeakerInfo({
   );
   const [popoverStyle, setPopoverStyle] = useState(null);
   const triggerRef = useRef(null);
+  const panelRef = useRef(null);
 
   const hasContent = (Array.isArray(rows) && rows.length > 0) || dataQuality != null;
 
   const closePanel = useCallback(() => setOpen(false), []);
+
+  // Click is the sole open/close toggle (hover previously opened the panel on
+  // mouse-enter, so the click toggle then closed it — making the button appear
+  // to do nothing). Close when a pointer goes down outside the trigger and the
+  // panel, so clicking a link inside the panel never dismisses it.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      const t = event.target;
+      if (triggerRef.current && triggerRef.current.contains(t)) return;
+      if (panelRef.current && panelRef.current.contains(t)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown, true);
+    document.addEventListener("touchstart", onPointerDown, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown, true);
+      document.removeEventListener("touchstart", onPointerDown, true);
+    };
+  }, [open]);
 
   // Track narrow-screen state so hover is disabled on touch-width screens.
   useEffect(() => {
@@ -221,23 +242,12 @@ export default function SpeakerInfo({
 
   return (
     <>
-      <div
-        style={{ position: "relative", display: "inline-flex", justifyContent: "center" }}
-        onMouseEnter={() => {
-          if (!isNarrow) setOpen(true);
-        }}
-        onMouseLeave={() => {
-          if (!isNarrow) setOpen(false);
-        }}
-      >
+      <div style={{ position: "relative", display: "inline-flex", justifyContent: "center" }}>
         <button
           ref={triggerRef}
           type="button"
           aria-label="Show source speaker data"
-          onFocus={() => setOpen(true)}
-          onBlur={() => {
-            if (!isNarrow) setOpen(false);
-          }}
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
           style={{
             width: 26,
@@ -256,7 +266,9 @@ export default function SpeakerInfo({
           <Info size={14} />
         </button>
       </div>
-      {open && !isNarrow && renderPanel(false)}
+      {open && !isNarrow && (
+        <div ref={panelRef}>{renderPanel(false)}</div>
+      )}
       {open && isNarrow && (
         <div
           onClick={closePanel}
@@ -271,7 +283,7 @@ export default function SpeakerInfo({
             padding: 16,
           }}
         >
-          <div onClick={(e) => e.stopPropagation()}>{renderPanel(true)}</div>
+          <div ref={panelRef} onClick={(e) => e.stopPropagation()}>{renderPanel(true)}</div>
         </div>
       )}
     </>
