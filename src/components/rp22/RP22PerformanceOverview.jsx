@@ -21,8 +21,8 @@
  *
  * Hovering a pill opens a Radix Popover (the same portaled, collision-aware
  * component SpeakerInfo uses) listing every parameter responsible for
- * limiting that pillar to its displayed level, with parameter number, name
- * and affected seating positions.
+ * limiting that pillar to its displayed level, by parameter number and exact
+ * headline (matching the Live RP22 Performance Summary).
  *
  * The Artcoustic System Design Rating and the Live RP22 Performance Summary
  * are unchanged and remain independently collapsible alongside this panel.
