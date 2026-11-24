@@ -137,12 +137,17 @@ async function readAlertConfig(serviceClient) {
  * Build the HTML body for the alert email. Uses the Sound Proof brand colors.
  * Never includes proposal text, client names or credentials.
  */
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity, user_blocked, workaround_available, cause_classification }) {
+  reference=escapeHtml(reference); component=escapeHtml(component); operation=escapeHtml(operation);
+  diagnosticSummary=escapeHtml(diagnosticSummary);
+  identity=Object.fromEntries(Object.entries(identity || {}).map(([k,v])=>[k,v == null ? null : escapeHtml(v)]));
+  const isTest = operation === 'controlled_alert_test';
   const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
   const severityColor = severity === 'critical' ? '#B23A3A' : (severity === 'high' ? '#625143' : '#3E4349');
   const incidentUrl = `https://soundproofcinemadesigner.com/admin/system-health?incident=${encodeURIComponent(reference)}`;
-  const dealerName = identity?.dealerName || 'Unknown';
-  const projectName = identity?.projectName || 'Unknown';
+  const dealerName = identity?.dealerName || (isTest ? 'Administrator test' : 'Not resolved — see account ID');
+  const projectName = identity?.projectName || (isTest ? 'No project selected for this test' : 'No project context available');
   const clientName = identity?.clientName || null;
   const projectDisplay = clientName ? `${projectName} (${clientName})` : projectName;
   const blockedLabel = user_blocked === true ? 'Yes — user cannot proceed without a fix'
@@ -204,13 +209,13 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
                 <tr>
                   <td class="content-card" style="padding:40px;">
                     <h1 style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:22px;font-weight:700;color:#213428;margin:0 0 6px;line-height:1.25;text-align:center;">
-                      System Health Incident
+                      ${isTest ? 'System Health — Test Alert' : 'System Health Incident'}
                     </h1>
                     <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:14px;font-weight:600;color:#625143;margin:0 0 24px;text-align:center;letter-spacing:0.02em;">
                       ${reference}
                     </p>
                     <p style="color:#1B1A1A;font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:15px;margin:0 0 20px;line-height:1.5;font-weight:400;">
-                      A significant operation failure has been recorded in Sound Proof. The incident has been logged for administrator review.
+                      ${isTest ? 'This is a controlled alert delivery test. No dealer failure occurred.' : 'A user-experience failure has been recorded in Sound Proof for administrator review.'}
                     </p>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px;">
                       <tr>
@@ -219,8 +224,11 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
                             <tr><td style="padding:4px 0;color:#625143;width:110px;font-weight:600;">Component:</td><td style="padding:4px 0;color:#1B1A1A;">${component}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Operation:</td><td style="padding:4px 0;color:#1B1A1A;">${operation}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Severity:</td><td style="padding:4px 0;color:${severityColor};font-weight:700;">${severityLabel}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Account:</td><td style="padding:4px 0;">${identity?.accountName || (isTest ? "Administrator test" : "Not resolved — see account ID")}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Dealer:</td><td style="padding:4px 0;color:#1B1A1A;">${dealerName}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Project:</td><td style="padding:4px 0;color:#1B1A1A;">${projectDisplay}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Reference:</td><td style="padding:4px 0;">${identity?.projectReference || "Not applicable"}</td></tr>
+                            <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Version:</td><td style="padding:4px 0;">${identity?.versionName || "No design version selected"}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Cause:</td><td style="padding:4px 0;color:#1B1A1A;">${causeLabel}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">User blocked:</td><td style="padding:4px 0;color:#1B1A1A;">${blockedLabel}</td></tr>
                             <tr><td style="padding:4px 0;color:#625143;font-weight:600;">Workaround:</td><td style="padding:4px 0;color:#1B1A1A;">${workaroundLabel}</td></tr>
@@ -279,23 +287,32 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
  * Returns { dealerName, projectName, clientName } with null for any value
  * that cannot be resolved. Never invents identity information.
  */
-async function resolveIncidentIdentity(serviceClient, { account_id, project_id }) {
-  const identity = { dealerName: null, projectName: null, clientName: null };
-  if (!account_id && !project_id) return identity;
-  try {
-    if (account_id) {
-      const acctResult = await serviceClient.asServiceRole.entities.Account.filter({ id: account_id }, { limit: 1 });
-      const acct = (Array.isArray(acctResult) ? acctResult : (acctResult?.items || []))[0] || null;
-      if (acct?.name) identity.dealerName = acct.name;
-    }
-    if (project_id) {
-      const projResult = await serviceClient.asServiceRole.entities.Project.filter({ id: project_id }, { limit: 1 });
-      const proj = (Array.isArray(projResult) ? projResult : (projResult?.items || []))[0] || null;
-      if (proj?.name) identity.projectName = proj.name;
-      if (proj?.client_name) identity.clientName = proj.client_name;
-    }
-  } catch {
-    // Fail-open: identity resolution must not block the notification.
+export async function resolveIncidentIdentity(serviceClient, { account_id, project_id, version_id }) {
+  const identity = { accountName:null, dealerName:null, projectName:null, clientName:null, projectReference:null, versionName:null };
+  const first = r => (Array.isArray(r) ? r : r?.items || [])[0] || null;
+  let project = null;
+  if (project_id) {
+    try {
+      project = first(await serviceClient.asServiceRole.entities.Project.filter({id:project_id}, '-updated_date', 1));
+      identity.projectName = project?.name || null;
+      identity.clientName = project?.client_name || null;
+      identity.projectReference = project?.project_reference || null;
+      identity.dealerName = project?.dealer_name || null;
+    } catch {}
+  }
+  const accountId = project?.account_id || account_id;
+  if (accountId) {
+    try {
+      const account = first(await serviceClient.asServiceRole.entities.Account.filter({id:accountId}, '-updated_date', 1));
+      identity.accountName = account?.name || null;
+      identity.dealerName ||= account?.name || null;
+    } catch {}
+  }
+  if (version_id && project_id) {
+    try {
+      const version = first(await serviceClient.asServiceRole.entities.ProjectVersion.filter({id:version_id, project_id}, '-updated_date', 1));
+      identity.versionName = version?.name || version?.version_name || null;
+    } catch {}
   }
   return identity;
 }
@@ -317,7 +334,7 @@ async function sendAlertNotification(serviceClient, { reference, component, oper
     return { status: 'skipped', sent_at: null, error: `Severity ${severity} does not warrant an alert` };
   }
 
-  const subject = `Sound Proof Incident ${reference}: ${operation} failed (${severity})`;
+  const subject = operation === "controlled_alert_test" ? `Sound Proof TEST alert ${reference}${identity?.projectName ? ": " + identity.projectName : ""}` : `Sound Proof ${severity}: ${identity?.accountName || identity?.dealerName || "account unresolved"} — ${identity?.projectName || operation} — ${reference}`;
   const html = buildAlertEmailHtml({ reference, component, operation, severity, diagnosticSummary, identity, user_blocked, workaround_available, cause_classification });
 
   let lastError = null;
@@ -540,10 +557,12 @@ export async function recordSystemIncident(serviceClient, details) {
     data_integrity_summary = null,
     test_run_id = null,
     grouping_scope = null,
+    version_id = null, page_path = null, error_detail = null, component_stack = null,
   } = details;
 
+  const identity = await resolveIncidentIdentity(serviceClient, {account_id, project_id, version_id});
   const fingerprint = computeIncidentFingerprint({
-    component, operation, errorCode: error_code, violationCodes: grouping_scope ? [grouping_scope] : [],
+    component, operation, errorCode: error_code, violationCodes: [account_id, project_id, version_id, grouping_scope].filter(Boolean),
   });
 
   const now = new Date().toISOString();
@@ -553,6 +572,9 @@ export async function recordSystemIncident(serviceClient, details) {
   const { user_blocked, workaround_available } = determineUserImpact(error_code, component);
 
   const enrichedFields = {
+    version_id, page_path, error_detail, component_stack,
+    account_name:identity.accountName, dealer_name:identity.dealerName, project_name:identity.projectName,
+    client_name:identity.clientName, project_reference:identity.projectReference, version_name:identity.versionName,
     operation_id: operation_id || null,
     operation_started_at: operation_started_at || null,
     operation_last_progress_at: operation_last_progress_at || null,
@@ -623,9 +645,8 @@ export async function recordSystemIncident(serviceClient, details) {
     });
 
     // Send the alert email (fail-open). Only sent for critical/high severity.
-    const identity = await resolveIncidentIdentity(serviceClient, { account_id, project_id });
     const notificationResult = await sendAlertNotification(serviceClient, {
-      reference, component, operation, severity, diagnosticSummary: diagnostic_summary, identity,
+      reference, component, operation, severity, diagnosticSummary: [diagnostic_summary, page_path && `Page: ${page_path}.`, error_detail && `Detail: ${error_detail}`, account_id && `Account ID: ${account_id}.`, project_id && `Project ID: ${project_id}.`, version_id && `Version ID: ${version_id}.`].filter(Boolean).join(" "), identity,
       user_blocked, workaround_available, cause_classification,
     });
 

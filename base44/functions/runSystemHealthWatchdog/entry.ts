@@ -33,7 +33,7 @@ export default async function(req) {
       { state: { $in: ['running', 'suspected_stalled'] } },
       { sort: '-started_at', limit: 100 },
     );
-    const operations = page?.items || [];
+    const operations = Array.isArray(page) ? page : page?.items || [];
     results.checked = operations.length;
 
     for (const op of operations) {
@@ -59,6 +59,7 @@ export default async function(req) {
               severity,
               account_id: op.account_id || null,
               project_id: op.project_id || null,
+              version_id: op.version_id || null,
               diagnostic_summary: diagnostic,
               operation_id: op.operation_id,
               operation_started_at: op.started_at || null,
@@ -70,11 +71,11 @@ export default async function(req) {
             });
 
             await base44.asServiceRole.entities.MonitoredOperation.update(op.id, {
-              state: 'failed',
+              state: incidentResult?.recorded ? 'failed' : 'suspected_stalled',
               error_code: 'OPERATION_STALLED',
               diagnostic_summary: diagnostic,
               incident_reference: incidentResult?.reference || null,
-              watchdog_notified: true,
+              watchdog_notified: incidentResult?.recorded === true,
             });
             results.confirmed++;
           }

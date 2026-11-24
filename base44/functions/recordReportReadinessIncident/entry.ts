@@ -11,7 +11,7 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
-    const access = await resolveAccountAccess(base44, user);
+    const access = await resolveAccountAccess(base44, user, { bootstrapLegacyMembership: false });
     try { assertCapability(access, 'soundProof'); }
     catch { return Response.json({ error: 'FORBIDDEN' }, { status: 403 }); }
     const body = await req.json().catch(() => ({}));
@@ -43,7 +43,7 @@ export default async function(req) {
     ].join(' ');
     const result = await recordSystemIncident(base44, {
       component: 'report_readiness', operation: `${reportType}_report`, error_code: code,
-      severity: 'high', account_id: owned.projectAccountId, project_id: projectId,
+      severity: 'high', account_id: owned.projectAccountId, project_id: projectId, version_id:versionId,
       grouping_scope: `${projectId}::${versionId}`,
       diagnostic_summary: diagnostic, operation_id: `${reportType}::${projectId}::${versionId}`,
       stage_failed: 'saved_engineering_readiness', data_committed: false,
