@@ -1,3 +1,4 @@
+import {reportClientFailure} from '@/components/systemHealth/clientExperienceMonitor';
 /**
  * useAutoDesignIntent
  * -------------------
@@ -102,7 +103,7 @@ async function readSnapshot(projectId, versionId) {
     { project_id: projectId, version_id: versionId, report_type: 'project' },
     { limit: 1 },
   );
-  return (page?.items || [])[0] || null;
+  return (Array.isArray(page)?page:page?.items || [])[0] || null;
 }
 
 /**
@@ -184,6 +185,7 @@ export default function useAutoDesignIntent({ projectId, versionId, enabled = fa
     } catch (err) { outcome = AUTO_INTENT.FAILED; refusalReason = err?.message || null; }
     inFlight.delete(key);
     setStatus(key, outcome, generation, refusalReason);
+    if(outcome===AUTO_INTENT.FAILED)reportClientFailure({code:'REPORT_NARRATIVE_FAILED',operation:'report-design-summary',projectId,versionId,detail:refusalReason || 'Report writer did not return an accepted saved summary.'});
     window.dispatchEvent(new Event(INTENT_UPDATED_EVENT));
   }, [key, projectId, versionId, onBeforeGenerate, skipQuestionIds]);
 

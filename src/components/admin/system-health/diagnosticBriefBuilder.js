@@ -57,6 +57,7 @@ function describeExpected(errorCode, component) {
 function describeActual(incident) {
   const parts = [];
   parts.push(`Error code: ${safe(incident.error_code)}`);
+  if (incident.runtime_environment) parts.push(`Environment: ${incident.runtime_environment}`);
   if (incident.diagnostic_summary) {
     parts.push(`Diagnostic: ${incident.diagnostic_summary}`);
   }

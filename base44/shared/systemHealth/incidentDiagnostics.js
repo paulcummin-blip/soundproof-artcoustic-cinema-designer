@@ -32,6 +32,7 @@ export function classifyCause(errorCode, component = '') {
   // Direct failures where the error code states the cause.
   const confirmedCauses = {
     CONTROLLED_ALERT_TEST:'Controlled administrator test; no dealer failure occurred.',
+    REPORT_NARRATIVE_FAILED:'The report writer returned a refusal or its accepted text could not be read back. The recorded reason identifies the failed stage.',
     RENDER_FAILED:'A React render boundary caught an exception. The stack identifies the affected component; the underlying defect needs investigation.',
     RENDER_VALUE_REJECTED:'The render boundary rejected a non-renderable child. Its JavaScript type is recorded.',
     DATA_REQUEST_FAILED:'An application data request returned an error; the operation and HTTP status are recorded.',
@@ -85,7 +86,7 @@ export function determineUserImpact(errorCode, component = '') {
   const code = errorCode || 'UNKNOWN';
 
   if (code === 'CONTROLLED_ALERT_TEST') return {user_blocked:false,workaround_available:null};
-  if (['RENDER_FAILED','RENDER_VALUE_REJECTED','PROJECT_LOAD_FAILED','BASS_CALCULATION_FAILED','ADI_OPTIMISATION_FAILED'].includes(code)) return {user_blocked:true,workaround_available:null};
+  if (['REPORT_NARRATIVE_FAILED','RENDER_FAILED','RENDER_VALUE_REJECTED','PROJECT_LOAD_FAILED','BASS_CALCULATION_FAILED','ADI_OPTIMISATION_FAILED'].includes(code)) return {user_blocked:true,workaround_available:null};
 
   // Pre-condition failures: the user cannot proceed until the condition is
   // fixed. No workaround is available — they must regenerate the report or

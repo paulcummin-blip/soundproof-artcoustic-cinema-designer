@@ -252,7 +252,7 @@ function buildAlertEmailHtml({ reference, component, operation, severity, diagno
                       </tr>
                     </table>
                     <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:13px;color:#625143;margin:0 0 6px;line-height:1.5;">
-                      No client content, credentials or confidential information is included in this notification.
+                      This private administrator alert contains account and project identifiers and diagnostic details. It excludes credentials, design briefs and document content.
                     </p>
                     <p style="font-family:'Didact Gothic','Century Gothic',Arial,sans-serif;font-size:15px;font-weight:700;color:#213428;margin:18px 0 4px;">
                       The Sound Proof Team<br>Artcoustic

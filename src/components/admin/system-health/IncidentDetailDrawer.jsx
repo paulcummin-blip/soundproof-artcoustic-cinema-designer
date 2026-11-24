@@ -279,7 +279,7 @@ export default function IncidentDetailDrawer({ incident, onClose, onUpdated }) {
             padding: 12, borderRadius: 8, border: `1px solid ${BRAND.border}`,
             lineHeight: 1.5,
           }}>
-            {incident.diagnostic_summary || 'No diagnostic summary available.'}
+            {incident.runtime_environment && `Environment: ${incident.runtime_environment}. `}{incident.diagnostic_summary || 'No diagnostic summary available.'}
             <p>{[incident.account_name,incident.project_name,incident.client_name,incident.project_reference,incident.version_name].filter(Boolean).join(" · ")}</p>
             <p>{incident.page_path || ""}</p>
             {incident.error_detail && <p>{incident.error_detail}</p>}
