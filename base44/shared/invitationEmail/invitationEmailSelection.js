@@ -1,11 +1,11 @@
 /**
  * Canonical invitation-email selection authority.
  *
- * Determines which branded supplementary email wording applies to a given
- * invitation, based on the authoritative dealer account classification and
- * the invitation type. Used by sendBrandedInvitationEmail so every invitation
- * path (Portal activation, master-admin dealer invite, account-admin
- * additional-user invite, and resends) selects wording from the same rule.
+ * Determines which branded welcome email wording applies to a given
+ * acceptance, based on the authoritative dealer account classification and
+ * the invitation type. Used by sendWelcomeEmail so every acceptance path
+ * (Portal-first activation, master-admin dealer invite, account-admin
+ * additional-user invite) selects wording from the same rule.
  *
  * Selection rules (priority order):
  *   1. Additional-user invitation (joining an existing activated account) →

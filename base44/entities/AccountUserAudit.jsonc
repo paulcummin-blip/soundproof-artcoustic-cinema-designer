@@ -1,7 +1,7 @@
 {
   "name": "AccountUserAudit",
   "type": "object",
-  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance, Partner Portal identity claims, Portal-first activation, term starts, renewals, eligibility changes and per-user successful login tracking. Written only by trusted backend functions.",
+  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance, Partner Portal identity claims, Portal-first activation, term starts, renewals, eligibility changes, per-user successful login tracking and welcome-email delivery. Written only by trusted backend functions.",
   "properties": {
     "account_id": {
       "type": "string"
@@ -29,7 +29,9 @@
         "PORTAL_ACTIVATION_REQUESTED",
         "SOUNDPROOF_TERM_STARTED",
         "SOUNDPROOF_RENEWED",
-        "USER_LOGIN_RECORDED"
+        "USER_LOGIN_RECORDED",
+        "WELCOME_EMAIL_SENT",
+        "WELCOME_EMAIL_FAILED"
       ]
     },
     "target_user_id": {

@@ -1,5 +1,6 @@
 import { validatePilotPortalAccessIfRequired } from './portalSsoAuthority.js';
 import { startSoundProofTermOnFirstClaim } from './portalActivationAuthority.js';
+import { sendWelcomeEmail } from './invitationEmail/sendWelcomeEmail.js';
 import {
   ACCESS_LEVELS,
   ACTIVE_SEAT_STATUSES,
@@ -411,7 +412,23 @@ export async function resolveAccountAccess(base44, sessionUser, {
       afterAccessLevel: accessLevel,
     });
 
-
+    // One-time personalised welcome email. Sent only on the pending→active
+    // transition, after the membership is active, the user is projected and
+    // (for Portal first-admin) the 90-day term has started. The atomic claim
+    // inside sendWelcomeEmail guarantees at most one welcome per membership
+    // across concurrent acceptance requests and repeated logins. Fail-open:
+    // a delivery failure is recorded in the audit trail but never blocks
+    // successful registration, membership acceptance or account activation.
+    try {
+      await sendWelcomeEmail(service, base44, {
+        account,
+        membership,
+        user: authoritativeUser,
+        isAccountAdmin,
+      });
+    } catch {
+      // Welcome delivery is best-effort and never blocks access.
+    }
   }
 
   // Richer Sounds delegated administration: an active member of the verified

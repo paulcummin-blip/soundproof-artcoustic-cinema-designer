@@ -1,23 +1,24 @@
 /**
- * Branded supplementary invitation email templates + renderer.
+ * Branded WELCOME email templates + renderer.
  *
  * Three cohesive branded emails reuse the existing Sound Proof email design
- * (brand header, content card, footer) with different body copy:
- *   - premiumPartner : the existing Premium Partner invitation wording, unchanged
- *   - generalDealer  : general dealer wording (Trade, Richer Sounds, Other…)
- *   - additionalUser  : additional-user wording (joining an existing account)
+ * (brand header, content card, footer) with different body copy, sent ONLY
+ * after a recipient has successfully registered, signed in, claimed their
+ * pending membership and joined their Sound Proof account:
+ *   - premiumPartner : Premium Partner welcome (retains existing marketing message)
+ *   - generalDealer  : general dealer welcome (Trade, Richer Sounds, Other…)
+ *   - additionalUser  : additional-user welcome (joined an existing account)
  *
- * The secure registration link ({{action_url}}) is delivered by the native
- * platform invitation email (UserInvite.html); it cannot be retrieved for use
- * here. These branded emails' "Accept your invitation" button links to the
- * app, where the recipient signs in after registering via the native email.
+ * The secure registration link was delivered earlier by the native platform
+ * invitation email (UserInvite.html). These welcome emails' "Open Sound Proof"
+ * button links to the normal Sound Proof website, NOT the registration URL.
  *
  * Rendered to raw inbox-safe HTML (inline styles, 600px table) and sent via
  * SendEmail with an `html` body and {{variable}} substitution performed here,
  * so no unresolved placeholder is ever emitted.
  */
 
-const APP_URL = 'https://soundproofcinemadesigner.com';
+const APP_URL = 'https://www.soundproofcinemadesigner.com';
 const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg';
 const FONT = "'Didact Gothic', 'Century Gothic', Arial, sans-serif";
 
@@ -115,20 +116,20 @@ const HEAD = (title, preview) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const BTN = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="invite-wrap" style="margin:8px 0 28px;">
+const OPEN_BTN = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="invite-wrap" style="margin:8px 0 28px;">
     <tr>
         <td style="text-align:center;">
             <a href="${APP_URL}" class="invite-btn" style="background-color:#213428;color:#FFFFFF;text-decoration:none;display:inline-block;width:auto;max-width:100%;box-sizing:border-box;padding:14px 34px;border-radius:8px;font-family:${FONT};font-size:16px;font-weight:600;border:1px solid #213428;">
-                Accept your invitation
+                Open Sound Proof
             </a>
         </td>
     </tr>
 </table>`;
 
-const ABOUT_BOX = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 18px;">
+const SIGN_IN_BOX = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 18px;">
     <tr>
         <td class="about-box" style="background-color:#F3F0EB;border-radius:8px;padding:20px 22px;text-align:left;border:1px solid #DCDBD6;">
-            <p style="margin:0 0 6px;color:#1B1A1A;font-family:${FONT};font-size:16px;font-weight:400;line-height:1.5;">Once registered, you can sign in directly at:</p>
+            <p style="margin:0 0 6px;color:#1B1A1A;font-family:${FONT};font-size:16px;font-weight:400;line-height:1.5;">You can sign in directly at:</p>
             <p style="margin:0;"><a href="${APP_URL}" style="color:#213428;font-family:${FONT};font-size:16px;font-weight:700;text-decoration:none;">www.soundproofcinemadesigner.com</a></p>
         </td>
     </tr>
@@ -144,22 +145,16 @@ function premiumPartnerBody() {
     Welcome to Sound Proof
 </h1>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 16px;line-height:1.5;font-weight:400;">
-    As an Artcoustic Premium Partner, you've been invited to join Sound Proof with early access and unlimited usage for 3 months. Sound Proof is Artcoustic's professional home cinema design platform.
+    As an Artcoustic Premium Partner, you now have access to Sound Proof with early access and unlimited usage for 3 months. Sound Proof is Artcoustic's professional home cinema design platform.
 </p>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 24px;line-height:1.5;font-weight:400;">
     Sound Proof helps you design, develop and present home cinema systems, with loudspeaker placement, acoustic analysis and performance predictions aligned with CEDIA RP22 principles.
 </p>
-${BTN}
-<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
-    Getting started
-</h2>
-<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
-    Accept your invitation and create your personal login.
-</p>
+${OPEN_BTN}
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 18px;line-height:1.5;font-weight:400;">
-    Your dealer account includes an initial <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">90-day licence</strong>, starting when the first account administrator completes activation.
+    Your Sound Proof account is now active. Your initial <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">90-day licence</strong> has started.
 </p>
-${ABOUT_BOX}
+${SIGN_IN_BOX}
 <p class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 6px;line-height:1.3;">
     Device compatibility
 </p>
@@ -206,23 +201,20 @@ function generalDealerBody({ includePromo, promoExpiry }) {
     Welcome to Sound Proof
 </h1>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 16px;line-height:1.5;font-weight:400;">
-    You've been invited to join Sound Proof, Artcoustic's professional home cinema design platform.
+    Welcome to Sound Proof, Artcoustic's professional home cinema design platform.
 </p>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 24px;line-height:1.5;font-weight:400;">
     Sound Proof helps you design, develop and present home cinema systems, with loudspeaker placement, acoustic analysis and performance predictions aligned with CEDIA RP22 principles.
 </p>
-${BTN}
-<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
-    Getting started
-</h2>
+${OPEN_BTN}
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
-    Accept your invitation and create your personal login.
+    Your Sound Proof account is now active.
 </p>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 18px;line-height:1.5;font-weight:400;">
-    Your dealer account includes an initial <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">90-day licence</strong>, starting when the first account administrator completes activation.
+    Your initial <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">90-day licence</strong> has started.
 </p>
 ${promoParagraph}
-${ABOUT_BOX}
+${SIGN_IN_BOX}
 ${SIGN_OFF}`;
 }
 
@@ -231,45 +223,38 @@ function additionalUserBody() {
     Welcome to Sound Proof
 </h1>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 16px;line-height:1.5;font-weight:400;">
-    You've been invited to join your company's Sound Proof account.
+    You've successfully joined your company's Sound Proof account.
 </p>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 24px;line-height:1.5;font-weight:400;">
-    Sound Proof is Artcoustic's professional home cinema design platform, helping you design, develop and present home cinema systems aligned with CEDIA RP22 principles.
+    You can now access Sound Proof to design, develop and present professional home cinema systems aligned with CEDIA RP22 principles.
 </p>
-${BTN}
-<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
-    Getting started
-</h2>
-<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
-    Accept your invitation and create your personal login to access your company's Sound Proof workspace.
-</p>
+${OPEN_BTN}
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 18px;line-height:1.5;font-weight:400;">
     Your access is managed by your company's Sound Proof account administrator and is subject to the existing dealer account licence.
 </p>
-${ABOUT_BOX}
+${SIGN_IN_BOX}
 ${SIGN_OFF}`;
 }
 
 const SUBJECTS = {
-  premiumPartner: "You're invited to Sound Proof",
-  generalDealer: "You're invited to Sound Proof",
-  additionalUser: "You're invited to Sound Proof",
+  premiumPartner: "Welcome to Sound Proof",
+  generalDealer: "Welcome to Sound Proof",
+  additionalUser: "Welcome to Sound Proof",
 };
 
 const PREVIEWS = {
-  premiumPartner: "Welcome to Sound Proof, Artcoustic's professional home cinema design platform.",
-  generalDealer: "You've been invited to join Sound Proof, Artcoustic's professional home cinema design platform.",
-  additionalUser: "You've been invited to join your company's Sound Proof account.",
+  premiumPartner: "Your Sound Proof account is now active. As an Artcoustic Premium Partner you have early access and unlimited usage for 3 months.",
+  generalDealer: "Your Sound Proof account is now active. Welcome to Artcoustic's professional home cinema design platform.",
+  additionalUser: "You've successfully joined your company's Sound Proof account.",
 };
 
 /**
- * Render the branded supplementary email for a selection result.
+ * Render the branded welcome email for a selection result.
  *
  * @param {{template: string, includePromo: boolean, promoExpiry: string|null}} selection
- * @param {{firstName?: string|null}} [options]
  * @returns {{subject: string, html: string}}
  */
-export function renderInvitationEmail(selection, options = {}) {
+export function renderWelcomeEmail(selection) {
   let body;
   if (selection.template === 'premiumPartner') {
     body = premiumPartnerBody();

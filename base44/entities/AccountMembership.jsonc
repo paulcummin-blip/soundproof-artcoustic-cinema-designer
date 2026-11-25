@@ -93,6 +93,23 @@
       "type": "string",
       "nullable": true,
       "description": "Unique Portal activation request ID (jti) that created this pending admin seat. Set only on the first dealer-admin membership created through Portal-first activation. Used to identify the Portal-originated first-admin claim that starts the 90-day term, and to reject replayed activation grants. Null for ordinary admin-invited seats."
+    },
+    "welcome_email_state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sent",
+        "failed"
+      ],
+      "default": "pending",
+      "nullable": true,
+      "description": "One-time welcome-email notification state. 'pending' = not yet sent (default for new invitations). 'sent' = a welcome email was claimed and delivered after successful membership acceptance. 'failed' = the claim was won but SendEmail delivery failed (no auto-retry). Null for legacy memberships created before this field existed; the atomic claim treats null as pending so a pre-existing pending invitation that is accepted after this feature ships still receives its welcome exactly once. Claimed atomically via conditional updateMany so concurrent acceptance requests cannot send duplicate welcomes."
+    },
+    "welcome_email_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the welcome email claim was won. Null until the one-time claim succeeds."
     }
   },
   "required": [
