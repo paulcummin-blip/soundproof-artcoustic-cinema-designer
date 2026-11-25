@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { readProjectRecord } from '@/components/state/projectReadCache';
 import useDocumentWorkflowStatus from '@/components/documentWorkflow/useDocumentWorkflowStatus';
@@ -10,7 +10,7 @@ import BackToProposalLink from '@/components/report/BackToProposalLink';
 
 // A normal report visit is a stored-file read. It never mounts the composition,
 // ADI, snapshot persistence or drawing/capture hooks.
-export default function StoredTechnicalReport({ projectId, requestedVersionId }) {
+export default function StoredTechnicalReport({ projectId, requestedVersionId, downloadOnOpen = false }) {
   const navigate = useNavigate();
   const [version, setVersion] = useState(requestedVersionId || null);
   const [identityError, setIdentityError] = useState(null);
@@ -54,6 +54,12 @@ export default function StoredTechnicalReport({ projectId, requestedVersionId })
     } catch (error) { setFileError(error?.message || 'The saved PDF could not be retrieved. Retry retrieval.'); }
     finally { setBusy(false); }
   };
+  const downloaded = useRef(false);
+  useEffect(() => {
+    if (!downloadOnOpen || downloaded.current || !record || status.loading) return;
+    downloaded.current = true;
+    run(downloadIssuedDocument);
+  }, [downloadOnOpen, record?.id, status.loading]);
   const pending = !identityError && (!version || status.loading);
   return <main style={{ padding: 24, fontFamily: 'Didact Gothic, sans-serif' }}>
     <h1>Technical Report</h1>
