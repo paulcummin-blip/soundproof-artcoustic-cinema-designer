@@ -151,12 +151,17 @@ export function useClientReportPdfExport({
       ...payload,
     }).catch(() => {});
   }, []);
+  const lastMonitorProgress = useRef({ stage: null, at: 0 });
   const updateProgress = useCallback((progress) => {
     progressStoreRef.current.set(progress);
     if (exportTimingsRef.current) exportTimingsRef.current.mark(progress.stage, progress.message);
     console.info('[ReportExport]', progress.stage, progress.message);
     // Report stage change to the backend watchdog (fire-and-forget).
-    reportOperation('progress', { stage: progress.stage });
+    const now = Date.now();
+    if (progress.stage !== lastMonitorProgress.current.stage || now - lastMonitorProgress.current.at >= 10000) {
+      lastMonitorProgress.current = { stage: progress.stage, at: now };
+      reportOperation('progress', { stage: progress.stage });
+    }
   }, [reportOperation]);
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
@@ -441,8 +446,20 @@ export function useClientReportPdfExport({
   // SAME saved authority, without regenerating the one that succeeded or
   // re-running the whole export.
   const retryMissing = useCallback(async (documentKey) => {
+    if (printingRef.current) return;
     const last = lastExportRef.current;
     if (!last) return retryExportRef.current?.({ storeOnly: storeOnlyRef.current });
+    printingRef.current = true;
+    setExporting(true);
+    operationIdRef.current = crypto.randomUUID();
+    exportTimingsRef.current = createExportTimings();
+    reportOperation('start', {
+      operation_type: 'report_export',
+      account_id: last.reportIdentity?.accountId || null,
+      project_id: last.reportIdentity?.projectId || null,
+      version_id: last.reportIdentity?.versionId || null,
+      initial_stage: 'readiness',
+    });
     setPublication((prev) => ({
       ...prev,
       status: "storing",
@@ -457,6 +474,7 @@ export function useClientReportPdfExport({
       onProgress: updateProgress,
     }).catch(error => ({ ok: false, error: error?.message || 'Storage recovery failed. Retry storage.' }));
     if (result.ok) {
+      reportOperation('complete');
       // Re-evaluate the remaining failures: if none remain, the publication is
       // complete; otherwise the incomplete state persists for the other document.
       setPublication((prev) => {
@@ -466,6 +484,8 @@ export function useClientReportPdfExport({
           : { status: "complete", failed: [] };
       });
     } else {
+      setError(result.error || 'Report recovery failed. Retry the incomplete document.');
+      reportOperation('fail', { error_code: 'EXPORT_RECOVERY_FAILED', diagnostic_summary: result.error || 'Report recovery failed.' });
       setPublication((prev) => ({
         status: "incomplete",
         failed: prev.failed.some((entry) => entry.key === documentKey)
@@ -475,7 +495,9 @@ export function useClientReportPdfExport({
           : [...prev.failed, { key: documentKey, error: result.error }],
       }));
     }
-  }, []);
+    exportTimingsRef.current?.report();
+    cleanup();
+  }, [cleanup, reportOperation, updateProgress]);
 
   return { exporting, error, progressStore: progressStoreRef.current, handleExport, publication, retryMissing, PUBLICATION_DOCUMENT };
 }
