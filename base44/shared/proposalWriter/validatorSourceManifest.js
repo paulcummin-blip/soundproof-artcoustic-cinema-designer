@@ -1,7 +1,7 @@
 /** SHA-256 of the bundled validator sources; regenerated with every rules edit. */
 export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerOutputValidator.js': '9abc142f30279dc77f186b95d430b6f13916997492e19f8b086f11bedca0284c',
-  'base44/shared/proposalWriter/writerProseScanner.js': 'bd0b3d24a6677d2949b460e8da95b05396030e8c4b9aa025a9c158fe6361e9e5',
+  'base44/shared/proposalWriter/writerProseScanner.js': '341f6e039708f6c356f15169d62d1425a19cd898eeac1ca66a4691e9265f2a38',
   'base44/shared/proposalWriter/writerOutputTextRules.js': 'ab466312229102216109229586a07a9e6401820ba3a548f726ee6c5c2618ed74',
   // The established-principle register: which sentences are design reasoning (an
   // established principle, or the designer's recorded intention) rather than a claim
@@ -13,7 +13,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
   'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
   'base44/shared/proposalWriter/writerVocabulary.js': '53b036a5ffa43d63c12fdebac504562345ce40852869fc365f0321db46e792b5',
-  'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
+  'base44/shared/proposalWriter/writerClausePrecision.js': '92cb1f4cc600bb50c2790e3c1b4b08b5e35b10f8adfefa19a95ff70a895dd092',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
   'base44/shared/proposalWriter/writerContractSchema.js': '8a43176be9b47411a941c8af2911d2214a1af24a4027b4e38a2515cbe0642751',
