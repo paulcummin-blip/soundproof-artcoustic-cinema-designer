@@ -65,23 +65,55 @@ function UnreadBadge({ count, label, tone }) {
  * replacing the count line. When count is 0 or unread is absent the card keeps
  * its existing normal appearance.
  */
-export default function AdminSectionCard({ title, description, status, count, href, unread }) {
+export default function AdminSectionCard({ title, description, status, count, href, unread, extraContent }) {
   const hasUnread = Boolean(unread && unread.count > 0);
   const accent = hasUnread ? (UNREAD_ACCENTS[unread.tone] || UNREAD_ACCENTS.activity) : null;
+
+  const cardStyle = {
+    display: "block", textDecoration: "none",
+    background: BRAND.card,
+    border: `1px solid ${BRAND.border}`,
+    borderLeft: hasUnread ? `4px solid ${accent.border}` : `1px solid ${BRAND.border}`,
+    borderRadius: 14, padding: 22,
+    transition: "box-shadow 0.15s, transform 0.15s",
+  };
+  const onEnter = (e) => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.transform = "translateY(-2px)"; };
+  const onLeave = (e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; };
+
+  // When extraContent is provided (e.g. the live summary), the card body becomes
+  // a div so the extra content — which may contain its own links — sits inside
+  // valid HTML. The title links to the destination and the Manage link stays.
+  if (extraContent) {
+    return (
+      <div style={cardStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+          <a href={href} style={{ fontSize: 17, fontWeight: 700, color: BRAND.text, textDecoration: "none" }}>{title}</a>
+          <StatusBadge status={status} />
+        </div>
+        <div style={{ fontSize: 13, color: BRAND.subtext, marginBottom: 16, lineHeight: 1.4 }}>
+          {description}
+        </div>
+        {extraContent}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {hasUnread
+              ? <UnreadBadge count={unread.count} label={unread.label} tone={unread.tone} />
+              : <span style={{ fontSize: 13, fontWeight: 600, color: BRAND.text }}>{count}</span>}
+          </div>
+          <a href={href} style={{ fontSize: 13, fontWeight: 700, color: "#213428", textDecoration: "none" }}>
+            Manage →
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <a
       href={href}
-      style={{
-        display: "block", textDecoration: "none",
-        background: BRAND.card,
-        border: `1px solid ${BRAND.border}`,
-        borderLeft: hasUnread ? `4px solid ${accent.border}` : `1px solid ${BRAND.border}`,
-        borderRadius: 14, padding: 22,
-        transition: "box-shadow 0.15s, transform 0.15s",
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; }}
+      style={cardStyle}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: BRAND.text }}>{title}</div>

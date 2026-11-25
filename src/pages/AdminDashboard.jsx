@@ -3,7 +3,9 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import AdminSectionCard from "@/components/admin/AdminSectionCard";
 import GptWriterFlagCard from "@/components/admin/GptWriterFlagCard";
+import AccountAccessLiveSummary from "@/components/admin/AccountAccessLiveSummary";
 import { useAdminDashboardUnread } from "@/lib/useAdminDashboardUnread";
+import { useAccountAccessSummary } from "@/lib/useAccountAccessSummary";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -156,6 +158,8 @@ export default function AdminDashboard() {
 
   const [accountCount, setAccountCount] = useState(null);
   const { counts: unreadCounts } = useAdminDashboardUnread(isAdmin);
+  const { summary: accessSummary, loading: accessSummaryLoading, error: accessSummaryError } =
+    useAccountAccessSummary(isAdmin);
 
   // Map unread counts to the three target card titles.
   const unreadForCard = (title) => {
@@ -223,9 +227,26 @@ export default function AdminDashboard() {
       gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
       gap: 18,
     }}>
-      {list.map(({ countKey, ...card }) => (
-        <AdminSectionCard key={card.title} {...card} unread={unreadForCard(card.title)} />
-      ))}
+      {list.map(({ countKey, ...card }) => {
+        // The Account Access & Credits card carries the live dealer-adoption
+        // summary inside the card body. All other cards render as before.
+        const liveSummary =
+          card.title === "Account Access & Credits" ? (
+            <AccountAccessLiveSummary
+              summary={accessSummary}
+              loading={accessSummaryLoading}
+              error={accessSummaryError}
+            />
+          ) : null;
+        return (
+          <AdminSectionCard
+            key={card.title}
+            {...card}
+            unread={unreadForCard(card.title)}
+            extraContent={liveSummary}
+          />
+        );
+      })}
     </div>
   );
 

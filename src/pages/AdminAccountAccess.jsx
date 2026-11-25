@@ -67,6 +67,26 @@ export default function AdminAccountAccess() {
 
   const CALENDAR_YEAR = new Date().getFullYear();
 
+  // Read initial filter hints from the URL (e.g. ?activity=not_activated or
+  // ?status=suspended) so the dashboard live-summary indicators can deep-link
+  // into a pre-filtered account view. Only applied once on mount.
+  useEffect(() => {
+    if (!isAdmin) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const hint = {};
+      const activity = params.get("activity");
+      const status = params.get("status");
+      const followUp = params.get("followUp");
+      if (activity && activity !== "all") hint.activity = activity;
+      if (status && status !== "all") hint.status = status;
+      if (followUp && followUp !== "all") hint.followUp = followUp;
+      if (Object.keys(hint).length > 0) setFilters((prev) => ({ ...prev, ...hint }));
+    } catch {
+      // URL parsing is best-effort; never block page load.
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     if (!isAdmin) return undefined;
     let mounted = true;
