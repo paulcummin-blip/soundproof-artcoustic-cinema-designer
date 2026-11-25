@@ -140,18 +140,32 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
       } else {
         setCreateStatus('SUBMITTING');
         try {
+          const createPayload = {
+            name: formData.name,
+            client_name: formData.client_name,
+            project_reference: formData.project_reference,
+            project_status: formData.project_status,
+            room_length: formData.room_length ? parseFloat(formData.room_length) : null,
+            room_width: formData.room_width ? parseFloat(formData.room_width) : null,
+            room_height: formData.room_height ? parseFloat(formData.room_height) : null,
+            dolby_config: formData.dolby_config,
+            target_spl: formData.target_spl,
+            amplifier_power: formData.amplifier_power ? parseInt(formData.amplifier_power) : null,
+            notes: formData.notes,
+            acoustic_treatment_enabled: false,
+          };
           const res = await base44.functions.invoke('createProfessionalProject', {
-            name: payload.name,
-            client_name: payload.client_name,
-            project_reference: payload.project_reference,
-            project_status: payload.project_status,
-            room_length: payload.room_length,
-            room_width: payload.room_width,
-            room_height: payload.room_height,
-            dolby_config: payload.dolby_config,
-            target_spl: payload.target_spl,
-            amplifier_power: payload.amplifier_power,
-            notes: payload.notes,
+            name: createPayload.name,
+            client_name: createPayload.client_name,
+            project_reference: createPayload.project_reference,
+            project_status: createPayload.project_status,
+            room_length: createPayload.room_length,
+            room_width: createPayload.room_width,
+            room_height: createPayload.room_height,
+            dolby_config: createPayload.dolby_config,
+            target_spl: createPayload.target_spl,
+            amplifier_power: createPayload.amplifier_power,
+            notes: createPayload.notes,
             acoustic_treatment_enabled: false,
           });
           const result = res.data;
