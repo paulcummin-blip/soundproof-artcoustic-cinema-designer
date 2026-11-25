@@ -406,7 +406,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     signal.throwIfAborted();
 
     const scope = frame.contentDocument;
-    if (bodyClass === 'client-report-printing') await inlineSvgCaptureImages(scope, signal);
+    if (bodyClass === 'client-report-printing') await inlineSvgCaptureImages(scope, signal, { includeHtmlImages: true });
 
     // Size the Sound Proof logo to the ADI strapline in the CAPTURE document
     // itself — the document html2canvas rasterises — after the frame's fonts
