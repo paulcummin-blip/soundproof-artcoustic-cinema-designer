@@ -158,6 +158,7 @@ export default function BestSubLayoutGuide({
       frontSubsCfg,
       rearSubsCfg,
       modelOverride,
+      roomDims,
     );
     const validation = validateAppliedInstances(next, roomDims);
     if (!validation.valid) {

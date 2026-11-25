@@ -201,7 +201,7 @@ export default function StartingLayoutCards({
     // A chosen starting layout must persist as valid canonical instances.
     // Fresh projects can hydrate with no explicit sub model, so use the
     // product default already presented by the subwoofer workflow.
-    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, applyModel);
+    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, applyModel, roomDims);
     try {
       commitInstances(next, {
         front: { placementMode: "manual", isManual: true },

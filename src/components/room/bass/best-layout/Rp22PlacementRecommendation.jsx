@@ -97,7 +97,7 @@ export default function Rp22PlacementRecommendation({ roomDims, currentLayout, b
     }
     // Build the EXACT instances that will be saved, then validate them through
     // the existing physical authorities. The same validated array is committed.
-    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
+    const nextInstances = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride, roomDims);
     const validation = validateAppliedInstances(nextInstances, roomDims);
     if (!validation.valid) {
       setApplyError(validation.reason);

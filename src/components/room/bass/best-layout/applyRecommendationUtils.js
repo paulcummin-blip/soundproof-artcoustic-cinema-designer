@@ -305,9 +305,29 @@ export function buildAppliedConfigs(layout, frontSubsCfg, rearSubsCfg) {
 const PLACEMENT_GROUPS = ["front", "rear", "left", "right"];
 const ROTATION_BY_GROUP = { front: 0, rear: 180, left: 90, right: 270 };
 
-export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, rearSubsCfg, modelOverride = null) {
+export function buildAppliedInstances(layout, currentInstances, frontSubsCfg, rearSubsCfg, modelOverride = null, roomDims = null) {
   const instances = Array.isArray(currentInstances) ? currentInstances : [];
-  const sources = layout?.sources || [];
+  const rawSources = layout?.sources || [];
+
+  // Pre-adjust every recommended source so the FULL cabinet sits entirely
+  // inside the room with a 10 mm wall clearance, using the selected model's
+  // actual cabinet dimensions and the wall-aware orientation. The along-wall
+  // position (e.g. a quarter-wall recommendation) is preserved; only the
+  // wall-normal offset is clamped so the cabinet rear face sits 10 mm inside
+  // the wall. This uses the same physical placement convention already
+  // established for the other loudspeakers, and the adjusted coordinates are
+  // what the product-specific bass simulation and RP22 calculations consume
+  // — the acoustic source is never left at the pre-adjustment coordinates.
+  const W = Number(roomDims?.widthM) || 0;
+  const L = Number(roomDims?.lengthM) || 0;
+  const hasRoom = W > 0 && L > 0;
+  const sources = hasRoom ? rawSources.map((src) => {
+    const group = String(src?.placement || "");
+    const cfg = group === "front" ? frontSubsCfg : group === "rear" ? rearSubsCfg : null;
+    const model = modelOverride || cfg?.model || null;
+    const adjusted = adjustSourceForCabinet(src, { widthM: W, lengthM: L }, getCabinetWidthM(model), getCabinetDepthM(model));
+    return { ...src, x: adjusted.x, y: adjusted.y, rotationDeg: adjusted.rotationDeg };
+  }) : rawSources;
 
   const sortSources = (srcs) =>
     srcs.slice().sort((a, b) => (Number(a.x) - Number(b.x)) || (Number(a.y) - Number(b.y)));

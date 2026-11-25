@@ -339,7 +339,7 @@ export default function BassPostCalculationActions({
   // own model — through the existing physical authorities. Mixed-model aware.
   const proposedInstances = useMemo(() => {
     if (!recommendation) return null;
-    return buildAppliedInstances(recommendation, subwooferInstances, frontSubsCfg, rearSubsCfg, null);
+    return buildAppliedInstances(recommendation, subwooferInstances, frontSubsCfg, rearSubsCfg, null, canonical.roomDims);
   }, [recommendation, subwooferInstances, frontSubsCfg, rearSubsCfg]);
   const applicationValid = useMemo(() => {
     if (!proposedInstances) return { valid: false };
@@ -368,7 +368,7 @@ export default function BassPostCalculationActions({
     // Build the EXACT instances that will be saved, then validate them through
     // the existing physical authorities. The same validated array is committed —
     // no reconstruction after validation.
-    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride);
+    const next = buildAppliedInstances(layout, subwooferInstances, frontSubsCfg, rearSubsCfg, modelOverride, canonical.roomDims);
     const validation = validateAppliedInstances(next, canonical.roomDims);
     if (!validation.valid) {
       setApplyError(validation.reason || "Could not apply this layout. Please check the room dimensions.");
