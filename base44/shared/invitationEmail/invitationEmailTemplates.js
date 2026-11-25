@@ -192,29 +192,59 @@ ${SIGN_OFF}`;
 }
 
 function generalDealerBody({ includePromo, promoExpiry }) {
-  const promoParagraph = includePromo && promoExpiry
-    ? `<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 18px;line-height:1.5;font-weight:400;">
-    As part of our introductory promotion, you can create unlimited projects until <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">${escapeText(promoExpiry)}</strong>, subject to your account having active access.
+  const promoSentence = includePromo && promoExpiry
+    ? `<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 16px;line-height:1.5;font-weight:400;">
+    As part of our introductory promotion, you have unlimited project creation until <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">${escapeText(promoExpiry)}</strong>.
 </p>`
     : '';
   return `<h1 class="mobile-text" style="font-family:${FONT};font-size:22px;font-weight:700;color:#213428;margin:0 0 18px;line-height:1.25;text-align:center;">
     Welcome to Sound Proof
 </h1>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 16px;line-height:1.5;font-weight:400;">
-    Welcome to Sound Proof, Artcoustic's professional home cinema design platform.
+    You've been invited to join Sound Proof, Artcoustic's professional home cinema design platform.
 </p>
+${promoSentence}
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 24px;line-height:1.5;font-weight:400;">
     Sound Proof helps you design, develop and present home cinema systems, with loudspeaker placement, acoustic analysis and performance predictions aligned with CEDIA RP22 principles.
 </p>
 ${OPEN_BTN}
-<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
-    Your Sound Proof account is now active.
-</p>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 18px;line-height:1.5;font-weight:400;">
-    Your initial <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">90-day licence</strong> has started.
+    Your Sound Proof account is now active. Your initial <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">90-day licence</strong> has started.
 </p>
-${promoParagraph}
 ${SIGN_IN_BOX}
+<p class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 6px;line-height:1.3;">
+    Device compatibility
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;font-weight:400;margin:0 0 26px;line-height:1.5;">
+    Sound Proof is currently designed for desktop and laptop browsers. iPad optimisation is planned for Q1 2027.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 26px;line-height:1.5;font-weight:400;">
+    When your licence expires, renew it through your secure Artcoustic Dealer Portal. Your existing projects and designs will remain available.
+</p>
+<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
+    Your Project Tokens
+</h2>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    For every <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">&pound;10,000</strong> of qualifying Artcoustic loudspeakers ordered at trade prices, your dealer account earns <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">5 Project Tokens</strong>. Your turnover for 2026 qualifies for the Project Tokens you have already earned and which are available in your account.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Each Project Token allows you to create one new cinema project.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Additional Project Tokens can be purchased through Sound Proof when purchasing becomes available.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 26px;line-height:1.5;font-weight:400;">
+    Your earned and purchased Project Tokens remain in your account until used.
+</p>
+<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
+    Explore up to five designs per project
+</h2>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Each cinema project includes up to <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">five design variations</strong>, allowing you to explore different speaker layouts, screen sizes, seating arrangements and other design choices for the same client.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 26px;line-height:1.5;font-weight:400;">
+    A fair usage policy applies. Design variations are intended for alternative approaches to the same physical cinema, not unrelated projects.
+</p>
 ${SIGN_OFF}`;
 }
 
@@ -223,16 +253,49 @@ function additionalUserBody() {
     Welcome to Sound Proof
 </h1>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 16px;line-height:1.5;font-weight:400;">
-    You've successfully joined your company's Sound Proof account.
+    You've joined your company's Sound Proof account.
 </p>
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 24px;line-height:1.5;font-weight:400;">
-    You can now access Sound Proof to design, develop and present professional home cinema systems aligned with CEDIA RP22 principles.
+    Sound Proof is Artcoustic's professional home cinema design platform, helping you design, develop and present home cinema systems, with loudspeaker placement, acoustic analysis and performance predictions aligned with CEDIA RP22 principles.
 </p>
 ${OPEN_BTN}
 <p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 18px;line-height:1.5;font-weight:400;">
-    Your access is managed by your company's Sound Proof account administrator and is subject to the existing dealer account licence.
+    Your personal login is now active. Your access is managed by your company's Sound Proof account administrator and is subject to your company's existing licence.
 </p>
 ${SIGN_IN_BOX}
+<p class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 6px;line-height:1.3;">
+    Device compatibility
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;font-weight:400;margin:0 0 26px;line-height:1.5;">
+    Sound Proof is currently designed for desktop and laptop browsers. iPad optimisation is planned for Q1 2027.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 26px;line-height:1.5;font-weight:400;">
+    Licence renewal is managed at the dealer-account level by your company's Sound Proof account administrator. Your existing projects and designs will remain available.
+</p>
+<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
+    Your Project Tokens
+</h2>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Project Tokens belong to your dealer account, not to you as an individual user. For every <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">&pound;10,000</strong> of qualifying Artcoustic loudspeakers ordered at trade prices, the dealer account earns <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">5 Project Tokens</strong>.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Each Project Token allows one new cinema project to be created for the account.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Additional Project Tokens can be purchased through Sound Proof when purchasing becomes available.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 26px;line-height:1.5;font-weight:400;">
+    Your account's earned and purchased Project Tokens remain in the account until used.
+</p>
+<h2 class="mobile-text" style="font-family:${FONT};font-size:16px;font-weight:700;color:#213428;margin:0 0 12px;line-height:1.3;">
+    Explore up to five designs per project
+</h2>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 14px;line-height:1.5;font-weight:400;">
+    Each cinema project includes up to <strong style="color:#1B1A1A;font-family:${FONT};font-weight:700;">five design variations</strong>, allowing you to explore different speaker layouts, screen sizes, seating arrangements and other design choices for the same client.
+</p>
+<p class="mobile-text" style="color:#1B1A1A;font-family:${FONT};font-size:16px;margin:0 0 26px;line-height:1.5;font-weight:400;">
+    A fair usage policy applies. Design variations are intended for alternative approaches to the same physical cinema, not unrelated projects.
+</p>
 ${SIGN_OFF}`;
 }
 
@@ -245,7 +308,7 @@ const SUBJECTS = {
 const PREVIEWS = {
   premiumPartner: "Your Sound Proof account is now active. As an Artcoustic Premium Partner you have early access and unlimited usage for 3 months.",
   generalDealer: "Your Sound Proof account is now active. Welcome to Artcoustic's professional home cinema design platform.",
-  additionalUser: "You've successfully joined your company's Sound Proof account.",
+  additionalUser: "You've joined your company's Sound Proof account. Your personal login is now active.",
 };
 
 /**
