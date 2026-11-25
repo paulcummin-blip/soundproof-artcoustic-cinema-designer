@@ -9,7 +9,7 @@ import { frontStageScopeViolations } from './writerFrontStageRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { verificationDisclaimer } from './writerVerificationDisclaimerRules.js';
 import { validationRegisterPhrase } from './writerValidationRegister.js';
-import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
+import { briefScreenContingency, framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
 import {
   displayTerminologyIssue,
   displayTypeOfPack,
@@ -157,7 +157,9 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       context = { text, sentence, clause };
       const claimed = stripOptionNames(clause, vocabulary.optionNames)
         .replace(/\bLevel\s?[1-4]\b(?:\s+versions?)?/gi, ' ');
-      const kind = assertedKind(claimed, anchors);
+      const asserted = assertedKind(claimed, anchors);
+      const kind = asserted === 'change' && briefScreenContingency(clause, input, section)
+        ? null : asserted;
       // A contrast sentence that places the difference between the options is
       // grounded by the input's own change evidence for the families it names.
       // Never an exemption: with no such evidence the clause stays unsupported,
