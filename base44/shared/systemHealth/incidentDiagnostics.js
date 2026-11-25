@@ -38,7 +38,6 @@ export function classifyCause(errorCode, component = '') {
     DATA_REQUEST_FAILED:'An application data request returned an error; the operation and HTTP status are recorded.',
     PROJECT_LOAD_FAILED:'The project opening authority reported a failed restore stage.',
     BASS_CALCULATION_FAILED:'The bass calculation authority reported a failure or timeout.',
-    ADI_OPTIMISATION_FAILED:'The ADI workflow reported a failure or timeout.',
     REPORT_SAVED_EVIDENCE_REJECTED: 'The report readiness gate rejected saved engineering evidence after loading completed. The recorded fingerprints identify the disagreement; its underlying cause requires investigation.',
     REPORT_EVIDENCE_READ_FAILED: 'Saved engineering evidence could not be read or restored for the report.',
     DRAFT_REJECTED: 'The proposal writer produced a draft that failed the validation contract. The violation codes are recorded in the diagnostic summary.',
@@ -56,6 +55,20 @@ export function classifyCause(errorCode, component = '') {
 
   if (confirmedCauses[code]) {
     return { cause_classification: 'confirmed', cause_summary: confirmedCauses[code] };
+  }
+
+  // Workflow failures: the workflow reported a failure, but the error code
+  // alone does not establish the technical root cause. The ADI optimisation
+  // workflow can fail at multiple phases (plan-save, applying, recalculating,
+  // publishing), and the underlying cause (settings mismatch, result
+  // mismatch, scheduling failure, publication timeout) is only established
+  // by the verification diagnostics — not by the error code itself. A
+  // confirmed workflow failure is NOT a confirmed root cause.
+  if (code === 'ADI_OPTIMISATION_FAILED') {
+    return {
+      cause_classification: 'unknown',
+      cause_summary: 'The ADI workflow reported a failure. The workflow failure is confirmed, but the underlying technical root cause has not been established. The verification diagnostics (settingsMatch, resultMatch, fingerprints, scheduling reason) must be examined to determine whether the failure was caused by a settings mismatch, a bass-result mismatch, a scheduling or publication failure, or another condition.',
+    };
   }
 
   // Circumstantial evidence: the watchdog detected no progress, but the

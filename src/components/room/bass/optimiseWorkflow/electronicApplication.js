@@ -152,6 +152,11 @@ export function comparisonReceipt(result){
 // the complete pair, never just crossover or tuning.
 export async function executeElectronicTransaction({before,after,receipt,persist,readback,commit,verify,guard}) {
   let wrote=false;
+  // verified is declared outside the try block so the catch block can attach
+  // its diagnostics to the restored receipt — the actual settingsMatch /
+  // resultMatch evidence survives the automatic rollback instead of being
+  // lost with the component-local ref.
+  let verified=null;
   const ensure=()=>{if(!guard())throw new Error("The design changed; ADI stopped applying settings.");};
   try {
     ensure();
@@ -161,9 +166,9 @@ export async function executeElectronicTransaction({before,after,receipt,persist
     if(!settingsEqual(await readback(),after))throw new Error("Saved settings did not match the confirmed candidate.");
     commit(after,{...receipt,status:"verifying"});
     ensure();
-    const verified=await verify(after);
+    verified=await verify(after);
     ensure();
-    if(!verified)throw new Error("Canonical recalculation did not reproduce the confirmed candidate.");
+    if(!verified?.ok)throw new Error("Canonical recalculation did not reproduce the confirmed candidate.");
     const finalReceipt={...receipt,status:"verified",verifiedAt:new Date().toISOString(),resultFingerprint:verified.fingerprint,integrationIdentity:verified.integrationIdentity || null,afterLevels:verified.levels};
     await persist(after,finalReceipt);
     ensure();
@@ -177,7 +182,8 @@ export async function executeElectronicTransaction({before,after,receipt,persist
       // prior pair in the pending receipt for recovery in that exceptional case.
       const saved=await readback().catch(()=>null);
       if(saved && (settingsEqual(saved,after)||settingsEqual(saved,before))){
-        const failed={...receipt,status:"restored",error:error.message};
+        const failed={...receipt,status:"restored",error:error.message,
+          ...(verified && !verified.ok && verified.diagnostics ? {verificationFailure:verified.diagnostics} : {})};
         await persist(before,failed);
         if(!settingsEqual(await readback(),before))throw new Error("Restoration requires attention; prior settings are retained in the ADI receipt.");
         commit(before,failed);

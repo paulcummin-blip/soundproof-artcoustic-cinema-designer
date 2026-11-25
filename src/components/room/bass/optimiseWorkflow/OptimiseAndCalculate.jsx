@@ -124,6 +124,7 @@ import { mergeAppliedLeverRecords } from "../optimiserPlan/optimiserApplyProvena
 import { buildElectronicApplyDecision } from "./electronicApplyDecision.js";
 import { attemptRecoveryRetry, resolveRecoveryFailurePhase } from "./recoveryRetry.js";
 import { verifyRecalculationScheduling } from "./verifyRecalculationScheduling.js";
+import { buildVerificationFailureDiagnostics } from "./verificationFailureDiagnostics.js";
 
 const SLEEP_MS = 100;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -342,14 +343,29 @@ export default function OptimiseAndCalculate({
             resultFingerprint:scheduling.resultFingerprint||null,
             currentJobFingerprint:scheduling.currentJobFingerprint||null,
             currentCacheKey:scheduling.currentCacheKey||null,
-            error:scheduling.error||null});
-          return false;
+            error:scheduling.error||null,
+            verificationFailure:buildVerificationFailureDiagnostics({
+              settingsMatch:null,resultMatch:null,reason:scheduling.reason,
+              schedulingReason:scheduling.reason,error:scheduling.error||null,
+              expectedTuning:tuning,expectedResult:expected,
+              expectedPhysicalContext:receipt.physicalContext,
+              actualPhysicalContext:physicalContext(electronicContextFromUi(liveElectronicRef.current)),
+              fingerprints:{dispatchFingerprint:scheduling.dispatchFingerprint,...scheduling},
+            })});
+          return {ok:false,diagnostics:restoring?restoringDiagnosticsRef.current:verifyDiagnosticsRef.current};
         }
         const state=sharedRef.current;
         const targetCacheKey=scheduling.dispatchFingerprint||state?.cacheKey||null;
         if(!Array.isArray(tuning)||!tuning.length){
-          writeDiag({settingsMatch:null,resultMatch:null,targetCacheKey,reason:"missing-tuning"});
-          return false;
+          writeDiag({settingsMatch:null,resultMatch:null,targetCacheKey,reason:"missing-tuning",
+            verificationFailure:buildVerificationFailureDiagnostics({
+              settingsMatch:null,resultMatch:null,reason:"missing-tuning",
+              expectedTuning:null,expectedResult:expected,
+              expectedPhysicalContext:receipt.physicalContext,
+              actualPhysicalContext:physicalContext(electronicContextFromUi(liveElectronicRef.current)),
+              fingerprints:{targetCacheKey},
+            })});
+          return {ok:false,diagnostics:restoring?restoringDiagnosticsRef.current:verifyDiagnosticsRef.current};
         }
         const settingsMatch=recommendationSettingsMatch(state.authoritative,{crossover:settings.effectiveCrossover||settings.crossover,tuning});
         const actualResult = verifyIntegration
@@ -358,13 +374,25 @@ export default function OptimiseAndCalculate({
         const resultMatch=comparisonResultsMatch(actualResult,expected);
         if(!settingsMatch||!resultMatch){
           writeDiag({settingsMatch,resultMatch,targetCacheKey,
-            reason:!settingsMatch?"settings-mismatch":"result-mismatch"});
-          return false;
+            reason:!settingsMatch?"settings-mismatch":"result-mismatch",
+            verificationFailure:buildVerificationFailureDiagnostics({
+              settingsMatch,resultMatch,reason:!settingsMatch?"settings-mismatch":"result-mismatch",
+              expectedTuning:tuning,actualSources:state.authoritative?.sources,
+              expectedResult:expected,actualResult,
+              expectedPhysicalContext:receipt.physicalContext,
+              actualPhysicalContext:physicalContext(electronicContextFromUi(liveElectronicRef.current)),
+              fingerprints:{targetCacheKey,
+                actualCacheKey:sharedRef.current?.cacheKey||null,
+                actualResultFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
+                actualCurrentJobFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null,
+                preCommitCacheKey},
+            })});
+          return {ok:false,diagnostics:restoring?restoringDiagnosticsRef.current:verifyDiagnosticsRef.current};
         }
         // A successful restore verify must NEVER erase the failed-apply
         // diagnostics the catch block reads — restore writes its own ref.
         if(restoring)restoringDiagnosticsRef.current=null;else verifyDiagnosticsRef.current=null;
-        return {fingerprint:state.cacheKey,levels:resultLevels(actualResult),integrationIdentity:state.authoritative.integrationIdentity};
+        return {ok:true,fingerprint:state.cacheKey,levels:resultLevels(actualResult),integrationIdentity:state.authoritative.integrationIdentity};
       };
       return executeElectronicTransaction({before,after,receipt,persist:io.persist,readback:io.readback,commit,verify,guard});
     });
