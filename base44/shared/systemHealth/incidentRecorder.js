@@ -433,6 +433,8 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
     project_id = null, account_id = null, proposal_id = null,
     error = '', operation_id = null, data_committed = null,
     data_integrity_summary = null, test_run_id = null, incidentContext = {},
+    version_id = null, runtime_environment = 'production',
+    error_detail = null, component_stack = null,
   } = details;
 
   const component = 'proposal_generation';
@@ -450,7 +452,8 @@ export async function recordProposalGenerationIncident(serviceClient, details) {
 
   return recordIncidentOccurrence(serviceClient, {
     component, operation, error_code: errorCode, severity,
-    account_id, project_id,
+    account_id, project_id, version_id, runtime_environment,
+    error_detail, component_stack, page_path: '/ProposalCentre',
     diagnostic_summary: diagnosticSummary,
     test_run_id, operation_id,
     user_blocked, workaround_available,
