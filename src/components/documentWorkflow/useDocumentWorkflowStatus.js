@@ -99,6 +99,8 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
   // frozen design facts for both the saved and current publications.
   useEffect(() => {
     if (!projectId) {
+      readInFlight.current = false;
+      setVerificationError(null);
       setExports([]);
       setEngineeringFingerprint(null);
       setAnalysisCache(null);
@@ -247,7 +249,7 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
   }, [projectId, versionId, loading, status.technicalReport, status.speakerDesign, status.clientProposal, engineeringFingerprint, verificationError]);
 
   // A failed record read is unknown, never evidence that no document exists.
-  const resolvedStatus = verificationError ? {
+  const resolvedStatus = verificationError && !engineeringFingerprint ? {
     ...status,
     proposalAvailable: false,
     ...Object.fromEntries(['technicalReport', 'speakerDesign', 'clientProposal'].map((key) => [key, {
