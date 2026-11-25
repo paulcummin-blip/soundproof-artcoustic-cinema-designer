@@ -396,6 +396,15 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const _fixedRspY = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : undefined;
   const _fixedRspX = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : undefined;
 
+  // Keep the RSP position ref current for the subwoofer drag handler's
+  // symmetry RSP-equidistance check. X is always the room centreline; Y is the
+  // effective RSP Y.
+  rspPointRef.current = (Number.isFinite(_fixedRspX) && Number.isFinite(_fixedRspY))
+    ? { x: _fixedRspX, y: _fixedRspY }
+    : (Number.isFinite(widthM) && Number.isFinite(_fixedRspY))
+      ? { x: widthM / 2, y: _fixedRspY }
+      : null;
+
   const mlp = useMlpCalculation({
     mlpPoint,
     seatingPositions,
@@ -457,6 +466,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const draftRearSubsRef = useRef(null);
   const isDraggingSubRef = useRef(false);
   const idleCommitTimerRef = useRef(null);
+  // RSP position ref for subwoofer symmetry RSP-equidistance checks.
+  // Updated from the effective RSP on every render so the drag handler reads
+  // the current RSP without re-creating its callback.
+  const rspPointRef = useRef(null);
   // Seat draft (transient positions during seat drag — no state writes)
   const draftSeatsRef = useRef(null);
   const isDraggingSeatRef = useRef(false);
@@ -1412,6 +1425,7 @@ const byId = useEntitiesById({
     setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
     setSubSnapState,
     scale,
+    rspPointRef,
   });
 
   // Commit draft seat positions to real state once on pointer release

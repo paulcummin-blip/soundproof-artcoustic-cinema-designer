@@ -27,6 +27,7 @@ import RvSeatDimensions from "@/components/room/rv/render/RvSeatDimensions";
 import RvProjectorDragDims from "@/components/room/rv/render/RvProjectorDragDims";
 import RvProjectorThrowWarning from "@/components/room/rv/render/RvProjectorThrowWarning";
 import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
+import RvSubOpposingAlignmentGuide from "@/components/room/rv/render/RvSubOpposingAlignmentGuide";
 import RvSubCoordinateGuide from "@/components/room/rv/render/RvSubCoordinateGuide";
 import { getSubRotationDeg } from "@/components/room/rv/utils/subWallOrientation";
 
@@ -631,6 +632,15 @@ export default function RvPlanCanvas({
               toPx={toPx}
               widthM={widthM}
               lengthM={lengthM}
+            />
+
+            {/* Stage 2B.7: drag-time subwoofer opposing-wall alignment guide */}
+            <RvSubOpposingAlignmentGuide
+              subSnapState={subSnapState}
+              draggedItemId={draggedItemId}
+              frontLive={frontLive}
+              rearLive={rearLive}
+              toPx={toPx}
             />
 
             {/* Layer 9: Draggable Seating Positions */}
