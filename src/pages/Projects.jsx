@@ -18,6 +18,10 @@ import { getAgeDays, formatAge, isAgeReviewDue } from "@/components/utils/projec
 import AgeReviewDialog from "@/components/projects/AgeReviewDialog";
 import ProjectCardPrototype from "@/components/projects/ProjectCardPrototype";
 import AccountStatusStrip from "@/components/projects/AccountStatusStrip";
+import {
+  buildProjectEditPayload,
+  refreshProjectIdentityAfterEdit,
+} from "@/components/projects/projectEditSync";
 
 // Build lookup maps from the shared label arrays
 const dolbyLabelMap = Object.fromEntries(dolbyConfigs.map(c => [c.value, c.label]));
@@ -179,6 +183,13 @@ export default function ProjectsPage() {
   // Edit project dialog state (inline, for existing projects only)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState({
+    name: "",
+    client: "",
+    status: "prospective",
+  });
+  // Snapshot of the draft when the legacy inline edit dialog opened, used to
+  // submit only intentionally changed identity fields.
+  const [originalDraft, setOriginalDraft] = useState({
     name: "",
     client: "",
     status: "prospective",
@@ -539,6 +550,9 @@ export default function ProjectsPage() {
   }
 
   function handleProjectUpdated(updated) {
+    // The canonical NewProjectDialog already refreshed the hydration store via
+    // refreshProjectIdentityAfterEdit before calling this callback. Here we
+    // only update the local Projects-card state to match the confirmed record.
     setProjects((arr) =>
       arr.map((p) =>
         p.id === updated.id
@@ -567,6 +581,21 @@ export default function ProjectsPage() {
   function handleEditProject(p) {
     setEditingProject(p);
     setNewProjectDialogOpen(true);
+  }
+
+  // Capture the original identity values when the legacy inline edit dialog
+  // opens, so saveProject can submit only the fields the user changed.
+  function openLegacyEditDialog(p) {
+    const populated = {
+      name: p?.name || "",
+      client: p?.client || "",
+      status: normalizeStatusId(p?.status || "prospective"),
+    };
+    setDraft(populated);
+    setOriginalDraft(populated);
+    setEditingProject(p);
+    setCreateError(null);
+    setDialogOpen(true);
   }
 
   function toNumberOrNull(v) {
@@ -632,11 +661,32 @@ export default function ProjectsPage() {
         setCreated(p);
         window.setTimeout(() => setCreated(null), 4000);
       } else {
-        // UPDATE EXISTING PROJECT
+        // UPDATE EXISTING PROJECT — submit only the identity fields the user
+        // intentionally changed (name, client_name, project_status). Room
+        // dimensions and other engineering-summary fields are never sent from
+        // this dialog, so they can never overwrite current values.
+        const legacyForm = {
+          name: draft.name.trim(),
+          client_name: draft.client.trim(),
+          project_status: draft.status,
+        };
+        const { payload, hasChanges } = buildProjectEditPayload(
+          { name: originalDraft.name, client_name: originalDraft.client, project_status: originalDraft.status },
+          legacyForm,
+        );
+        if (!hasChanges) {
+          setDialogOpen(false);
+          setEditingProject(null);
+          return;
+        }
         const updated = await base44.entities.Project.update(
           editingProject.id,
-          projectData
+          payload
         );
+
+        // Refresh cached/project-identity surfaces so the Projects card, Active
+        // Project sidebar and System Designer header agree immediately.
+        refreshProjectIdentityAfterEdit(editingProject.id, updated);
 
         setProjects((arr) =>
           arr.map((p) =>
@@ -645,10 +695,8 @@ export default function ProjectsPage() {
                   ...p,
                   name: updated.name,
                   client: updated.client_name || "",
-                  status: updated.project_status || status,
-                  roomLength: updated.room_length,
-                  roomWidth: updated.room_width,
-                  roomHeight: updated.room_height,
+                  status: normalizeStatusId(updated.project_status || status),
+                  project_reference: updated.project_reference ?? p.project_reference,
                 }
               : p
           )

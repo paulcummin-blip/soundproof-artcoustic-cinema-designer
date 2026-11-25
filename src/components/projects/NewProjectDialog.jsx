@@ -17,6 +17,10 @@ import { useAuth } from "@/lib/AuthContext";
 import CreateProjectStatusPanel from "@/components/projects/CreateProjectStatusPanel";
 import { useProjectStatuses } from "@/components/projects/useProjectStatuses";
 import { normalizeStatusId } from "@/components/projects/statusDefaults";
+import {
+  buildProjectEditPayload,
+  refreshProjectIdentityAfterEdit,
+} from "@/components/projects/projectEditSync";
 
 export const dolbyConfigs = [
   { value: "5.1", label: "5.1 Surround — P2 - L1" },
@@ -64,14 +68,22 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
   const { activeStatuses } = useProjectStatuses();
 
   const [formData, setFormData] = useState(EMPTY_FORM);
+  // Snapshot of the form values as they were when the dialog opened for editing.
+  // Used to submit only the fields the user has intentionally changed, so an
+  // identity-only correction (e.g. fixing a client-name spelling) never
+  // resubmits unchanged engineering-summary fields.
+  const [originalFormData, setOriginalFormData] = useState(EMPTY_FORM);
+  const [editError, setEditError] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [createStatus, setCreateStatus] = useState(null);
   const navigate = useNavigate();
 
   // When editProject changes (or dialog opens), populate form
   useEffect(() => {
     setCreateStatus(null);
+    setEditError(null);
     if (isEditMode && editProject) {
-      setFormData({
+      const populated = {
         name: editProject.name || "",
         client_name: editProject.client || "",
         project_reference: editProject.project_reference || "",
@@ -83,36 +95,46 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         target_spl: editProject.target_spl ?? 105,
         amplifier_power: editProject.amplifier_power != null ? String(editProject.amplifier_power) : "",
         notes: editProject.notes || "",
-      });
+      };
+      setFormData(populated);
+      setOriginalFormData(populated);
     } else if (!isEditMode) {
       setFormData(EMPTY_FORM);
+      setOriginalFormData(EMPTY_FORM);
     }
   }, [editProject, open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      room_length: formData.room_length ? parseFloat(formData.room_length) : null,
-      room_width: formData.room_width ? parseFloat(formData.room_width) : null,
-      room_height: formData.room_height ? parseFloat(formData.room_height) : null,
-      amplifier_power: formData.amplifier_power ? parseInt(formData.amplifier_power) : null,
-    };
+    setEditError(null);
     try {
       if (isEditMode) {
-        const updated = await Project.update(editProject.id, {
-          name: payload.name,
-          client_name: payload.client_name,
-          project_reference: payload.project_reference,
-          project_status: payload.project_status,
-          room_length: payload.room_length,
-          room_width: payload.room_width,
-          room_height: payload.room_height,
-          dolby_config: payload.dolby_config,
-          target_spl: payload.target_spl,
-          amplifier_power: payload.amplifier_power,
-          notes: payload.notes,
-        });
+        // Submit ONLY the fields the user has intentionally changed. Comparing
+        // the current form against the snapshot taken when the dialog opened
+        // means a client-name-only correction sends only client_name, and
+        // unchanged engineering-summary fields (room dimensions, Dolby config,
+        // target SPL, amplifier power) are never resubmitted.
+        const { payload, hasChanges } = buildProjectEditPayload(originalFormData, formData);
+        if (!hasChanges) {
+          // Nothing changed — close without a write.
+          onOpenChange(false);
+          return;
+        }
+        setIsSaving(true);
+        let updated;
+        try {
+          updated = await Project.update(editProject.id, payload);
+        } catch (saveErr) {
+          // Keep the user's edited values in the form so they can retry without
+          // re-entering the information. Do not close the dialog. Preserve the
+          // existing System Health instrumentation by re-throwing to the outer
+          // catch, which records the failure for admin investigation.
+          throw saveErr;
+        }
+        // The backend confirmed the update. Only now refresh identity surfaces
+        // and propagate the new record, so the new value is never shown as
+        // saved before the backend confirms it.
+        refreshProjectIdentityAfterEdit(editProject.id, updated);
         onProjectUpdated && onProjectUpdated(updated);
         onOpenChange(false);
       } else {
@@ -156,9 +178,15 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
       }
     } catch (error) {
       console.error("Failed to save project:", error);
-      alert("Failed to save project. Please try again.");
+      // Keep the user's edited values in the form (do not reset/close) so they
+      // can retry. The error is surfaced inline and the technical cause
+      // remains available to administrators via the existing System Health
+      // instrumentation that observes Project update failures.
+      setEditError(error?.message || "Failed to save project. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
-  };
+    };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -314,10 +342,15 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
             </div>
           </div>
 
+          {isEditMode && editError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              {editError}
+            </div>
+          )}
           <div className="flex w-full shrink-0 justify-end gap-3 pt-4 pb-2">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => onOpenChange(false)}
               className="border-[#DCDBD6] text-[#3E4349]"
             >
@@ -325,11 +358,11 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
             </Button>
             <Button
               type="submit"
-              disabled={!formData.name || createStatus === 'SUBMITTING'}
+              disabled={!formData.name || createStatus === 'SUBMITTING' || isSaving}
               className="hover:bg-[#3E4349]"
               style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
             >
-              {createStatus === 'SUBMITTING' ? "Creating..." : isEditMode ? "Save Changes" : "Create Project"}
+              {createStatus === 'SUBMITTING' ? "Creating..." : isSaving ? "Saving..." : isEditMode ? "Save Changes" : "Create Project"}
             </Button>
           </div>
         </form>
