@@ -37,6 +37,7 @@ import {
 } from '@/components/report/reportSnapshotAuthority';
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
 import { getStatusLabel } from '@/components/proposal/proposalLifecycle';
+import { identifyDesignChanges } from '@/components/documentWorkflow/documentFreshnessReason';
 
 /** The ONE report type the selector states. Legacy 'visual'/'technical' are retired. */
 const REPORT_TYPES = ['project'];
@@ -44,10 +45,12 @@ const REPORT_TYPES = ['project'];
 export const NO_REPORTS_LABEL = 'No report yet';
 export const CURRENT_REPORTS_LABEL = 'Project Report current';
 export const REPORTS_NEED_UPDATING_LABEL = 'Project Report needs updating';
+export const REPORTS_VERIFICATION_UNAVAILABLE_LABEL = 'Project Report verification unavailable';
 export const REPORT_STATE = Object.freeze({
   CURRENT: 'current',
   STALE: 'stale',
   MISSING: 'missing',
+  VERIFICATION_UNAVAILABLE: 'verification_unavailable',
 });
 
 /** The current fingerprint held for one version id, from a Map or a plain object. */
@@ -67,6 +70,13 @@ function fingerprintFor(byVersion, versionId) {
  * @param {Map|Object|null} [input.currentFingerprintByVersion] each version's
  *   current authority fingerprint, so the canonical report is resolved against
  *   the design the version holds now.
+ * @param {Map|Object|null} [input.publicationsByVersion] each version's
+ *   engineering_publications map (fingerprint → publication), so a fingerprint
+ *   mismatch is judged by the SAME canonical design-fact comparison
+ *   (identifyDesignChanges) the Document Workflow cards use — not a second
+ *   independent fingerprint-string calculation. A mismatch with no design
+ *   change is a presentation-only move (Current); an established change is
+ *   Stale; a publication that cannot be read is Verification unavailable.
  * @returns {Map<string, {
  *   reportsState: string,
  *   reportsLabel: string,
@@ -80,6 +90,7 @@ export function deriveVersionDocumentStatus({
   snapshots = [],
   proposals = [],
   currentFingerprintByVersion = null,
+  publicationsByVersion = null,
 } = {}) {
   const entries = new Map();
   const entryFor = (versionId) => {
@@ -88,6 +99,12 @@ export function deriveVersionDocumentStatus({
       entries.set(versionId, { reportStatusByType: {}, proposal: null });
     }
     return entries.get(versionId);
+  };
+
+  const publicationsFor = (versionId) => {
+    if (!publicationsByVersion || !versionId) return null;
+    if (typeof publicationsByVersion.get === 'function') return publicationsByVersion.get(versionId) ?? null;
+    return publicationsByVersion[versionId] ?? null;
   };
 
   // Every version the caller knows about gets an entry, so a version with no
@@ -112,14 +129,57 @@ export function deriveVersionDocumentStatus({
       const versionId = snapshot.version_id;
       const entry = entryFor(versionId);
       if (!entry) return;
+      const currentFingerprint = fingerprintFor(currentFingerprintByVersion, versionId) || null;
+      const savedFingerprint = snapshot.source_fingerprints?.engineeringFingerprint || null;
+
+      // Judge a fingerprint mismatch by the SAME canonical design-fact
+      // comparison the Document Workflow cards use (identifyDesignChanges),
+      // not a second fingerprint-string calculation. When the two frozen
+      // publications state the same physical design, the move is
+      // presentation-only and the saved report stays Current. When a
+      // publication cannot be read, verification is unavailable — distinct
+      // from a confirmed design change — so the badge never reads "needs
+      // updating" for a document whose validity simply could not be checked.
+      let presentationOnlyMove = false;
+      let verificationUnavailable = false;
+      if (currentFingerprint && savedFingerprint && savedFingerprint !== currentFingerprint) {
+        // Only upgrade to the canonical design-fact comparison when the
+        // version's engineering_publications are available. When they are not
+        // (the hook has not loaded them, or no version carries a published
+        // fingerprint), fall back to the same fingerprint-string comparison
+        // the report pages use, so the badge never reads "verification
+        // unavailable" merely because publications have not been read yet.
+        const publications = publicationsFor(versionId);
+        if (publications) {
+          const savedPublication = publications[savedFingerprint] || null;
+          const currentPublication = publications[currentFingerprint] || null;
+          if (savedPublication && currentPublication) {
+            const changes = identifyDesignChanges(savedPublication, currentPublication);
+            if (changes == null) {
+              verificationUnavailable = true;
+            } else {
+              presentationOnlyMove = changes.length === 0;
+            }
+          } else {
+            verificationUnavailable = true;
+          }
+        }
+      }
+
+      if (verificationUnavailable) {
+        entry.reportStatusByType[snapshot.report_type] = REPORT_STATE.VERIFICATION_UNAVAILABLE;
+        return;
+      }
+
       // The status the report pages and the Proposal Centre read: the saved
       // report's own fingerprints compared against the version's current
       // published authority. No second status calculation is introduced here.
       const resolution = resolveSnapshotStatus({
         saved: snapshot,
         currentFingerprints: {
-          engineeringFingerprint: fingerprintFor(currentFingerprintByVersion, versionId) || null,
+          engineeringFingerprint: currentFingerprint,
         },
+        presentationOnlyMove,
       });
       if (resolution.status === 'none') return;
       entry.reportStatusByType[snapshot.report_type] = resolution.status;
@@ -139,18 +199,26 @@ export function deriveVersionDocumentStatus({
   entries.forEach((entry, versionId) => {
     const generated = REPORT_TYPES.filter((type) => entry.reportStatusByType[type]);
     const stale = generated.some((type) => entry.reportStatusByType[type] === 'stale');
+    const verificationUnavailable = generated.some(
+      (type) => entry.reportStatusByType[type] === REPORT_STATE.VERIFICATION_UNAVAILABLE,
+    );
     const reportsState = generated.length === 0
       ? REPORT_STATE.MISSING
-      : (stale ? REPORT_STATE.STALE : REPORT_STATE.CURRENT);
+      : (stale
+        ? REPORT_STATE.STALE
+        : (verificationUnavailable ? REPORT_STATE.VERIFICATION_UNAVAILABLE : REPORT_STATE.CURRENT));
 
     statusByVersionId.set(versionId, {
       reportsState,
       reportsGenerated: generated,
-      // The dealer's words: a version's Project Report is current, or the design
-      // has moved on and it needs updating. No internal state name is rendered.
+      // The dealer's words: a version's Project Report is current, the design
+      // has moved on and it needs updating, or its validity could not be
+      // verified. No internal state name is rendered.
       reportsLabel: generated.length === 0
         ? NO_REPORTS_LABEL
-        : (stale ? REPORTS_NEED_UPDATING_LABEL : CURRENT_REPORTS_LABEL),
+        : (stale
+          ? REPORTS_NEED_UPDATING_LABEL
+          : (verificationUnavailable ? REPORTS_VERIFICATION_UNAVAILABLE_LABEL : CURRENT_REPORTS_LABEL)),
       proposal: entry.proposal,
       proposalStatus: entry.proposal?.status || null,
       proposalLabel: entry.proposal ? getStatusLabel(entry.proposal.status) : null,

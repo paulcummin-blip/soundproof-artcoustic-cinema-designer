@@ -23,6 +23,7 @@ import {
   NO_REPORTS_LABEL,
   CURRENT_REPORTS_LABEL,
   REPORTS_NEED_UPDATING_LABEL,
+  REPORTS_VERIFICATION_UNAVAILABLE_LABEL,
   REPORT_STATE,
   deriveVersionDocumentStatus,
 } from '@/components/versions/versionDocumentStatus';
@@ -171,5 +172,156 @@ describe('per-version document status', () => {
     expect(status.get(V1).reportsState).toBe(REPORT_STATE.MISSING);
     expect(status.get(V1).reportsLabel).toBe(NO_REPORTS_LABEL);
     expect(status.get(V1).reportsGenerated).toEqual([]);
+  });
+
+  // The same canonical design-fact comparison the Document Workflow cards use
+  // (identifyDesignChanges) is now the authority for the version-switcher badge
+  // too. A fingerprint mismatch with no design change is a presentation-only
+  // move (Current), not "needs updating". This is the Leeds correction: the
+  // badge must agree with the Document Workflow cards.
+  const reportProject = (overrides) => ({
+    roomDims: '4.5|6.0|2.4',
+    dolby_config: '7.1.4',
+    subwooferInstances: [],
+    front_subs_cfg: { count: 2 },
+    rear_subs_cfg: { count: 0 },
+    ...overrides,
+  });
+  const publication = (fingerprint, reportProjectOverrides) => ({
+    report_snapshot: { report_project: reportProject(reportProjectOverrides) },
+  });
+
+  test('TEST 11 — a fingerprint mismatch with no design change is Current (presentation-only move)', () => {
+    const SAVED = 'eng-saved';
+    const CURRENT = 'eng-current';
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: SAVED } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, CURRENT]]),
+      publicationsByVersion: new Map([
+        [V1, { [SAVED]: publication(SAVED), [CURRENT]: publication(CURRENT) }],
+      ]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.CURRENT);
+    expect(status.get(V1).reportsLabel).toBe(CURRENT_REPORTS_LABEL);
+  });
+
+  test('TEST 12 — a fingerprint mismatch with a material design change is Stale', () => {
+    const SAVED = 'eng-saved';
+    const CURRENT = 'eng-current';
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: SAVED } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, CURRENT]]),
+      publicationsByVersion: new Map([
+        [V1, {
+          [SAVED]: publication(SAVED, { dolby_config: '7.1.4' }),
+          [CURRENT]: publication(CURRENT, { dolby_config: '5.1.4' }),
+        }],
+      ]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.STALE);
+    expect(status.get(V1).reportsLabel).toBe(REPORTS_NEED_UPDATING_LABEL);
+  });
+
+  test('TEST 13 — a fingerprint mismatch with a missing publication is Verification unavailable', () => {
+    const SAVED = 'eng-saved';
+    const CURRENT = 'eng-current';
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: SAVED } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, CURRENT]]),
+      publicationsByVersion: new Map([[V1, { [CURRENT]: publication(CURRENT) }]]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.VERIFICATION_UNAVAILABLE);
+    expect(status.get(V1).reportsLabel).toBe(REPORTS_VERIFICATION_UNAVAILABLE_LABEL);
+  });
+
+  test('TEST 14 — no publications supplied falls back to fingerprint comparison (Stale, not unavailable)', () => {
+    const SAVED = 'eng-saved';
+    const CURRENT = 'eng-current';
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: SAVED } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, CURRENT]]),
+      publicationsByVersion: new Map([[V1, null]]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.STALE);
+    expect(status.get(V1).reportsLabel).toBe(REPORTS_NEED_UPDATING_LABEL);
+  });
+
+  test('TEST 15 — a matching fingerprint is Current regardless of publications', () => {
+    const FP = 'eng-v1';
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: FP } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, FP]]),
+      publicationsByVersion: null,
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.CURRENT);
+    expect(status.get(V1).reportsLabel).toBe(CURRENT_REPORTS_LABEL);
+  });
+
+  // Leeds regression: the real Production scenario — a client-name correction
+  // ("Rotherham Proejct" → "Rotherham Project") plus a legacy subwoofer metadata
+  // change, with identical subwooferInstances. identifyDesignChanges compares
+  // only engineering design categories (room, screen, seating, speakers,
+  // subwoofers, performance, acoustic treatment) — never client_name or legacy
+  // front_subs_cfg/rear_subs_cfg. So the badge must read Current, agreeing with
+  // the Document Workflow cards.
+  test('TEST 16 — Leeds: client-name correction + legacy metadata change stays Current', () => {
+    const SAVED = 'eng-saved-leeds';
+    const CURRENT = 'eng-current-leeds';
+    const leedsPublication = (clientName, legacyPlacementMode) => ({
+      report_snapshot: {
+        report_project: reportProject({
+          client_name: clientName,
+          front_subs_cfg: { count: 2, placementMode: legacyPlacementMode, isManual: false },
+          rear_subs_cfg: { count: 0, placementMode: 'auto', isManual: false },
+        }),
+      },
+    });
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: SAVED } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, CURRENT]]),
+      publicationsByVersion: new Map([
+        [V1, {
+          [SAVED]: leedsPublication('Rotherham Proejct', 'auto'),
+          [CURRENT]: leedsPublication('Rotherham Project', 'manual'),
+        }],
+      ]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.CURRENT);
+    expect(status.get(V1).reportsLabel).toBe(CURRENT_REPORTS_LABEL);
+  });
+
+  test('TEST 17 — Leeds: a genuine subwoofer-position change is Stale', () => {
+    const SAVED = 'eng-saved-leeds';
+    const CURRENT = 'eng-current-leeds';
+    const withSubs = (x) => ({
+      report_snapshot: {
+        report_project: reportProject({
+          subwooferInstances: [{ id: 'sub-1', model: 'SUB3-12', enabled: true, position: { x, y: 2 }, bottomHeightM: 0.1 }],
+        }),
+      },
+    });
+    const status = deriveVersionDocumentStatus({
+      snapshots: [snapshot({ version_id: V1, source_fingerprints: { engineeringFingerprint: SAVED } })],
+      proposals: [],
+      currentFingerprintByVersion: fpByVersion([[V1, CURRENT]]),
+      publicationsByVersion: new Map([
+        [V1, { [SAVED]: withSubs(1.0), [CURRENT]: withSubs(3.5) }],
+      ]),
+    });
+
+    expect(status.get(V1).reportsState).toBe(REPORT_STATE.STALE);
+    expect(status.get(V1).reportsLabel).toBe(REPORTS_NEED_UPDATING_LABEL);
   });
 });
