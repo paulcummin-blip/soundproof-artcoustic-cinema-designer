@@ -17,7 +17,7 @@
  * a proposal never changes whether it is Current.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export const REPORT_AUTOPRINT_PARAM = 'autoPrint';
 export const REPORT_UPDATE_PARAM = 'updateReport';
@@ -35,6 +35,28 @@ export function readReportActionIntent(search) {
     autoStore: params.get(REPORT_AUTOSTORE_PARAM) === '1',
     regenerateIntent: params.get(REPORT_REGENERATE_INTENT_PARAM) === '1',
   };
+}
+
+/**
+ * Remove executable flags from the current history entry before generation
+ * mounts. The current visit retains its request; reload/back is read-only.
+ * This consumes navigation intent, never marks an export completed.
+ */
+export function withoutReportActionIntent(search) {
+  const next = new URLSearchParams(search);
+  for (const key of [REPORT_AUTOPRINT_PARAM, REPORT_UPDATE_PARAM, REPORT_AUTOSTORE_PARAM, REPORT_REGENERATE_INTENT_PARAM]) next.delete(key);
+  return next;
+}
+
+export function useConsumedReportActionIntent(searchParams, setSearchParams) {
+  const [intent] = useState(() => readReportActionIntent(searchParams));
+  const [consumed, setConsumed] = useState(false);
+  useLayoutEffect(() => {
+    const next = withoutReportActionIntent(searchParams);
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    setConsumed(true);
+  }, [searchParams, setSearchParams]);
+  return { intent, consumed };
 }
 
 /**
