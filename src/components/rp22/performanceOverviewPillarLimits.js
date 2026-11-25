@@ -45,6 +45,17 @@ export const PILLAR_RANGES = Object.freeze({
 
 export const PILLAR_ORDER = Object.keys(PILLAR_RANGES);
 
+/**
+ * Parameter IDs excluded from the Performance Overview's limiting calculation.
+ * P15 and P21 are designer-assumed levels, not measured engineering results.
+ * The overview identifies design decisions a designer can improve, so an
+ * assumed value must never be the limiting level a pillar displays and must
+ * never appear in the limiting-parameter hover detail. P15 and P21 remain in
+ * the detailed Live RP22 Performance Summary and the ASDR calculation; only
+ * this compact overview skips them.
+ */
+export const OVERVIEW_EXCLUDED_PARAM_IDS = Object.freeze(new Set([15, 21]));
+
 // rank: higher = better. FAIL = 0 (worst). null = not assessed → skipped.
 const levelRank = (lvl) => {
   const c = normalizeLevel(lvl);
@@ -96,6 +107,10 @@ export function buildPillarOverview(liveSummary) {
       // Confirm the catalog pillar matches the range (defensive; the range is
       // the authority for the overview grouping).
       if (PARAM_CATEGORIES[p.id] !== pillar) continue;
+      // Assumed parameters (P15, P21) are excluded from this overview's
+      // limiting calculation and hover detail. They are not measured design
+      // results a designer can improve, so they must never limit a pillar here.
+      if (OVERVIEW_EXCLUDED_PARAM_IDS.has(p.id)) continue;
       const key = `p${p.id}`;
       const title = getHumanTitleForParam(p.id);
 

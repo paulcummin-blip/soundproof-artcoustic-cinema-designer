@@ -81,19 +81,29 @@ function makeSummary({ seatResults = {}, roomResults = {} } = {}) {
   console.log("✓ RSP-only P19 excluded from Secondary, limits Primary");
 }
 
-// ── 3. Room-scoped counts for BOTH groups ───────────────────────────────────
-// P15 (Background Noise Floor, Room) assumed L1 (worst valid). Counts for both.
+// ── 3. Assumed parameters P15 and P21 are excluded from the overview ────────
+// P15 (Background Noise Floor, Room) is a designer-assumed level. It must NOT
+// limit Dynamic Range and must NOT appear in the limiting-parameter detail.
+// P21 (Early Reflections, Room) is likewise assumed and excluded from Timbre.
 {
   const summary = makeSummary({
-    roomResults: { 15: { level: "L1", formatted: "NCB 26", value: null } },
+    roomResults: {
+      15: { level: "L1", formatted: "NCB 26", value: null },
+      21: { level: "L1", formatted: "-8 dB", value: null },
+    },
   });
   const ov = buildPillarOverview(summary);
   const dr = ov["Dynamic Range"];
-  assert.equal(dr.primary.level, "L1", "room-wide P15 limits primary Dynamic Range");
-  assert.equal(dr.secondary.level, "L1", "room-wide P15 also limits secondary Dynamic Range");
-  assert.equal(dr.primary.limiters[0].scope, "Room");
-  assert.equal(dr.secondary.limiters[0].scope, "Room");
-  console.log("✓ room-wide parameter counts for both groups");
+  assert.equal(dr.primary.level, null, "assumed P15 does not limit primary Dynamic Range");
+  assert.equal(dr.secondary.level, null, "assumed P15 does not limit secondary Dynamic Range");
+  assert.equal(dr.primary.limiters.length, 0, "P15 not in primary limiting detail");
+  assert.equal(dr.secondary.limiters.length, 0, "P15 not in secondary limiting detail");
+  const timbre = ov["Timbre Matching"];
+  assert.equal(timbre.primary.level, null, "assumed P21 does not limit primary Timbre Matching");
+  assert.equal(timbre.secondary.level, null, "assumed P21 does not limit secondary Timbre Matching");
+  assert.equal(timbre.primary.limiters.length, 0, "P21 not in primary limiting detail");
+  assert.equal(timbre.secondary.limiters.length, 0, "P21 not in secondary limiting detail");
+  console.log("✓ assumed P15 and P21 excluded from overview limiting calculation");
 }
 
 // ── 4. Unassessed / N/A params skipped (never L1 or FAIL) ───────────────────
