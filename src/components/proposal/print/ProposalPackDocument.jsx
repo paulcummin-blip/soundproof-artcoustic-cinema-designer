@@ -530,7 +530,8 @@ export default function ProposalPackDocument({
       const media = placementsBySection[section.id] || [];
       const landscape = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE
         || placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE) || null;
-      const portrait = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL) || null;
+      const portraits = media.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL);
+      const portrait = portraits[0] || null;
 
       // The single photograph that closes the design. A section placement wins;
       // otherwise one unused Full Width Library image is handed into this page.
@@ -718,6 +719,19 @@ export default function ProposalPackDocument({
               {blockCopy(continuingBlocks)}
             </div>
           ) : null}
+          {/* Further details explicitly assigned to this section stay with it.
+              Each is a separate measured composition, so a full page continues
+              naturally without dropping, cropping or reassigning a drawing. */}
+          {portraits.slice(1).map((placement) => (
+            <div
+              key={placement.id}
+              className="pp-composition"
+              data-editorial-composition="continuing"
+              data-editorial-section={section.section_type}
+            >
+              <ProposalImagePlacement placement={placement} />
+            </div>
+          ))}
           {/* The project photographs the plan integrated into this page, composed
               after its copy: a photograph that would have had a gallery page of
               its own takes its place in the narrative instead, one or two to a
