@@ -11,12 +11,12 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerPrincipleRegister.js': '14cd7139d5667f70843ea8a604d5282dd2df6372e901818970e4b7d7ff8a0957',
   'base44/shared/proposalWriter/writerEditorialRules.js': '08776775a8a4bdd2f2a167804809d5db51d750c4a01a1ac8ee23830761475324',
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
-  'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
+  'base44/shared/proposalWriter/writerProductScope.js': '2e1bd48eec1fc597878a3478c5ed550a92695a6aeb87c19bd55770cfbd318032',
   'base44/shared/proposalWriter/writerVocabulary.js': '53b036a5ffa43d63c12fdebac504562345ce40852869fc365f0321db46e792b5',
   'base44/shared/proposalWriter/writerClausePrecision.js': '92cb1f4cc600bb50c2790e3c1b4b08b5e35b10f8adfefa19a95ff70a895dd092',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': '8a43176be9b47411a941c8af2911d2214a1af24a4027b4e38a2515cbe0642751',
+  'base44/shared/proposalWriter/writerContractSchema.js': 'd09b33dae94d1e129f11226ab3fdd8cc1dd880856bee0950be3e617c2947c536',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
@@ -46,9 +46,9 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
   'base44/shared/proposalWriter/writerOptionEvidenceSummary.js': '7b503c07645b7437940de705ec809f4da5ddbccaf0c6d5b7212c516589c79524',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': 'abf11fad05bb0e16a7c25998774e2dfac4369ee97b89c27b342be4656af063ff',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '11ecdbd8ba57a0ece96cfd75f81fd9ebdf32250ee4fe7016f88b4a02efcf6403',
   'base44/shared/proposalWriter/writerSectionMapping.js': '822e2cb2b7fea7df336628bdf9e0438faecb93d6c300fc240297235df14d900d',
-  'base44/shared/proposalWriter/writerDesignContext.js': '66509c693e58db98774ce8abd345de2c4d3199f2a2e67c5f42d0d3fe835ab70f',
+  'base44/shared/proposalWriter/writerDesignContext.js': 'affbd97cf327a4e569f81d5c59da0bf6565c17423c32a34b0ff58b98e1866912',
   'base44/shared/proposalEdit/completeDocumentValidation.js': '5eaeab43e6af2b8792bd400b022e710c1624256b301465e31849850ee863d159',
   'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',
@@ -63,7 +63,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // reasoning authority it was written under.
   'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
-  'base44/shared/adiProjectInterpretation.js': '833506221843bbc8f76a43b3a24072e6a83bd72a41acf1a3198e861837c9b886',
+  'base44/shared/adiProjectInterpretation.js': '8a58dc33c6547ea3b1c6baed5a9b7605ab8f18f8f780b4b5864caef1b3971fae',
   // The check between the saved interpretation and the frozen evidence, which now
   // also holds the design philosophy's own statements to it.
   'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '2e88d5c9c5b3bc2e9000adaf528dc98e52c073c7c92fecc02c2030199fc412a0',
