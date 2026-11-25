@@ -1,4 +1,29 @@
 /** Narrow clause boundaries and screen-location readings; never a blanket exemption. */
+
+/**
+ * A designer-recorded screen-size contingency is not an achieved equipment
+ * change. Accept only this conditional design-edit grammar, in its assigned
+ * single-option brief section. It cannot carry a figure, product, performance
+ * gain or an additional assertion; all other prose checks still run.
+ */
+export function briefScreenContingency(clause, input, section) {
+  const mode = input?.section_structure?.proposal_mode ?? input?.evidence_pack?.mode;
+  if (!['single', 'system_summary'].includes(mode)) return false;
+  const text = String(clause || '').trim();
+  const conditionalEdit = /^(?:a\s+)?different\s+screen\s+size\s+would\s+(?:involve|require|need)\s+(?:a\s+)?(?:minor|small|minimal)\s+(?:adjustment|edit|change)\s+to\s+the\s+(?:system\s+)?design(?:,\s*rather\s+than\s+a\s+different\s+system\s+concept)?[.!]?$/i;
+  if (!conditionalEdit.test(text)) return false;
+  const objectives = input?.editorial_brief?.material_objectives;
+  if (!Array.isArray(objectives)) return false;
+  return objectives.some((objective) => {
+    if (objective?.section !== section || !objective?.subjects?.includes('display_options')) return false;
+    // The source must itself state this contingency, not merely mention a
+    // screen or an unrelated change elsewhere in the designer's brief.
+    return String(objective.instruction || '').split(/[.!?]/).some((sentence) =>
+      /^\s*(?:the\s+)?(?:system|design)\s+(?:will|would)\s+need\s+(?:just\s+)?(?:a\s+)?(?:minimal|minor|small)\s+(?:edit|adjustment|change)\s+(?:if|should)\s+a\s+different\s+(?:size\s+screen|screen\s+size)\s+(?:be\s+needed|is\s+needed|be\s+required|is\s+required)\s*$/i.test(sentence)
+      || conditionalEdit.test(sentence.trim()));
+  });
+}
+
 export function independentClauses(text) {
   const sentence = String(text || '');
   // A contrast's asserted half must not inherit the denial in its first half.
