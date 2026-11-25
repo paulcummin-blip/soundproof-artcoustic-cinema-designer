@@ -402,11 +402,14 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
   signal.addEventListener('abort', cleanup, { once: true });
 
   try {
+    onProgress({ stage: 'readiness', message: 'Waiting for report fonts and images…' });
     await waitForFrameAssets(frame);
+    onProgress({ stage: 'readiness', message: 'Report fonts and images ready.' });
     signal.throwIfAborted();
 
     const scope = frame.contentDocument;
     if (bodyClass === 'client-report-printing') await inlineSvgCaptureImages(scope, signal, { includeHtmlImages: true });
+    onProgress({ stage: 'readiness', message: 'Capture image references ready.' });
 
     // Size the Sound Proof logo to the ADI strapline in the CAPTURE document
     // itself — the document html2canvas rasterises — after the frame's fonts
@@ -421,6 +424,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     const composer = resolvePageComposer(pageComposer);
     if (composer) composer(scope, { contentHeightMm: paper.heightMm });
 
+    onProgress({ stage: 'readiness', message: 'Report pagination complete.' });
     const collected = collectPageFrames(scope, pageSelector);
     if (collected.length === 0) {
       throw new Error('The print composition carried no printable pages.');
