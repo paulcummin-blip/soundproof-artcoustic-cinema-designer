@@ -1,5 +1,6 @@
 // Only bounded diagnostic metadata crosses the browser/server boundary.
 export const CLIENT_FAILURES = Object.freeze({
+ AUTHENTICATION_CONTEXT_FAILED: 'Sound Proof could not complete the authenticated session or account verification.',
  REPORT_NARRATIVE_FAILED: 'The report writer could not finish the project summary.',
  RENDER_FAILED: 'A part of the application failed to render.',
  RENDER_VALUE_REJECTED: 'A screen rejected a value that React could not render.',
