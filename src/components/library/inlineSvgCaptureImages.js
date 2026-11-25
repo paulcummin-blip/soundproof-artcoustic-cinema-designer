@@ -1,6 +1,20 @@
 /** SVGs rasterised as images cannot load external image references.
  * Inline the original bytes in the isolated report clone; geometry stays intact.
  */
+// Some existing branding files are served as application/octet-stream.
+// Recognise their binary image signature, retaining every original byte.
+export async function captureImageBlob(blob) {
+  if (blob.type.startsWith('image/')) return blob;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let type = null;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) type = 'image/jpeg';
+  else if ([137,80,78,71,13,10,26,10].every((value, index) => bytes[index] === value)) type = 'image/png';
+  else if (String.fromCharCode(...bytes.slice(0,6)).match(/^GIF8[79]a$/)) type = 'image/gif';
+  else if (String.fromCharCode(...bytes.slice(0,4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8,12)) === 'WEBP') type = 'image/webp';
+  if (!type) throw new Error('Drawing image returned no image. Retry storage.');
+  return new Blob([bytes], { type });
+}
+
 export async function inlineSvgCaptureImages(scope, signal, { includeHtmlImages = false } = {}) {
   const cache = new Map();
   for (const image of scope.querySelectorAll(includeHtmlImages ? 'svg image, img' : 'svg image')) {
@@ -14,8 +28,7 @@ export async function inlineSvgCaptureImages(scope, signal, { includeHtmlImages 
       cache.set(href, (async () => {
         const response = await fetch(new URL(href, scope.baseURI).href, { signal });
         if (!response.ok) throw new Error('Drawing image request failed (' + response.status + '). Retry storage.');
-        const blob = await response.blob();
-        if (!blob.type.startsWith('image/')) throw new Error('Drawing image returned no image. Retry storage.');
+        const blob = await captureImageBlob(await response.blob());
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
