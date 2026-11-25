@@ -4,7 +4,7 @@
  * Compact sidebar panel: the three RP22 performance pillars (Spatial
  * Resolution P1–P11, Dynamic Range P12–P16, Timbre Matching P17–P21) with a
  * Primary Seating and Secondary Seating pill each. Each pill reports the
- * WORST valid assessed RP22 level within that pillar for the relevant seating
+ * valid assessed RP22 level within that pillar for the relevant seating
  * group — the limiting level that most needs the designer's attention.
  *
  * This is a LIVE presentation only. It consumes the SAME live compliance
@@ -202,8 +202,14 @@ export default function RP22PerformanceOverview({ liveSummary = null }) {
               gap: 10, marginBottom: 6,
             }}>
               <div />
-              <div style={groupHeaderStyle}>PRIMARY</div>
-              <div style={{ ...groupHeaderStyle, textAlign: "right" }}>SECONDARY</div>
+              <div style={{ textAlign: "center" }}>
+                <div style={groupHeaderStyle}>PRIMARY</div>
+                <div style={subHeaderStyle}>No lower than</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={groupHeaderStyle}>SECONDARY</div>
+                <div style={subHeaderStyle}>No lower than</div>
+              </div>
             </div>
             <div style={{ display: "grid", gap: 10 }}>
               {PILLAR_ORDER.map((pillar) => (
@@ -216,7 +222,7 @@ export default function RP22PerformanceOverview({ liveSummary = null }) {
               </div>
             )}
             <div style={{ marginTop: 8, fontSize: 9.5, color: "#9B8E82", letterSpacing: "0.02em" }}>
-              Each pill shows the worst assessed level in that pillar. Hover a pill for the limiting parameters.
+              Each pill shows the assessed level in that pillar. Hover a pill for the limiting parameters.
             </div>
           </div>
         )}
@@ -231,4 +237,13 @@ const groupHeaderStyle = {
   color: "#625143",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
+};
+
+const subHeaderStyle = {
+  fontSize: 7.5,
+  fontWeight: 500,
+  color: "#9B8E82",
+  letterSpacing: "0.02em",
+  marginTop: 2,
+  whiteSpace: "nowrap",
 };
