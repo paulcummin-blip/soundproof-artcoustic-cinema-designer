@@ -849,10 +849,7 @@ function GenerateClientReport({ reportIntent, onStored }) {
   // saved snapshot.
   const reportFullyReady = reportReady && (savedNarrativeAccepted || autoIntentVerified);
   // Every export entry point must wait for both the narrative and drawings.
-  const handleExport = useCallback(() => {
-    if (!reportFullyReady || !exportIntegrity.ready || publication.status === 'storing') return;
-    return rawHandleExport();
-  }, [reportFullyReady, exportIntegrity.ready, publication.status, rawHandleExport]);
+  // Downloads are handled by StoredTechnicalReport only after durable storage.
 
   // Store-only export: captures, validates and stores the PDF through the
   // existing issued-document pipeline without opening a browser print
@@ -960,12 +957,12 @@ function GenerateClientReport({ reportIntent, onStored }) {
   // publication.
   useReportActionIntent({
     requested: reportIntent.exportPdf,
-    ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
+    ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready && !!reportSnapshot.saved?.id && !reportSnapshot.saving && reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.STALE,
     onRun: handleStoreOnly,
   });
   useReportActionIntent({
-    requested: reportIntent.autoStore,
-    ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
+    requested: reportIntent.autoStore || reportIntent.updateReport || reportIntent.regenerateIntent,
+    ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready && !!reportSnapshot.saved?.id && !reportSnapshot.saving && reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.STALE,
     onRun: handleStoreOnly,
   });
   useReportActionIntent({
@@ -1138,8 +1135,7 @@ function GenerateClientReport({ reportIntent, onStored }) {
           </Button>
           <Button
             type="button"
-            onClick={handleExport}
-            disabled={publication.status !== 'complete'}
+            disabled
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
