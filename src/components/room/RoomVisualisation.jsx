@@ -396,6 +396,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const _fixedRspY = Number.isFinite(effectiveRspY_m) ? effectiveRspY_m : undefined;
   const _fixedRspX = Number.isFinite(effectiveRspX_m) ? effectiveRspX_m : undefined;
 
+  // RSP position ref for subwoofer symmetry RSP-equidistance checks.
+  // Updated from the effective RSP on every render so the drag handler reads
+  // the current RSP without re-creating its callback.
+  const rspPointRef = useRef(null);
   // Keep the RSP position ref current for the subwoofer drag handler's
   // symmetry RSP-equidistance check. X is always the room centreline; Y is the
   // effective RSP Y.
@@ -466,10 +470,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const draftRearSubsRef = useRef(null);
   const isDraggingSubRef = useRef(false);
   const idleCommitTimerRef = useRef(null);
-  // RSP position ref for subwoofer symmetry RSP-equidistance checks.
-  // Updated from the effective RSP on every render so the drag handler reads
-  // the current RSP without re-creating its callback.
-  const rspPointRef = useRef(null);
   // Seat draft (transient positions during seat drag — no state writes)
   const draftSeatsRef = useRef(null);
   const isDraggingSeatRef = useRef(false);
