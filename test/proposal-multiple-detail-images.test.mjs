@@ -36,6 +36,7 @@ test('the actual print component contains both drawings once within their target
   const html = renderToStaticMarkup(React.createElement(ProposalPackDocument, {
     proposal: { proposal_type: 'system_summary', created_date: '2026-11-25' },
     projectName: 'Fixture cinema', sections, projectImages: assets, coverImageUrl: assets[0].file_url,
+    heroImageUrl: 'https://example.test/brand.png', logoUrl: 'https://example.test/logo.png',
   }));
   for (const id of ['plan', 'elevation']) {
     assert.equal(html.split('src="https://example.test/' + id + '.png"').length - 1, 1);
