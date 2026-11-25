@@ -154,6 +154,10 @@ function createCaptureFrame(documentHtml, frameWidthMm = CONTENT_WIDTH_MM) {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.setAttribute('title', 'Issued document capture');
+  // This offscreen render workspace is not a user interaction. Recording every
+  // html2canvas clone duplicates the whole report into session replay per page.
+  // Keep the visible progress UI and operation telemetry recorded normally.
+  frame.classList.add('rr-block');
   frame.style.cssText = `position:fixed;left:-20000px;top:0;width:${frameWidthMm}mm;height:${CAPTURE_VIEWPORT_HEIGHT_PX}px;border:0;background:#FFFFFF;`;
   document.body.appendChild(frame);
 
