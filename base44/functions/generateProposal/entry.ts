@@ -72,6 +72,9 @@ export default async function(req) {
   let incidentContext = null;
   let requestProjectId = null;
   let requestAccountId = null;
+  let requestId = null;
+  let requestVersionId = null;
+  let runtimeEnvironment = 'production';
 
   try {
     base44 = createClientFromRequest(req);
@@ -80,6 +83,10 @@ export default async function(req) {
 
     const body = await req.json();
     const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, parent_proposal_id, clarification_answers, narrative_steer } = body;
+    requestId = request_id || null;
+    requestVersionId = selected_version_ids?.[0] || version_id || null;
+    runtimeEnvironment = body.runtime_environment === 'preview'
+      || /preview|sandbox|localhost/.test(req.headers.get('origin') || '') ? 'preview' : 'production';
     // The designer's narrative steer: the subjects they want weighed and the
     // subjects kept out of the client-facing narrative. Soft preferences only:
     // they change no evidence, no result and no table, and they are never turned
@@ -148,6 +155,7 @@ export default async function(req) {
       operation_type: OPERATION_TYPE.PROPOSAL_GENERATION,
       account_id: effectiveAccountId,
       project_id: requestProjectId,
+      version_id: requestVersionId,
       initial_stage: 'preparing_evidence',
     });
 
@@ -749,6 +757,7 @@ export default async function(req) {
       idempotent_replay: false,
     });
   } catch (error) {
+    console.error('[generateProposal] generation failed', error?.stack || error?.message || error);
     const cleanupSucceeded = proposal?.id
       ? await rollbackCreatedProposal(base44, proposal.id, sectionRecords)
       : true;
@@ -758,19 +767,23 @@ export default async function(req) {
     // whether the proposal survived. If recording fails, the original error
     // is still returned without an incident reference.
     let incidentResult = null;
-    if (base44 && incidentContext) {
+    if (base44) {
       try {
         incidentResult = await recordProposalGenerationIncident(base44, {
           project_id: requestProjectId || null,
           account_id: requestAccountId || null,
           proposal_id: cleanupSucceeded ? null : (proposal?.id || null),
           error: error?.message || 'Proposal generation failed.',
-          operation_id: request_id,
+          operation_id: requestId,
+          version_id: requestVersionId,
+          runtime_environment: runtimeEnvironment,
+          error_detail: String(error?.message || 'Proposal generation failed.').slice(0, 2000),
+          component_stack: String(error?.stack || '').slice(0, 6000),
           data_committed: !cleanupSucceeded,
           data_integrity_summary: cleanupSucceeded
             ? 'Proposal and all sections were rolled back. No durable data was committed.'
             : 'Proposal record or sections could not be fully rolled back. Partial data may remain and requires admin review.',
-          incidentContext,
+          incidentContext: incidentContext || {},
         });
       } catch (recordingErr) {
         // Fail-open: the original error is still returned.
@@ -786,7 +799,7 @@ export default async function(req) {
     // ── Mark the monitored operation as failed (fail-open) ──
     if (base44) {
       await failOperation(base44, {
-        operation_id: request_id,
+        operation_id: requestId,
         error_code: errorCode,
         diagnostic_summary: `Failure type: ${failureType}. Error code: ${errorCode}.`,
         incident_reference: incidentResult?.reference || null,
