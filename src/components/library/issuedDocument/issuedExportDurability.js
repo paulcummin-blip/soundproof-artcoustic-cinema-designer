@@ -24,6 +24,14 @@ export async function awaitExportOperation(entry, key, start, timeoutMs = 45000)
           : 'Asset save acknowledgement is still pending. Retry checks the existing save before continuing.'
       )), timeoutMs); }),
     ]);
+  } catch (error) {
+    const status = Number(error?.response?.status || error?.status || error?.cause?.response?.status || error?.cause?.status || 0);
+    if (key === 'uploadOperation' && entry[key]?.state === 'rejected' && ![400, 401, 403, 404, 422].includes(status)) {
+      const uncertain = new Error('The upload failed without a confirmed file path. A second upload cannot safely be started until its storage outcome is reconciled. Return to the project to use your previous completed documents; administrator recovery is required.');
+      uncertain.cause = error;
+      throw uncertain;
+    }
+    throw error;
   } finally { clearTimeout(timer); }
 }
 
