@@ -75,7 +75,17 @@ export default async function capturePagePng(element, pageNumber, options) {
       diagnostics.zeroSize = true;
       throw new Error(`The page measures nothing (${diagnostics.pageWidth} × ${diagnostics.pageHeight} px).`);
     }
-    canvas = await html2canvas(element, options);
+    const started = performance.now();
+    let clonedAt = started;
+    canvas = await html2canvas(element, {
+      ...options,
+      onclone: async (...args) => {
+        await options?.onclone?.(...args);
+        clonedAt = performance.now();
+      },
+    });
+    const rasterAt = performance.now();
+    diagnostics.timings = { clone_ms: Math.round(clonedAt - started), render_ms: Math.round(rasterAt - clonedAt) };
     diagnostics.canvasWidth = canvas.width;
     diagnostics.canvasHeight = canvas.height;
     diagnostics.operation = 'canvas_dimensions';
@@ -89,9 +99,12 @@ export default async function capturePagePng(element, pageNumber, options) {
       throw new Error(`The page raster came back as a ${canvas.width} × ${canvas.height} canvas.`);
     }
     diagnostics.operation = 'png_encoding';
+    const encodeStarted = performance.now();
     dataUrl = canvas.toDataURL('image/png');
+    diagnostics.timings.encode_ms = Math.round(performance.now() - encodeStarted);
     diagnostics.operation = 'png_validation';
     diagnostics.png = inspectCanvasPng(dataUrl);
+    console.info('[ReportCapturePage]', JSON.stringify({ page: pageNumber, ...diagnostics.timings, width: canvas.width, height: canvas.height }));
     if (!diagnostics.png.valid) {
       // An encoded PNG with a zero dimension is a sheet that paints nothing, not
       // a failed page: it is named as such so no capture is cancelled over it.
