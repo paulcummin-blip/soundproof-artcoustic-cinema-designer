@@ -97,6 +97,12 @@ export default function DocumentWorkflowPanel({
   const sdDownload = useDocumentDownloadStatus(userId, speakerDesign.record?.id);
   const cpDownload = useDocumentDownloadStatus(userId, clientProposal.record?.id);
   const [downloadingKeys, setDownloadingKeys] = React.useState({});
+  // Local mirror of the persisted download status, keyed by record id. Set
+  // synchronously the instant a retrieval succeeds, so the button turns green
+  // immediately even before the external-store re-render settles. Keyed by
+  // record id (not doc key) so a replacement document with a new id starts as
+  // "not downloaded" — the persisted store handles cross-session survival.
+  const [localDownloadedIds, setLocalDownloadedIds] = React.useState({});
 
   // Retrieves the existing stored PDF only — never regenerates, captures or
   // uploads. The store is marked only after the retrieval succeeds, so a
@@ -107,6 +113,9 @@ export default function DocumentWorkflowPanel({
     try {
       await downloadIssuedDocument(record);
       markDownloaded();
+      if (record.id) {
+        setLocalDownloadedIds((prev) => ({ ...prev, [record.id]: true }));
+      }
     } catch (error) {
       console.error(`[DocumentWorkflowPanel] Download failed for ${docKey}:`, error);
       alert(error?.message || 'This document could not be downloaded.');
@@ -119,9 +128,16 @@ export default function DocumentWorkflowPanel({
     }
   };
 
-  const trDownloadState = downloadingKeys.tr ? 'downloading' : (trDownload.downloaded ? 'downloaded' : 'idle');
-  const sdDownloadState = downloadingKeys.sd ? 'downloading' : (sdDownload.downloaded ? 'downloaded' : 'idle');
-  const cpDownloadState = downloadingKeys.cp ? 'downloading' : (cpDownload.downloaded ? 'downloaded' : 'idle');
+  const resolveDownloadState = (docKey, record, storeDownloaded) => {
+    if (downloadingKeys[docKey]) return 'downloading';
+    if (!record?.id) return 'idle';
+    if (localDownloadedIds[record.id] || storeDownloaded) return 'downloaded';
+    return 'idle';
+  };
+
+  const trDownloadState = resolveDownloadState('tr', technicalReport.record, trDownload.downloaded);
+  const sdDownloadState = resolveDownloadState('sd', speakerDesign.record, sdDownload.downloaded);
+  const cpDownloadState = resolveDownloadState('cp', clientProposal.record, cpDownload.downloaded);
 
   const onTrDownload = technicalReport.record ? () => handleDownload('tr', technicalReport.record, trDownload.markDownloaded) : null;
   const onSdDownload = speakerDesign.record ? () => handleDownload('sd', speakerDesign.record, sdDownload.markDownloaded) : null;

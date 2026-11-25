@@ -104,7 +104,7 @@ function DownloadButton({ downloadState, onClick }) {
       type="button"
       size="sm"
       className="h-7 px-3 text-[11px] font-medium border-0 flex-1 min-w-0"
-      style={{ background: isDownloaded ? '#2E7D4F' : '#B33A30', color: '#FFFFFF' }}
+      style={{ background: isDownloaded ? '#213428' : '#A66B5E', color: '#FFFFFF' }}
       onClick={onClick}
       disabled={isDownloading}
       title={isDownloaded ? 'Download again' : 'Download PDF'}
