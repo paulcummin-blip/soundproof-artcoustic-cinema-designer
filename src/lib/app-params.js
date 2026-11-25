@@ -58,10 +58,20 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 	return null;
 }
 
+const getBackendUrl = () => {
+  // Published Sound Proof already proxies /api. Keeping auth, functions and
+  // telemetry on that origin avoids a blocked cross-domain base44.app request.
+  const host = windowObj.location?.hostname;
+  if (['soundproofcinemadesigner.com', 'www.soundproofcinemadesigner.com',
+    'sound-proof-cinema-designer.base44.app'].includes(host)) return windowObj.location.origin;
+  // Preserve the editor/preview connection contract and quota fallback.
+  return getAppParamValue("server_url") || import.meta.env.VITE_BASE44_BACKEND_URL;
+};
+
 const getAppParams = () => {
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
-		serverUrl: getAppParamValue("server_url") || import.meta.env.VITE_BASE44_BACKEND_URL,
+		serverUrl: getBackendUrl(),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
 		fromUrl: getAppParamValue("from_url", { defaultValue: window.location.href }),
 		functionsVersion: getAppParamValue("functions_version"),

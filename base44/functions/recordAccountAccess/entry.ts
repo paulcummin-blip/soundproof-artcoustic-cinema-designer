@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { recordAuthIncident, safeAuthCorrelation, expectedAuthFailure } from '../../shared/systemHealth/authIncident.js';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 
 /**
@@ -19,12 +20,15 @@ import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
  * own account).
  */
 export default async function(req) {
+  let base44, user, correlationId, stage='authenticated_session';
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    base44 = createClientFromRequest(req);
+    const body=await req.json().catch(()=>({}));
+    correlationId=safeAuthCorrelation(body.correlation_id);
+    user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const accessContext = await resolveAccountAccess(base44, user);
+    const accessContext = await resolveAccountAccess(base44, user, {onStage:value=>{stage=value;}});
 
     // Master admin users bypass dealer account status checks entirely.
     if (accessContext.isMasterAdmin) {
@@ -56,6 +60,7 @@ export default async function(req) {
       return Response.json({ status: 'ok', no_account: true });
     }
 
+    stage='recordAccountAccess';
     const now = new Date().toISOString();
 
     // SUSPENDED — do NOT update, do NOT auto-reactivate.
@@ -114,6 +119,9 @@ export default async function(req) {
     });
     return Response.json({ status: account.status || 'ok' });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    const status=Number(error?.response?.status||error?.status||0);
+    if(stage==='authenticated_session' && [401,403].includes(status)) return Response.json({error:'UNAUTHENTICATED'},{status:401});
+    if(!expectedAuthFailure(error)) await recordAuthIncident(base44,{user,stage,correlationId,error,operation:'recordAccountAccess'});
+    return Response.json({error:'ACCESS_RECORD_FAILED',correlation_id:correlationId},{status:500});
   }
 }

@@ -39,6 +39,7 @@ export function reportClientFailure({code,operation='application',error,detail,s
   if(handledMessages.size>100)handledMessages.delete(handledMessages.keys().next().value);
   const current={...getExperienceContext(),...scope};
   const payload={runtime_environment:browser() && /preview|sandbox|localhost/.test(location.hostname)?"preview":"deployed",error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
+   correlation_id: /^[a-zA-Z0-9-]{8,100}$/.test(String(scope.correlationId || '')) ? scope.correlationId : null,
    page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
    error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
    component_stack:safeDiagnostic(stack || error?.stack || '',1800)};
@@ -48,7 +49,7 @@ export function reportClientFailure({code,operation='application',error,detail,s
   queue.push({payload,at:Date.now(),userId:context.userId||null});queue=queue.slice(-20);persist();void flushExperienceIncidents();
  }catch{/* Monitoring must never break the user's action. */}
 }
-const excluded=/^(recordClientExperienceIncident|recordReportReadinessIncident|manageMonitoredOperation|manageSystemHealthConfig|generateProposal)$/;
+const excluded=/^(getAccountAccessContext|recordAccountAccess|recordClientExperienceIncident|recordReportReadinessIncident|manageMonitoredOperation|manageSystemHealthConfig|generateProposal)$/;
 export function instrumentClientExperience(client){
  const wrap=(fn,owner,operation)=>function(...args){
   const scope=getExperienceContext();

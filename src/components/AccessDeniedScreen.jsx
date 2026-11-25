@@ -8,6 +8,8 @@ export default function AccessDeniedScreen({
   message = "This login does not have permission to open this area.",
   reason = null,
   identity = null,
+  onRetry = null,
+  correlationId = null,
 }) {
   const { user, logout } = useAuth();
   const signedInAs = identity || user?.email || null;
@@ -41,8 +43,13 @@ export default function AccessDeniedScreen({
             )}
           </div>
         )}
+        {correlationId && <p className="mt-3 text-xs text-[#625143]">Support reference: {correlationId}</p>}
         <div className="mt-6 flex flex-col gap-3">
-          {destination !== "/" && (
+          {onRetry && <button type="button" onClick={onRetry}
+            className="inline-flex justify-center rounded-lg bg-[#213428] px-5 py-2.5 text-sm font-semibold text-white">
+            Retry
+          </button>}
+          {!onRetry && destination !== "/" && (
             <a
               href={destination}
               className="inline-flex justify-center rounded-lg bg-[#213428] px-5 py-2.5 text-sm font-semibold text-white no-underline"

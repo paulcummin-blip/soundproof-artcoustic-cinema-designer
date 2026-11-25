@@ -78,7 +78,7 @@ const AccessHome = () => {
 };
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin, checkAppState } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -106,6 +106,8 @@ const AuthenticatedApp = () => {
           message={authError.message}
           reason={authError.reason}
           identity={authError.identity}
+          onRetry={authError.retryable ? checkAppState : null}
+          correlationId={authError.correlationId}
         />
       );
     } else if (authError.type === 'auth_required') {
@@ -115,6 +117,8 @@ const AuthenticatedApp = () => {
       return (
         <AccessDeniedScreen
           title="Sound Proof could not verify this login"
+          onRetry={authError.retryable ? checkAppState : null}
+          correlationId={authError.correlationId}
           message={authError.message || 'Please try again or contact your account administrator.'}
         />
       );

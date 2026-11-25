@@ -1,3 +1,4 @@
+import { authIncidentAccount, safeAuthCorrelation } from '../../shared/systemHealth/authIncident.js';
 import {createClientFromRequest} from 'npm:@base44/sdk@0.8.54';
 import {loadOwnedProject, loadOwnedProjectVersion} from '../../shared/publishedEngineeringRead.js';
 import {recordSystemIncident} from '../../shared/systemHealth/incidentRecorder.js';
@@ -29,16 +30,23 @@ export default async function(req) {
     projectId=null;versionId=null;
    }
   }
+  const authenticationFailure=code==='AUTHENTICATION_CONTEXT_FAILED';
+  if(authenticationFailure) {
+    if(user.is_verified!==true)return Response.json({recorded:false,reason:'unverified_session'});
+    try { accountId=await authIncidentAccount(base44.asServiceRole,user); } catch { accountId=null; }
+    projectId=null;versionId=null;
+  }
   const route=safeRoute(body.page_path);
   const operation=String(body.operation||'application').replace(/[^a-zA-Z0-9_.:-]/g,'').slice(0,100)||'application';
   const detail=safeDiagnostic(body.error_detail);
   const stack=safeDiagnostic(body.component_stack,1800);
   const testRunId=user.role==='admin' && /^ux-test-[a-zA-Z0-9-]{5,80}$/.test(String(body.test_run_id||'')) ? body.test_run_id : null;
   const result=await recordSystemIncident(base44,{
-   runtime_environment:body.runtime_environment==='preview'?'preview':'deployed',component:'user_experience',operation:testRunId?'controlled_alert_test':operation,error_code:code,severity:'high',
+   runtime_environment:body.runtime_environment==='preview'?'preview':'deployed',component:authenticationFailure?'authentication':'user_experience',operation:testRunId?'controlled_alert_test':operation,error_code:code,severity:authenticationFailure?'critical':'high',
+   operation_id:authenticationFailure?safeAuthCorrelation(body.correlation_id):null,
    account_id:accountId,project_id:projectId,version_id:versionId,page_path:route,
    error_detail:detail,component_stack:stack,
-   test_run_id:testRunId,diagnostic_summary:(testRunId?'CONTROLLED TEST — '+operation+'. ':'')+CLIENT_FAILURES[code], grouping_scope:[route,operation,testRunId||''].join('::'),
+   test_run_id:testRunId,diagnostic_summary:(testRunId?'CONTROLLED TEST — '+operation+'. ':'')+CLIENT_FAILURES[code]+(authenticationFailure?' Authenticated user: '+user.id+'.':''), grouping_scope:[route,operation,authenticationFailure?user.id:'',testRunId||''].join('::'),
    stage_failed:operation, data_integrity_summary:'Monitoring did not change project data. Completion of the interrupted action has not been verified.',
   });
   return Response.json(result||{recorded:false,fail_open:true});
