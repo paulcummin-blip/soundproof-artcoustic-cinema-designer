@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Sound Proof email previews</title></head><body style="font:16px Arial;padding:32px"><h1>Sound Proof email previews</h1><p>Original application. Recipient: paul@artcoustic.com only.</p><p>Registration button uses a non-functional .invalid test address. No accounts, invitations, memberships or delivery flags are changed.</p><button id="send" disabled>Send the four test emails</button><pre id="status">Checking administrator access...</pre><script type="module">
+import {base44} from '/src/api/base44Client.js';
+import invitation from '/base44/emails/UserInvite.html?raw';
+import {renderWelcomeEmail} from '/base44/shared/invitationEmail/invitationEmailTemplates.js';
+import {selectInvitationEmail,resolveApplicablePromotion} from '/base44/shared/invitationEmail/invitationEmailSelection.js';
+const status=document.getElementById('status'), button=document.getElementById('send');
+const ledgerKey='soundproof-email-preview-20261125-authorized-four-v1';
+const rows=JSON.parse(localStorage.getItem(ledgerKey)||'[]');
+const show=()=>{status.textContent=JSON.stringify(rows,null,2);};
+const save=()=>{localStorage.setItem(ledgerKey,JSON.stringify(rows));show();};
+try {
+const user=await base44.auth.me();
+if(user.role!=='admin') throw Error('Administrator access required');
+const general={id:'preview-only-not-an-account',account_type:'dealer',dealer_group:'OTHER_DEALER'};
+const promotion=await resolveApplicablePromotion(base44,general);
+const generalSelection=selectInvitationEmail({account:general,invitationType:'initial',promotion});
+if(!generalSelection.includePromo||generalSelection.promoExpiry!=='28 February 2027') throw Error('Current promotion differs from the verified preview; stop for review.');
+const messages=[
+{subject:'[TEST] Neutral registration invitation — non-functional test link',html:invitation.replaceAll('{{action_url}}','https://soundproof-preview.invalid/TEST-NONFUNCTIONAL-INVITATION')},
+...[
+['Premium Partner welcome',{account:{dealer_group:'PREMIUM_PARTNER'},invitationType:'initial',promotion:null}],
+['General dealer welcome',{account:general,invitationType:'initial',promotion}],
+['Additional-user welcome',{account:general,invitationType:'additional',promotion:null}]
+].map(([label,args])=>{const rendered=renderWelcomeEmail(selectInvitationEmail(args));return{...rendered,subject:'[TEST] '+label+' — '+rendered.subject};})
+];
+if(messages.some(x=>x.html.includes('{{'))) throw Error('Unresolved template variable');
+if(rows.length) {show();} else {status.textContent='Ready: four actual templates. General dealer promotion ends 28 February 2027.';button.disabled=false;}
+button.onclick=async()=>{
+button.disabled=true;
+for(const message of messages){
+rows.push({subject:message.subject,to:'paul@artcoustic.com',state:'sending',at:new Date().toISOString()});save();
+try {
+const response=await base44.integrations.Core.SendEmail({to:'paul@artcoustic.com',subject:message.subject,html:message.html,category:'transactional'});
+rows[rows.length-1].state='provider-response';
+rows[rows.length-1].response=response;
+save();
+}catch(error){rows[rows.length-1].state='error-or-uncertain';rows[rows.length-1].error=error.message;save();break;}
+}
+};
+}catch(error){status.textContent='Preview blocked: '+error.message;}
+</script></body></html>
