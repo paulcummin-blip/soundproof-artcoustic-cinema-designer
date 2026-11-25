@@ -65,12 +65,14 @@ export async function appendAccountUserAudit(service, {
  */
 export async function resolveAccountAccess(base44, sessionUser, {
   bootstrapLegacyMembership = true,
+  onStage = () => {},
 } = {}) {
   if (!sessionUser?.id) {
     return { allowed: false, reason: 'UNAUTHENTICATED' };
   }
 
   const service = base44.asServiceRole;
+  onStage('authoritative_user_read');
   const authoritativeUser = await getSingle(service, 'User', { id: sessionUser.id });
 
   // Platform administration is resolved FIRST, from the authenticated Base44
@@ -161,6 +163,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'ACCOUNT_NOT_LINKED' };
   }
 
+  onStage('account_lookup');
   const account = await getSingle(service, 'Account', { id: accountId });
   if (!account) {
     return { allowed: false, reason: 'ACCOUNT_NOT_FOUND' };
@@ -315,6 +318,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // This also recovers a claim interrupted after the account write without
   // extending the term or requiring another activation grant.
   if (membership.status === 'pending' && membership.portal_activation_request_id) {
+    onStage('first_administrator_claim');
     const expiresAt = await startSoundProofTermOnFirstClaim(service, {
       accountId, user: authoritativeUser, membership,
     });
@@ -322,6 +326,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
     account.soundproof_access_expires_at = expiresAt;
   }
 
+  onStage('user_account_binding');
   if (!authoritativeUser.account_id && invitationMembership) {
     await service.entities.User.update(authoritativeUser.id, { account_id: accountId });
     authoritativeUser.account_id = accountId;
@@ -372,10 +377,12 @@ export async function resolveAccountAccess(base44, sessionUser, {
     membershipPatch.membership_role = desiredMembershipRole;
   }
 
+  onStage('membership_claim');
   if (Object.keys(membershipPatch).length > 0) {
     membership = await service.entities.AccountMembership.update(membership.id, membershipPatch);
   }
 
+  onStage('user_access_projection');
   const userPatch = {};
   // Project/version RLS uses this server-maintained projection. New seats must
   // receive it only after the current account and membership have passed checks.
