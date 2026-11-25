@@ -10,13 +10,13 @@ const require = createRequire(import.meta.url);
 
 test('saved incomplete report offers recovery; retry saves once despite full storage; reopen reuses it', async () => {
   let snapshot = { id: 'saved-report', generated_at: 'generation-1', payload: {}, source_fingerprints: {} };
-  let calls = 0;
+  let calls = 0, snapshotReads = 0;
   globalThis.window = {
     localStorage: { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); }, removeItem: () => {} },
     dispatchEvent: () => {},
   };
   globalThis.__intentRecoveryApi = {
-    entities: { ReportSnapshot: { filter: async () => ({ items: [snapshot] }) } },
+    entities: { ReportSnapshot: { filter: async () => { snapshotReads++; return { items: [snapshot] }; } } },
     functions: { invoke: async () => {
       calls++;
       snapshot = { ...snapshot, payload: { design_intent: { status: 'accepted' } } };
@@ -32,7 +32,7 @@ test('saved incomplete report offers recovery; retry saves once despite full sto
   }
   const { default: useIntent } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
   let latest;
-  const Probe = () => { latest = useIntent({ projectId: 'cable-test', versionId: 'original', enabled: false }); return null; };
+  const Probe = () => { latest = useIntent({ projectId: 'cable-test', versionId: 'original', enabled: false, onBeforeGenerate: () => Promise.resolve(true) }); return null; };
   let view;
   try {
     await act(async () => { view = TestRenderer.create(React.createElement(Probe)); });
@@ -49,6 +49,12 @@ test('saved incomplete report offers recovery; retry saves once despite full sto
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 650)); });
     assert.equal(latest.status, 'complete');
     assert.equal(calls, 1);
+    const settledReads = snapshotReads;
+    for (let index = 0; index < 3; index++) {
+      await act(async () => { view.update(React.createElement(Probe, { tick: index })); });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 550)); });
+    }
+    assert.equal(snapshotReads, settledReads, 'settled narrative is not reread on each readiness-clock render');
   } finally {
     await act(async () => { view?.unmount(); });
     delete globalThis.__intentRecoveryApi;
