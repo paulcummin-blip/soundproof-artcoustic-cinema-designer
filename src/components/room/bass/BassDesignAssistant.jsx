@@ -32,7 +32,7 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import OptimiseAndCalculate from "@/components/room/bass/optimiseWorkflow/OptimiseAndCalculate";
-import EvaluatedLayoutCards from "@/components/room/bass/bda/EvaluatedLayoutCards";
+import Stage1LayoutCards from "@/components/room/bass/bda/Stage1LayoutCards";
 import SubwooferModelPicker from "@/components/room/bass/bda/SubwooferModelPicker";
 import { useEvaluatedRecommendations } from "@/components/room/bass/bda/evaluatedRecommendationsStore";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -316,17 +316,18 @@ export default function BassDesignAssistant({
           state is shown. Every P19/P20 value comes from the candidate's own
           canonical evaluation. Apply uses the existing quantity-aware,
           fingerprint-protected authority. */}
-      <EvaluatedLayoutCards
-        options={evaluatedRecommendations.options}
-        status={evaluatedRecommendations.status}
+      <Stage1LayoutCards
+        options={evaluatedRecommendations.stage1Options}
+        status={evaluatedRecommendations.stage1Status}
         waitingReason={evaluatedRecommendations.waitingReason}
         roomDims={roomDims}
         subwooferInstances={subwooferInstances}
         frontSubsCfg={frontSubsCfg}
         rearSubsCfg={rearSubsCfg}
         commitInstances={wrappedCommitInstances}
-        currentDesignFingerprint={evaluatedRecommendations.stage2Fingerprint}
-        hasSubwoofers={hasSubwoofers}
+        stage1Fingerprint={evaluatedRecommendations.stage1Fingerprint}
+        stage1CandidateCount={evaluatedRecommendations.stage1CandidateCount}
+        stage1Previews={evaluatedRecommendations.stage1Previews}
         onApplied={handleEvaluatedApplied}
       />
 

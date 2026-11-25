@@ -42,7 +42,7 @@
 // identity behaviour — they do not pass through this hook.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useStage1PlacementOptimiser } from "../stage1/useStage1PlacementOptimiser";
 import { useStage2PlacementOptimiser } from "../stage2/useStage2PlacementOptimiser";
 import {
@@ -64,6 +64,12 @@ import {
   subscribeStage1,
   getStage1State,
 } from "../stage1/stage1PlacementStore";
+import { buildStage1Recommendations } from "./stage1RecommendationSelection";
+import {
+  recoverStage1ResponsePreview,
+  prepareStage1PreviewContext,
+  normalisePreviewsForDisplay,
+} from "./stage1ResponseRecovery";
 
 function buildSeatPriorityMap(seatingPositions) {
   const map = new Map();
@@ -295,6 +301,64 @@ export function useEvaluatedPlacementRecommendations({
     && stage1State?.status === "complete"
     && stage1State?.fingerprint === expectedStage1Fingerprint;
 
+  // ── Stage 1 model-independent recommendations ──────────────────────
+  // Built directly from the Stage 1 placement store, independent of Stage 2
+  // (product capability). These appear as soon as Stage 1 discovery is
+  // complete, regardless of whether a subwoofer model, P14 target or
+  // Stage 2 evaluation exists.
+  const stage1Options = useMemo(
+    () => stage1EvidenceMatches ? buildStage1Recommendations(stage1State, { roomDims }) : [],
+    [stage1EvidenceMatches, stage1State, roomDims],
+  );
+
+  const stage1CandidateCount = useMemo(() => {
+    if (!stage1EvidenceMatches) return 0;
+    const buckets = [stage1State?.one_sub_result, stage1State?.two_sub_result, stage1State?.four_sub_result];
+    return buckets.reduce((sum, r) => sum + (Number(r?.candidateCount) || 0), 0);
+  }, [stage1EvidenceMatches, stage1State]);
+
+  const stage1Status = (() => {
+    if (!inputs.geometryReady) return "waiting";
+    if (stage1State?.status === "error") return "error";
+    if (!stage1EvidenceMatches) return "discovering";
+    return "complete";
+  })();
+
+  // ── Stage 1 preview curve recovery ─────────────────────────────────
+  // Recover genuine response curves for the recommended finalists using the
+  // existing normalized room-transfer engine. Three calls (one per
+  // recommended finalist), NOT the full placement search. Curves are cached
+  // per Stage 1 fingerprint so they do not recompute on unrelated re-renders.
+  const [stage1Previews, setStage1Previews] = useState(null);
+  useEffect(() => {
+    if (!stage1EvidenceMatches || !stage1Options.length) {
+      setStage1Previews(null);
+      return;
+    }
+    const validOptions = stage1Options.filter(Boolean);
+    if (validOptions.length === 0) {
+      setStage1Previews(null);
+      return;
+    }
+    let cancelled = false;
+    try {
+      const ctx = prepareStage1PreviewContext({
+        roomDims,
+        rspPosition,
+        seatingPositions,
+        physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
+      });
+      const rawPreviews = validOptions.map((option) =>
+        recoverStage1ResponsePreview(option, ctx));
+      if (cancelled) return;
+      const { previews, yMin, yMax } = normalisePreviewsForDisplay(rawPreviews);
+      setStage1Previews({ previews, yMin, yMax });
+    } catch {
+      if (!cancelled) setStage1Previews(null);
+    }
+    return () => { cancelled = true; };
+  }, [stage1EvidenceMatches, stage1Options, roomDims, rspPosition, seatingPositions, physicsOptions]);
+
   // Stage 2 evidence matches only when the store holds a COMPLETED result
   // whose fingerprint equals the fingerprint the current inputs would
   // produce. When the subwoofer model or P14 target changes but Stage 2
@@ -344,5 +408,10 @@ export function useEvaluatedPlacementRecommendations({
     isCurrent,
     stage2Fingerprint: currentEvaluationFingerprint,
     waitingReason,
+    stage1Options,
+    stage1Status,
+    stage1Fingerprint: expectedStage1Fingerprint,
+    stage1CandidateCount,
+    stage1Previews,
   };
 }

@@ -18,7 +18,17 @@
 
 import { useSyncExternalStore } from "react";
 
-const EMPTY = Object.freeze({ status: "idle", options: [], stage2Fingerprint: null, waitingReason: null });
+const EMPTY = Object.freeze({
+  status: "idle",
+  options: [],
+  stage2Fingerprint: null,
+  waitingReason: null,
+  stage1Options: [],
+  stage1Status: "waiting",
+  stage1Fingerprint: null,
+  stage1CandidateCount: 0,
+  stage1Previews: null,
+});
 
 const cache = new Map();
 const listeners = new Set();
@@ -32,7 +42,12 @@ function samePayload(a, b) {
   return a.status === b.status
     && a.stage2Fingerprint === b.stage2Fingerprint
     && a.options === b.options
-    && a.waitingReason === b.waitingReason;
+    && a.waitingReason === b.waitingReason
+    && a.stage1Options === b.stage1Options
+    && a.stage1Status === b.stage1Status
+    && a.stage1Fingerprint === b.stage1Fingerprint
+    && a.stage1CandidateCount === b.stage1CandidateCount
+    && a.stage1Previews === b.stage1Previews;
 }
 
 /** Publish the latest evaluated recommendations for a project/version key.

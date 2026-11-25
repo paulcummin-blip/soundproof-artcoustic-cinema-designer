@@ -57,8 +57,15 @@ export default function EvaluatedRecommendationBackgroundRunner({
       options: rec.options,
       stage2Fingerprint: rec.stage2Fingerprint,
       waitingReason: rec.waitingReason,
+      stage1Options: rec.stage1Options,
+      stage1Status: rec.stage1Status,
+      stage1Fingerprint: rec.stage1Fingerprint,
+      stage1CandidateCount: rec.stage1CandidateCount,
+      stage1Previews: rec.stage1Previews,
     });
-  }, [key, rec.status, rec.options, rec.stage2Fingerprint, rec.waitingReason]);
+  }, [key, rec.status, rec.options, rec.stage2Fingerprint, rec.waitingReason,
+    rec.stage1Options, rec.stage1Status, rec.stage1Fingerprint,
+    rec.stage1CandidateCount, rec.stage1Previews]);
 
   // Clear the entry when the project/version changes or the runner unmounts,
   // so a stale set of options is never presented against a new design.

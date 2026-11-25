@@ -224,8 +224,20 @@ export async function runStage1SearchForQuantity({
   // No acoustic physics, scoring weights or Stage 2 geometry are touched.
   const physicallyDistinct = dedupeByPhysicalArrangement(deduped);
 
+  // ── Wall-only filter before finalist selection ─────────────────────
+  // All recommended positions must correspond to genuine wall-boundary
+  // placements. Freestanding and room-interior arrangements (e.g. RP22_E
+  // inset variants at 0.08, 0.08) are excluded BEFORE the finalist
+  // shortlist is selected, so valid wall arrangements are not lost through
+  // the five-finalist truncation. A source is wall-boundary when xNorm is
+  // 0 or 1 (left/right wall) OR yNorm is 0 or 1 (front/rear wall). This
+  // uses the existing isWallReferencePoint authority — no new geometry.
+  const wallOnly = physicallyDistinct.filter((candidate) =>
+    candidate.sources.every((source) =>
+      isWallReferencePoint(source.xNorm, source.yNorm)));
+
   // ── Select finalists with diversity ─────────────────────────────────
-  const finalists = selectFinalists(physicallyDistinct, quantity);
+  const finalists = selectFinalists(wallOnly, quantity);
 
   // ── A-prohibition validation on finalists ──────────────────────────
   let aProhibitionPass = true;
