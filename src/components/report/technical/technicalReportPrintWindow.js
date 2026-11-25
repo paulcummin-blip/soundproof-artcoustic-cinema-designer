@@ -29,6 +29,7 @@ import {
   closeReportPrintWindow,
 } from '@/components/report/reportPrintWindow';
 import { preparePrintDocument } from '@/components/report/printReadiness';
+import { applyPrintHeaderLogoSizing } from '@/components/report/printHeaderLogoSizing';
 
 /** The status the report states when preparation did not complete. */
 export const TECHNICAL_PRINT_NOT_READY_STATUS = 'Print preparation failed — nothing was printed.';
@@ -69,10 +70,14 @@ export function closeTechnicalReportPrintWindow(win) {
  * @returns {Promise<boolean>} true when the print dialog was opened
  */
 export async function printTechnicalReportInWindow(win, { title, node, onDone } = {}) {
+  // Size the Sound Proof logo to the ADI strapline in the print window's own
+  // document, after fonts have loaded and the layout is stable, so the logo
+  // and strapline are 1:1 in the exported PDF. Runs before win.print().
   return printReportInWindow(win, {
     title,
     node,
     extraCss: PRINT_WINDOW_CSS,
+    prepareComposition: applyPrintHeaderLogoSizing,
     onDone,
   });
 }
@@ -102,6 +107,10 @@ export async function printTechnicalReportInPlace({ title, node, applyTitle, onB
   if (typeof applyTitle === 'function') applyTitle(title);
   const readiness = await preparePrintDocument({ doc: document, root: node });
   if (!readiness.ready) return false;
+  // Size the logo to the strapline in this document (the print-only block is
+  // display:none on screen, so the helper measures an off-screen clone) so the
+  // in-place PDF matches the window path.
+  applyPrintHeaderLogoSizing(document);
   if (typeof onBeforePrint === 'function') onBeforePrint();
   window.print();
   return true;
