@@ -94,7 +94,9 @@ export default async function (req: Request): Promise<Response> {
       ]);
 
     const accounts = (accountsPage?.items || []).filter(
-      (a: any) => a?.account_type === 'dealer'
+      (a: any) =>
+        a?.account_type === 'dealer' &&
+        a?.dealer_group !== 'INTERNAL'
     );
     const memberships = membershipsPage?.items || [];
     const audits = auditPage?.items || [];
