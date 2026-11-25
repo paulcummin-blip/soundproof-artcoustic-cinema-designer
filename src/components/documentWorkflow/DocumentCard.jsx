@@ -18,7 +18,7 @@
  *   • Outdated / Failed       → badge + Update / Retry action.
  */
 import React from 'react';
-import { ArrowRight, Check, Clock, AlertCircle, RefreshCw, ChevronRight, ExternalLink, FileText } from 'lucide-react';
+import { ArrowRight, Check, Clock, AlertCircle, RefreshCw, ChevronRight, ExternalLink, FileText, Download, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WORKFLOW_STATE } from './documentWorkflowStatus';
 
@@ -82,6 +82,45 @@ function CreateAction({ label, state, primary, onAct }) {
   );
 }
 
+/**
+ * DownloadButton — the Download PDF action on a completed document card.
+ *
+ *   • idle / downloading → red "Download PDF" with a download icon.
+ *   • downloading        → same red, but a spinner and disabled while the
+ *                          existing stored file is retrieved.
+ *   • downloaded         → green "Downloaded" with a tick icon. The button
+ *                          remains clickable so the user can download the
+ *                          same document again whenever required.
+ *
+ * `onDownload` retrieves the existing stored PDF only — it never triggers
+ * regeneration, capture or an upload. The green state is set only after the
+ * retrieval succeeds; a failed download never turns the button green.
+ */
+function DownloadButton({ downloadState, onClick }) {
+  const isDownloaded = downloadState === 'downloaded';
+  const isDownloading = downloadState === 'downloading';
+  return (
+    <Button
+      type="button"
+      size="sm"
+      className="h-7 px-3 text-[11px] font-medium border-0 flex-1 min-w-0"
+      style={{ background: isDownloaded ? '#2E7D4F' : '#B33A30', color: '#FFFFFF' }}
+      onClick={onClick}
+      disabled={isDownloading}
+      title={isDownloaded ? 'Download again' : 'Download PDF'}
+    >
+      {isDownloading ? (
+        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+      ) : isDownloaded ? (
+        <CheckCircle2 className="w-3 h-3 mr-1" />
+      ) : (
+        <Download className="w-3 h-3 mr-1" />
+      )}
+      {isDownloaded ? 'Downloaded' : 'Download PDF'}
+    </Button>
+  );
+}
+
 export default function DocumentCard({
   number,
   label,
@@ -98,6 +137,8 @@ export default function DocumentCard({
   primary = false,
   onSecondary = null,
   secondaryLabel = null,
+  onDownload = null,
+  downloadState = 'idle',
   verifying = false,
 }) {
   // Loading evidence is not a failed verification. Keep existing files usable,
@@ -137,18 +178,21 @@ export default function DocumentCard({
             {stateLabel}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {onOpen && (
             <Button
               type="button"
               size="sm"
-              className="h-7 px-3 text-[11px] font-medium border-0 flex-1"
+              className="h-7 px-3 text-[11px] font-medium border-0 flex-1 min-w-0"
               style={{ background: '#213428', color: '#FFFFFF' }}
               onClick={onOpen}
             >
               {openLabel}
               <ChevronRight className="w-3 h-3 ml-1" />
             </Button>
+          )}
+          {onDownload && (
+            <DownloadButton downloadState={downloadState} onClick={onDownload} />
           )}
           {onSecondary && (
             <Button

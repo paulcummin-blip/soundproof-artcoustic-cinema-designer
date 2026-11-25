@@ -28,11 +28,13 @@ import { FileText, Speaker, Presentation, ChevronRight, Image as ImageIcon } fro
 import { Button } from '@/components/ui/button';
 import { REPORT_ROUTE } from '@/components/report/reportLibraryContext';
 import { ensureSpeakerDesignForVersion } from '@/components/report/speakerDesign/ensureSpeakerDesignForVersion';
-import { openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
+import { openIssuedDocument, downloadIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
 import { REPORT_AUTOPRINT_PARAM, REPORT_UPDATE_PARAM, REPORT_AUTOSTORE_PARAM, REPORT_REGENERATE_INTENT_PARAM } from '@/components/report/reportActionIntent';
 import { useDesignContextReview } from '@/components/adi/designContext/useDesignContextReview';
+import { useAuth } from '@/lib/AuthContext';
 import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel, NOT_AVAILABLE_LABEL } from './documentWorkflowStatus';
 import { useProjectImageCount } from './useProjectImageCount';
+import { useDocumentDownloadStatus } from './useDocumentDownloadStatus';
 import DocumentCard from './DocumentCard';
 
 /**
@@ -84,6 +86,46 @@ export default function DocumentWorkflowPanel({
 }) {
   const { technicalReport, speakerDesign, clientProposal, proposalAvailable, loading, verificationError } = workflowStatus;
   const { count: imageCount, loading: imageCountLoading } = useProjectImageCount(projectId);
+
+  // Per-user, per-issued-document download tracking. Each issued document has
+  // a unique record id; the store persists across navigation, refresh and
+  // reopening. A replacement document gets a new record id, so it starts as
+  // "not downloaded" until the user downloads that specific document.
+  const { user } = useAuth();
+  const userId = user?.id || null;
+  const trDownload = useDocumentDownloadStatus(userId, technicalReport.record?.id);
+  const sdDownload = useDocumentDownloadStatus(userId, speakerDesign.record?.id);
+  const cpDownload = useDocumentDownloadStatus(userId, clientProposal.record?.id);
+  const [downloadingKeys, setDownloadingKeys] = React.useState({});
+
+  // Retrieves the existing stored PDF only — never regenerates, captures or
+  // uploads. The store is marked only after the retrieval succeeds, so a
+  // failed download never turns the button green.
+  const handleDownload = async (docKey, record, markDownloaded) => {
+    if (!record) return;
+    setDownloadingKeys((prev) => ({ ...prev, [docKey]: true }));
+    try {
+      await downloadIssuedDocument(record);
+      markDownloaded();
+    } catch (error) {
+      console.error(`[DocumentWorkflowPanel] Download failed for ${docKey}:`, error);
+      alert(error?.message || 'This document could not be downloaded.');
+    } finally {
+      setDownloadingKeys((prev) => {
+        const next = { ...prev };
+        delete next[docKey];
+        return next;
+      });
+    }
+  };
+
+  const trDownloadState = downloadingKeys.tr ? 'downloading' : (trDownload.downloaded ? 'downloaded' : 'idle');
+  const sdDownloadState = downloadingKeys.sd ? 'downloading' : (sdDownload.downloaded ? 'downloaded' : 'idle');
+  const cpDownloadState = downloadingKeys.cp ? 'downloading' : (cpDownload.downloaded ? 'downloaded' : 'idle');
+
+  const onTrDownload = technicalReport.record ? () => handleDownload('tr', technicalReport.record, trDownload.markDownloaded) : null;
+  const onSdDownload = speakerDesign.record ? () => handleDownload('sd', speakerDesign.record, sdDownload.markDownloaded) : null;
+  const onCpDownload = clientProposal.record ? () => handleDownload('cp', clientProposal.record, cpDownload.markDownloaded) : null;
 
   const openStoredPdf = async (record) => {
     if (!record) return;
@@ -256,6 +298,8 @@ export default function DocumentWorkflowPanel({
           openLabel="Open"
           onSecondary={trState === WORKFLOW_STATE.READY ? handleTechnicalReportAct : null}
           secondaryLabel={trState === WORKFLOW_STATE.READY ? 'Create New' : null}
+          onDownload={onTrDownload}
+          downloadState={trDownloadState}
           primary
         />
         <DocumentCard
@@ -272,6 +316,8 @@ export default function DocumentWorkflowPanel({
           onAct={sdOnAct}
           onOpen={speakerDesign.record ? () => openStoredPdf(speakerDesign.record) : null}
           openLabel="Open"
+          onDownload={onSdDownload}
+          downloadState={sdDownloadState}
         />
       </div>
 
@@ -291,7 +337,9 @@ export default function DocumentWorkflowPanel({
         primary={proposalAvailable && !cpIsCreated}
         onSecondary={cpIsCreated ? openProposalCentre : null}
         secondaryLabel={cpIsCreated ? 'Create New' : null}
-      />
+        onDownload={onCpDownload}
+        downloadState={cpDownloadState}
+        />
 
       <UploadedImagesRow
         count={imageCount}
