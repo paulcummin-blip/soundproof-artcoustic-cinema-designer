@@ -53,6 +53,7 @@ import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic"
 import DealerHero from "@/components/ui/HeroBanner";
 import BrandBar from "@/components/ui/BrandBar";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { hasCapability, isStrictMasterAdmin, isRicherSoundsAdmin } from "@/lib/accountAccess";
 
@@ -114,6 +115,13 @@ export default function Layout({ children, currentPageName }) {
   const isReportAutoPrint = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("autoPrint") === "1"
     && /\/RP22(?:Client)?Report\/?$/.test(window.location.pathname);
+  // The three performance panels (ASDR, RP22 Overview, Live RP22 Summary) are
+  // contextual to the System Designer page. On every other page they are
+  // hidden completely, with no empty-state placeholder or spacing. Their
+  // expanded/collapsed states persist in localStorage, so returning to the
+  // System Designer restores each panel exactly as it was left.
+  const location = useLocation();
+  const isSystemDesignerPage = location.pathname === "/RoomDesigner";
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
@@ -715,7 +723,7 @@ export default function Layout({ children, currentPageName }) {
               </div>
             )}
 
-            {canUseSoundProof && showAsdr && (
+            {canUseSoundProof && showAsdr && isSystemDesignerPage && (
               <div className="border-t border-brand-border">
                 <DesignRatingSummary
                   showAsdr={showAsdr}
