@@ -843,11 +843,11 @@ function GenerateClientReport({ reportIntent, onStored }) {
   // ADI failure only counts when the assessment itself is ready (so the report
   // genuinely reached ADI) and there is no already-accepted saved narrative
   // (a saved complete report reuses its narrative and never shows this error).
-  const adiFailed = autoIntentStatus === AUTO_INTENT.FAILED && reportReady && !savedNarrativeAccepted;
+  const adiFailed = autoIntentStatus === AUTO_INTENT.FAILED && reportReady && (!savedNarrativeAccepted || reportIntent.regenerateIntent);
   // The report is fully ready to display once engineering/pages are ready AND
   // the ADI narrative is accepted — either just generated or reused from the
   // saved snapshot.
-  const reportFullyReady = reportReady && !adiRunning && (savedNarrativeAccepted || autoIntentVerified);
+  const reportFullyReady = reportReady && !adiRunning && (reportIntent.regenerateIntent ? autoIntentVerified : (savedNarrativeAccepted || autoIntentVerified));
   // Every export entry point must wait for both the narrative and drawings.
   // Downloads are handled by StoredTechnicalReport only after durable storage.
 
