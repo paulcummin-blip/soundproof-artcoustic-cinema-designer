@@ -1,9 +1,10 @@
 // stage1ResponseRecovery.js
 // ---------------------------------------------------------------------------
-// Recover genuine predicted response curves for Stage 1 recommended finalists
-// using the existing normalized room-transfer engine. This does NOT rerun the
-// placement search — it calls computeNormalizedRoomTransfer for the three
-// recommended finalists only (three calls, not the full search).
+// Build Stage 1 recommendation preview curves from the REFINED response
+// evidence stored on each finalist (the 32 PPO refinement pass). The preview
+// graph and the displayed metrics therefore describe the SAME response — no
+// independent 96 PPO recovery pass, and no recomputation when the designer
+// changes product selection, P14 target, zoom or workspace settings.
 //
 // The output is a RELATIVE room-transfer response (predicted relative room
 // response), not measured SPL or final product-specific performance. Curves
@@ -11,47 +12,16 @@
 // normalisation across all three cards.
 //
 // No curves are independently flattened, exaggerated or artificially
-// smoothed. The raw complex-pressure sum is converted to dB exactly as the
-// production path does, then filtered to the 20–80 Hz display band.
+// smoothed. The raw complex-pressure sum was already converted to dB by the
+// refinement pass; here it is only averaged / enveloped and normalised.
 // ---------------------------------------------------------------------------
 
-import { computeNormalizedRoomTransfer } from "../normalizedRoomTransferEngine";
-import { prepareStage1Context, buildStage1EngineOptions } from "../stage1/stage1CandidateEvaluation";
-import { STAGE1_SCREENING_FREQ_MIN_HZ, STAGE1_SCREENING_FREQ_MAX_HZ, STAGE1_FALLBACK_SOURCE_HEIGHT_M } from "../stage1/stage1Constants";
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
-const DISPLAY_FREQ_MIN = STAGE1_SCREENING_FREQ_MIN_HZ; // 20
-const DISPLAY_FREQ_MAX = STAGE1_SCREENING_FREQ_MAX_HZ; // 80
-
-function filterToDisplayBand(curve) {
-  return (curve || []).filter(
-    (p) => p.frequency >= DISPLAY_FREQ_MIN && p.frequency <= DISPLAY_FREQ_MAX && Number.isFinite(p.spl),
-  );
-}
-
 /**
- * Build simulation sources from a Stage 1 recommendation option's
- * coordinates. Each source is a virtual-source point at the wall boundary
- * (x, y in metres, z = STAGE1_FALLBACK_SOURCE_HEIGHT_M), with flat tuning
- * (0 dB gain, 0 ms delay, 0 polarity). This matches the Stage 1 evaluation
- * exactly.
- * @private
- */
-function buildSimSources(option) {
-  const coordinates = Array.isArray(option?.coordinates) ? option.coordinates : [];
-  return coordinates.map((c, i) => ({
-    id: `stage1-preview-src-${i + 1}`,
-    x: Number(c.x),
-    y: Number(c.y),
-    z: STAGE1_FALLBACK_SOURCE_HEIGHT_M,
-    placement: "front",
-    tuning: { gainDb: 0, delayMs: 0, polarity: 0 },
-  }));
-}
-
-/**
- * Map transfer-engine seat curves to primary/secondary using the seating
- * positions' priority field. Returns { primaryCurves, secondaryCurves }.
+ * Map stored response-evidence seat curves to primary/secondary using the
+ * seating positions' priority field. Returns { primaryCurves, secondaryCurves }.
+ * The evidence curves are already filtered to the 20–80 Hz display band.
  * @private
  */
 function mapSeatCurves(seatCurves, seatingPositions) {
@@ -66,10 +36,10 @@ function mapSeatCurves(seatCurves, seatingPositions) {
   for (const sc of (Array.isArray(seatCurves) ? seatCurves : [])) {
     const id = String(sc.originalSeatId || "");
     const priority = priorityMap.get(id) || PRIMARY;
-    const filtered = filterToDisplayBand(sc.responseData);
-    if (filtered.length > 0) {
-      if (priority === PRIMARY) primaryCurves.push(filtered);
-      else secondaryCurves.push(filtered);
+    const curve = (sc.responseData || []).filter((p) => Number.isFinite(p.spl));
+    if (curve.length > 0) {
+      if (priority === PRIMARY) primaryCurves.push(curve);
+      else secondaryCurves.push(curve);
     }
   }
   return { primaryCurves, secondaryCurves };
@@ -115,43 +85,26 @@ function envelopeCurves(curves) {
 }
 
 /**
- * Recover predicted response curves for a single Stage 1 finalist.
+ * Build a Stage 1 preview from the refined response evidence stored on a
+ * recommendation option. No engine call: the 32 PPO refinement pass already
+ * produced the rspCurve and per-seat curves; here they are only mapped to
+ * primary/secondary, averaged and enveloped for the shaded band.
  *
  * Returns { rspCurve, primaryAverage, primaryBand: { min, max },
- * secondaryCount, primaryCount, frequencies } or null on error.
+ * secondaryCount, primaryCount, frequencies } or null when no evidence.
  *
- * Curves are filtered to the 20–80 Hz display band. No smoothing, no
- * flattening, no artificial enhancement.
- *
- * @param {object} option — Stage 1 recommendation option ({ coordinates, ... })
- * @param {object} context — { roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes }
+ * @param {object} option — Stage 1 recommendation option with responseEvidence
+ * @param {Array} seatingPositions — original seats (for priority mapping)
  * @returns {object|null}
  */
-export function recoverStage1ResponsePreview(option, context) {
-  if (!option || !context) return null;
-  const { roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes } = context;
-  if (!roomDims || !Array.isArray(option?.coordinates) || option.coordinates.length === 0) return null;
-
-  const sources = buildSimSources(option);
-  if (sources.length === 0) return null;
-
-  const transfer = computeNormalizedRoomTransfer({
-    roomDims,
-    rspPosition,
-    seatingPositions,
-    subsForSimulation: sources,
-    physicsOptions,
-    preparedModes,
-  });
-
-  if (transfer.status !== "complete") return null;
-
-  const rspCurve = filterToDisplayBand(transfer.rspCurve);
-  const { primaryCurves, secondaryCurves } = mapSeatCurves(transfer.seatCurves, seatingPositions);
-
+export function buildStage1PreviewFromEvidence(option, seatingPositions) {
+  const evidence = option?.responseEvidence;
+  if (!evidence) return null;
+  const rspCurve = (evidence.rspCurve || []).filter((p) => Number.isFinite(p.spl));
+  if (rspCurve.length === 0) return null;
+  const { primaryCurves, secondaryCurves } = mapSeatCurves(evidence.seatCurves, seatingPositions);
   const primaryAverage = averageCurves(primaryCurves);
   const primaryBand = envelopeCurves(primaryCurves);
-
   return {
     rspCurve,
     primaryAverage,
@@ -159,25 +112,6 @@ export function recoverStage1ResponsePreview(option, context) {
     primaryCount: primaryCurves.length,
     secondaryCount: secondaryCurves.length,
     frequencies: rspCurve.map((p) => p.frequency),
-  };
-}
-
-/**
- * Prepare a shared Stage 1 context (including precomputed room modes) for
- * efficient multi-finalist curve recovery. Compute the mode bank once and
- * reuse it across all three finalist calls.
- *
- * @param {object} params — { roomDims, rspPosition, seatingPositions, physicsOptions }
- * @returns {object} context for recoverStage1ResponsePreview
- */
-export function prepareStage1PreviewContext({ roomDims, rspPosition, seatingPositions, physicsOptions }) {
-  const ctx = prepareStage1Context({ roomDims, rspPosition, seatingPositions, physicsOptions });
-  return {
-    roomDims: ctx.roomDims,
-    rspPosition: ctx.rspPosition,
-    seatingPositions: ctx.seatingPositions,
-    physicsOptions: ctx.physicsOptions,
-    preparedModes: ctx.preparedModes,
   };
 }
 
@@ -190,7 +124,7 @@ export function prepareStage1PreviewContext({ roomDims, rspPosition, seatingPosi
  * Returns { previews, yMin, yMax } where yMin/yMax are the common dB range
  * across all normalised curve sets.
  *
- * @param {Array} rawPreviews — array of recoverStage1ResponsePreview outputs
+ * @param {Array} rawPreviews — array of buildStage1PreviewFromEvidence outputs
  * @returns {object} { previews, yMin, yMax }
  */
 export function normalisePreviewsForDisplay(rawPreviews) {

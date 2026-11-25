@@ -91,7 +91,7 @@ export function createStage1EvaluationPool({
     else if (!stopped) signal.addEventListener("abort", cancel, { once: true });
   }
 
-  async function evaluate(candidate) {
+  async function evaluate(candidate, options = {}) {
     const slot = await acquire();
     if (stopped) throw failure || new Error("Stage 1 evaluation pool terminated");
     return new Promise((resolve, reject) => {
@@ -99,7 +99,17 @@ export function createStage1EvaluationPool({
       slot.pending = { requestId, resolve, reject };
       arm(slot, "evaluation");
       report("job_posted", slot, { requestId });
-      try { slot.worker.postMessage({ type: "evaluate", requestId, candidate }); }
+      // Options carry the refinement resolution (pointsPerOctave) and a flag to
+      // return compact 20–80 Hz response evidence. Discovery calls omit them.
+      try {
+        slot.worker.postMessage({
+          type: "evaluate",
+          requestId,
+          candidate,
+          pointsPerOctave: Number.isFinite(options.pointsPerOctave) ? options.pointsPerOctave : undefined,
+          returnResponseEvidence: options.returnResponseEvidence === true,
+        });
+      }
       catch (error) { fail(slot, `Stage 1 evaluation dispatch failed: ${error?.message || error}`); }
     });
   }

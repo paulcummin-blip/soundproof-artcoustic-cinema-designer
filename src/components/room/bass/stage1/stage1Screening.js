@@ -5,11 +5,11 @@
 import {
   STAGE1_SCREENING_FREQ_MIN_HZ,
   STAGE1_SCREENING_FREQ_MAX_HZ,
-  STAGE1_NULL_RULE,
   STAGE1_TIE_TOLERANCE,
 } from "./stage1Constants";
 import { getFamilyPreferenceRank } from "./stage1FamilyRegistry";
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
+import { detectFrequencyDefinedDepressions } from "./stage1NullDetector";
 
 const mean = (values) => (values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0);
 
@@ -21,37 +21,12 @@ function filterToScreeningBand(curve) {
   );
 }
 
-function smoothCurve(curve) {
-  const radius = STAGE1_NULL_RULE.smoothingRadiusBins;
-  return curve.map((point, index) => {
-    const values = curve.slice(Math.max(0, index - radius), index + radius + 1).map((item) => item.spl).filter(Number.isFinite);
-    return { frequency: point.frequency, spl: mean(values) };
-  });
-}
-
+// detectFrequencyDefinedDepressions runs on the FULL extended simulation
+// response (15–200 Hz) so depressions near the 20/80 Hz screening-band edges
+// have complete reference shoulders, then reports only depressions centred
+// inside the 20–80 Hz screening band.
 function detectBroadNulls(curve) {
-  const smooth = smoothCurve(curve);
-  const depths = smooth.map((point, index) => {
-    const radius = STAGE1_NULL_RULE.shoulderRadiusBins;
-    const shoulders = smooth.slice(Math.max(0, index - radius), Math.max(0, index - 1))
-      .concat(smooth.slice(index + 2, index + radius + 1))
-      .map((item) => item.spl).filter(Number.isFinite);
-    return { ...point, depthDb: Math.max(0, mean(shoulders) - point.spl) };
-  });
-  const groups = [];
-  let active = [];
-  depths.forEach((point) => {
-    if (point.depthDb >= STAGE1_NULL_RULE.destructiveDepthDb) active.push(point);
-    else if (active.length) { groups.push(active); active = []; }
-  });
-  if (active.length) groups.push(active);
-  return groups
-    .filter((group) => group.length >= STAGE1_NULL_RULE.minimumContiguousBins)
-    .map((group) => ({
-      centreHz: group.reduce((best, item) => (item.depthDb > best.depthDb ? item : best)).frequency,
-      depthDb: Math.max(...group.map((item) => item.depthDb)),
-      bins: group.length,
-    }));
+  return detectFrequencyDefinedDepressions(curve);
 }
 
 // ── Per-seat metrics ────────────────────────────────────────────────────
@@ -102,10 +77,15 @@ function worstSpatialVariation(curves) {
  * @returns {object} screening metrics + ranking tuple
  */
 export function screenCandidate({ transferResult, seatingPositions, candidate }) {
+  // Null detection runs on the FULL extended response so edge depressions
+  // have complete reference shoulders; smoothness/variation metrics use the
+  // 20–80 Hz screening band only.
+  const rspCurveFull = (transferResult.rspCurve || []).filter((p) => Number.isFinite(p.spl));
   const rspCurve = filterToScreeningBand(transferResult.rspCurve);
-  const seatCurvesRaw = (transferResult.seatCurves || []).map((sc) => ({
+  const seatCurvesFull = (transferResult.seatCurves || []).map((sc) => ({
     seatKey: sc.seatKey,
     originalSeatId: sc.originalSeatId,
+    curveFull: (sc.responseData || []).filter((p) => Number.isFinite(p.spl)),
     curve: filterToScreeningBand(sc.responseData),
   }));
 
@@ -117,27 +97,48 @@ export function screenCandidate({ transferResult, seatingPositions, candidate })
   });
 
   const primaryCurves = [];
+  const primaryCurvesFull = [];
   const secondaryCurves = [];
-  seatCurvesRaw.forEach((sc) => {
+  seatCurvesFull.forEach((sc) => {
     const id = String(sc.originalSeatId || "");
     const priority = seatPriorityMap.get(id) || PRIMARY;
-    if (priority === PRIMARY) primaryCurves.push(sc.curve);
-    else secondaryCurves.push(sc.curve);
+    if (priority === PRIMARY) {
+      primaryCurves.push(sc.curve);
+      primaryCurvesFull.push(sc.curveFull);
+    } else {
+      secondaryCurves.push(sc.curve);
+    }
   });
 
-  // Per-seat metrics
-  const primaryPerSeat = primaryCurves.map((curve) => {
+  // Per-seat metrics (null detection uses the full extended curve)
+  const primaryPerSeat = primaryCurvesFull.map((curve) => {
     const nulls = detectBroadNulls(curve);
     const worstNullDepth = Math.max(0, ...nulls.map((n) => n.depthDb));
-    const hasSevereNull = nulls.some((n) => n.depthDb >= STAGE1_NULL_RULE.severeDepthDb);
-    const variationFromMean = seatVariationFromMean(curve);
-    const rspDiff = seatRspDifference(curve, rspCurve);
+    const hasSevereNull = nulls.some((n) => n.isSevere);
+    const variationFromMean = seatVariationFromMean(filterToScreeningBand(curve));
+    const rspDiff = seatRspDifference(filterToScreeningBand(curve), rspCurve);
     return { nulls, worstNullDepth, hasSevereNull, variationFromMean, rspDiff };
   });
 
   const secondaryPerSeat = secondaryCurves.map((curve) => ({
     variationFromMean: seatVariationFromMean(curve),
   }));
+
+  // RSP depressions (broad depressions in the RSP curve, 20–80 Hz band)
+  const rspDepressions = detectBroadNulls(rspCurveFull);
+  const deepestRspDepression = rspDepressions.length
+    ? rspDepressions.reduce((best, d) => (d.depthDb > best.depthDb ? d : best))
+    : null;
+
+  // Deepest primary-seat depression across all primary seats
+  let deepestPrimaryDepression = null;
+  for (const seat of primaryPerSeat) {
+    for (const n of seat.nulls) {
+      if (!deepestPrimaryDepression || n.depthDb > deepestPrimaryDepression.depthDb) {
+        deepestPrimaryDepression = n;
+      }
+    }
+  }
 
   // ── Screening metrics (neutral — NO P19/P20) ────────────────────────
   const primarySevereProblemCount = primaryPerSeat.filter((s) => s.hasSevereNull).length;
@@ -177,6 +178,15 @@ export function screenCandidate({ transferResult, seatingPositions, candidate })
     primarySeatCount: primaryCurves.length,
     secondarySeatCount: secondaryCurves.length,
     rspAvailable: rspCurve.length > 0,
+    // Validated depression metrics (frequency-defined detector). These are
+    // comparative Stage 1 evidence, never RP22 Performance Levels.
+    deepestRspDepression: deepestRspDepression
+      ? { depthDb: deepestRspDepression.depthDb, centreHz: deepestRspDepression.centreHz }
+      : null,
+    deepestPrimaryDepression: deepestPrimaryDepression
+      ? { depthDb: deepestPrimaryDepression.depthDb, centreHz: deepestPrimaryDepression.centreHz }
+      : null,
+    primarySeatsWithSevereBroadNulls: primarySevereProblemCount,
   };
 }
 

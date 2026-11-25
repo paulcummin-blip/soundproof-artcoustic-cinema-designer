@@ -16,6 +16,9 @@ import {
   STAGE1_DIVERSITY_MIN_DISPLACEMENT_NORM,
   STAGE1_CONCURRENCY,
   STAGE1_FALLBACK_SOURCE_HEIGHT_M,
+  STAGE1_REFINEMENT_POINTS_PER_OCTAVE,
+  STAGE1_REFINEMENT_POOL_SIZE,
+  STAGE1_REFINEMENT_SIDE_WALL_SUB_CAP,
 } from "./stage1Constants";
 import { generateStage1Candidates, generateFineCandidates } from "./stage1CandidateGenerator";
 import { compareScreeningResults } from "./stage1Screening";
@@ -28,6 +31,63 @@ import { dedupeByPhysicalArrangement } from "./stage1PhysicalArrangementFingerpr
 
 const round = (v, d = 3) => Number(Number(v || 0).toFixed(d));
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+
+// ── Refinement pool wall-classification helpers ─────────────────────────
+// A source is on a front/rear wall when yNorm is 0 or 1 (a corner counts as
+// front/rear — a corner subwoofer is practically a front/rear placement).
+// Side-wall-only is xNorm 0/1 with 0 < yNorm < 1 (not a corner). Used only to
+// guarantee credible front/rear representation inside the refinement pool.
+function isFrontRearSource(source) {
+  const y = Number(source?.yNorm);
+  return Number.isFinite(y) && (y <= 0 || y >= 1);
+}
+function isSideWallOnlySource(source) {
+  const x = Number(source?.xNorm);
+  const y = Number(source?.yNorm);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const onSide = x <= 0 || x >= 1;
+  const onFrontRear = y <= 0 || y >= 1;
+  return onSide && !onFrontRear;
+}
+function isFrontRearArrangement(candidate) {
+  const sources = Array.isArray(candidate?.sources) ? candidate.sources : [];
+  if (sources.length === 0) return false;
+  return sources.every(isFrontRearSource);
+}
+function isSideWallArrangement(candidate) {
+  const sources = Array.isArray(candidate?.sources) ? candidate.sources : [];
+  if (sources.length === 0) return false;
+  return sources.some(isSideWallOnlySource);
+}
+
+/**
+ * Select the bounded refinement pool from the 8 PPO discovery ranking:
+ * the top wall-only candidates, with a side-wall sub-cap so credible
+ * front/rear candidates are always retained independently of side-wall
+ * candidates. Capped at STAGE1_REFINEMENT_POOL_SIZE (validated 12–15 range).
+ * @private
+ */
+function selectRefinementPool(rankedWallOnly) {
+  const pool = [];
+  let sideWallCount = 0;
+  for (const candidate of rankedWallOnly) {
+    if (pool.length >= STAGE1_REFINEMENT_POOL_SIZE) break;
+    const isSide = isSideWallArrangement(candidate);
+    if (isSide && sideWallCount >= STAGE1_REFINEMENT_SIDE_WALL_SUB_CAP) continue;
+    pool.push(candidate);
+    if (isSide) sideWallCount += 1;
+  }
+  // If the pool is not full and side-wall candidates were the only ones left,
+  // fill the remaining slots so the pool still uses the validated size.
+  if (pool.length < STAGE1_REFINEMENT_POOL_SIZE) {
+    for (const candidate of rankedWallOnly) {
+      if (pool.length >= STAGE1_REFINEMENT_POOL_SIZE) break;
+      if (pool.includes(candidate)) continue;
+      pool.push(candidate);
+    }
+  }
+  return pool;
+}
 
 /**
  * Extract the best parameter q from a parameterised family candidate.
@@ -92,6 +152,28 @@ function makeEvaluationRunFn(pool) {
   return async function runFn(candidate) {
     const t0 = now();
     const result = await pool.evaluate(candidate);
+    return { result, workerMs: now() - t0 };
+  };
+}
+
+/**
+ * Build the runFn for the 32 PPO refinement pass: dispatch one candidate to
+ * the evaluation pool at the refinement resolution and request compact 20–80
+ * Hz response evidence so the preview graph and the displayed metrics share
+ * the same response. Rejects on worker error so the bounded runner records an
+ * isolated failure (never aborts siblings).
+ */
+function makeRefinementRunFn(pool) {
+  return async function runFn(candidate) {
+    const t0 = now();
+    // Preserve the 8 PPO discovery screening as diagnostics before the refined
+    // (32 PPO) screening overwrites it on the spread result.
+    const discoveryScreening = candidate?.screening ? { ...candidate.screening } : null;
+    const result = await pool.evaluate(candidate, {
+      pointsPerOctave: STAGE1_REFINEMENT_POINTS_PER_OCTAVE,
+      returnResponseEvidence: true,
+    });
+    if (result) result.discoveryScreening = discoveryScreening;
     return { result, workerMs: now() - t0 };
   };
 }
@@ -236,8 +318,50 @@ export async function runStage1SearchForQuantity({
     candidate.sources.every((source) =>
       isWallReferencePoint(source.xNorm, source.yNorm)));
 
-  // ── Select finalists with diversity ─────────────────────────────────
-  const finalists = selectFinalists(wallOnly, quantity);
+  // ── 32 PPO refinement of the bounded finalist pool ─────────────────
+  // The validated approach: re-evaluate a bounded pool of the top 8 PPO
+  // discovery candidates at 32 PPO, then re-rank by the refined screening
+  // metrics and select the five finalists from the refined set. The refined
+  // response evidence is stored on each finalist so the preview graph and the
+  // displayed metrics describe the SAME response (no routine 96 PPO path).
+  // The mode bank is resolution-independent, so the shared preparedModes is
+  // reused; only the frequency axis changes.
+  const refinementPool = selectRefinementPool(wallOnly);
+  let refinementResults = [];
+  let refinementStats = null;
+  if (refinementPool.length > 0 && !isAborted()) {
+    const refinementRun = await runBoundedConfirmations({
+      jobs: refinementPool,
+      maxConcurrency: stage1Concurrency,
+      runFn: makeRefinementRunFn(pool),
+      isAborted,
+    });
+    if (isAborted()) return null;
+    refinementResults = collectEvaluated(refinementRun.results);
+    refinementStats = refinementRun.stats;
+  }
+
+  // The refinement runFn already preserved the 8 PPO discovery screening on
+  // each refined result as `discoveryScreening`; `screening` is the refined
+  // 32 PPO screening used for ranking and display. Index refined results by id.
+  const refinedByFamilyAndId = new Map();
+  for (const refined of refinementResults) {
+    refinedByFamilyAndId.set(refined.id, refined);
+  }
+
+  // Build the refined candidate set: prefer the 32 PPO refined result where
+  // available, falling back to the 8 PPO discovery result for any pool
+  // candidate whose refinement transfer did not complete. Then re-rank by the
+  // (now refined) screening metrics.
+  const refinedSet = wallOnly.map((candidate) => {
+    const refined = refinedByFamilyAndId.get(candidate.id);
+    if (refined) return refined;
+    return candidate;
+  });
+  refinedSet.sort(compareScreeningResults);
+
+  // ── Select finalists with diversity (from the refined set) ─────────
+  const finalists = selectFinalists(refinedSet, quantity);
 
   // ── A-prohibition validation on finalists ──────────────────────────
   let aProhibitionPass = true;
@@ -251,7 +375,8 @@ export async function runStage1SearchForQuantity({
 
   const elapsedMs = performance.now() - started;
 
-  // Build compact result (no heavy transfer data — just screening + coordinates)
+  // Build compact result (no heavy transfer data — just screening + coordinates
+  // + the compact 20–80 Hz response evidence shared by graph and metrics).
   const compactFinalists = finalists.map((f) => ({
     id: f.id,
     familyId: f.familyId,
@@ -271,7 +396,13 @@ export async function runStage1SearchForQuantity({
       y: round(s.yNorm * L, 3),
       z: STAGE1_FALLBACK_SOURCE_HEIGHT_M,
     })),
+    // `screening` is the refined 32 PPO screening (ranking + display).
     screening: f.screening,
+    // `discoveryScreening` (8 PPO) is retained for diagnostics only.
+    discoveryScreening: f.discoveryScreening || null,
+    // Compact 20–80 Hz response evidence shared by the preview graph and the
+    // displayed metrics. Null for finalists without a refinement pass.
+    responseEvidence: f.responseEvidence || null,
     searchTier: f.searchTier,
     symmetryState: f.symmetryState,
     seedDisplacement: f.seedDisplacement,
@@ -283,16 +414,18 @@ export async function runStage1SearchForQuantity({
     candidateCount: deduped.length,
     coarseCandidateCount: coarseResults.length,
     fineCandidateCount: fineResults.length,
+    refinementCandidateCount: refinementResults.length,
     rejectedCount: rejected.length,
     familyCoverage,
     finalists: compactFinalists,
     aProhibitionValidation: aProhibitionPass ? "PASS" : "FAIL",
     bEvaluated: false,
     searchTimingMs: round(elapsedMs, 1),
-    tiersExhausted: ["coarse", "fine"],
-    // Diagnostic-only instrumentation (coarse/fine phase breakdown).
+    tiersExhausted: ["coarse", "fine", "refinement"],
+    // Diagnostic-only instrumentation (coarse/fine/refinement phase breakdown).
     coarseStats: coarseRun.stats,
     fineStats: fineRun.stats,
+    refinementStats,
   };
 }
 

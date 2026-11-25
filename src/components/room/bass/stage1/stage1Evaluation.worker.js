@@ -41,7 +41,14 @@ self.onmessage = (event) => {
       return;
     }
     try {
-      const result = evaluateCandidate(message.candidate, context);
+      // Refinement options (pointsPerOctave, returnResponseEvidence) are passed
+      // through by the pool; discovery calls omit them and keep 8 PPO defaults.
+      const options = {
+        pointsPerOctave: Number.isFinite(message.pointsPerOctave) ? message.pointsPerOctave : undefined,
+        returnResponseEvidence: message.returnResponseEvidence === true,
+      };
+      const hasOptions = options.pointsPerOctave !== undefined || options.returnResponseEvidence;
+      const result = evaluateCandidate(message.candidate, context, hasOptions ? options : undefined);
       self.postMessage({ type: "complete", requestId: message.requestId, result });
     } catch (err) {
       self.postMessage({

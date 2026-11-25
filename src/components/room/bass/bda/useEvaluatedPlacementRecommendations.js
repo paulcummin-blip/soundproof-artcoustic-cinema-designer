@@ -66,8 +66,7 @@ import {
 } from "../stage1/stage1PlacementStore";
 import { buildStage1Recommendations } from "./stage1RecommendationSelection";
 import {
-  recoverStage1ResponsePreview,
-  prepareStage1PreviewContext,
+  buildStage1PreviewFromEvidence,
   normalisePreviewsForDisplay,
 } from "./stage1ResponseRecovery";
 
@@ -324,11 +323,12 @@ export function useEvaluatedPlacementRecommendations({
     return "complete";
   })();
 
-  // ── Stage 1 preview curve recovery ─────────────────────────────────
-  // Recover genuine response curves for the recommended finalists using the
-  // existing normalized room-transfer engine. Three calls (one per
-  // recommended finalist), NOT the full placement search. Curves are cached
-  // per Stage 1 fingerprint so they do not recompute on unrelated re-renders.
+  // ── Stage 1 preview curves (from refined response evidence) ───────
+  // The 32 PPO refinement pass already stored the refined response evidence
+  // on each finalist. The preview graph and the displayed metrics therefore
+  // describe the SAME response. No engine call and no recomputation when the
+  // designer changes product selection, P14 target, zoom or workspace
+  // settings — the evidence is read directly from the recommendation option.
   const [stage1Previews, setStage1Previews] = useState(null);
   useEffect(() => {
     if (!stage1EvidenceMatches || !stage1Options.length) {
@@ -342,14 +342,8 @@ export function useEvaluatedPlacementRecommendations({
     }
     let cancelled = false;
     try {
-      const ctx = prepareStage1PreviewContext({
-        roomDims,
-        rspPosition,
-        seatingPositions,
-        physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS,
-      });
       const rawPreviews = validOptions.map((option) =>
-        recoverStage1ResponsePreview(option, ctx));
+        buildStage1PreviewFromEvidence(option, seatingPositions));
       if (cancelled) return;
       const { previews, yMin, yMax } = normalisePreviewsForDisplay(rawPreviews);
       setStage1Previews({ previews, yMin, yMax });
@@ -357,7 +351,7 @@ export function useEvaluatedPlacementRecommendations({
       if (!cancelled) setStage1Previews(null);
     }
     return () => { cancelled = true; };
-  }, [stage1EvidenceMatches, stage1Options, roomDims, rspPosition, seatingPositions, physicsOptions]);
+  }, [stage1EvidenceMatches, stage1Options, seatingPositions]);
 
   // Stage 2 evidence matches only when the store holds a COMPLETED result
   // whose fingerprint equals the fingerprint the current inputs would

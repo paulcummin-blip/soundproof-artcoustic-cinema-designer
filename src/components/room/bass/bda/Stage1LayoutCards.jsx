@@ -31,7 +31,6 @@ import {
   resolveQuantityApplyState,
 } from "@/components/room/bass/optimiserPlan/quantityPlacementApplyAuthority";
 import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecommendationUtils";
-import { formatDb } from "@/components/utils/formatDb";
 import Stage1ResponseGraph from "./Stage1ResponseGraph";
 
 const LAYOUT_TITLES = { 1: "1 Subwoofer", 2: "2 Subwoofers", 4: "4 Subwoofers" };
@@ -105,28 +104,51 @@ function MetricRow({ label, value, hint }) {
   );
 }
 
+// One decimal place for dB values (validated card presentation).
+function formatDb1(value) {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toFixed(1)} dB`;
+}
+
+function formatDepression(depression) {
+  if (!depression || !Number.isFinite(depression.depthDb)) return "None ≥ 8 dB";
+  const freq = Number.isFinite(depression.centreHz) ? depression.centreHz.toFixed(0) : "?";
+  return `−${depression.depthDb.toFixed(1)} dB @ ${freq} Hz`;
+}
+
 function screeningRows(screening) {
   if (!screening) return [];
   const rows = [];
 
-  const nulls = screening.primarySevereProblemCount;
+  const rspDep = screening.deepestRspDepression;
   rows.push(
     <MetricRow
-      key="nulls"
-      label="Primary nulls"
-      value={nulls === 0 ? "None detected" : `${nulls} severe`}
-      hint="Stage 1 screening: count of primary seats with a significant broad null (≥10 dB depth)"
+      key="rspdep"
+      label="Deepest RSP depression"
+      value={formatDepression(rspDep)}
+      hint="Stage 1 screening (32 PPO): deepest broad RSP depression (≥8 dB, ≥1/8 octave) in the 20–80 Hz band"
     />,
   );
 
-  const varDb = screening.worstPrimarySpatialVariation;
-  if (Number.isFinite(varDb)) {
+  const priDep = screening.deepestPrimaryDepression;
+  rows.push(
+    <MetricRow
+      key="pridep"
+      label="Deepest Primary depression"
+      value={formatDepression(priDep)}
+      hint="Stage 1 screening (32 PPO): deepest broad depression across primary seats (≥8 dB, ≥1/8 octave)"
+    />,
+  );
+
+  const severeSeats = screening.primarySeatsWithSevereBroadNulls;
+  if (Number.isFinite(severeSeats)) {
+    const seats = screening.primarySeatCount != null ? screening.primarySeatCount : null;
     rows.push(
       <MetricRow
-        key="pvar"
-        label="Primary variation"
-        value={formatDb(varDb)}
-        hint="Stage 1 screening: worst seat-to-seat variation across primary seats (lower is better)"
+        key="severeseats"
+        label="Primary seats with severe nulls"
+        value={seats != null ? `${severeSeats} / ${seats} seats` : `${severeSeats} seat${severeSeats === 1 ? "" : "s"}`}
+        hint="Stage 1 screening: count of primary seats with a severe broad null (≥10 dB depth, ≥1/8 octave)"
       />,
     );
   }
@@ -137,8 +159,20 @@ function screeningRows(screening) {
       <MetricRow
         key="smooth"
         label="Primary smoothness"
-        value={formatDb(Math.abs(smoothness))}
-        hint="Stage 1 screening: average primary-seat response variation from mean (lower is smoother)"
+        value={formatDb1(Math.abs(smoothness))}
+        hint="Stage 1 screening (32 PPO): average primary-seat response variation from mean (lower is smoother)"
+      />,
+    );
+  }
+
+  const varDb = screening.worstPrimarySpatialVariation;
+  if (Number.isFinite(varDb)) {
+    rows.push(
+      <MetricRow
+        key="pvar"
+        label="Primary seat-to-seat variation"
+        value={formatDb1(varDb)}
+        hint="Stage 1 screening (32 PPO): worst seat-to-seat variation across primary seats (lower is better)"
       />,
     );
   }
@@ -148,9 +182,9 @@ function screeningRows(screening) {
     rows.push(
       <MetricRow
         key="secvar"
-        label="Secondary variation"
-        value={formatDb(secVar)}
-        hint="Stage 1 screening: worst seat-to-seat variation across secondary seats (lower is better)"
+        label="Secondary seat-to-seat variation"
+        value={formatDb1(secVar)}
+        hint="Stage 1 screening (32 PPO): worst seat-to-seat variation across secondary seats (lower is better)"
       />,
     );
   }

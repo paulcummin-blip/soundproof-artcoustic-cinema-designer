@@ -124,6 +124,23 @@ function formatScreeningMetrics(screening) {
       ? Number(s.secondarySpatialConsistency) : null,
     efficiencyIndicator: Number.isFinite(Number(s.efficiencyIndicator))
       ? Number(s.efficiencyIndicator) : null,
+    // Validated frequency-defined depression metrics (comparative Stage 1
+    // evidence, never RP22 Performance Levels).
+    deepestRspDepression: s.deepestRspDepression
+      ? {
+          depthDb: Number.isFinite(Number(s.deepestRspDepression.depthDb)) ? Number(s.deepestRspDepression.depthDb) : null,
+          centreHz: Number.isFinite(Number(s.deepestRspDepression.centreHz)) ? Number(s.deepestRspDepression.centreHz) : null,
+        }
+      : null,
+    deepestPrimaryDepression: s.deepestPrimaryDepression
+      ? {
+          depthDb: Number.isFinite(Number(s.deepestPrimaryDepression.depthDb)) ? Number(s.deepestPrimaryDepression.depthDb) : null,
+          centreHz: Number.isFinite(Number(s.deepestPrimaryDepression.centreHz)) ? Number(s.deepestPrimaryDepression.centreHz) : null,
+        }
+      : null,
+    primarySeatsWithSevereBroadNulls: Number.isFinite(Number(s.primarySeatsWithSevereBroadNulls))
+      ? Number(s.primarySeatsWithSevereBroadNulls) : null,
+    primarySeatCount: Number.isFinite(Number(s.primarySeatCount)) ? Number(s.primarySeatCount) : null,
   };
 }
 
@@ -144,7 +161,12 @@ function buildStage1Option(finalist, quantity, placementKind) {
     familyId: finalist.familyId || null,
     familyLabel: meta.label || finalist.familyId || null,
     coordinates,
-    screening: formatScreeningMetrics(finalist.screening),
+    // Refined 32 PPO screening (ranking + display). Falls back to the
+    // discovery screening only when no refinement pass ran (legacy cache).
+    screening: formatScreeningMetrics(finalist.screening || finalist.discoveryScreening),
+    // Compact 20–80 Hz response evidence shared by the preview graph and the
+    // displayed metrics. Null when no refinement pass produced evidence.
+    responseEvidence: finalist.responseEvidence || null,
     placementKind,
     isStage1: true,
   };

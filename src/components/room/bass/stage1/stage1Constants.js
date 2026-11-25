@@ -9,17 +9,34 @@
 // subwoofers at the same cabinet centres regardless of search-family name,
 // before the shortlist limit is applied. Finalist selection can differ from
 // v2, so cached v2 results are rejected once.
-export const STAGE1_PLACEMENT_ALGORITHM_VERSION = "stage1-placement-v4-wall-only";
+// v5: validated two-resolution screening. 8 PPO discovery followed by 32 PPO
+// refinement of a bounded candidate pool, with a frequency-defined null
+// detector (fractional-octave smoothing and reference windows, interpolated
+// bandwidth crossings). Cached v4 results are rejected once because the
+// screening metrics and response evidence are materially different.
+export const STAGE1_PLACEMENT_ALGORITHM_VERSION = "stage1-placement-v5-refined-screening";
 // v3: the three-source family set was added, so a cached Stage 1 result written
 // under v2 has no three_sub_result and is not a current family policy.
 export const STAGE1_FAMILY_POLICY_VERSION = "stage1-family-policy-v3-three-source";
-export const STAGE1_CACHE_VERSION = 2;
+export const STAGE1_CACHE_VERSION = 3;
 
 // Frequency domain for positional consistency screening (RP22 §7.1).
 // This is NOT the canonical P19/P20 assessment band — Stage 2 owns that.
 export const STAGE1_SCREENING_FREQ_MIN_HZ = 20;
 export const STAGE1_SCREENING_FREQ_MAX_HZ = 80;
+// Discovery resolution (coarse + fine search). Retained from validation.
 export const STAGE1_POINTS_PER_OCTAVE = 8;
+// Refinement resolution for the bounded finalist pool. The validated approach
+// re-evaluates 12–15 candidates per quantity at 32 PPO and uses the refined
+// response evidence for both the preview curves and the displayed metrics, so
+// the graph and the numbers always describe the same response.
+export const STAGE1_REFINEMENT_POINTS_PER_OCTAVE = 32;
+// Bounded refinement pool: the top discovery candidates re-evaluated at the
+// refinement resolution. Capped at 15 (within the validated 12–15 range).
+export const STAGE1_REFINEMENT_POOL_SIZE = 15;
+// Side-wall sub-cap inside the refinement pool: guarantees credible front/rear
+// candidates are retained independently of side-wall candidates.
+export const STAGE1_REFINEMENT_SIDE_WALL_SUB_CAP = 6;
 
 // Source height fallback (acoustic centre Z). Product-independent.
 export const STAGE1_FALLBACK_SOURCE_HEIGHT_M = 0.05;
@@ -59,13 +76,21 @@ export const STAGE1_DIVERSITY_MIN_DISPLACEMENT_NORM = 0.03;
 // A-prohibition tolerance (normalised).
 export const STAGE1_A_PROHIBITION_TOLERANCE_NORM = 0.05;
 
-// Broad null detection (reused from bestSubLayoutConstants for parity).
+// Frequency-defined broad depression / null detector (validated method).
+// Smoothing and reference windows are fixed in fractional-octave terms so the
+// detector represents the same physical bandwidth at every resolution and
+// narrow simulated features can never dominate practical recommendations.
+//   smoothingFractionOctave  — half-width of the moving-average smoothing window
+//   shoulderFractionOctave   — half-width of the reference shoulder window
+//   broadDepthDb             — minimum depth for a broad depression
+//   severeDepthDb             — depth at which a broad depression is severe
+//   minBandwidthFractionOctave — minimum qualifying bandwidth (interpolated)
 export const STAGE1_NULL_RULE = Object.freeze({
-  smoothingRadiusBins: 1,
-  shoulderRadiusBins: 4,
-  minimumContiguousBins: 2,
-  destructiveDepthDb: 8,
+  smoothingFractionOctave: 1 / 8,
+  shoulderFractionOctave: 1 / 2,
+  broadDepthDb: 8,
   severeDepthDb: 10,
+  minBandwidthFractionOctave: 1 / 8,
 });
 
 // Screening variation tolerance (dB) for lexicographic tie comparison.

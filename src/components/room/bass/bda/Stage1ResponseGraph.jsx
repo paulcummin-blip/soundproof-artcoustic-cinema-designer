@@ -77,6 +77,14 @@ export default function Stage1ResponseGraph({ preview, yMin, yMax, width = 240 }
   const avgPath = buildPath(preview.primaryAverage, yMin, yMax, width, height);
   const bandPath = buildPath(preview.primaryBand?.min, preview.primaryBand?.max, yMin, yMax, width, height);
 
+  // Discreet dB axis labels: top, mid and bottom of the common dB range. The
+  // range is identical across all three cards (normalisePreviewsForDisplay
+  // computes one common yMin/yMax), so the scales always match.
+  const dbLabelMid = Math.round((yMin + yMax) / 2);
+  const dbTopY = dbToY(yMax, yMin, yMax, height);
+  const dbMidY = dbToY(dbLabelMid, yMin, yMax, height);
+  const dbBottomY = dbToY(yMin, yMin, yMax, height);
+
   return (
     <div>
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full rounded border border-[#E7E4DF] bg-[#F8F7F4]" style={{ height }}>
@@ -86,6 +94,10 @@ export default function Stage1ResponseGraph({ preview, yMin, yMax, width = 240 }
         {rspPath && <path d={rspPath} fill="none" stroke="#213428" strokeWidth={1.5} />}
         {/* Primary average (dashed) */}
         {avgPath && <path d={avgPath} fill="none" stroke="#625143" strokeWidth={1} strokeDasharray="3,2" />}
+        {/* Discreet dB axis labels (left edge) */}
+        <text x={2} y={Math.max(dbTopY + 5, 7)} fontSize="6.5" fill="#A89B89" textAnchor="start">{`${yMax}`}</text>
+        <text x={2} y={dbMidY + 2} fontSize="6.5" fill="#A89B89" textAnchor="start">{`${dbLabelMid}`}</text>
+        <text x={2} y={Math.min(dbBottomY - 1, height - 12)} fontSize="6.5" fill="#A89B89" textAnchor="start">{`${yMin}`}</text>
         {/* X-axis labels */}
         <text x={freqToX(20, width)} y={height - 3} fontSize="7" fill="#8A7B6A" textAnchor="start">20 Hz</text>
         <text x={freqToX(80, width)} y={height - 3} fontSize="7" fill="#8A7B6A" textAnchor="end">80 Hz</text>
