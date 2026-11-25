@@ -38,7 +38,7 @@ export async function inlineSvgCaptureImages(scope, signal, { includeHtmlImages 
         if (image.hasAttribute('xlink:href')) image.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', dataUrl);
       }
     } catch (error) {
-      const failure = new Error('A report image could not be captured. Retry generation. ' + error.message);
+      const failure = new Error((includeHtmlImages ? 'A report image could not be captured. Retry PDF creation. ' : 'A speaker drawing image could not be captured. Retry storage. ') + error.message);
       failure.cause = error;
       throw failure;
     }
