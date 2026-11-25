@@ -26,7 +26,8 @@ test('saved incomplete report offers recovery; retry saves once despite full sto
   let source = await fs.readFile(new URL('../components/report/projectReport/useAutoDesignIntent.js', import.meta.url), 'utf8');
   source = source.replace("from 'react'", "from " + JSON.stringify(pathToFileURL(require.resolve('react')).href));
   source = source.replace("import { base44 } from '@/api/base44Client';", 'const base44 = globalThis.__intentRecoveryApi;');
-  for (const name of ['autoDesignIntentStorage', 'autoDesignIntentGate']) {
+  source = source.replace("import {reportClientFailure} from '@/components/systemHealth/clientExperienceMonitor';", 'const reportClientFailure = () => {};');
+  for (const name of ['autoDesignIntentStorage', 'autoDesignIntentGate', 'reportNarrativeCurrent']) {
     source = source.replace("from './" + name + "'", "from " + JSON.stringify(new URL('../components/report/projectReport/' + name + '.js', import.meta.url).href));
   }
   const { default: useIntent } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
