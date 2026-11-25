@@ -1,22 +1,25 @@
 {
   "name": "SystemHealthIncident",
   "type": "object",
-  "description": "Admin-only central incident record for the Sound Proof System Health & Error Intelligence system. One record per grouped operational failure. Repeated occurrences of the same underlying problem (same grouping fingerprint) increment the occurrence_count rather than creating a duplicate record. Never stores proposal text, client briefs, passwords, tokens, secrets or confidential content. Created by trusted backend functions (e.g. generateProposal on failure) via the service role; read, updated and deleted by administrators only. Recovery attempts are recorded separately from permanent incident resolution: a recovery can restore a dealer's work while the underlying defect remains open for investigation.",
+  "description": "Admin-only notification group record for the Sound Proof System Health & Error Intelligence system. One record per grouped operational failure, grouped by notification_group_key (mechanism + environment + account). Repeated occurrences of the same underlying problem increment the occurrence_count and create separate IncidentOccurrence records preserving full diagnostic evidence. Never stores proposal text, client briefs, passwords, tokens, secrets or confidential content. Created by trusted backend functions via the service role; read, updated and deleted by administrators only. Recovery attempts are recorded separately from permanent incident resolution: a recovery can restore a dealer's work while the underlying defect remains open for investigation.",
   "properties": {
-    "runtime_environment": {"type":"string","description":"Preview or deployed browser reporting the failure."},
+    "runtime_environment": {
+      "type": "string",
+      "description": "Preview or deployed browser reporting the failure."
+    },
     "incident_reference": {
       "type": "string",
-      "description": "Unique human-readable reference (e.g. INC-261123-A1B2C3). Generated at creation time. Shown to the dealer only after the record is successfully persisted."
+      "description": "Unique human-readable reference (e.g. INC-261123-A1B2C3). Generated at creation time."
     },
     "first_detected_at": {
       "type": "string",
       "format": "date-time",
-      "description": "When this incident was first detected."
+      "description": "When this incident group was first detected."
     },
     "last_detected_at": {
       "type": "string",
       "format": "date-time",
-      "description": "When this incident was most recently detected. Updated on each repeated occurrence."
+      "description": "When this incident group was most recently detected. Updated on each repeated occurrence."
     },
     "component": {
       "type": "string",
@@ -38,7 +41,18 @@
         "medium",
         "low"
       ],
-      "description": "Incident severity. critical = system broken (unexpected error, provider failure). high = content quality failure (draft rejected by validator). medium = structural failure (section mapping, stalled operation). low = pre-condition failure (writer refusal)."
+      "description": "Initial severity of this incident group. The highest severity seen across all occurrences is tracked in highest_severity."
+    },
+    "highest_severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "nullable": true,
+      "description": "The highest severity recorded across all occurrences in this group. Updated atomically when a new occurrence has a higher severity. Null until the first occurrence sets it."
     },
     "account_id": {
       "type": "string",
@@ -48,7 +62,7 @@
     "project_id": {
       "type": "string",
       "nullable": true,
-      "description": "The affected project ID, when available."
+      "description": "The affected project ID from the first occurrence, when available."
     },
     "proposal_id": {
       "type": "string",
@@ -64,29 +78,29 @@
       "type": "string",
       "format": "date-time",
       "nullable": true,
-      "description": "When the monitored operation started. Copied from the MonitoredOperation record at incident creation time. Null when no monitored operation is linked."
+      "description": "When the monitored operation started. Copied from the MonitoredOperation record at incident creation time."
     },
     "operation_last_progress_at": {
       "type": "string",
       "format": "date-time",
       "nullable": true,
-      "description": "When the monitored operation last reported meaningful progress before the failure. Copied from the MonitoredOperation. Null when no progress was reported or no monitored operation is linked."
+      "description": "When the monitored operation last reported meaningful progress before the failure."
     },
     "operation_failed_at": {
       "type": "string",
       "format": "date-time",
       "nullable": true,
-      "description": "When the failure was detected. For watchdog-confirmed stalls, this is the watchdog run time. For direct failures, this is the catch-block time. Null when the failure time is unknown."
+      "description": "When the failure was detected."
     },
     "stage_failed": {
       "type": "string",
       "nullable": true,
-      "description": "The stage at which the operation stopped (e.g. preparing_evidence, writing_proposal, validating, saving, capturing, uploading, verifying). Null when the stage is unknown."
+      "description": "The stage at which the operation stopped."
     },
     "stage_timeline": {
       "type": "array",
       "nullable": true,
-      "description": "Safe timeline of meaningful stage transitions recorded by the monitored operation. Each entry: {stage, timestamp}. Contains only stage names and timestamps, never proposal text or client data. Null when no timeline was recorded.",
+      "description": "Safe timeline of meaningful stage transitions recorded by the monitored operation.",
       "items": {
         "type": "object",
         "properties": {
@@ -103,12 +117,12 @@
     "data_committed": {
       "type": "boolean",
       "nullable": true,
-      "description": "Whether the failed operation committed any durable data before failing. True = a proposal, report or other record was saved. False = all data was rolled back. Null = unknown (no monitored operation linked)."
+      "description": "Whether the failed operation committed any durable data before failing."
     },
     "data_integrity_summary": {
       "type": "string",
       "nullable": true,
-      "description": "Safe plain-text summary of what was saved, rolled back or remains uncertain. Contains only operation outcomes (e.g. 'Proposal and all sections were rolled back. No durable data was committed.'). Never contains proposal text, client names or credentials. Null when the data integrity state is unknown."
+      "description": "Safe plain-text summary of what was saved, rolled back or remains uncertain."
     },
     "cause_classification": {
       "type": "string",
@@ -118,60 +132,83 @@
         "unknown"
       ],
       "default": "unknown",
-      "description": "How well the cause is established by the recorded evidence. confirmed = the error code directly states the cause (DRAFT_REJECTED, PROVIDER_FAILED, SECTION_MAPPING_FAILED). suspected = the evidence is circumstantial (OPERATION_STALLED \u2014 no progress does not prove the cause). unknown = the error is unexpected and the cause has not been determined. Never set to confirmed based on a successful retry \u2014 a retry succeeding only proves the failure is intermittent, not that the cause is fixed."
+      "description": "How well the cause is established by the recorded evidence."
     },
     "cause_summary": {
       "type": "string",
       "nullable": true,
-      "description": "Plain-text statement of what the recorded evidence shows about the cause. Distinguishes what is confirmed from what is suspected. Never states a cause the evidence does not support. Null when no cause summary has been recorded."
+      "description": "Plain-text statement of what the recorded evidence shows about the cause."
     },
     "dealer_contacted": {
       "type": "boolean",
       "default": false,
-      "description": "Whether an administrator has contacted the affected dealer about this incident. Set manually by an admin through the manageSystemHealthIncident function."
+      "description": "Whether an administrator has contacted the affected dealer about this incident."
     },
     "user_blocked": {
       "type": "boolean",
       "nullable": true,
-      "description": "Whether the affected user remains blocked from their work as a result of this incident. True = the user cannot proceed without a fix or workaround. False = the user can continue (e.g. they can retry, or the failure is non-blocking). Null = unknown. Never set to true unless the evidence supports it."
+      "description": "Whether the affected user remains blocked from their work."
     },
     "workaround_available": {
       "type": "boolean",
       "nullable": true,
-      "description": "Whether a genuine workaround is available for the affected user. True only when the actual recovery path supports it (e.g. retry available for DRAFT_REJECTED). False = no workaround exists. Null = unknown. Never set to true unless the recovery path supports it."
+      "description": "Whether a genuine workaround is available for the affected user."
     },
     "diagnostic_summary": {
       "type": "string",
-      "description": "Safe, sanitized diagnostic summary. Contains only error codes, violation codes, section types and operation names. Never contains proposal text, client names, project names, credentials or confidential content."
+      "description": "Safe, sanitized diagnostic summary for the first occurrence. Per-occurrence diagnostic details are preserved in IncidentOccurrence records."
     },
     "proposal_generation_id": {
       "type": "string",
       "nullable": true,
-      "description": "Reference to the existing ProposalGeneration audit record for this failure, when one was created. Allows an administrator to navigate from the incident to the full generation audit without duplicating sensitive content in the incident record."
+      "description": "Reference to the existing ProposalGeneration audit record for this failure."
     },
     "grouping_fingerprint": {
       "type": "string",
-      "description": "Stable fingerprint used to group repeated occurrences of the same underlying problem. Computed from component + operation + error_code + sorted violation codes. Two failures with the same fingerprint are the same incident."
+      "description": "Legacy grouping fingerprint from the original incident system. Retained for backward compatibility with historical records. New records use notification_group_key for grouping."
+    },
+    "notification_group_key": {
+      "type": "string",
+      "nullable": true,
+      "description": "The notification group key: mechanism::environment::account_scope. Groups failures sharing the same underlying mechanism, runtime environment and affected account, across different operations, pages, projects and versions. Null on historical records that predate the new grouping."
+    },
+    "failure_mechanism": {
+      "type": "string",
+      "nullable": true,
+      "description": "Normalized failure mechanism used for notification grouping (e.g. ENTITY_RATE_LIMIT_429, AUTHENTICATION_CONTEXT_FAILED)."
+    },
+    "http_status": {
+      "type": "number",
+      "nullable": true,
+      "description": "HTTP status code from the first occurrence, when available. Used for mechanism classification."
     },
     "occurrence_count": {
       "type": "number",
       "default": 1,
-      "description": "How many times this grouped incident has been detected. Incremented on each repeated occurrence instead of creating a duplicate record."
+      "description": "How many occurrences have been recorded in this notification group. Incremented atomically via $inc on each new occurrence. Each occurrence is also preserved as a separate IncidentOccurrence record."
+    },
+    "affected_production_accounts": {
+      "type": "array",
+      "nullable": true,
+      "items": {
+        "type": "string"
+      },
+      "description": "Production (deployed) account IDs that have been affected by this incident group. Used to detect when a new production dealer is affected and trigger an immediate notification. Accounts are added atomically via $addToSet."
     },
     "recovery_attempted": {
       "type": "boolean",
       "default": false,
-      "description": "Whether an automatic recovery was attempted for this incident (e.g. the bounded wording correction in the proposal writer). True even when the recovery failed."
+      "description": "Whether an automatic recovery was attempted for this incident."
     },
     "recovery_successful": {
       "type": "boolean",
       "default": false,
-      "description": "Whether the automatic recovery succeeded. False when no recovery was attempted or the recovery failed."
+      "description": "Whether the automatic recovery succeeded."
     },
     "recovery_summary": {
       "type": "string",
       "nullable": true,
-      "description": "Short description of the recovery attempt and its outcome. Null when no recovery was attempted."
+      "description": "Short description of the recovery attempt and its outcome."
     },
     "incident_status": {
       "type": "string",
@@ -182,12 +219,18 @@
         "dismissed"
       ],
       "default": "open",
-      "description": "The incident's lifecycle status. open = newly detected. investigating = an admin is looking into it. resolved = the underlying defect is fixed. dismissed = the admin determined no action is needed. Recovery success is tracked separately (recovery_successful) and does not automatically resolve the incident."
+      "description": "The incident's lifecycle status. open = newly detected. investigating = an admin is looking into it. resolved = the underlying defect is fixed. dismissed = the admin determined no action is needed."
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the incident group was last resolved by an administrator. Used to detect recurrence: a new occurrence after resolution triggers a recurrence notification and reopens the group. Set by manageSystemHealthIncident when status changes to 'resolved'. Cleared when the group is reopened by a recurrence."
     },
     "admin_notes": {
       "type": "string",
       "nullable": true,
-      "description": "Administrator's investigation notes. Added through the manageSystemHealthIncident function."
+      "description": "Administrator's investigation notes."
     },
     "notification_status": {
       "type": "string",
@@ -199,44 +242,125 @@
         "skipped"
       ],
       "default": "pending",
-      "description": "Email submission status. sent means the email service accepted the message, not proof of inbox delivery."
+      "description": "Email submission status for the most recent notification attempt. sent means the email service accepted the message."
     },
     "notification_sent_at": {
       "type": "string",
       "format": "date-time",
       "nullable": true,
-      "description": "When the alert email was successfully sent. Null when no email was sent."
+      "description": "When the most recent alert email was successfully sent."
     },
     "notification_error": {
       "type": "string",
       "nullable": true,
-      "description": "The error message when the alert email failed to send. Null when the email was sent or not required."
+      "description": "The error message when the most recent alert email failed to send."
+    },
+    "notifications_sent_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Total number of alert emails successfully sent for this notification group. Distinguishes the number of recorded failures (occurrence_count) from the number of emails sent (notifications_sent_count)."
+    },
+    "last_alert_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the most recent alert email (any type: initial, escalation, new account, recurrence, reminder) was successfully sent. Used to enforce the 24-hour reminder limit."
+    },
+    "last_reminder_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the most recent 24-hour reminder email was sent."
+    },
+    "initial_notification_claimed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Atomic claim flag for the initial notification. False = no initial email has been sent. Set to true atomically via conditional updateMany (initial_notification_claimed: false -> true) so concurrent occurrences cannot send duplicate initial emails. Reset to false when the group is resolved by an administrator."
+    },
+    "initial_notification_claim_token": {
+      "type": "string",
+      "nullable": true,
+      "description": "The occurrence ID that claimed the initial notification. Used to release the claim on failed email delivery."
+    },
+    "initial_notification_claimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the initial notification was claimed."
+    },
+    "critical_notification_sent": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether a critical escalation notification has been sent for this group. Set atomically via conditional updateMany. Reset to false when the group is resolved."
+    },
+    "critical_escalation_claim_token": {
+      "type": "string",
+      "nullable": true,
+      "description": "The occurrence ID that claimed the critical escalation notification."
+    },
+    "critical_escalation_claimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the critical escalation notification was claimed."
+    },
+    "new_account_claim_token": {
+      "type": "string",
+      "nullable": true,
+      "description": "The occurrence ID that claimed the new-account notification. Used to release the claim on failed email delivery."
+    },
+    "new_account_claimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the new-account notification was claimed."
+    },
+    "recurrence_claimed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Atomic claim flag for the recurrence notification. Set to true when a recurrence is claimed, preventing duplicate recurrence emails. Reset to false when the group is resolved by an administrator."
+    },
+    "recurrence_claim_token": {
+      "type": "string",
+      "nullable": true,
+      "description": "The occurrence ID that claimed the recurrence notification."
+    },
+    "recurrence_claimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the recurrence notification was claimed."
+    },
+    "reminder_claim_token": {
+      "type": "string",
+      "nullable": true,
+      "description": "Token for the current 24-hour reminder claim."
     },
     "test_run_id": {
       "type": "string",
       "nullable": true,
       "default": null,
-      "description": "TEST ISOLATION MARKER. Null for all production incidents. When non-null, the record was created by a diagnostic test run and carries the unique test-run identifier so cleanup can delete only that test run's records. Production incident recording always passes null (or omits this field). Cleanup must NEVER delete records where test_run_id is null. This field prevents diagnostic test cleanup from deleting real production incidents by ensuring test records are explicitly distinguishable from production records."
+      "description": "TEST ISOLATION MARKER. Null for all production incidents. When non-null, the record was created by a diagnostic test run. Cleanup must NEVER delete records where test_run_id is null."
     },
     "version_id": {
       "type": "string",
       "nullable": true,
-      "description": "Affected saved design version ID."
+      "description": "Affected saved design version ID from the first occurrence."
     },
     "page_path": {
       "type": "string",
       "nullable": true,
-      "description": "Affected page path without query strings."
+      "description": "Affected page path from the first occurrence."
     },
     "error_detail": {
       "type": "string",
       "nullable": true,
-      "description": "Sanitized bounded browser error detail. No request payloads or credentials."
+      "description": "Sanitized bounded browser error detail from the first occurrence."
     },
     "component_stack": {
       "type": "string",
       "nullable": true,
-      "description": "Sanitized component or JavaScript stack, bounded."
+      "description": "Sanitized component or JavaScript stack from the first occurrence, bounded."
     },
     "account_name": {
       "type": "string",

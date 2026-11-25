@@ -42,9 +42,21 @@ export default async function(req) {
         return Response.json({ error: 'Incident not found.' }, { status: 404 });
       }
 
-      await base44.entities.SystemHealthIncident.update(incident_id, {
-        incident_status: status,
-      });
+      // When an incident is resolved, stamp resolved_at and reset notification
+      // claim flags so a genuine recurrence can trigger a new notification.
+      // Recovery success is tracked separately and is not changed here.
+      const updateFields = { incident_status: status };
+      if (status === 'resolved') {
+        updateFields.resolved_at = new Date().toISOString();
+        updateFields.initial_notification_claimed = false;
+        updateFields.initial_notification_claim_token = null;
+        updateFields.initial_notification_claimed_at = null;
+        updateFields.critical_notification_sent = false;
+        updateFields.critical_escalation_claim_token = null;
+        updateFields.recurrence_claimed = false;
+        updateFields.recurrence_claim_token = null;
+      }
+      await base44.entities.SystemHealthIncident.update(incident_id, updateFields);
 
       return Response.json({ ok: true, incident_id, incident_status: status });
     }

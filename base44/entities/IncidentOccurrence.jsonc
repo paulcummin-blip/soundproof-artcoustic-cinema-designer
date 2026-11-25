@@ -1,0 +1,179 @@
+{
+  "name": "IncidentOccurrence",
+  "type": "object",
+  "description": "Append-only per-failure occurrence record for the Sound Proof System Health system. One record per individual failure detection, preserving the full diagnostic evidence (timestamp, operation, page, environment, account, project, version, error details, severity, user impact). Never updated except to link to its notification group. Never deleted except for test-run cleanup. Linked to its SystemHealthIncident notification group via notification_group_key and incident_id. Created by trusted backend functions via the service role; read by administrators only.",
+  "properties": {
+    "occurrence_id": {
+      "type": "string",
+      "description": "Unique occurrence identifier (UUID). Generated at creation time."
+    },
+    "notification_group_key": {
+      "type": "string",
+      "description": "The notification group key this occurrence belongs to. Format: mechanism::environment::account_scope. Used to find the corresponding SystemHealthIncident notification group."
+    },
+    "incident_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the SystemHealthIncident notification group this occurrence is linked to. Null until the group is assigned."
+    },
+    "incident_reference": {
+      "type": "string",
+      "nullable": true,
+      "description": "Human-readable INC reference of the linked notification group."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this failure occurrence was detected."
+    },
+    "component": {
+      "type": "string",
+      "description": "The system component that failed (e.g. user_experience, authentication, proposal_generation)."
+    },
+    "operation": {
+      "type": "string",
+      "description": "The specific operation that failed (e.g. data:Project.filter, project-open, generateProposal)."
+    },
+    "error_code": {
+      "type": "string",
+      "description": "The machine-readable error code for this occurrence (e.g. DATA_REQUEST_FAILED, PROJECT_LOAD_FAILED, AUTHENTICATION_CONTEXT_FAILED)."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Severity of this specific occurrence."
+    },
+    "runtime_environment": {
+      "type": "string",
+      "description": "preview or production (deployed)."
+    },
+    "failure_mechanism": {
+      "type": "string",
+      "description": "Normalized failure mechanism used for notification grouping (e.g. ENTITY_RATE_LIMIT_429, AUTHENTICATION_CONTEXT_FAILED, DATA_REQUEST_FAILED). Multiple error codes may share the same mechanism."
+    },
+    "http_status": {
+      "type": "number",
+      "nullable": true,
+      "description": "HTTP status code when the failure was an HTTP error. Used for mechanism classification. Null for non-HTTP failures."
+    },
+    "account_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The affected dealer account ID, when available. Null for internal/admin operations."
+    },
+    "project_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The affected project ID, when available."
+    },
+    "version_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The affected design version ID, when available."
+    },
+    "page_path": {
+      "type": "string",
+      "nullable": true,
+      "description": "Affected page path without query strings."
+    },
+    "error_detail": {
+      "type": "string",
+      "nullable": true,
+      "description": "Sanitized bounded error detail. No request payloads or credentials."
+    },
+    "component_stack": {
+      "type": "string",
+      "nullable": true,
+      "description": "Sanitized component or JavaScript stack, bounded."
+    },
+    "diagnostic_summary": {
+      "type": "string",
+      "description": "Safe, sanitized diagnostic summary for this occurrence."
+    },
+    "user_blocked": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "Whether the affected user was blocked by this occurrence."
+    },
+    "workaround_available": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "Whether a workaround was available for this occurrence."
+    },
+    "cause_classification": {
+      "type": "string",
+      "nullable": true,
+      "description": "How well the cause is established: confirmed, suspected, or unknown."
+    },
+    "cause_summary": {
+      "type": "string",
+      "nullable": true,
+      "description": "Plain-text statement of what the evidence shows about the cause."
+    },
+    "account_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Verified account name at occurrence time."
+    },
+    "dealer_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Dealer name at occurrence time."
+    },
+    "project_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Verified project name at occurrence time."
+    },
+    "client_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Client display name from the verified project."
+    },
+    "test_run_id": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "TEST ISOLATION MARKER. Null for all production occurrences. When non-null, the record was created by a diagnostic test run and carries the unique test-run identifier so cleanup can delete only that test run's records. Production occurrence recording always passes null (or omits this field). Cleanup must NEVER delete records where test_run_id is null."
+    }
+  },
+  "required": [
+    "occurrence_id",
+    "notification_group_key",
+    "timestamp",
+    "component",
+    "operation",
+    "error_code",
+    "severity",
+    "runtime_environment",
+    "failure_mechanism",
+    "diagnostic_summary"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

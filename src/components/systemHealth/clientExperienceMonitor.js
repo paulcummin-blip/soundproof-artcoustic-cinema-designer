@@ -33,16 +33,24 @@ export async function flushExperienceIncidents(){
  }catch(e){if([400,403].includes(e?.response?.status)){queue.shift();persist();}}
  finally{sending=false;}
 }
-export function reportClientFailure({code,operation='application',error,detail,stack,...scope}={}){
- try{
-  if(error && typeof error === "object") {handledErrors.add(error);if(error.message)handledMessages.set(error.message,Date.now());}
-  if(handledMessages.size>100)handledMessages.delete(handledMessages.keys().next().value);
-  const current={...getExperienceContext(),...scope};
-  const payload={runtime_environment:browser() && /preview|sandbox|localhost/.test(location.hostname)?"preview":"deployed",error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
-   correlation_id: /^[a-zA-Z0-9-]{8,100}$/.test(String(scope.correlationId || '')) ? scope.correlationId : null,
-   page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
-   error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
-   component_stack:safeDiagnostic(stack || error?.stack || '',1800)};
+function extractHttpStatus(error,detail,explicit){
+  if(explicit)return explicit;
+  if(error){const s=Number(error?.response?.status||error?.status||0);if(s)return s;}
+  if(detail){const m=String(detail).match(/HTTP status: (\d+)/);if(m)return Number(m[1]);}
+  return null;
+}
+export function reportClientFailure({code,operation='application',error,detail,stack,http_status,...scope}={}){
+  try{
+   if(error && typeof error === "object") {handledErrors.add(error);if(error.message)handledMessages.set(error.message,Date.now());}
+   if(handledMessages.size>100)handledMessages.delete(handledMessages.keys().next().value);
+   const current={...getExperienceContext(),...scope};
+   const status=extractHttpStatus(error,detail,http_status);
+   const payload={runtime_environment:browser() && /preview|sandbox|localhost/.test(location.hostname)?"preview":"deployed",error_code:code,operation,report_type:scope.reportType || null,test_run_id:scope.testRunId || null,project_id:current.projectId||null,version_id:current.versionId||null,
+    correlation_id: /^[a-zA-Z0-9-]{8,100}$/.test(String(scope.correlationId || '')) ? scope.correlationId : null,
+    page_path:safeRoute(current.pagePath || (browser()?location.pathname:'/')),
+    error_detail:safeDiagnostic(detail || error?.message || error?.name || ''),
+    component_stack:safeDiagnostic(stack || error?.stack || '',1800),
+    http_status:status};
   const key=[payload.error_code,payload.operation,payload.report_type,payload.project_id,payload.version_id,payload.page_path].join('::');
   if(Date.now()-(recent.get(key)||0)<300000)return;
   recent.set(key,Date.now());if(recent.size>200)recent.delete(recent.keys().next().value);
@@ -63,6 +71,7 @@ export function instrumentClientExperience(client){
   return Promise.resolve(result).then(value=>{finish();return value;},error=>{
    finish();
    if(requestFailureWarrantsAlert(error))reportClientFailure({code:'DATA_REQUEST_FAILED',operation,...scope,error,
+    http_status:Number(error?.response?.status||error?.status||0)||null,
     detail:`Request failed. HTTP status: ${error?.response?.status||error?.status||'unavailable'}. ${safeDiagnostic(error?.message,300)}`});
    throw error;
   });
