@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { setActiveProjectId } from '@/components/state/project-session';
+import { ArrowLeft } from 'lucide-react';
 import { getProposalType, availableProposalTypes } from '@/components/proposal/proposalTypes';
 import WizardStepper from '@/components/proposal/wizard/WizardStepper';
 import ProjectSelectStep from '@/components/proposal/wizard/ProjectSelectStep';
@@ -54,6 +57,7 @@ const STEPS = [
  */
 export default function CreateProposalWizard({ onCreated, onCancel, regenerateFrom = null, initialProjectId = null, initialVersionId = null }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
   // Regeneration starts from the proposal it revises: project, report type,
@@ -618,14 +622,42 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // The latest generate, for the preparation step's automatic continuation.
   generateRef.current = handleGenerate;
 
+  // Return directly to the System Designer for the exact project this proposal
+  // is for — not the Projects list, and not the globally active project, which
+  // may differ from the one selected here. The primary selected version is
+  // passed so the designer lands on it (or the version switcher, the existing
+  // selection mechanism, where the design has several). The wizard's session
+  // draft is already kept by useProposalPreparation, so the proposal resumes
+  // unchanged when the designer returns to the Proposal Centre.
+  const handleBackToSystemDesigner = () => {
+    if (!selectedProjectId) return;
+    setActiveProjectId(selectedProjectId);
+    const params = new URLSearchParams();
+    params.set('projectId', selectedProjectId);
+    const primaryVersionId = selectedVersionIds[0] || null;
+    if (primaryVersionId) params.set('versionId', primaryVersionId);
+    navigate(`/RoomDesigner?${params.toString()}`);
+  };
+
   const proposalIdentity = selectedProjectId ? (
-        <div className="mb-8 border-l-4 border-[#213428] pl-4" aria-label="Proposal project">
-          <div className="text-xs uppercase tracking-widest text-[#625143]">Creating proposal for</div>
-          <div className="text-lg text-[#1B1A1A]">{selectedProject?.name || 'Identifying project…'}</div>
-          {selectedProject && <div className="text-sm text-[#625143]">Client: {selectedProject.client_name || 'Not recorded'} · Reference: {selectedProject.project_reference || 'Not recorded'}</div>}
-          <div className="text-sm text-[#625143]">Version: {selectedVersionIds.map((id) => canonicalVersions.find((v) => v.id === id)?.version_name || 'Identifying version…').join(', ') || 'Not selected'}</div>
-          {restoredDraft?.projectId === selectedProjectId && <div className="text-xs text-[#625143] mt-1">Resumed proposal draft for this project.</div>}
-        </div>
+    <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="border-l-4 border-[#213428] pl-4 flex-1 min-w-0" aria-label="Proposal project">
+        <div className="text-xs uppercase tracking-widest text-[#625143]">Creating proposal for</div>
+        <div className="text-lg text-[#1B1A1A]">{selectedProject?.name || 'Identifying project…'}</div>
+        {selectedProject && <div className="text-sm text-[#625143]">Client: {selectedProject.client_name || 'Not recorded'} · Reference: {selectedProject.project_reference || 'Not recorded'}</div>}
+        <div className="text-sm text-[#625143]">Version: {selectedVersionIds.map((id) => canonicalVersions.find((v) => v.id === id)?.version_name || 'Identifying version…').join(', ') || 'Not selected'}</div>
+        {restoredDraft?.projectId === selectedProjectId && <div className="text-xs text-[#625143] mt-1">Resumed proposal draft for this project.</div>}
+      </div>
+      <button
+        type="button"
+        onClick={handleBackToSystemDesigner}
+        className="flex items-center gap-2 px-5 py-2.5 text-xs uppercase tracking-[0.14em] text-white shrink-0 self-start transition-colors hover:bg-[#3E4349]"
+        style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Back to System Designer
+      </button>
+    </div>
   ) : null;
 
   // ── Preparing screen — Sound Proof's own work, one line, one action ──
