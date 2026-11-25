@@ -35,6 +35,12 @@ import {
   partitionByDecisionCurrency,
 } from '../base44/shared/designContext/designContextModel.js';
 import {
+  decisionKeyForQuestion,
+  decisionKeyForQuestionId,
+  DESIGN_DECISION,
+  canonicalSubwooferFingerprint,
+} from '../base44/shared/designContext/designContextModel.js';
+import {
   discoverDeterministicQuestions,
   discoverDesignContextQuestions,
   MAX_DISCOVERY_QUESTIONS,
@@ -160,9 +166,15 @@ describe('Dixon saved answers suppress equivalent questions', () => {
   });
 
   it('Dixon saved subwoofer_count_rationale suppresses subwoofer_single_wall_arrangement', () => {
-    // Dixon has 2 front subs → subwoofer_single_wall_arrangement fires.
-    const current = currentDixonQuestions();
-    expect(current.map((q) => q.question_id)).toContain('subwoofer_single_wall_arrangement');
+    // Routine subwoofer questions are no longer asked deterministically, so
+    // the current question is constructed with the canonical fingerprint the
+    // discovery would have produced, to test the decision-currency logic.
+    const current = [{
+      question_id: 'subwoofer_single_wall_arrangement',
+      question: 'All 2 subwoofers are placed near the front wall. Is there a particular reason for this arrangement rather than distributing them around the room?',
+      area: 'subwoofers',
+      decision_fingerprint: canonicalSubwooferFingerprint({ type: 'single_wall', count: 2, front: 2, rear: 0 }),
+    }];
 
     // The saved answer was stored under a DIFFERENT question ID that maps to
     // the same underlying decision.

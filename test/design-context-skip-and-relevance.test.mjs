@@ -238,7 +238,10 @@ describe('Existing answer recognition', () => {
     ]);
   });
 
-  it('recognises front/rear subwoofer distribution as a deterministic question', () => {
+  it('does not ask routine subwoofer arrangement questions deterministically', () => {
+    // Routine subwoofer questions are never asked: using multiple subwoofers
+    // to manage room modes and improve bass consistency is standard engineering
+    // practice the writer explains from the RP22 principle and the evidence.
     // Subs spread across front AND rear halves.
     const version = versionWith({
       roomDims: '{"widthM":5.6,"lengthM":8.0,"heightM":2.7}',
@@ -249,14 +252,12 @@ describe('Existing answer recognition', () => {
     });
     const questions = discoverDeterministicQuestions(version, null);
     const ids = questions.map((q) => q.question_id);
-    expect(ids).toContain('subwoofer_front_rear_distribution');
-    const dist = questions.find((q) => q.question_id === 'subwoofer_front_rear_distribution');
-    expect(dist.area).toBe('subwoofers');
-    expect(dist.decision_fingerprint).toMatch(/^subarr:/);
+    expect(ids).not.toContain('subwoofer_front_rear_distribution');
+    expect(ids).not.toContain('subwoofer_single_wall_arrangement');
   });
 
-  it('still recognises all-on-one-wall arrangements', () => {
-    // All subs in the front half.
+  it('does not ask about all-on-one-wall subwoofer arrangements either', () => {
+    // All subs in the front half — still not a routine question.
     const version = versionWith({
       roomDims: '{"widthM":5.6,"lengthM":8.0,"heightM":2.7}',
       subwooferInstances: [
@@ -265,7 +266,7 @@ describe('Existing answer recognition', () => {
       ],
     });
     const questions = discoverDeterministicQuestions(version, null);
-    expect(questions.map((q) => q.question_id)).toContain('subwoofer_single_wall_arrangement');
+    expect(questions.map((q) => q.question_id)).not.toContain('subwoofer_single_wall_arrangement');
     expect(questions.map((q) => q.question_id)).not.toContain('subwoofer_front_rear_distribution');
   });
 
