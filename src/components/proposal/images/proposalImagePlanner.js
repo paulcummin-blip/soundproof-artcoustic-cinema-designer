@@ -378,7 +378,8 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     return target ? (entries.find((entry) => entry.section_type === target) || null) : null;
   };
   const detailImagesAwaitingTarget = [];
-  // One supporting image to a section: the copy stays in charge of its own page.
+  // Explicitly targeted details may share a section. Keep track of occupied
+  // sections only to prevent an automatic cropped-detail placement joining them.
   const detailSectionsTaken = new Set();
   narrativeSources
     .filter((asset) => asset.id && asset.id !== coverAsset?.id
@@ -386,11 +387,11 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     .forEach((source) => {
       const entry = detailEntryFor(source);
       // The section is the ONLY thing that decides. A detail whose section is not
-      // chosen, is not composed by this document, is already carrying a supporting
-      // image, or cannot take it at this page is NOT moved to another section: it
-      // waits for the designer instead.
-      if (!entry || detailSectionsTaken.has(entry.section_id)
-        || !eligible(source, entry.page, CROP_ORIENTATION.PORTRAIT)) {
+      // chosen, is not composed by this document, or cannot take it at this page
+      // is NOT moved to another section: it waits for the designer instead.
+      // Another detail with the same explicit target does not consume this one:
+      // the composer keeps additional details in that section's continuation.
+      if (!entry || !eligible(source, entry.page, CROP_ORIENTATION.PORTRAIT)) {
         detailImagesAwaitingTarget.push(source.id);
         return;
       }
@@ -612,7 +613,7 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     })),
     galleryImages,
     // The Inline Detail images the document did not place because their PLACE WITH
-    // section is not chosen, is already taken by another supporting image, or names
+    // section is not chosen or names
     // a section this document does not compose. They are withheld rather than
     // guessed at: the Image Library asks for a section, and no page claims them
     // because it has room.
