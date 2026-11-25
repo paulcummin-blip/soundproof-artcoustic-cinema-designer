@@ -117,3 +117,24 @@ test('identity-store outage still records the unexpected failure with user and c
  const last=incidents.at(-1);assert.ok(last.diagnostic_summary.includes(f.data.User[0].id));
  assert.equal(last.account_id,null);assert.equal(last.stage_failed,'authoritative_user_read');
 });
+
+test('mounted AuthProvider retains login and Retry recovers after bounded session failures',async()=>{
+ const React=await import('react');const {create,act}=await import('react-test-renderer');
+ const alerts=[];let attempts=0,fail=true,snapshot;
+ const fake={auth:{me:async()=>{attempts++;if(fail)throw Object.assign(Error('Network Error'),{code:'ERR_NETWORK'});return{id:'synthetic-react-user',role:'user',is_verified:true};}},
+ functions:{invoke:async name=>({data:name==='getAccountAccessContext'?{allowed:true,user:{id:'synthetic-react-user',account_id:'synthetic-react-account'}}:{status:'active'}})}};
+ globalThis.window={location:{search:'',pathname:'/',hash:'',href:'https://soundproofcinemadesigner.com/'}};
+ const source=read('src/lib/AuthContext.jsx').replace(/^import[\s\S]*?;\n/gm,'').replace(/\bexport /g,'');
+ const code=transformSync(source,{loader:'jsx',format:'esm'}).code;
+ const names={React:React.default,createContext:React.createContext,useState:React.useState,useContext:React.useContext,useEffect:React.useEffect,useRef:React.useRef,base44:fake,portalLaunchRejectionMessage:()=>'',buildPlatformAdminAccessContext:()=>({allowed:true}),appParams:{serverUrl:'https://soundproofcinemadesigner.com',appId:'synthetic',token:'synthetic'},clearAppParamAuthFallback:()=>{},createAxiosClient:()=>({get:async()=>({})}),...recovery,authFailureStatus:e=>Number(e?.status||0),authCorrelationId:()=> 'synthetic-mounted-correlation',reportClientFailure:x=>alerts.push(x),setExperienceContext:()=>{}};
+ const {AuthProvider,useAuth}=new Function(...Object.keys(names),code+';return {AuthProvider,useAuth};')(...Object.values(names));
+ function Probe(){snapshot=useAuth();return null;}
+ let renderer;
+ await act(async()=>{renderer=create(React.createElement(AuthProvider,null,React.createElement(Probe)));await new Promise(r=>setTimeout(r,1500));});
+ assert.equal(attempts,3);assert.equal(snapshot.isAuthenticated,false);assert.equal(snapshot.authError.retryable,true);assert.equal(alerts.length,1);
+ fail=false;
+ await act(async()=>{const a=snapshot.checkAppState(),b=snapshot.checkAppState();assert.equal(a,b);await a;});
+ assert.equal(attempts,4);assert.equal(snapshot.isAuthenticated,true);assert.equal(snapshot.authError,null);
+ await act(async()=>renderer.unmount());delete globalThis.window;
+});
+
