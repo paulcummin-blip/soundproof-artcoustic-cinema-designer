@@ -163,3 +163,41 @@ describe('design identity comparison (Leeds scenario)', () => {
     expect(samePhysicalDesign(publicationWithFlags, changedCurrent)).toBe(false);
   });
 });
+
+describe('design identity comparison — project identity metadata is not a design change', () => {
+  // The second Leeds publication move: the client name spelling was corrected
+  // ("Rotherham Proejct" → "Rotherham Project") and commercial pricing fields
+  // moved with it. None of that is a physical design fact, so a saved document
+  // frozen against the old publication must not be marked out of date.
+  const identityProject = (clientName, priceMode = 'incVat', showPrices = true) => ({
+    roomDims: { widthM: 5.2, lengthM: 6.8, heightM: 2.7 },
+    subwooferInstances: SUBWOOFER_INSTANCES,
+    report_screen: { visibleWidthInches: 87.8, aspectRatio: '16:9', mountMode: 'projector' },
+    client_name: clientName,
+    name: 'Leeds 25',
+    project_reference: 'RS-LEEDS-25',
+    version_name: 'Original Design',
+    price_mode: priceMode,
+    show_prices: showPrices,
+    difficulty_multiplier: 1.2,
+  });
+  const savedIdentity = { report_snapshot: { report_project: identityProject('Rotherham Proejct') } };
+  const currentIdentity = { report_snapshot: { report_project: identityProject('Rotherham Project', 'exVat', false) } };
+
+  it('samePhysicalDesign ignores project identity and commercial metadata', () => {
+    expect(samePhysicalDesign(savedIdentity, currentIdentity)).toBe(true);
+    expect(engineeringDifferenceIsPresentationOnly(savedIdentity, currentIdentity)).toBe(true);
+  });
+
+  it('still flags a real design change alongside identity metadata', () => {
+    const changed = {
+      report_snapshot: {
+        report_project: {
+          ...identityProject('Rotherham Project'),
+          roomDims: { widthM: 5.8, lengthM: 6.8, heightM: 2.7 },
+        },
+      },
+    };
+    expect(samePhysicalDesign(savedIdentity, changed)).toBe(false);
+  });
+});

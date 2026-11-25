@@ -25,6 +25,36 @@ import { withoutDerivedDisplayIdentity } from '@/components/models/screen/displa
 import { stableStringify, stripLegacySubwooferUiMetadata } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 
 /**
+ * Project identity and commercial metadata that live on a frozen report_project
+ * but are NOT physical design facts: who the project is for and how it is priced.
+ * A spelling correction to the client name, a price-mode toggle or a
+ * difficulty-multiplier change must never invalidate an engineering document,
+ * because none of these changes the design the document was issued against.
+ * Mirrored with base44/shared/designIdentityComparison.js (a parity test agrees).
+ */
+export const PROJECT_IDENTITY_METADATA_KEYS = Object.freeze([
+  'client_name',
+  'name',
+  'project_reference',
+  'version_name',
+  'project_id',
+  'version_id',
+  'price_mode',
+  'show_prices',
+  'difficulty_multiplier',
+]);
+
+export function stripProjectIdentityMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const removed = new Set(PROJECT_IDENTITY_METADATA_KEYS);
+  const facts = {};
+  for (const [key, v] of Object.entries(value)) {
+    if (!removed.has(key)) facts[key] = v;
+  }
+  return facts;
+}
+
+/**
  * The physical design facts a publication froze, with the screen's derived
  * display identity removed. Null when the publication states none, in which case
  * no comparison is possible and the strict verdict must stand.
@@ -35,8 +65,12 @@ export function frozenDesignFacts(publication) {
   if (Object.keys(raw).length === 0) return null;
   // Legacy subwoofer UI metadata (placementMode/isManual) is inert once
   // subwooferInstances exist and is excluded so an equivalent design compares
-  // equal — see stripLegacySubwooferUiMetadata.
-  const project = stripLegacySubwooferUiMetadata(raw);
+  // equal — see stripLegacySubwooferUiMetadata. Project identity and commercial
+  // metadata (client name, price mode, difficulty multiplier, …) are likewise
+  // excluded: a spelling correction or a pricing change is not a design change
+  // and must never invalidate an engineering document — see
+  // stripProjectIdentityMetadata.
+  const project = stripProjectIdentityMetadata(stripLegacySubwooferUiMetadata(raw));
   const screen = project.report_screen;
   if (!screen || typeof screen !== 'object' || Array.isArray(screen)) return project;
   return { ...project, report_screen: withoutDerivedDisplayIdentity(screen) };
