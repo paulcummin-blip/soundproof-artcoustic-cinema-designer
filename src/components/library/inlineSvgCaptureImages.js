@@ -1,11 +1,14 @@
 /** SVGs rasterised as images cannot load external image references.
  * Inline the original bytes in the isolated report clone; geometry stays intact.
  */
-export async function inlineSvgCaptureImages(scope, signal) {
+export async function inlineSvgCaptureImages(scope, signal, { includeHtmlImages = false } = {}) {
   const cache = new Map();
-  for (const image of scope.querySelectorAll('svg image')) {
+  for (const image of scope.querySelectorAll(includeHtmlImages ? 'svg image, img' : 'svg image')) {
     signal?.throwIfAborted();
-    const href = image.getAttribute('href') || image.getAttribute('xlink:href');
+    const isHtmlImage = image.tagName?.toLowerCase() === 'img';
+    const href = isHtmlImage
+      ? image.currentSrc || image.getAttribute('src')
+      : image.getAttribute('href') || image.getAttribute('xlink:href');
     if (!href || href.startsWith('data:')) continue;
     if (!cache.has(href)) {
       cache.set(href, (async () => {
@@ -24,10 +27,18 @@ export async function inlineSvgCaptureImages(scope, signal) {
     try {
       const dataUrl = await cache.get(href);
       signal?.throwIfAborted();
-      image.setAttribute('href', dataUrl);
-      if (image.hasAttribute('xlink:href')) image.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', dataUrl);
+      if (isHtmlImage) {
+        // Preserve the selected image's original bytes once for every page.
+        // html2canvas otherwise creates a fresh image request for each raster.
+        image.removeAttribute('srcset');
+        image.setAttribute('src', dataUrl);
+        if (typeof image.decode === 'function') await image.decode();
+      } else {
+        image.setAttribute('href', dataUrl);
+        if (image.hasAttribute('xlink:href')) image.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', dataUrl);
+      }
     } catch (error) {
-      const failure = new Error('A speaker drawing image could not be captured. Retry storage. ' + error.message);
+      const failure = new Error('A report image could not be captured. Retry generation. ' + error.message);
       failure.cause = error;
       throw failure;
     }
