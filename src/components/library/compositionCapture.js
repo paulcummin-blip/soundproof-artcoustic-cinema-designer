@@ -43,6 +43,7 @@ import { pageFitRecords } from '@/components/library/issuedDocument/capturePageF
 import { pageMeasurement } from '@/components/proposal/export/composition/proposalPageGeometry';
 import { proposalPageInventory, sameProposalBoundaries } from '@/components/proposal/export/composition/proposalCompositionInventory';
 import { elementLabel, elementIdentifier, unitIdentityOf } from '@/components/proposal/export/composition/paginationFailureDiagnostics';
+import { applyPrintHeaderLogoSizing } from '@/components/report/printHeaderLogoSizing';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
@@ -402,6 +403,13 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
 
     const scope = frame.contentDocument;
     if (bodyClass === 'client-report-printing') await inlineSvgCaptureImages(scope, signal);
+
+    // Size the Sound Proof logo to the ADI strapline in the CAPTURE document
+    // itself — the document html2canvas rasterises — after the frame's fonts
+    // and assets have loaded, so the logo and strapline are 1:1 in the stored
+    // PDF by construction. Runs before the composer paginates, so page 1 holds
+    // the correct header height. No-op when the composition has no print header.
+    applyPrintHeaderLogoSizing(scope);
 
     // A content-driven composition pages itself with the SAME composer the
     // printed document used, so the stored copy holds the pages that were

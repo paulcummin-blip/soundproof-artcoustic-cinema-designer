@@ -27,6 +27,7 @@ import {
   printReportInWindow,
   closeReportPrintWindow,
 } from "@/components/report/reportPrintWindow";
+import { applyPrintHeaderLogoSizing } from "@/components/report/printHeaderLogoSizing";
 import {
   PRINT_NOT_READY_MESSAGE,
   describePrintReadinessFailure,
@@ -366,6 +367,10 @@ export function useClientReportPdfExport({
           node: findReportPrintNode(PRINT_NODE_SELECTOR),
           bodyClass: PRINT_BODY_CLASS,
           extraCss: PRINT_WINDOW_CSS,
+          // Size the Sound Proof logo to the ADI strapline in the print window's
+          // own document, after fonts load, so the logo and strapline are 1:1 in
+          // the downloaded PDF. No-op when the composition has no print header.
+          prepareComposition: applyPrintHeaderLogoSizing,
           onDone: cleanup,
         });
         if (result.printed) {
