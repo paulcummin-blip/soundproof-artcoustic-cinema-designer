@@ -32,7 +32,7 @@ test('saved incomplete report offers recovery; retry saves once despite full sto
   }
   const { default: useIntent } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
   let latest;
-  const Probe = () => { latest = useIntent({ projectId: 'cable-test', versionId: 'original', enabled: false, onBeforeGenerate: () => Promise.resolve(true) }); return null; };
+  const Probe = ({ force = false } = {}) => { latest = useIntent({ projectId: 'cable-test', versionId: 'original', enabled: force, forceRegenerate: force, onBeforeGenerate: () => Promise.resolve(true) }); return null; };
   let view;
   try {
     await act(async () => { view = TestRenderer.create(React.createElement(Probe)); });
@@ -55,6 +55,13 @@ test('saved incomplete report offers recovery; retry saves once despite full sto
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 550)); });
     }
     assert.equal(snapshotReads, settledReads, 'settled narrative is not reread on each readiness-clock render');
+    await act(async () => { view.unmount(); view = TestRenderer.create(React.createElement(Probe, { force: true })); });
+    assert.equal(latest.verifiedCurrent, false, 'old accepted narrative cannot finish a newly requested refresh');
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 650)); });
+    assert.equal(calls, 2, 'explicit new request refreshes an already accepted narrative once');
+    await act(async () => { view.update(React.createElement(Probe, { force: true, tick: 4 })); await new Promise(resolve => setTimeout(resolve, 650)); });
+    assert.equal(calls, 2);
+    assert.equal(latest.verifiedCurrent, true);
   } finally {
     await act(async () => { view?.unmount(); });
     delete globalThis.__intentRecoveryApi;
