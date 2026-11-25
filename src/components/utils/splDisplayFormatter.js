@@ -17,7 +17,9 @@ export function roundDbValue(value) {
   if (value === null || value === undefined || value === "" || typeof value === "boolean") return null;
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
-  return Math.sign(number) * Math.round(Math.abs(number));
+  const whole = Math.sign(number) * Math.round(Math.abs(number));
+  // Normalise negative zero so a tiny negative value never displays as "-0 dB".
+  return whole === 0 ? 0 : whole;
 }
 
 /**
