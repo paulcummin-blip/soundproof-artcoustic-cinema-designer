@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { recordAuthIncident, safeAuthCorrelation, expectedAuthFailure } from '../../shared/systemHealth/authIncident.js';
 
+// Correlate verified-session failures without exposing account authority to the browser.
 export default async function(req) {
   let base44, sessionUser, correlationId, stage='authenticated_session';
   try {
