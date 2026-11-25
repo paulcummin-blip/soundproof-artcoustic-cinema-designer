@@ -104,43 +104,49 @@ export default function DocumentCard({
   const showDescription = !isCreated && Boolean(description);
   const badge = badgeClass(state, notAvailable);
 
-  // Created → compact status row, no large creation card.
+  // Created → compact card: a heading row (number + full title + status
+  // indicator), then a separate row beneath it for the Open and Create New /
+  // secondary actions. Title and status are never squeezed onto the same
+  // line as the buttons.
   if (isCreated) {
     return (
-      <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2 flex items-center gap-2 min-w-0">
-        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0" style={{ background: '#2E7D4F', color: '#FFFFFF' }}>
-          {number}
-        </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A] truncate">{label}</span>
-        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badge} shrink-0`}>
-          <StepGlyph state={state} icon={icon} />
-          {stateLabel}
+      <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2.5 flex flex-col gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0" style={{ background: '#2E7D4F', color: '#FFFFFF' }}>
+            {number}
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A] flex-1 min-w-0">{label}</span>
+          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badge} shrink-0`}>
+            <StepGlyph state={state} icon={icon} />
+            {stateLabel}
+          </div>
         </div>
-        <div className="flex-1" />
-        {onOpen && (
-          <Button
-            type="button"
-            size="sm"
-            className="h-7 px-3 text-[11px] font-medium border-0"
-            style={{ background: '#213428', color: '#FFFFFF' }}
-            onClick={onOpen}
-          >
-            {openLabel}
-            <ChevronRight className="w-3 h-3 ml-1" />
-          </Button>
-        )}
-        {onSecondary && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 px-3 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
-            onClick={onSecondary}
-          >
-            {secondaryLabel}
-            <ChevronRight className="w-3 h-3 ml-1" />
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onOpen && (
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 px-3 text-[11px] font-medium border-0 flex-1"
+              style={{ background: '#213428', color: '#FFFFFF' }}
+              onClick={onOpen}
+            >
+              {openLabel}
+              <ChevronRight className="w-3 h-3 ml-1" />
+            </Button>
+          )}
+          {onSecondary && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 px-3 text-[11px] font-medium border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7] shrink-0"
+              onClick={onSecondary}
+            >
+              {secondaryLabel}
+              <ChevronRight className="w-3 h-3 ml-1" />
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -151,7 +157,7 @@ export default function DocumentCard({
         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0" style={{ background: '#213428', color: '#FFFFFF' }}>
           {number}
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A] truncate">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1B1A1A] flex-1 min-w-0">{label}</span>
         <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${badge} shrink-0`}>
           <StepGlyph state={state} icon={icon} notAvailable={notAvailable} />
           {stateLabel}

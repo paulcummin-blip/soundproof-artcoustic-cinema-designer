@@ -119,13 +119,13 @@ function downloadImage(url, caption) {
 
 function AssetRow({ icon: Icon, name, sub, onOpen, onDownload, canOpen = true, deleteButton = null }) {
   return (
-    <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[#F8F8F7] transition-colors min-w-0">
+    <div className="flex items-center gap-2 py-1 px-2 rounded hover:bg-[#F8F8F7] transition-colors min-w-0">
       <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: '#8B8378' }} />
       <button
         type="button"
         onClick={canOpen ? onOpen : undefined}
         disabled={!canOpen}
-        className="min-w-0 max-w-[calc(100%-7rem)] text-left disabled:cursor-default"
+        className="flex-1 min-w-0 text-left disabled:cursor-default"
         title={canOpen ? `Open ${name}` : name}
       >
         <span className={`block text-xs font-medium text-[#1B1A1A] truncate ${canOpen ? 'hover:underline' : ''}`} title={name}>{name}</span>

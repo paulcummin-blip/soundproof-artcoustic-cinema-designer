@@ -122,7 +122,7 @@ export default function DocumentsAssetsControl({
 
         {open && (
           <div className="px-3.5 pb-3.5 pt-2.5 border-t border-[#E2DED7]">
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,45fr)_minmax(0,55fr)] gap-3.5 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-3.5 items-start">
               <DocumentWorkflowPanel
                 projectId={projectId}
                 versionId={versionId}
