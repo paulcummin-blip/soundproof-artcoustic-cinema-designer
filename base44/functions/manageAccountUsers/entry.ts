@@ -126,10 +126,10 @@ async function loadAccountUsers(service, account) {
   };
 }
 
-async function inviteThroughPlatform(base44, email) {
+async function inviteThroughPlatform(base44, { email, accountId, invitationType }) {
   const response = await base44.asServiceRole.functions.invoke(
     'sendAccountUserInvitation',
-    { email },
+    { email, account_id: accountId, invitation_type: invitationType },
   );
   const payload = response?.data || response || {};
   if (payload?.sent !== true) {
@@ -340,7 +340,11 @@ export default async function(req) {
       let invitationError = null;
       if (!linkedUser || linkedUser.is_verified !== true) {
         try {
-          await inviteThroughPlatform(base44, email);
+          await inviteThroughPlatform(base44, {
+            email,
+            accountId: account.id,
+            invitationType: makeAccountAdmin ? 'initial' : 'additional',
+          });
           invitationSent = true;
         } catch {
           invitationError = 'INVITATION_DELIVERY_UNCONFIRMED';
@@ -417,8 +421,14 @@ export default async function(req) {
         invited_by_user_id: context.user.id,
         invited_by_email: context.user.email,
       });
+      const resendInvitationType =
+        (isMembershipAdmin(target) || target.id === protectedAdminId) ? 'initial' : 'additional';
       try {
-        await inviteThroughPlatform(base44, email);
+        await inviteThroughPlatform(base44, {
+          email,
+          accountId: account.id,
+          invitationType: resendInvitationType,
+        });
       } catch {
         return errorResponse('INVITATION_FAILED', 'The invitation could not be resent.', 502);
       }

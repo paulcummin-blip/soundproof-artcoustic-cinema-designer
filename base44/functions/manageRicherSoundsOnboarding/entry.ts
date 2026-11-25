@@ -93,7 +93,16 @@ export default async function(req) {
     });
 
     try {
-      const response = await base44.asServiceRole.functions.invoke('sendAccountUserInvitation', { email });
+      const isInitial = Boolean(
+        membership.is_account_admin
+        || membership.membership_role === 'dealer_admin'
+        || membership.portal_activation_request_id,
+      );
+      const response = await base44.asServiceRole.functions.invoke('sendAccountUserInvitation', {
+        email,
+        account_id: accountId,
+        invitation_type: isInitial ? 'initial' : 'additional',
+      });
       const payload = response?.data || response || {};
       if (payload?.sent !== true) {
         throw new Error(payload?.message || payload?.error || 'INVITATION_SERVICE_UNAVAILABLE');

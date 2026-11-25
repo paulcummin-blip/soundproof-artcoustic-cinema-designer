@@ -321,7 +321,7 @@ export async function createPortalActivation(service, base44, { grant, account }
     let invitationSent = false;
     let invitationError = null;
     try {
-      const response = await base44.asServiceRole.functions.invoke('sendAccountUserInvitation', { email: grant.admin_email });
+      const response = await base44.asServiceRole.functions.invoke('sendAccountUserInvitation', { email: grant.admin_email, account_id: current.id, invitation_type: 'initial' });
       const payload = response?.data || response || {};
       if (payload.sent !== true) throw new Error('INVITATION_FAILED');
       invitationSent = true;
