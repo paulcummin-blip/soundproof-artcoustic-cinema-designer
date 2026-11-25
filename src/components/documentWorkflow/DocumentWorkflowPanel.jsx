@@ -290,7 +290,7 @@ export default function DocumentWorkflowPanel({
         openLabel="Open"
         primary={proposalAvailable && !cpIsCreated}
         onSecondary={cpIsCreated ? openProposalCentre : null}
-        secondaryLabel={cpIsCreated ? 'Proposal Centre' : null}
+        secondaryLabel={cpIsCreated ? 'Create New' : null}
       />
 
       <UploadedImagesRow
