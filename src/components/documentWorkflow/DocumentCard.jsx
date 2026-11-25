@@ -27,6 +27,7 @@ function StepGlyph({ state, icon: Icon, notAvailable = false }) {
   if (state === WORKFLOW_STATE.GENERATING) return <Clock className="w-3.5 h-3.5 animate-pulse" style={{ color: '#625143' }} />;
   if (state === WORKFLOW_STATE.FAILED) return <AlertCircle className="w-3.5 h-3.5" style={{ color: '#B23A3A' }} />;
   if (state === WORKFLOW_STATE.OUTDATED) return <AlertCircle className="w-3.5 h-3.5" style={{ color: '#B37A2B' }} />;
+  if (state === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE) return <RefreshCw className="w-3.5 h-3.5" style={{ color: '#6C7A89' }} />;
   return <Icon className="w-3.5 h-3.5" style={{ color: notAvailable ? '#A39A88' : '#1565C0' }} />;
 }
 
@@ -36,6 +37,7 @@ function badgeClass(state, notAvailable = false) {
     case WORKFLOW_STATE.GENERATING: return 'bg-[#F5F4F0] text-[#625143] border-[#E2DED7]';
     case WORKFLOW_STATE.FAILED: return 'bg-[#FDECEC] text-[#B23A3A] border-[#F5C8C8]';
     case WORKFLOW_STATE.OUTDATED: return 'bg-[#FFF3E0] text-[#B37A2B] border-[#FFE0B2]';
+    case WORKFLOW_STATE.VERIFICATION_UNAVAILABLE: return 'bg-[#ECEFF1] text-[#6C7A89] border-[#D7DCE0]';
     case WORKFLOW_STATE.NOT_CREATED:
       return notAvailable
         ? 'bg-[#F5F4F0] text-[#A39A88] border-[#E8E5DF]'
@@ -51,6 +53,7 @@ function badgeClass(state, notAvailable = false) {
 function CreateAction({ label, state, primary, onAct }) {
   const isRetry = state === WORKFLOW_STATE.FAILED;
   const isUpdate = state === WORKFLOW_STATE.OUTDATED;
+  const isVerify = state === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE;
   if (primary) {
     return (
       <Button
@@ -59,9 +62,9 @@ function CreateAction({ label, state, primary, onAct }) {
         style={{ background: '#213428', color: '#FFFFFF' }}
         onClick={onAct}
       >
-        {isRetry && <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+        {(isRetry || isVerify) && <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
         {label}
-        {!isRetry && <ArrowRight className="w-3.5 h-3.5 ml-1.5" />}
+        {!isRetry && !isVerify && <ArrowRight className="w-3.5 h-3.5 ml-1.5" />}
       </Button>
     );
   }
@@ -72,9 +75,9 @@ function CreateAction({ label, state, primary, onAct }) {
       className="w-full h-9 text-[12px] font-semibold border-[#213428] text-[#213428] hover:bg-[#F4F7F4]"
       onClick={onAct}
     >
-      {isRetry && <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+      {(isRetry || isVerify) && <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
       {label}
-      {!isRetry && <ArrowRight className="w-3.5 h-3.5 ml-1.5" />}
+      {!isRetry && !isVerify && <ArrowRight className="w-3.5 h-3.5 ml-1.5" />}
     </Button>
   );
 }
@@ -165,7 +168,12 @@ export default function DocumentCard({
           {reason || 'Document source could not be verified.'}
         </p>
       )}
-      {onOpen && (state === WORKFLOW_STATE.OUTDATED || state === WORKFLOW_STATE.FAILED) && (
+      {state === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE && (
+        <p className="text-[10px] text-[#6C7A89] leading-snug">
+          {reason || 'Source could not be verified. Retry to re-check without regenerating.'}
+        </p>
+      )}
+      {onOpen && (state === WORKFLOW_STATE.OUTDATED || state === WORKFLOW_STATE.FAILED || state === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE) && (
         <button
           type="button"
           onClick={onOpen}

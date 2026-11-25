@@ -207,6 +207,40 @@ function normalizeSplConfig(splConfig) {
   };
 }
 
+/**
+ * Strip legacy subwoofer UI metadata that never affects the engineering
+ * calculation or the document content, so an equivalent design cannot produce
+ * a different fingerprint.
+ *
+ * `subwooferInstances` is the sole bass-analysis authority (it is hashed in
+ * its own canonical field below). The legacy `frontSubsCfg`/`rearSubsCfg`
+ * carry a `placementMode` preset and an `isManual` toggle that are only ever
+ * read by `subwooferInstanceMigration` to derive INITIAL positions when no
+ * instances exist. Once `subwooferInstances` are present — the only state a
+ * published design is ever in — these two fields are inert UI state. Hashing
+ * them let a normalisation/migration that dropped them move a version's
+ * engineering identity without any engineering change. They are excluded here
+ * for that reason, and nothing else: every other legacy cfg field is kept.
+ *
+ * Accepts both the camelCase keys the design state uses and the snake_case
+ * keys the frozen report project stores, so the same helper serves the
+ * fingerprint input and the design-identity comparison.
+ */
+export function stripLegacySubwooferUiMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const stripCfg = (cfg) => {
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return cfg;
+    const { placementMode, isManual, ...rest } = cfg;
+    return rest;
+  };
+  const out = { ...value };
+  if (out.frontSubsCfg) out.frontSubsCfg = stripCfg(out.frontSubsCfg);
+  if (out.rearSubsCfg) out.rearSubsCfg = stripCfg(out.rearSubsCfg);
+  if (out.front_subs_cfg) out.front_subs_cfg = stripCfg(out.front_subs_cfg);
+  if (out.rear_subs_cfg) out.rear_subs_cfg = stripCfg(out.rear_subs_cfg);
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Full Engineering Fingerprint
 // ---------------------------------------------------------------------------
@@ -257,8 +291,8 @@ export function computeEngineeringFingerprint(designState, versions = {}) {
       // exactly as it stands, and the screen key is only replaced when the design
       // actually states a screen.
       frozenReportFacts: screenFacts
-        ? { ...ds, screen: withoutDerivedDisplayIdentity(screenFacts) }
-        : ds,
+        ? { ...stripLegacySubwooferUiMetadata(ds), screen: withoutDerivedDisplayIdentity(screenFacts) }
+        : stripLegacySubwooferUiMetadata(ds),
     } : {}),
 
     // Room geometry

@@ -22,7 +22,7 @@
  */
 
 import { withoutDerivedDisplayIdentity } from '@/components/models/screen/displayTypeAuthority';
-import { stableStringify } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
+import { stableStringify, stripLegacySubwooferUiMetadata } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 
 /**
  * The physical design facts a publication froze, with the screen's derived
@@ -30,9 +30,13 @@ import { stableStringify } from '@/components/proposal/engineeringAuthority/engi
  * no comparison is possible and the strict verdict must stand.
  */
 export function frozenDesignFacts(publication) {
-  const project = publication?.report_snapshot?.report_project;
-  if (!project || typeof project !== 'object' || Array.isArray(project)) return null;
-  if (Object.keys(project).length === 0) return null;
+  const raw = publication?.report_snapshot?.report_project;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (Object.keys(raw).length === 0) return null;
+  // Legacy subwoofer UI metadata (placementMode/isManual) is inert once
+  // subwooferInstances exist and is excluded so an equivalent design compares
+  // equal — see stripLegacySubwooferUiMetadata.
+  const project = stripLegacySubwooferUiMetadata(raw);
   const screen = project.report_screen;
   if (!screen || typeof screen !== 'object' || Array.isArray(screen)) return project;
   return { ...project, report_screen: withoutDerivedDisplayIdentity(screen) };

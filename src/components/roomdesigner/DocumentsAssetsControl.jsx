@@ -45,11 +45,13 @@ function buildSummary(workflowStatus) {
   const generating = steps.some((s) => s?.state === WORKFLOW_STATE.GENERATING);
   const hasFailed = steps.some((s) => s?.state === WORKFLOW_STATE.FAILED);
   const hasOutdated = steps.some((s) => s?.state === WORKFLOW_STATE.OUTDATED);
+  const hasVerificationUnavailable = steps.some((s) => s?.state === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE);
 
   let text = `${readyCount} of ${total} created`;
   if (generating) text = "Creating…";
   else if (hasFailed) text = `${readyCount} of ${total} created · Needs attention`;
   else if (hasOutdated) text = `${readyCount} of ${total} created · Outdated`;
+  else if (hasVerificationUnavailable) text = `${readyCount} of ${total} created · Verify`;
 
   return { text, readyCount, total };
 }
@@ -63,6 +65,7 @@ export default function DocumentsAssetsControl({
   versionName,
   engineeringFingerprint,
   workflowStatus,
+  onRetryVerification = null,
   disabled = false,
   onOpenReport,
 }) {
@@ -127,6 +130,7 @@ export default function DocumentsAssetsControl({
                 versionName={versionName}
                 engineeringFingerprint={engineeringFingerprint}
                 workflowStatus={workflowStatus}
+                onRetryVerification={onRetryVerification}
                 disabled={disabled}
                 onOpenReport={onOpenReport}
               />

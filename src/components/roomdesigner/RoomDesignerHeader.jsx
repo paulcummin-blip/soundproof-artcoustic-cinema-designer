@@ -134,6 +134,7 @@ export default function RoomDesignerHeader({
             versionName={projectCadVersionName}
             engineeringFingerprint={workflowStatus?.engineeringFingerprint || null}
             workflowStatus={workflowStatus}
+            onRetryVerification={workflowStatus?.retry || null}
             disabled={!isLoaded}
             onOpenReport={handleProjectReportClick}
           />

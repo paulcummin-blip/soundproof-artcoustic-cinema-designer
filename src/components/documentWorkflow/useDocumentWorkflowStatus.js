@@ -15,7 +15,7 @@
  * alongside the stored records so the panel can show "Generating…" while a
  * creation is in flight, before the record has landed.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   isPreparingSpeakerDesign,
@@ -25,7 +25,9 @@ import {
 import { resolveWorkflowStatus } from './documentWorkflowStatus';
 import { subscribeIssuedExportStored } from '@/components/library/issuedExportSignal';
 import { subscribeReportSourceStored } from '@/components/proposal/sourceAuthority/reportSourceSignal';
-import { buildFreshnessReason } from './documentFreshnessReason';
+import { buildFreshnessReason, identifyDesignChanges } from './documentFreshnessReason';
+import { EQUIVALENCE, WORKFLOW_STATE } from './documentWorkflowStatus';
+import { reportClientFailure } from '@/components/systemHealth/clientExperienceMonitor';
 
 const asItems = (page) => (Array.isArray(page) ? page : (page?.items || []));
 
@@ -33,26 +35,29 @@ const TECHNICAL_REPORT_TYPE = 'project';
 const SPEAKER_DESIGN_TYPE = 'speaker_design';
 
 /**
- * Compute the human-readable freshness reason for each outdated document by
- * comparing its source publication's frozen facts against the current
- * publication's frozen facts.
+ * Compute BOTH the human-readable freshness reason AND the canonical
+ * equivalence verdict for each stored document whose source fingerprint
+ * differs from the version's current publication.
  *
  * The publications are looked up from the ProjectAnalysisCache's
- * engineering_publications map, keyed by fingerprint. A document's source
- * fingerprint is its stored source_fingerprints.engineeringFingerprint; the
- * current fingerprint is the version's published_fingerprint.
- *
- * Returns a map of documentType → reason (string) or null when no reason can be
- * determined (evidence unavailable or no identifiable design change).
+ * engineering_publications map, keyed by fingerprint. The equivalence verdict
+ * (EQUIVALENCE) is what the workflow status uses to decide Ready vs Outdated
+ * vs Verification unavailable, from the SAME two publications the reason is
+ * built from:
+ *   - identifyDesignChanges returns []  → EQUIVALENT (Ready)
+ *   - returns a non-empty list          → MATERIALLY_CHANGED (Outdated, reason)
+ *   - returns null (a publication unavailable) → UNKNOWN (Verification unavailable)
  */
-function computeFreshnessReasons({ exports, versionId, versionFingerprint, analysisCache }) {
+function computeFreshnessAndEquivalence({ exports, versionId, versionFingerprint, analysisCache }) {
   const publications = (analysisCache?.engineering_publications && typeof analysisCache.engineering_publications === 'object')
     ? analysisCache.engineering_publications
     : null;
-  if (!publications || !versionFingerprint) return {};
+  const empty = { reasons: {}, equivalences: {} };
+  if (!publications || !versionFingerprint) return empty;
   const currentPublication = publications[versionFingerprint] || null;
-  if (!currentPublication) return {};
+  if (!currentPublication) return empty;
   const reasons = {};
+  const equivalences = {};
   const documentTypes = [TECHNICAL_REPORT_TYPE, SPEAKER_DESIGN_TYPE, 'proposal'];
   for (const documentType of documentTypes) {
     const record = exports.find((entry) => {
@@ -67,13 +72,17 @@ function computeFreshnessReasons({ exports, versionId, versionFingerprint, analy
     const savedFingerprint = record.source_fingerprints?.engineeringFingerprint || null;
     if (!savedFingerprint || savedFingerprint === versionFingerprint) continue;
     const savedPublication = publications[savedFingerprint] || null;
+    const changes = identifyDesignChanges(savedPublication, currentPublication);
+    equivalences[documentType] = changes == null
+      ? EQUIVALENCE.UNKNOWN
+      : (changes.length === 0 ? EQUIVALENCE.EQUIVALENT : EQUIVALENCE.MATERIALLY_CHANGED);
     reasons[documentType] = buildFreshnessReason({
       savedPublication,
       currentPublication,
       documentType,
     });
   }
-  return reasons;
+  return { reasons, equivalences };
 }
 
 export function useDocumentWorkflowStatus({ projectId = null, versionId = null } = {}) {
@@ -163,7 +172,7 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
   const speakerDesignGenerating = isPreparingSpeakerDesign(projectId, versionId);
   const speakerDesignError = getSpeakerDesignGenerationError(projectId, versionId);
 
-  const freshnessReasons = computeFreshnessReasons({
+  const { reasons: freshnessReasons, equivalences } = computeFreshnessAndEquivalence({
     exports,
     versionId,
     versionFingerprint: engineeringFingerprint,
@@ -177,9 +186,47 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
     speakerDesignGenerating,
     speakerDesignError,
     freshnessReasons,
+    equivalences,
   });
 
-  return { loading, ...status };
+  // A manual retry re-runs the stored-record + publication read without
+  // regenerating any document. Used by a Verification-unavailable card to
+  // re-attempt verification once the underlying publication read is available.
+  const retry = useCallback(() => setTick((t) => t + 1), []);
+
+  // System Health: a document that is Verification unavailable is an
+  // unexpected verification failure (a frozen publication is missing, so the
+  // document's validity cannot be established). It is NOT a legitimate
+  // Outdated state, so it is reported once per project+version+document so the
+  // admin can see the document identities and fingerprints involved. A
+  // legitimate Outdated state is never reported here.
+  const reportedVerificationFailures = useRef(new Set());
+  useEffect(() => {
+    if (!projectId || !versionId || loading) return;
+    const steps = [
+      ['technical_report', status.technicalReport],
+      ['speaker_design', status.speakerDesign],
+      ['proposal', status.clientProposal],
+    ];
+    for (const [docType, step] of steps) {
+      if (!step || step.state !== WORKFLOW_STATE.VERIFICATION_UNAVAILABLE) continue;
+      const key = `${projectId}:${versionId}:${docType}`;
+      if (reportedVerificationFailures.current.has(key)) continue;
+      reportedVerificationFailures.current.add(key);
+      reportClientFailure({
+        code: 'DOCUMENT_VERIFICATION_UNAVAILABLE',
+        operation: 'document-workflow-verification',
+        projectId,
+        versionId,
+        detail: `${docType} source could not be verified against the current engineering publication.`,
+        document_type: docType,
+        saved_fingerprint: step.record?.source_fingerprints?.engineeringFingerprint || null,
+        current_fingerprint: engineeringFingerprint || null,
+      });
+    }
+  }, [projectId, versionId, loading, status.technicalReport, status.speakerDesign, status.clientProposal, engineeringFingerprint]);
+
+  return { loading, retry, ...status };
 }
 
 export default useDocumentWorkflowStatus;

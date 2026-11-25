@@ -62,6 +62,27 @@ export function withoutDerivedDisplayIdentity(screen) {
   return facts;
 }
 
+/**
+ * Strip legacy subwoofer UI metadata (placementMode/isManual) that is inert
+ * once subwooferInstances exist. Mirrors the client helper in
+ * engineeringFingerprint.js so an equivalent design compares equal here too.
+ * Accepts both camelCase (design state) and snake_case (frozen report project).
+ */
+export function stripLegacySubwooferUiMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const stripCfg = (cfg) => {
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return cfg;
+    const { placementMode, isManual, ...rest } = cfg;
+    return rest;
+  };
+  const out = { ...value };
+  if (out.frontSubsCfg) out.frontSubsCfg = stripCfg(out.frontSubsCfg);
+  if (out.rearSubsCfg) out.rearSubsCfg = stripCfg(out.rearSubsCfg);
+  if (out.front_subs_cfg) out.front_subs_cfg = stripCfg(out.front_subs_cfg);
+  if (out.rear_subs_cfg) out.rear_subs_cfg = stripCfg(out.rear_subs_cfg);
+  return out;
+}
+
 /** Order-independent serialization, so two equal facts compare equal. */
 export function stableStringify(value) {
   if (value === null || value === undefined) return 'null';
@@ -85,9 +106,13 @@ export function stableStringify(value) {
  * no comparison is possible and the strict verdict must stand.
  */
 export function frozenDesignFacts(publication) {
-  const project = publication?.report_snapshot?.report_project;
-  if (!project || typeof project !== 'object' || Array.isArray(project)) return null;
-  if (Object.keys(project).length === 0) return null;
+  const raw = publication?.report_snapshot?.report_project;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (Object.keys(raw).length === 0) return null;
+  // Legacy subwoofer UI metadata (placementMode/isManual) is inert once
+  // subwooferInstances exist and is excluded so an equivalent design compares
+  // equal — see stripLegacySubwooferUiMetadata.
+  const project = stripLegacySubwooferUiMetadata(raw);
   const screen = project.report_screen;
   if (!screen || typeof screen !== 'object' || Array.isArray(screen)) return project;
   return { ...project, report_screen: withoutDerivedDisplayIdentity(screen) };

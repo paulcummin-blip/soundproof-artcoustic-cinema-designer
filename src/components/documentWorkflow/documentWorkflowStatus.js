@@ -32,6 +32,15 @@ export const WORKFLOW_STATE = Object.freeze({
   READY: 'ready',
   FAILED: 'failed',
   OUTDATED: 'outdated',
+  /**
+   * The system cannot currently establish whether the stored document remains
+   * valid — its source fingerprint no longer matches the current design AND no
+   * canonical comparison could be made (one or both frozen publications are
+   * unavailable). Distinct from OUTDATED (a material change was established) and
+   * from NOT_CREATED (no document exists). A retry re-runs verification without
+   * regenerating the document.
+   */
+  VERIFICATION_UNAVAILABLE: 'verification_unavailable',
 });
 
 /** User-facing labels for each state. */
@@ -41,6 +50,21 @@ export const WORKFLOW_STATE_LABEL = Object.freeze({
   [WORKFLOW_STATE.READY]: 'Ready',
   [WORKFLOW_STATE.FAILED]: 'Failed',
   [WORKFLOW_STATE.OUTDATED]: 'Outdated',
+  [WORKFLOW_STATE.VERIFICATION_UNAVAILABLE]: 'Verification unavailable',
+});
+
+/**
+ * The canonical equivalence between a stored document's frozen source
+ * publication and the version's current publication, established from the two
+ * publications' own frozen design facts (identifyDesignChanges). A document is
+ * Ready when EQUIVALENT — the same engineering design under a fingerprint that
+ * moved for a non-engineering reason. MATERIALLY_CHANGED is Outdated; UNKNOWN
+ * is Verification unavailable.
+ */
+export const EQUIVALENCE = Object.freeze({
+  EQUIVALENT: 'equivalent',
+  MATERIALLY_CHANGED: 'materially_changed',
+  UNKNOWN: 'unknown',
 });
 
 /**
@@ -59,6 +83,7 @@ export const WORKFLOW_DISPLAY_LABEL = Object.freeze({
   [WORKFLOW_STATE.READY]: 'Created',
   [WORKFLOW_STATE.FAILED]: 'Failed',
   [WORKFLOW_STATE.OUTDATED]: 'Outdated',
+  [WORKFLOW_STATE.VERIFICATION_UNAVAILABLE]: 'Verification unavailable',
 });
 
 /** Label shown when a step's prerequisites are not satisfied. */
@@ -124,6 +149,7 @@ export function resolveWorkflowStepState({
   engineeringFingerprint = null,
   isGenerating = false,
   generationError = null,
+  equivalence = null,
   freshnessReason = null,
 }) {
   if (isGenerating) {
@@ -138,7 +164,18 @@ export function resolveWorkflowStepState({
   }
   const anyExport = findAnyExport(exports, versionId, documentType);
   if (anyExport) {
-    return { state: WORKFLOW_STATE.OUTDATED, record: anyExport, freshnessReason };
+    // The stored document exists but its source fingerprint differs from the
+    // current design. Resolve its meaning from the canonical comparison of the
+    // two publications' frozen design facts rather than the fingerprint strings
+    // alone: equivalent designs are Ready; an established material change is
+    // Outdated; anything that could not be compared is Verification unavailable.
+    if (equivalence === EQUIVALENCE.EQUIVALENT) {
+      return { state: WORKFLOW_STATE.READY, record: anyExport };
+    }
+    if (equivalence === EQUIVALENCE.MATERIALLY_CHANGED) {
+      return { state: WORKFLOW_STATE.OUTDATED, record: anyExport, freshnessReason };
+    }
+    return { state: WORKFLOW_STATE.VERIFICATION_UNAVAILABLE, record: anyExport };
   }
   return { state: WORKFLOW_STATE.NOT_CREATED };
 }
@@ -159,12 +196,14 @@ export function resolveWorkflowStatus({
   speakerDesignGenerating = false,
   speakerDesignError = null,
   freshnessReasons = {},
+  equivalences = {},
 }) {
   const technicalReport = resolveWorkflowStepState({
     exports,
     versionId,
     documentType: TECHNICAL_REPORT_TYPE,
     engineeringFingerprint,
+    equivalence: equivalences[TECHNICAL_REPORT_TYPE] || null,
     freshnessReason: freshnessReasons[TECHNICAL_REPORT_TYPE] || null,
   });
   const speakerDesign = resolveWorkflowStepState({
@@ -174,6 +213,7 @@ export function resolveWorkflowStatus({
     engineeringFingerprint,
     isGenerating: speakerDesignGenerating,
     generationError: speakerDesignError,
+    equivalence: equivalences[SPEAKER_DESIGN_TYPE] || null,
     freshnessReason: freshnessReasons[SPEAKER_DESIGN_TYPE] || null,
   });
   const proposalAvailable =
@@ -191,6 +231,7 @@ export function resolveWorkflowStatus({
     versionId,
     documentType: 'proposal',
     engineeringFingerprint,
+    equivalence: equivalences.proposal || null,
     freshnessReason: freshnessReasons.proposal || null,
   });
   return { technicalReport, speakerDesign, clientProposal, proposalAvailable };

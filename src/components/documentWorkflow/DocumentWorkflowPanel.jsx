@@ -78,6 +78,7 @@ export default function DocumentWorkflowPanel({
   versionName,
   engineeringFingerprint,
   workflowStatus,
+  onRetryVerification = null,
   disabled = false,
   onOpenReport,
 }) {
@@ -176,34 +177,65 @@ export default function DocumentWorkflowPanel({
   if (trState !== WORKFLOW_STATE.READY) missingPrerequisites.push('Technical Report');
   if (sdState !== WORKFLOW_STATE.READY) missingPrerequisites.push('Speaker Design');
 
-  // The Outdated message is the meaningful freshness reason — the design
-  // changes between the saved and current publications. The Failed message is
-  // the generation error; the Not Available message is the missing-prerequisite
-  // note. These are mutually exclusive states, so each card receives the reason
-  // that applies to its current state.
-  const trDisplayReason = trState === WORKFLOW_STATE.OUTDATED ? technicalReport.freshnessReason : technicalReport.reason;
-  const sdDisplayReason = sdState === WORKFLOW_STATE.OUTDATED ? speakerDesign.freshnessReason : speakerDesign.reason;
+  // Verification unavailable: the stored document exists but its source could
+  // not be compared to the current design (a frozen publication is missing).
+  // It is distinct from Outdated (a material change was established) and offers
+  // a Retry that re-runs verification WITHOUT regenerating the document.
+  const VERIFICATION_UNAVAILABLE_COPY =
+    'Source could not be verified. Retry to re-check without regenerating.';
+  const trDisplayReason = trState === WORKFLOW_STATE.OUTDATED
+    ? technicalReport.freshnessReason
+    : trState === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE
+      ? VERIFICATION_UNAVAILABLE_COPY
+      : technicalReport.reason;
+  const sdDisplayReason = sdState === WORKFLOW_STATE.OUTDATED
+    ? speakerDesign.freshnessReason
+    : sdState === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE
+      ? VERIFICATION_UNAVAILABLE_COPY
+      : speakerDesign.reason;
 
   const trLabel = resolveStepDisplayLabel(WORKFLOW_STEP.TECHNICAL_REPORT, trState);
   const sdLabel = resolveStepDisplayLabel(WORKFLOW_STEP.SPEAKER_DESIGN, sdState);
   const cpLabel = resolveStepDisplayLabel(WORKFLOW_STEP.CLIENT_PROPOSAL, cpState, proposalAvailable);
 
-  const trCanAct = !disabled && (trState === WORKFLOW_STATE.NOT_CREATED || trState === WORKFLOW_STATE.OUTDATED || trState === WORKFLOW_STATE.FAILED);
-  const sdCanAct = !disabled && (sdState === WORKFLOW_STATE.NOT_CREATED || sdState === WORKFLOW_STATE.OUTDATED || sdState === WORKFLOW_STATE.FAILED);
-  const cpCanAct = !disabled && proposalAvailable && (cpState === WORKFLOW_STATE.NOT_CREATED || cpState === WORKFLOW_STATE.OUTDATED || cpState === WORKFLOW_STATE.FAILED);
+  const trIsVerificationUnavailable = trState === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE;
+  const sdIsVerificationUnavailable = sdState === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE;
+  const cpIsVerificationUnavailable = cpState === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE;
 
-  const trActLabel = trState === WORKFLOW_STATE.OUTDATED ? 'Update Technical Report' : trState === WORKFLOW_STATE.FAILED ? 'Retry Technical Report' : 'Create Technical Report';
-  const sdActLabel = sdState === WORKFLOW_STATE.OUTDATED ? 'Update Speaker Design' : sdState === WORKFLOW_STATE.FAILED ? 'Retry Speaker Design' : 'Create Speaker Design';
-  const cpActLabel = cpState === WORKFLOW_STATE.OUTDATED ? 'Update Client Proposal' : cpState === WORKFLOW_STATE.FAILED ? 'Retry Client Proposal' : 'Create Client Proposal';
+  const trCanAct = !disabled && (trIsVerificationUnavailable
+    ? !!onRetryVerification
+    : (trState === WORKFLOW_STATE.NOT_CREATED || trState === WORKFLOW_STATE.OUTDATED || trState === WORKFLOW_STATE.FAILED));
+  const sdCanAct = !disabled && (sdIsVerificationUnavailable
+    ? !!onRetryVerification
+    : (sdState === WORKFLOW_STATE.NOT_CREATED || sdState === WORKFLOW_STATE.OUTDATED || sdState === WORKFLOW_STATE.FAILED));
+  const cpCanAct = !disabled && (cpIsVerificationUnavailable
+    ? !!onRetryVerification
+    : proposalAvailable && (cpState === WORKFLOW_STATE.NOT_CREATED || cpState === WORKFLOW_STATE.OUTDATED || cpState === WORKFLOW_STATE.FAILED));
+
+  const trActLabel = trIsVerificationUnavailable
+    ? 'Retry verification'
+    : trState === WORKFLOW_STATE.OUTDATED ? 'Update Technical Report' : trState === WORKFLOW_STATE.FAILED ? 'Retry Technical Report' : 'Create Technical Report';
+  const sdActLabel = sdIsVerificationUnavailable
+    ? 'Retry verification'
+    : sdState === WORKFLOW_STATE.OUTDATED ? 'Update Speaker Design' : sdState === WORKFLOW_STATE.FAILED ? 'Retry Speaker Design' : 'Create Speaker Design';
+  const cpActLabel = cpIsVerificationUnavailable
+    ? 'Retry verification'
+    : cpState === WORKFLOW_STATE.OUTDATED ? 'Update Client Proposal' : cpState === WORKFLOW_STATE.FAILED ? 'Retry Client Proposal' : 'Create Client Proposal';
+
+  const trOnAct = trIsVerificationUnavailable ? onRetryVerification : handleTechnicalReportAct;
+  const sdOnAct = sdIsVerificationUnavailable ? onRetryVerification : handleSpeakerDesignAct;
+  const cpOnAct = cpIsVerificationUnavailable ? onRetryVerification : handleClientProposalAct;
 
   const cpIsCreated = cpState === WORKFLOW_STATE.READY;
   const cpIsUnavailable = cpState === WORKFLOW_STATE.NOT_CREATED && !proposalAvailable;
   const cpReason = cpIsUnavailable && missingPrerequisites.length > 0
     ? `Available once the ${missingPrerequisites.join(' and ')} have been created.`
     : null;
-  const cpDisplayReason = cpState === WORKFLOW_STATE.OUTDATED
-    ? (clientProposal?.freshnessReason || null)
-    : cpReason;
+  const cpDisplayReason = cpIsVerificationUnavailable
+    ? VERIFICATION_UNAVAILABLE_COPY
+    : cpState === WORKFLOW_STATE.OUTDATED
+      ? (clientProposal?.freshnessReason || null)
+      : cpReason;
 
   return (
     <div className="space-y-2.5">
@@ -218,7 +250,7 @@ export default function DocumentWorkflowPanel({
           reason={trDisplayReason}
           canAct={trCanAct}
           actLabel={trActLabel}
-          onAct={handleTechnicalReportAct}
+          onAct={trOnAct}
           onOpen={technicalReport.record ? () => openStoredPdf(technicalReport.record) : null}
           openLabel="Open"
           onSecondary={trState === WORKFLOW_STATE.READY ? handleTechnicalReportAct : null}
@@ -235,7 +267,7 @@ export default function DocumentWorkflowPanel({
           reason={sdDisplayReason}
           canAct={sdCanAct}
           actLabel={sdActLabel}
-          onAct={handleSpeakerDesignAct}
+          onAct={sdOnAct}
           onOpen={speakerDesign.record ? () => openStoredPdf(speakerDesign.record) : null}
           openLabel="Open"
         />
@@ -250,7 +282,7 @@ export default function DocumentWorkflowPanel({
         reason={cpDisplayReason}
         canAct={cpCanAct}
         actLabel={cpActLabel}
-        onAct={handleClientProposalAct}
+        onAct={cpOnAct}
         onOpen={clientProposal.record ? () => openStoredPdf(clientProposal.record) : null}
         openLabel="Open"
         primary={proposalAvailable && !cpIsCreated}
