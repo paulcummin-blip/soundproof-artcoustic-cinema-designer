@@ -19,7 +19,7 @@
  * with the drag pipeline.
  */
 
-import { wallCorners, isCustomWall, speakersClashingWalls, CUSTOM_WALL_TYPE } from "@/components/room/customWall/customWallGeometry";
+import { wallCorners, wallMidpoint, isCustomWall, speakersClashingWalls, CUSTOM_WALL_TYPE } from "@/components/room/customWall/customWallGeometry";
 
 const NORMAL_STROKE = "#5B5148";
 const NORMAL_FILL = "rgba(168,159,149,0.35)";
@@ -77,6 +77,16 @@ export default function RvCustomWallLayer({
         // Endpoints
         const [p1x, p1y] = toPx(wall.p1.x, wall.p1.y);
         const [p2x, p2y] = toPx(wall.p2.x, wall.p2.y);
+
+        // Label at the wall midpoint, rotated to follow the segment so it stays
+        // attached to the wall body for diagonal walls. Flipped 180 deg when the
+        // segment points up-left so the text is never upside-down.
+        const mid = wallMidpoint(wall);
+        const [lmx, lmy] = toPx(mid.x, mid.y);
+        let labelAngleDeg = Math.atan2(p2y - p1y, p2x - p1x) * 180 / Math.PI;
+        if (labelAngleDeg > 90) labelAngleDeg -= 180;
+        if (labelAngleDeg < -90) labelAngleDeg += 180;
+        const wallLabel = String(wall.label || 'Custom Wall');
 
         // Snap indicators for this wall's endpoints
         const snapP1 = snapIndicators.find((s) => s.wallId === wall.id && s.endpoint === 'p1');
@@ -150,6 +160,24 @@ export default function RvCustomWallLayer({
                 vectorEffect="non-scaling-stroke"
                 pointerEvents="none"
               />
+            )}
+            {/* Wall label at the midpoint, rotated along the segment */}
+            {wallLabel && (
+              <text
+                x={lmx}
+                y={lmy}
+                fill="#1B1A1A"
+                fillOpacity={0.9}
+                fontSize={11}
+                fontWeight={700}
+                style={{ userSelect: 'none' }}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                transform={labelAngleDeg !== 0 ? `rotate(${labelAngleDeg}, ${lmx}, ${lmy})` : undefined}
+                pointerEvents="none"
+              >
+                {wallLabel}
+              </text>
             )}
             {/* Endpoint handles — only when selected */}
             {isSelected && handleMouseDown && (

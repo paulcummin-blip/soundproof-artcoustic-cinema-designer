@@ -5,6 +5,7 @@ import {
   skylightRectM,
   skylightClashingSpeakers,
 } from "@/components/room/rv/utils/skylightGeometry";
+import { isCustomWall } from "@/components/room/customWall/customWallGeometry";
 
 export default function RvRoomElementsLayer({
   hasRoomRect,
@@ -192,9 +193,15 @@ export default function RvRoomElementsLayer({
       return getSpeakerVisibility(s.role, s.model);
     });
 
+  // Custom walls are rendered by their own layer (RvCustomWallLayer) as
+  // rotated segments with draggable endpoints. Excluding them here prevents
+  // the generic element branch from drawing a second, door-like rectangle
+  // (defaulting to the front wall) with a label detached from the real wall.
+  const renderableElements = roomElements.filter((el) => !isCustomWall(el));
+
   return (
     <g data-layer="room-elements">
-      {roomElements.map((element, idx) => {
+      {renderableElements.map((element, idx) => {
         const e = normalizeElement(element);
 
         const L = Math.max(0.01, Number(e.__lengthM) || 0.9);
