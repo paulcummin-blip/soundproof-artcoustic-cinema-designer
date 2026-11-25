@@ -215,7 +215,7 @@ export default function useAutoDesignIntent({ projectId, versionId, enabled = fa
         // is now on the snapshot, transition to COMPLETE; otherwise keep the
         // failed outcome without re-running, so a failure never becomes an
         // automatic retry loop.
-        if (narrativeIsCurrent(snapshot)) setStatus(key, AUTO_INTENT.COMPLETE, generation);
+        if (!forceRegenerate && narrativeIsCurrent(snapshot)) setStatus(key, AUTO_INTENT.COMPLETE, generation);
         return;
       }
       if (narrativeIsCurrent(snapshot) && !forceRegenerate) {
