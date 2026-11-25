@@ -34,7 +34,7 @@ import { useDesignContextReview } from "@/components/adi/designContext/useDesign
 import useAutoStoreSpeakerDesign from "@/components/report/speakerDesign/useAutoStoreSpeakerDesign";
 import ReportLoadingOverlay from "@/components/report/ReportLoadingOverlay";
 import {
-  readReportActionIntent,
+  useConsumedReportActionIntent,
   useReportActionIntent,
 } from "@/components/report/reportActionIntent";
 import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
@@ -99,7 +99,23 @@ import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speake
 import { reportDateLabel } from "@/components/report/reportFirstPageMeta";
 import { validateReportExportIntegrity } from "@/components/report/reportExportIntegrity";
 
+import StoredTechnicalReport from '@/components/report/client/StoredTechnicalReport';
+
 export default function RP22ClientReport() {
+  const [params, setParams] = useSearchParams();
+  const { intent, consumed } = useConsumedReportActionIntent(params, setParams);
+  const [completed, setCompleted] = React.useState(false);
+  const onStored = useCallback(() => setCompleted(true), []);
+  const projectId = params.get('projectId') || params.get('id') || null;
+  const versionId = readRequestedVersionId(params);
+  if (!consumed) return <p role="status">Opening Technical Report…</p>;
+  if (completed || !(intent.autoStore || intent.updateReport || intent.regenerateIntent)) {
+    return <StoredTechnicalReport key={projectId + ':' + versionId} projectId={projectId} requestedVersionId={versionId} downloadOnOpen={intent.exportPdf} />;
+  }
+  return <GenerateClientReport reportIntent={intent} onStored={onStored} />;
+}
+
+function GenerateClientReport({ reportIntent, onStored }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -135,7 +151,6 @@ export default function RP22ClientReport() {
   //
   // GENERATE: no saved report means the current version authority, which is
   // generation mode.
-  const reportIntent = readReportActionIntent(searchParams);
   const updateRequested = reportIntent.updateReport === true;
   const savedReport = useSavedReportFingerprint({
     projectId,
@@ -781,6 +796,10 @@ export default function RP22ClientReport() {
     speakerDesignCompanion,
   });
 
+  React.useEffect(() => {
+    if (publication.status === 'complete') onStored();
+  }, [publication.status, onStored]);
+
   // A failed export resolves the report to the canonical Failed state.
   const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed || !!savedReport.error;
   const readiness = authorityReadFailed
@@ -859,7 +878,7 @@ export default function RP22ClientReport() {
     : authorityReadFailed
       ? authority.retry
       : exportError
-        ? handleExport
+        ? () => retryMissing(publication.failed[0]?.key || 'project_report')
         : undefined;
   const failedReason = adiFailed
     ? (autoIntentReason || 'The project summary could not be written. Try again, or return to the project.')
@@ -942,7 +961,7 @@ export default function RP22ClientReport() {
   useReportActionIntent({
     requested: reportIntent.exportPdf,
     ready: reportFullyReady && filenameIdentity.ready && orderedPages.length > 0 && !exporting && exportIntegrity.ready,
-    onRun: handleExport,
+    onRun: handleStoreOnly,
   });
   useReportActionIntent({
     requested: reportIntent.autoStore,
@@ -1120,7 +1139,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportFullyReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || publication.status === 'storing' || planDrawings.pending || !isometricReportImageReady || autoIntentStatus === AUTO_INTENT.RUNNING || autoIntentStatus === AUTO_INTENT.FAILED || !exportIntegrity.ready}
+            disabled={publication.status !== 'complete'}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
@@ -1133,7 +1152,7 @@ export default function RP22ClientReport() {
             }}
           >
             <Download className="w-4 h-4 mr-2" style={{ color: "#FFFFFF", flexShrink: 0 }} />
-            {exporting ? "Preparing Project Report…" : "Download Project Report (PDF)"}
+            Preparing Project Report…
           </Button>
         </div>
         {reportReady && isometricCaptureFailed && !exporting && (
