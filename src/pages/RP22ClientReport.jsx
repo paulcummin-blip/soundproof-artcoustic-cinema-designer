@@ -847,7 +847,7 @@ function GenerateClientReport({ reportIntent, onStored }) {
   // The report is fully ready to display once engineering/pages are ready AND
   // the ADI narrative is accepted — either just generated or reused from the
   // saved snapshot.
-  const reportFullyReady = reportReady && (savedNarrativeAccepted || autoIntentVerified);
+  const reportFullyReady = reportReady && !adiRunning && (savedNarrativeAccepted || autoIntentVerified);
   // Every export entry point must wait for both the narrative and drawings.
   // Downloads are handled by StoredTechnicalReport only after durable storage.
 
