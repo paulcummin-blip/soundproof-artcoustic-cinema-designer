@@ -168,3 +168,43 @@ export function detectFrequencyDefinedDepressions(curve, rule = STAGE1_NULL_RULE
 
   return depressions;
 }
+
+/**
+ * Find the actual deepest depression in the 20–80 Hz screening band using the
+ * SAME response baseline and metric definition as detectFrequencyDefinedDepressions
+ * (same fractional-octave smoothing and reference shoulders), but WITHOUT the
+ * broadDepthDb threshold filter.
+ *
+ * This exposes the true deepest calculated depression for display, even when it
+ * is shallower than 8 dB. The 8 dB threshold in detectFrequencyDefinedDepressions
+ * is retained unchanged for its existing engineering purpose (significant
+ * depression identification and severe-null counting); this function is DISPLAY
+ * ONLY and does not introduce an alternative metric or simulation.
+ *
+ * @param {Array} curve — full response curve [{ frequency, spl }]
+ * @param {object} [rule] — override for STAGE1_NULL_RULE (mainly for tests)
+ * @returns {{ centreHz: number, depthDb: number } | null} — the deepest
+ *   depression point in the screening band, or null when the curve is too
+ *   short. depthDb is always >= 0 (clamped by depressionDepths).
+ */
+export function findDeepestDepressionInBand(curve, rule = STAGE1_NULL_RULE) {
+  const points = (Array.isArray(curve) ? curve : [])
+    .filter((p) => Number.isFinite(p?.frequency) && p?.frequency > 0 && Number.isFinite(p?.spl))
+    .slice()
+    .sort((a, b) => a.frequency - b.frequency);
+  if (points.length < 3) return null;
+
+  const smoothed = smoothByFractionalOctave(points, rule.smoothingFractionOctave);
+  const depths = depressionDepths(smoothed, rule.smoothingFractionOctave, rule.shoulderFractionOctave);
+
+  let deepest = null;
+  for (const point of depths) {
+    if (point.frequency < STAGE1_SCREENING_FREQ_MIN_HZ || point.frequency > STAGE1_SCREENING_FREQ_MAX_HZ) continue;
+    if (!deepest || point.depthDb > deepest.depthDb) {
+      deepest = point;
+    }
+  }
+
+  if (!deepest) return null;
+  return { centreHz: deepest.frequency, depthDb: deepest.depthDb };
+}

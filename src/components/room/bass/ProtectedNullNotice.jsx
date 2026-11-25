@@ -1,6 +1,8 @@
 import React from "react";
 
-const signed = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value.toFixed(1)} dB` : "—";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
+
+const signed = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${roundDbValue(value)} dB` : "—";
 
 export default function ProtectedNullNotice({ annotations = [] }) {
   if (!annotations.length) return null;

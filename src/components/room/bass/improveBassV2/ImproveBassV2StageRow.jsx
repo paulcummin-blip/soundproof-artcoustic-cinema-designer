@@ -8,6 +8,7 @@
 //   - If APPLIED: green checkmark with "APPLIED" label
 
 import React from "react";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Minus, AlertCircle, Lock } from "lucide-react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -187,7 +188,7 @@ function GainDetail({ result, currentResult, grouping }) {
       {Math.abs(adjustmentDb) > 0.1 && (
         <div className="text-[10px] text-[#625143]">
           {groupLabel && <span className="font-semibold">{groupLabel}: </span>}
-          <span>{adjustmentDb > 0 ? "+" : ""}{adjustmentDb.toFixed(1)} dB</span>
+          <span>{adjustmentDb > 0 ? "+" : ""}{roundDbValue(adjustmentDb)} dB</span>
         </div>
       )}
       <div className="grid grid-cols-2 gap-1.5">

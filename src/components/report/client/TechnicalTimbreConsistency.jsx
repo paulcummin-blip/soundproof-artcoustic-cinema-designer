@@ -24,6 +24,7 @@
 import React from "react";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 
 // ── L-level badge styles — derived from canonical RP22_GRADE_TOKENS ──
 const LEVEL_STYLES = {
@@ -52,7 +53,7 @@ function formatDb(param) {
   if (!param) return null;
   if (param.formatted) return param.formatted;
   if (param.value != null && Number.isFinite(param.value)) {
-    return `±${Math.abs(param.value).toFixed(1)} dB`;
+    return `±${roundDbValue(Math.abs(param.value))} dB`;
   }
   return null;
 }

@@ -104,16 +104,23 @@ function MetricRow({ label, value, hint }) {
   );
 }
 
-// One decimal place for dB values (validated card presentation).
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
+
+// Whole-number dB display (conventional rounding, round half away from zero).
 function formatDb1(value) {
-  if (!Number.isFinite(value)) return "—";
-  return `${value.toFixed(1)} dB`;
+  const whole = roundDbValue(value);
+  return whole === null ? "—" : `${whole} dB`;
 }
 
+// Always display the actual calculated deepest depression and its frequency,
+// even when the depression is shallower than 8 dB. A shallow 1–2 dB depression
+// before EQ is an excellent predicted result and should be visible.
 function formatDepression(depression) {
-  if (!depression || !Number.isFinite(depression.depthDb)) return "None ≥ 8 dB";
-  const freq = Number.isFinite(depression.centreHz) ? depression.centreHz.toFixed(0) : "?";
-  return `−${depression.depthDb.toFixed(1)} dB @ ${freq} Hz`;
+  if (!depression || !Number.isFinite(depression.depthDb)) return "0 dB";
+  const depth = roundDbValue(depression.depthDb);
+  if (depth === null || depth === 0) return "0 dB";
+  const freq = Number.isFinite(depression.centreHz) ? Math.round(depression.centreHz) : "?";
+  return `−${depth} dB @ ${freq} Hz`;
 }
 
 function screeningRows(screening) {
@@ -126,7 +133,7 @@ function screeningRows(screening) {
       key="rspdep"
       label="Deepest RSP depression"
       value={formatDepression(rspDep)}
-      hint="Stage 1 screening (32 PPO): deepest broad RSP depression (≥8 dB, ≥1/8 octave) in the 20–80 Hz band"
+      hint="Stage 1 screening: actual deepest RSP depression in the 20–80 Hz band (same metric as the ≥8 dB broad-depression detector, shown at any depth)"
     />,
   );
 
@@ -136,7 +143,7 @@ function screeningRows(screening) {
       key="pridep"
       label="Deepest Primary depression"
       value={formatDepression(priDep)}
-      hint="Stage 1 screening (32 PPO): deepest broad depression across primary seats (≥8 dB, ≥1/8 octave)"
+      hint="Stage 1 screening: actual deepest depression across primary seats in the 20–80 Hz band (same metric as the ≥8 dB broad-depression detector, shown at any depth)"
     />,
   );
 

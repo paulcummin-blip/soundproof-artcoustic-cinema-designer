@@ -16,6 +16,7 @@
 // instances acoustically, but Apply must preserve them in project state.
 
 import { applyCalibrationTuning, resolveTuningInstances } from "./improveBassV2ApplyCalibration.js";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
 
 const COORDINATE_TOLERANCE_M = 0.01; // 10 mm
@@ -135,7 +136,7 @@ export function buildCalibrationSummary(winner) {
 
   return {
     delays: tuning.map((t) => `${(Number(t.delayMs) || 0).toFixed(1)} ms`),
-    trims: tuning.map((t) => `${(Number(t.gainDb) || 0).toFixed(1)} dB`),
+    trims: tuning.map((t) => `${roundDbValue(Number(t.gainDb) || 0)} dB`),
     phases: tuning.map((t) => `${normalisePhaseControlDeg(t.phaseControlDeg ?? t.phaseAdjust).toFixed(0)}° at 80 Hz`),
     polarities: tuning.map((t) => normalisePolarity(t.polarity) < 0 ? "Inverted" : "Normal"),
   };

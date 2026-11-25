@@ -178,7 +178,7 @@ const buildP17DebugSummary = (metric) => {
   const list = Array.isArray(metric?.perSpeaker) ? metric.perSpeaker : [];
   if (!list.length) return "";
   const worst = metric?.worstRole
-    ? `${metric.worstRole}${Number.isFinite(metric?.worstLossDb) ? ` ${Number(metric.worstLossDb).toFixed(1)} dB` : ""}`
+    ? `${metric.worstRole}${Number.isFinite(metric?.worstLossDb) ? ` ${Math.round(Number(metric.worstLossDb))} dB` : ""}`
     : null;
   return `${list.length} speaker${list.length === 1 ? "" : "s"} evaluated at this seat${worst ? ` · worst ${worst}` : ""}`;
 };

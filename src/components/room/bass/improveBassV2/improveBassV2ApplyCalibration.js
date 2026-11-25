@@ -15,6 +15,7 @@
 //   - product selection
 
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 
 // New confirmations bind tuning to the frozen source order once. Legacy helper
 // inputs without IDs remain readable; mounted Apply accepts only a fresh result.
@@ -148,7 +149,7 @@ export function buildCalibrationChangeSummary(currentInstances, calibrationTunin
     const newGain = Number(t.gainDb) || 0;
     if (Math.abs(newGain - currentGain) > TUNING_TOLERANCE_GAIN_DB) {
       const delta = newGain - currentGain;
-      changes.trims.push(`Sub ${i + 1}: ${delta > 0 ? "+" : ""}${delta.toFixed(1)} dB`);
+      changes.trims.push(`Sub ${i + 1}: ${delta > 0 ? "+" : ""}${roundDbValue(delta)} dB`);
     }
 
     const currentPol = normalisePolarity(inst.polarity);

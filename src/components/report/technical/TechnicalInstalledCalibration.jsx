@@ -97,9 +97,9 @@ function formatDelay(delayMs) {
  */
 function formatGain(gainDb) {
   const n = Number(gainDb);
-  if (!Number.isFinite(n) || n === 0) return "0.0 dB";
+  if (!Number.isFinite(n) || n === 0) return "0 dB";
   const sign = n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(1)} dB`;
+  return `${sign}${Math.round(Math.abs(n))} dB`;
 }
 
 /**

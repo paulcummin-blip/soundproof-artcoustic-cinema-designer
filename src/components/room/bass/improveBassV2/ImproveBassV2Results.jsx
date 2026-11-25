@@ -12,6 +12,7 @@
 // Other material improvements are ranked below using the user's hierarchy.
 
 import React from "react";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { AlertTriangle, FlaskConical, CheckCircle2 } from "lucide-react";
 import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
@@ -95,8 +96,8 @@ function P14CapabilityPill({ currentLevel, currentDb, winnerLevel, winnerDb }) {
   const win = numericLevel(winnerLevel) || 0;
   const curText = cur > 0 ? `L${cur}` : "—";
   const winText = win > 0 ? `L${win}` : "—";
-  const curDbText = (currentDb != null && Number.isFinite(Number(currentDb))) ? `${Number(currentDb).toFixed(1)} dBC` : "";
-  const winDbText = (winnerDb != null && Number.isFinite(Number(winnerDb))) ? `${Number(winnerDb).toFixed(1)} dBC` : "";
+  const curDbText = (currentDb != null && Number.isFinite(Number(currentDb))) ? `${roundDbValue(currentDb)} dBC` : "";
+  const winDbText = (winnerDb != null && Number.isFinite(Number(winnerDb))) ? `${roundDbValue(winnerDb)} dBC` : "";
   const curDisplay = curDbText ? `${curDbText} / ${curText}` : curText;
   const winDisplay = winDbText ? `${winDbText} / ${winText}` : winText;
   const dbChanged = Number.isFinite(Number(currentDb)) && Number.isFinite(Number(winnerDb))

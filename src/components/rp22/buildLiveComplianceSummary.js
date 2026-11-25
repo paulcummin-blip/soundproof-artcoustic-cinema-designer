@@ -42,6 +42,7 @@ import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 import { resolveAssumedParameterResult } from "@/components/utils/assumedParameterAuthority";
 import { P8_NUMBER, buildP8RoomResult } from "@/components/utils/rp22/p8Authority";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 
 const ASSUMED_PARAM_KEYS = new Set(["p8", "p15", "p21"]);
 const isAssumedKey = (key) => ASSUMED_PARAM_KEYS.has(key);
@@ -118,7 +119,7 @@ export function withCurrentVerifiedBass(analysisResult, bassResults, seats) {
       ...previous,
       rp22: {
         ...(previous.rp22 || {}),
-        20: { level, value, formatted: `±${value.toFixed(1)} dB`, status: "complete", resultFingerprint: fingerprint },
+        20: { level, value, formatted: `±${roundDbValue(value)} dB`, status: "complete", resultFingerprint: fingerprint },
       },
     };
   }
@@ -203,7 +204,7 @@ export function buildLiveComplianceSummary({ analysisResult, bassResults = null,
         priority: String(seat?.priority || "").toLowerCase() === "secondary" ? "secondary" : "primary",
         isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
         valueFormatted: isBassDeviation
-          ? `±${Number(rawValue).toFixed(1)} dB`
+          ? `±${roundDbValue(rawValue)} dB`
           : firstStatedPrimitive([metric?.formatted, metric?.hudLabel, rawValue], "—"),
         level,
         status: metric?.status || null,

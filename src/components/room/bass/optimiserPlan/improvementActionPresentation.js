@@ -75,11 +75,13 @@ function msText(value) {
 }
 
 /** "-3 dB" — signed, one decimal place. */
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
+
 function dbText(value) {
   const n = num(value);
   if (n == null) return null;
   const sign = n > 0 ? "+" : "";
-  return `${sign}${Number(n.toFixed(1))} dB`;
+  return `${sign}${roundDbValue(n)} dB`;
 }
 
 /** "2.60 m" — two decimals, in metres. */

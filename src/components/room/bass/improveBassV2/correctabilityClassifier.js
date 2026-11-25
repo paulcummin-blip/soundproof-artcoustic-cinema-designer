@@ -47,6 +47,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { floorP19P20Deviation } from '@/components/utils/rp22/resolveRp22DesignValue';
 
 // ── Physical Recoverability Classes ───────────────────────────────────────
@@ -160,8 +161,8 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
 
   if (isAbsoluteDeepNull || isExtremeNarrowNull) {
     const reason = isAbsoluteDeepNull
-      ? `a ${deviation.toFixed(1)} dB null at ${freq.toFixed(0)} Hz leaves negligible remaining energy`
-      : `a ${deviation.toFixed(1)} dB null at ${freq.toFixed(0)} Hz is an extreme narrow null at a low modal frequency — likely non-minimum-phase`;
+      ? `a ${roundDbValue(deviation)} dB null at ${Math.round(freq)} Hz leaves negligible remaining energy`
+      : `a ${roundDbValue(deviation)} dB null at ${Math.round(freq)} Hz is an extreme narrow null at a low modal frequency — likely non-minimum-phase`;
     return {
       class: CORRECTABILITY_CLASS.ABSOLUTE_CANCELLATION,
       description: `Not physically recoverable — ${reason}. EQ cannot recover this; physical changes are required.`,
@@ -178,7 +179,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
   if (p14TargetDb > 0 && p14Headroom < deviation + t.capabilityHeadroomMarginDb) {
     return {
       class: CORRECTABILITY_CLASS.CAPABILITY_LIMITED,
-      description: `Physically recoverable but capability-limited — correcting the ${floorP19P20Deviation(deviation)} dB deviation would require boost that consumes P14 headroom (only ${p14Headroom.toFixed(1)} dB remaining above target). The correction would compromise the selected capability objective.`,
+      description: `Physically recoverable but capability-limited — correcting the ${floorP19P20Deviation(deviation)} dB deviation would require boost that consumes P14 headroom (only ${roundDbValue(p14Headroom)} dB remaining above target). The correction would compromise the selected capability objective.`,
       eqAllowed: false,
       physicalRecommended: false,
     };
@@ -205,7 +206,7 @@ export function classifyCorrectability(problem, currentResult, designObjectives 
     : (freq > 0 && freq < t.extremeNarrowNullMaxFreqHz ? 'moderate null' : 'response feature');
   return {
     class: CORRECTABILITY_CLASS.RECOVERABLE,
-    description: `Physically recoverable — a ${deviation.toFixed(1)} dB ${featureType} at ${freq.toFixed(0)} Hz with usable energy remaining. The response is physically recoverable; whether EQ is applied is determined by the Engineering Optimisation layer based on the selected design objectives.`,
+    description: `Physically recoverable — a ${roundDbValue(deviation)} dB ${featureType} at ${Math.round(freq)} Hz with usable energy remaining. The response is physically recoverable; whether EQ is applied is determined by the Engineering Optimisation layer based on the selected design objectives.`,
     eqAllowed: true,
     physicalRecommended: false,
   };

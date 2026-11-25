@@ -3,6 +3,7 @@ import LiveHouseCurveDiagnostics from "@/components/room/bass/LiveHouseCurveDiag
 import { buildCandidateSignature, signatureToString } from "@/components/room/bass/candidateConsistency";
 import { formatP20Deviation, levelP20_lfConsistency } from "@/components/utils/rp22/levels";
 import ProductionHouseCurveAuthorityDiagnostic from "./ProductionHouseCurveAuthorityDiagnostic";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import ShadowPairedCapabilityDiagnostic from "./ShadowPairedCapabilityDiagnostic";
 
 const level = (value) => value > 0 ? `L${value}` : "FAIL";
@@ -52,7 +53,7 @@ export default function BassOptimiserValidationPanel({ result, activeSubs, usabl
         <span>Selected fit profile: <strong className="text-slate-900">{profileLabel}</strong></span>
         <span>P14 preservation: <strong className={preserveP14 ? "text-emerald-700" : "text-amber-700"}>{preserveP14 ? "Yes" : "No"}</strong></span>
         <span>Profile fitting tolerance: <strong className="text-slate-900">±{fmt(fittingTol, " dB")}</strong></span>
-        <span>Requested P19 tolerance: <strong className="text-slate-900">{Number.isFinite(reqP19Tol) ? `±${reqP19Tol.toFixed(1)} dB` : "—"}</strong></span>
+        <span>Requested P19 tolerance: <strong className="text-slate-900">{Number.isFinite(reqP19Tol) ? `±${roundDbValue(reqP19Tol)} dB` : "—"}</strong></span>
         <span>Constraint: <strong className="text-slate-900">cut up to −{fmt(maxCut, " dB")} / boost up to +{fmt(maxBoost, " dB")}, capability-limited</strong></span>
       </div>;
     })()}
@@ -82,9 +83,9 @@ export default function BassOptimiserValidationPanel({ result, activeSubs, usabl
       const bestHc = credible.filter((c) => c.designEqFitProfile === "house_curve").sort((a, b) => a.achievedP19VariationDb - b.achievedP19VariationDb)[0];
       const sel = result.selectedCandidate;
       const selProfile = sel ? (sel.designEqFitProfile || "standard") : "—";
-      const selP19 = sel && Number.isFinite(sel.achievedP19VariationDb) ? `±${sel.achievedP19VariationDb.toFixed(1)} dB` : "—";
+      const selP19 = sel && Number.isFinite(sel.achievedP19VariationDb) ? `±${roundDbValue(sel.achievedP19VariationDb)} dB` : "—";
       return <div className="mt-1 font-mono text-[10px] text-slate-600">
-        Best Standard accuracy: {bestStd ? `±${bestStd.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Best house-curve accuracy: {bestHc ? `±${bestHc.achievedP19VariationDb.toFixed(1)} dB` : "—"} | Selected: {selProfile} {selP19}
+        Best Standard accuracy: {bestStd ? `±${roundDbValue(bestStd.achievedP19VariationDb)} dB` : "—"} | Best house-curve accuracy: {bestHc ? `±${roundDbValue(bestHc.achievedP19VariationDb)} dB` : "—"} | Selected: {selProfile} {selP19}
       </div>;
     })()}
     {result.selectedCandidate && (() => {

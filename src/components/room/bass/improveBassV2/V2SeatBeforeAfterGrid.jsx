@@ -13,6 +13,7 @@
 // Row structure follows real seating rows (Row 1 = 2 seats, Row 2 = 3 seats).
 
 import React from "react";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { PRIMARY } from "@/components/utils/seatPriorityAuthority";
 const REFERENCE_IDS = new Set(["rsp", "mlp", "synthetic-rsp", "synthetic_rsp"]);
@@ -32,12 +33,12 @@ function buildResultMap(results) {
 
 function formatP19Db(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  return `±${Math.abs(Number(raw)).toFixed(1)} dB`;
+  return `±${roundDbValue(Math.abs(Number(raw)))} dB`;
 }
 
 function formatP20Db(raw) {
   if (!Number.isFinite(Number(raw))) return "—";
-  return `±${Math.abs(Number(raw)).toFixed(1)} dB`;
+  return `±${roundDbValue(Math.abs(Number(raw)))} dB`;
 }
 
 function p19LevelText(level) {

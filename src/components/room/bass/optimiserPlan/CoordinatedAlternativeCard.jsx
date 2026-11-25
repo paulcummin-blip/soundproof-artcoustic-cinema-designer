@@ -25,6 +25,7 @@ import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import MiniPlanView from "./MiniPlanView.jsx";
 import { formatCrossover } from "./formatCrossover.js";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 
 const LEVEL_LABEL = { 1: "L1", 2: "L2", 3: "L3", 4: "L4" };
 
@@ -36,7 +37,7 @@ function levelLabel(level) {
 function fmtDb(value) {
   if (value == null || !Number.isFinite(Number(value))) return null;
   const n = Number(value);
-  return `${n >= 0 ? "+" : ""}${n.toFixed(1)} dB`;
+  return `${n >= 0 ? "+" : ""}${roundDbValue(n)} dB`;
 }
 
 function fmtMm(m) {
@@ -281,7 +282,7 @@ export default function CoordinatedAlternativeCard({
                 rows={tuning.map((t, i) => [
                   { value: i + 1, bold: true },
                   { value: t.delayMs != null ? `${t.delayMs.toFixed(1)} ms` : "—" },
-                  { value: t.gainDb != null ? `${t.gainDb > 0 ? "+" : ""}${t.gainDb.toFixed(1)} dB` : "—" },
+                  { value: t.gainDb != null ? `${t.gainDb > 0 ? "+" : ""}${roundDbValue(t.gainDb)} dB` : "—" },
                   { value: t.polarity != null ? (Number(t.polarity) < 0 || Number(t.polarity) === 180 ? "Inverted" : "Normal") : "—" },
                   { value: t.phaseControlDeg != null ? `${Math.round(t.phaseControlDeg)}°` : "—" },
                 ])}

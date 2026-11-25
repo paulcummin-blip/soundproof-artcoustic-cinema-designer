@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { normalizeLevelForDisplay } from '../utils/rp22LevelDisplay';
 import SeatComplianceSummary from './SeatComplianceSummary';
+import { roundDbValue } from '@/components/utils/splDisplayFormatter';
 import { formatSeatLabel } from '../utils/seatLabel';
 
 const formatMetricMeters = (value) => {
@@ -132,7 +133,7 @@ export default function ReportSeatParametersCard({
                                                     )}
                                                     {metric && key === 'p17' && metric.worstRole && (
                                                         <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                            Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
+                                                            Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {roundDbValue(metric.worstLossDb) ?? '—'} dB)
                                                         </div>
                                                     )}
                                                     {metric && key === 'p9' && metric.debugText && (

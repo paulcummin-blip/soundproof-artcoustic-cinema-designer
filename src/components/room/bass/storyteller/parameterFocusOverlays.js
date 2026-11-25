@@ -10,7 +10,7 @@
 
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 import { formatP18FloorBoundedStatement } from "@/components/room/bass/p18SelectedTargetExplanation";
-import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
+import { formatSplDisplay, roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { P14_EQ_ASSESSMENT_RANGE_HZ } from "@/components/utils/p14CapabilityAuthority";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
@@ -93,7 +93,7 @@ function buildP14Focus({ p14PresentationData, rp22GraphMarkers, finalBassRespons
   const lines = [];
   if (targetDb != null) lines.push(`Target: ${formatSplDisplay(targetDb)} dBC (${p14PresentationData?.basis || "minimum"} L${p14PresentationData?.levelNum || "?"})`);
   if (achieved != null) lines.push(`Achieved capability: ${formatSplDisplay(achieved)} dBC`);
-  if (headroom != null) lines.push(`Headroom: ${headroom >= 0 ? "+" : ""}${headroom.toFixed(1)} dB${headroom < 0 ? " (shortfall)" : ""}`);
+  if (headroom != null) lines.push(`Headroom: ${headroom >= 0 ? "+" : ""}${roundDbValue(headroom)} dB${headroom < 0 ? " (shortfall)" : ""}`);
   lines.push(`Assessment band: ${P14_EQ_ASSESSMENT_RANGE_HZ.lowerHz}–${P14_EQ_ASSESSMENT_RANGE_HZ.upperHz} Hz (C-weighted integration)`);
   lines.push("Operating Response = the post-EQ RSP curve (green solid)");
   lines.push("House Target = the normalised target curve (dark dashed)");

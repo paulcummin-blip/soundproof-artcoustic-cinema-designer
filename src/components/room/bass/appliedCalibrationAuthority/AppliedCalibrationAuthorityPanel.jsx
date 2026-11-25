@@ -103,10 +103,12 @@ function formatDelay(ms) {
   return `${v.toFixed(1)} ms`;
 }
 
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
+
 function formatGain(db) {
   const v = Number(db) || 0;
   const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(1)} dB`;
+  return `${sign}${roundDbValue(v)} dB`;
 }
 
 export default function AppliedCalibrationAuthorityPanel({

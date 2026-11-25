@@ -9,7 +9,7 @@ import {
 } from "./stage1Constants";
 import { getFamilyPreferenceRank } from "./stage1FamilyRegistry";
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
-import { detectFrequencyDefinedDepressions } from "./stage1NullDetector";
+import { detectFrequencyDefinedDepressions, findDeepestDepressionInBand } from "./stage1NullDetector";
 
 const mean = (values) => (values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0);
 
@@ -124,19 +124,19 @@ export function screenCandidate({ transferResult, seatingPositions, candidate })
     variationFromMean: seatVariationFromMean(curve),
   }));
 
-  // RSP depressions (broad depressions in the RSP curve, 20–80 Hz band)
+  // RSP broad depressions (≥8 dB) — retained for severe-null engineering.
+  // The actual deepest RSP depression for DISPLAY uses the same metric
+  // definition without the 8 dB threshold, so a shallow 1–2 dB depression
+  // is visible to the designer instead of "None ≥ 8 dB".
   const rspDepressions = detectBroadNulls(rspCurveFull);
-  const deepestRspDepression = rspDepressions.length
-    ? rspDepressions.reduce((best, d) => (d.depthDb > best.depthDb ? d : best))
-    : null;
+  const deepestRspDepression = findDeepestDepressionInBand(rspCurveFull);
 
-  // Deepest primary-seat depression across all primary seats
+  // Deepest primary-seat depression for display (same metric, no threshold).
   let deepestPrimaryDepression = null;
-  for (const seat of primaryPerSeat) {
-    for (const n of seat.nulls) {
-      if (!deepestPrimaryDepression || n.depthDb > deepestPrimaryDepression.depthDb) {
-        deepestPrimaryDepression = n;
-      }
+  for (const sc of primaryCurvesFull) {
+    const dep = findDeepestDepressionInBand(sc.curveFull);
+    if (dep && (!deepestPrimaryDepression || dep.depthDb > deepestPrimaryDepression.depthDb)) {
+      deepestPrimaryDepression = dep;
     }
   }
 

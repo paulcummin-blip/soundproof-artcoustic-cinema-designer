@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import {
   CartesianGrid,
   Line,
@@ -32,7 +33,7 @@ function levelText(level) {
 }
 
 function fmtDb(value) {
-  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)} dB` : "—";
+  return Number.isFinite(Number(value)) ? `${roundDbValue(value)} dB` : "—";
 }
 
 function deltaText(delta) {
@@ -40,8 +41,8 @@ function deltaText(delta) {
   if (!Number.isFinite(value)) return null;
   if (Math.abs(value) <= 0.05) return "unchanged";
   return value > 0
-    ? `${value.toFixed(1)} dB better`
-    : `${Math.abs(value).toFixed(1)} dB worse`;
+    ? `${roundDbValue(value)} dB better`
+    : `${roundDbValue(Math.abs(value))} dB worse`;
 }
 
 function Row({ label, children }) {
@@ -91,7 +92,7 @@ function AlignmentGraph({ curves }) {
             <YAxis tick={{ fontSize: 9, fill: "#8A7B6A" }} domain={["auto", "auto"]} />
             <Tooltip
               contentStyle={{ fontSize: 10, borderRadius: 6, border: "1px solid #E7E4DF" }}
-              formatter={(value) => `${Number(value).toFixed(1)} dB`}
+              formatter={(value) => `${roundDbValue(value)} dB`}
               labelFormatter={(label) => `${label} Hz`}
             />
             <Line type="monotone" dataKey="before" name="Current" stroke="#8A7B6A" strokeWidth={1.5} dot={false} />

@@ -6,7 +6,7 @@
 // Behaviour is identical to the original function — pure extraction.
 
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
-import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
+import { formatSplDisplay, roundDbValue } from "@/components/utils/splDisplayFormatter";
 
 const isFiniteNumber = (value) => value !== null
   && value !== undefined
@@ -30,5 +30,6 @@ export function formatBassParameterValue(key, value) {
     const designVal = resolveRp22DesignValue(pid, Math.abs(number));
     return `±${designVal} dB`;
   }
-  return `${number.toFixed(1)} dB`;
+  const whole = roundDbValue(number);
+  return whole === null ? "" : `${whole} dB`;
 }

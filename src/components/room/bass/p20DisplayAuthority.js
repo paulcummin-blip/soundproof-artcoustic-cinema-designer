@@ -25,6 +25,7 @@
 // the P20 result.
 
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { formatSeatLabel, formatSeatPillLabel } from "@/components/utils/seatLabel";
 import { resolveSeatPriority, PRIMARY, SECONDARY } from "@/components/utils/seatPriorityAuthority";
 
@@ -111,8 +112,8 @@ export function resolveP20SeatDisplay(seatResult, {
     displayDeviationDb,
     // Displayed text. Every surface uses these strings — never its own rounding.
     displayVariationText: `±${displayDeviationDb} dB`,
-    exactVariationText: `±${exactDeviationDb.toFixed(1)} dB`,
-    displayDiffersFromExact: Number(exactDeviationDb.toFixed(1)) !== displayDeviationDb,
+    exactVariationText: `±${roundDbValue(exactDeviationDb)} dB`,
+    displayDiffersFromExact: roundDbValue(exactDeviationDb) !== displayDeviationDb,
     grade: p20GradeText(seatResult?.level),
     level: seatResult?.level ?? null,
     limitingFrequencyHz,

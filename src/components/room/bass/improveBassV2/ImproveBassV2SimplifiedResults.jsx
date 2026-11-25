@@ -11,6 +11,7 @@
 // No naive field-overlay merge. No individual result addition.
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
@@ -124,7 +125,7 @@ function buildImprovementList(selection) {
       if (range > 0.1) changeDesc = `+${range.toFixed(1)} ms (${formatAcousticPath(range)})`;
     } else if (stageKey === "gain") {
       const adjDb = extractGainAdjustmentDb(result);
-      if (Math.abs(adjDb) > 0.1) changeDesc = `${adjDb > 0 ? "+" : ""}${adjDb.toFixed(1)} dB`;
+      if (Math.abs(adjDb) > 0.1) changeDesc = `${adjDb > 0 ? "+" : ""}${roundDbValue(adjDb)} dB`;
     } else if (stageKey === "subPositions") {
       const coords = result.positionCoordinates || result.coordinates || [];
       if (coords.length) changeDesc = `${coords.length} subwoofer${coords.length > 1 ? "s" : ""} repositioned`;

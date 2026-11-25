@@ -14,6 +14,7 @@
 // The designer is choosing a priority, not being told one is universally correct.
 
 import React, { useState, useMemo, useEffect } from "react";
+import { roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Wrench, Settings, Scale, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { buildWhatChanged } from "./improveBassV2WhatChanged.js";
@@ -91,7 +92,7 @@ function PracticalTuningSection({ result, currentInstances }) {
 
   const roundToHalf = (v) => Math.round(Number(v) * 2) / 2;
   const formatDelay = (v) => `${roundToHalf(v).toFixed(1)} ms`;
-  const formatGain = (v) => `${v > 0 ? "+" : ""}${roundToHalf(v).toFixed(1)} dB`;
+  const formatGain = (v) => `${v > 0 ? "+" : ""}${roundDbValue(v)} dB`;
 
   return (
     <div className="mt-2 rounded-md border border-[#E0DDD7] bg-white p-2">

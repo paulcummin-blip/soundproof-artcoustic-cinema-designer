@@ -25,7 +25,7 @@ import { formatP14BasisLabel, normalizeP14TargetBasis } from "@/components/utils
 import { normalizeP18TargetBasis, P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
 import { formatP18CriterionRows } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { formatBassParameterValue } from "@/components/room/bass/bassParameterValueFormatter";
-import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
+import { formatSplDisplay, roundDbValue } from "@/components/utils/splDisplayFormatter";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 
@@ -76,7 +76,7 @@ function buildP14Lines(shared) {
   if (isFiniteNumber(achievedCapability) && isFiniteNumber(selectedTargetDb)) {
     const margin = Number(achievedCapability) - Number(selectedTargetDb);
     const sign = margin >= 0 ? "+" : "";
-    lines.push(["Margin", sign + margin.toFixed(1) + " dB"]);
+    lines.push(["Margin", sign + roundDbValue(margin) + " dB"]);
   }
 
   if (targetAchievable === false) {
