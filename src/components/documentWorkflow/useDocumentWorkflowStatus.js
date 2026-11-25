@@ -91,6 +91,8 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
   const [analysisCache, setAnalysisCache] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const [verificationError, setVerificationError] = useState(null);
+  const readInFlight = useRef(false);
 
   // Read stored exports, the version's published fingerprint, and the
   // ProjectAnalysisCache record whose engineering_publications map holds the
@@ -104,7 +106,9 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
       return;
     }
     let cancelled = false;
+    readInFlight.current = true;
     setLoading(true);
+    setVerificationError(null);
     (async () => {
       try {
         const [exportPage, versionPage] = await Promise.all([
@@ -132,11 +136,17 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
           try {
             const cachePage = await base44.entities.ProjectAnalysisCache.filter(
               { project_id: projectId, version_id: version.id },
-              { limit: 1 },
+              { sort: '-updated_date', limit: 1, fields: ['engineering_publications'] },
             );
             if (!cancelled) setAnalysisCache(asItems(cachePage)[0] || null);
-          } catch {
-            if (!cancelled) setAnalysisCache(null);
+          } catch (error) {
+            if (!cancelled) {
+              setAnalysisCache(null);
+              const httpStatus = Number(error?.response?.status || error?.status || 0);
+              setVerificationError(httpStatus
+                ? `The saved engineering evidence could not be loaded (HTTP ${httpStatus}). Retry when access is restored.`
+                : 'The saved engineering evidence request failed. Check your connection and retry.');
+            }
           }
         } else {
           setAnalysisCache(null);
@@ -147,9 +157,13 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
           setExports([]);
           setEngineeringFingerprint(null);
           setAnalysisCache(null);
+          setVerificationError('The document or version records could not be loaded. Check your connection and retry.');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          readInFlight.current = false;
+          setLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -192,7 +206,13 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
   // A manual retry re-runs the stored-record + publication read without
   // regenerating any document. Used by a Verification-unavailable card to
   // re-attempt verification once the underlying publication read is available.
-  const retry = useCallback(() => setTick((t) => t + 1), []);
+  const retry = useCallback(() => {
+    // Do not cancel a pending successful read and start the same large request
+    // again. A settled failure always gets a fresh SDK request on retry.
+    if (readInFlight.current) return;
+    readInFlight.current = true;
+    setTick((t) => t + 1);
+  }, []);
 
   // System Health: a document that is Verification unavailable is an
   // unexpected verification failure (a frozen publication is missing, so the
@@ -218,15 +238,23 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
         operation: 'document-workflow-verification',
         projectId,
         versionId,
-        detail: `${docType} source could not be verified against the current engineering publication.`,
+        detail: verificationError || `${docType} frozen source facts are unavailable for comparison with the current publication.`,
         document_type: docType,
         saved_fingerprint: step.record?.source_fingerprints?.engineeringFingerprint || null,
         current_fingerprint: engineeringFingerprint || null,
       });
     }
-  }, [projectId, versionId, loading, status.technicalReport, status.speakerDesign, status.clientProposal, engineeringFingerprint]);
+  }, [projectId, versionId, loading, status.technicalReport, status.speakerDesign, status.clientProposal, engineeringFingerprint, verificationError]);
 
-  return { loading, retry, ...status };
+  // A failed record read is unknown, never evidence that no document exists.
+  const resolvedStatus = verificationError ? {
+    ...status,
+    proposalAvailable: false,
+    ...Object.fromEntries(['technicalReport', 'speakerDesign', 'clientProposal'].map((key) => [key, {
+      ...status[key], state: WORKFLOW_STATE.VERIFICATION_UNAVAILABLE,
+    }])),
+  } : status;
+  return { loading, retry, verificationError, ...resolvedStatus };
 }
 
 export default useDocumentWorkflowStatus;
