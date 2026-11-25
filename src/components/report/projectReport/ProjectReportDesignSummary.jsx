@@ -129,6 +129,7 @@ export default function ProjectReportDesignSummary({
   autoIntentStatus = null,
   autoIntentReason = null,
   onRetryAutoIntent = null,
+  onReturnToProject = null,
   // The deliberate Regenerate Design Intent action. Available only when the
   // Project Report already contains an accepted narrative; screen only.
   projectId = null,
@@ -254,8 +255,10 @@ export default function ProjectReportDesignSummary({
       )}
 
       {/* A failed generation is never shown as a finished summary: the deterministic
-          fallback is withheld and a clear failure card with Retry is shown in its
-          place. Screen only — the printed PDF is never produced in this state. */}
+          fallback is withheld and a clear failure card with Retry and Return to
+          Project is shown in its place. Screen only — the printed PDF is never
+          produced in this state. The dealer sees plain copy, never the internal
+          validation code; the technical reason remains in System Health. */}
       {!print && autoIntentStatus === AUTO_INTENT.FAILED && (
         <div style={{
           marginTop: 20,
@@ -267,30 +270,47 @@ export default function ProjectReportDesignSummary({
           fontFamily: FONT_BODY,
         }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#8A1A1A' }}>
-            ADI could not write the project summary.
+            Project Report could not be completed
           </div>
           <div style={{ fontSize: 12.5, color: '#625143', marginTop: 4, lineHeight: 1.5 }}>
-            {autoIntentReason
-              ? `The writer refused: ${autoIntentReason}. Retry to generate it again.`
-              : 'The summary could not be generated from this design. Retry to generate it again.'}
+            ADI was unable to complete the report. Your cinema design has been saved. Please try generating the report again.
           </div>
-          <button
-            type="button"
-            onClick={onRetryAutoIntent}
-            style={{
-              marginTop: 12,
-              fontFamily: FONT_BODY,
-              fontSize: 12,
-              color: '#FFFFFF',
-              background: '#213428',
-              border: 'none',
-              borderRadius: 6,
-              padding: '6px 16px',
-              cursor: 'pointer',
-            }}
-          >
-            Retry
-          </button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={onRetryAutoIntent}
+              style={{
+                fontFamily: FONT_BODY,
+                fontSize: 12,
+                color: '#FFFFFF',
+                background: '#213428',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 16px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+            {onReturnToProject && (
+              <button
+                type="button"
+                onClick={onReturnToProject}
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 12,
+                  color: '#3E4349',
+                  background: '#F8F8F7',
+                  border: '1px solid #625143',
+                  borderRadius: 6,
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                }}
+              >
+                Return to Project
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -54,6 +54,16 @@ export const WORDING_CORRECTION_ELIGIBLE_REJECTIONS = Object.freeze([
   WRITER_REJECTION.REPETITIVE_PARAGRAPH_OPENER,
   WRITER_REJECTION.REPORT_VOICE,
   WRITER_REJECTION.VALIDATION_REGISTER,
+  // VERIFICATION_DISCLAIMER is a wording-only rejection: it concerns HOW a
+  // predicted capability is phrased (made conditional on a future process such
+  // as calibration, commissioning, measurement or installation) rather than the
+  // engineering fact behind it. Correcting it rewrites the offending passage to
+  // state the predicted capability confidently without deferring it to a future
+  // process; it never changes a figure, a level, a product, a scope or a result.
+  // The corrected draft is still validated by the complete validator, so a
+  // correction that introduces an engineering violation is refused, never
+  // accepted.
+  WRITER_REJECTION.VERIFICATION_DISCLAIMER,
 ]);
 
 /** The reason recorded when a correction is attempted. */

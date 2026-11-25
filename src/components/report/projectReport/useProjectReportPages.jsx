@@ -114,6 +114,7 @@ export function useProjectReportPages({
   autoIntentStatus = null,
   autoIntentReason = null,
   onRetryAutoIntent = null,
+  onReturnToProject = null,
 }) {
   // The front page's DESIGN INTENT: the designer's own account of the cinema this
   // report documents — the experience it is designed to deliver and the reasoning
@@ -725,6 +726,7 @@ export function useProjectReportPages({
           autoIntentStatus={autoIntentStatus}
           autoIntentReason={autoIntentReason}
           onRetryAutoIntent={onRetryAutoIntent}
+          onReturnToProject={onReturnToProject}
           projectId={projectId}
           versionId={versionId}
           hasAcceptedNarrative={savedDesignIntent?.status === 'accepted'}
@@ -792,5 +794,5 @@ export function useProjectReportPages({
     // where the complete P1–P21 parameter-card sequence, the drawing set, the
     // bass curves and the single closing About Sound Proof page print.
     return [projectSummaryPage, adiHighlightsPage, systemProductsPage, ...pageList];
-  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary, autoIntentStatus, autoIntentReason, onRetryAutoIntent]);
+  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary, autoIntentStatus, autoIntentReason, onRetryAutoIntent, onReturnToProject]);
 }

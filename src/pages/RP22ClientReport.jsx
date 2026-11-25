@@ -668,6 +668,7 @@ export default function RP22ClientReport() {
     autoIntentStatus,
     autoIntentReason,
     onRetryAutoIntent: retryAutoIntent,
+    onReturnToProject: () => navigate(`/RoomDesigner?projectId=${projectId}`),
   });
 
   // ── Export integrity ────────────────────────────────────────────────────

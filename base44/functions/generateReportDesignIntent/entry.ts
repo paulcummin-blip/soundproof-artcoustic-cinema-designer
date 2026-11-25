@@ -2,6 +2,83 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { generateAndSaveReportDesignIntent } from '../../shared/reportDesignIntent/generateAndSaveReportDesignIntent.js';
 import { buildReportDesignIntentAttempt } from '../../shared/reportDesignIntent/buildReportDesignIntentAttempt.js';
+import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
+import { safeDiagnostic } from '../../shared/systemHealth/clientIncidentPolicy.js';
+
+/**
+ * Extract the rejected decision_summary passage from a refused writer draft,
+ * so an administrator can see the exact wording the validator refused. The draft
+ * is the provider's raw output (a JSON string or an already-parsed object).
+ * Returns the bounded section text, or null when it cannot be read.
+ */
+function extractRejectedPassage(draft) {
+  let parsed = draft;
+  if (typeof draft === 'string') {
+    const text = draft.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+    try { parsed = JSON.parse(text); } catch { return null; }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const sections = Array.isArray(parsed.sections) ? parsed.sections : [];
+  const entry = sections.find((row) => row?.section === 'decision_summary') || null;
+  const text = typeof entry?.text === 'string' ? entry.text : '';
+  return text.length > 0 ? text : null;
+}
+
+/**
+ * Build a bounded diagnostic summary for a refused report-narrative attempt,
+ * preserving the rejected passage, the validator rule, the correction attempt
+ * and result, and the final validation outcome. Diagnostic only: never saved as
+ * accepted Design Intent or client-facing content.
+ */
+function buildNarrativeFailureDiagnostic(attempt) {
+  const violations = Array.isArray(attempt.validation_errors) ? attempt.validation_errors : [];
+  const violationList = violations.slice(0, 5)
+    .map((v) => `${v.code || v.rejection || 'unknown'}${v.detail ? ':' + v.detail : ''}`)
+    .join('; ');
+  const correction = attempt.correction;
+  const correctionLine = correction && correction.attempted
+    ? `Correction attempted: yes. Succeeded: ${correction.succeeded ? 'yes' : 'no'}.`
+    : 'Correction attempted: no.';
+  const passage = extractRejectedPassage(attempt.draft);
+  const passageLine = passage
+    ? `Rejected passage: ${safeDiagnostic(passage, 600)}`
+    : 'Rejected passage: unavailable.';
+  return [
+    `Report narrative refused. Reason: ${attempt.reason || 'unknown'}.`,
+    `Detail: ${attempt.detail || 'none'}.`,
+    `Violations: ${violationList || 'none'}.`,
+    correctionLine,
+    passageLine,
+  ].join(' ');
+}
+
+/**
+ * Record a refused report-narrative attempt as a System Health incident,
+ * preserving the full diagnostic evidence (rejected passage, validator rule,
+ * correction attempt and result) for an administrator. Fail-open: a recording
+ * failure never blocks the response to the dealer.
+ */
+async function recordNarrativeFailureIncident(base44, { attempt, accessContext, projectId, versionId }) {
+  try {
+    const accountId = accessContext?.user?.account_id || accessContext?.account?.id || null;
+    const isValidation = attempt.reason === 'validation_failed' || attempt.reason === 'accepted_text_missing';
+    await recordSystemIncident(base44, {
+      component: 'report_generation',
+      operation: 'generateReportDesignIntent',
+      error_code: 'REPORT_NARRATIVE_FAILED',
+      severity: isValidation ? 'high' : 'medium',
+      account_id: accountId,
+      project_id: projectId || null,
+      version_id: versionId || null,
+      diagnostic_summary: buildNarrativeFailureDiagnostic(attempt),
+      error_detail: attempt.detail || attempt.reason || null,
+      test_run_id: null,
+      grouping_scope: [attempt.reason || 'unknown', attempt.detail || 'none'].join('::'),
+    });
+  } catch (err) {
+    console.error(`[generateReportDesignIntent] failed to record incident: ${err?.message || err}`);
+  }
+}
 
 /**
  * Generate the Project Report's Design Intent with the Astra writer — OPTIONAL.
@@ -96,6 +173,10 @@ export default async function(req) {
             visual_context: attempt.visual_context || null,
           }
           : null;
+        // ── Preserve the full diagnostic evidence (rejected passage, validator
+        // rule, correction attempt and result) in System Health for an
+        // administrator. Fail-open: a recording failure never blocks the response.
+        await recordNarrativeFailureIncident(base44, { attempt, accessContext, projectId: project_id, versionId: version_id });
         return Response.json({
           ok: false,
           reason: attempt.reason,
@@ -169,6 +250,11 @@ export default async function(req) {
           visual_context: attempt.visual_context || null,
         }
         : null;
+
+      // ── Preserve the full diagnostic evidence (rejected passage, validator
+      // rule, correction attempt and result) in System Health for an
+      // administrator. Fail-open: a recording failure never blocks the response.
+      await recordNarrativeFailureIncident(base44, { attempt, accessContext, projectId: project_id, versionId: version_id });
 
       return Response.json({
         ok: false,

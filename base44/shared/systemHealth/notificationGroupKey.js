@@ -53,6 +53,7 @@ export function normalizeFailureMechanism({
   http_status = null,
   component = '',
   operation = '',
+  detail = '',
 } = {}) {
   // HTTP 429 rate limit: the strongest evidence. When the HTTP status is
   // explicitly 429, the mechanism is the rate limit regardless of the
@@ -63,10 +64,54 @@ export function normalizeFailureMechanism({
   // Authentication failures have a distinct, stable mechanism.
   if (error_code === 'AUTHENTICATION_CONTEXT_FAILED') return 'AUTHENTICATION_CONTEXT_FAILED';
 
+  // REPORT_NARRATIVE_FAILED covers several genuinely independent terminal
+  // causes (a validation rule refusal, a writer flag-off, a provider failure,
+  // an acceptance-text-missing outcome). Grouping them all under one generic
+  // mechanism suppresses independent failures affecting different projects: a
+  // dealer blocked by a verification-disclaimer refusal and a dealer blocked by
+  // a provider timeout are not the same underlying defect. The detail string
+  // carries the specific sub-cause (e.g. "validation_failed:
+  // verification_disclaimer:conditional_on_future_confirmation" or
+  // "writer_flag_off" or "provider_failed"), so the mechanism is refined to
+  // the specific cause. The same cause recurring on different projects still
+  // groups together (one underlying defect, no duplicate emails); different
+  // causes stay in separate actionable incidents.
+  if (error_code === 'REPORT_NARRATIVE_FAILED') {
+    return refineReportNarrativeMechanism(detail);
+  }
+
   // For all other failures, use the error code as the mechanism. This is
   // conservative: two different error codes are never grouped together
   // unless they share the same HTTP status evidence.
   return error_code || 'UNKNOWN';
+}
+
+/**
+ * Refine the REPORT_NARRATIVE_FAILED mechanism to the specific underlying
+ * cause carried in the detail string. The detail arrives as
+ * "<reason>: <rule>:<sub-rule>" (e.g. "validation_failed:
+ * verification_disclaimer:conditional_on_future_confirmation") or as a single
+ * refusal code ("writer_flag_off", "provider_failed",
+ * "accepted_text_missing"). The first two colon-separated segments identify
+ * the cause family and the specific rule, which is the right granularity for
+ * grouping: the same validation rule recurring is one underlying defect; a
+ * different validation rule or a non-validation refusal is a different one.
+ */
+function refineReportNarrativeMechanism(detail) {
+  const text = String(detail || '').trim();
+  if (!text) return 'REPORT_NARRATIVE_FAILED:unknown';
+  const segments = text.split(':').map((part) => part.trim()).filter(Boolean);
+  if (segments.length === 0) return 'REPORT_NARRATIVE_FAILED:unknown';
+  // reason (e.g. "validation_failed") identifies the cause family.
+  const reason = segments[0] || 'unknown';
+  // The second segment is the specific rule for a validation failure (e.g.
+  // "verification_disclaimer"). For a non-validation refusal (writer_flag_off,
+  // provider_failed) there is no second segment, so the reason alone is the
+  // specific cause.
+  const rule = segments[1] || null;
+  return rule
+    ? `REPORT_NARRATIVE_FAILED:${reason}:${rule}`
+    : `REPORT_NARRATIVE_FAILED:${reason}`;
 }
 
 /**

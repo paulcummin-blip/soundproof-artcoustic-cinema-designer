@@ -189,7 +189,7 @@ async function recordIncidentOccurrence(serviceClient, details) {
   const env = runtime_environment === 'preview' ? 'preview' : 'production';
 
   // 1. Compute failure mechanism and notification group key.
-  const failureMechanism = normalizeFailureMechanism({ error_code, http_status, component, operation });
+  const failureMechanism = normalizeFailureMechanism({ error_code, http_status, component, operation, detail: error_detail });
   const accountScope = account_id || 'internal';
   const groupKey = computeNotificationGroupKey({ failure_mechanism: failureMechanism, runtime_environment: env, account_id: accountScope });
 
@@ -198,8 +198,9 @@ async function recordIncidentOccurrence(serviceClient, details) {
 
   // 3. Always create the occurrence record (preserves full diagnostic evidence).
   const occurrenceId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `occ-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let createdOccurrenceId = null;
   try {
-    await serviceClient.asServiceRole.entities.IncidentOccurrence.create({
+    const createdOccurrence = await serviceClient.asServiceRole.entities.IncidentOccurrence.create({
       occurrence_id: occurrenceId,
       notification_group_key: groupKey,
       incident_id: null,
@@ -224,6 +225,11 @@ async function recordIncidentOccurrence(serviceClient, details) {
       client_name: identity.clientName,
       test_run_id: test_run_id || null,
     });
+    // The platform generates the record's primary `id`; the `occurrence_id`
+    // field above is a custom UUID, NOT the record's primary key. The link
+    // update below must use the platform-generated id, not the UUID field, or
+    // it silently fails to find the record and the occurrence stays unlinked.
+    createdOccurrenceId = createdOccurrence?.id || null;
   } catch (err) {
     console.error(`[incidentRecorder] failed to create occurrence: ${err?.message || err}`);
   }
@@ -331,9 +337,11 @@ async function recordIncidentOccurrence(serviceClient, details) {
     }
   }
 
-  // 5b. Link the occurrence to the group.
+  // 5b. Link the occurrence to the group, using the platform-generated record id
+  // captured at creation (not the custom occurrence_id UUID field).
+  const occurrenceRecordId = createdOccurrenceId || occurrenceId;
   try {
-    await serviceClient.asServiceRole.entities.IncidentOccurrence.update(occurrenceId, {
+    await serviceClient.asServiceRole.entities.IncidentOccurrence.update(occurrenceRecordId, {
       incident_id: group.id,
       incident_reference: group.incident_reference,
     });
