@@ -141,20 +141,16 @@ const QUESTION_CANDIDATES = Object.freeze([
       'front', 'middle', 'rear',
     ],
   },
-  {
-    question_id: 'subwoofer_arrangement_reason',
-    area: 'subwoofers',
-    belongs_to: 'what_stays_same',
-    priority: 2,
-    applies: ({ facts }) => (subwooferCount({ facts }) || 0) > 1,
-    sharedAcross: (sources) => sameValue(sources.map(subwooferCount)),
-    question: (sources) => {
-      const count = numberWord(subwooferCount(sources[0]));
-      return count ? `What was the main reason for the ${count}-subwoofer arrangement in this room?` : null;
-    },
-    subjectPatterns: [/\bsubwoofers?\b|\bsubs\b/i],
-    documentedTerms: ['placement', 'position', 'count', 'symmetry', 'strategy', 'arrangement', 'layout', 'chosen', 'selected', 'specified'],
-  },
+  // ROUTINE SUBWOOFER QUESTIONS ARE NOT ASKED. Using multiple subwoofers to
+  // manage room modes, reduce the severity of bass peaks and nulls, and improve
+  // bass consistency across the seating area is standard engineering practice
+  // that ADI already understands and the RP22 subwoofer_optimisation principle
+  // already establishes. The proposal writer explains the purpose of the
+  // arrangement from the engineering evidence and that principle without
+  // requiring a designer explanation, so this question is never put. A
+  // subwoofer-related question is justified only for a genuinely unusual
+  // constraint or compromise that cannot be established from the available
+  // information, which is not a routine clarification.
   {
     question_id: 'seating_priority_reason',
     area: 'seating',

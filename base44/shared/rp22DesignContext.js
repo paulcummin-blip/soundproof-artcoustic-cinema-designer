@@ -433,6 +433,14 @@ export function rp22QuestionDecision({ question_id, snapshot = null } = {}) {
   if (question_id === 'acoustic_treatment_reason') {
     return { ask: false, reason: 'acoustics_are_not_a_design_stage_client_proposal_subject' };
   }
+  // Routine subwoofer questions are never asked: using multiple subwoofers to
+  // manage room modes, reduce peaks and nulls, and improve bass consistency is
+  // standard engineering practice the subwoofer_optimisation principle already
+  // establishes, and the writer explains the arrangement from the evidence
+  // without requiring a designer explanation.
+  if (question_id === 'subwoofer_arrangement_reason') {
+    return { ask: false, reason: 'subwoofer_arrangement_is_standard_engineering_practice' };
+  }
   if (question_id === 'seating_priority_reason') {
     const declared = declaredReferencePosition(snapshot);
     if (declared) {
