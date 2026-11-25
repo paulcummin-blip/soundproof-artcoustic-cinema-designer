@@ -82,7 +82,7 @@ export default function DocumentWorkflowPanel({
   disabled = false,
   onOpenReport,
 }) {
-  const { technicalReport, speakerDesign, clientProposal, proposalAvailable } = workflowStatus;
+  const { technicalReport, speakerDesign, clientProposal, proposalAvailable, loading, verificationError } = workflowStatus;
   const { count: imageCount, loading: imageCountLoading } = useProjectImageCount(projectId);
 
   const openStoredPdf = async (record) => {
@@ -182,7 +182,7 @@ export default function DocumentWorkflowPanel({
   // It is distinct from Outdated (a material change was established) and offers
   // a Retry that re-runs verification WITHOUT regenerating the document.
   const VERIFICATION_UNAVAILABLE_COPY =
-    'Source could not be verified. Retry to re-check without regenerating.';
+    verificationError || 'The saved or current engineering publication is missing its frozen design facts. Retry after the source becomes available.';
   const trDisplayReason = trState === WORKFLOW_STATE.OUTDATED
     ? technicalReport.freshnessReason
     : trState === WORKFLOW_STATE.VERIFICATION_UNAVAILABLE
@@ -241,6 +241,7 @@ export default function DocumentWorkflowPanel({
     <div className="space-y-2.5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <DocumentCard
+          verifying={loading}
           number="1a"
           label="Technical Report"
           description="Creates the Project Report and matching Speaker Design PDF"
@@ -258,6 +259,7 @@ export default function DocumentWorkflowPanel({
           primary
         />
         <DocumentCard
+          verifying={loading}
           number="1b"
           label="Speaker Design"
           description="Can run independently. Reuses existing generation."
@@ -274,6 +276,7 @@ export default function DocumentWorkflowPanel({
       </div>
 
       <DocumentCard
+        verifying={loading}
         number="2"
         label="Client Proposal"
         icon={Presentation}
