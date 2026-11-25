@@ -35,20 +35,16 @@ import {
   partitionByDecisionCurrency,
 } from '../base44/shared/designContext/designContextModel.js';
 import {
-  decisionKeyForQuestion,
-  decisionKeyForQuestionId,
-  DESIGN_DECISION,
-  canonicalSubwooferFingerprint,
-} from '../base44/shared/designContext/designContextModel.js';
-import {
   discoverDeterministicQuestions,
   discoverDesignContextQuestions,
+  discoverAiQuestions,
   MAX_DISCOVERY_QUESTIONS,
 } from '../base44/shared/designContext/designContextDiscovery.js';
 import {
   decisionKeyForQuestionId,
   decisionKeyForQuestion,
   DESIGN_DECISION,
+  canonicalSubwooferFingerprint,
 } from '../base44/shared/designContext/designContextDecisionIdentity.js';
 
 /* ── Fixtures ─────────────────────────────────────────────────────────────── */
@@ -425,28 +421,35 @@ describe('No duplicate decisions in one review', () => {
   });
 
   it('AI discovery does not duplicate a deterministic decision', async () => {
-    // Deterministic finds subwoofer_single_wall_arrangement. The AI tries
-    // to add subwoofer_count_rationale (same decision). The AI question is
-    // suppressed by decision-level dedup.
-    const version = versionWith({
-      roomDims: '{"widthM":5.6,"lengthM":8.0,"heightM":2.7}',
-      subwooferInstances: [
-        { id: 'sub1', enabled: true, position: { x: 1.0, y: 0.5 } },
-        { id: 'sub2', enabled: true, position: { x: 4.0, y: 0.5 } },
-      ],
-    });
+    // A deterministic seating question fires for Dixon. The AI tries to add
+    // a question about the same seating decision under a different ID. The
+    // AI question is suppressed by decision-level dedup.
+    const deterministicQuestions = discoverDeterministicQuestions(dixonVersion(), dixonProject());
+    const seatQ = deterministicQuestions.find((q) => q.question_id === 'seating_forward_of_rear_wall');
+    expect(seatQ).toBeTruthy();
+
     const invokeLLM = async () => ({
       questions: [{
-        question_id: 'subwoofer_count_rationale',
-        question: 'Why this subwoofer count?',
-        area: 'subwoofers',
+        question_id: 'seating_priority_reason',
+        question: 'Which seating row was the priority?',
+        area: 'seating',
       }],
     });
-    const questions = await discoverDesignContextQuestions({ version, project: null, invokeLLM });
-    const ids = questions.map((q) => q.question_id);
-    expect(ids).toContain('subwoofer_single_wall_arrangement');
-    expect(ids).not.toContain('subwoofer_count_rationale'); // same decision, deduped
-    const decisions = questions.map((q) => decisionKeyForQuestion(q));
+    const aiQuestions = await discoverAiQuestions({
+      version: dixonVersion(),
+      project: dixonProject(),
+      deterministicQuestions,
+      invokeLLM,
+    });
+    // The AI question about the same decision is deduped.
+    expect(aiQuestions.map((q) => q.question_id)).not.toContain('seating_priority_reason');
+    // The combined discovery never presents two questions about the same decision.
+    const combined = await discoverDesignContextQuestions({
+      version: dixonVersion(),
+      project: dixonProject(),
+      invokeLLM,
+    });
+    const decisions = combined.map((q) => decisionKeyForQuestion(q));
     expect(new Set(decisions).size).toBe(decisions.length);
   });
 
