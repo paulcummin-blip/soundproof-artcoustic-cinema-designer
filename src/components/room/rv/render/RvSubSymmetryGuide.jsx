@@ -20,7 +20,8 @@ export default function RvSubSymmetryGuide({
   widthM,
   lengthM,
 }) {
-  if (!subSnapState || subSnapState.type !== "symmetry") return null;
+  const sym = subSnapState?.symmetry;
+  if (!sym) return null;
 
   const all = [
     ...(Array.isArray(frontLive) ? frontLive : []),
@@ -29,7 +30,7 @@ export default function RvSubSymmetryGuide({
   const dragged = all.find((s) => s?.id === draggedItemId);
   if (!dragged?.position) return null;
 
-  const partnerPos = subSnapState.partnerPosition;
+  const partnerPos = sym.partnerPosition;
   if (!partnerPos || !Number.isFinite(partnerPos.x) || !Number.isFinite(partnerPos.y)) return null;
 
   const [dx, dy] = toPx(dragged.position.x, dragged.position.y);
@@ -38,7 +39,7 @@ export default function RvSubSymmetryGuide({
   const midY = (dy + py) / 2;
 
   const SNAP_COLOR = "#10B981";
-  const rspEquidistant = subSnapState.rspEquidistant === true;
+  const rspEquidistant = sym.rspEquidistant === true;
 
   return (
     <g data-layer="sub-symmetry-guide" style={{ pointerEvents: "none" }}>

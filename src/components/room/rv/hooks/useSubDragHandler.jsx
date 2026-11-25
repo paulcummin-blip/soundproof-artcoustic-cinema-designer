@@ -18,6 +18,19 @@ const SNAP_TOLERANCE_MAX_M = 0.15;
  * Handles drag movement for subwoofer elements.
  * Extracted from RoomVisualisation.jsx – behaviour is identical.
  *
+ * Snapping order (compatible geometric constraints, NOT mutually exclusive):
+ *   1. Wall lock (coordinate snap perpendicular) — pins the cabinet to the
+ *      wall at 10 mm clearance.
+ *   2. Subwoofer alignment (opposing + symmetry) — snaps the ALONG-WALL
+ *      position to match a partner. This overrides any along-wall coordinate
+ *      snap (quarter / midpoint) because the subwoofer target is more
+ *      specific.
+ *   3. Interior coordinate snaps (quarter / midpoint) apply on the along-wall
+ *      axis only when no subwoofer alignment is within 5 cm.
+ *
+ * All three snap results are reported independently so the guides can render
+ * simultaneously (e.g. a wall-lock line + a symmetry line + an opposing line).
+ *
  * Returns: { handleSubDrag }
  */
 export function useSubDragHandler({
@@ -119,11 +132,13 @@ export function useSubDragHandler({
       return;
     }
 
-    // Stage 2B.6 — magnetic coordinate snap (wall / quarter / midpoint / corner).
-    // Runs BEFORE symmetry snap so the designer's explicit target wins.
-    // Uses the same canonical coordinate authority as the Placement Guide
-    // candidate generation (getSubPlacementGuideCoordinates), ensuring
-    // manual magnetic snaps equal Apply-Layout coordinates.
+    // ── Magnetic snapping (compatible constraints, applied simultaneously) ──
+    //
+    // The wall-perpendicular axis is pinned by the coordinate wall snap.
+    // The along-wall axis is pinned by the subwoofer alignment (opposing or
+    // symmetry) when within 5 cm, otherwise by the coordinate interior snap.
+    // These are compatible: wall lock + subwoofer alignment can both hold.
+
     const toleranceM = Number.isFinite(scale) && scale > 0
       ? Math.max(SNAP_TOLERANCE_MIN_M, Math.min(SNAP_TOLERANCE_MAX_M, SNAP_TOLERANCE_PX / scale))
       : SNAP_TOLERANCE_MIN_M;
@@ -135,129 +150,138 @@ export function useSubDragHandler({
       wallClearance: EPS,
     });
 
+    // Pre-snap position (after clamping). Sub snaps evaluate against this so
+    // the 5 cm capture reflects the user's actual pointer, not a coordinate-
+    // snapped value.
+    const clampedX = finalX;
+    const clampedY = finalY;
+
+    // 1. Coordinate snap (wall lock + interior positions).
     let coordSnap = null;
     try {
       if (guideCoordinates) {
         coordSnap = findCoordinateSnap({
-          candidateX: finalX,
-          candidateY: finalY,
+          candidateX: clampedX,
+          candidateY: clampedY,
           guideCoordinates,
           toleranceM,
         });
       }
     } catch (_) { /* snap is best-effort, never blocks drag */ }
 
+    // 2. Subwoofer alignment snaps — ALWAYS evaluated (never suppressed by
+    //    the coordinate snap). Both fire independently so both guides can
+    //    render simultaneously.
+    const rspPoint = rspPointRef?.current ?? null;
+
+    const allPartners = [
+      ...(Array.isArray(draftFrontSubsRef.current) ? draftFrontSubsRef.current : []),
+      ...(Array.isArray(draftRearSubsRef.current) ? draftRearSubsRef.current : []),
+    ];
+
+    let opposingResult = null;
+    let symResult = null;
+
+    try {
+      opposingResult = findOpposingAlignmentSnap({
+        draggedSub: sub,
+        allPartners,
+        widthM,
+        lengthM,
+        candidateX: clampedX,
+        candidateY: clampedY,
+        draggedDims: { widthM: w, depthM: d },
+        getModelDimsM,
+      });
+    } catch (_) { /* snap is best-effort */ }
+
+    try {
+      symResult = findSymmetrySnap({
+        draggedSub: sub,
+        draftArray,
+        widthM,
+        lengthM,
+        candidateX: clampedX,
+        candidateY: clampedY,
+        draggedDims: { widthM: w, depthM: d },
+        getModelDimsM,
+        rspPoint,
+      });
+    } catch (_) { /* snap is best-effort */ }
+
+    // 3. Merge: wall lock (perpendicular) + subwoofer alignment (along-wall).
+    let snapX = clampedX;
+    let snapY = clampedY;
+
+    // Apply coordinate snap first (perpendicular wall lock + along-wall interior).
     if (coordSnap) {
-      finalX = coordSnap.x;
-      finalY = coordSnap.y;
+      if (coordSnap.snapX !== null) snapX = coordSnap.snapX;
+      if (coordSnap.snapY !== null) snapY = coordSnap.snapY;
     }
 
-    // Stage 2B.4 — drag-time symmetry snap assistance.
-    // Stage 2B.7 — drag-time opposing-wall alignment snap.
-    //
-    // Both are drag-time magnetic snaps that fire only when no coordinate snap
-    // is active (coordinate snap wins). The two are mutually exclusive in
-    // practice — a sub near a wall either opposes a sub on the far wall or
-    // mirrors a partner on the same wall — but both candidates are evaluated
-    // and the one with the smaller capture distance wins to avoid flickering.
-    //
-    // Neither snap moves the partner, locks the pair, or links movement.
-    // Cabinet 10 mm wall clearance is re-validated after snap: if the snapped
-    // coordinate would push the dragged sub's cabinet through a wall, the snap
-    // is rejected and the sub stays at its clamped position.
-    let snapResult = coordSnap;
-    if (!coordSnap) {
-      const rspPoint = rspPointRef?.current ?? null;
+    // Sub snaps override the ALONG-WALL axis only. The perpendicular wall
+    // lock is never touched. Pick the closer sub snap on the along-wall axis.
+    const draggedWall = deriveSubWallOrientation({
+      x: clampedX, y: clampedY, widthM, lengthM, subWidthM: w, subDepthM: d,
+    }).wall;
+    const alongAxis = (draggedWall === "front" || draggedWall === "rear") ? "x" : "y";
 
-      // Build combined partner list from both draft arrays for opposing search.
-      const allPartners = [
-        ...(Array.isArray(draftFrontSubsRef.current) ? draftFrontSubsRef.current : []),
-        ...(Array.isArray(draftRearSubsRef.current) ? draftRearSubsRef.current : []),
-      ];
+    let chosenSub = null;
+    let chosenDist = Infinity;
+    if (opposingResult) {
+      const dist = alongAxis === "x"
+        ? Math.abs(clampedX - opposingResult.snappedX)
+        : Math.abs(clampedY - opposingResult.snappedY);
+      if (dist < chosenDist) { chosenSub = opposingResult; chosenDist = dist; }
+    }
+    if (symResult) {
+      const dist = alongAxis === "x"
+        ? Math.abs(clampedX - symResult.snappedX)
+        : Math.abs(clampedY - symResult.snappedY);
+      if (dist < chosenDist) { chosenSub = symResult; chosenDist = dist; }
+    }
 
-      let opposingResult = null;
-      let symResult = null;
-
-      try {
-        opposingResult = findOpposingAlignmentSnap({
-          draggedSub: sub,
-          allPartners,
-          widthM,
-          lengthM,
-          candidateX: finalX,
-          candidateY: finalY,
-          draggedDims: { widthM: w, depthM: d },
-          getModelDimsM,
-        });
-      } catch (_) { /* snap is best-effort */ }
-
-      try {
-        symResult = findSymmetrySnap({
-          draggedSub: sub,
-          draftArray,
-          widthM,
-          lengthM,
-          candidateX: finalX,
-          candidateY: finalY,
-          draggedDims: { widthM: w, depthM: d },
-          getModelDimsM,
-          rspPoint,
-        });
-      } catch (_) { /* snap is best-effort */ }
-
-      // Pick the closest snap to avoid flickering between competing targets.
-      // Opposing alignment and symmetry never share an axis for the same wall,
-      // so this is a safe tiebreak.
-      const opposingDist = opposingResult
-        ? (opposingResult.axis === "x"
-            ? Math.abs(finalX - opposingResult.snappedX)
-            : Math.abs(finalY - opposingResult.snappedY))
-        : Infinity;
-      const symDist = symResult
-        ? (symResult.axis === "x"
-            ? Math.abs(finalX - symResult.snappedX)
-            : Math.abs(finalY - symResult.snappedY))
-        : Infinity;
-
-      let chosen = null;
-      if (opposingResult && symResult) {
-        chosen = opposingDist <= symDist ? opposingResult : symResult;
-      } else {
-        chosen = opposingResult || symResult;
-      }
-
-      if (chosen) {
-        const snapX = chosen.snappedX;
-        const snapY = chosen.snappedY;
-
-        // Re-validate cabinet bounds: the snapped coordinate must not push the
-        // dragged sub's cabinet through a wall. Reject the snap entirely if it
-        // would; the sub stays at its pre-snap clamped position.
-        const snapOrient = deriveSubWallOrientation({
-          x: snapX, y: snapY, widthM, lengthM, subWidthM: w, subDepthM: d,
-        });
-        const snapExt = subHalfExtents(w, d, snapOrient.rotationDeg);
-        const snapMinX = snapExt.halfX + EPS;
-        const snapMaxX = widthM - snapExt.halfX - EPS;
-        const snapMinY = snapExt.halfY + EPS;
-        const snapMaxY = lengthM - snapExt.halfY - EPS;
-
-        if (
-          snapX >= snapMinX && snapX <= snapMaxX &&
-          snapY >= snapMinY && snapY <= snapMaxY
-        ) {
-          finalX = snapX;
-          finalY = snapY;
-          // Re-derive rotation from the snapped position for consistency.
-          finalRot = snapOrient.rotationDeg;
-          snapResult = chosen;
-        }
-        // else: snap rejected — cabinet would breach wall clearance.
+    if (chosenSub) {
+      if (alongAxis === "x" && Number.isFinite(chosenSub.snappedX)) {
+        snapX = chosenSub.snappedX;
+      } else if (alongAxis === "y" && Number.isFinite(chosenSub.snappedY)) {
+        snapY = chosenSub.snappedY;
       }
     }
 
+    // 4. Re-validate cabinet bounds for the merged position. The snapped
+    //    coordinate must not push the cabinet through a wall. If it would,
+    //    keep the clamped position and suppress the sub snaps (not applied).
+    const snapOrient = deriveSubWallOrientation({
+      x: snapX, y: snapY, widthM, lengthM, subWidthM: w, subDepthM: d,
+    });
+    const snapExt = subHalfExtents(w, d, snapOrient.rotationDeg);
+    const snapMinX = snapExt.halfX + EPS;
+    const snapMaxX = widthM - snapExt.halfX - EPS;
+    const snapMinY = snapExt.halfY + EPS;
+    const snapMaxY = lengthM - snapExt.halfY - EPS;
+
+    if (
+      snapX >= snapMinX && snapX <= snapMaxX &&
+      snapY >= snapMinY && snapY <= snapMaxY
+    ) {
+      finalX = snapX;
+      finalY = snapY;
+      finalRot = snapOrient.rotationDeg;
+    } else {
+      // Merged position breaches wall clearance — keep clamped, suppress sub
+      // snaps so guides do not claim a snap that was not applied.
+      opposingResult = null;
+      symResult = null;
+    }
+
+    // Report ALL active snaps so the guides can render simultaneously.
     if (typeof setSubSnapState === "function") {
-      setSubSnapState(snapResult);
+      setSubSnapState({
+        opposing: opposingResult,
+        symmetry: symResult,
+        coordinate: coordSnap,
+      });
     }
 
     // Resolve the dragged draft entry by exact stable id (already found above as `sub`)

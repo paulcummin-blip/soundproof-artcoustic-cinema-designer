@@ -15,7 +15,8 @@ export default function RvSubOpposingAlignmentGuide({
   rearLive,
   toPx,
 }) {
-  if (!subSnapState || subSnapState.type !== "opposing") return null;
+  const opposing = subSnapState?.opposing;
+  if (!opposing) return null;
 
   const all = [
     ...(Array.isArray(frontLive) ? frontLive : []),
@@ -24,7 +25,7 @@ export default function RvSubOpposingAlignmentGuide({
   const dragged = all.find((s) => s?.id === draggedItemId);
   if (!dragged?.position) return null;
 
-  const partnerPos = subSnapState.partnerPosition;
+  const partnerPos = opposing.partnerPosition;
   if (!partnerPos || !Number.isFinite(partnerPos.x) || !Number.isFinite(partnerPos.y)) return null;
 
   const [dx, dy] = toPx(dragged.position.x, dragged.position.y);

@@ -19,7 +19,8 @@ export default function RvSubCoordinateGuide({
   widthM,
   lengthM,
 }) {
-  if (!subSnapState || subSnapState.type !== "coordinate") return null;
+  const coord = subSnapState?.coordinate;
+  if (!coord) return null;
 
   const all = [
     ...(Array.isArray(frontLive) ? frontLive : []),
@@ -28,7 +29,7 @@ export default function RvSubCoordinateGuide({
   const dragged = all.find((s) => s?.id === draggedItemId);
   if (!dragged?.position) return null;
 
-  const { snapX, snapY, xLabel, yLabel } = subSnapState;
+  const { snapX, snapY, xLabel, yLabel } = coord;
 
   const INTERIOR_COLOR = "#9CA3AF";
   const WALL_COLOR = "#4B5563";
