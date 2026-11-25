@@ -98,7 +98,23 @@ export default function DocumentCard({
   primary = false,
   onSecondary = null,
   secondaryLabel = null,
+  verifying = false,
 }) {
+  // Loading evidence is not a failed verification. Keep existing files usable,
+  // but do not offer generation or restart the verification while it is pending.
+  if (verifying) {
+    return (
+      <div className="rounded-lg border border-[#E2DED7] bg-white px-3 py-2.5 flex flex-col gap-2 min-w-0" aria-busy="true">
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="font-semibold uppercase flex-1">{number} {label}</span>
+          <span className="inline-flex items-center gap-1 text-[#625143]">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />Checking sources…
+          </span>
+        </div>
+        {onOpen && <Button type="button" size="sm" variant="outline" onClick={onOpen}>{openLabel}</Button>}
+      </div>
+    );
+  }
   const isCreated = state === WORKFLOW_STATE.READY;
   const notAvailable = state === WORKFLOW_STATE.NOT_CREATED && !canAct;
   const showDescription = !isCreated && Boolean(description);
