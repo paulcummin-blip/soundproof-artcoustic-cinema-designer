@@ -60,14 +60,15 @@ export default function ReportExportProgressPanel({ store, publication, onRetryM
   const ready = status === 'ready';
   const working = !failed && !ready;
 
+  const captureIncomplete = ['readiness', 'capture', 'assemble'].includes(progress?.stage || 'readiness');
   const heading = failed
-    ? 'Storage could not be completed'
+    ? (captureIncomplete ? 'PDF creation could not be completed' : 'Storage could not be completed')
     : ready
       ? 'Report ready'
       : 'Preparing your Technical Report';
 
   const subline = failed
-    ? 'The PDF was created but could not be saved to the Project Library. You can retry storage without regenerating the report.'
+    ? (captureIncomplete ? 'The saved report content is available, but PDF creation did not finish. Retry the incomplete PDF.' : 'The PDF could not be saved or verified in the Project Library. Retry resumes the incomplete document.')
     : ready
       ? 'Your Technical Report has been saved to Documents & Assets.'
       : 'Sound Proof is assembling your engineering analysis, diagrams and system details into a complete report.';
@@ -177,7 +178,7 @@ export default function ReportExportProgressPanel({ store, publication, onRetryM
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  Retry storage
+                  {captureIncomplete ? 'Retry PDF creation' : 'Retry storage'}
                 </Button>
               )}
             </div>
