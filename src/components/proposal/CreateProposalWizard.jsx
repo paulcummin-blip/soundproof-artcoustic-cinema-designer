@@ -565,6 +565,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       setGenerationPhase(GENERATION_PHASE.WRITING);
       const response = await base44.functions.invoke('generateProposal', {
         request_id: requestId,
+        runtime_environment: /preview|sandbox|localhost/.test(window.location.hostname) ? 'preview' : 'production',
         project_id: selectedProjectId,
         proposal_type: proposalType,
         selected_version_ids: selectedVersionIds,
@@ -607,11 +608,14 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         creationRequestIdRef.current = null;
       }
       setGenerationPhase(GENERATION_PHASE.FAILED);
-      setError(errorData?.error || err?.message || 'Generation failed. Please try again.');
+      const failureMessage = errorData?.error || err?.message;
+      setError(typeof failureMessage === 'string' && !/user[-_ ]exception|status code 500/i.test(failureMessage)
+        ? failureMessage
+        : "ADI couldn't complete the proposal. Your saved brief, answers and design are safe. Please retry; contact support if this continues.");
       setIncidentInfo({
         reference: errorData?.incident_reference || null,
         recorded: errorData?.incident_recorded === true,
-        recoveryAvailable: errorData?.recovery_available === true,
+        recoveryAvailable: errorData?.recovery_available !== false,
       });
       setGenerating(false);
     } finally {
@@ -666,7 +670,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   }
 
   // ── Generating screen ──
-  if (generating) {
+  if (generating || generationPhase === GENERATION_PHASE.FAILED) {
     return (
       <div>{proposalIdentity}<GenerateStep
         phase={generationPhase || GENERATION_PHASE.PREPARING}
