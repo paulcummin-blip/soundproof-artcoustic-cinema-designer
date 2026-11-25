@@ -85,6 +85,7 @@ export function classifyCause(errorCode, component = '') {
 export function determineUserImpact(errorCode, component = '') {
   const code = errorCode || 'UNKNOWN';
 
+  if (code === 'AUTHENTICATION_CONTEXT_FAILED') return {user_blocked:true,workaround_available:true};
   if (code === 'CONTROLLED_ALERT_TEST') return {user_blocked:false,workaround_available:null};
   if (['REPORT_NARRATIVE_FAILED','RENDER_FAILED','RENDER_VALUE_REJECTED','PROJECT_LOAD_FAILED','BASS_CALCULATION_FAILED','ADI_OPTIMISATION_FAILED'].includes(code)) return {user_blocked:true,workaround_available:null};
 
