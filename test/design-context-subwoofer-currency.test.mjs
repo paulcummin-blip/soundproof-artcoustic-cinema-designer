@@ -112,24 +112,16 @@ function questionsToAsk(savedItems, currentQuestions) {
 
 describe('Case A — Dixon unchanged (4 front/rear)', () => {
   it('does not re-ask the subwoofer question when the arrangement is unchanged', () => {
-    // Dixon's current design: 4 subs, 2 front, 2 rear.
-    const version = versionWith({
-      seating_positions: dixonSeats(),
-      subwooferInstances: [
-        { id: 'sub-front-1', enabled: true, position: { x: 2.128, y: 0.1375 } },
-        { id: 'sub-front-2', enabled: true, position: { x: 3.472, y: 0.1375 } },
-        { id: 'sub-rear-1', enabled: true, position: { x: 1.4, y: 6.5525 } },
-        { id: 'sub-rear-2', enabled: true, position: { x: 5.165, y: 6.5525 } },
-      ],
-      screen_mount_mode: 'baffle',
-      acoustic_treatment_enabled: false,
-    });
-    const current = discoverDeterministicQuestions(version, dixonProject());
-
-    // The current question is subwoofer_front_rear_distribution.
-    expect(current.map((q) => q.question_id)).toContain('subwoofer_front_rear_distribution');
-    const subQ = current.find((q) => q.question_id === 'subwoofer_front_rear_distribution');
-    expect(subQ.decision_fingerprint).toBe('subarr:front_rear:4:2:2');
+    // Dixon's current design: 4 subs, 2 front, 2 rear. The deterministic
+    // discovery no longer asks routine subwoofer questions, so the current
+    // question is constructed with the canonical fingerprint the discovery
+    // would have produced, to test the decision-currency logic directly.
+    const current = [{
+      question_id: 'subwoofer_front_rear_distribution',
+      question: 'The 4 subwoofers are distributed across the front and rear of the room. Is there a particular reason for this distribution?',
+      area: 'subwoofers',
+      decision_fingerprint: canonicalSubwooferFingerprint({ type: 'front_rear', count: 4, front: 2, rear: 2 }),
+    }];
 
     // Dixon's saved answer (legacy fingerprint, question text mentions "4 subwoofers").
     const saved = [dixonSavedSubwooferItem()];
@@ -183,22 +175,15 @@ describe('Case A — Dixon unchanged (4 front/rear)', () => {
 
 describe('Case B — Material change (4 front/rear → 2 front-only)', () => {
   it('re-asks the subwoofer question after a material arrangement change', () => {
-    // Current design: 2 subs, both front (changed from 4 front/rear).
-    const version = versionWith({
-      seating_positions: dixonSeats(),
-      subwooferInstances: [
-        { id: 'sub-front-1', enabled: true, position: { x: 2.128, y: 0.1375 } },
-        { id: 'sub-front-2', enabled: true, position: { x: 3.472, y: 0.1375 } },
-      ],
-      screen_mount_mode: 'baffle',
-      acoustic_treatment_enabled: false,
-    });
-    const current = discoverDeterministicQuestions(version, dixonProject());
-
-    // The current question is now subwoofer_single_wall_arrangement.
-    expect(current.map((q) => q.question_id)).toContain('subwoofer_single_wall_arrangement');
-    const subQ = current.find((q) => q.question_id === 'subwoofer_single_wall_arrangement');
-    expect(subQ.decision_fingerprint).toBe('subarr:single_wall:2:2:0');
+    // Current design: 2 subs, both front (changed from 4 front/rear). The
+    // deterministic discovery no longer asks routine subwoofer questions, so
+    // the current question is constructed with the canonical fingerprint.
+    const current = [{
+      question_id: 'subwoofer_single_wall_arrangement',
+      question: 'All 2 subwoofers are placed near the front wall. Is there a particular reason for this arrangement rather than distributing them around the room?',
+      area: 'subwoofers',
+      decision_fingerprint: canonicalSubwooferFingerprint({ type: 'single_wall', count: 2, front: 2, rear: 0 }),
+    }];
 
     // Dixon's saved answer mentions "4 subwoofers" — count 4 ≠ current 2.
     const saved = [dixonSavedSubwooferItem()];
@@ -209,16 +194,12 @@ describe('Case B — Material change (4 front/rear → 2 front-only)', () => {
   });
 
   it('marks the saved subwoofer item as stale after the material change', () => {
-    const version = versionWith({
-      seating_positions: dixonSeats(),
-      subwooferInstances: [
-        { id: 'sub-front-1', enabled: true, position: { x: 2.128, y: 0.1375 } },
-        { id: 'sub-front-2', enabled: true, position: { x: 3.472, y: 0.1375 } },
-      ],
-      screen_mount_mode: 'baffle',
-      acoustic_treatment_enabled: false,
-    });
-    const current = discoverDeterministicQuestions(version, dixonProject());
+    const current = [{
+      question_id: 'subwoofer_single_wall_arrangement',
+      question: 'All 2 subwoofers are placed near the front wall.',
+      area: 'subwoofers',
+      decision_fingerprint: canonicalSubwooferFingerprint({ type: 'single_wall', count: 2, front: 2, rear: 0 }),
+    }];
     const saved = [dixonSavedSubwooferItem()];
 
     const { current: currentSaved, stale } = partitionByDecisionCurrency(saved, current);
@@ -263,47 +244,28 @@ describe('Case C — Wording / question-ID change only', () => {
 
 describe('Case D — Minor position adjustment', () => {
   it('does not re-ask when positions shift slightly without changing count or distribution', () => {
-    // Original positions (saved).
-    const savedVersion = versionWith({
-      seating_positions: dixonSeats(),
-      subwooferInstances: [
-        { id: 'sub-front-1', enabled: true, position: { x: 2.128, y: 0.1375 } },
-        { id: 'sub-front-2', enabled: true, position: { x: 3.472, y: 0.1375 } },
-        { id: 'sub-rear-1', enabled: true, position: { x: 1.4, y: 6.5525 } },
-        { id: 'sub-rear-2', enabled: true, position: { x: 5.165, y: 6.5525 } },
-      ],
-      screen_mount_mode: 'baffle',
-      acoustic_treatment_enabled: false,
-    });
-    const savedQuestions = discoverDeterministicQuestions(savedVersion, dixonProject());
-    const subQ = savedQuestions.find((q) => q.question_id === 'subwoofer_front_rear_distribution');
+    // The canonical fingerprint captures count and distribution, not exact
+    // coordinates, so a minor position adjustment produces the same fingerprint.
+    // The deterministic discovery no longer asks routine subwoofer questions,
+    // so both the saved and current questions are constructed with the same
+    // canonical fingerprint to test the currency logic directly.
+    const fingerprint = canonicalSubwooferFingerprint({ type: 'front_rear', count: 4, front: 2, rear: 2 });
 
-    // Slightly adjusted positions (current) — same 4 subs, 2 front, 2 rear.
-    const currentVersion = versionWith({
-      seating_positions: dixonSeats(),
-      subwooferInstances: [
-        { id: 'sub-front-1', enabled: true, position: { x: 2.0, y: 0.2 } },
-        { id: 'sub-front-2', enabled: true, position: { x: 3.5, y: 0.2 } },
-        { id: 'sub-rear-1', enabled: true, position: { x: 1.5, y: 6.4 } },
-        { id: 'sub-rear-2', enabled: true, position: { x: 5.0, y: 6.4 } },
-      ],
-      screen_mount_mode: 'baffle',
-      acoustic_treatment_enabled: false,
-    });
-    const current = discoverDeterministicQuestions(currentVersion, dixonProject());
+    const current = [{
+      question_id: 'subwoofer_front_rear_distribution',
+      question: 'The 4 subwoofers are distributed across the front and rear of the room.',
+      area: 'subwoofers',
+      decision_fingerprint: fingerprint,
+    }];
 
-    // Both produce the same canonical fingerprint.
-    const currentSubQ = current.find((q) => q.question_id === 'subwoofer_front_rear_distribution');
-    expect(currentSubQ.decision_fingerprint).toBe(subQ.decision_fingerprint);
-
-    // Saved with the canonical fingerprint — suppresses the current question.
+    // Saved with the same canonical fingerprint — suppresses the current question.
     const saved = [{
       question_id: 'subwoofer_front_rear_distribution',
       question: 'The 4 subwoofers are distributed across the front and rear.',
       area: 'subwoofers',
       status: CONTEXT_STATUS.ANSWERED,
       answer: 'For smooth bass across all seats.',
-      decision_fingerprint: subQ.decision_fingerprint,
+      decision_fingerprint: fingerprint,
       answered_at: NOW,
       answered_by: USER_NAME,
     }];

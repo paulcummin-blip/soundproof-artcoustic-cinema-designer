@@ -281,6 +281,15 @@ describe('F. Fewer unnecessary clarification questions are put', () => {
     expect(list.map((entry) => entry.question_id)).not.toContain('acoustic_treatment_reason');
   });
 
+  it('never asks a routine subwoofer arrangement question', () => {
+    const decision = rp22QuestionDecision({ question_id: 'subwoofer_arrangement_reason', snapshot: genesisSnapshot() });
+    expect(decision.ask).toBe(false);
+    expect(decision.reason).toBe('subwoofer_arrangement_is_standard_engineering_practice');
+
+    const list = buildClarificationQuestions({ versions: sourcesOf(genesisSnapshot()), material: '' });
+    expect(list.map((entry) => entry.question_id)).not.toContain('subwoofer_arrangement_reason');
+  });
+
   it('does not ask for a reference position the frozen evidence already declares', () => {
     expect(declaredReferencePosition(genesisSnapshot())).toBe(null);
     const declared = genesisSnapshot({ room: { ...genesisSnapshot().room, rsp: { mode: 'middle_row_center' } } });
@@ -298,7 +307,10 @@ describe('F. Fewer unnecessary clarification questions are put', () => {
     const list = buildClarificationQuestions({ versions: sourcesOf(genesisSnapshot()), material: '' });
     const ids = list.map((entry) => entry.question_id);
     expect(ids).toContain('overhead_speaker_reason');
-    expect(ids).toContain('subwoofer_arrangement_reason');
+    // Routine subwoofer questions are never asked: the writer explains the
+    // arrangement from the RP22 subwoofer_optimisation principle and the
+    // engineering evidence without requiring a designer explanation.
+    expect(ids).not.toContain('subwoofer_arrangement_reason');
     expect(list.length).toBeLessThanOrEqual(3);
     // A general principle never suppresses a question about this project's own
     // decision: the overhead reason is genuinely absent, so it is asked.

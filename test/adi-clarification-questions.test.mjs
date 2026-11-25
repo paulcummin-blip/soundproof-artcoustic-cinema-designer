@@ -121,17 +121,21 @@ describe('A. Genesis — the questions ADI may ask', () => {
   });
 
   it('never asks more than three questions', () => {
-    // All four candidates apply to Genesis, so the limit is what decides.
+    // All applicable candidates apply to Genesis, so the limit is what decides.
     const list = buildClarificationQuestions({ versions: genesis(), material: '' });
-    expect(list.length).toBe(MAX_CLARIFICATION_QUESTIONS);
+    expect(list.length).toBeLessThanOrEqual(MAX_CLARIFICATION_QUESTIONS);
     expect(questionIds(list)).not.toContain('acoustic_treatment_reason');
   });
 
-  it('asks about the configuration, never about a performance outcome', () => {
-    const sub = buildClarificationQuestions({ versions: genesis(), material: '' })
-      .find((entry) => entry.question_id === 'subwoofer_arrangement_reason');
-    expect(sub.question).toBe('What was the main reason for the four-subwoofer arrangement in this room?');
-    expect(sub.question).not.toMatch(/consisten|seat-to-seat|equal/i);
+  it('never asks a routine subwoofer arrangement question', () => {
+    // Using multiple subwoofers to manage room modes and improve bass
+    // consistency is standard engineering practice the writer explains from
+    // the RP22 subwoofer_optimisation principle, so the question is never put.
+    const list = buildClarificationQuestions({ versions: genesis(), material: '' });
+    expect(questionIds(list)).not.toContain('subwoofer_arrangement_reason');
+    for (const entry of list) {
+      expect(entry.question).not.toMatch(/subwoofer.*arrangement|arrangement.*subwoofer/i);
+    }
   });
 
   it('names nothing the frozen evidence does not state', () => {
@@ -198,9 +202,10 @@ describe('C. A question is never asked twice in one preparation', () => {
     const list = buildClarificationQuestions({
       versions: genesis(),
       material: '',
-      askedQuestionIds: ['overhead_speaker_reason', 'subwoofer_arrangement_reason'],
+      askedQuestionIds: ['overhead_speaker_reason'],
     });
     expect(questionIds(list)).not.toContain('overhead_speaker_reason');
+    // Routine subwoofer questions are never asked regardless.
     expect(questionIds(list)).not.toContain('subwoofer_arrangement_reason');
     // The limit is not filled up with further questions beyond the three allowed.
     expect(list.length).toBeLessThanOrEqual(3);
@@ -215,8 +220,9 @@ describe('D. A comparison never misdescribes one of its options', () => {
     ];
     const list = buildClarificationQuestions({ versions, material: '' });
     expect(questionIds(list)).not.toContain('overhead_speaker_reason');
-    // The subwoofer count is the same in both, so that question is still valid.
-    expect(questionIds(list)).toContain('subwoofer_arrangement_reason');
+    // The subwoofer count is the same in both, but routine subwoofer questions
+    // are never asked — the writer explains the arrangement from the evidence.
+    expect(questionIds(list)).not.toContain('subwoofer_arrangement_reason');
   });
 });
 
