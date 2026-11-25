@@ -16,8 +16,10 @@ import { selectCanonicalReportSnapshot } from '@/components/report/reportSnapsho
 import {
   groupProposalsByProject,
   proposalVersionIds,
-  resolveProposalSourceState,
 } from './proposalSourceState';
+
+import { resolveProposalPublicationSource } from './proposalPublicationSource';
+import { fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
 
 /** The ONE report a proposal is built from. */
 const REPORT_TYPES = ['project'];
@@ -97,13 +99,14 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
       });
 
       const nextSourceById = {};
-      proposalList.forEach((proposal) => {
-        nextSourceById[proposal.id] = resolveProposalSourceState({
+      await Promise.all(proposalList.map(async (proposal) => {
+        nextSourceById[proposal.id] = await resolveProposalPublicationSource({
           proposal,
           versionsById: nextVersionsById,
           savedReportsByVersionId,
+          readPublication: fetchDurablePublication,
         });
-      });
+      }));
 
       const counts = {};
       asItems(sectionRecords).forEach((section) => {
