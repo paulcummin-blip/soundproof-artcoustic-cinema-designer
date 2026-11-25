@@ -16,8 +16,10 @@ import { base44 } from '@/api/base44Client';
 import { selectCanonicalReportSnapshot } from '@/components/report/reportSnapshotCanonical';
 import {
   proposalVersionIds,
-  resolveProposalSourceState,
 } from '@/components/proposal/library/proposalSourceState';
+
+import { resolveProposalPublicationSource } from '@/components/proposal/library/proposalPublicationSource';
+import { fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
 
 const LAYER_ONE_REPORT_TYPES = ['project'];
 
@@ -31,6 +33,7 @@ const asItems = (result) => (Array.isArray(result) ? result : (result?.items || 
 export async function resolveProposalExportSource(proposal) {
   const versionIds = proposalVersionIds(proposal);
   const base = {
+    sourceRecordId: proposal?.id || null,
     selectedVersionIds: versionIds,
     versionId: versionIds.length === 1 ? versionIds[0] : null,
     sourceFingerprints: {
@@ -74,18 +77,17 @@ export async function resolveProposalExportSource(proposal) {
     savedReportsByVersionId.set(snapshot.version_id, entry);
   });
 
-  const sourceState = resolveProposalSourceState({
+  const sourceState = await resolveProposalPublicationSource({
     proposal,
     versionsById,
     savedReportsByVersionId,
+    readPublication: fetchDurablePublication,
   });
 
   // A current report cannot make an older proposal current. Compare the
   // proposal's frozen fingerprint, never stamp it with the latest version's.
   if (versionIds.length === 1 && sourceState.state === 'current') {
-    const frozen = base.sourceFingerprints.engineeringFingerprint;
-    const current = versionsById.get(versionIds[0])?.published_fingerprint;
-    if (!frozen || frozen !== current) sourceState.state = 'source_changed';
+    if (!sourceState.frozenProposalMatchesCurrent) sourceState.state = 'source_changed';
   }
 
   return {
