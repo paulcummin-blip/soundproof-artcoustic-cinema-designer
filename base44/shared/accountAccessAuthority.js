@@ -1,5 +1,4 @@
 import { recordSystemIncident } from './systemHealth/incidentRecorder.js';
-import { validatePilotPortalAccessIfRequired } from './portalSsoAuthority.js';
 import { startSoundProofTermOnFirstClaim } from './portalActivationAuthority.js';
 import { sendWelcomeEmail } from './invitationEmail/sendWelcomeEmail.js';
 import {
@@ -82,7 +81,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // administrator can never be denied by any dealer-side requirement below.
   // An administrator is not an account member: direct access must not depend on
   // a Sound Proof account linkage, an AccountMembership, a dealer_account_id or
-  // a Partner Portal / PortalIdentity launch. Evaluating this before the record
+  // a ****** / PortalIdentity launch. Evaluating this before the record
   // read means a User-read miss can no longer turn an admin into USER_NOT_FOUND,
   // and every dealer rejection (ACCOUNT_NOT_LINKED, MEMBERSHIP_*, the iCubed
   // portal gate) is reached only by non-admin sessions.
@@ -212,7 +211,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // 90-day Sound Proof access expiry is now enforced. The authenticated
   // Lovable renewal mechanism is implemented (portalSoundProofAccess with
   // purpose "renew"), so the temporary disable is lifted. An expired active
-  // account is rejected here; the dealer renews through the Partner Portal.
+  // account is rejected here; the dealer renews through the ******.
   // Backend operations additionally recheck the user flag via the RLS
   // soundproof_access_enabled condition on protected entities.
   // Note: direct entity RLS checks the flag, not the current time. A
@@ -228,22 +227,8 @@ export async function resolveAccountAccess(base44, sessionUser, {
     }
   }
 
-  // The iCubed pilot is fail-closed on every server-side authority call.
-  // A Base44 session, account membership, matching email or editable URL is
-  // never enough: the verified Supabase subject and live portal session must
-  // resolve through the unique ExternalAccountLink to this exact account.
-  const portalAccess = await validatePilotPortalAccessIfRequired(
-    base44,
-    authoritativeUser,
-    account,
-  );
-  if (portalAccess.required && !portalAccess.allowed) {
-    return {
-      allowed: false,
-      reason: portalAccess.reason || 'PORTAL_SSO_REQUIRED',
-      account,
-    };
-  }
+  // All dealer accounts use the same verified user, account and membership
+  // authority. Company identity is separately verified at project creation.
 
   const accountMemberships = await service.entities.AccountMembership.filter({ account_id: accountId });
   const allMemberships = Array.isArray(accountMemberships) ? accountMemberships : [];
@@ -448,7 +433,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
 
   // Richer Sounds delegated administration: an active member of the verified
   // Custom Install - 93 master account (the RICHER_SOUNDS account whose active
-  // Partner Portal link carries trading number "93" with a stamped
+  // ****** link carries trading number "93" with a stamped
   // portal_dealer_account_id) gains a scoped capability. The check runs only
   // for RICHER_SOUNDS accounts and fails open: any read error leaves the flag
   // false and login is unaffected.
@@ -534,3 +519,4 @@ async function denyAccountAccess(base44, user, account, reason) {
   }
   return { allowed: false, reason, account, enforcement_failed: Boolean(enforcementFailure) };
 }
+
