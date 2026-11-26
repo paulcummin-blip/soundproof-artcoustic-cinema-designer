@@ -5,7 +5,7 @@ let source = await fs.readFile(new URL("../src/components/state/conditionalDesig
 const fingerprintSource = await fs.readFile(new URL("../src/components/proposal/engineeringAuthority/engineeringFingerprint.js", import.meta.url), "utf8");
 const stringifySource = fingerprintSource.slice(fingerprintSource.indexOf("export function stableStringify"), fingerprintSource.indexOf("function fnv1a32Seeded")).replace("export ", "");
 source = source.replace(/import \{ base44 \}[^\n]+\n/, "const base44 = {};\n").replace(/import \{ stableStringify \}[^\n]+\n/, stringifySource);
-const {saveDesignConditionally, saveSharedConditionally, assertDesignUnchanged, DESIGN_CONFLICT} =
+const {createSaveBaseline, saveDesignConditionally, saveSharedConditionally, assertDesignUnchanged, DESIGN_CONFLICT} =
   await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"));
 const copy = v => JSON.parse(JSON.stringify(v));
 function fixture() {
@@ -30,6 +30,14 @@ function fixture() {
   return {rows,baseline,client:{entities},get calls(){return calls;},
     race(fn){beforeWrite=fn;},loseReply(){lost=true;},fail(){failed=true;}};
 }
+test("loaded and acknowledged snapshots cannot be changed by mutable UI objects",async()=>{
+ const f=fixture(),b=createSaveBaseline(f.rows.Project,f.rows.ProjectVersion);
+ const desired={seats:5,screen:55};
+ await saveDesignConditionally(b,desired,()=>{},f.client);
+ desired.seats=6;
+ assert.equal(b.version.design_state.seats,5);
+ await assertDesignUnchanged(b,"p","v",f.client);
+});
 test("JSON-omitted fields cannot cause a false conflict after our own save",async()=>{
  const f=fixture(),b=f.baseline();
  await saveDesignConditionally(b,{seats:5,screen:55,optional:undefined},()=>{},f.client);
