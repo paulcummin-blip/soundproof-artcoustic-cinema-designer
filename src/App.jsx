@@ -1,4 +1,3 @@
-import InternalStorageAcceptanceProbe from '@/components/report/InternalStorageAcceptanceProbe';
 import ExperienceContext from "@/components/systemHealth/ExperienceContext";
 import './App.css'
 import { Toaster } from "@/components/ui/toaster"
@@ -130,8 +129,6 @@ const AuthenticatedApp = () => {
     navigateToLogin();
     return null;
   }
-
-  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('internal_storage_probe') === '1') return <InternalStorageAcceptanceProbe />;
 
   return (
     <LayoutWrapper currentPageName={mainPageKey}>
