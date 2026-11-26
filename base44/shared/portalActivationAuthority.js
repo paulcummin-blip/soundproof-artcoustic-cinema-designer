@@ -196,12 +196,19 @@ async function withActivationLock(service, accountId, work) {
   const lock = await acquireCreationLock(service, accountId);
   if (!lock.acquired) return { ok: false, error: 'ACCOUNT_OPERATION_BUSY' };
   let release = true;
+  // Marked by the protected callback immediately before its first write. A
+  // failure before any write is a read or validation failure that never
+  // started a write, so the lock is safe to release. A failure after a write
+  // was attempted may have committed without a confirmed outcome, so the
+  // lock is retained for review.
+  let writeStarted = false;
+  const ctx = { markWriteStarted: () => { writeStarted = true; } };
   try {
     const rows = await service.entities.Account.filter({ id: accountId });
     if (!Array.isArray(rows) || rows.length !== 1) return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
-    return await work(rows[0]);
+    return await work(rows[0], ctx);
   } catch (error) {
-    release = false;
+    if (writeStarted) release = false;
     throw error;
   } finally {
     if (release) await releaseCreationLock(service, accountId, lock.token);
@@ -275,7 +282,7 @@ export async function findExistingAdminSeat(service, accountId) {
 }
 
 export async function createPortalActivation(service, base44, { grant, account }) {
-  return withActivationLock(service, account.id, async current => {
+  return withActivationLock(service, account.id, async (current, ctx) => {
     const error = await checkGrantUnderLock(service, current, grant);
     if (error) return { ok: false, error };
     const audits = await grantAudits(service, grant.jti);
@@ -310,6 +317,7 @@ export async function createPortalActivation(service, base44, { grant, account }
     }
 
     // Durable reservation precedes all side effects, including native email.
+    ctx.markWriteStarted();
     await recordGrant(service, current, grant, { phase: 'reserved' });
     const membership = await service.entities.AccountMembership.create({
       email: grant.admin_email, full_name: grant.admin_full_name || null,
@@ -339,7 +347,7 @@ export async function createPortalActivation(service, base44, { grant, account }
 }
 
 export async function renewPortalAccess(service, { grant, account }) {
-  return withActivationLock(service, account.id, async current => {
+  return withActivationLock(service, account.id, async (current, ctx) => {
     const error = await checkGrantUnderLock(service, current, grant);
     if (error) return { ok: false, error };
     const audits = await grantAudits(service, grant.jti);
@@ -359,6 +367,7 @@ export async function renewPortalAccess(service, { grant, account }) {
     const expiryMs = Date.parse(previousExpiry);
     if (!Number.isFinite(expiryMs)) return { ok: false, error: 'ACCOUNT_EXPIRY_INVALID' };
     const expiresAt = new Date(Math.max(expiryMs, Date.now()) + NINETY_DAYS_MS).toISOString();
+    ctx.markWriteStarted();
     await recordGrant(service, current, grant, { phase: 'reserved',
       previous_expires_at: previousExpiry, new_expires_at: expiresAt });
     const updated = await service.entities.Account.updateMany({
@@ -475,7 +484,7 @@ export async function readSoundProofAccessStatus(service, { dealerAccountId }) {
 export async function startSoundProofTermOnFirstClaim(service, { accountId, user, membership }) {
   if (user?.is_verified !== true || user.disabled === true || !user.id
     || (user.account_id && user.account_id !== accountId)) throw new Error('VERIFIED_CLAIM_REQUIRED');
-  const result = await withActivationLock(service, accountId, async account => {
+  const result = await withActivationLock(service, accountId, async (account, ctx) => {
     const [members, users] = await Promise.all([
       service.entities.AccountMembership.filter({ id: membership?.id, account_id: accountId }),
       service.entities.User.filter({ id: user.id }),
@@ -531,6 +540,7 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.parse(now) + NINETY_DAYS_MS).toISOString();
     // Term, status and first timestamp change together, once, on the account.
+    ctx.markWriteStarted();
     const updated = await service.entities.Account.updateMany({
       id: accountId, status: 'inactive', soundproof_eligible: true,
       first_activated_at: null, soundproof_access_expires_at: null,

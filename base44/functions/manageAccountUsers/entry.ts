@@ -249,6 +249,12 @@ export default async function(req) {
     const lock = await acquireCreationLock(service, account.id);
     if (!lock.acquired) return errorResponse('ACCOUNT_OPERATION_BUSY', 'Another account operation is in progress. Please retry.', 409);
     let release = true;
+    // Set to true immediately before the first protected membership/user
+    // write in each action. A failure before any write is a read or
+    // validation failure that never started a write, so the lock is safe to
+    // release. A failure after a write was attempted may have committed
+    // without a confirmed outcome, so the lock is retained for review.
+    let writeAttempted = false;
     try {
       // Recheck authority after acquiring the lock, not only before waiting.
       const fresh = await resolveAccountAccess(base44, sessionUser);
@@ -329,6 +335,7 @@ export default async function(req) {
       // Reserve the seat before delivery. A timeout may mean an email was sent;
       // subsequent invite requests see this seat and cannot send another email.
       // Claiming and linking the user belongs to verified login, not invitation.
+      writeAttempted = true;
       const membership = await service.entities.AccountMembership.create({
         user_id: null, email, full_name: linkedUser?.full_name || null,
         account_id: account.id, membership_role: membershipRole(accessLevel, makeAccountAdmin),
@@ -386,6 +393,7 @@ export default async function(req) {
         return errorResponse('INVALID_ACCESS_LEVEL', 'Choose a valid access level.');
       }
       const before = normaliseAccessLevel(target.access_level, ACCESS_LEVELS.FULL_ACCESS);
+      writeAttempted = true;
       await service.entities.AccountMembership.update(target.id, {
         access_level: accessLevel,
         membership_role: membershipRole(accessLevel, false),
@@ -416,6 +424,7 @@ export default async function(req) {
         return errorResponse('INVITATION_RECENTLY_SENT', 'An invitation was recently attempted. Please wait before an explicit resend.', 409);
       }
       // Reserve the delivery attempt before contacting the external service.
+      writeAttempted = true;
       await service.entities.AccountMembership.update(target.id, {
         invited_at: new Date().toISOString(),
         invited_by_user_id: context.user.id,
@@ -455,6 +464,7 @@ export default async function(req) {
         return errorResponse('CANNOT_REMOVE_SELF', 'You cannot remove your own login.', 409);
       }
       const now = new Date().toISOString();
+      writeAttempted = true;
       await service.entities.AccountMembership.update(target.id, {
         status: 'removed',
         removed_at: now,
@@ -538,6 +548,7 @@ export default async function(req) {
       // unclaimed. A concurrent acceptance or cancellation that changed the
       // status or linked a user updates 0 rows, so the correction fails closed
       // instead of racing the claim.
+      writeAttempted = true;
       const corrected = await service.entities.AccountMembership.updateMany(
         { id: target.id, status: 'pending', user_id: null },
         {
@@ -619,6 +630,7 @@ export default async function(req) {
       const now = new Date().toISOString();
       // Conditional update — only if still pending and unclaimed. A concurrent
       // acceptance updates 0 rows, so cancellation never overrides a claim.
+      writeAttempted = true;
       const cancelled = await service.entities.AccountMembership.updateMany(
         { id: target.id, status: 'pending', user_id: null },
         {
@@ -658,8 +670,10 @@ export default async function(req) {
 
     return errorResponse('UNKNOWN_ACTION', 'Unsupported account-user action.', 400);
     } catch (error) {
-      // Unknown write outcomes require review, never overlapping retries.
-      release = false;
+      // Retain the lock only when a protected write was attempted and may
+      // have committed without a confirmed outcome. A failed read or pre-write
+      // validation never started a write, so the lock is safe to release.
+      if (writeAttempted) release = false;
       throw error;
     } finally {
       if (release) await releaseCreationLock(service, account.id, lock.token);
