@@ -223,3 +223,13 @@ test('rendered bass status cannot display an old overall waiting list or non-bas
   expect(html).not.toMatch(/Calculated and saved/);
   expect(html).not.toMatch(/Overall|Waiting|P4|P9|<ul/);
 });
+test('Minimum system omission is not a P14 failure, and never becomes Current', () => {
+  const state = blockedBy({ status: 'not_ready',
+    missing: [{key:'engineering_summary.p14 is not terminal'}],
+    gates: [gate('minimum_system','Select the front speakers, surrounds and at least one subwoofer'),
+      gate('rp22_terminal','RP22 assessments','p1, p14, p18, p19, p20')],
+  });
+  expect(state.code).toBe('bass_calculated');
+  expect(state.message).toMatch(/surrounds/);
+  expect(state.actionLabel).toBeNull();
+});
