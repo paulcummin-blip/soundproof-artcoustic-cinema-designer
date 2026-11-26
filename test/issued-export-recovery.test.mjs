@@ -40,7 +40,7 @@ test('delayed upload is reused after timeout; only one upload occurs',async()=>{
 });
 test('unacknowledged upload failure never automatically uploads another PDF',async()=>{
  const f=setup();f.api.upload=async()=>{f.calls.upload++;throw Error('uncertain upload');};
- for(let n=0;n<2;n++) await assert.rejects(saveIssuedArtifact(f.args),/uncertain upload/);
+ for(let n=0;n<2;n++) await assert.rejects(saveIssuedArtifact(f.args),/storage outcome is reconciled/);
  assert.equal(f.calls.upload,1);assert.equal(f.calls.create,0);
 });
 test('wrong version or changed source is rejected without writing',async()=>{
