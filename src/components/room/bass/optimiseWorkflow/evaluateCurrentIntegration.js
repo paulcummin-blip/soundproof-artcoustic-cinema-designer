@@ -4,7 +4,11 @@ import { evaluateStage2Confirmation, buildSeatPriorityMap } from "../stage2/stag
 // confirmation authority. This never changes or republishes ordinary bass.
 export function evaluateCurrentIntegration(authoritative, correctabilityAssessment = null) {
   const a = authoritative;
-  if (!a?.combinedSystem?.available || a.status !== "ready") return null;
+  // Completing publication clears the manual request, which returns status to
+  // idle. The simulation's identity-checked completion signal remains true.
+  // Never assess an incomplete or superseded simulation merely because curves exist.
+  if (!a?.simulationReady || !a?.combinedSystem?.available ||
+      !["ready", "idle"].includes(a.status)) return null;
   const req = a.requested;
   return evaluateStage2Confirmation({
     rspRawCurve: a.combinedSystem.combinedBySeat.rsp,
@@ -18,3 +22,4 @@ export function evaluateCurrentIntegration(authoritative, correctabilityAssessme
   }, {p14TargetBasis:req.p14TargetBasis, p14TargetLevel:req.requestedLevel,
     p14TargetDb:req.selectedP14TargetDb, p18TargetBasis:req.p18TargetBasis, correctabilityAssessment});
 }
+
