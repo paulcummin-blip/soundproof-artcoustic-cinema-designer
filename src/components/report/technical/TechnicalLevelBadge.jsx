@@ -51,7 +51,7 @@ export default function TechnicalLevelBadge({ level, size = "normal" }) {
         justifyContent: "center",
         // box-sizing keeps the border inside the fixed box, so every badge in a
         // row is the same size; line-height 1 plus the centred flex alignment
-        // places the label centrally in the browser and in the exported PDF.
+        // places the label in the browser. The capture marker centres PDF ink.
         boxSizing: "border-box",
         textAlign: "center",
         fontSize: dims.fs,
