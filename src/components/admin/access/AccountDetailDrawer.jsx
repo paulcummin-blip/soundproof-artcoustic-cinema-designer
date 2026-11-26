@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import AccessPill from "@/components/admin/access/AccessPill";
 import AccountDrawerAccessSection from "@/components/admin/access/AccountDrawerAccessSection";
+import PendingInvitationCard from "@/components/admin/access/PendingInvitationCard";
 import AccountDrawerCredits from "@/components/admin/access/AccountDrawerCredits";
 import AccountDrawerEvents from "@/components/admin/access/AccountDrawerEvents";
 import AccountDrawerMembers from "@/components/admin/access/AccountDrawerMembers";
@@ -107,6 +108,9 @@ export default function AccountDetailDrawer({
             onReinstate={onReinstate}
             onAccessChanged={onAccessChanged}
           />
+
+          {/* Pending activation invitation — resend, correct email, cancel */}
+          <PendingInvitationCard row={row} onAccessChanged={onAccessChanged} />
 
           {/* Summary */}
           <div className="grid gap-2 sm:grid-cols-3">

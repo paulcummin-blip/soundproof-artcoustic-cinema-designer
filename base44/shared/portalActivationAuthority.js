@@ -492,9 +492,22 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
     }
     if (account.status === 'suspended' || account.soundproof_eligible !== true) return { ok: false, error: 'ACCOUNT_NOT_ELIGIBLE' };
     const audits = await grantAudits(service, seat.portal_activation_request_id);
-    if (!audits.some(a => a.account_id === accountId && a.action === 'PORTAL_ACTIVATION_REQUESTED'
-      && a.details.purpose === 'activate'
-      && a.details.admin_email === normaliseEmail(claimant.email))) return { ok: false, error: 'ACTIVATION_PROOF_MISSING' };
+    // The activation proof recognises the latest authorised email for this
+    // membership: the original Portal activation request OR a master-admin
+    // email correction (INVITATION_EMAIL_CORRECTED) linked to this exact
+    // membership and activation request. Historical (superseded) emails never
+    // satisfy the proof, so a corrected invitation is the only one that can
+    // start the term.
+    const claimantEmail = normaliseEmail(claimant.email);
+    const proofFound = audits.some((a) => a.account_id === accountId && (
+      (a.action === 'PORTAL_ACTIVATION_REQUESTED'
+        && a.details?.purpose === 'activate'
+        && normaliseEmail(a.details?.admin_email) === claimantEmail)
+      || (a.action === 'INVITATION_EMAIL_CORRECTED'
+        && a.details?.membership_id === seat.id
+        && normaliseEmail(a.details?.admin_email) === claimantEmail)
+    ));
+    if (!proofFound) return { ok: false, error: 'ACTIVATION_PROOF_MISSING' };
     // A repeated claim never restarts or extends a term.
     if (account.first_activated_at && account.soundproof_access_expires_at && account.status === 'active') {
       return { ok: true, expires_at: account.soundproof_access_expires_at };

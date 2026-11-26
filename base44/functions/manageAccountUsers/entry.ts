@@ -478,6 +478,184 @@ export default async function(req) {
       return Response.json(await loadAccountUsers(service, account));
     }
 
+    if (action === 'change_email') {
+      if (!context.isMasterAdmin) {
+        return errorResponse('FORBIDDEN', 'Only the Sound Proof master admin can correct an invitation email.', 403);
+      }
+      if (target.status !== 'pending') {
+        return errorResponse('MEMBERSHIP_INACTIVE', 'Only pending invitations can be corrected.', 409);
+      }
+      if (target.user_id) {
+        return errorResponse('INVITATION_ALREADY_CLAIMED', 'This invitation has already been claimed and cannot be corrected.', 409);
+      }
+      const newEmail = normaliseEmail(body.new_email);
+      if (!newEmail || !newEmail.includes('@')) {
+        return errorResponse('INVALID_EMAIL', 'Enter a valid replacement email address.', 400);
+      }
+      if (newEmail === normaliseEmail(target.email)) {
+        return errorResponse('EMAIL_UNCHANGED', 'The replacement email is the same as the current email.', 409);
+      }
+      const duplicate = occupied.find((membership) => normaliseEmail(membership.email) === newEmail);
+      if (duplicate) {
+        return errorResponse('EMAIL_ALREADY_ADDED', 'That email already occupies a seat in this account.', 409);
+      }
+      const otherMemberships = await service.entities.AccountMembership.filter({ email: newEmail });
+      const activeElsewhere = (otherMemberships || []).find((membership) =>
+        membership.account_id !== account.id
+        && OCCUPIED_STATUSES.has(membership.status || 'active')
+      );
+      if (activeElsewhere) {
+        return errorResponse(
+          'EMAIL_LINKED_TO_ANOTHER_ACCOUNT',
+          'That email is already linked to another account. Contact the Sound Proof master admin.',
+          409,
+        );
+      }
+      const existingUserRows = await service.entities.User.filter({ email: newEmail });
+      if (!Array.isArray(existingUserRows) || existingUserRows.length > 1 || existingUserRows.some((u) => u.disabled === true)) {
+        return errorResponse('LOGIN_REQUIRES_REVIEW', 'This login requires an administrator review before invitation.', 409);
+      }
+      const linkedUser = Array.isArray(existingUserRows) && existingUserRows.length > 0
+        ? existingUserRows[0]
+        : null;
+      if (linkedUser?.role === 'admin') {
+        return errorResponse(
+          'PLATFORM_ADMIN_RESERVED',
+          'The Sound Proof master admin cannot occupy a dealer account seat.',
+          409,
+        );
+      }
+      if (linkedUser?.account_id && linkedUser.account_id !== account.id) {
+        return errorResponse(
+          'EMAIL_LINKED_TO_ANOTHER_ACCOUNT',
+          'That login is already linked to another account. Contact the Sound Proof master admin.',
+          409,
+        );
+      }
+
+      const now = new Date().toISOString();
+      // Conditional update — only if the invitation is still pending and
+      // unclaimed. A concurrent acceptance or cancellation that changed the
+      // status or linked a user updates 0 rows, so the correction fails closed
+      // instead of racing the claim.
+      const corrected = await service.entities.AccountMembership.updateMany(
+        { id: target.id, status: 'pending', user_id: null },
+        {
+          $set: {
+            email: newEmail,
+            invited_at: now,
+            invited_by_user_id: context.user.id,
+            invited_by_email: context.user.email,
+          },
+        },
+      );
+      if (corrected?.updated !== 1) {
+        return errorResponse(
+          'INVITATION_STATE_CONFLICT',
+          'The invitation changed before the email could be corrected. Reload and retry.',
+          409,
+        );
+      }
+
+      // Send the native invitation to the corrected address. The corrected
+      // membership is retained on delivery failure so the admin can resend;
+      // success is reported only when the invitation service confirms the send.
+      let invitationSent = false;
+      let invitationError = null;
+      try {
+        await inviteThroughPlatform(base44, {
+          email: newEmail,
+          accountId: account.id,
+          invitationType: (isMembershipAdmin(target) || target.id === protectedAdminId) ? 'initial' : 'additional',
+        });
+        invitationSent = true;
+      } catch (err) {
+        invitationError = String(err?.message || 'INVITATION_DELIVERY_UNCONFIRMED');
+      }
+
+      // Auditable email correction, linked to the exact original activation
+      // request and membership so the term-start proof recognises the corrected
+      // email. Recorded whether or not delivery succeeded; historical emails
+      // are no longer valid for acceptance because the membership email is now
+      // the corrected one.
+      await appendAccountUserAudit(service, {
+        accountId: account.id,
+        actor: context.user,
+        action: 'INVITATION_EMAIL_CORRECTED',
+        target: { id: linkedUser?.id || null, email: newEmail },
+        afterAccessLevel: target.access_level || ACCESS_LEVELS.FULL_ACCESS,
+        details: {
+          membership_id: target.id,
+          portal_activation_request_id: target.portal_activation_request_id || null,
+          previous_email: normaliseEmail(target.email),
+          new_email: newEmail,
+          admin_email: newEmail,
+          invitation_sent: invitationSent,
+          invitation_error: invitationError,
+        },
+      });
+
+      if (!invitationSent) {
+        return Response.json({
+          error: 'INVITATION_DELIVERY_FAILED',
+          message: 'The email was corrected but the invitation could not be sent. Retry sending.',
+          invitation_delivery: { ok: false, error: invitationError || 'INVITATION_DELIVERY_UNCONFIRMED' },
+          corrected_email: newEmail,
+        }, { status: 502 });
+      }
+      return Response.json(await loadAccountUsers(service, account));
+    }
+
+    if (action === 'cancel_invitation') {
+      if (!context.isMasterAdmin) {
+        return errorResponse('FORBIDDEN', 'Only the Sound Proof master admin can cancel an invitation.', 403);
+      }
+      if (target.status !== 'pending') {
+        return errorResponse('MEMBERSHIP_INACTIVE', 'Only pending invitations can be cancelled.', 409);
+      }
+      if (target.user_id) {
+        return errorResponse('INVITATION_ALREADY_CLAIMED', 'This invitation has already been claimed and cannot be cancelled.', 409);
+      }
+      const now = new Date().toISOString();
+      // Conditional update — only if still pending and unclaimed. A concurrent
+      // acceptance updates 0 rows, so cancellation never overrides a claim.
+      const cancelled = await service.entities.AccountMembership.updateMany(
+        { id: target.id, status: 'pending', user_id: null },
+        {
+          $set: {
+            status: 'removed',
+            removed_at: now,
+            removed_by_user_id: context.user.id,
+          },
+        },
+      );
+      if (cancelled?.updated !== 1) {
+        return errorResponse(
+          'INVITATION_STATE_CONFLICT',
+          'The invitation changed before it could be cancelled. Reload and retry.',
+          409,
+        );
+      }
+      // No linked user to disable (the seat was unclaimed). The account status,
+      // eligibility, term, Premium Partner status, promotions, Project Tokens
+      // and the Partner Portal identity link are all untouched. Removing the
+      // pending admin seat releases it, so the Portal returns to Activate Sound
+      // Proof and the dealer can submit a fresh activation request.
+      await appendAccountUserAudit(service, {
+        accountId: account.id,
+        actor: context.user,
+        action: 'INVITATION_CANCELLED',
+        target,
+        beforeAccessLevel: normaliseAccessLevel(target.access_level, ACCESS_LEVELS.FULL_ACCESS),
+        details: {
+          membership_id: target.id,
+          portal_activation_request_id: target.portal_activation_request_id || null,
+          cancelled_email: normaliseEmail(target.email),
+        },
+      });
+      return Response.json(await loadAccountUsers(service, account));
+    }
+
     return errorResponse('UNKNOWN_ACTION', 'Unsupported account-user action.', 400);
     } catch (error) {
       // Unknown write outcomes require review, never overlapping retries.
