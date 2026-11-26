@@ -14,7 +14,7 @@ function fixture() {
     async filter(query) { return (query.id === op.id || query.operation_id === op.operation_id) ? [structuredClone(op)] : []; },
     async updateMany(query, update) {
       assert.equal(query.id, op.id, 'claims must name a plain single id');
-      const matches = Object.entries(query).every(([key,v])=> typeof v === 'object' ? ('$exists' in v ? (get(key)!==undefined)===v.$exists : v.$in.includes(get(key))) : (v === null ? get(key) == null : get(key)===v));
+      const matches = Object.entries(query).every(([key,v])=> v && typeof v === 'object' ? ('$exists' in v ? (get(key)!==undefined)===v.$exists : v.$in.includes(get(key))) : (v === null ? get(key) == null : get(key)===v));
       if(!matches) return {updated:0};
       for(const [key,value] of Object.entries(update.$set))set(key,value);
       return {updated:1};
