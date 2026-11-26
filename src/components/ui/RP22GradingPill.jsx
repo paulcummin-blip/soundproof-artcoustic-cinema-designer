@@ -100,5 +100,5 @@ export default function RP22GradingPill({ level, variant, compact = false, count
     ...style,
   };
 
-  return <span style={styleBase}>{label}</span>;
+  return <span data-rp22-capture-label="" style={styleBase}>{label}</span>;
 }
