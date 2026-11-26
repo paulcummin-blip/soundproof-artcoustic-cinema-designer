@@ -7,7 +7,8 @@
 //                         and no surface declares a stack of its own
 //   B  header rhythm      uppercase headings, tracking +100, line height 1.2
 //   C  body type          Didact Gothic, 9pt A4 copy, tracking +50, line height 1.4
-//   D  pill centring      a fixed box with the label centred in it, line-height 1
+//   D  pill centring      a fixed box with the label centred in it (line-height
+//                        sourced per variant; print variants centre by content height)
 //   E  fail label         the summary's fifth bucket reads FAIL × n, never "–"
 //   F  fail colour        the one canonical FAIL token — the brand's #4A230F
 //   G  PDF export         the printed document carries the same fonts, tracking
@@ -164,10 +165,16 @@ test('D. the RP22 pill centres its label in a fixed, border-box box', () => {
   assert.match(source, /alignItems: "center"/);
   assert.match(source, /justifyContent: "center"/);
   assert.match(source, /textAlign: "center"/);
-  assert.match(source, /lineHeight: 1,/);
+  // The label is centred by line-height sourced per variant (print variants
+  // carry a content-height line-height), so the html2canvas-rasterised PDF
+  // centres the label identically to the browser — flex alignment of an
+  // anonymous text node is not relied on for the PDF.
+  assert.match(source, /lineHeight: size\.lineHeight \?\? 1,/);
   assert.match(source, /boxSizing: "border-box"/);
   assert.match(source, /height: size\.height/);
   assert.match(source, /minWidth: size\.minWidth/);
+  assert.match(source, /lineHeight: "18px"/);
+  assert.match(source, /lineHeight: "20px"/);
   assert.match(source, /fontFamily: REPORT_FONT_HEADING/);
 
   // Every variant carries a fixed height, so a row of pills is one row of boxes.
