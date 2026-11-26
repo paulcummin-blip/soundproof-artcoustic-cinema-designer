@@ -87,7 +87,7 @@ function harness(failAt){
  persist:async(settings,r)=>{events.push("save:"+r.status);saved={...clone(settings),receipt:clone(r)};if(failAt==="save"&&r.status==="verifying")throw Error("ambiguous save");},
  readback:async()=>{events.push("read");if(failAt==="receipt"&&saved.receipt?.status==="verified")return {...saved,receipt:null};return clone(saved);},
  commit:(settings,r)=>{events.push("commit:"+r.status);live=clone(settings);if(r.status==="verified")assert.equal(verified,true);},
- verify:async(settings,restoring)=>{events.push(restoring?"verify:rollback":"verify");if(restoring)return true;if(failAt==="verify")return false;verified=true;return {fingerprint:"new-cache",levels:{p19:4,primary:3,secondary:2}};}
+ verify:async(settings,restoring)=>{events.push(restoring?"verify:rollback":"verify");if(restoring)return true;if(failAt==="verify")return false;verified=true;return {ok:true,fingerprint:"new-cache",levels:{p19:4,primary:3,secondary:2}};}
  };
  return {io,events,state:()=>({saved,live,verified})};
 }
