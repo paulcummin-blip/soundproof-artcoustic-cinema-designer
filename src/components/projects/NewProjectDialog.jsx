@@ -179,6 +179,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
           }
         } catch (err) {
           const result = err?.response?.data;
+          if (result?.status === 'DEALER_NOT_LINKED') console.warn('[dealer-preview-acceptance]', result.reason || 'NO_REASON');
           if (result?.status === 'OUT_OF_CAPACITY') {
             setCreateStatus('OUT_OF_CAPACITY');
           } else if (result?.status === 'ACCOUNT_NOT_LINKED') {
