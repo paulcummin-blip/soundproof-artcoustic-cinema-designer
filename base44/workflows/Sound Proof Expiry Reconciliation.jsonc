@@ -1,0 +1,50 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/5 * * * *",
+      "one_time_date": null,
+      "timezone": "Europe/London",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "sound_proof_expiry_reconciliation",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "reconcile_expiry": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "manageSoundProofAccess",
+            "args": {
+              "action": "reconcile_expired",
+              "account_ids": [
+                "6afec9e83b4359ee843e1b36"
+              ]
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Reconcile expired internal access",
+            "description": "Internal acceptance scope only; report incomplete enforcement through System Health."
+          }
+        }
+      }
+    ]
+  },
+  "name": "Sound Proof Expiry Reconciliation",
+  "description": "Every five minutes reconcile expired access flags. Acceptance scope: internal Artcoustic account only. Does not change licence dates, status, membership or Project Tokens."
+}
