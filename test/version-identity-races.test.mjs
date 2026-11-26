@@ -13,6 +13,7 @@ const clone=x=>JSON.parse(JSON.stringify(x)); const noop=()=>{};const ref=curren
 function base(){let canonical={projectId:fixture.project.id,design:'loaded',status:'loaded',error:null,identity:{activeVersionId:fixture.a.id,saveBaseline:{project:clone(fixture.project),version:clone(fixture.a)}}};
  const app={activeVersionId:fixture.a.id,format:fixture.a.design_state.dolby_config,seats:clone(fixture.a.design_state.seating_positions),speakers:clone(fixture.a.design_state.selected_speakers),setProjectHydrationReady:noop,setSubwooferInstanceMigrationState:noop};app.setActiveVersionId=v=>app.activeVersionId=v;
  const c={console,Promise,JSON,Date,Number,String,Array,Map,Set,Error,setTimeout:()=>0,clearTimeout:noop,
+ createSaveBaseline:(project,version)=>({project:clone(project),version:clone(version)}),
  saveBaselineRef:ref(canonical.identity.saveBaseline),DESIGN_CONFLICT:'DESIGN_SAVE_CONFLICT',assertSaveBaseline:noop,assertDesignUnchanged:async()=>{},
  activeProjectId:fixture.project.id,projectIdState:fixture.project.id,projectIdFromUrl:fixture.project.id,effectiveProjectId:fixture.project.id,
  appState:app,getProjectHydration:()=>canonical,hydrationAuthorityRef:ref({projectId:fixture.project.id,status:'loaded',loadGenerationId:1}),loadGenerationRef:ref(1),activeVersionIdRef:ref(fixture.a.id),commercialAuthorityRef:ref({}),loadedRoomDimensionsEditedRef:ref(false),hydratedStructuralCountsRef:ref({}),
