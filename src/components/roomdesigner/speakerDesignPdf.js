@@ -133,7 +133,9 @@ const SCHEDULE_CSS = `
   color: #625143;
 }
 .speaker-design-schedule .facts dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; }
-.speaker-design-schedule .group { margin-bottom: 20px; break-inside: avoid; }
+/* Padding is measurable spacing: unlike adjacent margins it cannot collapse
+   with the footer and make the page packer overestimate the content height. */
+.speaker-design-schedule .group { margin-bottom: 0; padding-bottom: 12px; break-inside: avoid; }
 .speaker-design-schedule .group h2 {
   font-size: 11px;
   font-weight: 700;
@@ -153,14 +155,14 @@ const SCHEDULE_CSS = `
   color: #625143;
   padding: 0 12px 5px 0;
 }
-.speaker-design-schedule td { padding: 7px 12px 7px 0; vertical-align: top; border-bottom: 1px solid #EFEDE8; }
+.speaker-design-schedule td { padding: 5px 12px 5px 0; vertical-align: top; border-bottom: 1px solid #EFEDE8; }
 .speaker-design-schedule tr:last-child td { border-bottom: 0; }
 .speaker-design-schedule .pos { width: 26%; color: #3E4349; }
 .speaker-design-schedule .model { width: 56%; }
 .speaker-design-schedule .model-name { font-weight: 600; color: #1B1A1A; }
 .speaker-design-schedule .qty { width: 18%; text-align: right; padding-right: 0; color: #3E4349; }
 .speaker-design-schedule .foot {
-  margin-top: 22px;
+  margin-top: 12px;
   padding-top: 10px;
   /* The closing note keeps its own clearance from the printable edge, so it can
      never sit flush against the paper on the last page. */
