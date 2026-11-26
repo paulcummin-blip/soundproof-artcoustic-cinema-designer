@@ -12,6 +12,7 @@ import { setFirstActivatedAtIfUnset } from '../../shared/accountActivationAuthor
  *               enable all linked users (soundproof_access_enabled=true).
  *   suspend   — Set status=suspended, disable all linked users
  *               (soundproof_access_enabled=false).
+ *   reconcile — Reapply linked-user flags from current account state only.
  *   restore   — Set status=active. If the 90-day term has NOT expired, re-enable
  *               linked users. If the term HAS expired, leave users disabled (the
  *               dealer must renew). Does NOT extend the expiry.
@@ -44,8 +45,8 @@ export default async function(req) {
     const body = await req.json().catch(() => ({}));
     const { action, account_id, account_ids } = body || {};
 
-    if (!['enable', 'suspend', 'restore', 'set_eligible'].includes(action)) {
-      return Response.json({ error: 'action must be enable, suspend, restore or set_eligible.' }, { status: 400 });
+    if (!['enable', 'suspend', 'restore', 'set_eligible', 'reconcile'].includes(action)) {
+      return Response.json({ error: 'action must be enable, suspend, restore, set_eligible or reconcile.' }, { status: 400 });
     }
 
     // set_eligible requires an explicit boolean. No coercion: a missing or
@@ -212,11 +213,18 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
     }
   }
 
-  // Update the account.
-  await service.entities.Account.update(accountId, {
-    status: newStatus,
-    soundproof_access_expires_at: newExpiresAt,
-  });
+  // Reconciliation projects the current authority only. It must not repeat
+  // activation, renewal, suspension or restore, or change the existing term.
+  if (action === 'reconcile') {
+    const expiresAtMs = newExpiresAt ? new Date(newExpiresAt).getTime() : null;
+    accountAllowsAccess = account.status === 'active'
+      && (expiresAtMs === null || (Number.isFinite(expiresAtMs) && expiresAtMs >= Date.now()));
+  } else {
+    await service.entities.Account.update(accountId, {
+      status: newStatus,
+      soundproof_access_expires_at: newExpiresAt,
+    });
+  }
 
   // Record the canonical first-activation timestamp (write-once) on the first
   // admin enable. Suspend and restore never change it; renewal never changes
@@ -297,7 +305,10 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
   return {
     account_id: accountId,
     account_name: account.name,
-    ok: true,
+    ok: flagSyncOk,
+    account_updated: action !== 'reconcile',
+    partial_failure: !flagSyncOk,
+    error: flagSyncOk ? null : 'Account state is saved, but linked-user access enforcement is incomplete. Retry reconciliation; do not assume access has been revoked.',
     flag_sync_ok: flagSyncOk,
     action,
     previous_status: account.status,
@@ -306,7 +317,8 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
     account_allows_access: accountAllowsAccess,
     flags_enabled: flagsEnabled,
     flags_disabled: flagsDisabled,
-    linked_users_updated: linkedUserIds.size,
+    linked_users_updated: flagsEnabled + flagsDisabled,
+    linked_users_attempted: linkedUserIds.size,
     flag_failures: flagFailures,
   };
 }
