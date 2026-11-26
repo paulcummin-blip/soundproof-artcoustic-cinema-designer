@@ -262,6 +262,7 @@ export function useClientReportPdfExport({
     const reportIdentity = issuedDocument?.documentType
       ? {
           ...issuedDocument,
+          uploadOperationId: operationIdRef.current,
           filename: title,
           // A storage failure that could not be retried from the held PDF can
           // re-run this export, and says so on the button that does it.
@@ -451,15 +452,9 @@ export function useClientReportPdfExport({
     if (!last) return retryExportRef.current?.({ storeOnly: storeOnlyRef.current });
     printingRef.current = true;
     setExporting(true);
-    operationIdRef.current = crypto.randomUUID();
+    operationIdRef.current = last.reportIdentity?.uploadOperationId || operationIdRef.current;
     exportTimingsRef.current = createExportTimings();
-    reportOperation('start', {
-      operation_type: 'report_export',
-      account_id: last.reportIdentity?.accountId || null,
-      project_id: last.reportIdentity?.projectId || null,
-      version_id: last.reportIdentity?.versionId || null,
-      initial_stage: 'readiness',
-    });
+    reportOperation('progress', { stage: 'reconcile' });
     setPublication((prev) => ({
       ...prev,
       status: "storing",

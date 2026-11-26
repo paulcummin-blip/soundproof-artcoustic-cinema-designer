@@ -132,6 +132,44 @@
       "type": "string",
       "nullable": true,
       "description": "Authenticated user ID that started monitoring."
+    },
+    "report_upload": {
+      "type": "object",
+      "description": "Private upload receipt for this report operation. Opaque storage reference and PDF checksum only; no document content or client-facing filename. No automatic takeover of an uncertain upload.",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "uploading",
+            "stored",
+            "refused",
+            "unknown"
+          ]
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "file_uri": {
+          "type": "string"
+        },
+        "prepared_at": {
+          "type": "string"
+        },
+        "claimed_at": {
+          "type": "string"
+        },
+        "stored_at": {
+          "type": "string"
+        },
+        "failure_code": {
+          "type": "string",
+          "nullable": true
+        }
+      }
     }
   },
   "required": [

@@ -1,3 +1,4 @@
+import { handleReportUpload } from '../../shared/reportUploadRecovery.js';
 import {loadOwnedProject,loadOwnedProjectVersion} from "../../shared/publishedEngineeringRead.js";
 import {safeDiagnostic} from "../../shared/systemHealth/clientIncidentPolicy.js";
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
@@ -26,8 +27,18 @@ export default async function(req) {
     const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const body = await req.json().catch(() => ({}));
+    const multipart = req.headers.get('content-type')?.includes('multipart/form-data');
+    const form = multipart ? await req.formData() : null;
+    const body = form ? Object.fromEntries(form.entries()) : await req.json().catch(() => ({}));
     const { action } = body;
+    if (['report_upload_prepare', 'report_upload_status', 'report_upload_put'].includes(action)) {
+      // Storage is fail-closed. Existing monitoring actions remain fail-open.
+      try {
+        return Response.json(await handleReportUpload({ service: base44.asServiceRole, caller: base44, user, body, file: form?.get('file') }));
+      } catch (error) {
+        return Response.json({ error: error?.code || 'REPORT_UPLOAD_RECONCILIATION_UNAVAILABLE' }, { status: error?.status || 503 });
+      }
+    }
 
     if (!/^[a-zA-Z0-9:_-]{8,160}$/.test(String(body.operation_id || ''))) return Response.json({error:'Invalid operation ID'},{status:400});
     if (action === 'start') {

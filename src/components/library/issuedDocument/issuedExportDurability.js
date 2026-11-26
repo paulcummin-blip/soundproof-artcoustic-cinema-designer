@@ -27,7 +27,7 @@ export async function awaitExportOperation(entry, key, start, timeoutMs = 45000)
   } catch (error) {
     const status = Number(error?.response?.status || error?.status || error?.cause?.response?.status || error?.cause?.status || 0);
     if (key === 'uploadOperation' && entry[key]?.state === 'rejected' && ![400, 401, 403, 404, 422].includes(status)) {
-      const uncertain = new Error('The upload failed without a confirmed file path. A second upload cannot safely be started until its storage outcome is reconciled. Return to the project to use your previous completed documents; administrator recovery is required.');
+      const uncertain = new Error(entry.uploadReceiptRecovery ? 'The upload response was interrupted. The completed PDF is retained. Retry storage to check the original upload receipt before continuing.' : 'The upload failed without a confirmed file path. A second upload cannot safely be started until its storage outcome is reconciled. Return to the project to use your previous completed documents; administrator recovery is required.');
       uncertain.cause = error;
       throw uncertain;
     }
@@ -64,8 +64,21 @@ export function matchesIssuedRow(row, expected) {
 /** Uses only the existing private-file and ProjectAssetExport authorities. */
 export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = () => {}, update = () => {}, timeoutMs = 45000, telemetry = null }) {
   const progress = (stage, message) => { try { onProgress({ stage, message }); } catch { /* UI cannot change durability */ } };
+  entry.uploadReceiptRecovery = Boolean(api.reconcileUpload);
+  if (!entry.fileUri && api.reconcileUpload) {
+    progress('reconcile_upload', 'Checking the previous PDF upload…');
+    const receipt = await boundedExportRead(() => api.reconcileUpload(), 'Upload receipt', timeoutMs);
+    if (receipt.state === 'stored') {
+      entry.fileUri = receipt.file_uri;
+      update({ fileUri: entry.fileUri });
+    } else if (['ready', 'refused'].includes(receipt.state)) {
+      // A fresh request is safe only behind the server's atomic claim. Even a
+      // delayed earlier request cannot claim this same operation a second time.
+      entry.uploadOperation = null;
+    } else throw new Error('Upload outcome remains uncertain. No second upload was started.');
+  }
   if (!entry.fileUri) {
-    if (entry.uploadStarted && !entry.uploadOperation) throw new Error('The previous upload has no confirmed file path after reload. Its outcome must be reconciled before another upload.');
+    if (!api.reconcileUpload && entry.uploadStarted && !entry.uploadOperation) throw new Error('The previous upload has no confirmed file path after reload. Its outcome must be reconciled before another upload.');
     if (!entry.blob) throw new Error('The captured PDF is unavailable. No new export was started.');
     progress('upload', 'Uploading PDF to private storage…');
     entry.uploadStarted = true;

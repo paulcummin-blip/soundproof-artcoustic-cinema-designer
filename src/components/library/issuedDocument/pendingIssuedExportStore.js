@@ -24,7 +24,7 @@ const MAX_HELD_ATTEMPTS = 5;
 const held = new Map();
 const RECOVERY_KEY = 'soundproof.pending-issued-export.v1';
 const metadataKeys = ['key', 'identity', 'issued', 'filename', 'pageCount', 'attemptStartedAt',
-  'fileUri', 'previewStatus', 'rendering', 'uploadStarted', 'recordStarted'];
+  'fileUri', 'previewStatus', 'rendering', 'uploadStarted', 'recordStarted', 'uploadSha256', 'uploadSize'];
 function persistRecovery() {
   try {
     if (typeof window === 'undefined') return;
@@ -54,6 +54,8 @@ export function pendingExportKey({ projectId, documentType, filename } = {}) {
  */
 export function holdPendingExport({ identity = {}, filename = null, issued = null, blob = null, pageCount = null, retryExport = null, attemptStartedAt = new Date() } = {}) {
   const key = pendingExportKey({ projectId: identity.projectId, documentType: identity.documentType, filename });
+  const prior = held.get(key);
+  if ((prior && (prior.blob || prior.fileUri || prior.uploadStarted)) || (!prior && held.size >= MAX_HELD_ATTEMPTS)) throw new Error('An earlier PDF still needs storage recovery. Finish that operation before starting another export.');
   held.set(key, {
     key,
     identity,
@@ -65,10 +67,6 @@ export function holdPendingExport({ identity = {}, filename = null, issued = nul
     attemptStartedAt: (attemptStartedAt instanceof Date ? attemptStartedAt : new Date(attemptStartedAt)).toISOString(),
   });
 
-  while (held.size > MAX_HELD_ATTEMPTS) {
-    const oldest = held.keys().next().value;
-    held.delete(oldest);
-  }
   persistRecovery();
   return key;
 }

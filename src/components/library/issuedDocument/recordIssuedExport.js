@@ -24,6 +24,7 @@
  */
 
 import React from 'react';
+import { reportUploadReceiptApi } from './reportUploadReceipt';
 import { saveIssuedArtifact, boundedExportRead } from './issuedExportDurability';
 import { resolveIssuedDocumentUrl } from './issuedDocumentActions';
 import { base44 } from '@/api/base44Client';
@@ -286,11 +287,16 @@ async function verifyStoredPdf(fileUri, expectedBlob) {
 async function persistHeldPdf(pendingKey, onProgress, telemetry = null) {
   const entry = peekPendingExport(pendingKey);
   if (!entry) throw new Error(RETRY_UNAVAILABLE_REASON);
+  const update = patch => updatePendingExport(pendingKey, patch);
+  const receiptApi = entry.issued?.documentType === 'project' && entry.issued?.uploadOperationId
+    ? reportUploadReceiptApi({ entry, update, invoke: body => base44.functions.invoke('manageMonitoredOperation', body) })
+    : null;
   return saveIssuedArtifact({
     entry, onProgress, verifyFile: verifyStoredPdf,
     update: patch => updatePendingExport(pendingKey, patch),
     api: {
       upload: (blob, filename) => uploadIssuedPdf({ blob, filename }),
+      ...receiptApi,
       find: query => base44.entities.ProjectAssetExport.filter(query, { limit: 2 }),
       create: row => base44.entities.ProjectAssetExport.create(row),
     },
