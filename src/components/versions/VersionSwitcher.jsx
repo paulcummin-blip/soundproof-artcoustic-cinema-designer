@@ -397,7 +397,7 @@ export default function VersionSwitcher({
               } else {
                 void handleCreateVersion();
               }
-            }
+            }}
             disabled={busy || disabled || !canCreateVersion}
             className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: BRAND.green, fontFamily: 'Didact Gothic, sans-serif' }}
