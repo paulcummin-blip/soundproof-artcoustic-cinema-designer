@@ -28,21 +28,11 @@ import { resolveIssuedDocumentUrl } from '@/components/library/issuedDocument/is
 import { ISSUED_DOCUMENT_LABEL, ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
 import { standardFilenameForExportRecord } from './standardAssetFilename';
 import AssetDeleteButton from './AssetDeleteButton';
+import { formatAssetDate, formatAssetTimestamp, sortAssetsByCreatedDesc } from './assetTimestamp';
 
 /** Human-friendly label for a document type, falling back to the raw value. */
 function documentTypeLabel(documentType) {
   return ISSUED_DOCUMENT_LABEL[documentType] || documentType || 'Document';
-}
-
-/** Short date string for a revision subtitle. */
-function formatExportDate(isoString) {
-  if (!isoString) return '';
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch {
-    return '';
-  }
 }
 
 /**
@@ -117,9 +107,9 @@ function downloadImage(url, caption) {
   };
 }
 
-function AssetRow({ icon: Icon, name, sub, onOpen, onDownload, canOpen = true, deleteButton = null }) {
+function AssetRow({ icon: Icon, name, sub, onOpen, onDownload, canOpen = true, deleteButton = null, rowTitle = null }) {
   return (
-    <div className="flex items-center gap-2 py-1 px-2 rounded hover:bg-[#F8F8F7] transition-colors min-w-0">
+    <div className="flex items-center gap-2 py-1 px-2 rounded hover:bg-[#F8F8F7] transition-colors min-w-0" title={rowTitle || undefined}>
       <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: '#8B8378' }} />
       <button
         type="button"
@@ -129,7 +119,7 @@ function AssetRow({ icon: Icon, name, sub, onOpen, onDownload, canOpen = true, d
         title={canOpen ? `Open ${name}` : name}
       >
         <span className={`block text-xs font-medium text-[#1B1A1A] truncate ${canOpen ? 'hover:underline' : ''}`} title={name}>{name}</span>
-        {sub && <span className="block text-[10px] text-[#8B8378] truncate" title={sub}>{sub}</span>}
+        {sub && <span className="block text-[10px] text-[#8B8378] truncate" title={rowTitle || sub}>{sub}</span>}
       </button>
       <button
         type="button"
@@ -153,6 +143,65 @@ function AssetRow({ icon: Icon, name, sub, onOpen, onDownload, canOpen = true, d
       {deleteButton}
     </div>
   );
+}
+
+/**
+ * Render one group's assets (issued PDFs + uploaded images) as a single list
+ * ordered by the actual stored creation timestamp, newest first, so a newly
+ * created document of any type appears at the top of its group. Each row
+ * carries the full local-time creation timestamp as its hover tooltip; the
+ * visible short date format is retained.
+ */
+function renderSortedAssetRows({ exportRecords, imageRecords, versionNameById, project, onRefresh, imageLabel, onImageOpen }) {
+  const entries = sortAssetsByCreatedDesc(exportRecords, imageRecords);
+  return entries.map(({ record, kind }) => {
+    const fullTimestamp = formatAssetTimestamp(record?.created_date);
+    if (kind === 'export') {
+      const dateStr = formatAssetDate(record?.created_date);
+      const fname = standardFilenameForExportRecord(record, project, versionNameById);
+      return (
+        <AssetRow
+          key={record.id}
+          icon={FileText}
+          name={fname}
+          sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
+          rowTitle={fullTimestamp}
+          onOpen={openSingle(record)}
+          onDownload={downloadSingle(record, 'document.pdf', fname)}
+          deleteButton={
+            <AssetDeleteButton
+              record={record}
+              kind="export"
+              assetLabel={fname}
+              typeLabel={documentTypeLabel(record.document_type)}
+              onDeleted={onRefresh}
+            />
+          }
+        />
+      );
+    }
+    const label = record.caption || record.slot || 'Image';
+    return (
+      <AssetRow
+        key={record.id}
+        icon={ImageIcon}
+        name={label}
+        sub={imageLabel}
+        rowTitle={fullTimestamp}
+        onOpen={onImageOpen ? onImageOpen(record.file_url) : undefined}
+        onDownload={downloadImage(record.file_url, record.caption || 'image')}
+        deleteButton={
+          <AssetDeleteButton
+            record={record}
+            kind="image"
+            assetLabel={label}
+            typeLabel="image"
+            onDeleted={onRefresh}
+          />
+        }
+      />
+    );
+  });
 }
 
 export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false, defaultOpen = false, project = null }) {
@@ -285,47 +334,15 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
           {!loading && (projectWideExports.length > 0 || projectWideImages.length > 0) && (
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A79E8C] mb-1">Project-wide</div>
-              {projectWideExports.map((record) => {
-                const dateStr = formatExportDate(record?.exported_at);
-                const fname = standardFilenameForExportRecord(record, project, versionNameById);
-                return (
-                  <AssetRow
-                    key={record.id}
-                    icon={FileText}
-                    name={fname}
-                    sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                    onOpen={openSingle(record)}
-                    onDownload={downloadSingle(record, 'document.pdf', fname)}
-                    deleteButton={
-                      <AssetDeleteButton
-                        record={record}
-                        kind="export"
-                        assetLabel={fname}
-                        typeLabel={documentTypeLabel(record.document_type)}
-                        onDeleted={refresh}
-                      />
-                    }
-                  />
-                );
+              {renderSortedAssetRows({
+                exportRecords: projectWideExports,
+                imageRecords: projectWideImages,
+                versionNameById,
+                project,
+                onRefresh: refresh,
+                imageLabel: 'Project image',
+                onImageOpen: null,
               })}
-              {projectWideImages.map((record) => (
-                <AssetRow
-                  key={record.id}
-                  icon={ImageIcon}
-                  name={record.caption || record.slot || 'Image'}
-                  sub="Project image"
-                  onDownload={downloadImage(record.file_url, record.caption || 'image')}
-                  deleteButton={
-                    <AssetDeleteButton
-                      record={record}
-                      kind="image"
-                      assetLabel={record.caption || record.slot || 'Image'}
-                      typeLabel="image"
-                      onDeleted={refresh}
-                    />
-                  }
-                />
-              ))}
             </div>
           )}
 
@@ -339,48 +356,15 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
             return (
               <div key={versionId}>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A79E8C] mb-1">{versionName}</div>
-                {versionExports.map((record) => {
-                  const dateStr = formatExportDate(record?.exported_at);
-                  const fname = standardFilenameForExportRecord(record, project, versionNameById);
-                  return (
-                    <AssetRow
-                      key={record.id}
-                      icon={FileText}
-                      name={fname}
-                      sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                      onOpen={openSingle(record)}
-                      onDownload={downloadSingle(record, 'document.pdf', fname)}
-                      deleteButton={
-                        <AssetDeleteButton
-                          record={record}
-                          kind="export"
-                          assetLabel={fname}
-                          typeLabel={documentTypeLabel(record.document_type)}
-                          onDeleted={refresh}
-                        />
-                      }
-                    />
-                  );
+                {renderSortedAssetRows({
+                  exportRecords: versionExports,
+                  imageRecords: versionImages,
+                  versionNameById,
+                  project,
+                  onRefresh: refresh,
+                  imageLabel: 'Version image',
+                  onImageOpen: openImage,
                 })}
-                {versionImages.map((record) => (
-                  <AssetRow
-                    key={record.id}
-                    icon={ImageIcon}
-                    name={record.caption || record.slot || 'Image'}
-                    sub="Version image"
-                    onOpen={openImage(record.file_url)}
-                    onDownload={downloadImage(record.file_url, record.caption || 'image')}
-                    deleteButton={
-                      <AssetDeleteButton
-                        record={record}
-                        kind="image"
-                        assetLabel={record.caption || record.slot || 'Image'}
-                        typeLabel="image"
-                        onDeleted={refresh}
-                      />
-                    }
-                  />
-                ))}
               </div>
             );
           })}
@@ -405,48 +389,15 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A79E8C] mb-1">
                     Version (deleted)
                   </div>
-                  {versionExports.map((record) => {
-                    const dateStr = formatExportDate(record?.exported_at);
-                    const fname = standardFilenameForExportRecord(record, project, versionNameById);
-                    return (
-                      <AssetRow
-                        key={record.id}
-                        icon={FileText}
-                        name={fname}
-                        sub={`${documentTypeLabel(record.document_type)}${record.rendering === 'text_vector' ? ' · Text-only fallback — regenerate for designed PDF' : ''}${dateStr ? ' · ' + dateStr : ''}`}
-                        onOpen={openSingle(record)}
-                        onDownload={downloadSingle(record, 'document.pdf', fname)}
-                        deleteButton={
-                          <AssetDeleteButton
-                            record={record}
-                            kind="export"
-                            assetLabel={fname}
-                            typeLabel={documentTypeLabel(record.document_type)}
-                            onDeleted={refresh}
-                          />
-                        }
-                      />
-                    );
+                  {renderSortedAssetRows({
+                    exportRecords: versionExports,
+                    imageRecords: versionImages,
+                    versionNameById,
+                    project,
+                    onRefresh: refresh,
+                    imageLabel: 'Version image',
+                    onImageOpen: openImage,
                   })}
-                  {versionImages.map((record) => (
-                    <AssetRow
-                      key={record.id}
-                      icon={ImageIcon}
-                      name={record.caption || record.slot || 'Image'}
-                      sub="Version image"
-                      onOpen={openImage(record.file_url)}
-                      onDownload={downloadImage(record.file_url, record.caption || 'image')}
-                      deleteButton={
-                        <AssetDeleteButton
-                          record={record}
-                          kind="image"
-                          assetLabel={record.caption || record.slot || 'Image'}
-                          typeLabel="image"
-                          onDeleted={refresh}
-                        />
-                      }
-                    />
-                  ))}
                 </div>
               );
             });
