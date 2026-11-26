@@ -39,3 +39,23 @@ export function isSameVersion(currentVersionId, targetVersionId) {
   if (!currentVersionId || !targetVersionId) return false;
   return String(currentVersionId) === String(targetVersionId);
 }
+
+/** Wait for the existing writer, then save the latest render's design. */
+export async function saveBeforeVersionCreation({
+  save, readBucket, assertScope, timeoutMs = 15000,
+  now = () => Date.now(), wait = ms => new Promise(resolve => setTimeout(resolve, ms)),
+}) {
+  const deadline = now() + timeoutMs;
+  assertScope();
+  while (readBucket()?.inFlight) {
+    if (now() >= deadline) throw new Error('The current save is still running. Your changes remain open; retry when saving finishes.');
+    await wait(50);
+    assertScope();
+  }
+  const result = await save();
+  assertScope();
+  if (result?.success !== true) throw new Error(result?.error || 'The design could not be confirmed saved. Your changes remain open.');
+  if (readBucket()?.inFlight || readBucket()?.dirty) {
+    throw new Error('The design changed while saving. Your latest changes remain open; save them before creating an option.');
+  }
+}
