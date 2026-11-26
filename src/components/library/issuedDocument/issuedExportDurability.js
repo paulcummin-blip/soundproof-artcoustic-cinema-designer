@@ -26,7 +26,7 @@ export async function awaitExportOperation(entry, key, start, timeoutMs = 45000)
     ]);
   } catch (error) {
     const status = Number(error?.response?.status || error?.status || error?.cause?.response?.status || error?.cause?.status || 0);
-    if (key === 'uploadOperation' && entry[key]?.state === 'rejected' && ![400, 401, 403, 404, 422].includes(status)) {
+    if (key === 'uploadOperation' && !entry.fileUri && entry[key]?.state === 'rejected' && ![400, 401, 403, 404, 422].includes(status)) {
       const uncertain = new Error(entry.uploadReceiptRecovery ? 'The upload response was interrupted. The completed PDF is retained. Retry storage to check the original upload receipt before continuing.' : 'The upload failed without a confirmed file path. A second upload cannot safely be started until its storage outcome is reconciled. Return to the project to use your previous completed documents; administrator recovery is required.');
       uncertain.cause = error;
       throw uncertain;
@@ -118,6 +118,21 @@ export async function saveIssuedArtifact({ entry, api, verifyFile, onProgress = 
   if (existing) {
     progress('complete', 'PDF and asset record verified.');
     return existing;
+  }
+  if (api.reconcileRecord) {
+    const result = await boundedExportRead(() => api.reconcileRecord(expected), 'Document save receipt', timeoutMs);
+    if (result.state === 'stored') {
+      const recovered = await read();
+      if (!recovered) throw new Error('The saved document is not yet readable. Retry checks the same record.');
+      progress('complete', 'PDF and asset record verified.');
+      return recovered;
+    }
+    if (!['ready', 'refused'].includes(result.state)) throw new Error('The document save outcome is uncertain; no new record was created.');
+    // A fresh request is safe behind the existing operation's server-side claim.
+    // A delayed previous request cannot acquire the same claim concurrently.
+    entry.recordOperation = null;
+    entry.recordStarted = false;
+    update({ recordStarted: false });
   }
   if (entry.recordStarted && !entry.recordOperation) throw new Error('The previous asset save is not visible yet after reload. Retry checks for that record without creating another.');
   entry.recordStarted = true;

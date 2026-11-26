@@ -170,6 +170,40 @@
           "nullable": true
         }
       }
+    },
+    "report_record": {
+      "type": "object",
+      "nullable": true,
+      "description": "Final issued-document claim for this existing report operation. Unknown writes are reconciled, never taken over by elapsed time.",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "writing",
+            "refused",
+            "unknown",
+            "stored"
+          ]
+        },
+        "identity_hash": {
+          "type": "string"
+        },
+        "asset_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "failure_code": {
+          "type": "string",
+          "nullable": true
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "stored_at": {
+          "type": "string"
+        }
+      }
     }
   },
   "required": [

@@ -41,6 +41,7 @@ import {
   retryPublicationDocument,
   PUBLICATION_DOCUMENT,
 } from "@/components/report/projectReport/storeProjectReportPublication";
+import { ensureReportRegistration } from './reportOperationRegistration';
 import { base44 } from "@/api/base44Client";
 
 // Version metadata is optional — only present when the project has a saved
@@ -143,6 +144,7 @@ export function useClientReportPdfExport({
   // Monitored operation ID for the current export, so progress is reported to
   // the backend watchdog. Null when no export is in flight.
   const operationIdRef = useRef(null);
+  const registrationRef = useRef(null);
   const reportOperation = useCallback((action, payload = {}) => {
     if (!operationIdRef.current) return;
     base44.functions.invoke('manageMonitoredOperation', {
@@ -209,17 +211,12 @@ export function useClientReportPdfExport({
 
     storeOnlyRef.current = storeOnly;
 
-    // ── Start operation monitoring (fire-and-forget, fail-open) ──
-    operationIdRef.current = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : `rpt-${Date.now()}`;
-    reportOperation('start', {
-      operation_type: 'report_export',
-      account_id: issuedDocument?.accountId || null,
-      project_id: issuedDocument?.projectId || null,
-      version_id: issuedDocument?.versionId || null,
-      initial_stage: 'readiness',
-    });
+    const registrationKey = [issuedDocument?.projectId, issuedDocument?.versionId].join('|');
+    if (!registrationRef.current || registrationRef.current.key !== registrationKey || registrationRef.current.confirmed) {
+      registrationRef.current = { key: registrationKey, operationId: crypto.randomUUID() };
+    }
+    operationIdRef.current = registrationRef.current.operationId;
+    lastExportRef.current = null;
 
     const title = buildProjectReportTitle(
       projectName,
@@ -255,6 +252,17 @@ export function useClientReportPdfExport({
     // publication reads incomplete and a targeted retry re-stores only the
     // document that failed — never the one that succeeded.
     try {
+    if (issuedDocument?.documentType === 'project') {
+      updateProgress({ stage: 'registration', message: 'Confirming report storage registration…' });
+      await ensureReportRegistration({ attempt: registrationRef.current,
+        invoke: body => base44.functions.invoke('manageMonitoredOperation', body),
+        projectId: issuedDocument.projectId, versionId: issuedDocument.versionId,
+      });
+    } else {
+      reportOperation('start', { operation_type: 'report_export',
+        account_id: issuedDocument?.accountId || null, project_id: issuedDocument?.projectId || null,
+        version_id: issuedDocument?.versionId || null, initial_stage: 'readiness' });
+    }
     updateProgress({ stage: 'readiness', message: 'Preparing the completed report pages…' });
     const reportSnapshot = issuedDocument?.documentType
       ? snapshotIssuedComposition(issuedDocument.documentType)
@@ -263,6 +271,7 @@ export function useClientReportPdfExport({
       ? {
           ...issuedDocument,
           uploadOperationId: operationIdRef.current,
+          recordRecoveryVersion: 1,
           filename: title,
           // A storage failure that could not be retried from the held PDF can
           // re-run this export, and says so on the button that does it.

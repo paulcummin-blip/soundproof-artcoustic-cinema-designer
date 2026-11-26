@@ -31,7 +31,7 @@ export default async function(req) {
     const form = multipart ? await req.formData() : null;
     const body = form ? Object.fromEntries(form.entries()) : await req.json().catch(() => ({}));
     const { action } = body;
-    if (['report_upload_prepare', 'report_upload_status', 'report_upload_put'].includes(action)) {
+    if (['report_upload_prepare', 'report_upload_status', 'report_upload_put', 'report_upload_recover', 'report_record_status', 'report_record_put'].includes(action)) {
       // Storage is fail-closed. Existing monitoring actions remain fail-open.
       try {
         return Response.json(await handleReportUpload({ service: base44.asServiceRole, caller: base44, user, body, file: form?.get('file') }));

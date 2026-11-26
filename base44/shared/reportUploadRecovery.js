@@ -1,6 +1,8 @@
 // Private-file receipts for the EXISTING report operation. No new file store,
 // document authority or expiry-based lock takeover. A lost storage receipt is
 // explicitly uncertain; it is never permission to upload again.
+import { reconcileReportRecord } from './reportRecordRecovery.js';
+
 const REFUSED = new Set([400, 401, 403, 404, 413, 415, 422]);
 const rows = value => Array.isArray(value) ? value : value?.items || [];
 const fail = (code, status = 409) => Object.assign(new Error(code), { code, status });
@@ -33,6 +35,41 @@ export async function handleReportUpload({ service, caller, user, body, file = n
     return { state, file_uri: receipt.file_uri || null, sha256: receipt.sha256, size: receipt.size, failure_code: receipt.failure_code || null };
   };
   if (body.action === 'report_upload_status') return view(await read());
+  if (['report_record_status', 'report_record_put'].includes(body.action)) {
+    return reconcileReportRecord({ operations, operation, caller, body, receipt: await read(), now });
+  }
+  if (body.action === 'report_upload_recover') {
+    const receipt = await read();
+    if (!receipt || receipt.sha256 !== body.sha256 || receipt.size !== Number(body.size)) throw fail('REPORT_PDF_IDENTITY_CONFLICT');
+    if (receipt.state === 'stored') {
+      if (receipt.file_uri !== body.file_uri) throw fail('REPORT_FILE_IDENTITY_CONFLICT');
+      return view(receipt);
+    }
+    if (!['uploading', 'unknown'].includes(receipt.state)) throw fail('REPORT_UPLOAD_NOT_STARTED');
+    // Only a reference returned for this caller's original operation can be recovered.
+    // The signing integration retains Base44's private-file authorization.
+    const uri = String(body.file_uri || '');
+    const parts = uri.split('/');
+    if (parts.length !== 6 || parts[0] !== 'mp' || parts[1] !== 'private' ||
+        !/^[a-f0-9]{24}$/.test(parts[2]) || parts[3] !== 'app-users' ||
+        parts[4] !== operation.initiated_by ||
+        !parts[5].endsWith(`_SoundProofReport-${operation.operation_id}.pdf`) ||
+        !/^[A-Za-z0-9:_-]+\.pdf$/.test(parts[5])) throw fail('INVALID_RECOVERY_FILE', 400);
+    const signed = await caller.integrations.Core.CreateFileSignedUrl({ file_uri: uri, expires_in: 60 });
+    const url = new URL(signed.signed_url);
+    if (url.protocol !== 'https:' || url.hostname !== 'media.base44.com') throw fail('UNSUPPORTED_PRIVATE_FILE_HOST');
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw fail('RECOVERY_FILE_UNAVAILABLE');
+    const bytes = await response.arrayBuffer();
+    const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(x => x.toString(16).padStart(2, '0')).join('');
+    if (bytes.byteLength !== receipt.size || hash !== receipt.sha256 || new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw fail('RECOVERY_FILE_BYTES_MISMATCH');
+    await operations.updateMany({ id: operation.id, 'report_upload.state': { $in: ['uploading', 'unknown'] }, 'report_upload.sha256': hash }, { $set: {
+      'report_upload.state': 'stored', 'report_upload.file_uri': uri, 'report_upload.stored_at': now(), 'report_upload.failure_code': null,
+    } });
+    const recovered = await read();
+    if (recovered.state !== 'stored' || recovered.file_uri !== uri) throw fail('UPLOAD_RECEIPT_SAVE_UNCONFIRMED');
+    return view(recovered);
+  }
   if (!/^[a-f0-9]{64}$/.test(body.sha256 || '') || !Number.isSafeInteger(Number(body.size)) || Number(body.size) < 8) throw fail('INVALID_PDF_IDENTITY', 400);
   const same = receipt => receipt?.sha256 === body.sha256 && receipt?.size === Number(body.size);
   let receipt = await read();
@@ -76,11 +113,17 @@ export async function handleReportUpload({ service, caller, user, body, file = n
     await operations.updateMany({ id: operation.id, 'report_upload.state': 'uploading' }, { $set: { 'report_upload.state': 'unknown', 'report_upload.failure_code': 'STORAGE_RECEIPT_MISSING' } });
     return view(await read());
   }
-  // Persist BEFORE acknowledging the browser. A disconnect after this point
-  // is recoverable through status without another private-file upload.
-  const saved = await operations.updateMany({ id: operation.id, 'report_upload.state': 'uploading' }, { $set: {
-    'report_upload.state': 'stored', 'report_upload.file_uri': uploaded.file_uri, 'report_upload.stored_at': now(),
-  } });
-  if (saved.updated !== 1) throw fail('UPLOAD_RECEIPT_SAVE_UNCONFIRMED');
-  return view(await read());
+  // Keep the known storage result even when the subsequent receipt write fails.
+  // receipt_pending does NOT claim that the database acknowledgement succeeded.
+  const known = { state: 'receipt_pending', file_uri: uploaded.file_uri,
+    sha256: receipt.sha256, size: receipt.size, failure_code: 'UPLOAD_RECEIPT_SAVE_UNCONFIRMED' };
+  try {
+    const saved = await operations.updateMany({ id: operation.id, 'report_upload.state': 'uploading' }, { $set: {
+      'report_upload.state': 'stored', 'report_upload.file_uri': uploaded.file_uri, 'report_upload.stored_at': now(),
+    } });
+    if (saved.updated !== 1) return known;
+    return view(await read());
+  } catch {
+    return known;
+  }
 }

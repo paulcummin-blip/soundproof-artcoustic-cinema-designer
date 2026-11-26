@@ -296,9 +296,9 @@ async function persistHeldPdf(pendingKey, onProgress, telemetry = null) {
     update: patch => updatePendingExport(pendingKey, patch),
     api: {
       upload: (blob, filename) => uploadIssuedPdf({ blob, filename }),
-      ...receiptApi,
       find: query => base44.entities.ProjectAssetExport.filter(query, { limit: 2 }),
       create: row => base44.entities.ProjectAssetExport.create(row),
+      ...receiptApi,
     },
     telemetry,
   });

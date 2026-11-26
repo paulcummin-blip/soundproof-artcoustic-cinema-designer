@@ -81,8 +81,8 @@ test('same operation refuses different PDF bytes',async()=>{
 test('disabled caller and inaccessible project cannot recover storage references',async()=>{
   const f=fixture();f.user.role='user';f.user.account_id='account';f.user.access_level='FULL_ACCESS';f.user.soundproof_access_enabled=false;await assert.rejects(f.save(),/FORBIDDEN/);f.user.soundproof_access_enabled=true;f.caller.entities.Project.filter=async()=>[];await assert.rejects(f.save(),/FORBIDDEN/);assert.equal(f.calls.upload,0);
 });
-test('receipt-write failure after upload remains unknown and never re-uploads',async()=>{
-  const f=fixture();const update=f.operations.updateMany;f.operations.updateMany=async(q,u)=>{if(u.$set['report_upload.state']==='stored')throw Error('database unavailable');return update(q,u);};await assert.rejects(f.save());f.operations.updateMany=update;await assert.rejects(f.save(),/still running/);assert.equal(f.calls.upload,1);assert.equal(f.files.size,1);assert.equal(f.assets.length,0);
+test('receipt-write failure retains the known reference for legacy caller recovery',async()=>{
+  const f=fixture();const update=f.operations.updateMany;f.operations.updateMany=async(q,u)=>{if(u.$set['report_upload.state']==='stored')throw Error('database unavailable');return update(q,u);};await assert.rejects(f.save());f.operations.updateMany=update;assert.ok(f.entry.fileUri);await f.save();assert.equal(f.calls.upload,1);assert.equal(f.files.size,1);assert.equal(f.assets.length,1);
 });
 
 
