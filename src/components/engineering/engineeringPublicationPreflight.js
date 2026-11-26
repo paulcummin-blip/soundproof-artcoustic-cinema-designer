@@ -5,8 +5,6 @@ import { statesBassAuthority } from './versionedEngineeringAuthority';
 import { bassContractMatchesRequestedP14 } from '../room/bass/completedBassResultPersistence';
 import { deriveRequestedCalibrationConfig } from '../room/bass/requestedCalibrationConfig';
 
-let lastInternalDiagnostic = null;
-
 export function publicationBassIdentityMatches({ completedBassAuthority, bassFingerprint, designState }) {
   if (!bassFingerprint) return true; // Explicit non-applicability is checked by the existing terminal gates.
   const contract = completedBassAuthority?.contract;
@@ -18,7 +16,7 @@ export function publicationBassIdentityMatches({ completedBassAuthority, bassFin
 export function engineeringPublicationPreflight({
   projectId, versionId, ready, isPublishable, engineeringSummary,
   engineeringFingerprint, bassReadiness = {}, retainedFromRefresh = false,
-  reportSnapshot, designState, versions, completedBassAuthority,
+  reportSnapshot, designState, versions, completedBassAuthority, minimumSystemMet,
 }) {
   const bassReady = bassReadiness.ready === true || retainedFromRefresh === true;
   const candidate = {
@@ -45,6 +43,7 @@ export function engineeringPublicationPreflight({
     ...(reportSnapshot?.capture_missing || []).map(reason => ({ key:reason, label:reason, ok:false })),
     ...contract.missing.map(reason => ({ key:reason, label:reason, ok:false })),
     { key: 'version', label: 'Project and selected version', ok: !!projectId && !!versionId },
+    ...(minimumSystemMet === undefined ? [] : [{ key: 'minimum_system', label: 'Select the front speakers, surrounds and at least one subwoofer', ok: minimumSystemMet === true }]),
     { key: 'hydration', label: 'Version loaded and minimum system selected', ok: ready === true },
     { key: 'rp22_terminal', label: 'RP22 P1–P21 terminal (verified bass or explicit N/A)', ok: provisional.length === 0, detail: provisional.join(', ') },
     { key: 'bass_current', label: 'Current verified bass / P19', ok: bassReady, detail: bassReady ? null : bassReason },
@@ -55,20 +54,6 @@ export function engineeringPublicationPreflight({
     ...sectionReport.items.filter(item => item.key !== 'published_at'),
   ];
   const missing = gates.filter(item => !item.ok);
-  if (projectId === '6b07f4b1e21850ee5483b240') {
-    const diagnostic = JSON.stringify({ engineeringFingerprint, p14: parameters.p14,
-      roomP14: engineeringSummary?.roomResultsByParameter?.p14,
-      contractP14: completedBassAuthority?.contract?.productAnalysis?.parameters?.p14,
-      currentFingerprint: completedBassAuthority?.currentFingerprint,
-      resultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint,
-      selectedP14Level: designState?.splConfig?.selectedP14Level,
-      selectedP14TargetBasis: designState?.splConfig?.selectedP14TargetBasis,
-      missing: missing.map(({key,detail}) => ({key,detail})) });
-    if (diagnostic !== lastInternalDiagnostic) {
-      lastInternalDiagnostic = diagnostic;
-      console.info('[internal-p14-publication]', diagnostic);
-    }
-  }
   return {
     ready: missing.length === 0, gates, missing,
     assessmentComplete: terminal.complete && bassReady,
