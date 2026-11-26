@@ -36,6 +36,7 @@ export default function TechnicalLevelBadge({ level, size = "normal" }) {
 
   return (
     <div
+      data-rp22-capture-label=""
       className={size === "small" ? "tech-seat-badge" : undefined}
       style={{
         width: dims.w,
