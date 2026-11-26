@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><title>Internal RP22 pill capture diagnostic</title></head><body>
 <h1>Internal RP22 pill capture diagnostic</h1><p>No project records or stored documents are read or written.</p>
 <button id="run">Capture baseline</button><button id="probe">Measure font probe</button><button id="fix">Capture with isolated probe correction</button>
-<div id="downloads"></div><pre id="status">Loading</pre><div id="root"></div>
+<div id="downloads"></div><pre id="status" style="max-height:150px;overflow:auto">Loading</pre><div id="root"></div>
 <script type="module">
 import React from 'react';
 import {createRoot} from 'react-dom/client';
@@ -37,7 +37,7 @@ function probe(inline=false){
 }
 document.getElementById('probe').onclick=()=>output.textContent=JSON.stringify([probe(),probe(true)],null,2);
 async function capture(fix=false){
- let style;if(fix){style=document.createElement('style');style.textContent='body > div[style*="visibility: hidden"] {line-height:normal !important;} body > div[style*="visibility: hidden"] > img {display:inline-block !important;}';document.head.append(style);}
+ let style;if(fix){style=document.createElement('style');style.textContent='body > div[style*="visibility: hidden"] > img {display:inline-block !important;}';document.head.append(style);}
  try{
  const snapshots=[];
  const result=await captureCompositionToPdf({nodeHtml:document.querySelector('.client-report-root').outerHTML,pageSelector:'.audit-page',bodyClass:'client-report-printing',onProgress:p=>{
@@ -46,7 +46,7 @@ async function capture(fix=false){
  const doc=document.querySelector('iframe[title="Issued document capture"]')?.contentDocument;
  if(doc)snapshots.push([...doc.querySelectorAll('span, .tech-seat-badge')].filter(e=>/^(L[1-4]|FAIL|N\/A|—)$/.test(e.textContent)).map(e=>{const s=doc.defaultView.getComputedStyle(e),r=e.getBoundingClientRect();return {label:e.textContent,width:r.width,height:r.height,font:s.fontFamily,fontSize:s.fontSize,lineHeight:s.lineHeight,display:s.display};}));
  }}});
- const a=document.createElement('a');a.download=fix?'pill-probe-normal.pdf':'pill-baseline.pdf';a.href=URL.createObjectURL(result.blob);a.textContent='Download '+a.download;document.getElementById('downloads').append(a,document.createElement('br'));
+ const a=document.createElement('a');a.download=fix?'pill-probe-corrected.pdf':'pill-after.pdf';a.href=URL.createObjectURL(result.blob);a.textContent='Download '+a.download;document.getElementById('downloads').append(a,document.createElement('br'));
  output.textContent=JSON.stringify({pageCount:result.pageCount,rendering:result.rendering,diagnostics:result.captureDiagnostics,probe:[probe(),probe(true)],snapshots},null,2);
  }catch(e){output.textContent=e.stack;}finally{style?.remove();}
 }
