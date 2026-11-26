@@ -45,12 +45,26 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
     height: formatDimension(roomDims?.heightM),
   }));
 
+  // Tracks the last value committed for each dimension. Guards against
+  // duplicate recalculations when Enter commits and the subsequent blur
+  // fires for the same unchanged value.
+  const lastCommittedRef = React.useRef({
+    width: roomDims?.widthM,
+    length: roomDims?.lengthM,
+    height: roomDims?.heightM,
+  });
+
   React.useEffect(() => {
     setDraftDims({
       width: formatDimension(roomDims?.widthM),
       length: formatDimension(roomDims?.lengthM),
       height: formatDimension(roomDims?.heightM),
     });
+    lastCommittedRef.current = {
+      width: roomDims?.widthM,
+      length: roomDims?.lengthM,
+      height: roomDims?.heightM,
+    };
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
   const handleDimensionChange = (key, raw) => {
@@ -63,21 +77,27 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
     }));
   };
 
-  const handleDimensionBlur = (key) => {
+  // Shared commit used by both blur and Enter. Only calls the dimension
+  // setter when the parsed value actually differs from the last committed
+  // value, so pressing Enter then leaving the field does not trigger a
+  // duplicate update or recalculation.
+  const commitDimension = (key) => {
     const value = draftDims[key];
-    
+
     // Skip invalid states
     if (value === "" || value === ".") {
       setDraftDims((prev) => ({
         ...prev,
         [key]: formatDimension(roomDims?.[`${key}M`]),
       }));
+      lastCommittedRef.current[key] = roomDims?.[`${key}M`];
       return;
     }
 
-    // Parse and commit
+    // Parse and commit only if changed
     const parsed = parseDimensionInput(value);
-    if (parsed !== null) {
+    if (parsed !== null && parsed !== lastCommittedRef.current[key]) {
+      lastCommittedRef.current[key] = parsed;
       if (key === 'width') {
         setRoomWidthM(parsed);
       } else if (key === 'length') {
@@ -92,6 +112,16 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
       ...prev,
       [key]: formatDimension(roomDims?.[`${key}M`]),
     }));
+  };
+
+  const handleDimensionKeyDown = (key, e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitDimension(key);
+      // Blur so the field leaves editing mode; the blur commit is a guarded
+      // no-op when the value is unchanged.
+      e.target.blur();
+    }
   };
 
   // Mutual exclusivity (Plan View only): only one of Room Dimensions /
@@ -192,7 +222,8 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
               spellCheck={false}
               value={draftDims.length}
               onChange={(e) => handleDimensionChange('length', e.target.value)}
-              onBlur={() => handleDimensionBlur('length')}
+              onBlur={() => commitDimension('length')}
+              onKeyDown={(e) => handleDimensionKeyDown('length', e)}
               disabled={disabled}
               style={compactInputStyle}
             />
@@ -210,7 +241,8 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
               spellCheck={false}
               value={draftDims.width}
               onChange={(e) => handleDimensionChange('width', e.target.value)}
-              onBlur={() => handleDimensionBlur('width')}
+              onBlur={() => commitDimension('width')}
+              onKeyDown={(e) => handleDimensionKeyDown('width', e)}
               disabled={disabled}
               style={compactInputStyle}
             />
@@ -228,7 +260,8 @@ export default function RoomDimensions({ disabled, speakerPositionsView, onSpeak
               spellCheck={false}
               value={draftDims.height}
               onChange={(e) => handleDimensionChange('height', e.target.value)}
-              onBlur={() => handleDimensionBlur('height')}
+              onBlur={() => commitDimension('height')}
+              onKeyDown={(e) => handleDimensionKeyDown('height', e)}
               disabled={disabled}
               style={compactInputStyle}
             />
