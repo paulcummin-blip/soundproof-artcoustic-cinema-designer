@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { registerElectronicPersistence } from "@/components/room/bass/optimiseWorkflow/electronicPersistence.js";
 import { Project } from "@/entities/Project";
+import { DESIGN_CONFLICT, assertSaveBaseline, assertDesignUnchanged, saveDesignConditionally, saveSharedConditionally } from "@/components/state/conditionalDesignSave";
 import { base44 } from "@/api/base44Client";
 import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
 import { mergeProjectAndVersion, buildDesignState, buildSharedUpdate } from "@/lib/versionAuthority";
@@ -127,6 +128,7 @@ appState, // Pass appState directly for setters
   // Set during loadProject, used by autosave/manual save to write design_state
   // to the correct ProjectVersion record.
   const activeVersionIdRef = useRef(null);
+  const saveBaselineRef = useRef(null);
   // Commercial-collection hydration gate. A database write is refused until the
   // priced selections of this exact project + version — manual extras, acoustic
   // treatment, price-display basis — have finished loading, and a populated
@@ -363,6 +365,7 @@ appState, // Pass appState directly for setters
       // Then load the active version's design_state and merge with the
       // Project's shared fields for hydration.
       let mergedP = p;
+      let loadedSaveVersion = null;
       let createdMigrationVersionId = null;
       // A version read failure is handled by the outer load-error boundary;
       // it must never become a successful legacy/default design load.
@@ -381,6 +384,7 @@ appState, // Pass appState directly for setters
           if (!version || version.id !== p.active_version_id || version.project_id !== id) {
             throw new Error("The selected design version could not be loaded for this project. Retry opening it.");
           }
+          loadedSaveVersion = version;
           mergedP = mergeProjectAndVersion(p, version);
         } else {
           throw new Error("The project has no saved design version. Retry opening it.");
@@ -406,6 +410,9 @@ appState, // Pass appState directly for setters
       }
       // Commit the version identity only after that exact version's design is
       // available. A later pointer must not relabel an earlier AppState.
+      saveBaselineRef.current = canRetainHydratedDesign && !sameLegacyDesignJustVersioned
+        ? canonical.identity?.saveBaseline || null
+        : { project: p, version: loadedSaveVersion };
       activeVersionIdRef.current = p.active_version_id;
       appState?.setActiveVersionId?.(p.active_version_id);
       setProjectNameState(mergedP?.name || "Project"); // Update internal projectName state
@@ -418,6 +425,7 @@ appState, // Pass appState directly for setters
         clientName: mergedP?.client_name || null,
         projectReference: mergedP?.project_reference || null,
         activeVersionId: mergedP?.active_version_id || null,
+        saveBaseline: saveBaselineRef.current,
       });
       // Only enable saving after successful same-project hydration.
       hydrationAuthorityRef.current = markLoaded(hydrationAuthorityRef.current);
@@ -761,6 +769,12 @@ appState, // Pass appState directly for setters
       }
 
       // Only save when dirty, and avoid overlapping writes
+      if (saveBaselineRef.current?.conflict) {
+        r.dirty = true;
+        r.lastError = saveBaselineRef.current.conflict;
+        setAutosaveStatus("conflict");
+        return;
+      }
       if (!r.dirty || r.inFlight) return;
 
       r.inFlight = true;
@@ -859,8 +873,12 @@ appState, // Pass appState directly for setters
         const sharedData = buildSharedUpdate(data);
         const sharedSig = (() => { try { return JSON.stringify(sharedData); } catch { return String(Date.now()); } })();
         if (!saveScopeCurrent()) throw new Error("The edited version changed before saving.");
+        const baseline = saveBaselineRef.current;
+        assertSaveBaseline(baseline, effectiveProjectId, savedVersionId);
+        await assertDesignUnchanged(baseline, effectiveProjectId, savedVersionId);
+        const guardScope = () => { if (!saveScopeCurrent()) throw new Error("The edited version changed during save."); };
         if (sharedSig !== r.lastSavedSharedSig) {
-          await Project.update(effectiveProjectId, sharedData);
+          await saveSharedConditionally(baseline, sharedData, guardScope);
         }
         // A shared write may yield while a different version is opened.
         // Refuse the stale capture before any version update is dispatched.
@@ -868,7 +886,7 @@ appState, // Pass appState directly for setters
         if (savedVersionId) {
           const terminalTrace = designState.optimiser_plan?.terminalTrace;
           try {
-            await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designState });
+            await saveDesignConditionally(baseline, designState, guardScope);
           } catch (error) {
             if (terminalTrace) console.info("[Bass ADI plan save failure]", JSON.stringify({
               runId: terminalTrace.runId, projectId: effectiveProjectId, versionId: savedVersionId,
@@ -945,7 +963,7 @@ appState, // Pass appState directly for setters
       } catch (e) {
         r.lastError = e?.message || "The version update failed.";
         if (globalThis.__B44_LOGS) console.error("Error during autosave:", e);
-        setAutosaveStatus("error");
+        setAutosaveStatus(e?.code === DESIGN_CONFLICT ? "conflict" : "error");
       } finally {
         r.inFlight = false;
       }
@@ -1134,6 +1152,7 @@ appState, // Pass appState directly for setters
     return registerElectronicPersistence(projectId, versionId, async (work, {saveCompletedPlan = false} = {}) => {
       const bucket = globalThis[`__rdAutosaveRefs_${projectId}`];
       if (!bucket) throw new Error("The save owner is not ready.");
+      assertSaveBaseline(saveBaselineRef.current, projectId, versionId);
       const generation = loadGenerationRef.current;
       const current = () => isMountedRef.current && generation === loadGenerationRef.current &&
         activeVersionIdRef.current === versionId &&
@@ -1141,6 +1160,7 @@ appState, // Pass appState directly for setters
       const waitStart = Date.now();
       while (bucket.inFlight && Date.now()-waitStart < 30000) await new Promise(resolve=>setTimeout(resolve,50));
       if (bucket.inFlight || !current()) throw new Error("The project is busy or changed before saving.");
+      await assertDesignUnchanged(saveBaselineRef.current, projectId, versionId);
       // A completed optimisation is an explicit save action, even when the
       // read-only opening gate never observed an input event (or HMR re-armed
       // that gate). Save its evaluated design through all normal guards first;
@@ -1190,7 +1210,7 @@ appState, // Pass appState directly for setters
         const ds=row.design_state;
         const next={...ds,subwooferInstances:settings.instances,
           spl_config:{...ds.spl_config,crossover:settings.crossover,bassAdiReceipt:receipt}};
-        await base44.entities.ProjectVersion.update(versionId,{design_state:next});
+        await saveDesignConditionally(saveBaselineRef.current, next, () => { if (!current()) throw new Error("The project changed during the ADI save."); });
       };
       try {
         setAutosaveStatus("saving");
@@ -1199,15 +1219,18 @@ appState, // Pass appState directly for setters
           const row = await read();
           // Merge only the plan into the freshly read version; geometry,
           // electronics and historical engineering publications are untouched.
-          await base44.entities.ProjectVersion.update(versionId, {
-            design_state: {...row.design_state, optimiser_plan:plan},
-          });
+          await saveDesignConditionally(saveBaselineRef.current,
+            {...row.design_state, optimiser_plan:plan},
+            () => { if (!current()) throw new Error("The project changed during the ADI save."); });
         };
         const result=await work({readback,persist,current,readVersion:read,writePlan});
         if(current()) setAutosaveStatus("saved");
         return result;
       } catch(error) {
-        if(current()) setAutosaveStatus("error");
+        if(current()) {
+          bucket.lastError = error?.message;
+          setAutosaveStatus(error?.code === DESIGN_CONFLICT ? "conflict" : "error");
+        }
         throw error;
       } finally {
         bucket.inFlight=false;
@@ -1340,8 +1363,12 @@ appState, // Pass appState directly for setters
         const sharedDataMS = buildSharedUpdate(projectData);
         sharedSigMS = (() => { try { return JSON.stringify(sharedDataMS); } catch { return String(Date.now()); } })();
         if (!saveScopeCurrent()) throw new Error("The edited version changed before saving.");
+        const baseline = saveBaselineRef.current;
+        assertSaveBaseline(baseline, effectiveProjectId, savedVersionId);
+        await assertDesignUnchanged(baseline, effectiveProjectId, savedVersionId);
+        const guardScope = () => { if (!saveScopeCurrent()) throw new Error("The edited version changed during save."); };
         if (sharedSigMS !== rMS.lastSavedSharedSig) {
-          savedProject = await Project.update(effectiveProjectId, sharedDataMS);
+          savedProject = await saveSharedConditionally(baseline, sharedDataMS, guardScope);
         } else {
           savedProject = { id: effectiveProjectId };
         }
@@ -1349,7 +1376,7 @@ appState, // Pass appState directly for setters
         if (savedVersionId) {
           const terminalTrace = designStateMS.optimiser_plan?.terminalTrace;
           try {
-            await base44.entities.ProjectVersion.update(savedVersionId, { design_state: designStateMS });
+            await saveDesignConditionally(baseline, designStateMS, guardScope);
           } catch (error) {
             if (terminalTrace) console.info("[Bass ADI plan save failure]", JSON.stringify({
               runId: terminalTrace.runId, projectId: effectiveProjectId, versionId: savedVersionId,
@@ -1434,7 +1461,8 @@ appState, // Pass appState directly for setters
         return { success: false, error: "Save operation failed." };
       }
     } catch (e) {
-      setAutosaveStatus("error");
+      rMS.lastError = e?.message;
+      setAutosaveStatus(e?.code === DESIGN_CONFLICT ? "conflict" : "error");
       if (globalThis.__B44_LOGS) console.error("Error during manual save:", e);
       return { success: false, error: e.message || String(e) };
     } finally {
