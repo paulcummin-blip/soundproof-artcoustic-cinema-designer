@@ -81,15 +81,26 @@ export function packSpeakerDesignSheets({
     sheet.heightMm += blockHeight;
   });
 
-  groups.forEach((group) => {
+  const lastNonEmptyGroup = groups.reduce((last, group, index) =>
+    Array.isArray(group?.rowHeightsMm) && group.rowHeightsMm.length ? index : last, -1);
+
+  groups.forEach((group, groupIndex) => {
     const headHeight = mm(group?.headHeightMm);
     const rowHeights = (Array.isArray(group?.rowHeightsMm) ? group.rowHeightsMm : []).map(mm);
     let index = 0;
+    // Keep the closing note with the last equipment row whenever that pair
+    // fits on a sheet. A footer alone is not a useful continuation page.
+    const requiredHeight = (rowIndex) => {
+      const rowHeight = rowHeights[rowIndex];
+      const closingHeight = groupIndex === lastNonEmptyGroup && rowIndex === rowHeights.length - 1
+        ? mm(closing?.heightMm) : 0;
+      return rowHeight + (headHeight + rowHeight + closingHeight <= limit + FIT_SLACK_MM ? closingHeight : 0);
+    };
 
     while (index < rowHeights.length) {
       // The heading, the column headings and at least the first row travel
       // together, so a sheet never opens with a heading and no rows under it.
-      if (sheet.heightMm > 0 && sheet.heightMm + headHeight + rowHeights[index] > limit + FIT_SLACK_MM) {
+      if (sheet.heightMm > 0 && sheet.heightMm + headHeight + requiredHeight(index) > limit + FIT_SLACK_MM) {
         openSheet();
       }
 
@@ -97,7 +108,7 @@ export function packSpeakerDesignSheets({
       sheet.groups.push(portion);
       sheet.heightMm += headHeight;
 
-      while (index < rowHeights.length && sheet.heightMm + rowHeights[index] <= limit + FIT_SLACK_MM) {
+      while (index < rowHeights.length && sheet.heightMm + requiredHeight(index) <= limit + FIT_SLACK_MM) {
         portion.rows.push(index);
         sheet.heightMm += rowHeights[index];
         index += 1;
@@ -115,9 +126,8 @@ export function packSpeakerDesignSheets({
 
   if (closing) {
     const closingHeight = mm(closing.heightMm);
-    // The closing note is never clipped and never split: it joins the last sheet
-    // when it fits there, and otherwise opens the next one — a page the note
-    // genuinely needs, never a page a fitting schedule was pushed onto.
+    // Normal schedules reserved this space with the last row above. Preserve
+    // an oversized closing note too, rather than clipping or dropping it.
     if (sheet.heightMm + closingHeight > limit + FIT_SLACK_MM) openSheet();
     sheet.closing = true;
     sheet.heightMm += closingHeight;
