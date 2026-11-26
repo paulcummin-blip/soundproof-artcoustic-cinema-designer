@@ -491,7 +491,21 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
       return { ok: false, error: 'VERIFIED_CLAIM_REQUIRED' };
     }
     if (account.status === 'suspended' || account.soundproof_eligible !== true) return { ok: false, error: 'ACCOUNT_NOT_ELIGIBLE' };
-    const audits = await grantAudits(service, seat.portal_activation_request_id);
+    const grantAuditsForProof = await grantAudits(service, seat.portal_activation_request_id);
+    // grantAudits is scoped to portal-actor audits (the Portal grant trail used
+    // for replay protection). A master-admin email correction is recorded as an
+    // INVITATION_EMAIL_CORRECTED audit whose actor is the admin, not 'portal',
+    // so it is not returned by grantAudits. Fetch those correction audits
+    // separately, scoped to this account and linked to this exact membership
+    // and activation request, and include them in the proof search. grantAudits
+    // and the portal-scoped replay protection are unchanged.
+    const correctionRows = await service.entities.AccountUserAudit.filter({
+      account_id: accountId, action: 'INVITATION_EMAIL_CORRECTED',
+    });
+    const correctionAudits = (Array.isArray(correctionRows) ? correctionRows : []).filter((a) =>
+      a.details?.portal_activation_request_id === seat.portal_activation_request_id
+      && a.details?.membership_id === seat.id);
+    const proofAudits = grantAuditsForProof.concat(correctionAudits);
     // The activation proof recognises the latest authorised email for this
     // membership: the original Portal activation request OR a master-admin
     // email correction (INVITATION_EMAIL_CORRECTED) linked to this exact
@@ -499,7 +513,7 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
     // satisfy the proof, so a corrected invitation is the only one that can
     // start the term.
     const claimantEmail = normaliseEmail(claimant.email);
-    const proofFound = audits.some((a) => a.account_id === accountId && (
+    const proofFound = proofAudits.some((a) => a.account_id === accountId && (
       (a.action === 'PORTAL_ACTIVATION_REQUESTED'
         && a.details?.purpose === 'activate'
         && normaliseEmail(a.details?.admin_email) === claimantEmail)
