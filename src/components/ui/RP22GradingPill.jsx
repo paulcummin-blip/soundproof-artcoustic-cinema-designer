@@ -43,10 +43,9 @@ const VARIANT_SIZES = {
   // level rendered in Cinema Designer uses this exact box.
   app:          { height: 28, padding: "0 12px", fontSize: "13px", radius: "6px", minWidth: "44px", fontWeight: 600 },
   // Print-only sizes. No on-screen surface may select these.
-  // lineHeight is set to the CONTENT height (box height − 2 × 1px border) so the
-  // single-line label is centred by line-height — not by flex alignment of an
-  // anonymous text node, which the PDF rasteriser (html2canvas) does not apply.
-  // Browser and exported PDF therefore place the label identically.
+  // Content-height line boxes preserve the report's existing screen layout.
+  // PDF label ink is centred separately by centreCapturedRp22Labels: CSS
+  // line-height cannot correct html2canvas's font-probe baseline error.
   printCompact: { height: 20, padding: "0 7px",  fontSize: "10px", radius: "5px", minWidth: "36px", fontWeight: 700, lineHeight: "18px" },
   report:       { height: 22, padding: "0 9px",  fontSize: "11px", radius: "4px", minWidth: "38px", fontWeight: 600, lineHeight: "20px" },
 };
@@ -80,11 +79,8 @@ export default function RP22GradingPill({ level, variant, compact = false, count
     fontSize: size.fontSize,
     fontFamily: REPORT_FONT_HEADING,
     fontWeight: token.solid ? 700 : size.fontWeight,
-    // Print variants centre the label by line-height (see VARIANT_SIZES): the
-    // line box fills the fixed content height, so the label sits dead centre in
-    // the browser AND in the html2canvas-rasterised PDF, which does not apply
-    // flex align-items to an anonymous text node. The on-screen "app" variant
-    // keeps lineHeight 1 and lets flex alignment place it, unchanged.
+    // Preserve the existing browser line boxes. The capture-only label marker
+    // below allows PDF ink centring without changing these boxes or pagination.
     lineHeight: size.lineHeight ?? 1,
     display: "inline-flex",
     alignItems: "center",
