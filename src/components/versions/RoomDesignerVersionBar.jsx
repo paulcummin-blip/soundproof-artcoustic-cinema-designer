@@ -35,6 +35,8 @@ function SaveStatusIndicator({ status = 'idle' }) {
     saving: { dot: '#B7791F', text: 'Saving…', color: '#8A6A21' },
     saved: { dot: '#2E7D4F', text: 'Saved', color: '#2E7D4F' },
     dirty: { dot: '#B7791F', text: 'Unsaved', color: '#8A6A21' },
+    error: { dot: '#A33A2B', text: 'Save failed — edits kept', color: '#A33A2B' },
+    conflict: { dot: '#A33A2B', text: 'Save conflict — edits kept', color: '#A33A2B' },
     hydrating: { dot: '#8B8378', text: 'Loading…', color: '#8B8378' },
     idle: null,
   };
@@ -136,6 +138,12 @@ export default function RoomDesignerVersionBar({
 
       {/* Save status indicator */}
       <SaveStatusIndicator status={autosaveStatus} />
+      {autosaveStatus === 'conflict' && (
+        <div role="alert" className="w-full text-sm" style={{ color: '#A33A2B' }}>
+          {globalThis[`__rdAutosaveRefs_${projectId}`]?.lastError ||
+            'Another tab changed this design. Your edits remain here. Review them before reloading the saved version.'}
+        </div>
+      )}
 
       {/* Version switcher */}
       <div className="flex items-center shrink-0">
