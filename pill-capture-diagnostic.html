@@ -39,15 +39,18 @@ document.getElementById('probe').onclick=()=>output.textContent=JSON.stringify([
 async function capture(fix=false){
  let style;if(fix){style=document.createElement('style');style.textContent='body > div[style*="visibility: hidden"] > img {display:inline-block !important;}';document.head.append(style);}
  try{
- const snapshots=[];
+ const snapshots=[]; let beforeGeometry=null, afterGeometry=null;
+ const geometry=()=>{const doc=document.querySelector('iframe[title="Issued document capture"]')?.contentDocument;return doc?[...doc.querySelectorAll('[data-rp22-capture-label]')].map(e=>({text:e.textContent,rect:e.getBoundingClientRect().toJSON(),border:doc.defaultView.getComputedStyle(e).border,background:doc.defaultView.getComputedStyle(e).backgroundColor,font:doc.defaultView.getComputedStyle(e).font})):null;};
  const result=await captureCompositionToPdf({nodeHtml:document.querySelector('.client-report-root').outerHTML,pageSelector:'.audit-page',bodyClass:'client-report-printing',onProgress:p=>{
  output.textContent=JSON.stringify(p);
+ if(p.message==='Report fonts and images ready.') beforeGeometry=geometry();
+ if(p.stage==='capture') afterGeometry=geometry();
  if(p.stage==='capture'){
  const doc=document.querySelector('iframe[title="Issued document capture"]')?.contentDocument;
  if(doc)snapshots.push([...doc.querySelectorAll('span, .tech-seat-badge')].filter(e=>/^(L[1-4]|FAIL|N\/A|—)$/.test(e.textContent)).map(e=>{const s=doc.defaultView.getComputedStyle(e),r=e.getBoundingClientRect();return {label:e.textContent,width:r.width,height:r.height,font:s.fontFamily,fontSize:s.fontSize,lineHeight:s.lineHeight,display:s.display};}));
  }}});
- const a=document.createElement('a');a.download=fix?'pill-probe-corrected.pdf':'pill-after.pdf';a.href=URL.createObjectURL(result.blob);a.textContent='Download '+a.download;document.getElementById('downloads').append(a,document.createElement('br'));
- output.textContent=JSON.stringify({pageCount:result.pageCount,rendering:result.rendering,diagnostics:result.captureDiagnostics,probe:[probe(),probe(true)],snapshots},null,2);
+ const a=document.createElement('a');a.download=fix?'pill-probe-corrected.pdf':'pill-verified.pdf';a.href=URL.createObjectURL(result.blob);a.textContent='Download '+a.download;document.getElementById('downloads').append(a,document.createElement('br'));
+ const report={pageCount:result.pageCount,rendering:result.rendering,diagnostics:result.captureDiagnostics,geometryUnchanged:JSON.stringify(beforeGeometry)===JSON.stringify(afterGeometry),beforeGeometry,afterGeometry,probe:[probe(),probe(true)],snapshots}; output.textContent=JSON.stringify(report,null,2); const json=document.createElement('a');json.download='pill-verification.json';json.href=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));json.textContent='Download measurements';document.getElementById('downloads').append(json);
  }catch(e){output.textContent=e.stack;}finally{style?.remove();}
 }
 document.getElementById('run').onclick=()=>capture();
