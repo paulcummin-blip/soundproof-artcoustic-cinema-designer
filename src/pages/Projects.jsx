@@ -625,41 +625,8 @@ export default function ProjectsPage() {
       };
 
       if (!editingProject) {
-        // CREATE NEW PROJECT
-        // The legacy dialog also uses the server-owned creation authority.
-        const response = await base44.functions.invoke('createProfessionalProject', projectData);
-        const result = response?.data || response;
-        if (result?.status !== 'SUCCESS' || !result?.project?.id) {
-          throw new Error(result?.message || 'Unable to create the project.');
-        }
-        const newProject = result.project;
-
-        const p = {
-          id: newProject.id,
-          name: newProject.name,
-          client: newProject.client_name || "",
-          status: newProject.project_status || status,
-          roomLength: newProject.room_length,
-          roomWidth: newProject.room_width,
-          roomHeight: newProject.room_height,
-          createdAt: new Date(newProject.created_date).getTime(),
-          lifecycleStatus: newProject.lifecycle_status || "Draft",
-          lastAgeReviewedAt: newProject.last_age_reviewed_at || null,
-          documentWorkflow: newProject.document_workflow || 'legacy',
-          lcrModel: null,
-          surroundModel: null,
-          heightModel: null,
-          subModel: null,
-          subCount: null,
-          screenSizeInches: null,
-          seats: null,
-        };
-
-        setProjects((arr) => [p, ...arr]);
         setDialogOpen(false);
-        setEditingProject(null);
-        setCreated(p);
-        window.setTimeout(() => setCreated(null), 4000);
+        openDialog();
       } else {
         // UPDATE EXISTING PROJECT — submit only the identity fields the user
         // intentionally changed (name, client_name, project_status). Room

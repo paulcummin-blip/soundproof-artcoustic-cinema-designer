@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,14 @@ const EMPTY_FORM = {
   notes: ""
 };
 
+function readPendingCreation(key) {
+  const raw = sessionStorage.getItem(key);
+  if (raw === null) return null;
+  const payload = JSON.parse(raw);
+  if (!payload?.request_id || typeof payload.name !== 'string') throw new Error('Invalid pending creation');
+  return payload;
+}
+
 // editProject: if provided, modal is in edit mode
 export default function NewProjectDialog({ open, onOpenChange, onProjectCreated, editProject, onProjectUpdated }) {
   const isEditMode = !!editProject;
@@ -76,6 +84,10 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
   const [editError, setEditError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [createStatus, setCreateStatus] = useState(null);
+  const creating = useRef(false);
+  const isAdmin = user?.role === 'admin';
+  const accountId = user?.access_context?.account?.id || user?.account_id;
+  const operationKey = user?.id && accountId ? `soundproof.pendingCreate.${user.id}.${accountId}` : null;
   const navigate = useNavigate();
 
   // When editProject changes (or dialog opens), populate form
@@ -99,13 +111,20 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
       setFormData(populated);
       setOriginalFormData(populated);
     } else if (!isEditMode) {
+      if (open && !isAdmin && operationKey) {
+        try {
+          const pending = readPendingCreation(operationKey);
+          if (pending) setCreateStatus('RECOVER');
+        } catch { setCreateStatus('STORAGE_UNAVAILABLE'); }
+      }
       setFormData(EMPTY_FORM);
       setOriginalFormData(EMPTY_FORM);
     }
-  }, [editProject, open]);
+  }, [editProject, open, operationKey, isAdmin]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
+    if (creating.current) return;
     setEditError(null);
     try {
       if (isEditMode) {
@@ -138,6 +157,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
         onProjectUpdated && onProjectUpdated(updated);
         onOpenChange(false);
       } else {
+        creating.current = true;
         setCreateStatus('SUBMITTING');
         try {
           const createPayload = {
@@ -154,39 +174,41 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
             notes: formData.notes,
             acoustic_treatment_enabled: false,
           };
-          const res = await base44.functions.invoke('createProfessionalProject', {
-            name: createPayload.name,
-            client_name: createPayload.client_name,
-            project_reference: createPayload.project_reference,
-            project_status: createPayload.project_status,
-            room_length: createPayload.room_length,
-            room_width: createPayload.room_width,
-            room_height: createPayload.room_height,
-            dolby_config: createPayload.dolby_config,
-            target_spl: createPayload.target_spl,
-            amplifier_power: createPayload.amplifier_power,
-            notes: createPayload.notes,
-            acoustic_treatment_enabled: false,
-          });
+          let payload = createPayload;
+          if (!isAdmin) {
+            if (!operationKey) throw new Error('Dealer identity unavailable');
+            const pending = readPendingCreation(operationKey);
+            payload = pending || { ...createPayload, request_id: crypto.randomUUID() };
+            if (!pending) sessionStorage.setItem(operationKey, JSON.stringify(payload));
+          }
+          const res = await base44.functions.invoke('createProfessionalProject', payload);
           const result = res.data;
-          if (result.status === 'SUCCESS') {
+          if (result.status === 'SUCCESS' && result.project?.id) {
+            if (!isAdmin) sessionStorage.removeItem(operationKey);
             setFormData(EMPTY_FORM);
             setCreateStatus(null);
             onProjectCreated && onProjectCreated(result.project);
             onOpenChange(false);
           } else {
-            setCreateStatus(result.status || 'CREATION_FAILED');
+            if (!isAdmin && result.status === 'OUT_OF_CAPACITY') sessionStorage.removeItem(operationKey);
+            setCreateStatus(result.status === 'OUT_OF_CAPACITY' || isAdmin ? result.status || 'CREATION_FAILED' : 'RECOVER');
           }
         } catch (err) {
           const result = err?.response?.data;
           if (result?.status === 'OUT_OF_CAPACITY') {
+            if (!isAdmin) sessionStorage.removeItem(operationKey);
             setCreateStatus('OUT_OF_CAPACITY');
           } else if (result?.status === 'ACCOUNT_NOT_LINKED') {
             setCreateStatus('ACCOUNT_NOT_LINKED');
           } else if (result?.status === 'DEALER_NOT_LINKED') {
             setCreateStatus('DEALER_NOT_LINKED');
           } else {
-            setCreateStatus('CREATION_FAILED');
+            let status = 'CREATION_FAILED';
+            if (!isAdmin) {
+              try { status = operationKey && readPendingCreation(operationKey) ? 'RECOVER' : 'STORAGE_UNAVAILABLE'; }
+              catch { status = 'STORAGE_UNAVAILABLE'; }
+            }
+            setCreateStatus(status);
           }
         }
       }
@@ -198,6 +220,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
       // instrumentation that observes Project update failures.
       setEditError(error?.message || "Failed to save project. Please try again.");
     } finally {
+      creating.current = false;
       setIsSaving(false);
     }
     };
@@ -217,7 +240,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
               onOpenChange(false);
               navigate('/PurchaseProjects');
             }}
-            onRetry={() => setCreateStatus(null)}
+            onRetry={createStatus === 'RECOVER' ? () => handleSubmit() : () => setCreateStatus(null)}
             onClose={() => {
               setCreateStatus(null);
               onOpenChange(false);

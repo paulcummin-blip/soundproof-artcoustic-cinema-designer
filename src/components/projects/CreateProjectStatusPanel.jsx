@@ -10,6 +10,19 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 
 export default function CreateProjectStatusPanel({ status, onPurchaseProjects, onRetry, onClose }) {
+  if (status === 'RECOVER' || status === 'STORAGE_UNAVAILABLE') {
+    const recoverable = status === 'RECOVER';
+    return (
+      <div className="space-y-4 py-4">
+        <h3 className="font-bold">{recoverable ? 'Recover your project' : 'Project creation paused'}</h3>
+        <p>{recoverable
+          ? 'Your last submission is awaiting confirmation. Recover it using the original project details. If recovery stays pending, contact Sound Proof support.'
+          : 'Your creation details could not be verified in this session. Contact Sound Proof support before starting again.'}</p>
+        <Button variant="outline" onClick={onClose}>Close</Button>
+        {recoverable && <Button onClick={onRetry}>Recover project</Button>}
+      </div>
+    );
+  }
   if (status === 'OUT_OF_CAPACITY') {
     return (
       <div className="space-y-6 font-body py-4">

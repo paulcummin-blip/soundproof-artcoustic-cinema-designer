@@ -228,7 +228,7 @@ export default async function(req) {
             // reconciling — a write may have committed; do not duplicate.
             return Response.json({
               status: 'CREATION_RECONCILING',
-              message: 'A previous creation for this request could not be confirmed. Please retry with a new request id, or contact support if it persists.',
+              message: 'A previous creation for this request could not be confirmed. Recover the original request. Contact support if confirmation remains pending.',
               reason: recovered.reason || 'UNCERTAIN',
               project_id: existing.project_id || null,
             }, { status: 409 });
@@ -291,7 +291,7 @@ export default async function(req) {
           await setStage({ stage: 'RECONCILING' });
           return Response.json({
             status: 'CREATION_RECONCILING',
-            message: 'Project creation could not be confirmed. Please retry with a new request id, or contact support if it persists.',
+            message: 'Project creation could not be confirmed. Recover the original request. Contact support if confirmation remains pending.',
             reason: 'PROJECT_CREATE_UNCERTAIN',
           }, { status: 409 });
         }
@@ -370,7 +370,7 @@ export default async function(req) {
         await setStage({ stage: 'RECONCILING' });
         return Response.json({
           status: 'CREATION_RECONCILING',
-          message: 'Project creation could not be confirmed. Please retry with a new request id, or contact support if it persists.',
+          message: 'Project creation could not be confirmed. Recover the original request. Contact support if confirmation remains pending.',
           reason: 'PROJECT_CREATE_UNCERTAIN',
         }, { status: 409 });
       }
