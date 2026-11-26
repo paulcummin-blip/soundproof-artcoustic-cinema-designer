@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { registerElectronicPersistence } from "@/components/room/bass/optimiseWorkflow/electronicPersistence.js";
 import { Project } from "@/entities/Project";
-import { DESIGN_CONFLICT, assertSaveBaseline, assertDesignUnchanged, saveDesignConditionally, saveSharedConditionally } from "@/components/state/conditionalDesignSave";
+import { DESIGN_CONFLICT, createSaveBaseline, assertSaveBaseline, assertDesignUnchanged, saveDesignConditionally, saveSharedConditionally } from "@/components/state/conditionalDesignSave";
 import { base44 } from "@/api/base44Client";
 import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
 import { mergeProjectAndVersion, buildDesignState, buildSharedUpdate } from "@/lib/versionAuthority";
@@ -404,6 +404,7 @@ appState, // Pass appState directly for setters
       const canRetainHydratedDesign = wasAlreadyHydrated
         && (hydratedVersionId === p.active_version_id || sameLegacyDesignJustVersioned)
         && (!appState?.activeVersionId || appState.activeVersionId === hydratedVersionId);
+      const loadedSaveBaseline = createSaveBaseline(p, loadedSaveVersion);
       if (!canRetainHydratedDesign) {
         appState?.setProjectHydrationReady?.(false);
         hydrateFromProject(mergedP);
@@ -412,7 +413,7 @@ appState, // Pass appState directly for setters
       // available. A later pointer must not relabel an earlier AppState.
       saveBaselineRef.current = canRetainHydratedDesign && !sameLegacyDesignJustVersioned
         ? canonical.identity?.saveBaseline || null
-        : { project: p, version: loadedSaveVersion };
+        : loadedSaveBaseline;
       activeVersionIdRef.current = p.active_version_id;
       appState?.setActiveVersionId?.(p.active_version_id);
       setProjectNameState(mergedP?.name || "Project"); // Update internal projectName state
