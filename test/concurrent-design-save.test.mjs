@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 let source = await fs.readFile(new URL("../src/components/state/conditionalDesignSave.js", import.meta.url), "utf8");
-source = source.replace(/import \{ base44 \}[^\n]+\n/, "const base44 = {};\n").replace(/import \{ stableStringify \}[^\n]+\n/, "const stableStringify = v => JSON.stringify(v);\n");
+const fingerprintSource = await fs.readFile(new URL("../src/components/proposal/engineeringAuthority/engineeringFingerprint.js", import.meta.url), "utf8");
+const stringifySource = fingerprintSource.slice(fingerprintSource.indexOf("export function stableStringify"), fingerprintSource.indexOf("function fnv1a32Seeded")).replace("export ", "");
+source = source.replace(/import \{ base44 \}[^\n]+\n/, "const base44 = {};\n").replace(/import \{ stableStringify \}[^\n]+\n/, stringifySource);
 const {saveDesignConditionally, saveSharedConditionally, assertDesignUnchanged, DESIGN_CONFLICT} =
   await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"));
 const copy = v => JSON.parse(JSON.stringify(v));
