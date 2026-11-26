@@ -17,6 +17,9 @@ export default function InternalAccessAcceptanceProbe() {
       if (kind === 'read') {
         const records = await base44.entities.Project.filter({id:'6b08548c4d63965ed1665c4e'});
         rows.push({test:'protected_project_read',returned:records.length,at:new Date().toISOString()});
+      } else if (kind === 'write') {
+        try { await base44.entities.Project.update('6b08548c4d63965ed1665c4e',{notes:'INTERNAL TEST: direct protected write at '+new Date().toISOString()}); rows.push({test:'protected_project_write',allowed:true,at:new Date().toISOString()}); }
+        catch(error) { rows.push({test:'protected_project_write',allowed:false,status:error?.status || error?.response?.status,message:error.message,at:new Date().toISOString()}); }
       } else if (kind === 'locks') {
         const attempts = {account_id:'INTERNAL-NO-ACCOUNT',account_role:'admin',access_level:'PRICE_LIST_ONLY',app_role:'Viewer',dealer_account_id:'INTERNAL-NO-DEALER',dealer_name:'INTERNAL FIELD LOCK TEST',soundproof_access_enabled:!me.soundproof_access_enabled};
         for (const [field,value] of Object.entries(attempts)) {
@@ -43,6 +46,7 @@ export default function InternalAccessAcceptanceProbe() {
     <div className="flex gap-4 my-4">
       <button disabled={busy} onClick={()=>run('identity')}>Check signed-in identity</button>
       <button disabled={busy} onClick={()=>run('read')}>Check protected project read</button>
+      <button disabled={busy} onClick={()=>run('write')}>Check protected project write</button>
       <button disabled={busy} onClick={()=>run('locks')}>Check seven protected fields</button>
       <button disabled={busy} onClick={()=>base44.auth.logout(window.location.href)}>Sign out for internal test</button>
     </div>
