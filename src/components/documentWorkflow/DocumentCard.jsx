@@ -85,12 +85,12 @@ function CreateAction({ label, state, primary, onAct }) {
 /**
  * DownloadButton — the Download PDF action on a completed document card.
  *
- *   • idle / downloading → red "Download PDF" with a download icon.
- *   • downloading        → same red, but a spinner and disabled while the
+ *   • idle / downloading → terracotta "Download PDF" with a download icon.
+ *   • downloading        → same terracotta, spinner and disabled while the
  *                          existing stored file is retrieved.
- *   • downloaded         → green "Downloaded" with a tick icon. The button
- *                          remains clickable so the user can download the
- *                          same document again whenever required.
+ *   • downloaded         → brand green with a tick icon. The label stays
+ *                          "Download PDF" in both states; the button remains
+ *                          clickable so the user can download again.
  *
  * `onDownload` retrieves the existing stored PDF only — it never triggers
  * regeneration, capture or an upload. The green state is set only after the
@@ -116,7 +116,7 @@ function DownloadButton({ downloadState, onClick }) {
       ) : (
         <Download className="w-3 h-3 mr-1" />
       )}
-      {isDownloaded ? 'Downloaded' : 'Download PDF'}
+      Download PDF
     </Button>
   );
 }

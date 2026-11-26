@@ -27,6 +27,8 @@ import LibraryStatusLabel from './LibraryStatusLabel';
 import { LIBRARY_SOURCE_STATE } from './librarySourceStatus';
 import { issuedDocumentLabel } from '@/components/library/issuedDocument/issuedDocumentTypes';
 import { downloadIssuedDocument, openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
+import { useAuth } from '@/lib/AuthContext';
+import { useIssuedDocumentDownload } from '@/components/documentWorkflow/useIssuedDocumentDownload';
 import { formatLibraryDate } from './libraryFormat';
 
 /** A current file: white, bordered and lifted — the primary treatment. */
@@ -48,6 +50,9 @@ export default function ExportedDocumentRow({
 }) {
   const [busy, setBusy] = useState(null);
   const [failure, setFailure] = useState(null);
+  const { user } = useAuth();
+  const userId = user?.id || null;
+  const { download: downloadIssued } = useIssuedDocumentDownload(userId);
 
   const run = useCallback(async (action, key) => {
     setBusy(key);
@@ -138,7 +143,7 @@ export default function ExportedDocumentRow({
         </button>
         <button
           type="button"
-          onClick={() => run(downloadIssuedDocument, 'download')}
+          onClick={() => run(downloadIssued, 'download')}
           disabled={busy !== null}
           className={actionClass}
           style={{ fontFamily: REPORT_FONT_BODY }}

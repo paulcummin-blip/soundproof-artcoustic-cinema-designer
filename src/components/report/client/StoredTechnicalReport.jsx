@@ -7,11 +7,17 @@ import { downloadIssuedDocument, openIssuedDocument, resolveIssuedDocumentUrl } 
 import { Button } from '@/components/ui/button';
 import BackToProjectLibraryLink from '@/components/report/BackToProjectLibraryLink';
 import BackToProposalLink from '@/components/report/BackToProposalLink';
+import { useAuth } from '@/lib/AuthContext';
+import DocumentDownloadButton from '@/components/documentWorkflow/DocumentDownloadButton';
+import { useIssuedDocumentDownload } from '@/components/documentWorkflow/useIssuedDocumentDownload';
 
 // A normal report visit is a stored-file read. It never mounts the composition,
 // ADI, snapshot persistence or drawing/capture hooks.
 export default function StoredTechnicalReport({ projectId, requestedVersionId, downloadOnOpen = false }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = user?.id || null;
+  const { download: downloadIssued } = useIssuedDocumentDownload(userId);
   const [version, setVersion] = useState(requestedVersionId || null);
   const [identityError, setIdentityError] = useState(null);
   useEffect(() => {
@@ -58,8 +64,11 @@ export default function StoredTechnicalReport({ projectId, requestedVersionId, d
   useEffect(() => {
     if (!downloadOnOpen || downloaded.current || !record || status.loading) return;
     downloaded.current = true;
-    run(downloadIssuedDocument);
-  }, [downloadOnOpen, record?.id, status.loading]);
+    (async () => {
+      try { await downloadIssued(record); }
+      catch (error) { setFileError(error?.message || 'The saved PDF could not be retrieved. Retry retrieval.'); }
+    })();
+  }, [downloadOnOpen, record?.id, status.loading, downloadIssued]);
   const pending = !identityError && (!version || status.loading);
   return <main style={{ padding: 24, fontFamily: 'Didact Gothic, sans-serif' }}>
     <h1>Technical Report</h1>
@@ -68,7 +77,14 @@ export default function StoredTechnicalReport({ projectId, requestedVersionId, d
       <BackToProjectLibraryLink projectId={projectId} versionId={version} />
       <BackToProposalLink />
       <Button disabled={!record || busy || status.loading} onClick={() => run(openIssuedDocument)}>Open saved PDF</Button>
-      <Button disabled={!record || busy || status.loading} onClick={() => run(downloadIssuedDocument)}>{busy ? 'Retrieving saved PDF…' : 'Download Project Report (PDF)'}</Button>
+      <DocumentDownloadButton
+        userId={userId}
+        recordId={record?.id || null}
+        onDownload={() => downloadIssuedDocument(record)}
+        onError={(e) => setFileError(e?.message || 'The saved PDF could not be retrieved. Retry retrieval.')}
+        disabled={!record || status.loading}
+        className="h-9 px-4 text-[12px] font-medium border-0"
+      />
     </div>
     <p role="status">{pending ? 'Checking saved report…' : identityError || status.verificationError || (record ? WORKFLOW_STATE_LABEL[status.technicalReport.state] : 'No completed PDF is stored for this version. Return to Documents & Assets to create or recover the report.')}</p>
     {record && <p>{record.filename}</p>}
