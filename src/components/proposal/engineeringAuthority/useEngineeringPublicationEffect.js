@@ -110,6 +110,7 @@ export function useEngineeringPublicationEffect({
   engineeringSummary,
   bassFingerprint,
   ready,
+  minimumSystemMet,
   designState: assessmentDesignState,
   bassReadiness,
   retainedFromRefresh,
@@ -180,7 +181,7 @@ export function useEngineeringPublicationEffect({
   }, [designState, bassFingerprint]);
 
   const preflight = engineeringPublicationPreflight({
-    projectId, versionId, ready, isPublishable, engineeringSummary,
+    projectId, versionId, ready, minimumSystemMet, isPublishable, engineeringSummary,
     engineeringFingerprint, bassReadiness, retainedFromRefresh, designState, completedBassAuthority,
     reportSnapshot: buildReportSnapshot(projectId, versionId, designState),
     versions: {

@@ -316,6 +316,14 @@ export function resolveBassAuthorityState({
     // internal field names are never shown, and the status is not repeated on
     // each parameter result.
     if (attemptStatus === ATTEMPT.FAILED || attemptStatus === ATTEMPT.NOT_READY) {
+      // An absent whole-design summary before minimum system selection is not
+      // a failed P14 calculation. Keep the publication gate closed and name
+      // the actual prerequisite, without changing the completed bass evidence.
+      if (attemptStatus === ATTEMPT.NOT_READY
+        && failedGates(matchingAttempt).some(gate => gate.key === 'minimum_system')) {
+        return { ...withCopy(BASS_AUTHORITY_STATE.BASS_CALCULATED),
+          message: 'Select the front speakers, surrounds and at least one subwoofer to complete the engineering assessment.' };
+      }
       // Only a bass-domain parameter may be named here. A blocker outside
       // P14/P18/P19/P20 is not a bass problem, so it is never presented as one.
       if (hasBassDomainBlocker(matchingAttempt)) {

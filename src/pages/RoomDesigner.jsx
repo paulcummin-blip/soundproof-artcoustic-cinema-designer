@@ -1949,6 +1949,7 @@ function RoomDesignerWithState() {
   const engineeringPublication = useEngineeringPublicationEffect({
     projectId: resolvedProjectId || projectIdState || null,
     versionId: appState?.activeVersionId || null,
+    minimumSystemMet,
     isPublishable: appDesignRating?.isPublishable === true,
     bassReadiness: appDesignRating?.bassReadiness,
     retainedFromRefresh: appDesignRating?.retainedFromRefresh === true,
