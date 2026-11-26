@@ -158,7 +158,6 @@ const SCHEDULE_CSS = `
 .speaker-design-schedule .pos { width: 26%; color: #3E4349; }
 .speaker-design-schedule .model { width: 56%; }
 .speaker-design-schedule .model-name { font-weight: 600; color: #1B1A1A; }
-.speaker-design-schedule .model-note { display: block; font-size: 10.5px; color: #625143; margin-top: 2px; }
 .speaker-design-schedule .qty { width: 18%; text-align: right; padding-right: 0; color: #3E4349; }
 .speaker-design-schedule .foot {
   margin-top: 22px;
@@ -238,9 +237,7 @@ function groupsMarkup(groups) {
         .map(
           (row) => `<tr>
           <td class="pos">${escapeHtml(row.position)}</td>
-          <td class="model"><span class="model-name">${escapeHtml(row.model)}</span>${
-            row.note ? `<span class="model-note">${escapeHtml(row.note)}</span>` : ''
-          }</td>
+          <td class="model"><span class="model-name">${escapeHtml(row.model)}</span></td>
           <td class="qty">${escapeHtml(row.quantityLabel)}</td>
         </tr>`
         )

@@ -99,13 +99,6 @@ export default function CurrentSpeakerDesignDialog({
                         <td className="py-2 pr-3 text-[#3E4349]">{row.position}</td>
                         <td className="py-2 pr-3">
                           <span className="font-medium text-[#1B1A1A]">{row.model}</span>
-                          {/* The row's own note — a dual-centre arrangement, or a
-                              position such as "Behind screen" — is folded into the
-                              model cell: the panel states Position, Model and Qty
-                              only, and never a separate Notes column. */}
-                          {row.note && (
-                            <span className="block text-xs text-[#625143] mt-0.5">{row.note}</span>
-                          )}
                         </td>
                         <td className="py-2 text-right text-[#3E4349] tabular-nums">
                           {row.quantityLabel}
