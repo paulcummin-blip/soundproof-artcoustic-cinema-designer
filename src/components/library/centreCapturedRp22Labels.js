@@ -39,7 +39,7 @@ export function centreCapturedRp22Labels(scope) {
       ctx.fillStyle = style.color;
       ctx.textBaseline = 'alphabetic';
       const glyphs = [];
-      let advance = 0, left = Infinity, right = -Infinity, ascent = 0, descent = 0;
+      let advance = 0, left = Infinity, right = -Infinity, ascent = -Infinity, descent = -Infinity;
       for (const char of Array.from(label)) {
         const m = ctx.measureText(char);
         glyphs.push({ char, x: advance });
