@@ -4,7 +4,10 @@ import { stableStringify } from "@/components/proposal/engineeringAuthority/engi
 // Uses the existing records and permissions. No new revision field or lock.
 // The SDK's single-id conditional update rechecks updated_date at write time.
 export const DESIGN_CONFLICT = "DESIGN_SAVE_CONFLICT";
-const same = (a, b) => stableStringify(a ?? null) === stableStringify(b ?? null);
+// Compare the JSON actually sent to storage, not omitted undefined properties.
+const wireCopy = value => JSON.parse(JSON.stringify(value ?? null));
+const same = (a, b) => stableStringify(wireCopy(a)) === stableStringify(wireCopy(b));
+export const createSaveBaseline = (project, version) => ({ project: wireCopy(project), version: wireCopy(version) });
 export function assertSaveBaseline(baseline, projectId, versionId) {
   if (baseline?.conflict) throw Object.assign(new Error(baseline.conflict), { code: DESIGN_CONFLICT });
   if (!baseline?.project?.id || !baseline?.version?.id || baseline.project.id !== projectId || baseline.version.id !== versionId ||
@@ -47,6 +50,7 @@ export async function assertDesignUnchanged(baseline, projectId, versionId, clie
 async function conditionalWrite(baseline, kind, patch, assertScope, client) {
   assertSaveBaseline(baseline, baseline?.project?.id, baseline?.version?.id);
   const entity = client.entities[kind === "version" ? "ProjectVersion" : "Project"];
+  patch = wireCopy(patch);
   const original = baseline[kind];
   const keys = Object.keys(patch);
   const row = await latest(entity, original.id);
@@ -67,7 +71,7 @@ async function conditionalWrite(baseline, kind, patch, assertScope, client) {
     result = await entity.updateMany(query, { $set: patch });
   } catch (error) { failure = error; }
   if (result?.updated === 1) {
-    baseline[kind] = { ...row, ...patch };
+    baseline[kind] = wireCopy({ ...row, ...patch });
     return baseline[kind];
   }
   // Neither a rejected request nor zero matches is permission to overwrite.
