@@ -699,6 +699,7 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
 
   return {
     status: responseStatus,
+    simulationReady,
     reason: blockedReason,
     exportable: !analysisBlocked && inputsValid,
     roomDims, seatingPositions, splConfig, rspPosition, sources, subsForSimulation: sources, simulationResults,
