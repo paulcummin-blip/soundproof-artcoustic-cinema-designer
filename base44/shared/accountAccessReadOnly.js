@@ -37,7 +37,6 @@ import {
   normaliseEmail,
   publicUser,
 } from './accountAccessRules.js';
-import { readPilotPortalAccess } from './portalSessionGateRead.js';
 
 /**
  * THE READS THIS PATH MAY MAKE, entity by entity. Nothing else is on the door:
@@ -225,18 +224,8 @@ export async function resolveAccountAccessReadOnly({
     }
   }
 
-  // The same pilot gate, read and decided by portalSessionGateRead.js.
-  const portalAccess = await readPilotPortalAccess(base44, login, account, {
-    entities,
-    bridgeUrl,
-  });
-  if (portalAccess.required && !portalAccess.allowed) {
-    return {
-      allowed: false,
-      reason: portalAccess.reason || 'PORTAL_SSO_REQUIRED',
-      account,
-    };
-  }
+  // All dealer accounts use the same verified user, account and membership
+  // authority. Company identity is separately verified at project creation.
 
   // The shared resolver stamps the login's account here when an invitation bound it.
   // The account is the one just resolved, so this path carries it in memory only.
