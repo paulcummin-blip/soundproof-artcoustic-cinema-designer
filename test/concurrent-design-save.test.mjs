@@ -5,7 +5,7 @@ let source = await fs.readFile(new URL("../src/components/state/conditionalDesig
 source = source.replace(/import \{ base44 \}[^\n]+\n/, "const base44 = {};\n").replace(/import \{ stableStringify \}[^\n]+\n/, "const stableStringify = v => JSON.stringify(v);\n");
 const {saveDesignConditionally, saveSharedConditionally, assertDesignUnchanged, DESIGN_CONFLICT} =
   await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"));
-const copy = v => structuredClone(v);
+const copy = v => JSON.parse(JSON.stringify(v));
 function fixture() {
   const rows = {
     Project:{id:"p", account_id:"a", updated_date:"1", room_width:4},
@@ -28,6 +28,11 @@ function fixture() {
   return {rows,baseline,client:{entities},get calls(){return calls;},
     race(fn){beforeWrite=fn;},loseReply(){lost=true;},fail(){failed=true;}};
 }
+test("JSON-omitted fields cannot cause a false conflict after our own save",async()=>{
+ const f=fixture(),b=f.baseline();
+ await saveDesignConditionally(b,{seats:5,screen:55,optional:undefined},()=>{},f.client);
+ await assertDesignUnchanged(b,"p","v",f.client);
+});
 test("ordinary saves advance the loaded baseline without a schema field",async()=>{
  const f=fixture(), b=f.baseline();
  await saveDesignConditionally(b,{seats:5,screen:55},()=>{},f.client);
