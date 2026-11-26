@@ -226,14 +226,18 @@ export default function AdminAccountAccess() {
       // Route through the existing secure authority — never a direct
       // Account.update. The authority synchronises account status, linked-user
       // flags, expiry rules and audit events as one consistent operation.
-      const action = accessChange.mode === "rescind" ? "suspend" : "restore";
+      const action = accessChange.retryReconcile ? "reconcile" : accessChange.mode === "rescind" ? "suspend" : "restore";
       const res = await base44.functions.invoke("manageSoundProofAccess", {
         action,
         account_id: accessChange.row.account.id,
       });
       const data = res?.data || {};
-      if (!data.ok) {
-        const failed = (data.results || []).find((r) => !r.ok);
+      const failed = (data.results || []).find((r) => r.ok !== true || r.flag_sync_ok === false);
+      if (data.ok !== true || failed) {
+        if (failed?.flag_sync_ok === false) {
+          setAccessChange((current) => current ? { ...current, retryReconcile: true } : current);
+          setRefreshKey((key) => key + 1);
+        }
         throw new Error(failed?.error || data.error || "The access change could not be completed.");
       }
       setAccessChange(null);
