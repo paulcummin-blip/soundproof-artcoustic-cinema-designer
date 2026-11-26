@@ -96,12 +96,14 @@ export default function ProjectDesignHydrator({ projectId }) {
         // Merge with the active ProjectVersion so per-version design fields come
         // from design_state, not from the legacy Project position.
         let merged = project;
+        let savedVersion = null;
         if (project.active_version_id) {
           const version = await readProjectVersionRecord(project.active_version_id);
           if (cancelled) return;
           if (!version || version.id !== project.active_version_id || version.project_id !== projectId) {
             throw new Error("The selected design version could not be loaded for this project. Retry opening it.");
           }
+          savedVersion = version;
           merged = mergeProjectAndVersion(project, version);
         }
 
@@ -130,6 +132,7 @@ export default function ProjectDesignHydrator({ projectId }) {
             name: merged?.name || project.name || null,
             clientName: merged?.client_name || project.client_name || null,
             accountId: project.account_id || null,
+            saveBaseline: { project, version: savedVersion },
             activeVersionId: project.active_version_id || null,
           });
         }
