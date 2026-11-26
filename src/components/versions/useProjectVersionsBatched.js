@@ -24,7 +24,7 @@ import {
   resolveActiveAfterDeletion,
 } from "@/lib/versionAuthority";
 import { selectCanonicalVersions } from "@/lib/canonicalVersionSelection";
-import { neutraliseDesignStateForNewVersion } from "@/components/utils/subwooferNeutralTuning";
+import { cloneSavedDesignVersion } from "./cloneSavedDesignVersion";
 
 const VERSION_BATCH_SIZE = 50;
 
@@ -171,33 +171,8 @@ export function useProjectVersionsBatched() {
       throw new Error(`Invalid slot number: ${slotNumber}`);
     }
 
-    const versions = versionsRef.current[projectId] || [];
-
-    // Find the source version to clone from (active version, or first)
-    // We need the active_version_id; fetch the project to get it
-    const projects = await base44.entities.Project.filter({ id: projectId });
-    const project = projects?.[0];
-    if (!project) throw new Error("Project not found");
-
-    const sourceVersion =
-      versions.find((v) => v.id === project.active_version_id) || versions[0];
-    if (!sourceVersion) throw new Error("No source version to clone from");
-
-    const accountId = project.account_id || "";
-
-    const newVersion = await base44.entities.ProjectVersion.create({
-      project_id: projectId,
-      account_id: accountId,
-      version_number: slot,
-      version_name: sanitisedName,
-      design_state: sourceVersion.design_state
-        ? neutraliseDesignStateForNewVersion(JSON.parse(JSON.stringify(sourceVersion.design_state)))
-        : {},
-    });
-
-    // Switch the project to the new version
-    await base44.entities.Project.update(projectId, {
-      active_version_id: newVersion.id,
+    const newVersion = await cloneSavedDesignVersion({
+      client: base44, projectId, slot, name: sanitisedName,
     });
 
     // Update local state: add the new version to the map
