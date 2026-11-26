@@ -519,4 +519,3 @@ async function denyAccountAccess(base44, user, account, reason) {
   }
   return { allowed: false, reason, account, enforcement_failed: Boolean(enforcementFailure) };
 }
-
