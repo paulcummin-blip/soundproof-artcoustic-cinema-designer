@@ -333,6 +333,13 @@ export default function OptimiseAndCalculate({
           waitForPublication:(ref,phRef)=>waitForCurrentPublication(ref,phRef),
         });
         const writeDiag=(d)=>{const rec={phase:"recalculating",...d,preCommitCacheKey,
+          integrationVerification: {
+            required: verifyIntegration,
+            responseStatus: sharedRef.current?.authoritative?.status || null,
+            responseReason: sharedRef.current?.authoritative?.reason || null,
+            combinedAvailable: sharedRef.current?.authoritative?.combinedSystem?.available === true,
+            combinedRspPoints: sharedRef.current?.authoritative?.combinedSystem?.combinedBySeat?.rsp?.length || 0,
+          },
           actualCacheKey:sharedRef.current?.cacheKey||null,
           actualResultFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint||null,
           actualCurrentJobFingerprint:sharedRef.current?.completedBassAuthority?.contract?.job?.currentJobFingerprint||null};
