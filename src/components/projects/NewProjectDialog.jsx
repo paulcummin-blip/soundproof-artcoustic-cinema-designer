@@ -178,6 +178,10 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
           if (!isAdmin) {
             if (!operationKey) throw new Error('Dealer identity unavailable');
             const pending = readPendingCreation(operationKey);
+            if (createStatus === 'RECOVER' && !pending) {
+              setCreateStatus('STORAGE_UNAVAILABLE');
+              return;
+            }
             payload = pending || { ...createPayload, request_id: crypto.randomUUID() };
             if (!pending) sessionStorage.setItem(operationKey, JSON.stringify(payload));
           }

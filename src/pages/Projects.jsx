@@ -616,14 +616,6 @@ export default function ProjectsPage() {
     try {
       setCreateError(null);
 
-      const projectData = {
-        name,
-        client_name: client || "",
-        project_status: status,
-        // Room dimensions will be filled in by Room Designer and autosave.
-        // We deliberately do NOT set room_length / room_width / room_height here.
-      };
-
       if (!editingProject) {
         setDialogOpen(false);
         openDialog();
