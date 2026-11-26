@@ -7,13 +7,14 @@ export const DESIGN_CONFLICT = "DESIGN_SAVE_CONFLICT";
 const same = (a, b) => stableStringify(a ?? null) === stableStringify(b ?? null);
 export function assertSaveBaseline(baseline, projectId, versionId) {
   if (baseline?.conflict) throw Object.assign(new Error(baseline.conflict), { code: DESIGN_CONFLICT });
-  if (baseline?.project?.id !== projectId || baseline?.version?.id !== versionId ||
+  if (!baseline?.project?.id || !baseline?.version?.id || baseline.project.id !== projectId || baseline.version.id !== versionId ||
       baseline.version.project_id !== projectId) {
     throw new Error("The saved design baseline is unavailable. Keep your changes open and reopen the saved design in another tab before retrying.");
   }
 }
 function conflict(baseline, detail) {
-  const message = detail + " Your unsaved edits are kept in this tab. Review them before reloading the saved version.";
+  const partial = baseline.sharedCommitPending ? " Shared room changes from this save already completed; the design save did not complete." : "";
+  const message = detail + partial + " Your unsaved edits are kept in this tab. Review them before reloading the saved version.";
   baseline.conflict = message;
   return Object.assign(new Error(message), { code: DESIGN_CONFLICT });
 }
@@ -81,9 +82,14 @@ async function conditionalWrite(baseline, kind, patch, assertScope, client) {
   if (failure) throw failure;
   throw new Error("The record changed while saving. Your edits remain open; retry the save.");
 }
-export function saveDesignConditionally(baseline, designState, assertScope = () => {}, client = base44) {
-  return conditionalWrite(baseline, "version", { design_state: designState }, assertScope, client);
+export async function saveDesignConditionally(baseline, designState, assertScope = () => {}, client = base44) {
+  const row = await conditionalWrite(baseline, "version", { design_state: designState }, assertScope, client);
+  baseline.sharedCommitPending = false;
+  return row;
 }
-export function saveSharedConditionally(baseline, patch, assertScope = () => {}, client = base44) {
-  return conditionalWrite(baseline, "project", patch, assertScope, client);
+export async function saveSharedConditionally(baseline, patch, assertScope = () => {}, client = base44) {
+  const changed = !matches(baseline?.project, patch, Object.keys(patch));
+  const row = await conditionalWrite(baseline, "project", patch, assertScope, client);
+  if (changed) baseline.sharedCommitPending = true;
+  return row;
 }
