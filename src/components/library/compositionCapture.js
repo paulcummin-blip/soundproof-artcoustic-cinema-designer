@@ -25,6 +25,7 @@
 
 import { jsPDF } from 'jspdf';
 import { inlineSvgCaptureImages } from './inlineSvgCaptureImages';
+import { centreCapturedRp22Labels } from './centreCapturedRp22Labels';
 import { waitForCapturePaint, withCaptureDeadline } from './captureTiming';
 import { pageCaptureFailure } from '@/components/library/capturePagePng';
 import {
@@ -408,6 +409,7 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
     signal.throwIfAborted();
 
     const scope = frame.contentDocument;
+    centreCapturedRp22Labels(scope);
     if (bodyClass === 'client-report-printing') await inlineSvgCaptureImages(scope, signal, { includeHtmlImages: true });
     onProgress({ stage: 'readiness', message: 'Capture image references ready.' });
 
