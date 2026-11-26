@@ -15,7 +15,7 @@
 // reports, bass authority and pricing all rebuild from the one selected version.
 // Nothing from the previous version is carried across or overwritten.
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AlertCircle, Check, ChevronDown, Edit2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +36,7 @@ import { formatLibraryDate } from '@/components/library/libraryFormat';
 import {
   hasUnsavedVersionChanges,
   isSameVersion,
+  saveBeforeVersionCreation,
 } from '@/components/versions/versionSwitchSafety';
 import { useVersionDocumentStatus } from '@/components/versions/useVersionDocumentStatus';
 import UnsavedVersionChangeDialog from '@/components/versions/UnsavedVersionChangeDialog';
@@ -78,6 +79,7 @@ function cancelPendingAutosave(projectId) {
 export default function VersionSwitcher({
   projectId,
   versionApi,
+  loadedVersionId = null,
   autosaveStatus = 'idle',
   onSaveProject = null,
   disabled = false,
@@ -88,6 +90,10 @@ export default function VersionSwitcher({
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [pendingVersion, setPendingVersion] = useState(null);
+  const [pendingCreate, setPendingCreate] = useState(false);
+  const creatingRef = useRef(false);
+  const liveRef = useRef(null);
+  liveRef.current = { projectId, loadedVersionId, onSaveProject, disabled };
 
   const versions = versionApi?.versions || [];
   const activeVersionId = versionApi?.activeVersionId || null;
@@ -157,15 +163,34 @@ export default function VersionSwitcher({
   };
 
   const handleCreateVersion = async () => {
-    if (busy || disabled) return;
+    if (busy || disabled || creatingRef.current) return;
     if (!canCreateVersion) {
       setError(MAX_VERSIONS_MESSAGE);
       return;
     }
+    creatingRef.current = true;
     setBusy(true);
     setError(null);
+    const sourceId = loadedVersionId;
+    const assertScope = () => {
+      const live = liveRef.current;
+      if (!sourceId || live.projectId !== projectId || live.loadedVersionId !== sourceId || live.disabled) {
+        throw new Error('The open design changed or is still loading. No new option was opened.');
+      }
+    };
     try {
-      await versionApi.createVersion(nextEmptySlot, NEW_VERSION_DEFAULT_NAME);
+      await saveBeforeVersionCreation({
+        assertScope,
+        readBucket: () => globalThis[`__rdAutosaveRefs_${projectId}`],
+        save: () => liveRef.current.onSaveProject?.(),
+      });
+      const assertSavedScope = () => {
+        assertScope();
+        const bucket = globalThis[`__rdAutosaveRefs_${projectId}`];
+        if (bucket?.dirty || bucket?.inFlight) throw new Error('The design changed while creating the option. Your latest changes remain open.');
+      };
+      await versionApi.createVersion(nextEmptySlot, NEW_VERSION_DEFAULT_NAME, { sourceVersionId: sourceId, assertScope: assertSavedScope });
+      assertSavedScope();
       setActiveProjectId(projectId);
       // renameVersion=1 is read by the version bar after the load, so the new
       // option's name can be typed straight away.
@@ -174,6 +199,8 @@ export default function VersionSwitcher({
       console.error('[VersionSwitcher] Create version failed:', createError);
       setError(createError?.message || 'Failed to create design option.');
       setBusy(false);
+    } finally {
+      creatingRef.current = false;
     }
   };
 
@@ -362,7 +389,15 @@ export default function VersionSwitcher({
 
           <button
             type="button"
-            onClick={handleCreateVersion}
+            onClick={() => {
+              if (hasUnsavedVersionChanges(autosaveStatus)) {
+                setOpen(false);
+                setError(null);
+                setPendingCreate(true);
+              } else {
+                void handleCreateVersion();
+              }
+            }
             disabled={busy || disabled || !canCreateVersion}
             className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: BRAND.green, fontFamily: 'Didact Gothic, sans-serif' }}
@@ -382,15 +417,17 @@ export default function VersionSwitcher({
       </DropdownMenu>
 
       <UnsavedVersionChangeDialog
-        open={Boolean(pendingVersion)}
+        open={Boolean(pendingVersion) || pendingCreate}
+        createOption={pendingCreate}
         versionName={activeVersion?.version_name || null}
         busy={busy}
         error={error}
         onCancel={() => {
           setPendingVersion(null);
+          setPendingCreate(false);
           setError(null);
         }}
-        onSaveAndOpen={() => openVersion(pendingVersion, { saveFirst: true })}
+        onSaveAndOpen={() => pendingCreate ? handleCreateVersion() : openVersion(pendingVersion, { saveFirst: true })}
         onOpenWithoutSaving={() => openVersion(pendingVersion, { saveFirst: false })}
       />
     </>
