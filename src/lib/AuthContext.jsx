@@ -30,6 +30,9 @@ export const AuthProvider = ({ children }) => {
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
   const authFlight = useRef(null);
+  const accessRefreshFlight = useRef(null);
+  const lastAccessRefresh = useRef(0);
+  const [accessRefreshState, setAccessRefreshState] = useState(null);
   const checkStage = useRef('public_settings');
   const correlationId = useRef(null);
   const reportAuthFailure = (error) => {
@@ -306,7 +309,73 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshSessionAccess = ({ force = false } = {}) => {
+    if (!isAuthenticated || !user || user.role === 'admin') return Promise.resolve();
+    if (accessRefreshFlight.current) return accessRefreshFlight.current;
+    if (!force && Date.now() - lastAccessRefresh.current < 15000) return Promise.resolve();
+    lastAccessRefresh.current = Date.now();
+    setAccessRefreshState('checking');
+    accessRefreshFlight.current = (async () => {
+      try {
+        const response = await base44.functions.invoke('getAccountAccessContext', {
+          correlation_id: authCorrelationId(),
+        });
+        const context = response?.data;
+        if (!context || typeof context.allowed !== 'boolean') throw new Error('Incomplete account verification response');
+        if (!context.allowed) {
+          const reason = context.reason || 'ACCOUNT_ACCESS_DENIED';
+          setAuthError({
+            type: reason === 'ACCOUNT_EXPIRED' ? 'account_expired'
+              : reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended'
+              : reason === 'ACCOUNT_NOT_ACTIVATED' ? 'account_not_activated' : 'access_denied',
+            reason, identity: user.email, message: context.message || 'Account access is not available.',
+          });
+          setIsAuthenticated(false);
+        } else {
+          setUser(previous => ({ ...previous, ...(context.user || {}), access_context: context }));
+          setAuthError(null);
+        }
+        setAccessRefreshState(null);
+      } catch (error) {
+        const payload = error?.response?.data || error?.data || {};
+        const reason = payload.reason;
+        if (['ACCOUNT_EXPIRED', 'ACCOUNT_SUSPENDED', 'ACCOUNT_NOT_ACTIVATED'].includes(reason)) {
+          setAuthError({ type: reason === 'ACCOUNT_EXPIRED' ? 'account_expired'
+            : reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'account_not_activated',
+            reason, identity: user.email });
+          setIsAuthenticated(false);
+          setAccessRefreshState(null);
+        } else {
+          // Keep the mounted editor and draft. A transient connection error
+          // must not unmount the user's work or imply access was verified.
+          setAccessRefreshState('failed');
+          reportAuthFailure(error);
+        }
+      }
+    })().finally(() => { accessRefreshFlight.current = null; });
+    return accessRefreshFlight.current;
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !user || user.role === 'admin') return;
+    const resume = () => {
+      if (document.visibilityState === 'visible') refreshSessionAccess();
+    };
+    const reconnect = () => refreshSessionAccess({ force: true });
+    window.addEventListener('focus', resume);
+    window.addEventListener('online', reconnect);
+    document.addEventListener('visibilitychange', resume);
+    const timer = window.setInterval(resume, 60000);
+    return () => {
+      window.removeEventListener('focus', resume);
+      window.removeEventListener('online', reconnect);
+      document.removeEventListener('visibilitychange', resume);
+      window.clearInterval(timer);
+    };
+  }, [isAuthenticated, user?.id, user?.role]);
+
   const logout = (shouldRedirect = true) => {
+    setAccessRefreshState(null);
     clearAppParamAuthFallback();
     setUser(null);
     setIsAuthenticated(false);
@@ -337,7 +406,20 @@ export const AuthProvider = ({ children }) => {
       navigateToLogin,
       checkAppState
     }}>
-      {children}
+      <div inert={accessRefreshState ? '' : undefined}>{children}</div>
+      {accessRefreshState && (
+        <div role="dialog" aria-modal="true" aria-label="Account verification"
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-white/90 p-6">
+          <div className="max-w-md text-center space-y-4">
+            <p>{accessRefreshState === 'checking' ? 'Checking account access…'
+              : 'Sound Proof could not verify account access. Your work is retained here; reconnect and retry.'}</p>
+            {accessRefreshState === 'failed' && (
+              <button onClick={() => refreshSessionAccess({ force: true })}
+                className="rounded-lg bg-slate-900 px-5 py-3 text-white">Retry verification</button>
+            )}
+          </div>
+        </div>
+      )}
     </AuthContext.Provider>
   );
 };
