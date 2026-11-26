@@ -96,16 +96,6 @@ export default function CustomWallEditor({
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={handleDuplicate}
-            className="p-1.5 rounded-md transition-colors hover:bg-[#F3F2EF]"
-            style={{ color: '#625143' }}
-            aria-label="Duplicate wall"
-            title="Duplicate"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
             onClick={() => onDelete?.(wall.id)}
             className="p-1.5 rounded-md transition-colors hover:bg-[#F3F2EF]"
             style={{ color: '#9CA3AF' }}

@@ -326,18 +326,6 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
           <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#213428' }} />
         </button>
 
-        <button
-          type="button"
-          onClick={addCustomWall}
-          className="group flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-all duration-150 border-[#DCDBD6] bg-white hover:bg-[#F9F8F6] hover:border-[#5B5148] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5B5148] focus-visible:ring-offset-1 active:translate-y-[1px]"
-          aria-label="Create Custom Wall"
-          title="Add a visual custom wall segment"
-        >
-          <span className="text-xs font-semibold" style={{ color: '#5B5148', letterSpacing: 0.3 }}>
-            CREATE CUSTOM WALL
-          </span>
-          <Plus className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" style={{ color: '#5B5148' }} />
-        </button>
       </div>
 
       {/* Custom Wall editor — shown for the first custom_wall element so its
