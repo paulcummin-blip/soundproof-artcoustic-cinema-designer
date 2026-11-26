@@ -30,21 +30,18 @@
           "with": {
             "function_name": "manageSoundProofAccess",
             "args": {
-              "action": "reconcile_expired",
-              "account_ids": [
-                "6afec9e83b4359ee843e1b36"
-              ]
+              "action": "reconcile_expired"
             }
           },
           "then": "end",
           "x-base44": {
-            "title": "Reconcile expired internal access",
-            "description": "Internal acceptance scope only; report incomplete enforcement through System Health."
+            "title": "Reconcile expired account access",
+            "description": "Existing expiry authority across all expired active accounts; report incomplete enforcement through System Health."
           }
         }
       }
     ]
   },
   "name": "Sound Proof Expiry Reconciliation",
-  "description": "Every five minutes reconcile expired access flags. Acceptance scope: internal Artcoustic account only. Does not change licence dates, status, membership or Project Tokens."
+  "description": "Every five minutes reconcile expired active accounts using existing authority. Does not change licence dates, status, membership, promotions or Project Tokens; unchanged user flags are not rewritten."
 }
