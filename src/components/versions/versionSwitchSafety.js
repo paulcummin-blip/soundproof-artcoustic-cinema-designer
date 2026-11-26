@@ -15,7 +15,7 @@ export const VERSION_SWITCH_ACTION = Object.freeze({
 });
 
 /** Autosave states that mean work exists which is not yet in the database. */
-const UNSAVED_AUTOSAVE_STATES = Object.freeze(['dirty', 'saving', 'error']);
+const UNSAVED_AUTOSAVE_STATES = Object.freeze(['dirty', 'saving', 'error', 'conflict']);
 
 /**
  * Does the open design version hold changes that are not saved?
