@@ -20,6 +20,7 @@ import {
   sanitiseVersionName,
 } from "@/lib/versionAuthority";
 import { selectCanonicalVersions } from "@/lib/canonicalVersionSelection";
+import { cloneSavedDesignVersion } from './cloneSavedDesignVersion';
 import { neutraliseDesignStateForNewVersion } from "@/components/utils/subwooferNeutralTuning";
 
 // Lazy-migrate a single project to V1 if it hasn't been migrated yet.
@@ -144,7 +145,7 @@ export function useProjectVersions(projectId) {
   // slotNumber: 2–5 (the target slot)
   // name: custom version name (sanitised to 50 chars)
   const createVersion = useCallback(
-    async (slotNumber, name) => {
+    async (slotNumber, name, { sourceVersionId = activeVersionId, assertScope } = {}) => {
       if (!projectId) return null;
       const sanitisedName = sanitiseVersionName(name);
       const slot = Number(slotNumber);
@@ -153,32 +154,8 @@ export function useProjectVersions(projectId) {
       }
 
       try {
-        // Get the active version to clone from
-        const sourceVersion = versions.find((v) => v.id === activeVersionId) || versions[0];
-        if (!sourceVersion) {
-          throw new Error("No source version to clone from");
-        }
-
-        // Get the project for account_id
-        const projects = await base44.entities.Project.filter({ id: projectId });
-        const project = projects?.[0];
-        const accountId = project?.account_id || "";
-
-        // Create the new version with a deep clone of the design_state
-        const newVersion = await base44.entities.ProjectVersion.create({
-          project_id: projectId,
-          account_id: accountId,
-          version_number: slot,
-          version_name: sanitisedName,
-          // New version starts with neutral subwoofer tuning (no inherited ADI settings).
-          design_state: sourceVersion.design_state
-            ? neutraliseDesignStateForNewVersion(JSON.parse(JSON.stringify(sourceVersion.design_state)))
-            : {},
-        });
-
-        // Switch to the new version
-        await base44.entities.Project.update(projectId, {
-          active_version_id: newVersion.id,
+        const newVersion = await cloneSavedDesignVersion({
+          client: base44, projectId, sourceVersionId, slot, name: sanitisedName, assertScope,
         });
 
         // Reload versions
