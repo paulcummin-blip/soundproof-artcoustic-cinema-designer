@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { getAvailableCapacity, findActivationEntry } from '../../shared/capacityAuthority.js';
 import { findEffectivePromotion } from '../../shared/promotionAuthority.js';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
-import { associateDealerIdentityCore } from '../../shared/dealerIdentityAssociation.js';
+import { associateMemberDealerIdentityCore } from '../../shared/dealerIdentityAssociation.js';
 import { acquireCreationLock, releaseCreationLock } from '../../shared/projectCreationLock.js';
 import {
   findExistingReceipt,
@@ -51,19 +51,6 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ status: 'ACCOUNT_NOT_LINKED', error: 'Unauthorized' }, { status: 401 });
 
-    // Revalidate the current provider access token before any dealer project
-    // or capacity/promotion write. Central admins keep the internal workflow.
-    if (user.role !== 'admin') {
-      const association = await associateDealerIdentityCore(base44, user.id);
-      if (association?.resolved !== true) {
-        return Response.json({
-          status: 'DEALER_NOT_LINKED',
-          reason: association?.reason || 'DEALER_IDENTITY_UNRESOLVED',
-          message: 'Unable to verify your Dealer Account. Please launch Sound Proof from your Partner Portal.'
-        }, { status: 403 });
-      }
-    }
-
     const accessContext = await resolveAccountAccess(base44, user);
     try {
       assertCapability(accessContext, 'soundProof');
@@ -74,16 +61,31 @@ export default async function(req) {
       }, { status: 403 });
     }
 
+    // Accepted membership establishes the user's company relationship. The
+    // existing server-owned company mapping supplies immutable dealer identity.
+    let dealerIdentity = null;
+    if (!accessContext.isMasterAdmin) {
+      const association = await associateMemberDealerIdentityCore(base44, user.id, accessContext);
+      if (association?.resolved !== true) {
+        return Response.json({
+          status: 'DEALER_NOT_LINKED',
+          reason: association?.reason || 'DEALER_IDENTITY_UNRESOLVED',
+          message: 'Your Sound Proof membership could not be matched to its verified dealer company. Contact Sound Proof support.'
+        }, { status: 403 });
+      }
+      dealerIdentity = association.identity;
+    }
+
     // ── 1. Resolve authoritative account_id from the authenticated user ──
     const userRecords = await base44.asServiceRole.entities.User.filter({ id: user.id });
     const authoritativeUser = (Array.isArray(userRecords) && userRecords.length > 0) ? userRecords[0] : null;
     const accountId = authoritativeUser?.account_id || null;
-    const dealerAccountId = authoritativeUser?.dealer_account_id || null;
-    const dealerName = authoritativeUser?.dealer_name || null;
+    const dealerAccountId = dealerIdentity?.dealer_account_id || authoritativeUser?.dealer_account_id || null;
+    const dealerName = dealerIdentity?.dealer_name || authoritativeUser?.dealer_name || null;
     const userRole = authoritativeUser?.role || user?.role || 'user';
     const isAdmin = userRole === 'admin';
 
-    if (!isAdmin && (!accountId || accountId === '')) {
+    if (!isAdmin && (!accountId || accountId !== accessContext.account?.id)) {
       return Response.json({
         status: 'ACCOUNT_NOT_LINKED',
         message: 'Your user account is not linked to an organisation. Contact your administrator.'
@@ -93,7 +95,7 @@ export default async function(req) {
     if (!isAdmin && (!dealerAccountId || dealerAccountId === '')) {
       return Response.json({
         status: 'DEALER_NOT_LINKED',
-        message: 'Unable to determine your Dealer Account. Please launch Sound Proof from your Partner Portal.'
+        message: 'Unable to determine your Dealer Account. Please launch Sound Proof from your ******.'
       }, { status: 403 });
     }
 
