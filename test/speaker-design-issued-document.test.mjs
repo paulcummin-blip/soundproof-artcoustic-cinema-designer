@@ -133,12 +133,10 @@ test('the schedule states Position, Model and Qty only — never a Notes column'
   assert.match(markup, /<th class="pos">Position<\/th><th class="model">Model<\/th><th class="qty">Qty<\/th>/);
   assert.doesNotMatch(markup, />\s*Notes/i, 'no Notes column');
 
-  // The Model cell states the product name alone; the number of speakers belongs
-  // to the Qty column. The dual-centre wording stays inside the Model cell.
-  assert.match(
-    markup,
-    /model-name">C4-1<\/span>\s*<span class="model-note">Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically<\/span>/,
-  );
+  // Installation notes remain in the source schedule but never enter this PDF.
+  assert.match(markup, /model-name">C4-1<\/span><\/td>/);
+  assert.doesNotMatch(markup, /model-note|Behind screen|Dual physical centre cabinets/);
+  assert.equal(SCHEDULE_GROUPS[0].rows[1].note, 'Behind screen');
   // Every QTY cell is a plain number: the physical loudspeakers at that position —
   // 1 each for separate left and right rows, 2 for a pair that shares one row, 2
   // for two centre loudspeakers. Never a unit, never a wording.
@@ -315,6 +313,23 @@ test('a longer schedule continues onto further sheets, inside the frame, nothing
       `sheet ${index + 1} stays inside the frame, so the bottom margin is kept`,
     );
   });
+});
+
+test('a closing note never creates a footer-only continuation when it fits with the last row', () => {
+  const metrics = {
+    leading: [{ key: 'opening', heightMm: 180 }],
+    groups: [
+      { key: 'equipment', headHeightMm: 10, rowHeightsMm: [20, 20, 20] },
+      { key: 'empty', headHeightMm: 0, rowHeightsMm: [] },
+    ],
+    closing: { key: 'closing', heightMm: 20 },
+    contentHeightMm: 264,
+  };
+  const packed = packSpeakerDesignSheets(metrics);
+  assert.equal(packed.sheetCount, 2);
+  assert.deepEqual(packed.sheets.map(sheet => sheet.groups.flatMap(group => group.rows)), [[0, 1], [2]]);
+  assert.equal(packed.sheets[1].closing, true);
+  assert.ok(sheetHeights(packed, metrics).every(height => height <= 264));
 });
 
 test('one group longer than a sheet continues, with its heading repeated', () => {
