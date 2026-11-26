@@ -17,6 +17,7 @@
 // and the project is marked loaded immediately.
 
 import { useEffect } from "react";
+import { createSaveBaseline } from "@/components/state/conditionalDesignSave";
 import { readProjectRecord, readProjectVersionRecord } from "@/components/state/projectReadCache";
 import { useAppState } from "@/components/AppStateProvider";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
@@ -107,6 +108,7 @@ export default function ProjectDesignHydrator({ projectId }) {
           merged = mergeProjectAndVersion(project, version);
         }
 
+        const saveBaseline = createSaveBaseline(project, savedVersion);
         hydrateProjectIntoAppState(merged, app, {
           ...app,
           setDolbyPreset: app.setDolbyLayout,
@@ -132,7 +134,7 @@ export default function ProjectDesignHydrator({ projectId }) {
             name: merged?.name || project.name || null,
             clientName: merged?.client_name || project.client_name || null,
             accountId: project.account_id || null,
-            saveBaseline: { project, version: savedVersion },
+            saveBaseline,
             activeVersionId: project.active_version_id || null,
           });
         }
