@@ -5,6 +5,8 @@ import { statesBassAuthority } from './versionedEngineeringAuthority';
 import { bassContractMatchesRequestedP14 } from '../room/bass/completedBassResultPersistence';
 import { deriveRequestedCalibrationConfig } from '../room/bass/requestedCalibrationConfig';
 
+let lastInternalDiagnostic = null;
+
 export function publicationBassIdentityMatches({ completedBassAuthority, bassFingerprint, designState }) {
   if (!bassFingerprint) return true; // Explicit non-applicability is checked by the existing terminal gates.
   const contract = completedBassAuthority?.contract;
@@ -53,6 +55,20 @@ export function engineeringPublicationPreflight({
     ...sectionReport.items.filter(item => item.key !== 'published_at'),
   ];
   const missing = gates.filter(item => !item.ok);
+  if (projectId === '6b07f4b1e21850ee5483b240') {
+    const diagnostic = JSON.stringify({ engineeringFingerprint, p14: parameters.p14,
+      roomP14: engineeringSummary?.roomResultsByParameter?.p14,
+      contractP14: completedBassAuthority?.contract?.productAnalysis?.parameters?.p14,
+      currentFingerprint: completedBassAuthority?.currentFingerprint,
+      resultFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint,
+      selectedP14Level: designState?.splConfig?.selectedP14Level,
+      selectedP14TargetBasis: designState?.splConfig?.selectedP14TargetBasis,
+      missing: missing.map(({key,detail}) => ({key,detail})) });
+    if (diagnostic !== lastInternalDiagnostic) {
+      lastInternalDiagnostic = diagnostic;
+      console.info('[internal-p14-publication]', diagnostic);
+    }
+  }
   return {
     ready: missing.length === 0, gates, missing,
     assessmentComplete: terminal.complete && bassReady,
