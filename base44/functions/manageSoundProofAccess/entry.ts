@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { desiredAccessFlag } from '../../shared/soundProofAccessFlagAuthority.js';
+import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
 import { setFirstActivatedAtIfUnset } from '../../shared/accountActivationAuthority.js';
 
 /**
@@ -44,6 +45,11 @@ export default async function(req) {
 
     const body = await req.json().catch(() => ({}));
     const { action, account_id, account_ids } = body || {};
+
+    if (action === 'reconcile_expired') {
+      const result = await reconcileExpiredAccounts(base44, user, body);
+      return Response.json(result, { status: result.ok ? 200 : 503 });
+    }
 
     if (!['enable', 'suspend', 'restore', 'set_eligible', 'reconcile'].includes(action)) {
       return Response.json({ error: 'action must be enable, suspend, restore, set_eligible or reconcile.' }, { status: 400 });
@@ -115,6 +121,10 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
   const account = (Array.isArray(accounts) && accounts.length > 0) ? accounts[0] : null;
   if (!account) {
     return { account_id: accountId, ok: false, error: 'Account not found.' };
+  }
+
+  if (action === 'reconcile_expired' && !isExpiredActiveAccount(account)) {
+    return { account_id: accountId, ok: true, skipped: 'not_expired_active', linked_users_updated: 0 };
   }
 
   // Find all users linked to this account. Two linkage paths exist:
@@ -215,10 +225,10 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
 
   // Reconciliation projects the current authority only. It must not repeat
   // activation, renewal, suspension or restore, or change the existing term.
-  if (action === 'reconcile') {
+  if (action === 'reconcile' || action === 'reconcile_expired') {
     const expiresAtMs = newExpiresAt ? new Date(newExpiresAt).getTime() : null;
     accountAllowsAccess = account.status === 'active'
-      && (expiresAtMs === null || (Number.isFinite(expiresAtMs) && expiresAtMs >= Date.now()));
+      && (expiresAtMs === null || (Number.isFinite(expiresAtMs) && expiresAtMs > Date.now()));
   } else {
     await service.entities.Account.update(accountId, {
       status: newStatus,
@@ -255,6 +265,18 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
         membershipStatus: membershipStatusByUserId.get(userId),
       });
       try {
+        if (action === 'reconcile_expired') {
+          // Re-read at the write boundary: a renewal must not be overwritten
+          // from the earlier batch snapshot. This path can only revoke.
+          const latestAccount = (await service.entities.Account.filter({ id: accountId }))[0];
+          if (!isExpiredActiveAccount(latestAccount)) continue;
+          const currentUser = (await service.entities.User.filter({ id: userId }))[0];
+          if (!currentUser) continue;
+          if (currentUser.account_id && currentUser.account_id !== accountId) {
+            throw new Error('User account linkage changed; expiry reconciliation requires review.');
+          }
+          if (currentUser.soundproof_access_enabled !== true) continue;
+        }
         await service.entities.User.update(userId, {
           soundproof_access_enabled: desiredFlag,
         });
@@ -270,13 +292,14 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
 
   const flagSyncOk = flagFailures.length === 0;
 
-  // Audit trail.
-  try {
+  // Audit trail. Avoid an audit write on every unchanged scheduled tick.
+  let auditFailure = null;
+  if (action !== 'reconcile_expired' || flagsEnabled + flagsDisabled > 0 || !flagSyncOk) try {
     await service.entities.AccountUserAudit.create({
       account_id: accountId,
       actor_user_id: String(actor.id),
       actor_email: actor.email || 'admin',
-      action: `SOUNDPROOF_${action.toUpperCase()}`,
+      action: action === 'reconcile_expired' ? 'ACCESS_CHANGED' : `SOUNDPROOF_${action.toUpperCase()}`,
       target_user_id: null,
       // target_email is a required non-nullable string. An account-level
       // access action has no single target user, so the account's own
@@ -286,6 +309,7 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
       after_access_level: newStatus,
       occurred_at: now,
       details: {
+        reconciliation_action: action,
         previous_status: account.status,
         new_status: newStatus,
         previous_expires_at: account.soundproof_access_expires_at || null,
@@ -299,14 +323,16 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
       },
     });
   } catch (auditErr) {
+    auditFailure = auditErr?.message || 'Access audit could not be recorded.';
     console.error(`[manageSoundProofAccess] audit failed: ${auditErr?.message}`);
   }
 
   return {
     account_id: accountId,
     account_name: account.name,
-    ok: flagSyncOk,
-    account_updated: action !== 'reconcile',
+    ok: flagSyncOk && (action !== 'reconcile_expired' || !auditFailure),
+    audit_error: auditFailure,
+    account_updated: !['reconcile', 'reconcile_expired'].includes(action),
     partial_failure: !flagSyncOk,
     error: flagSyncOk ? null : 'Account state is saved, but linked-user access enforcement is incomplete. Retry reconciliation; do not assume access has been revoked.',
     flag_sync_ok: flagSyncOk,
@@ -320,5 +346,78 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
     linked_users_updated: flagsEnabled + flagsDisabled,
     linked_users_attempted: linkedUserIds.size,
     flag_failures: flagFailures,
+  };
+}
+
+function isExpiredActiveAccount(account) {
+  const expiry = account?.soundproof_access_expires_at
+    ? Date.parse(account.soundproof_access_expires_at) : NaN;
+  return account?.status === 'active' && Number.isFinite(expiry) && expiry <= Date.now();
+}
+
+// Same authority and user-flag projection as manual reconciliation; never a
+// licence, membership, entitlement or Account write. Scope is administrator-only.
+async function reconcileExpiredAccounts(base44, actor, body) {
+  const startedAt = new Date().toISOString();
+  const scope = [...new Set(Array.isArray(body.account_ids) ? body.account_ids : body.account_id ? [body.account_id] : [])];
+  if (scope.some(id => typeof id !== 'string' || !id.trim()) || scope.length > 50) {
+    return { ok: false, error: 'Invalid account scope.', processed: 0 };
+  }
+  const dryRun = body.dry_run === true;
+  const results = [];
+  let cursor = null;
+  let scanComplete = false;
+  let scanError = null;
+  try {
+    for (let page = 0; page < 10; page++) {
+      if (Date.now() - Date.parse(startedAt) > 180000) throw new Error('Expiry reconciliation exceeded its bounded processing time.');
+      const query = {
+        status: 'active',
+        soundproof_access_expires_at: { $lte: startedAt },
+        ...(scope.length ? { id: { $in: scope, ...(cursor ? { $gt: cursor } : {}) } } : cursor ? { id: { $gt: cursor } } : {}),
+      };
+      const accounts = await base44.asServiceRole.entities.Account.filter(query, 'id', 50);
+      for (const account of accounts || []) {
+        if (!isExpiredActiveAccount(account)) continue;
+        if (dryRun) { results.push({ account_id: account.id, ok: true, expiry: account.soundproof_access_expires_at, would_reconcile: true }); continue; }
+        try {
+          results.push(await processAccount(base44, { action: 'reconcile_expired', accountId: account.id, actor, now: new Date().toISOString() }));
+        } catch (error) {
+          results.push({ account_id: account.id, ok: false, error: error?.message || 'Expiry reconciliation failed.' });
+        }
+      }
+      if (!accounts || accounts.length < 50) { scanComplete = true; break; }
+      cursor = accounts[accounts.length - 1].id;
+    }
+    if (!scanComplete) scanError = 'Expiry reconciliation reached its account batch limit; review required.';
+  } catch (error) {
+    scanError = error?.message || 'Expiry account scan failed.';
+  }
+  const failures = results.filter(result => !result.ok);
+  const incidents = [];
+  if (!dryRun) {
+    for (const failure of [...failures, ...(scanError ? [{ account_id: null, error: scanError }] : [])]) {
+      try {
+        incidents.push(await recordSystemIncident(base44, {
+          component: 'account_access', operation: 'expiry_reconciliation',
+          error_code: 'EXPIRY_ENFORCEMENT_INCOMPLETE',
+          severity: scope.length === 1 && scope[0] === '6afec9e83b4359ee843e1b36' ? 'medium' : 'high',
+          account_id: failure.account_id, runtime_environment: 'production',
+          diagnostic_summary: 'Scheduled expiry enforcement is incomplete. Protected access may remain enabled until reconciliation succeeds.',
+          error_detail: JSON.stringify(failure).slice(0, 3000),
+          stage_failed: 'user_access_flag_reconciliation', data_committed: false,
+        }));
+      } catch (error) {
+        incidents.push({ recorded: false, error: error?.message || 'System Health recording failed.' });
+      }
+    }
+  }
+  return {
+    ok: !scanError && failures.length === 0, action: 'reconcile_expired', dry_run: dryRun,
+    actor_user_id: actor.id, started_at: startedAt, completed_at: new Date().toISOString(),
+    scope: scope.length ? scope : 'all_expired_active', scan_complete: scanComplete,
+    scan_error: scanError, processed: results.length, failed: failures.length,
+    flags_disabled: results.reduce((sum, result) => sum + (result.flags_disabled || 0), 0),
+    results, incidents,
   };
 }
