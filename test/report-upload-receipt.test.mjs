@@ -5,7 +5,7 @@ import { reportUploadReceiptApi } from '../src/components/library/issuedDocument
 import { saveIssuedArtifact } from '../src/components/library/issuedDocument/issuedExportDurability.js';
 
 function fixture() {
-  const op = { id: 'op-record', operation_id: 'internal-report-uuid', operation_type: 'report_export', initiated_by: 'owner', account_id: 'account', project_id: 'internal', version_id: 'original' };
+  const op = { id: 'op-record', operation_id: 'internal-report-uuid', operation_type: 'report_export', initiated_by: 'owner', account_id: 'account', project_id: 'internal', version_id: 'original', report_upload: null };
   const user = { id: 'owner', role: 'admin' };
   const assets = []; const files = new Map(); const calls = { upload: 0, create: 0, capture: 1, put: 0 };
   const get = key => key.split('.').reduce((v,k) => v?.[k],op);
@@ -14,7 +14,7 @@ function fixture() {
     async filter(query) { return (query.id === op.id || query.operation_id === op.operation_id) ? [structuredClone(op)] : []; },
     async updateMany(query, update) {
       assert.equal(query.id, op.id, 'claims must name a plain single id');
-      const matches = Object.entries(query).every(([key,v])=> typeof v === 'object' ? ('$exists' in v ? (get(key)!==undefined)===v.$exists : v.$in.includes(get(key))) : get(key)===v);
+      const matches = Object.entries(query).every(([key,v])=> typeof v === 'object' ? ('$exists' in v ? (get(key)!==undefined)===v.$exists : v.$in.includes(get(key))) : (v === null ? get(key) == null : get(key)===v));
       if(!matches) return {updated:0};
       for(const [key,value] of Object.entries(update.$set))set(key,value);
       return {updated:1};
