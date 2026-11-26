@@ -1,3 +1,4 @@
+import { recordSystemIncident } from './systemHealth/incidentRecorder.js';
 import { validatePilotPortalAccessIfRequired } from './portalSsoAuthority.js';
 import { startSoundProofTermOnFirstClaim } from './portalActivationAuthority.js';
 import { sendWelcomeEmail } from './invitationEmail/sendWelcomeEmail.js';
@@ -170,7 +171,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
     return { allowed: false, reason: 'ACCOUNT_NOT_FOUND' };
   }
   if (account.status === 'suspended') {
-    return { allowed: false, reason: 'ACCOUNT_SUSPENDED', account };
+    return denyAccountAccess(base44, authoritativeUser, account, 'ACCOUNT_SUSPENDED');
   }
 
   // An inactive account has NOT been explicitly enabled by an administrator.
@@ -190,7 +191,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
       && invitationMembership?.membership_role === 'dealer_admin'
       && invitationMembership?.status === 'pending';
     if (!isPortalFirstAdminClaim) {
-      return { allowed: false, reason: 'ACCOUNT_NOT_ACTIVATED', account };
+      return denyAccountAccess(base44, authoritativeUser, account, 'ACCOUNT_NOT_ACTIVATED');
     }
     // Fall through to membership claim, which will start the term.
   }
@@ -222,8 +223,8 @@ export async function resolveAccountAccess(base44, sessionUser, {
     && account.soundproof_access_expires_at
   ) {
     const expiresAtMs = new Date(account.soundproof_access_expires_at).getTime();
-    if (Number.isFinite(expiresAtMs) && expiresAtMs < Date.now()) {
-      return { allowed: false, reason: 'ACCOUNT_EXPIRED', account };
+    if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+      return denyAccountAccess(base44, authoritativeUser, account, 'ACCOUNT_EXPIRED');
     }
   }
 
@@ -383,6 +384,20 @@ export async function resolveAccountAccess(base44, sessionUser, {
     membership = await service.entities.AccountMembership.update(membership.id, membershipPatch);
   }
 
+  // A membership/Portal claim may have taken time. Re-read the existing
+  // account authority before projecting an enabled flag into RLS.
+  const currentAccount = await getSingle(service, 'Account', { id: accountId });
+  if (!currentAccount) return { allowed: false, reason: 'ACCOUNT_NOT_FOUND' };
+  if (currentAccount.status !== 'active') {
+    return denyAccountAccess(base44, authoritativeUser, currentAccount,
+      currentAccount.status === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_NOT_ACTIVATED');
+  }
+  const currentExpiry = currentAccount.soundproof_access_expires_at
+    ? Date.parse(currentAccount.soundproof_access_expires_at) : null;
+  if (currentExpiry !== null && Number.isFinite(currentExpiry) && currentExpiry <= Date.now()) {
+    return denyAccountAccess(base44, authoritativeUser, currentAccount, 'ACCOUNT_EXPIRED');
+  }
+  Object.assign(account, currentAccount);
   onStage('user_access_projection');
   const userPatch = {};
   // Project/version RLS uses this server-maintained projection. New seats must
@@ -495,4 +510,27 @@ export function assertCapability(context, capability) {
     error.code = 'FORBIDDEN';
     throw error;
   }
+}
+async function denyAccountAccess(base44, user, account, reason) {
+  let enforcementFailure = null;
+  if (user.soundproof_access_enabled === true) {
+    try {
+      await base44.asServiceRole.entities.User.update(user.id, { soundproof_access_enabled: false });
+      user.soundproof_access_enabled = false;
+    } catch (error) {
+      enforcementFailure = error?.message || 'Could not clear the protected access flag.';
+      try {
+        await recordSystemIncident(base44, {
+          component: 'account_access', operation: 'access_denial_reconciliation',
+          error_code: 'ACCESS_ENFORCEMENT_INCOMPLETE', severity: 'high',
+          account_id: account.id, runtime_environment: 'production',
+          diagnostic_summary: 'The account authority denied access but its RLS flag could not be cleared. Reconciliation is required.',
+          error_detail: enforcementFailure, stage_failed: 'user_access_flag_reconciliation',
+        });
+      } catch (incidentError) {
+        console.error('[accountAccessAuthority] enforcement and incident recording failed', incidentError?.message);
+      }
+    }
+  }
+  return { allowed: false, reason, account, enforcement_failed: Boolean(enforcementFailure) };
 }
