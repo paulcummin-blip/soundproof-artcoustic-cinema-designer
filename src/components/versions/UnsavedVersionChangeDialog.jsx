@@ -24,6 +24,7 @@ export default function UnsavedVersionChangeDialog({
   versionName = null,
   busy = false,
   error = null,
+  createOption = false,
   onCancel,
   onSaveAndOpen,
   onOpenWithoutSaving,
@@ -39,7 +40,7 @@ export default function UnsavedVersionChangeDialog({
         <DialogHeader>
           <DialogTitle>Unsaved changes</DialogTitle>
           <DialogDescription>
-            {versionSwitchQuestion(versionName)}
+            {createOption ? 'Save your current design before creating a new option?' : versionSwitchQuestion(versionName)}
           </DialogDescription>
         </DialogHeader>
 
@@ -57,16 +58,16 @@ export default function UnsavedVersionChangeDialog({
           <Button variant="outline" onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="secondary" onClick={onOpenWithoutSaving} disabled={busy}>
+          {!createOption && <Button variant="secondary" onClick={onOpenWithoutSaving} disabled={busy}>
             Open without saving
-          </Button>
+          </Button>}
           <Button
             onClick={onSaveAndOpen}
             disabled={busy}
             className="font-semibold hover:brightness-110"
             style={{ background: '#213428', color: '#FFFFFF' }}
           >
-            {busy ? 'Saving…' : 'Save and open'}
+            {busy ? 'Saving…' : createOption ? 'Save and create option' : 'Save and open'}
           </Button>
         </DialogFooter>
       </DialogContent>
