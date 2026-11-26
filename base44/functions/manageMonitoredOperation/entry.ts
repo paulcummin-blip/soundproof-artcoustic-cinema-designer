@@ -22,6 +22,7 @@ import {
  * blocks the dealer's operation.
  */
 export default async function(req) {
+  let reportRegistration=false, registrationWriteAttempted=false;
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
@@ -31,6 +32,7 @@ export default async function(req) {
     const form = multipart ? await req.formData() : null;
     const body = form ? Object.fromEntries(form.entries()) : await req.json().catch(() => ({}));
     const { action } = body;
+    reportRegistration=action==='start' && body.operation_type==='report_export';
     if (['report_upload_prepare', 'report_upload_status', 'report_upload_put', 'report_upload_recover', 'report_record_status', 'report_record_put'].includes(action)) {
       // Storage is fail-closed. Existing monitoring actions remain fail-open.
       try {
@@ -58,12 +60,33 @@ export default async function(req) {
       if (user.role!=='admin' && record.initiated_by!==user.id && (!record.account_id || record.account_id!==user.account_id))
         return Response.json({error:'Forbidden'},{status:403});
     }
+    if(reportRegistration) {
+      const result=await base44.asServiceRole.entities.MonitoredOperation.filter({operation_id:body.operation_id},'-created_date',2);
+      const existing=Array.isArray(result)?result:result?.items||[];
+      if(existing.length) {
+        const row=existing[0];
+        const same=existing.length===1 && row.operation_type==='report_export' && row.initiated_by===user.id && row.project_id===body.project_id && row.version_id===body.version_id;
+        return Response.json(same ? {recorded:true,operation_id:body.operation_id,reconciled:true} : {recorded:false,registration_outcome:'conflict',error:'REPORT_REGISTRATION_IDENTITY_CONFLICT'});
+      }
+    }
     body.initial_stage=safeDiagnostic(body.initial_stage,100);
     body.stage=safeDiagnostic(body.stage,100);
     body.diagnostic_summary=safeDiagnostic(body.diagnostic_summary);
     switch (action) {
-      case 'start':
-        return Response.json(await startOperation(base44, {
+      case 'start': {
+        registrationWriteAttempted=true;
+        let registrationOutcome='unknown';
+        const monitorClient=reportRegistration ? {asServiceRole:{entities:{MonitoredOperation:{
+          create:async data=>{
+            try {return await base44.asServiceRole.entities.MonitoredOperation.create(data);}
+            catch(error) {
+              const status=Number(error?.response?.status || error?.status || 0);
+              registrationOutcome=[400,401,403,404,413,415,422].includes(status)?'refused':'unknown';
+              throw error;
+            }
+          },
+        }}}} : base44;
+        const started=await startOperation(monitorClient, {
           operation_id: body.operation_id,
           operation_type: body.operation_type,
           initiated_by:user.id,
@@ -72,7 +95,9 @@ export default async function(req) {
           version_id: body.version_id || null,
           proposal_id: body.proposal_id || null,
           initial_stage: body.initial_stage || 'started',
-        }));
+        });
+        return Response.json({...started,...(reportRegistration && !started.recorded ? {registration_outcome:registrationOutcome}:{})});
+      }
 
       case 'progress':
         return Response.json(await reportOperationProgress(base44, {
@@ -104,6 +129,7 @@ export default async function(req) {
     }
   } catch (error) {
     // Fail-open: never block the dealer's operation.
-    return Response.json({ recorded: false, error: error?.message || 'Monitoring failed', fail_open: true });
+    return Response.json({ recorded: false, error: error?.message || 'Monitoring failed', fail_open: true, ...(reportRegistration?{registration_outcome:registrationWriteAttempted?'unknown':'not_started'}:{}) });
   }
 }
+
