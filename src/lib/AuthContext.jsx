@@ -8,6 +8,7 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 import { retryAuthRequest, isUnexpectedAuthFailure, authFailureStatus, authCorrelationId } from '@/lib/authRecovery';
 import { reportClientFailure, setExperienceContext } from '@/components/systemHealth/clientExperienceMonitor';
 
+import InternalAccessAcceptanceProbe from '@/components/account/InternalAccessAcceptanceProbe';
 const AuthContext = createContext();
 
 function takePortalLaunchPass() {
@@ -420,6 +421,7 @@ export const AuthProvider = ({ children }) => {
           </div>
         </div>
       )}
+      {import.meta.env.DEV && new URLSearchParams(window.location.search).get('internal_access_probe') === '1' && <InternalAccessAcceptanceProbe />}
     </AuthContext.Provider>
   );
 };
