@@ -40,7 +40,7 @@ export async function handleReportUpload({ service, caller, user, body, file = n
     if (!receipt) {
       // The plain id is essential: Base44 rechecks this condition atomically
       // at write time ONLY when the query names a single record id.
-      await operations.updateMany({ id: operation.id, report_upload: { $exists: false } }, { $set: {
+      await operations.updateMany({ id: operation.id, report_upload: null }, { $set: {
         report_upload: { state: 'ready', sha256: body.sha256, size: Number(body.size), prepared_at: now() },
       } });
       receipt = await read();
