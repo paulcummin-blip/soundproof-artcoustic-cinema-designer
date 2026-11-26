@@ -142,6 +142,7 @@ export default function RoomDesignerVersionBar({
         <VersionSwitcher
           projectId={projectId}
           versionApi={versionApi}
+          loadedVersionId={loadedVersionId}
           autosaveStatus={autosaveStatus}
           onSaveProject={onSaveProject}
           disabled={disabled}
