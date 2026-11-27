@@ -313,3 +313,52 @@ test('a project switch invalidates both in-flight reads and counts', () => {
   expect(onReadEnd(state, { projectId: 'B', generation: rB.generation }).shouldCommit).toBe(true);
   expect(onCountEnd(state, { projectId: 'B', generation: cB.generation }).shouldCommit).toBe(true);
 });
+
+/* ── A failed count settles and runs the pending follow-up ────────────── */
+
+test('A→B: A count fails, B queued count runs automatically', () => {
+  const state = createProjectAssetsRefreshState();
+  const cA = requestCount(state, { projectId: 'A' });
+  expect(cA.shouldRun).toBe(true);
+
+  // Switch to B queues a count (coalesced behind A's in-flight count).
+  requestCount(state, { projectId: 'B' });
+  expect(state.countPending).toBe(true);
+
+  // A's count fails — onCountEnd must still release countInFlight and
+  // return pendingRefresh so the hook runs B's queued count.
+  const end = onCountEnd(state, { projectId: 'A', generation: cA.generation });
+  expect(end.shouldCommit).toBe(false); // wrong project
+  expect(end.pendingRefresh).toBe(true); // B's count is queued
+  expect(state.countInFlight).toBe(false); // settled
+
+  // B's count runs and commits.
+  const cB = requestCount(state, { projectId: 'B' });
+  expect(cB.shouldRun).toBe(true);
+  const endB = onCountEnd(state, { projectId: 'B', generation: cB.generation });
+  expect(endB.shouldCommit).toBe(true);
+  expect(endB.pendingRefresh).toBe(false);
+});
+
+test('a failed count for the current project settles and allows a follow-up', () => {
+  const state = createProjectAssetsRefreshState();
+  const c0 = requestCount(state, { projectId: 'A' });
+  // A notification queues another count during the failed count.
+  requestCount(state, { projectId: 'A' });
+  expect(state.countPending).toBe(true);
+
+  // The count fails — onCountEnd still runs, releasing countInFlight.
+  // shouldCommit is true (identity matches) but the hook does NOT set counts
+  // on failure; it only uses pendingRefresh to run the follow-up.
+  const end = onCountEnd(state, { projectId: 'A', generation: c0.generation });
+  expect(end.shouldCommit).toBe(true); // identity is correct
+  expect(end.pendingRefresh).toBe(true); // the follow-up recovers
+  expect(state.countInFlight).toBe(false);
+
+  // The follow-up count can succeed.
+  const c1 = requestCount(state, { projectId: 'A' });
+  expect(c1.shouldRun).toBe(true);
+  const end1 = onCountEnd(state, { projectId: 'A', generation: c1.generation });
+  expect(end1.shouldCommit).toBe(true);
+  expect(end1.pendingRefresh).toBe(false);
+});

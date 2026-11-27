@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { base44 } from '@/api/base44Client';
 import { Loader2, ImageOff } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
+import LibraryReadError from '@/components/library/LibraryReadError';
 import { notifyProjectImagesChanged, subscribeIssuedExportStored } from '@/components/library/issuedExportSignal';
 import {
   createProjectAssetsRefreshState,
@@ -65,6 +66,7 @@ export default function ProposalAssetsPanel({
   const [assets, setAssets] = useState([]);
   const [projectName, setProjectName] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // The current project identity is held in a ref so the stable load callback
   // always reads the live project. The state machine's activeProjectId is
@@ -86,6 +88,7 @@ export default function ProposalAssetsPanel({
     if (!shouldRun) return;
     if (!silent) setLoading(true);
     let resultData = null;
+    let caughtError = null;
     try {
       const [assetResults, projectResults] = await Promise.all([
         base44.entities.ProposalAsset.filter({ project_id: currentProjectId }),
@@ -93,6 +96,7 @@ export default function ProposalAssetsPanel({
       ]);
       resultData = { assetResults, projectResults };
     } catch (err) {
+      caughtError = err;
       console.error('Failed to load project images:', err);
     }
     const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
@@ -100,6 +104,9 @@ export default function ProposalAssetsPanel({
       if (resultData) {
         setAssets(resultData.assetResults || []);
         setProjectName(resultData.projectResults?.[0]?.name || 'Untitled Project');
+        setError(null);
+      } else {
+        setError(caughtError || new Error('Images could not be loaded.'));
       }
       setLoading(false);
     }
@@ -113,6 +120,7 @@ export default function ProposalAssetsPanel({
   useEffect(() => {
     setAssets([]);
     setProjectName(null);
+    setError(null);
     setLoading(true);
     load();
   }, [load, projectId]);
@@ -429,6 +437,15 @@ export default function ProposalAssetsPanel({
     );
   }
 
+  // A failed read shows the error with Retry, not an empty gallery of "0
+  // images". When previous images from the current project are still loaded,
+  // they remain visible below a compact error banner.
+  if (error && assets.length === 0) {
+    return (
+      <LibraryReadError onRetry={() => load()} />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-white border border-[#DCDBD6] rounded-lg p-4">
@@ -437,6 +454,10 @@ export default function ProposalAssetsPanel({
           {projectName}
         </div>
       </div>
+
+      {error && assets.length > 0 && (
+        <LibraryReadError onRetry={() => load()} variant="banner" />
+      )}
 
       {groups.map((group) => {
         const { bySlot, surplus, assets: scopedAssets } = assignmentsFor(group);

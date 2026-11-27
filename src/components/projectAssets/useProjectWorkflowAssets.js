@@ -154,8 +154,15 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
         refreshCounts();
       }
     } catch (err) {
-      onCountEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
+      // A failed count must still settle the state machine so the next
+      // queued count can run. If a project switch queued a count for the
+      // current project, the pending follow-up runs automatically — the
+      // collapsed heading never stays at "(…)" after a failed count.
+      const { pendingRefresh } = onCountEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
       console.warn('[useProjectWorkflowAssets] count failed:', err);
+      if (pendingRefresh) {
+        refreshCounts();
+      }
     }
   }, []);
 
@@ -185,13 +192,17 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
   }, [projectId, enabled, load, refreshCounts]);
 
   // A document or image stored while this section is open is listed as soon
-  // as it exists. The notification is project-scoped and coalesced: many
-  // notifications during one read produce a single follow-up read, and many
-  // during one count produce a single follow-up count.
+  // as it exists. When the full records are loaded (enabled), the coalesced
+  // read derives the counts on completion — a separate count request is
+  // redundant and would fire once per notification gap during a slow read.
+  // When collapsed (not enabled), only the coalesced count runs.
   useEffect(() => subscribeIssuedExportStored((storedProjectId) => {
     if (!projectIdRef.current || storedProjectId !== projectIdRef.current) return;
-    refreshCounts();
-    if (enabled) load({ silent: true });
+    if (enabled) {
+      load({ silent: true });
+    } else {
+      refreshCounts();
+    }
   }), [enabled, load, refreshCounts]);
 
   const totalCount = exportCount + imageCount;

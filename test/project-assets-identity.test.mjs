@@ -92,6 +92,14 @@ test('LibraryReadError banner variant shows a compact retry banner', () => {
   expect(html).toContain('role="alert"');
 });
 
+test('LibraryReadError does not show "0 images" on a failed read', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(LibraryReadError, { onRetry: () => {} }),
+  );
+  expect(html).not.toContain('0 images');
+  expect(html).not.toContain('image'); // no empty-gallery message
+});
+
 /* ── Simulated A→B→A hook sequence with delayed first A response ──────── */
 
 test('A→B→A with delayed first A: stale A response is discarded, current visit commits', async () => {
@@ -168,7 +176,9 @@ test('five notifications during a read produce exactly one follow-up read', () =
   expect(state.pending).toBe(false);
 });
 
-test('five notifications during a count produce exactly one follow-up count', () => {
+test('five count notifications produce one follow-up when counts are requested', () => {
+  // When the section is collapsed (not enabled), the hook calls requestCount
+  // on each notification. The state machine coalesces five into one follow-up.
   const state = createProjectAssetsRefreshState();
   const c0 = requestCount(state, { projectId: 'A' });
 
@@ -181,13 +191,37 @@ test('five notifications during a count produce exactly one follow-up count', ()
   const end = onCountEnd(state, { projectId: 'A', generation: c0.generation });
   expect(end.pendingRefresh).toBe(true);
 
-  // The hook runs ONE follow-up count.
+  // One follow-up count runs.
   const c1 = requestCount(state, { projectId: 'A' });
   if (c1.shouldRun) followUpCount++;
   onCountEnd(state, { projectId: 'A', generation: c1.generation });
 
   expect(followUpCount).toBe(1);
   expect(state.countPending).toBe(false);
+});
+
+test('when enabled, notifications trigger reads not separate counts', () => {
+  // When the section is expanded (enabled), the hook calls load (requestRead)
+  // on notifications, not refreshCounts — the full read derives counts on
+  // completion. Five notifications produce five requestRead calls, all of
+  // which coalesce into one follow-up read. No requestCount is called.
+  const state = createProjectAssetsRefreshState();
+  const r0 = requestRead(state, { projectId: 'A', silent: false });
+
+  for (let i = 0; i < 5; i++) {
+    requestRead(state, { projectId: 'A', silent: true });
+  }
+  expect(state.pending).toBe(true);
+  expect(state.countInFlight).toBe(false); // no count was started
+
+  const end = onReadEnd(state, { projectId: 'A', generation: r0.generation });
+  expect(end.pendingRefresh).toBe(true);
+
+  // One follow-up read runs; it derives the counts.
+  const r1 = requestRead(state, { projectId: 'A', silent: consumePendingSilent(state) });
+  expect(r1.shouldRun).toBe(true);
+  onReadEnd(state, { projectId: 'A', generation: r1.generation });
+  expect(state.countInFlight).toBe(false); // still no separate count
 });
 
 /* ── Obsolete responses cannot change counts or loading state ──────────── */
