@@ -102,6 +102,13 @@ const PRODUCTS_ENGINEERING_CARDS = [
 
 const CONTENT_SYSTEM_CARDS = [
   {
+    title: "Education Library",
+    description: "Upload, publish, replace and remove technical PDF guides shared with all Sound Proof users.",
+    status: "Ready",
+    count: "PDF library",
+    href: "/admin/education",
+  },
+  {
     title: "Content Management",
     description: "Publication content — the canonical source for About Sound Proof and client-facing text.",
     status: "Ready",

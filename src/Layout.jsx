@@ -27,7 +27,8 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  Building2
+  Building2,
+  GraduationCap
 } from "lucide-react";
 import { readRoomDimsMissingIndicator } from "@/components/state/designReviewHandoff";
 
@@ -56,6 +57,7 @@ import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/a
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { hasCapability, isStrictMasterAdmin, isRicherSoundsAdmin } from "@/lib/accountAccess";
+import { useEducationNewContent } from "@/components/education/useEducationNewContent";
 
 
 // Content-driven sidebar width for the Live RP22 Performance Summary panel.
@@ -95,9 +97,10 @@ const menuItems = [
   { title: "Project Library", url: "/ProjectProposalAssets", icon: Images, capability: "soundProof" },
   { title: "Proposal Centre", url: "/ProposalCentre", icon: Presentation, capability: "soundProof" },
   { title: "Price List", url: "/PriceList", icon: Tags, capability: "priceList" },
-  { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },
   { title: "Dealer Branding", url: "/DealerBranding", icon: Palette, capability: "soundProof" },
   { title: "Users & Permissions", url: "/account/users", icon: UserCog, capability: "manageUsers" },
+  { title: "Education", url: "/Education", icon: GraduationCap, alwaysVisible: true, education: true },
+  { title: "About Sound Proof", url: "/AboutSoundProof", icon: FileText, alwaysVisible: true },
 ];
 
 export default function Layout({ children, currentPageName }) {
@@ -122,6 +125,7 @@ export default function Layout({ children, currentPageName }) {
   // System Designer restores each panel exactly as it was left.
   const location = useLocation();
   const isSystemDesignerPage = location.pathname === "/RoomDesigner";
+  const educationHasNew = useEducationNewContent();
   const [dealerAccountUrl, setDealerAccountUrl] = React.useState(null);
 
   // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
@@ -513,6 +517,9 @@ export default function Layout({ children, currentPageName }) {
                     return availableMenuItems.map((item) => {
                       const itemPath = String(item.url || "");
                       const isActive = itemPath && (currentPath === itemPath || currentPath.startsWith(itemPath + "/"));
+                      // Education "New content" highlight: subtle green background
+                      // and a small New badge shown until this user opens Education.
+                      const isNew = Boolean(item.education) && educationHasNew && !isActive;
 
                       return (
                         <a
@@ -525,23 +532,46 @@ export default function Layout({ children, currentPageName }) {
                             ${
                               isActive
                                 ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-md'
-                                : 'text-brand-text-muted border-transparent bg-transparent'
+                                : isNew
+                                  ? 'text-brand-primary border-brand-primary'
+                                  : 'text-brand-text-muted border-transparent bg-transparent'
                             }
                             hover:bg-white hover:border-[#D9D5CE] hover:text-brand-text-label
                             hover:shadow-md hover:-translate-y-[2px]
                             active:translate-y-0 active:shadow-sm
                           `}
+                          style={isNew ? { background: '#EDF3EF' } : undefined}
                         >
                           <item.icon
                             className={`w-4 h-4 transition-all duration-200 ${
                               isActive
                                 ? 'text-brand-primary'
-                                : 'text-brand-text-muted group-hover:text-brand-text-label'
+                                : isNew
+                                  ? 'text-brand-primary'
+                                  : 'text-brand-text-muted group-hover:text-brand-text-label'
                             } group-hover:-translate-y-[1px]`}
                           />
-                          <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                          <span style={{ fontFamily: 'Didact Gothic, sans-serif', flex: 1, minWidth: 0 }}>
                             {item.title}
                           </span>
+                          {isNew ? (
+                            <span
+                              style={{
+                                flexShrink: 0,
+                                fontSize: 9,
+                                fontWeight: 700,
+                                letterSpacing: '0.06em',
+                                textTransform: 'uppercase',
+                                color: '#FFFFFF',
+                                background: '#213428',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                lineHeight: 1,
+                              }}
+                            >
+                              New
+                            </span>
+                          ) : null}
                         </a>
                       );
                     });

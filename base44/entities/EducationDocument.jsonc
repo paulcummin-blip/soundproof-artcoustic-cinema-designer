@@ -1,0 +1,99 @@
+{
+  "name": "EducationDocument",
+  "type": "object",
+  "description": "A shared technical education PDF in the Sound Proof Education Library. Visible to all authorised Sound Proof users when published; managed (upload, replace, edit, publish, unpublish, delete) by administrators only. Not associated with any individual cinema project. The PDF is stored as a private file_uri; authorised readers mint a short-lived signed URL to preview or download. new_content_at drives the per-user 'New' sidebar notification: it is set to now when a document is first published or re-published, and when an administrator announces a replacement PDF as new content. Ordinary title/description edits and unpublishing never change new_content_at.",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Document title. Defaults to the uploaded filename (without extension) when the administrator does not supply one."
+    },
+    "description": {
+      "type": "string",
+      "nullable": true,
+      "description": "Optional short description shown on the document card."
+    },
+    "file_uri": {
+      "type": "string",
+      "description": "Private storage URI of the uploaded PDF, returned by UploadPrivateFile. Never a public URL. Readers mint a time-limited signed URL via CreateFileSignedUrl to preview or download."
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Original uploaded filename. Used for the download filename and PDF validation (must end in .pdf)."
+    },
+    "file_size": {
+      "type": "number",
+      "nullable": true,
+      "description": "Size of the uploaded PDF in bytes, when known."
+    },
+    "file_content_type": {
+      "type": "string",
+      "default": "application/pdf",
+      "description": "Stored content type. Always application/pdf for this library."
+    },
+    "published": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the document is visible to non-administrator users. Drafts (published=false) are only visible to administrators."
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the document was most recently published (unpublished -> published transition). Null while a draft. Used to sort the published library newest-first. Set to now on each publish transition."
+    },
+    "new_content_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "Timestamp that drives the per-user Education 'New' sidebar notification. Set to now when a document is first published or re-published, and when an administrator announces a replacement PDF as new content. Null while the document has never been published. Each authenticated user's education_last_visited_at is compared against the maximum new_content_at among published documents to decide whether the 'New' badge shows."
+    },
+    "created_by_name": {
+      "type": "string",
+      "nullable": true,
+      "description": "Display name or email of the administrator who uploaded the document."
+    }
+  },
+  "required": [
+    "title",
+    "file_uri",
+    "file_name"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.published": true
+            },
+            {
+              "user_condition": {
+                "role": "user"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

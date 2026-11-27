@@ -47,6 +47,8 @@ import PriceList from './pages/PriceList';
 import AccountUsers from './pages/AccountUsers';
 import AboutSoundProof from './pages/AboutSoundProof';
 import DealerBranding from './pages/DealerBranding';
+import Education from './pages/Education';
+import AdminEducation from './pages/AdminEducation';
 import AccessGate from '@/components/AccessGate';
 import AccessDeniedScreen from '@/components/AccessDeniedScreen';
 import AdminOnlyRoute from '@/components/AdminOnlyRoute';
@@ -155,6 +157,7 @@ const AuthenticatedApp = () => {
         <Route path="/PriceList" element={<AccessGate capability="priceList"><PriceList /></AccessGate>} />
         <Route path="/account/users" element={<AccessGate capability="manageUsers"><AccountUsers /></AccessGate>} />
         <Route path="/AboutSoundProof" element={<AboutSoundProof />} />
+        <Route path="/Education" element={<Education />} />
         <Route path="/DealerBranding" element={<AccessGate capability="soundProof"><DealerBranding /></AccessGate>} />
         <Route path="/admin" element={<AccessGate masterAdmin><AdminDashboard /></AccessGate>} />
         <Route path="/admin/commercial-intelligence" element={<AccessGate masterAdmin><AdminCommercialIntelligence /></AccessGate>} />
@@ -172,6 +175,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/product-prices" element={<AccessGate masterAdmin><Navigate to="/PriceList" replace /></AccessGate>} />
         <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />
         <Route path="/admin/content" element={<AccessGate masterAdmin><AdminPublicationContent /></AccessGate>} />
+        <Route path="/admin/education" element={<AccessGate masterAdmin><AdminEducation /></AccessGate>} />
         <Route path="/admin/proposal-diagnostics" element={<AccessGate masterAdmin><AdminProposalDiagnostics /></AccessGate>} />
         <Route path="/admin/adi-design-knowledge" element={<AccessGate masterAdmin><AdminAdiDesignKnowledge /></AccessGate>} />
         <Route path="/admin/design-intent-preview" element={<AccessGate masterAdmin><AdminDesignIntentPreview /></AccessGate>} />

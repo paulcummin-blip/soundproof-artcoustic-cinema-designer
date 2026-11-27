@@ -205,6 +205,13 @@
       "nullable": true,
       "default": null,
       "description": "Per-admin unread-state timestamp for the Admin Dashboard Commercial Control Centre card. Set to now when the admin opens the Commercial Control Centre page. The dashboard compares this against Project.created_date for Professional projects. Per-user. Never alters project records."
+    },
+    "education_last_visited_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "default": null,
+      "description": "Per-user last-visit timestamp for the Education Library. Set to now when the user opens the Education page (markEducationVisited via base44.auth.updateMe). The sidebar compares this against the maximum EducationDocument.new_content_at among published documents to show the 'New' badge. Per-user, never associated with the dealer account or local browser storage; survives logout, reload and device switches. Never alters Education documents."
     }
   }
 }
