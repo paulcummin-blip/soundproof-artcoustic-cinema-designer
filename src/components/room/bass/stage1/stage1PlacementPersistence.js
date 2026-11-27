@@ -12,7 +12,7 @@ import {
 import { parseStage1FingerprintScope } from "./stage1RecommendationScope";
 
 import { recommendationTarget } from "../bda/stage1RecommendationSelection";
-import { verifiedFinalist } from "./stage1FinalistEvidence";
+import { finalistKey, verifiedFinalist } from "./stage1FinalistEvidence";
 import { replaceRecommendation, resultField } from "../bda/repairStage1Recommendation";
 
 const BASS_PHYSICS_VERSION = "normalized-physics-v1";
@@ -65,10 +65,10 @@ function buildPersistedCache(existing, fingerprint, results, status) {
  * @param {string} projectId
  * @returns {Promise<object|null>} persisted cache, or null if not found
  */
-export async function hydrateStage1PlacementCache(projectId, versionId) {
+export async function hydrateStage1PlacementCache(projectId, versionId, entity = base44.entities.Stage1PlacementCache) {
   if (!projectId || !versionId) return null;
   try {
-    const records = await base44.entities.Stage1PlacementCache.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
+    const records = await entity.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
     const record = Array.isArray(records) ? records[0] : null;
     if (!record) return null;
     return {
@@ -148,6 +148,25 @@ export function isStage1CacheValid(hydrated, fingerprint) {
   return true;
 }
 
+// Some existing rows hold a second copy under completed_by_fingerprint.
+export function restoreRecommendationBuckets(saved, fingerprint, seats) {
+  const results = {};
+  for (const field of Object.values(STAGE1_RESULT_FIELDS)) {
+    const bucket = saved[field];
+    results[field] = bucket;
+    if (!bucket || bucket.quantity === 3) continue;
+    const current = recommendationTarget(bucket);
+    if (!current || verifiedFinalist(current, bucket.quantity, fingerprint, seats)) continue;
+    const mirror = recommendationTarget(saved.completed_by_fingerprint?.[saved.current_fingerprint]?.[field]);
+    if (verifiedFinalist(mirror, bucket.quantity, fingerprint, seats) &&
+        mirror.responseEvidence.key === finalistKey(current, bucket.quantity, fingerprint)) {
+      const option = { quantity: bucket.quantity, fingerprint, evidenceKey: mirror.responseEvidence.key };
+      results[field] = replaceRecommendation(bucket, option, { screening: mirror.screening, responseEvidence: mirror.responseEvidence });
+    }
+  }
+  return results;
+}
+
 /**
  * Persist Stage 1 results to the database.
  * @param {string} projectId
@@ -156,7 +175,7 @@ export function isStage1CacheValid(hydrated, fingerprint) {
  * @param {string|null} existingRecordId
  * @returns {Promise<object|null>}
  */
-export async function syncStage1PlacementCache(projectId, versionId, fingerprint, results, existingRecordId) {
+export async function syncStage1PlacementCache(projectId, versionId, fingerprint, results, existingRecordId, entity = base44.entities.Stage1PlacementCache) {
   if (!projectId || !versionId || !fingerprint || !results) return null;
   try {
     const existing = existingRecordId ? { id: existingRecordId } : null;
@@ -166,15 +185,15 @@ export async function syncStage1PlacementCache(projectId, versionId, fingerprint
       ...persisted,
     };
     if (existingRecordId) {
-      await base44.entities.Stage1PlacementCache.update(existingRecordId, payload);
+      await entity.update(existingRecordId, payload);
     } else {
       // Check if a record already exists (avoid duplicates)
-      const records = await base44.entities.Stage1PlacementCache.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
+      const records = await entity.filter(bassDbFilter(projectId, versionId), "-updated_date", 1);
       const record = Array.isArray(records) ? records[0] : null;
       if (record?.id) {
-        await base44.entities.Stage1PlacementCache.update(record.id, payload);
+        await entity.update(record.id, payload);
       } else {
-        await base44.entities.Stage1PlacementCache.create(payload);
+        await entity.create(payload);
       }
     }
     return persisted;
@@ -185,11 +204,10 @@ export async function syncStage1PlacementCache(projectId, versionId, fingerprint
 
 // Repair only the chosen quantity, in both existing representations. Guard
 // the bucket actually read so simultaneous repairs cannot replace another layout.
-export async function saveRepairedResponse(projectId, versionId, option, evidence, seats, signal) {
+export async function saveRepairedResponse(projectId, versionId, option, evidence, seats, signal, entity = base44.entities.Stage1PlacementCache) {
   const field = resultField[option.quantity];
-  const entity = base44.entities.Stage1PlacementCache;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const saved = await hydrateStage1PlacementCache(projectId, versionId);
+    const saved = await hydrateStage1PlacementCache(projectId, versionId, entity);
     if (signal.aborted) throw new Error("Response recovery cancelled.");
     if (!isStage1CacheValid(saved, option.fingerprint)) throw new Error("The saved discovery could not be verified.");
     const bucket = replaceRecommendation(saved[field], option, evidence);
