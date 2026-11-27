@@ -284,8 +284,11 @@ export default function RvRoomBaseLayers(props) {
             const screenY = Number(screenFrontPlaneM);
             if (!Number.isFinite(lensY) || !Number.isFinite(screenY)) return null;
 
-            const throwDistanceM = lensY - screenY;
-            if (!Number.isFinite(throwDistanceM) || throwDistanceM <= 0) return null;
+            // Throw distance is the absolute lens-to-screen distance, correct
+            // for a projector placed outside the room (e.g. behind the rear wall
+            // or, unusually, ahead of the screen plane).
+            const throwDistanceM = Math.abs(lensY - screenY);
+            if (!Number.isFinite(throwDistanceM) || throwDistanceM <= 0.0001) return null;
 
             const lensX = Number(projector?.x_lens_m);
             const centerX = Number.isFinite(lensX) ? lensX : (widthM / 2);

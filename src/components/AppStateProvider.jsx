@@ -2111,11 +2111,15 @@ function useDesignerState() {
           if (Math.abs(lensX - oldCenterX) <= 0.10) {
             next.x_lens_m = newCenterX;
           } else {
-            next.x_lens_m = Math.max(0.10, Math.min(newW - 0.10, lensX + widthShift));
+            // External placement is preserved: apply the width shift but do NOT
+            // clamp X back inside the room (the projector may sit outside).
+            next.x_lens_m = lensX + widthShift;
           }
         }
         if (Number.isFinite(lensY)) {
-          next.y_lens_m = Math.max(0.10, Math.min(newL - 0.10, lensY));
+          // External placement is preserved: do NOT clamp Y back inside the
+          // room when the room length changes.
+          next.y_lens_m = lensY;
         }
         if (Number.isFinite(lensZ)) {
           next.z_lens_m = Math.max(0.10, Math.min(newH - 0.10, lensZ));

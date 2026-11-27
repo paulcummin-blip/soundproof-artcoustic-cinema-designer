@@ -15,8 +15,6 @@ const clamp = (value, min, max) => {
 export function sanitizeProjectorElement(el, roomDims) {
   if (el?.type !== "projector") return el;
 
-  const widthM = Number(roomDims?.widthM);
-  const lengthM = Number(roomDims?.lengthM);
   const heightM = Number(roomDims?.heightM);
 
   let x_lens_m = round2(el.x_lens_m);
@@ -26,14 +24,12 @@ export function sanitizeProjectorElement(el, roomDims) {
   const body_height_m = round2(el.body_height_m);
   const body_depth_m = round2(el.body_depth_m);
 
-  if (Number.isFinite(widthM)) {
-    x_lens_m = clamp(x_lens_m, 0.1, widthM - 0.1);
-  }
-
-  if (Number.isFinite(lengthM)) {
-    y_lens_m = clamp(y_lens_m, 0.1, lengthM - 0.1);
-  }
-
+  // Lens X and Y are NOT clamped to the room: the projector may be placed
+  // partially or completely outside the room boundaries (e.g. behind the rear
+  // wall), and manual Lens X / Lens Y entry may exceed the room dimensions,
+  // including negative coordinates. Only the mounting height (Z) is constrained
+  // to the ceiling/floor — that is the existing mounting-height control and is
+  // unaffected by external plan placement.
   if (Number.isFinite(heightM)) {
     z_lens_m = clamp(z_lens_m, 0.1, heightM - 0.1);
 

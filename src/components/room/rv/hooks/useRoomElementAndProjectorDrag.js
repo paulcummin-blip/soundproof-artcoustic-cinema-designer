@@ -74,7 +74,11 @@ export function useRoomElementAndProjectorDrag({
       : null;
     const bodyD = Number(projEl?.body_depth_m) || 0.517;
     const halfD = bodyD / 2;
-    const clampedY = Math.max(halfD, Math.min(lengthM - halfD, rawY));
+    // The projector may be dragged partially or completely outside the room
+    // (e.g. through the rear wall). Do NOT clamp Y to the room boundary; round
+    // to 1 cm resolution only. Throw and rear-wall distances below use abs,
+    // so they stay correct for an external lens position.
+    const clampedY = Math.round(rawY * 100) / 100;
 
     const lensX = Number(projEl?.x_lens_m) || (widthM / 2);
     const screenY = Number.isFinite(Number(screenFrontPlaneM)) ? Number(screenFrontPlaneM) : 0;
