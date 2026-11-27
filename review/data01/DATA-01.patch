@@ -418,10 +418,10 @@ index 67837d5..925ef54 100644
  test("loaded and acknowledged snapshots cannot be changed by mutable UI objects",async()=>{
 diff --git a/test/data01-publication-reservation.test.mjs b/test/data01-publication-reservation.test.mjs
 new file mode 100644
-index 0000000..3ce52b4
+index 0000000..a8a855a
 --- /dev/null
 +++ b/test/data01-publication-reservation.test.mjs
-@@ -0,0 +1,265 @@
+@@ -0,0 +1,278 @@
 +import test, { after } from 'node:test';
 +import assert from 'node:assert/strict';
 +import { isDeepStrictEqual } from 'node:util';
@@ -687,8 +687,21 @@ index 0000000..3ce52b4
 +  assert.equal((await call(proposal,request)).status,409);
 +  assert.equal((await current()).data.acknowledgement.durably_published,false);
 +});
++
++test('fingerprint-only legacy evidence remains available on physical reversion and as a saved document',async t=>{
++  const s=recordStore(t);await save('legacy');
++  const row=s.cache();delete row.engineering_publications.legacy.source_physical_room;s.put('ProjectAnalysisCache',row);
++  s.put('ProjectVersion',{...s.version(),published_cache_record_id:null});
++  const width=s.rows('Project')[0].room_width;
++  assert.equal((await current()).data.acknowledgement.durably_published,true);
++  assert.equal((await editRoom(s,{room_width:width+1})).status,200);
++  assert.equal((await current()).data.status,'stale');
++  assert.equal((await call(read,{project_id:projectId,version_id:versionId,engineering_fingerprint:'legacy'})).data.publication.engineering_fingerprint,'legacy');
++  assert.equal((await editRoom(s,{room_width:width})).status,200);
++  assert.equal((await current()).data.acknowledgement.durably_published,true);
++});
 diff --git a/test/proposal-generate-readiness-agreement.test.mjs b/test/proposal-generate-readiness-agreement.test.mjs
-index 2233383..9855431 100644
+index 2233383..33cccf6 100644
 --- a/test/proposal-generate-readiness-agreement.test.mjs
 +++ b/test/proposal-generate-readiness-agreement.test.mjs
 @@ -28,6 +28,7 @@
@@ -699,7 +712,7 @@ index 2233383..9855431 100644
  import assert from 'node:assert/strict';
  import fs from 'node:fs';
  import path from 'node:path';
-@@ -144,13 +145,27 @@ const frozenProject = (displayType, roomWidthM) => ({
+@@ -144,17 +145,32 @@ const frozenProject = (displayType, roomWidthM) => ({
  });
  const publication = (facts) => ({ report_snapshot: { report_project: facts } });
  
@@ -729,7 +742,12 @@ index 2233383..9855431 100644
    },
  });
  
-@@ -195,7 +210,7 @@ test('TEST 3 — a real physical change is still refused, in the same sentence',
+ const entities = (record) => ({
++  Project: { get: async () => record?.engineering_publications?.[MOVED_FP]?.report_snapshot?.report_project },
+   ReportSnapshot: { filter: async () => ({ items: [saved] }) },
+   ProjectAnalysisCache: { filter: async () => (record ? [record] : []) },
+ });
+@@ -195,7 +211,7 @@ test('TEST 3 — a real physical change is still refused, in the same sentence',
  test('TEST 3 — no comparison, no exemption', async () => {
    await assert.rejects(
      () => readProposalReportEvidence(entities(null), PROJECT_ID, [VERSION]),
@@ -738,7 +756,16 @@ index 2233383..9855431 100644
      'a version with no publication history keeps the strict verdict',
    );
    assert.equal(
-@@ -295,7 +310,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
+@@ -283,7 +299,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
+     ReportSnapshot: { filter: async () => ({ items: [saved] }) },
+     ProjectAnalysisCache: { filter: async () => [] },
+   };
+-  const authority = { ProjectAnalysisCache: { filter: async () => [cacheRecord()] } };
++  const authority = entities(cacheRecord());
+ 
+   const snapshots = await readProposalReportEvidence(callerEntities, PROJECT_ID, [VERSION], {
+     authorityEntities: authority,
+@@ -295,7 +311,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
    // never excuses a report.
    await assert.rejects(
      () => readProposalReportEvidence(callerEntities, PROJECT_ID, [VERSION]),
@@ -747,7 +774,7 @@ index 2233383..9855431 100644
    );
  
    // Both callers pass the authority door, and the reader uses the one shared cache
-@@ -303,7 +318,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
+@@ -303,7 +319,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
    assert.match(READ_EVIDENCE_FUNCTION, /authorityEntities: client\.asServiceRole\.entities/);
    assert.match(SERVER_GATE, /authorityEntities: base44\.asServiceRole\.entities/);
    assert.match(SERVER_GATE, /loadCacheRecord\(base44\.asServiceRole, project_id, versionId\)/);
@@ -756,7 +783,7 @@ index 2233383..9855431 100644
  });
  
  // ── TEST 6 — no second status path is left on the screen ─────────────────────
-@@ -325,7 +340,7 @@ test('TEST 6 — the wizard states one readiness verdict and clears the refused
+@@ -325,7 +341,7 @@ test('TEST 6 — the wizard states one readiness verdict and clears the refused
    );
  
    // The evidence gate asks the one rule, and the server gate applies it too.
@@ -1376,11 +1403,11 @@ index 1aa33a9..2b1381a 100644
        error: 'PUBLISH_ENGINEERING_FAILED',
        message: error?.message || 'Unable to publish engineering result.',
 diff --git a/base44/functions/readPublishedEngineering/entry.ts b/base44/functions/readPublishedEngineering/entry.ts
-index 98db1b5..1578eeb 100644
+index 98db1b5..4e542a6 100644
 --- a/base44/functions/readPublishedEngineering/entry.ts
 +++ b/base44/functions/readPublishedEngineering/entry.ts
 @@ -1,9 +1,10 @@
-+import { matchesRoom, physicalRoom } from '../../shared/publicationRoom.js';
++import { matchesRoom, physicalRoom, publicationRoom } from '../../shared/publicationRoom.js';
 +import { publicationRow, PublicationConflict } from "../../shared/publicationRow.js";
  import { restorePublicationBassGraphEvidence } from '../../shared/bassEvidencePublication.js';
  import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
@@ -1400,8 +1427,8 @@ index 98db1b5..1578eeb 100644
      const publication = findPublication(cacheRecord, fingerprint);
  
 -    if (!publication) {
-+    const currentRoomChanged = !explicitFingerprint && publication?.source_physical_room &&
-+      !matchesRoom(publication.source_physical_room, physicalRoom(project));
++    const currentRoomChanged = !explicitFingerprint && publication &&
++      !matchesRoom(publicationRoom(publication,version.design_state), physicalRoom(project));
 +    if (!publication || currentRoomChanged) {
        // Fingerprint is set on the version but no matching publication exists
        // in the cache — the publication is stale or the cache was cleared.
@@ -1573,10 +1600,10 @@ index ec5b337..dd3cd81 100644
      // Evidence only: each report's own machine-readable snapshot, or a block
 diff --git a/base44/shared/publicationRoom.js b/base44/shared/publicationRoom.js
 new file mode 100644
-index 0000000..739c254
+index 0000000..1557102
 --- /dev/null
 +++ b/base44/shared/publicationRoom.js
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,56 @@
 +// Project holds physical dimensions. Frozen reports hold effective dimensions,
 +// which swap width and length for a version oriented across the physical room.
 +export const roomKeys = ['roomDims', 'room_width', 'room_length', 'room_height', 'screen_wall'];
@@ -1598,9 +1625,14 @@ index 0000000..739c254
 +
 +export function capturedRoom(report, design, screenWall) {
 +  const viewed = physicalRoom(report);
-+  const rotated = design.room_orientation === 'width_front';
++  const rotated = design?.room_orientation === 'width_front';
 +  return { width: rotated ? viewed.length : viewed.width, length: rotated ? viewed.width : viewed.length,
 +    height: viewed.height, wall: screenWall };
++}
++
++export function publicationRoom(entry, design) {
++  return entry?.source_physical_room ||
++    capturedRoom(entry?.report_snapshot?.report_project, design, entry?.report_snapshot?.report_project?.screen_wall || 'front');
 +}
 +
 +export function matchesRoom(a, b) {
@@ -1630,11 +1662,11 @@ index 0000000..739c254
 +}
 diff --git a/base44/shared/publicationRow.js b/base44/shared/publicationRow.js
 new file mode 100644
-index 0000000..b0c7980
+index 0000000..101ee44
 --- /dev/null
 +++ b/base44/shared/publicationRow.js
 @@ -0,0 +1,76 @@
-+import { matchesRoom, physicalRoom } from './publicationRoom.js';
++import { matchesRoom, physicalRoom, publicationRoom } from './publicationRoom.js';
 +import { auditEngineeringPublication } from './publicationGateAuthority.js';
 +
 +export class PublicationConflict extends Error {
@@ -1684,8 +1716,8 @@ index 0000000..b0c7980
 +export async function verifiedPublicationRow(service, version, project) {
 +  const row = await publicationRow(service, version);
 +  const fp = version.published_fingerprint;
-+  const captured = row.engineering_publications[fp]?.source_physical_room;
-+  if (captured && !matchesRoom(captured, physicalRoom(project || await service.entities.Project.get(version.project_id))))
++  const captured = publicationRoom(row.engineering_publications[fp],version.design_state);
++  if (!matchesRoom(captured, physicalRoom(project || await service.entities.Project.get(version.project_id))))
 +    throw new PublicationConflict('The shared room changed since this evidence was calculated.');
 +  const audit = auditEngineeringPublication(row.engineering_publications[fp], {
 +    expectedFingerprint: fp, project, bassAuthorityAvailable: Object.keys(row.completed_by_fingerprint || {}).length > 0,
