@@ -111,12 +111,16 @@ export function resolveProposalExportReadiness({
   comparisonBlockReason = null,
   issueBlockReason = null,
   approvalBlockReason = null,
+  orderBlockReason = null,
 }) {
   // The approval rule is asked first: it is the gate the designer acts on, and the
   // one that names the sections still to be read.
   if (approvalBlockReason) return approvalBlockReason;
   if (issueBlockReason) return issueBlockReason;
   if (comparisonBlockReason) return comparisonBlockReason;
+  // An unsaved section order must be persisted before a PDF is issued, so the
+  // exported document can never reflect an order that was never saved.
+  if (orderBlockReason) return orderBlockReason;
   if (!proposal) {
     return 'This proposal could not be loaded. Reopen it from the Proposal Centre and try again.';
   }
@@ -162,6 +166,9 @@ export function useProposalExport({
   // The human approval rule: generated narrative sections nobody has approved yet.
   // The PDF may not be created before every one of them has been read and approved.
   approvalBlockReason = null,
+  // The section order is still unsaved (saving, or a failed save awaiting retry).
+  // A PDF must not be issued until the order shown is the order saved.
+  orderBlockReason = null,
   projectName,
   // Optional filename segments: the shared helper omits them when unavailable.
   dealerName = null,
@@ -244,7 +251,7 @@ export function useProposalExport({
     // Library: only an export carrying an issued document does.
     const shouldRecordIssued = Boolean(issuedDocument?.documentType);
 
-    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason });
+    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, orderBlockReason });
     if (reason) {
       setBlockedReason(reason);
       setError(null);
@@ -476,7 +483,7 @@ export function useProposalExport({
       setRetryable(notReady);
       cleanup(printWindow);
     }
-  }, [proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
+  }, [proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, orderBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
 
   // The one entry point: the export prepares and prints the real A4 document, and
   // stores the composition it printed in the Project Library.

@@ -2,6 +2,7 @@ import { buildProposalEvidence } from '../../base44/shared/proposalEvidence/prop
 import { buildWriterInput } from '../../base44/shared/proposalWriter/writerInputBuilder.js';
 import { composeWriterSectionBodies } from '../../base44/shared/proposalWriter/writerSectionMapping.js';
 import { validateWriterOutput } from '../../base44/shared/proposalWriter/writerOutputValidator.js';
+import { canonicalSectionTypes } from '../../base44/shared/proposalEdit/publicationOrder.js';
 import { twoOptions } from './proposalEvidenceFixtures.mjs';
 import { validDraft } from './proposalWriterFixtures.mjs';
 export const PRIVATE_NOTE = 'Please present these two arrangements as comfort choices, not an equipment upgrade.';
@@ -37,10 +38,21 @@ export function completeFixture({ alternatives = true, historical = false } = {}
     created_at: '2026-10-11T12:00:00Z', status: 'valid_generated', record_fingerprint: 'fixture-record',
     evidence_pack: pack, evidence_pack_fingerprint: pack.pack_fingerprint, gpt_input: input, gpt_output: output,
     validation_result: historical ? { valid: true } : validateWriterOutput({ input, output }) };
+  // The section records a GENERATION creates. Real generation (generateProposal)
+  // writes order_index as the canonical position of each section type, so a
+  // freshly generated proposal opens in canonical order. The fixture mirrors
+  // that: the writer's own compose order is the body order, but the stored
+  // order_index is the canonical rank, exactly as generation writes it. A
+  // shuffled database read therefore still resolves to canonical publication
+  // order, and a dealer who later reorders has their saved order_index honoured.
+  const canonicalRank = new Map(
+    canonicalSectionTypes('comparison').map((type, i) => [type, i]),
+  );
+  const rankOf = (type, fallback) => (canonicalRank.has(type) ? canonicalRank.get(type) : fallback);
   const sections = composeWriterSectionBodies({ output, mode: 'comparison' }).bodies.map((body, i) => ({ id: `fixture-section-${i}`, proposal_id: 'fixture-proposal',
     section_type: body.section_type, section_key: body.section_type, title: body.section_type,
-    body: body.html, is_enabled: true, order_index: i, dealer_notes: '', metadata: {} }));
-  if (!alternatives || historical) sections.push({ id: 'empty-options', section_type: 'presented_options', body: '', is_enabled: false, order_index: 9 });
+    body: body.html, is_enabled: true, order_index: rankOf(body.section_type, i), dealer_notes: '', metadata: {} }));
+  if (!alternatives || historical) sections.push({ id: 'empty-options', section_type: 'presented_options', body: '', is_enabled: false, order_index: rankOf('presented_options', 9) });
   const proposal = { id: 'fixture-proposal', project_id: 'project', status: 'generated', proposal_type: 'comparison',
     selected_version_ids: ['a', 'b'], engineering_snapshot: { available: true, identity: { projectId: 'project', versionId: 'a' }, system: {} } };
   return { proposal, sections, generationRecords: [generation], editRecords: [], optionGuidance: guidance };

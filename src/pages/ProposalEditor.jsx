@@ -65,8 +65,10 @@ import {
   resolveProposalEditorState,
   resolveProposalContextNotice,
 } from '@/components/proposal/editor/proposalEditorStateAuthority';
-
-const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
+import { SAVE_STATUS } from '@/components/proposal/editor/proposalSaveStatus';
+import { createReorderSaveQueue } from '@/components/proposal/editor/reorderSaveQueue';
+import useTrackedSave from '@/components/proposal/editor/useTrackedSave';
+import { useToast } from '@/components/ui/ToastProvider';
 
 /**
  * Proposal Editor — the publishing tool.
@@ -139,10 +141,48 @@ export default function ProposalEditor() {
   const [regenerating, setRegenerating] = useState(null);
   const [clientBrief, setClientBrief] = useState('');
   const [showClientBrief, setShowClientBrief] = useState(false);
-  const [savingBrief, setSavingBrief] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // ── Section reorder persistence ──
+  // The visible order updates live during a drag; the completed order is saved
+  // once, when the drag finishes. The save is serialized and coalesced so an
+  // earlier request can never overwrite a newer intended order. A failed save
+  // retains the dealer's intended order and offers Retry. The export is blocked
+  // while the order remains unsaved.
+  const [reorderStatus, setReorderStatus] = useState(SAVE_STATUS.IDLE);
+  const latestOrderRef = useRef([]);
+  const savedReorderTimersRef = useRef(null);
+  const reorderQueueRef = useRef(null);
+  if (!reorderQueueRef.current) {
+    reorderQueueRef.current = createReorderSaveQueue({
+      persist: async (order) => {
+        if (archivedRef.current) return;
+        await base44.entities.ProposalSection.bulkUpdate(
+          order.map((s, i) => ({ id: s.id, order_index: i }))
+        );
+      },
+      onStatus: (next) => {
+        setReorderStatus(next);
+        if (next === SAVE_STATUS.SAVED) {
+          if (savedReorderTimersRef.current) clearTimeout(savedReorderTimersRef.current);
+          savedReorderTimersRef.current = setTimeout(() => {
+            setReorderStatus((prev) => (prev === SAVE_STATUS.SAVED ? SAVE_STATUS.IDLE : prev));
+            savedReorderTimersRef.current = null;
+          }, 2000);
+        }
+      },
+    });
+  }
+
+  // Tracked saves for the discrete field edits, reusing the shared SAVE_STATUS.
+  // Each preserves the dealer's intended local state on failure and exposes a
+  // Retry that re-runs the last write.
+  const briefSave = useTrackedSave();
+  const notesSave = useTrackedSave();
+  const toast = useToast();
+
   const [projectContext, setProjectContext] = useState({
     projectName: null,
     clientName: null,
@@ -303,6 +343,9 @@ export default function ProposalEditor() {
     setEditingSectionId(null);
     editDraftsRef.current = {};
     editBaselinesRef.current = {};
+    // A different section means a different notes draft; the prior save status
+    // does not belong to this one.
+    notesSave.reset();
   }, [activeSectionKey]);
 
   const handleDirty = useCallback((sectionId, html, editedAt) => {
@@ -524,11 +567,45 @@ export default function ProposalEditor() {
   // ── Section handlers ──
   const activeSection = sections.find((s) => s.section_key === activeSectionKey);
 
-  const handleSetLock = async (section, locked) => {
+  // Optimistic local update + a guarded write for a discrete field edit (lock,
+  // visibility). The intended change is kept on screen when the write fails, and
+  // a toast offers a Retry that re-runs the same write. Reuses the existing toast
+  // surface so no second persistence framework is introduced.
+  const guardedSectionUpdate = useCallback(async (sectionId, patch, label) => {
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, ...patch } : s)));
+    const attemptWrite = () => base44.entities.ProposalSection.update(sectionId, patch);
+    try {
+      await attemptWrite();
+    } catch (err) {
+      console.error(`${label} save failed:`, err);
+      const toastId = toast.push({
+        title: `${label} not saved`,
+        description: 'Your change is kept here, but could not be saved. Retry to persist it.',
+        action: (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await attemptWrite();
+                toast.remove(toastId);
+              } catch (retryErr) {
+                console.error(`${label} retry failed:`, retryErr);
+              }
+            }}
+            className="px-2 py-1 text-xs rounded border border-[#DCDBD6] text-[#213428] hover:bg-[#F5F4F0]"
+            style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+          >
+            Retry
+          </button>
+        ),
+        duration: 0,
+      });
+    }
+  }, [toast]);
+
+  const handleSetLock = (section, locked) => {
     if (!section || archived) return;
-    const updated = { ...section, locked };
-    setSections((prev) => prev.map((s) => (s.id === section.id ? updated : s)));
-    await base44.entities.ProposalSection.update(section.id, { locked });
+    guardedSectionUpdate(section.id, { locked }, 'Section lock');
   };
 
   const handleToggleLock = async () => {
@@ -594,46 +671,51 @@ export default function ProposalEditor() {
     }
   };
 
-  const handleToggleVisibility = async (sectionId) => {
+  const handleToggleVisibility = (sectionId) => {
     if (archived) return;
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
-    const updated = { ...section, is_enabled: !section.is_enabled };
-    setSections((prev) => prev.map((s) => (s.id === sectionId ? updated : s)));
-    await base44.entities.ProposalSection.update(sectionId, { is_enabled: updated.is_enabled });
+    guardedSectionUpdate(sectionId, { is_enabled: !section.is_enabled }, 'Section visibility');
   };
 
-  const handleReorder = async (reorderedSections) => {
-    if (archived) return;
+  // The visible order updates live during a drag (this handler, no save). The
+  // completed order is committed once when the drag finishes.
+  const handleReorder = useCallback((reorderedSections) => {
+    if (archivedRef.current) return;
     setSections(reorderedSections);
-    try {
-      await base44.entities.ProposalSection.bulkUpdate(
-        reorderedSections.map((s, i) => ({ id: s.id, order_index: i }))
-      );
-    } catch (err) {
-      console.error('Reorder failed:', err);
-    }
-  };
+    latestOrderRef.current = reorderedSections;
+  }, []);
+
+  // Persist the completed order: serialized and coalesced so an earlier request
+  // cannot overwrite a newer intended order. On failure the intended order is
+  // retained and the notices offer a Retry.
+  const handleReorderCommit = useCallback(() => {
+    if (archivedRef.current) return;
+    const order = latestOrderRef.current;
+    if (!order || order.length === 0) return;
+    reorderQueueRef.current.commit(order);
+  }, []);
+
+  const handleReorderRetry = useCallback(() => {
+    handleReorderCommit();
+  }, [handleReorderCommit]);
 
   const handleSaveNotes = async (notes) => {
     if (!activeSection || archived) return;
     setSections((prev) =>
       prev.map((s) => (s.id === activeSection.id ? { ...s, dealer_notes: notes } : s))
     );
-    await base44.entities.ProposalSection.update(activeSection.id, { dealer_notes: notes });
+    await notesSave.run(
+      () => base44.entities.ProposalSection.update(activeSection.id, { dealer_notes: notes })
+    );
   };
 
   // ── Save Client Brief to Proposal record ──
   const handleSaveClientBrief = async () => {
     if (!proposal || archived) return;
-    setSavingBrief(true);
-    try {
-      await base44.entities.Proposal.update(proposal.id, { client_brief: clientBrief });
-      setSavingBrief(false);
-    } catch (err) {
-      console.error('Failed to save client brief:', err);
-      setSavingBrief(false);
-    }
+    await briefSave.run(
+      () => base44.entities.Proposal.update(proposal.id, { client_brief: clientBrief })
+    );
   };
 
   // ── Archived read-only + restore ──
@@ -783,6 +865,11 @@ export default function ProposalEditor() {
   // ── Export — full proposal PDF ──
   // Exports the whole proposal (every enabled section). Section-level export is
   // not implemented, so it is deliberately not exposed.
+  // The section order must be saved before a PDF can be issued, so the exported
+  // document can never reflect an order that was never persisted.
+  const orderUnsaved =
+    reorderStatus === SAVE_STATUS.SAVING || reorderStatus === SAVE_STATUS.FAILED;
+  const orderBlockReason = orderUnsaved ? 'Save the section order before exporting.' : null;
   const {
     exporting,
     error: exportError,
@@ -803,6 +890,9 @@ export default function ProposalEditor() {
     // section has been read and approved. The export click is routed to the
     // approval dialog before it ever reaches here.
     approvalBlockReason,
+    // The section order is still unsaved (saving, or a failed save awaiting
+    // retry). A PDF must not be issued until the order shown is the order saved.
+    orderBlockReason,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
@@ -904,8 +994,8 @@ export default function ProposalEditor() {
         onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
         exporting={exporting}
         onExport={handleExportClick}
-        exportDisabled={false}
-        blockedReason={comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
+        exportDisabled={orderUnsaved}
+        blockedReason={orderBlockReason || comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
         review={copyReview}
         approval={approval}
         error={exportError}
@@ -938,6 +1028,7 @@ export default function ProposalEditor() {
         onSelect={setActiveSectionKey}
         onToggleVisibility={handleToggleVisibility}
         onReorder={handleReorder}
+        onReorderCommit={handleReorderCommit}
         readOnly={archived}
         proposalType={proposal?.proposal_type}
         approvalByType={approvalByType}
@@ -971,6 +1062,8 @@ export default function ProposalEditor() {
             onRestore={handleRestore}
             manualEditInProgress={Boolean(editingSectionId)}
             unsavedSectionCount={dirtySections.size}
+            reorderStatus={reorderStatus}
+            onRetryReorder={handleReorderRetry}
           />
           {visibleSections.map((section) => {
             const def = getSectionDef(section.section_type);
@@ -1092,6 +1185,8 @@ export default function ProposalEditor() {
                     <DealerNotesPanel
                       section={section}
                       onSave={handleSaveNotes}
+                      saveStatus={notesSave.status}
+                      onRetry={notesSave.retry}
                       onClose={() => setShowNotes(false)}
                     />
                   </div>
@@ -1248,7 +1343,8 @@ export default function ProposalEditor() {
           readOnly={archived}
           onChange={setClientBrief}
           onSave={handleSaveClientBrief}
-          saving={savingBrief}
+          saveStatus={briefSave.status}
+          onRetry={briefSave.retry}
           onClose={() => setShowClientBrief(false)}
         />
       )}

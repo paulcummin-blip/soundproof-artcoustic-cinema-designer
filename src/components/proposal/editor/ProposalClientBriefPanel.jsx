@@ -14,20 +14,26 @@
  * - readOnly: the proposal is archived
  * - onChange(text): a change to the text
  * - onSave(): save the brief
- * - saving: the brief is being saved
+ * - saveStatus: 'idle' | 'saving' | 'saved' | 'failed' (shared SAVE_STATUS)
+ * - onRetry(): retry the failed save
  * - onClose(): close the panel
  */
 
 import React from 'react';
+import { SAVE_STATUS } from '@/components/proposal/editor/proposalSaveStatus';
 
 export default function ProposalClientBriefPanel({
   clientBrief = '',
   readOnly = false,
   onChange,
   onSave,
-  saving = false,
+  saveStatus = SAVE_STATUS.IDLE,
+  onRetry,
   onClose,
 }) {
+  const saving = saveStatus === SAVE_STATUS.SAVING;
+  const failed = saveStatus === SAVE_STATUS.FAILED;
+  const saved = saveStatus === SAVE_STATUS.SAVED;
   return (
     <div className="w-72 border-l border-[#DCDBD6] bg-white p-4 overflow-y-auto flex-shrink-0">
       <div className="flex items-center justify-between mb-3">
@@ -66,6 +72,31 @@ export default function ProposalClientBriefPanel({
         >
           {saving ? 'Saving…' : 'Save Brief'}
         </button>
+      )}
+
+      {/* Save feedback — shared SAVE_STATUS vocabulary. A failed save keeps the
+          dealer's text; Retry re-runs the same write. */}
+      {saving && (
+        <div className="mt-2 text-[11px] text-[#3E4349]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+          Saving…
+        </div>
+      )}
+      {saved && !failed && (
+        <div className="mt-2 text-[11px] text-green-700" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+          ✓ Saved
+        </div>
+      )}
+      {failed && (
+        <div className="mt-2 flex items-center gap-2 text-[11px] text-red-700" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+          Not saved — your text is kept.
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-2 py-0.5 rounded border border-red-300 text-red-700 hover:bg-red-50"
+          >
+            Retry
+          </button>
+        </div>
       )}
       <div className="mt-4 p-2.5 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">
         <p className="text-[10px] text-[#625143] leading-relaxed">

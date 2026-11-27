@@ -17,7 +17,8 @@
  * - activeSectionKey: the section the designer is working in
  * - onSelect: select a section
  * - onToggleVisibility: hide or show a section
- * - onReorder: reorder the sections
+ * - onReorder: update the visible order during a drag (no save)
+ * - onReorderCommit: persist the completed order when the drag finishes
  * - readOnly: the proposal is archived
  * - proposalType: the report type being edited
  */
@@ -35,6 +36,7 @@ export default function ProposalSectionSidebar({
   onSelect,
   onToggleVisibility,
   onReorder,
+  onReorderCommit,
   readOnly = false,
   proposalType = null,
   // section_type → approval status, for the sections that carry generated copy.
@@ -72,6 +74,7 @@ export default function ProposalSectionSidebar({
           onSelect={onSelect}
           onToggleVisibility={onToggleVisibility}
           onReorder={onReorder}
+          onReorderCommit={onReorderCommit}
           readOnly={readOnly}
           proposalType={proposalType}
           approvalByType={approvalByType}

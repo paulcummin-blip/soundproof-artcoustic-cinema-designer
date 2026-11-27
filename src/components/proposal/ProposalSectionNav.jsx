@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
 import { getSectionDef, getSectionLabel } from '@/components/proposal/proposalSections';
 import {
@@ -23,9 +23,13 @@ import {
  *   to be read is obvious from the list. Sections with nothing to approve show
  *   no state at all.
  */
-export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, readOnly = false, proposalType = null, approvalByType = null }) {
+export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, onReorderCommit, readOnly = false, proposalType = null, approvalByType = null }) {
   const sorted = [...sections].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
   const [dragIndex, setDragIndex] = useState(null);
+  // Whether the current drag actually moved a section. The visible order updates
+  // live during the drag (onReorder); the SAVE happens once, when the drag
+  // finishes (onReorderCommit) — never on every drag-over.
+  const didReorderRef = useRef(false);
 
   const handleDragStart = (index) => {
     if (!readOnly) setDragIndex(index);
@@ -38,10 +42,15 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
     const [moved] = reordered.splice(dragIndex, 1);
     reordered.splice(index, 0, moved);
     onReorder(reordered.map((s, i) => ({ ...s, order_index: i })));
+    didReorderRef.current = true;
     setDragIndex(index);
   };
   const handleDragEnd = () => {
-    if (!readOnly) setDragIndex(null);
+    if (readOnly) return;
+    const didReorder = didReorderRef.current;
+    setDragIndex(null);
+    didReorderRef.current = false;
+    if (didReorder && typeof onReorderCommit === 'function') onReorderCommit();
   };
 
   return (

@@ -17,10 +17,13 @@
  * - archived / restoring / onRestore: archived read-only state, and the restore
  * - manualEditInProgress: a section is open for manual editing
  * - unsavedSectionCount: how many sections have unsaved changes
+ * - reorderStatus: 'idle' | 'saving' | 'saved' | 'failed' for the section order
+ * - onRetryReorder: retry the failed section-order save
  */
 
 import React from 'react';
 import { Archive, RotateCcw } from 'lucide-react';
+import { SAVE_STATUS } from '@/components/proposal/editor/proposalSaveStatus';
 
 export default function ProposalEditorNotices({
   contextNotice = null,
@@ -29,6 +32,8 @@ export default function ProposalEditorNotices({
   onRestore,
   manualEditInProgress = false,
   unsavedSectionCount = 0,
+  reorderStatus = SAVE_STATUS.IDLE,
+  onRetryReorder,
 }) {
   return (
     <>
@@ -69,6 +74,27 @@ export default function ProposalEditorNotices({
         <div className="mb-4 text-xs text-amber-700 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           Unsaved changes — {unsavedSectionCount} {unsavedSectionCount === 1 ? 'section' : 'sections'} pending. Do not close this tab until saved.
+        </div>
+      )}
+
+      {reorderStatus === SAVE_STATUS.SAVING && !archived && (
+        <div className="mb-4 text-xs text-[#3E4349] flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#625143] animate-pulse" />
+          Saving section order…
+        </div>
+      )}
+      {reorderStatus === SAVE_STATUS.FAILED && !archived && (
+        <div className="mb-4 text-xs text-red-700 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+          Section order not saved.
+          <button
+            type="button"
+            onClick={onRetryReorder}
+            className="px-2 py-0.5 rounded border border-red-300 text-red-700 hover:bg-red-50"
+            style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+          >
+            Retry
+          </button>
         </div>
       )}
     </>
