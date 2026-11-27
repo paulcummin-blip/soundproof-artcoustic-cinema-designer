@@ -418,10 +418,10 @@ index 67837d5..925ef54 100644
  test("loaded and acknowledged snapshots cannot be changed by mutable UI objects",async()=>{
 diff --git a/test/data01-publication-reservation.test.mjs b/test/data01-publication-reservation.test.mjs
 new file mode 100644
-index 0000000..a8a855a
+index 0000000..c5908dd
 --- /dev/null
 +++ b/test/data01-publication-reservation.test.mjs
-@@ -0,0 +1,278 @@
+@@ -0,0 +1,310 @@
 +import test, { after } from 'node:test';
 +import assert from 'node:assert/strict';
 +import { isDeepStrictEqual } from 'node:util';
@@ -488,7 +488,7 @@ index 0000000..a8a855a
 +    },
 +  }]));
 +  const room=sample.report_snapshot.report_project;
-+  put('Project',{id:projectId,account_id:accountId,roomDims:room.roomDims,room_width:room.room_width,room_length:room.room_length,room_height:room.room_height,screen_wall:'front'});
++  put('Project',{id:projectId,account_id:accountId,updated_date:'equal-time',roomDims:room.roomDims,room_width:room.room_width,room_length:room.room_length,room_height:room.room_height,screen_wall:'front'});
 +  put('ProjectVersion',{id:versionId,version_name:'Test',project_id:projectId,account_id:accountId,design_state:design,updated_date:'equal-time'});
 +  put('ProjectAnalysisCache',{id:'row-a',project_id:projectId,version_id:versionId,account_id:accountId,updated_date:'equal-time',engineering_publications:{}});
 +  globalThis.data01Client={entities,auth:{me:async()=>({account_id:accountId})},asServiceRole:{entities}};
@@ -699,6 +699,38 @@ index 0000000..a8a855a
 +  assert.equal((await call(read,{project_id:projectId,version_id:versionId,engineering_fingerprint:'legacy'})).data.publication.engineering_fingerprint,'legacy');
 +  assert.equal((await editRoom(s,{room_width:width})).status,200);
 +  assert.equal((await current()).data.acknowledgement.durably_published,true);
++});
++
++
++test('Room Designer conditional save and sparse project edits use the guarded handler',async t=>{
++  const s=recordStore(t);
++  const file=join(dir,'dealer-room-save.mjs');
++  await build({stdin:{contents:`export {createSaveBaseline,saveSharedConditionally} from './src/components/state/conditionalDesignSave.js';
++    export {saveProjectEdit} from './src/components/state/sharedRoomSave.js';`,resolveDir:process.cwd()},
++    outfile:file,format:'esm',bundle:true,platform:'node',alias:{'@':join(process.cwd(),'src')},
++    plugins:[{name:'fixture-sdk',setup(plugin){
++      plugin.onResolve({filter:/^@\/api\/base44Client$/},()=>({path:'sdk',namespace:'fixture'}));
++      plugin.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const base44={};'}));
++    }}]});
++  const {createSaveBaseline,saveSharedConditionally,saveProjectEdit}=await import(file);
++  let guarded=0;
++  const client={entities:s.entities,functions:{invoke:async(name,body)=>{
++    assert.equal(name,'saveSharedRoom');
++    guarded++;
++    const result=await call(saveRoomHandler,body);
++    assert.equal(result.status,200,JSON.stringify(result.data));
++    return {data:result.data};
++  }}};
++  const start=s.rows('Project')[0];
++  const baseline=createSaveBaseline(start,s.version());
++  const width=start.room_width+1;
++  await saveSharedConditionally(baseline,{room_width:width},()=>{},client);
++  assert.equal(JSON.parse(s.rows('Project')[0].roomDims).widthM,width);
++  await saveSharedConditionally(baseline,{notes:'fixture'},()=>{},client);
++  assert.equal(guarded,1);
++  await saveProjectEdit(client,projectId,{room_length:start.room_length+1});
++  assert.equal(JSON.parse(s.rows('Project')[0].roomDims).lengthM,start.room_length+1);
++  assert.equal(guarded,2);
 +});
 diff --git a/test/proposal-generate-readiness-agreement.test.mjs b/test/proposal-generate-readiness-agreement.test.mjs
 index 2233383..33cccf6 100644
