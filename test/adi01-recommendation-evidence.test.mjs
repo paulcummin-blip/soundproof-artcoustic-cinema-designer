@@ -62,8 +62,12 @@ test("primary depression retains 9.5 dB at 40 Hz, genuine zero and missing input
   });
   const primary = data => screenCandidate({ transferResult: {rspCurve:curve, seatCurves: [{originalSeatId:"P",responseData:data}]},
     seatingPositions:[{id:"P",priority:"primary"}], candidate:{id:"x",familyId:"RP22_C",sources:[{}]} }).deepestPrimaryDepression;
-  assert.equal(formatDepression(primary(curve)), "−9.5 dB @ 40 Hz");
-  assert.equal(formatDepression(primary(curve.map(p => ({...p,spl:85})))), "0.0 dB");
+  const measured = primary(curve);
+  assert.equal(measured.centreHz, 40);
+  assert.ok(Math.abs(measured.depthDb - 9.46531113809074) < 1e-9);
+  assert.equal(formatDepression(measured), "−9 dB @ 40 Hz");
+  assert.equal(formatDepression({depthDb: 9.5, centreHz: 40}), "−10 dB @ 40 Hz");
+  assert.equal(formatDepression(primary(curve.map(p => ({...p,spl:85})))), "0 dB");
   assert.equal(formatDepression(primary([])), "NOT CALCULATED");
 });
 

@@ -31,6 +31,7 @@ import {
   resolveQuantityApplyState,
 } from "@/components/room/bass/optimiserPlan/quantityPlacementApplyAuthority";
 import { coordinatesMatch } from "@/components/room/bass/best-layout/applyRecommendationUtils";
+import { formatWholeNumberDb, roundDbValue } from "@/components/utils/splDisplayFormatter";
 import Stage1ResponseGraph from "./Stage1ResponseGraph";
 
 const LAYOUT_TITLES = { 1: "1 Subwoofer", 2: "2 Subwoofers", 4: "4 Subwoofers" };
@@ -113,14 +114,14 @@ function MetricRow({ label, value, hint }) {
   );
 }
 
-function formatDb1(value) {
-  return Number.isFinite(value) ? value.toFixed(1) + " dB" : "NOT CALCULATED";
+function formatDb(value) {
+  return formatWholeNumberDb(value, { fallback: "NOT CALCULATED" });
 }
 
 export function formatDepression(depression) {
   if (!Number.isFinite(depression?.depthDb)) return "NOT CALCULATED";
-  const depth = depression.depthDb.toFixed(1);
-  if (depth === "0.0") return "0.0 dB";
+  const depth = roundDbValue(depression.depthDb);
+  if (depth === 0) return "0 dB";
   if (!Number.isFinite(depression.centreHz)) return "NOT CALCULATED";
   return `−${depth} dB @ ${Math.round(depression.centreHz)} Hz`;
 }
@@ -168,7 +169,7 @@ function screeningRows(screening) {
       <MetricRow
         key="smooth"
         label="Primary smoothness"
-        value={formatDb1(Math.abs(smoothness))}
+        value={formatDb(Math.abs(smoothness))}
         hint="Stage 1 screening (32 PPO): average primary-seat response variation from mean (lower is smoother)"
       />,
     );
@@ -180,7 +181,7 @@ function screeningRows(screening) {
       <MetricRow
         key="pvar"
         label="Primary seat-to-seat variation"
-        value={formatDb1(varDb)}
+        value={formatDb(varDb)}
         hint="Stage 1 screening (32 PPO): worst seat-to-seat variation across primary seats (lower is better)"
       />,
     );
@@ -192,7 +193,7 @@ function screeningRows(screening) {
       <MetricRow
         key="secvar"
         label="Secondary seat-to-seat variation"
-        value={formatDb1(secVar)}
+        value={formatDb(secVar)}
         hint="Stage 1 screening (32 PPO): worst seat-to-seat variation across secondary seats (lower is better)"
       />,
     );
