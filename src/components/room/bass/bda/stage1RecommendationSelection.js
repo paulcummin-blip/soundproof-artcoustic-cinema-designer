@@ -22,7 +22,7 @@
 // ---------------------------------------------------------------------------
 
 import { compareScreeningResults } from "../stage1/stage1Screening";
-import { isWallReferencePoint } from "../stage2/installableWallCentreAuthority";
+import { finalistKey, verifiedFinalist } from "../stage1/stage1FinalistEvidence";
 import { getFamilyDisplayMetadata } from "../stage1/stage1FamilyRegistry";
 
 const QUANTITY_BUCKETS = [
@@ -95,11 +95,10 @@ function placementForSource(source) {
  * centres — cabinet offsets belong to subsequent product evaluation.
  * @private
  */
-function buildCoordinates(finalist) {
-  const sources = Array.isArray(finalist?.sources) ? finalist.sources : [];
-  return sources.map((source) => ({
-    x: Number(source.x),
-    y: Number(source.y),
+function buildCoordinates(finalist, roomDims) {
+  return finalist.sources.map(source => ({
+    x: Number((source.xNorm * roomDims.widthM).toFixed(3)),
+    y: Number((source.yNorm * roomDims.lengthM).toFixed(3)),
     placement: placementForSource(source),
   }));
 }
@@ -112,35 +111,35 @@ function buildCoordinates(finalist) {
 function formatScreeningMetrics(screening) {
   const s = screening || {};
   return {
-    primarySevereProblemCount: Number.isFinite(Number(s.primarySevereProblemCount))
+    primarySevereProblemCount: Number.isFinite(s.primarySevereProblemCount)
       ? Number(s.primarySevereProblemCount) : null,
-    worstPrimarySpatialVariation: Number.isFinite(Number(s.worstPrimarySpatialVariation))
+    worstPrimarySpatialVariation: Number.isFinite(s.worstPrimarySpatialVariation)
       ? Number(s.worstPrimarySpatialVariation) : null,
-    primaryResponseSmoothness: Number.isFinite(Number(s.primaryResponseSmoothness))
+    primaryResponseSmoothness: Number.isFinite(s.primaryResponseSmoothness)
       ? Number(s.primaryResponseSmoothness) : null,
-    primaryRspCoherence: Number.isFinite(Number(s.primaryRspCoherence))
+    primaryRspCoherence: Number.isFinite(s.primaryRspCoherence)
       ? Number(s.primaryRspCoherence) : null,
-    secondarySpatialConsistency: Number.isFinite(Number(s.secondarySpatialConsistency))
+    secondarySpatialConsistency: Number.isFinite(s.secondarySpatialConsistency)
       ? Number(s.secondarySpatialConsistency) : null,
-    efficiencyIndicator: Number.isFinite(Number(s.efficiencyIndicator))
+    efficiencyIndicator: Number.isFinite(s.efficiencyIndicator)
       ? Number(s.efficiencyIndicator) : null,
     // Validated frequency-defined depression metrics (comparative Stage 1
     // evidence, never RP22 Performance Levels).
     deepestRspDepression: s.deepestRspDepression
       ? {
-          depthDb: Number.isFinite(Number(s.deepestRspDepression.depthDb)) ? Number(s.deepestRspDepression.depthDb) : null,
-          centreHz: Number.isFinite(Number(s.deepestRspDepression.centreHz)) ? Number(s.deepestRspDepression.centreHz) : null,
+          depthDb: Number.isFinite(s.deepestRspDepression.depthDb) ? Number(s.deepestRspDepression.depthDb) : null,
+          centreHz: Number.isFinite(s.deepestRspDepression.centreHz) ? Number(s.deepestRspDepression.centreHz) : null,
         }
       : null,
     deepestPrimaryDepression: s.deepestPrimaryDepression
       ? {
-          depthDb: Number.isFinite(Number(s.deepestPrimaryDepression.depthDb)) ? Number(s.deepestPrimaryDepression.depthDb) : null,
-          centreHz: Number.isFinite(Number(s.deepestPrimaryDepression.centreHz)) ? Number(s.deepestPrimaryDepression.centreHz) : null,
+          depthDb: Number.isFinite(s.deepestPrimaryDepression.depthDb) ? Number(s.deepestPrimaryDepression.depthDb) : null,
+          centreHz: Number.isFinite(s.deepestPrimaryDepression.centreHz) ? Number(s.deepestPrimaryDepression.centreHz) : null,
         }
       : null,
-    primarySeatsWithSevereBroadNulls: Number.isFinite(Number(s.primarySeatsWithSevereBroadNulls))
+    primarySeatsWithSevereBroadNulls: Number.isFinite(s.primarySeatsWithSevereBroadNulls)
       ? Number(s.primarySeatsWithSevereBroadNulls) : null,
-    primarySeatCount: Number.isFinite(Number(s.primarySeatCount)) ? Number(s.primarySeatCount) : null,
+    primarySeatCount: Number.isFinite(s.primarySeatCount) ? Number(s.primarySeatCount) : null,
   };
 }
 
@@ -148,9 +147,12 @@ function formatScreeningMetrics(screening) {
  * Build a compact Stage 1 recommendation option from a finalist.
  * @private
  */
-function buildStage1Option(finalist, quantity, placementKind) {
+function buildStage1Option(finalist, quantity, placementKind, fingerprint, context) {
   if (!finalist) return null;
-  const coordinates = buildCoordinates(finalist);
+  const key = finalistKey(finalist, quantity, fingerprint);
+  if (!key || !context?.roomDims) return null;
+  const ready = verifiedFinalist(finalist, quantity, fingerprint, context.seatingPositions);
+  const coordinates = buildCoordinates(finalist, context.roomDims);
   if (coordinates.length === 0) return null;
   if (coordinates.some((c) => !Number.isFinite(c.x) || !Number.isFinite(c.y))) return null;
 
@@ -161,12 +163,9 @@ function buildStage1Option(finalist, quantity, placementKind) {
     familyId: finalist.familyId || null,
     familyLabel: meta.label || finalist.familyId || null,
     coordinates,
-    // Refined 32 PPO screening (ranking + display). Falls back to the
-    // discovery screening only when no refinement pass ran (legacy cache).
-    screening: formatScreeningMetrics(finalist.screening || finalist.discoveryScreening),
-    // Compact 20–80 Hz response evidence shared by the preview graph and the
-    // displayed metrics. Null when no refinement pass produced evidence.
-    responseEvidence: finalist.responseEvidence || null,
+    fingerprint, evidenceKey: key, ready,
+    screening: ready ? formatScreeningMetrics(finalist.screening) : null,
+    responseEvidence: ready ? finalist.responseEvidence : null,
     placementKind,
     isStage1: true,
   };
@@ -195,35 +194,29 @@ export function buildStage1Recommendations(stage1State, context) {
   for (const bucket of QUANTITY_BUCKETS) {
     const result = stage1State[bucket.key];
     const finalists = Array.isArray(result?.finalists) ? result.finalists : [];
-    if (finalists.length === 0) {
-      options.push(null);
-      continue;
-    }
-
-    // Re-rank finalists by their screening sort key to find the absolute
-    // best front/rear and best side-wall. The finalists array is family-
-    // diversified, not purely ranked.
-    const ranked = [...finalists].sort(compareScreeningResults);
-
-    const frontRear = ranked.filter(isFrontRearArrangement);
-    const sideWall = ranked.filter(isSideWallArrangement);
-
-    const bestFrontRear = frontRear[0] || null;
-    const bestSideWall = sideWall[0] || null;
-
-    const option = buildStage1Option(bestFrontRear, bucket.quantity, "practical");
+    const chosen = recommendationTarget(result);
+    const option = buildStage1Option(chosen, bucket.quantity, "practical", runFingerprint, context);
     if (option) {
-      option.fingerprint = runFingerprint;
-      // Retain the best side-wall candidate and its comparative acoustic
-      // metrics for future threshold validation. NOT shown as a card.
-      if (bestSideWall) {
-        option.sideWallAlternative = buildStage1Option(bestSideWall, bucket.quantity, "alternative");
-      } else {
-        option.sideWallAlternative = null;
-      }
+      const alternative = finalists.filter(isSideWallArrangement)
+        .filter(f => verifiedFinalist(f, bucket.quantity, runFingerprint, context.seatingPositions))
+        .sort(compareScreeningResults)[0];
+      option.sideWallAlternative = buildStage1Option(alternative, bucket.quantity, "alternative", runFingerprint, context);
     }
     options.push(option);
   }
 
   return options;
+}
+export function recommendationTarget(result) {
+  if (!result) return null;
+  const finalists = Array.isArray(result.finalists) ? result.finalists : [];
+  if ("recommendationId" in result) {
+    const target = [result.recommendationFinalist, ...finalists].find(f => f?.id && f.id === result.recommendationId);
+    return isFrontRearArrangement(target) ? target : null;
+  }
+  // Historical caches have no pinned winner. Prefer a previously refined
+  // practical arrangement. A discovery-only target must finish refinement
+  // before either its graph or its screening can reach the card.
+  const practical = finalists.filter(isFrontRearArrangement).sort(compareScreeningResults);
+  return practical.find(f => f.discoveryScreening) || practical[0] || null;
 }

@@ -99,13 +99,14 @@ function envelopeCurves(curves) {
  */
 export function buildStage1PreviewFromEvidence(option, seatingPositions) {
   const evidence = option?.responseEvidence;
-  if (!evidence) return null;
+  if (!option?.ready || !evidence || evidence.key !== option.evidenceKey) return null;
   const rspCurve = (evidence.rspCurve || []).filter((p) => Number.isFinite(p.spl));
   if (rspCurve.length === 0) return null;
   const { primaryCurves, secondaryCurves } = mapSeatCurves(evidence.seatCurves, seatingPositions);
   const primaryAverage = averageCurves(primaryCurves);
   const primaryBand = envelopeCurves(primaryCurves);
   return {
+    evidenceKey: option.evidenceKey,
     rspCurve,
     primaryAverage,
     primaryBand,
@@ -141,6 +142,7 @@ export function normalisePreviewsForDisplay(rawPreviews) {
     }));
 
     return {
+      evidenceKey: preview.evidenceKey,
       rspCurve: shift(preview.rspCurve),
       primaryAverage: shift(preview.primaryAverage),
       primaryBand: {

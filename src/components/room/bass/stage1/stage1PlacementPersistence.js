@@ -11,6 +11,10 @@ import {
 } from "./stage1Constants";
 import { parseStage1FingerprintScope } from "./stage1RecommendationScope";
 
+import { recommendationTarget } from "../bda/stage1RecommendationSelection";
+import { verifiedFinalist } from "./stage1FinalistEvidence";
+import { replaceRecommendation, resultField } from "../bda/repairStage1Recommendation";
+
 const BASS_PHYSICS_VERSION = "normalized-physics-v1";
 
 // Per-quantity result slots, in quantity order.
@@ -177,6 +181,25 @@ export async function syncStage1PlacementCache(projectId, versionId, fingerprint
   } catch {
     return null;
   }
+}
+
+// Repair only the chosen quantity, in both existing representations. Guard
+// the bucket actually read so simultaneous repairs cannot replace another layout.
+export async function saveRepairedResponse(projectId, versionId, option, evidence, seats, signal) {
+  const field = resultField[option.quantity];
+  const entity = base44.entities.Stage1PlacementCache;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const saved = await hydrateStage1PlacementCache(projectId, versionId);
+    if (signal.aborted) throw new Error("Response recovery cancelled.");
+    if (!isStage1CacheValid(saved, option.fingerprint)) throw new Error("The saved discovery could not be verified.");
+    const bucket = replaceRecommendation(saved[field], option, evidence);
+    if (verifiedFinalist(recommendationTarget(saved[field]), option.quantity, option.fingerprint, seats)) return saved[field];
+    const mirror = "completed_by_fingerprint." + saved.current_fingerprint + "." + field;
+    const match = { id: saved.recordId, status: "complete", current_fingerprint: saved.current_fingerprint, [field]: saved[field] };
+    const result = await entity.updateMany(match, { $set: { [field]: bucket, [mirror]: bucket } });
+    if (result?.updated === 1) return bucket;
+  }
+  throw new Error("The saved recommendation changed while its response was being recovered.");
 }
 
 /**

@@ -164,6 +164,8 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     // carries the same Stage 1 identity a fresh completed search would, and
     // Stage 2 derives an identical downstream fingerprint from either path.
     if (isStage1CacheValid(hydratedCache, fingerprint)) {
+      const live = getStage1State(projectId, versionId);
+      if (live.status === "complete" && live.fingerprint === fingerprint) return;
       publishHydratedStage1(projectId, versionId, fingerprint, {
         one_sub_result: hydratedCache.one_sub_result,
         two_sub_result: hydratedCache.two_sub_result,

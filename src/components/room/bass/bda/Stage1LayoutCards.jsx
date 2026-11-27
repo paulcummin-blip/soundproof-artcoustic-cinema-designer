@@ -72,12 +72,13 @@ function arrangementMatchesStage1Option(instances, option) {
   return coordinatesMatch(currentSources, recSources);
 }
 
-function LayoutMiniSchematic({ option, roomDims }) {
+function LayoutMiniSchematic({ option, roomDims, seatingPositions, rspPosition }) {
   const width = Number(roomDims?.widthM) || 1;
   const length = Number(roomDims?.lengthM) || 1;
   const radius = Math.max(0.04, Math.min(width, length) * 0.04);
+  const pad = radius * 1.5;
   return (
-    <svg viewBox={`0 0 ${width} ${length}`} className="h-20 w-full rounded border border-[#E7E4DF] bg-[#F8F7F4]"
+    <svg preserveAspectRatio="xMidYMid meet" viewBox={`${-pad} ${-pad} ${width + 2 * pad} ${length + 2 * pad}`} className="h-20 w-full rounded border border-[#E7E4DF] bg-[#F8F7F4]"
       role="img" aria-label={`Schematic: ${option?.quantity || 0} subwoofers`}>
       <rect x="0" y="0" width={width} height={length} fill="none"
         stroke="#BFB9AE" strokeWidth={Math.max(0.015, radius * 0.15)} />
@@ -85,6 +86,14 @@ function LayoutMiniSchematic({ option, roomDims }) {
         strokeWidth={Math.max(0.03, radius * 0.3)} />
       <line x1={0} y1={length} x2={width} y2={length} stroke="#1B1A1A"
         strokeWidth={Math.max(0.03, radius * 0.3)} />
+      {(seatingPositions || []).filter(s => Number.isFinite(s?.x) && Number.isFinite(s?.y)).map((seat, i) => (
+        <rect key={seat.id || i} x={seat.x-radius*0.7} y={seat.y-radius*0.7}
+          width={radius*1.4} height={radius*1.4} rx={radius*0.3} fill="#998C79"><title>Seat {i + 1}</title></rect>
+      ))}
+      {Number.isFinite(rspPosition?.x) && Number.isFinite(rspPosition?.y) && (
+        <circle cx={rspPosition.x} cy={rspPosition.y} r={radius*1.3} fill="none" stroke="#346684"
+          strokeWidth={radius*0.32}><title>Reference seating position (RSP)</title></circle>
+      )}
       {(option?.coordinates || []).map((coord, index) => {
         const x = Number(coord?.x);
         const y = Number(coord?.y);
@@ -104,23 +113,16 @@ function MetricRow({ label, value, hint }) {
   );
 }
 
-import { roundDbValue } from "@/components/utils/splDisplayFormatter";
-
-// Whole-number dB display (conventional rounding, round half away from zero).
 function formatDb1(value) {
-  const whole = roundDbValue(value);
-  return whole === null ? "—" : `${whole} dB`;
+  return Number.isFinite(value) ? value.toFixed(1) + " dB" : "NOT CALCULATED";
 }
 
-// Always display the actual calculated deepest depression and its frequency,
-// even when the depression is shallower than 8 dB. A shallow 1–2 dB depression
-// before EQ is an excellent predicted result and should be visible.
-function formatDepression(depression) {
-  if (!depression || !Number.isFinite(depression.depthDb)) return "0 dB";
-  const depth = roundDbValue(depression.depthDb);
-  if (depth === null || depth === 0) return "0 dB";
-  const freq = Number.isFinite(depression.centreHz) ? Math.round(depression.centreHz) : "?";
-  return `−${depth} dB @ ${freq} Hz`;
+export function formatDepression(depression) {
+  if (!Number.isFinite(depression?.depthDb)) return "NOT CALCULATED";
+  const depth = depression.depthDb.toFixed(1);
+  if (depth === "0.0") return "0.0 dB";
+  if (!Number.isFinite(depression.centreHz)) return "NOT CALCULATED";
+  return `−${depth} dB @ ${Math.round(depression.centreHz)} Hz`;
 }
 
 function screeningRows(screening) {
@@ -202,6 +204,7 @@ function screeningRows(screening) {
 function Stage1Card({
   option,
   roomDims,
+  seatingPositions, rspPosition, repair, quantity,
   responsePreview,
   responseYMin,
   responseYMax,
@@ -216,13 +219,13 @@ function Stage1Card({
   if (!option) {
     return (
       <div className="rounded-lg border border-dashed border-[#C9C2B8] bg-white/60 p-3">
-        <div className="text-[13px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[option?.quantity] || "—"}</div>
+        <div className="text-[13px] font-semibold text-[#1B1A1A]">{LAYOUT_TITLES[quantity] || "—"}</div>
         <div className="mt-1 text-[10px] text-[#8A7B6A]">No valid wall arrangement discovered for this quantity.</div>
       </div>
     );
   }
   return (
-    <div className={`rounded-lg border p-3 transition-all ${
+    <div className={`flex flex-col rounded-lg border p-3 transition-all ${
       isSelected || isApplied
         ? "border-2 border-[#213428] bg-[#F3F1EC]"
         : "border border-[#D9D5CE] bg-white hover:border-[#BFB9AE]"
@@ -239,22 +242,23 @@ function Stage1Card({
         )}
       </div>
       <div className="mt-1.5">
-        <LayoutMiniSchematic option={option} roomDims={roomDims} />
+        <LayoutMiniSchematic option={option} roomDims={roomDims} seatingPositions={seatingPositions} rspPosition={rspPosition} />
       </div>
       <div className="mt-1 text-[9px] text-[#8A7B6A]">
-        Model-independent placement · virtual-source positions
+        Squares show seats · Blue ring shows RSP
       </div>
       <div className="mt-2">
         <Stage1ResponseGraph
+          repair={repair}
           preview={responsePreview}
           yMin={responseYMin}
           yMax={responseYMax}
         />
       </div>
       <div className="mt-2 space-y-0.5">
-        {screeningRows(option.screening)}
+        {option.ready ? screeningRows(option.screening) : <MetricRow label="Acoustic evidence" value="NOT CALCULATED" />}
       </div>
-      <div className="mt-2.5 flex items-center gap-2">
+      <div className="mt-auto pt-2.5 flex items-center gap-2">
         {isSelected && !isApplied ? (
           <>
             <button type="button" onClick={onConfirmApply} disabled={!canApply}
@@ -267,7 +271,7 @@ function Stage1Card({
             </button>
           </>
         ) : (
-          <button type="button" onClick={() => onSelect(optionKey)} disabled={isApplied}
+          <button type="button" onClick={() => onSelect(optionKey)} disabled={isApplied || !option.ready}
             className="w-full rounded-md border border-[#D9D5CE] px-3 py-1.5 text-[11px] font-medium text-[#1B1A1A] hover:bg-[#F3F1EC] disabled:opacity-50">
             {isApplied ? "Current layout" : "Select"}
           </button>
@@ -282,7 +286,7 @@ function Stage1Card({
 
 function optionKeyFor(option) {
   if (!option) return "none";
-  return `s1::${option.quantity}::${option.finalistId || JSON.stringify(option.coordinates)}`;
+  return option.evidenceKey;
 }
 
 function splitCoordsByPlacement(coords) {
@@ -299,6 +303,7 @@ export default function Stage1LayoutCards({
   options,
   status,
   roomDims,
+  seatingPositions, rspPosition,
   subwooferInstances,
   frontSubsCfg,
   rearSubsCfg,
@@ -312,25 +317,15 @@ export default function Stage1LayoutCards({
   const [selectedKey, setSelectedKey] = useState(null);
   const [applyError, setApplyError] = useState(null);
 
-  // Map response previews to options by quantity. The previews array is
-  // aligned with the valid (non-null) options in order.
-  const previewMap = useMemo(() => {
-    const map = new Map();
-    if (!stage1Previews?.previews) return map;
-    const validOptions = (Array.isArray(options) ? options : []).filter(Boolean);
-    stage1Previews.previews.forEach((preview, i) => {
-      if (validOptions[i] && preview) {
-        map.set(validOptions[i].quantity, preview);
-      }
-    });
-    return map;
-  }, [stage1Previews, options]);
+  const previewMap = useMemo(() => new Map(
+    (stage1Previews?.previews || []).map(preview => [preview.evidenceKey, preview])
+  ), [stage1Previews]);
 
   const isApplied = (option) => arrangementMatchesStage1Option(subwooferInstances, option);
 
   const handleConfirmApply = (option) => {
     setApplyError(null);
-    if (!option) return;
+    if (!option?.ready) return;
     if (typeof commitInstances !== "function") {
       setApplyError("Subwoofer instances are not ready.");
       return;
@@ -421,22 +416,26 @@ export default function Stage1LayoutCards({
         {discovering && [0, 1, 2].map((q) => (
           <div key={q} className="h-24 animate-pulse rounded-lg border border-dashed border-[#C9C2B8] bg-[#F8F7F4]" />
         ))}
-        {!discovering && orderedOptions.map((option) => {
+        {!discovering && orderedOptions.map((option, index) => {
           const key = optionKeyFor(option);
           return (
             <Stage1Card
-              key={key}
+              key={option?.evidenceKey || index}
+              quantity={[1,2,4][index]}
+              seatingPositions={seatingPositions}
+              rspPosition={rspPosition}
+              repair={stage1Previews?.repairs?.[option?.quantity]}
               option={option}
               optionKey={key}
               roomDims={roomDims}
-              responsePreview={option ? previewMap.get(option.quantity) || null : null}
+              responsePreview={option ? previewMap.get(option.evidenceKey) || null : null}
               responseYMin={stage1Previews?.yMin}
               responseYMax={stage1Previews?.yMax}
               isSelected={selectedKey === key}
               onSelect={setSelectedKey}
               isApplied={isApplied(option)}
               onConfirmApply={() => handleConfirmApply(option)}
-              canApply={true}
+              canApply={option?.ready === true}
             />
           );
         })}
