@@ -25,7 +25,8 @@
 // existing card styling. All account-status information stays on the
 // Projects page only.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { formatPromotionEndDate, formatPromotionEndDateLong } from '@/lib/commercial/useEffectivePromotion';
 import { useDealerAccountNavigation } from './useDealerAccountNavigation';
 
@@ -85,6 +86,18 @@ export default function AccountStatusStrip({
   const { url: dealerPageUrl } = useDealerAccountNavigation();
   const [purchaseMessageVisible, setPurchaseMessageVisible] = useState(false);
 
+  // Collapsible Project Tokens panel — the expanded/collapsed preference is
+  // remembered across visits to the Projects page. Defaults to expanded so a
+  // first-time dealer sees the full detail, promotional information and the
+  // Purchase Project Tokens button.
+  const PROJECT_TOKENS_COLLAPSED_KEY = 'b44_project_tokens_collapsed';
+  const [tokensCollapsed, setTokensCollapsed] = useState(() => {
+    try { return localStorage.getItem(PROJECT_TOKENS_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(PROJECT_TOKENS_COLLAPSED_KEY, tokensCollapsed ? '1' : '0'); } catch { /* ignore */ }
+  }, [tokensCollapsed]);
+
   if (!showCapacityIndicator && !illustrativeHeader) return null;
 
   // --- Section visibility (genuine data only) -----------------------------
@@ -126,143 +139,72 @@ export default function AccountStatusStrip({
   const inRenewalWindow = showAccessRenewal && isRenewalWindowActive(accessExpiry);
   const renewalLinkActive = showAccessRenewal && !!renewalUrl && (inRenewalWindow || overdue);
 
+  // Compact-header summary values (shown in both collapsed and expanded states).
+  const promoExpiryLabel = showPromotionBlock && promoEndsAt
+    ? formatPromotionEndDateLong(promoEndsAt)
+    : null;
+
   return (
-    <dl
-      aria-label="Account status"
-      className={`grid gap-x-8 gap-y-5 ${gridClass}`}
+    <div
       style={{
         margin: '18px 0 0',
-        padding: '20px 24px',
         border: `1px solid ${BRAND.border}`,
         borderRadius: 10,
         background: '#F3F0EB',
         color: BRAND.green,
+        overflow: 'hidden',
       }}
     >
-      {/* Project Tokens — always shown */}
-      {showProjectTokens && (
-        <div style={{ minWidth: 0 }}>
-          <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Project Tokens</dt>
-          <dd style={{ margin: 0, fontSize: 22, fontWeight: 600, lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {projectTokensLink ? (
-              <a
-                href={dealerPageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'inherit', textDecoration: 'underline', textDecorationColor: BRAND.border }}
-                title="View your Project Token history on your Dealer Page"
-              >
-                <strong>{capacityValue}</strong>{' available'}
-              </a>
-            ) : (
-              <span>
-                <strong>{capacityValue}</strong>{' available'}
-              </span>
-            )}
-            {canPurchase && (
-              <button
-                type="button"
-                onClick={() => setPurchaseMessageVisible((v) => !v)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 8,
-                  border: `1px solid ${BRAND.border}`,
-                  background: '#FFFFFF',
-                  color: BRAND.text,
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  lineHeight: 1,
-                }}
-              >
-                Purchase Project Tokens
-              </button>
-            )}
-          </dd>
-          <dd style={{ margin: '6px 0 0', fontSize: 12, color: BRAND.subtext }}>
-            1 token creates 1 new project, with up to 5 design variations.
-          </dd>
-
-          {/* Purchase coming-soon message — no payment, no balance change */}
-          {canPurchase && purchaseMessageVisible && (
-            <dd style={{
-              margin: '10px 0 0',
-              padding: '12px 14px',
-              background: '#FFFFFF',
-              border: `1px solid ${BRAND.border}`,
-              borderRadius: 8,
-              fontSize: 13,
-              color: BRAND.subtext,
-              lineHeight: 1.45,
-            }}>
-              Online Project Token purchases are coming soon. Please contact Artcoustic if you need additional tokens.
-            </dd>
-          )}
-
-          {/* Unlimited Projects promotion — directly below the balance */}
-          {showPromotionBlock && (
-            <dd style={{
-              margin: '12px 0 0',
-              padding: '14px 16px',
-              background: '#FFFFFF',
-              border: `1px solid ${BRAND.green}`,
-              borderLeft: `3px solid ${BRAND.green}`,
-              borderRadius: 8,
-            }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.text, lineHeight: 1.35 }}>
-                Unlimited project creation until {formatPromotionEndDateLong(promoEndsAt)}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 13, color: BRAND.subtext, lineHeight: 1.5 }}>
-                Your Project Tokens won&rsquo;t be used during this promotion. All projects and design variations you create will remain available afterwards.
-              </div>
-            </dd>
-          )}
-
-          {illustrativeHeader && (
-            <dd style={{ margin: '6px 0 0', fontSize: 13, color: BRAND.subtext }}>Illustrative balance</dd>
+      <button
+        type="button"
+        onClick={() => setTokensCollapsed((v) => !v)}
+        aria-expanded={!tokensCollapsed}
+        aria-controls="project-tokens-panel"
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '16px 24px',
+          background: 'transparent',
+          border: 'none',
+          borderBottom: tokensCollapsed ? 'none' : `1px solid ${BRAND.border}`,
+          cursor: 'pointer',
+          color: 'inherit',
+          textAlign: 'left',
+          fontFamily: 'inherit',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', minWidth: 0 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Project Tokens</span>
+          <span style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.35 }}>
+            <strong>{capacityValue}</strong>{' available'}
+          </span>
+          {promoExpiryLabel && (
+            <span style={{ fontSize: 13, color: BRAND.subtext }}>
+              {'Unlimited creation until '}{promoExpiryLabel}
+            </span>
           )}
         </div>
+        <ChevronDown
+          className={`h-5 w-5 text-[#625143] transition-transform ${tokensCollapsed ? 'rotate-0' : 'rotate-180'}`}
+        />
+      </button>
+      {!tokensCollapsed && (
+      <dl
+        id="project-tokens-panel"
+        aria-label="Account status"
+        className={`grid gap-x-8 gap-y-5 ${gridClass}`}
+        style={{
+          margin: 0,
+          padding: '16px 24px 20px',
+          color: BRAND.green,
+        }}
+      >
+...
+      </dl>
       )}
-
-      {/* Current offer — genuine active, eligible offer only */}
-      {showCurrentOffer && (
-        <div style={{ minWidth: 0 }}>
-          <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Current offer</dt>
-          <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>{offerLabel}</dd>
-          {offerEndDate && (
-            <dd style={{ margin: '6px 0 0', fontSize: 15, lineHeight: 1.4 }}>
-              {'Ends '}{formatPromotionEndDate(offerEndDate)}
-            </dd>
-          )}
-        </div>
-      )}
-
-      {/* Access renewal — genuine 90-day system only */}
-      {showAccessRenewal && (
-        <div style={{ minWidth: 0 }}>
-          <dt style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Access renewal</dt>
-          <dd style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.4 }}>
-            {renewalLinkActive ? (
-              <a
-                href={renewalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  color: overdue ? OVERDUE_COLOR : 'inherit',
-                  textDecoration: 'underline',
-                }}
-              >
-                {'Renew by '}{formatPromotionEndDate(accessExpiry)}
-              </a>
-            ) : (
-              `Renew by ${formatPromotionEndDate(accessExpiry)}`
-            )}
-          </dd>
-          {overdue && (
-            <dd style={{ margin: '6px 0 0', fontSize: 13, color: OVERDUE_COLOR }}>{'Overdue'}</dd>
-          )}
-        </div>
-      )}
-    </dl>
+    </div>
   );
 }
