@@ -20,6 +20,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { subscribeIssuedExportStored } from '@/components/library/issuedExportSignal';
 import {
+  createProjectAssetsRefreshState,
+  requestRead,
+  onReadEnd,
+  consumePendingSilent,
+} from '@/components/library/projectAssetsRefreshState';
+import {
   REPORT_DOCUMENT_TYPES,
   PROPOSAL_DOCUMENT_TYPES,
 } from '@/components/library/issuedDocument/issuedDocumentTypes';
@@ -49,9 +55,13 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Guards against overlapping reads: a background export landing while a read
-  // is already in flight simply waits for the next one.
-  const inFlight = useRef(false);
+  // Guards against overlapping reads: a notification arriving while a read is
+  // in flight is retained and processed once the active read completes, so a
+  // stored document is never missed. Many notifications coalesce into one
+  // follow-up read. An older response can never populate a newly selected
+  // project — the pure state machine enforces both rules.
+  const refreshStateRef = useRef(createProjectAssetsRefreshState());
+  refreshStateRef.current.activeProjectId = projectId;
 
   /**
    * Read the project's versions, saved reports and issued documents.
@@ -59,60 +69,79 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
    * `silent` re-reads without raising the loading state, so a refresh triggered
    * by a just-stored export or by returning to the tab never flashes the Loading
    * state over the rows already on screen.
+   *
+   * A refresh requested while a read is already in flight is retained, not
+   * discarded: it runs as one coalesced follow-up once the active read settles.
    */
   const load = useCallback(async ({ silent = false } = {}) => {
-    if (!projectId) {
+    const currentProjectId = refreshStateRef.current.activeProjectId;
+    if (!currentProjectId) {
       setVersions([]);
       setSavedReports([]);
       setIssuedExports([]);
       setLoading(false);
+      setError(null);
       return;
     }
-    if (inFlight.current) return;
-
-    inFlight.current = true;
+    const { shouldRun } = requestRead(refreshStateRef.current, { projectId: currentProjectId, silent });
+    if (!shouldRun) return;
     if (!silent) setLoading(true);
     setError(null);
+    let resultData = null;
+    let caughtError = null;
     try {
       const [versionPage, snapshotPage, exportPage] = await Promise.all([
         base44.entities.ProjectVersion.filter(
-          { project_id: projectId },
+          { project_id: currentProjectId },
           { sort: 'version_number', limit: 20 },
         ),
         base44.entities.ReportSnapshot.filter(
-          { project_id: projectId },
+          { project_id: currentProjectId },
           { sort: '-generated_at', limit: REPORT_SNAPSHOT_LIMIT },
         ),
         base44.entities.ProjectAssetExport.filter(
-          { project_id: projectId },
+          { project_id: currentProjectId },
           { sort: '-exported_at', limit: ISSUED_EXPORT_LIMIT },
         ),
       ]);
-
-      setVersions(asItems(versionPage));
-      setSavedReports(asItems(snapshotPage));
-      setIssuedExports(asItems(exportPage));
+      resultData = { versionPage, snapshotPage, exportPage };
     } catch (loadError) {
-      console.error('[ProjectLibrary] Failed to load project assets:', loadError);
-      setError(loadError);
-    } finally {
-      inFlight.current = false;
+      caughtError = loadError;
+    }
+    const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId });
+    if (shouldCommit) {
+      if (resultData) {
+        setVersions(asItems(resultData.versionPage));
+        setSavedReports(asItems(resultData.snapshotPage));
+        setIssuedExports(asItems(resultData.exportPage));
+      } else {
+        console.error('[ProjectLibrary] Failed to load project assets:', caughtError);
+        setError(caughtError);
+      }
       setLoading(false);
     }
-  }, [projectId]);
+    if (pendingRefresh) {
+      load({ silent: consumePendingSilent(refreshStateRef.current) });
+    }
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Switching projects resets state immediately so assets from the previous
+  // project never appear while the new project's read is outstanding.
+  useEffect(() => {
+    setVersions([]);
+    setSavedReports([]);
+    setIssuedExports([]);
+    setError(null);
+    setLoading(true);
+    load();
+  }, [load, projectId]);
 
-  // A document stored while this Library is open is listed as soon as it exists.
-  // The export is recorded in the background after the download, so the row can
-  // land after this page has already read.
-  useEffect(
-    () => subscribeIssuedExportStored((storedProjectId) => {
-      if (!projectId || storedProjectId !== projectId) return;
-      load({ silent: true });
-    }),
-    [load, projectId],
-  );
+  // A document or image stored while this Library is open is listed as soon
+  // as it exists. The notification is project-scoped and coalesced.
+  useEffect(() => subscribeIssuedExportStored((storedProjectId) => {
+    if (!refreshStateRef.current.activeProjectId || storedProjectId !== refreshStateRef.current.activeProjectId) return;
+    load({ silent: true });
+  }), [load]);
 
   // Returning to the tab — an export made in another tab, or a return from a
   // report — reads again rather than showing what was true when it was opened.

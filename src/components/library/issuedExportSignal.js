@@ -33,6 +33,18 @@ export function notifyIssuedExportStored(projectId) {
 }
 
 /**
+ * Announce that a project image was created, replaced or removed.
+ * Fires the SAME listeners as notifyIssuedExportStored — a project's asset
+ * readers refresh once, whether the change was a stored PDF or an image.
+ * Only call this after the ProposalAsset record has been successfully
+ * persisted; a failed upload must never announce.
+ * @param {string} projectId the project the image belongs to
+ */
+export function notifyProjectImagesChanged(projectId) {
+  notifyIssuedExportStored(projectId);
+}
+
+/**
  * Listen for stored issued documents.
  * @param {(projectId: string) => void} listener
  * @returns {() => void} unsubscribe

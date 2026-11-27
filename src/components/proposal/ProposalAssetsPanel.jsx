@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, ImageOff } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
+import { notifyProjectImagesChanged } from '@/components/library/issuedExportSignal';
 import {
   ASSET_SLOT_OPTIONS,
   isCoverAsset,
@@ -173,6 +174,7 @@ export default function ProposalAssetsPanel({
           image_presentation: IMAGE_PRESENTATION.FULL_WIDTH,
         });
       }
+      notifyProjectImagesChanged(projectId);
       await load();
     } catch (err) {
       console.error('Failed to save image:', err);
@@ -185,6 +187,7 @@ export default function ProposalAssetsPanel({
     if (!existing) return;
     try {
       await base44.entities.ProposalAsset.delete(existing.id);
+      notifyProjectImagesChanged(projectId);
       await load();
     } catch (err) {
       console.error('Failed to remove image:', err);
