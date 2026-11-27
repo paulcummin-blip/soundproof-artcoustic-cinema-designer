@@ -1,0 +1,487 @@
+{
+  "schemas": [
+    {
+      "entity_name": "ProjectVersion",
+      "entity_schema": {
+        "name": "ProjectVersion",
+        "type": "object",
+        "description": "A complete, independent design state for a single physical room. Every calculation, report, optimisation, AI summary and cached result is version-specific, while project metadata remains shared on the parent Project. The design_state field is the authoritative serialisation of the Room Designer state — it contains every field required to completely reconstruct a design version. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes. The UI slot limit is 5; the data model allows any number internally for future flexibility.",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "ID of the parent Project this version belongs to."
+          },
+          "account_id": {
+            "type": "string",
+            "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+          },
+          "version_number": {
+            "type": "integer",
+            "description": "Version slot number (1–5 in the UI; data model allows any positive integer). V1 is the permanent baseline and cannot be deleted."
+          },
+          "version_name": {
+            "type": "string",
+            "description": "Designer-editable custom name for this version (max 50 characters). Shown in the Open Version dropdown and on report headers instead of the raw version number. Defaults to 'Current Design' for migrated V1.",
+            "default": "Current Design"
+          },
+          "design_state": {
+            "type": "object",
+            "description": "The authoritative serialisation of the Room Designer state. Contains every field required to completely reconstruct a design version — speakers, subwoofers, seating, screen, overlays, SPL config, RSP, acoustic treatment, calibration assumptions, and all other per-version design data. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes.",
+            "properties": {}
+          },
+          "published_fingerprint": {
+            "type": "string",
+            "description": "Engineering fingerprint of the last Published Engineering result. Written only by publishEngineering(). Null = not yet published. When set, a matching entry exists in ProjectAnalysisCache.engineering_publications under this key.",
+            "nullable": true
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the last engineering publication. Written only by publishEngineering(). Null = never published.",
+            "nullable": true
+          },
+          "published_engine_version": {
+            "type": "string",
+            "description": "Engineering Authority schema version at publication time. Written only by publishEngineering().",
+            "nullable": true
+          },
+          "published_rp22_version": {
+            "type": "string",
+            "description": "RP22 bass metric schema version at publication time. Written only by publishEngineering().",
+            "nullable": true
+          },
+          "published_algorithm_version": {
+            "type": "string",
+            "description": "Bass analysis contract version at publication time. Written only by publishEngineering().",
+            "nullable": true
+          },
+          "publication_reason": {
+            "type": "string",
+            "description": "Reason for the last publication (e.g. 'auto-settled', 'legacy-migration'). Written only by publishEngineering().",
+            "nullable": true
+          }
+        },
+        "required": [
+          "project_id",
+          "account_id",
+          "version_number",
+          "version_name"
+        ],
+        "rls": {
+          "read": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          },
+          "create": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          },
+          "update": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          },
+          "delete": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entity_name": "ProjectAnalysisCache",
+      "entity_schema": {
+        "name": "ProjectAnalysisCache",
+        "type": "object",
+        "description": "Persistent completed bass-analysis authority for a project version, keyed by exact result fingerprint. Also stores immutable Published Engineering publications keyed by engineering fingerprint — the database-backed Published Engineering Authority.",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project identifier owning this analysis authority."
+          },
+          "version_id": {
+            "type": "string",
+            "description": "ProjectVersion identifier owning this analysis authority. Together with project_id and fingerprint, this is the sole cache lookup key. No NULL version_id fallback path exists — every cache row must have a valid version_id."
+          },
+          "account_id": {
+            "type": "string",
+            "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id.",
+            "nullable": true
+          },
+          "completed_cache_version": {
+            "type": "integer",
+            "description": "Completed authority cache envelope version."
+          },
+          "instance_authority_version": {
+            "type": "integer",
+            "description": "Completed authority instance generation."
+          },
+          "metric_schema_version": {
+            "type": "integer",
+            "description": "RP22 P19/P20 metric-definition generation."
+          },
+          "current_fingerprint": {
+            "type": "string",
+            "description": "Exact calibration/result fingerprint currently required by the project version."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uncalculated",
+              "updating",
+              "complete"
+            ],
+            "default": "uncalculated"
+          },
+          "completed_by_fingerprint": {
+            "type": "object",
+            "description": "Bounded completed-result snapshots keyed by exact result fingerprint."
+          },
+          "target_cache": {
+            "type": "object",
+            "description": "Persistent P14 background target cache. Contains: { metricSchemaVersion: number, baseDesignFingerprint: string, targets: { targetKey -> compact authoritative bass contract } }. All 8 P14 target combinations share the same baseDesignFingerprint. Invalidated when any bass-relevant design input changes."
+          },
+          "engineering_publications": {
+            "type": "object",
+            "description": "Immutable Published Engineering publications keyed by exact engineering fingerprint. Each entry: { engineering_summary, engineering_fingerprint, published_at, engine_version, rp22_version, algorithm_version, publication_reason, provenance }. Publications are write-once: once an entry exists for a fingerprint, it is never modified or deleted. The ProjectVersion.published_fingerprint pointer selects the current publication. Null when no publications exist yet.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "project_id",
+          "version_id"
+        ],
+        "rls": {
+          "read": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          },
+          "create": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          },
+          "update": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          },
+          "delete": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "data.account_id": "{{user.data.account_id}}"
+                  },
+                  {
+                    "data.account_id": {
+                      "$nin": [
+                        null,
+                        ""
+                      ]
+                    }
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "data.access_level": "FULL_ACCESS"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "data.access_level": "SOUND_PROOF_ONLY"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "user_condition": {
+                      "data.soundproof_access_enabled": true
+                    }
+                  }
+                ]
+              },
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "total": 2
+}
