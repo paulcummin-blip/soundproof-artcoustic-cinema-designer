@@ -1,0 +1,1205 @@
+[
+  {
+    "entity_name": "Project",
+    "entity_schema": {
+      "name": "Project",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Project name"
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Client name"
+        },
+        "project_reference": {
+          "type": "string",
+          "description": "Dealer-assigned project reference / job number, shown on client-facing report and proposal covers (e.g. 'AC-2026-014'). Free-form. Null or empty = no reference, and the cover omits the reference line entirely.",
+          "nullable": true
+        },
+        "project_status": {
+          "type": "string",
+          "description": "Lifecycle status: Live, Prospective, Lost, Completed",
+          "default": "Prospective"
+        },
+        "roomDims": {
+          "type": "string",
+          "description": "JSON string of room dimensions {widthM, lengthM, heightM}"
+        },
+        "room_length": {
+          "type": "number",
+          "description": "Room length in meters (legacy)"
+        },
+        "room_width": {
+          "type": "number",
+          "description": "Room width in meters (legacy)"
+        },
+        "room_height": {
+          "type": "number",
+          "description": "Room height in meters (legacy)"
+        },
+        "room_orientation": {
+          "type": "string",
+          "enum": [
+            "length_front",
+            "width_front"
+          ],
+          "default": "length_front"
+        },
+        "screen_wall": {
+          "type": "string",
+          "enum": [
+            "front",
+            "back",
+            "left",
+            "right"
+          ],
+          "default": "front"
+        },
+        "screen_size": {
+          "type": "number",
+          "description": "Screen width in inches",
+          "default": 120
+        },
+        "screen_height_from_floor": {
+          "type": "number",
+          "default": 0.5
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "16:9",
+            "2.35:1"
+          ],
+          "default": "16:9"
+        },
+        "manual_dimensions": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, use manual screen width/height (meters)"
+        },
+        "manual_width_m": {
+          "type": "number",
+          "description": "Manual viewable width in meters"
+        },
+        "manual_height_m": {
+          "type": "number",
+          "description": "Manual viewable height in meters"
+        },
+        "viewing_level": {
+          "type": "string",
+          "enum": [
+            "level1",
+            "level2",
+            "level3",
+            "level4"
+          ],
+          "default": "level2"
+        },
+        "seating_positions": {
+          "type": "array",
+          "description": "Seating positions array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "row_spacing_m": {
+          "type": "number",
+          "default": 1.8,
+          "description": "Centre-to-centre spacing between seat rows in meters"
+        },
+        "seats_per_row_by_row": {
+          "type": "array",
+          "description": "Per-row seat counts array [3, 5, 2]",
+          "items": {
+            "type": "number"
+          }
+        },
+        "dolby_config": {
+          "type": "string",
+          "enum": [
+            "5.1",
+            "7.1",
+            "5.1.2",
+            "5.1.4",
+            "7.1.2",
+            "7.1.4",
+            "9.1.2",
+            "9.1.4",
+            "9.1.6",
+            "9.2.4",
+            "9.4.2",
+            "9.4.4",
+            "9.4.6"
+          ]
+        },
+        "selected_speakers": {
+          "type": "array",
+          "description": "Selected speakers array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "selected_speakers_by_role": {
+          "type": "object",
+          "description": "Speaker models by role for SPL handoff"
+        },
+        "spl_speaker_nodes": {
+          "type": "array",
+          "description": "Speaker placement nodes from SPL Calculator",
+          "items": {
+            "type": "object"
+          }
+        },
+        "room_elements": {
+          "type": "array",
+          "description": "Room elements array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "subwoofers": {
+          "type": "array",
+          "description": "Subwoofer config array (legacy, superseded by subwooferInstances)",
+          "items": {
+            "type": "object"
+          }
+        },
+        "subwooferInstances": {
+          "type": "array",
+          "description": "Canonical subwoofer instance array — the sole authority for bass analysis. Each item: {id, model, enabled, position:{x,y}, bottomHeightM, rotationDeg, positionSource, legacyGroup, symmetryLinkId, gainDb, delayMs, polarity}. position.z is NOT stored — derive centreZ = bottomHeightM + cabinetHeightM/2 at boundaries. front_subs_cfg/rear_subs_cfg remain as compatibility metadata only.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "target_spl": {
+          "type": "number",
+          "default": 85
+        },
+        "amplifier_power": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Project notes"
+        },
+        "show_zones": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether RP22 pads overlay is enabled"
+        },
+        "show_angles": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether angles overlay is enabled"
+        },
+        "screen_mount_mode": {
+          "type": "string",
+          "enum": [
+            "baffle",
+            "floating"
+          ],
+          "default": "baffle"
+        },
+        "float_depth_m": {
+          "type": "number",
+          "enum": [
+            0,
+            0.2,
+            0.3
+          ],
+          "default": 0
+        },
+        "show_screen_plane": {
+          "type": "boolean",
+          "default": false
+        },
+        "show_cavity": {
+          "type": "boolean",
+          "default": false
+        },
+        "speaker_clearance_m": {
+          "type": "number",
+          "default": 0.02,
+          "description": "Fixed screen→speaker clearance (m)"
+        },
+        "seven_bed_layout_type": {
+          "type": "string",
+          "default": "rears",
+          "description": "7.x bed layout choice: rears or wides"
+        },
+        "overlays": {
+          "type": "object",
+          "description": "Overlay visibility flags"
+        },
+        "overhead_global_model": {
+          "type": "string",
+          "description": "Global overhead speaker model. No default: a new project starts with overheads Not Selected, and a model is assigned only by the designer's own selection in the overhead control.",
+          "nullable": true
+        },
+        "overhead_front_override": {
+          "type": "string",
+          "description": "Front overhead position model override"
+        },
+        "overhead_mid_override": {
+          "type": "string",
+          "description": "Mid overhead position model override"
+        },
+        "overhead_rear_override": {
+          "type": "string",
+          "description": "Rear overhead position model override"
+        },
+        "use_front_global": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use global model for front overhead"
+        },
+        "use_mid_global": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use global model for mid overhead"
+        },
+        "use_rear_global": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use global model for rear overhead"
+        },
+        "screen_front_plane_m": {
+          "type": "number",
+          "description": "Screen front plane Y-coordinate in meters"
+        },
+        "lcr_aim_mode": {
+          "type": "string",
+          "description": "LCR speaker aim mode: flat or angled"
+        },
+        "enable_front_wides": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable front wide speakers for 7.x layouts"
+        },
+        "front_subs_cfg": {
+          "type": "object",
+          "description": "Front subwoofer configuration (legacy compatibility metadata — not analysis authority)"
+        },
+        "rear_subs_cfg": {
+          "type": "object",
+          "description": "Rear subwoofer configuration (legacy compatibility metadata — not analysis authority)"
+        },
+        "spl_config": {
+          "type": "object",
+          "description": "SPL configuration"
+        },
+        "tv_preset_key": {
+          "type": "string",
+          "description": "TV preset identifier (e.g. tv83)",
+          "nullable": true
+        },
+        "tv_width_mm": {
+          "type": "number",
+          "description": "Exact TV width in millimeters",
+          "nullable": true
+        },
+        "seating_block_offset": {
+          "type": "number",
+          "description": "Viewing distance offset in meters",
+          "default": 0
+        },
+        "mlp_basis": {
+          "type": "string",
+          "enum": [
+            "front",
+            "middle",
+            "back",
+            "all"
+          ],
+          "default": "middle",
+          "description": "Reference for MLP calculation"
+        },
+        "border_thickness_m": {
+          "type": "number",
+          "description": "Screen border thickness in meters",
+          "default": 0.08
+        },
+        "rsp_mode": {
+          "type": "string",
+          "enum": [
+            "auto_from_screen",
+            "front_row_center",
+            "middle_row_center",
+            "back_row_center",
+            "all_rows_average",
+            "manual_position",
+            "seat_bound"
+          ],
+          "default": "auto_from_screen",
+          "description": "RSP source-of-truth mode. auto_from_screen = 57.5° derived; *_row_* = seating-derived; manual_position = user-nominated Y; seat_bound = canonical RSP bound to designated_rsp_seat_id (exact seat coordinates)."
+        },
+        "manual_rsp_y_m": {
+          "type": "number",
+          "description": "Explicit RSP Y position in meters when rsp_mode is manual_position. Null = not set.",
+          "nullable": true
+        },
+        "manual_rsp_x_m": {
+          "type": "number",
+          "description": "Explicit RSP X position in meters when rsp_mode is manual_position. Null = use room centreline.",
+          "nullable": true
+        },
+        "designated_rsp_seat_id": {
+          "type": "string",
+          "description": "ID of the seating position bound as the canonical RSP when rsp_mode is seat_bound. Null = free-floating RSP (no seat bound). When set, the bass engine RSP uses this seat's exact XYZ so P20 for that seat is naturally 0 dB. Cleared when the designer moves the RSP green dot independently.",
+          "nullable": true
+        },
+        "viewing_priority": {
+          "type": "string",
+          "default": "balanced",
+          "description": "Project-scoped multi-row viewing intent. 'balanced' = lexicographic balanced comparator across all rows; dynamic 'row_N' values prioritise row N and are normalised against the current row count at runtime."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "ID of the Account this project belongs to",
+          "rls": {
+            "write": {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          }
+        },
+        "dealer_account_id": {
+          "type": "string",
+          "description": "Immutable Dealer Account UUID from the Partner Portal Dealer Identity Service. Stamped at project creation from the authenticated user's dealer_account_id. The permanent ownership model — every project belongs to exactly one dealer. Never overwritten automatically after creation. Null for admin-created internal projects.",
+          "nullable": true,
+          "rls": {
+            "write": {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          }
+        },
+        "dealer_name": {
+          "type": "string",
+          "description": "Dealer display name from the Partner Portal Dealer Identity Service. Stamped at project creation from the authenticated user's dealer_name.",
+          "nullable": true,
+          "rls": {
+            "write": {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          }
+        },
+        "active_version_id": {
+          "type": "string",
+          "description": "ID of the active ProjectVersion. Single source of truth for which version is currently loaded in the Room Designer. Null = not yet migrated (legacy project). When set, the Room Designer loads this version's design_state. There is NO is_active flag on ProjectVersion — this pointer is the only authority.",
+          "nullable": true
+        },
+        "lifecycle_status": {
+          "type": "string",
+          "enum": [
+            "Draft",
+            "Active",
+            "Archived"
+          ],
+          "default": "Draft",
+          "description": "Project lifecycle stage. Archived projects are excluded from the active Projects list but remain fully visible to admin and retain all data, Professional Project status, and CapacityLedger entries."
+        },
+        "last_age_reviewed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last 200-day age review confirmation (Keep Live). Used to suppress repeat review prompts until 100 further days has elapsed. Null = no prior review.",
+          "nullable": true
+        },
+        "commercial_tier": {
+          "type": "string",
+          "enum": [
+            "UNCLASSIFIED",
+            "FREE",
+            "PROFESSIONAL",
+            "INTERNAL"
+          ],
+          "default": "UNCLASSIFIED",
+          "description": "Commercial classification of this project. UNCLASSIFIED = existing/pre-B1 projects (no change in behaviour). FREE / PROFESSIONAL / INTERNAL assigned by future commercial enforcement. Not enforced in Stage B1 — projects remain fully editable regardless of value."
+        },
+        "professional_activated_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this project was activated as a Professional project (consumed capacity via PROJECT_ACTIVATION ledger entry). Null = not yet activated. Not set automatically in Stage B1.",
+          "nullable": true
+        },
+        "activation_ledger_entry_id": {
+          "type": "string",
+          "description": "ID of the CapacityLedger record that activated this project (delta=-1). Null = not yet activated. Links the project to its commercial consumption record.",
+          "nullable": true
+        },
+        "commercial_source": {
+          "type": "string",
+          "description": "Source of the commercial classification (e.g. 'TRIAL', 'PURCHASED', 'UK_TURNOVER_REWARD', 'DISTRIBUTOR_ALLOCATION', 'ADMIN_GRANT', 'PROMOTION'). Informational — mirrors the ledger transaction type that granted the capacity consumed by this project. 'PROMOTION' indicates the project was created under an active UNLIMITED_PRO_PROJECTS promotion and consumed no banked capacity."
+        },
+        "promotion_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "ID of the Promotion that entitled this project's creation. Null for normal capacity-consumed projects. Set only when the project was created under an active UNLIMITED_PRO_PROJECTS promotion. Promotional projects have commercial_tier=PROFESSIONAL, commercial_source='PROMOTION', activation_ledger_entry_id=null (no PROJECT_ACTIVATION ledger entry)."
+        },
+        "metrics_last_opened": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Analytics only — last time this project was opened. Not wired to any tracking yet."
+        },
+        "metrics_last_modified": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Analytics only — last time this project was modified. Not wired to any tracking yet."
+        },
+        "metrics_session_count": {
+          "type": "number",
+          "default": 0,
+          "description": "Analytics only — number of sessions. Not wired to any tracking yet."
+        },
+        "metrics_total_minutes_used": {
+          "type": "number",
+          "default": 0,
+          "description": "Analytics only — total minutes used. Not wired to any tracking yet."
+        },
+        "metrics_reports_generated": {
+          "type": "number",
+          "default": 0,
+          "description": "Analytics only — number of reports generated. Not wired to any tracking yet."
+        },
+        "metrics_bass_simulations_run": {
+          "type": "number",
+          "default": 0,
+          "description": "Analytics only — number of bass simulations run. Not wired to any tracking yet."
+        },
+        "metrics_exports": {
+          "type": "number",
+          "default": 0,
+          "description": "Analytics only — number of exports. Not wired to any tracking yet."
+        },
+        "acoustic_treatment_enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether acoustic treatment (Artcoustic Abfuser) is enabled for this project. When enabled, the Visual Report shows the ADI acoustic treatment recommendation page."
+        },
+        "selected_abfuser_qty": {
+          "type": "number",
+          "default": 0,
+          "description": "Designer-selected (included) Abfuser quantity. This is the ONLY quantity that drives System Price and RP22 Products Selected. 0 = nothing selected: the ADI recommendation has not been accepted, so no Abfuser is priced or included. Never written automatically from the recommendation."
+        },
+        "abfuser_qty_source": {
+          "type": "string",
+          "enum": [
+            "none",
+            "recommended",
+            "user"
+          ],
+          "default": "none",
+          "description": "How selected_abfuser_qty was set. 'none' = nothing selected (the ADI recommendation has not been accepted). 'user' = set by the designer (typed, or accepted via 'Use ADI recommendation'). There is NO auto-follow: the ADI recommendation is guidance only and never becomes a priced selection by itself."
+        },
+        "legacy_abfuser_auto_qty": {
+          "type": "number",
+          "default": 0,
+          "description": "Retired automatic Abfuser quantity from the previous surface-area percentage model. Retained for transparency and audit only — it is never treated as a designer selection, never priced, and never displayed as a designer choice. Migration sets selected_abfuser_qty to 0 and records the old automatic value here."
+        },
+        "assumed_p15_level": {
+          "type": "string",
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "nullable": true,
+          "description": "Designer-assumed RP22 P15 background noise floor Performance Level. L1 = NCB 26, L2 = NCB 22, L3 = NCB 18, L4 = NCB 15. Null = not yet assumed (NOT CALCULATED). Single shared authority consumed by Compliance Report, Technical Report, rating engine, and PDF exports."
+        },
+        "assumed_p21_level": {
+          "type": "string",
+          "enum": [
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "nullable": true,
+          "description": "Designer-assumed RP22 P21 early reflections Performance Level. L1 = N/A, L2 = −8 dB, L3 = −10 dB, L4 = −12 dB. Null = not yet assumed (NOT CALCULATED). Single shared authority consumed by Compliance Report, Technical Report, rating engine, and PDF exports."
+        },
+        "room_dimensions_edited": {
+          "type": "boolean",
+          "default": false,
+          "description": "Authoritative flag indicating whether the user has deliberately supplied or changed room dimensions. Set to true at creation if real dimensions were entered, or on the first genuine room-dimension edit in the Room Designer. Once true, never reset to false — even if dimensions numerically return to the generic 4.5 × 6.0 × 2.4 m defaults. Hydration/autosave of generated defaults must NOT set this true. Used by the 7-day incomplete-project cleanup rule: a project with room_dimensions_edited !== true after 7 days qualifies for auto-cleanup."
+        },
+        "link_ear_platform_heights": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, editing Ear Height or Platform Height for a seating row applies the same delta to both, preserving their relative offset. When false, each is edited independently. Persisted per-project so the preference survives across sessions, browsers, and users."
+        },
+        "applied_calibration": {
+          "type": "object",
+          "description": "Persisted Applied Calibration Authority for the active version. Contains calibration values, source, lifecycle status, geometry fingerprint, and recommendation reference. Hydrated into the in-memory Applied Calibration Authority store on project load so the designer's accepted calibration survives page refresh, application restart, and project reopen. Null = no calibration applied. Stored inside design_state (per-version), not shared Project fields.",
+          "nullable": true,
+          "properties": {}
+        },
+        "appliedSeatingProvenance": {
+          "type": "object",
+          "description": "Durable Apply provenance for the V2 Improve Bass Seating Position stage. Seating Apply mutates seatingPositions (not subwooferInstances), so provenance cannot be stamped on sub instances. This project-level field records the actual Apply action: { stageKey, candidateId, baselineFingerprint, appliedFingerprint }. Null when no Seating Apply has occurred. Cleared when the design changes (stale detection). Used by isStageResultApplied to distinguish a genuine Apply from coincidental value matching.",
+          "nullable": true,
+          "properties": {
+            "stageKey": {
+              "type": "string"
+            },
+            "candidateId": {
+              "type": "string"
+            },
+            "baselineFingerprint": {
+              "type": "string"
+            },
+            "appliedFingerprint": {
+              "type": "string"
+            }
+          }
+        },
+        "commercial_outcome": {
+          "type": "string",
+          "enum": [
+            "won",
+            "lost"
+          ],
+          "nullable": true,
+          "default": null,
+          "description": "Independent UK-only commercial outcome, entirely separate from the dealer's own project_status. null = Live (default for all projects). 'won' = Won, 'lost' = Lost. Mutually exclusive: only one may be set; unticking the selected box returns the project to Live. Admin-only writes via the setProjectCommercialOutcome backend function. Not tracked for International (non-UK) projects. Live projects count towards the potential monetary pipeline; Won and Lost are excluded from Live but remain in historical proposal activity graphs. This field never alters engineering, proposal records, project history, or dealer workflow statuses."
+        },
+        "document_workflow": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "v2"
+          ],
+          "default": "legacy",
+          "description": "Document creation workflow version stamped at project creation. 'legacy' = existing projects created before the coordinated document workflow feature — they keep their current standalone Project Report action and Project Library, and are never migrated, relabelled or regenerated. 'v2' = projects created after the feature: these show the coordinated 1a Technical Report / 1b Speaker Design / 2 Client Proposal workflow panel and the Project Assets section. Stamped once by createProfessionalProject and never changed afterwards. Never used to alter room designs, RP22 calculations, engineering results or existing documents."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "rls": {
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "delete": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "entity_name": "ProjectAnalysisCache",
+    "entity_schema": {
+      "name": "ProjectAnalysisCache",
+      "type": "object",
+      "description": "Persistent completed bass-analysis authority for a project version, keyed by exact result fingerprint. Also stores immutable Published Engineering publications keyed by engineering fingerprint — the database-backed Published Engineering Authority.",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "description": "Project identifier owning this analysis authority."
+        },
+        "version_id": {
+          "type": "string",
+          "description": "ProjectVersion identifier owning this analysis authority. Together with project_id and fingerprint, this is the sole cache lookup key. No NULL version_id fallback path exists — every cache row must have a valid version_id."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id.",
+          "nullable": true
+        },
+        "completed_cache_version": {
+          "type": "integer",
+          "description": "Completed authority cache envelope version."
+        },
+        "instance_authority_version": {
+          "type": "integer",
+          "description": "Completed authority instance generation."
+        },
+        "metric_schema_version": {
+          "type": "integer",
+          "description": "RP22 P19/P20 metric-definition generation."
+        },
+        "current_fingerprint": {
+          "type": "string",
+          "description": "Exact calibration/result fingerprint currently required by the project version."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "uncalculated",
+            "updating",
+            "complete"
+          ],
+          "default": "uncalculated"
+        },
+        "completed_by_fingerprint": {
+          "type": "object",
+          "description": "Bounded completed-result snapshots keyed by exact result fingerprint."
+        },
+        "target_cache": {
+          "type": "object",
+          "description": "Persistent P14 background target cache. Contains: { metricSchemaVersion: number, baseDesignFingerprint: string, targets: { targetKey -> compact authoritative bass contract } }. All 8 P14 target combinations share the same baseDesignFingerprint. Invalidated when any bass-relevant design input changes."
+        },
+        "engineering_publications": {
+          "type": "object",
+          "description": "Immutable Published Engineering publications keyed by exact engineering fingerprint. Each entry: { engineering_summary, engineering_fingerprint, published_at, engine_version, rp22_version, algorithm_version, publication_reason, provenance }. Publications are write-once: once an entry exists for a fingerprint, it is never modified or deleted. The ProjectVersion.published_fingerprint pointer selects the current publication. Null when no publications exist yet.",
+          "nullable": true
+        }
+      },
+      "required": [
+        "project_id",
+        "version_id"
+      ],
+      "rls": {
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "create": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "update": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "delete": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "entity_name": "ProjectVersion",
+    "entity_schema": {
+      "name": "ProjectVersion",
+      "type": "object",
+      "description": "A complete, independent design state for a single physical room. Every calculation, report, optimisation, AI summary and cached result is version-specific, while project metadata remains shared on the parent Project. The design_state field is the authoritative serialisation of the Room Designer state — it contains every field required to completely reconstruct a design version. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes. The UI slot limit is 5; the data model allows any number internally for future flexibility.",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "description": "ID of the parent Project this version belongs to."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+        },
+        "version_number": {
+          "type": "integer",
+          "description": "Version slot number (1–5 in the UI; data model allows any positive integer). V1 is the permanent baseline and cannot be deleted."
+        },
+        "version_name": {
+          "type": "string",
+          "description": "Designer-editable custom name for this version (max 50 characters). Shown in the Open Version dropdown and on report headers instead of the raw version number. Defaults to 'Current Design' for migrated V1.",
+          "default": "Current Design"
+        },
+        "design_state": {
+          "type": "object",
+          "description": "The authoritative serialisation of the Room Designer state. Contains every field required to completely reconstruct a design version — speakers, subwoofers, seating, screen, overlays, SPL config, RSP, acoustic treatment, calibration assumptions, and all other per-version design data. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes.",
+          "properties": {}
+        },
+        "published_fingerprint": {
+          "type": "string",
+          "description": "Engineering fingerprint of the last Published Engineering result. Written only by publishEngineering(). Null = not yet published. When set, a matching entry exists in ProjectAnalysisCache.engineering_publications under this key.",
+          "nullable": true
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last engineering publication. Written only by publishEngineering(). Null = never published.",
+          "nullable": true
+        },
+        "published_engine_version": {
+          "type": "string",
+          "description": "Engineering Authority schema version at publication time. Written only by publishEngineering().",
+          "nullable": true
+        },
+        "published_rp22_version": {
+          "type": "string",
+          "description": "RP22 bass metric schema version at publication time. Written only by publishEngineering().",
+          "nullable": true
+        },
+        "published_algorithm_version": {
+          "type": "string",
+          "description": "Bass analysis contract version at publication time. Written only by publishEngineering().",
+          "nullable": true
+        },
+        "publication_reason": {
+          "type": "string",
+          "description": "Reason for the last publication (e.g. 'auto-settled', 'legacy-migration'). Written only by publishEngineering().",
+          "nullable": true
+        }
+      },
+      "required": [
+        "project_id",
+        "account_id",
+        "version_number",
+        "version_name"
+      ],
+      "rls": {
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "create": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "update": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        },
+        "delete": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "data.account_id": "{{user.data.account_id}}"
+                },
+                {
+                  "data.account_id": {
+                    "$nin": [
+                      null,
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "data.access_level": "FULL_ACCESS"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "data.access_level": "SOUND_PROOF_ONLY"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "data.soundproof_access_enabled": true
+                  }
+                }
+              ]
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+]
