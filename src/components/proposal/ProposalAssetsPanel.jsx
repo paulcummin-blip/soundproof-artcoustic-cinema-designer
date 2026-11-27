@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, ImageOff } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
-import { notifyProjectImagesChanged } from '@/components/library/issuedExportSignal';
+import { notifyProjectImagesChanged, subscribeIssuedExportStored } from '@/components/library/issuedExportSignal';
+import {
+  createProjectAssetsRefreshState,
+  requestRead,
+  onReadEnd,
+  consumePendingSilent,
+} from '@/components/library/projectAssetsRefreshState';
 import {
   ASSET_SLOT_OPTIONS,
   isCoverAsset,
@@ -60,26 +66,64 @@ export default function ProposalAssetsPanel({
   const [projectName, setProjectName] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!projectId) return;
-    setLoading(true);
+  // The current project identity is held in a ref so the stable load callback
+  // always reads the live project. The state machine's activeProjectId is
+  // managed solely by requestRead so the visit generation is bumped on every
+  // switch — an obsolete response from an earlier visit is never committed.
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+  const refreshStateRef = useRef(createProjectAssetsRefreshState());
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    const currentProjectId = projectIdRef.current;
+    if (!currentProjectId) {
+      setAssets([]);
+      setProjectName(null);
+      setLoading(false);
+      return;
+    }
+    const { shouldRun, generation } = requestRead(refreshStateRef.current, { projectId: currentProjectId, silent });
+    if (!shouldRun) return;
+    if (!silent) setLoading(true);
+    let resultData = null;
     try {
       const [assetResults, projectResults] = await Promise.all([
-        base44.entities.ProposalAsset.filter({ project_id: projectId }),
-        base44.entities.Project.filter({ id: projectId }),
+        base44.entities.ProposalAsset.filter({ project_id: currentProjectId }),
+        base44.entities.Project.filter({ id: currentProjectId }),
       ]);
-      setAssets(assetResults || []);
-      setProjectName(projectResults?.[0]?.name || 'Untitled Project');
+      resultData = { assetResults, projectResults };
     } catch (err) {
       console.error('Failed to load project images:', err);
-    } finally {
+    }
+    const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
+    if (shouldCommit) {
+      if (resultData) {
+        setAssets(resultData.assetResults || []);
+        setProjectName(resultData.projectResults?.[0]?.name || 'Untitled Project');
+      }
       setLoading(false);
     }
-  }, [projectId]);
+    if (pendingRefresh) {
+      load({ silent: consumePendingSilent(refreshStateRef.current) });
+    }
+  }, []);
 
+  // Switching projects clears the gallery immediately so images from the
+  // previous project never appear while the new project's read is outstanding.
   useEffect(() => {
+    setAssets([]);
+    setProjectName(null);
+    setLoading(true);
     load();
-  }, [load]);
+  }, [load, projectId]);
+
+  // An image created, replaced or deleted in another view (Project Assets,
+  // or another open gallery) is reflected here immediately. The notification
+  // is project-scoped and coalesced with the shared issued-export signal.
+  useEffect(() => subscribeIssuedExportStored((storedProjectId) => {
+    if (!projectIdRef.current || storedProjectId !== projectIdRef.current) return;
+    load({ silent: true });
+  }), [load]);
 
   const grouped = useMemo(() => groupImagesByScope(assets), [assets]);
 
@@ -175,7 +219,6 @@ export default function ProposalAssetsPanel({
         });
       }
       notifyProjectImagesChanged(projectId);
-      await load();
     } catch (err) {
       console.error('Failed to save image:', err);
       alert('Failed to save image. Please try again.');
@@ -188,7 +231,6 @@ export default function ProposalAssetsPanel({
     try {
       await base44.entities.ProposalAsset.delete(existing.id);
       notifyProjectImagesChanged(projectId);
-      await load();
     } catch (err) {
       console.error('Failed to remove image:', err);
     }

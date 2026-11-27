@@ -8,6 +8,7 @@ import ProjectLibraryImagesSection from '@/components/library/ProjectLibraryImag
 import ProjectLibraryReportsSection from '@/components/library/ProjectLibraryReportsSection';
 import ProjectLibraryProposalsSection from '@/components/library/ProjectLibraryProposalsSection';
 import ProjectLibraryStorageDiagnostics from '@/components/library/ProjectLibraryStorageDiagnostics';
+import LibraryReadError from '@/components/library/LibraryReadError';
 import useProjectLibraryAssets from '@/components/library/useProjectLibraryAssets';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 
@@ -93,16 +94,23 @@ export default function ProjectProposalAssets() {
             <p className="text-sm text-[#8A8477] py-16 text-center" style={{ fontFamily: REPORT_FONT_BODY }}>
               Loading saved reports…
             </p>
+          ) : library.error && library.versions.length === 0 ? (
+            <LibraryReadError onRetry={() => library.reload()} />
           ) : (
-            <ProjectLibraryReportsSection
-              projectId={projectId}
-              versions={library.versions}
-              versionById={library.versionById}
-              versionNameById={library.versionNameById}
-              liveReports={library.liveReports}
-              reportExports={library.reportExports}
-              collisions={library.collisions}
-            />
+            <>
+              {library.error && library.versions.length > 0 && (
+                <LibraryReadError onRetry={() => library.reload()} variant="banner" />
+              )}
+              <ProjectLibraryReportsSection
+                projectId={projectId}
+                versions={library.versions}
+                versionById={library.versionById}
+                versionNameById={library.versionNameById}
+                liveReports={library.liveReports}
+                reportExports={library.reportExports}
+                collisions={library.collisions}
+              />
+            </>
           )
         )}
 
@@ -111,12 +119,19 @@ export default function ProjectProposalAssets() {
             <p className="text-sm text-[#8A8477] py-16 text-center" style={{ fontFamily: REPORT_FONT_BODY }}>
               Loading issued proposals…
             </p>
+          ) : library.error && library.proposalExports.length === 0 ? (
+            <LibraryReadError onRetry={() => library.reload()} />
           ) : (
-            <ProjectLibraryProposalsSection
-              proposalExports={library.proposalExports}
-              versionById={library.versionById}
-              versionNameById={library.versionNameById}
-            />
+            <>
+              {library.error && library.proposalExports.length > 0 && (
+                <LibraryReadError onRetry={() => library.reload()} variant="banner" />
+              )}
+              <ProjectLibraryProposalsSection
+                proposalExports={library.proposalExports}
+                versionById={library.versionById}
+                versionNameById={library.versionNameById}
+              />
+            </>
           )
         )}
       </div>

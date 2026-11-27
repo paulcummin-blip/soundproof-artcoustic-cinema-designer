@@ -23,6 +23,8 @@ import {
   requestRead,
   onReadEnd,
   consumePendingSilent,
+  requestCount,
+  onCountEnd,
 } from '@/components/library/projectAssetsRefreshState';
 
 const asItems = (page) => (Array.isArray(page) ? page : (page?.items || []));
@@ -42,18 +44,26 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
   const [imageCount, setImageCount] = useState(0);
   const [countLoaded, setCountLoaded] = useState(false);
 
-  // Guards against overlapping reads and project identity, enforced by the
-  // pure state machine both asset readers share.
+  // The current project identity is held in a ref (updated on every render)
+  // so the stable useCallback closures always read the live project. The
+  // state machine's activeProjectId is managed solely by requestRead /
+  // requestCount so the visit generation is bumped correctly on every switch.
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+
+  // Guards against overlapping reads, obsolete responses and excessive count
+  // requests, enforced by the pure state machine both asset readers share.
   const refreshStateRef = useRef(createProjectAssetsRefreshState());
-  refreshStateRef.current.activeProjectId = projectId;
 
   /**
    * Read the project's full asset records. Coalesces refresh requests: if a
    * read is already in flight, a new request is retained and processed once
-   * the active read completes, so a notification is never discarded.
+   * the active read completes, so a notification is never discarded. An
+   * obsolete response (wrong project or earlier visit) is discarded by the
+   * state machine's generation check and never written to state.
    */
   const load = useCallback(async ({ silent = false } = {}) => {
-    const currentProjectId = refreshStateRef.current.activeProjectId;
+    const currentProjectId = projectIdRef.current;
     if (!currentProjectId) {
       setExports([]);
       setImages([]);
@@ -66,7 +76,7 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
       setCountLoaded(false);
       return;
     }
-    const { shouldRun } = requestRead(refreshStateRef.current, { projectId: currentProjectId, silent });
+    const { shouldRun, generation } = requestRead(refreshStateRef.current, { projectId: currentProjectId, silent });
     if (!shouldRun) return;
     if (!silent) setLoading(true);
     setError(null);
@@ -88,7 +98,7 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
     } catch (err) {
       caughtError = err;
     }
-    const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId });
+    const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
     if (shouldCommit) {
       if (resultData) {
         const expItems = asItems(resultData.exportPage);
@@ -115,27 +125,36 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
 
   /**
    * Lightweight counts so a collapsed section can show the total without
-   * fetching every record. Runs even when the full list is not requested.
+   * fetching every record. Coalesced: five notifications during one count
+   * produce one follow-up count, not five. An obsolete count (wrong project
+   * or earlier visit) is discarded by the generation check.
    */
   const refreshCounts = useCallback(async () => {
-    const currentProjectId = refreshStateRef.current.activeProjectId;
+    const currentProjectId = projectIdRef.current;
     if (!currentProjectId) {
       setExportCount(0);
       setImageCount(0);
       setCountLoaded(false);
       return;
     }
+    const { shouldRun, generation } = requestCount(refreshStateRef.current, { projectId: currentProjectId });
+    if (!shouldRun) return;
     try {
       const [ec, ic] = await Promise.all([
         base44.entities.ProjectAssetExport.count({ project_id: currentProjectId }),
         base44.entities.ProposalAsset.count({ project_id: currentProjectId }),
       ]);
-      if (refreshStateRef.current.activeProjectId === currentProjectId) {
+      const { shouldCommit, pendingRefresh } = onCountEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
+      if (shouldCommit) {
         setExportCount(Number(ec) || 0);
         setImageCount(Number(ic) || 0);
         setCountLoaded(true);
       }
+      if (pendingRefresh) {
+        refreshCounts();
+      }
     } catch (err) {
+      onCountEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
       console.warn('[useProjectWorkflowAssets] count failed:', err);
     }
   }, []);
@@ -167,9 +186,10 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
 
   // A document or image stored while this section is open is listed as soon
   // as it exists. The notification is project-scoped and coalesced: many
-  // notifications during one read produce a single follow-up read.
+  // notifications during one read produce a single follow-up read, and many
+  // during one count produce a single follow-up count.
   useEffect(() => subscribeIssuedExportStored((storedProjectId) => {
-    if (!refreshStateRef.current.activeProjectId || storedProjectId !== refreshStateRef.current.activeProjectId) return;
+    if (!projectIdRef.current || storedProjectId !== projectIdRef.current) return;
     refreshCounts();
     if (enabled) load({ silent: true });
   }), [enabled, load, refreshCounts]);

@@ -55,13 +55,21 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Guards against overlapping reads: a notification arriving while a read is
-  // in flight is retained and processed once the active read completes, so a
-  // stored document is never missed. Many notifications coalesce into one
-  // follow-up read. An older response can never populate a newly selected
-  // project — the pure state machine enforces both rules.
+  // The current project identity is held in a ref (updated on every render)
+  // so the load callback — a stable useCallback — always reads the live
+  // project. The state machine's activeProjectId is managed solely by
+  // requestRead so the visit generation is bumped correctly on every switch.
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+
+  // Guards against overlapping reads and obsolete responses: a notification
+  // arriving while a read is in flight is retained and processed once the
+  // active read completes, so a stored document is never missed. Many
+  // notifications coalesce into one follow-up read. An older response — from
+  // before a project switch, or from an earlier visit to the same project —
+  // can never be committed: the pure state machine checks both the project
+  // id and the visit generation captured at read time.
   const refreshStateRef = useRef(createProjectAssetsRefreshState());
-  refreshStateRef.current.activeProjectId = projectId;
 
   /**
    * Read the project's versions, saved reports and issued documents.
@@ -72,9 +80,11 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
    *
    * A refresh requested while a read is already in flight is retained, not
    * discarded: it runs as one coalesced follow-up once the active read settles.
+   * An obsolete response (wrong project or earlier visit) is discarded by the
+   * state machine's generation check and never written to state.
    */
   const load = useCallback(async ({ silent = false } = {}) => {
-    const currentProjectId = refreshStateRef.current.activeProjectId;
+    const currentProjectId = projectIdRef.current;
     if (!currentProjectId) {
       setVersions([]);
       setSavedReports([]);
@@ -83,7 +93,7 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
       setError(null);
       return;
     }
-    const { shouldRun } = requestRead(refreshStateRef.current, { projectId: currentProjectId, silent });
+    const { shouldRun, generation } = requestRead(refreshStateRef.current, { projectId: currentProjectId, silent });
     if (!shouldRun) return;
     if (!silent) setLoading(true);
     setError(null);
@@ -108,7 +118,7 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
     } catch (loadError) {
       caughtError = loadError;
     }
-    const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId });
+    const { shouldCommit, pendingRefresh } = onReadEnd(refreshStateRef.current, { projectId: currentProjectId, generation });
     if (shouldCommit) {
       if (resultData) {
         setVersions(asItems(resultData.versionPage));
@@ -139,7 +149,7 @@ export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
   // A document or image stored while this Library is open is listed as soon
   // as it exists. The notification is project-scoped and coalesced.
   useEffect(() => subscribeIssuedExportStored((storedProjectId) => {
-    if (!refreshStateRef.current.activeProjectId || storedProjectId !== refreshStateRef.current.activeProjectId) return;
+    if (!projectIdRef.current || storedProjectId !== projectIdRef.current) return;
     load({ silent: true });
   }), [load]);
 
