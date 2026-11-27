@@ -40,9 +40,11 @@ export default function AccountUsersPanel({ accountId = null }) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [refreshWarning, setRefreshWarning] = useState("");
 
   const load = useCallback(async () => {
     setError("");
+    setRefreshWarning("");
     setBusy("load");
     try {
       const response = await base44.functions.invoke("manageAccountUsers", {
@@ -75,6 +77,7 @@ export default function AccountUsersPanel({ accountId = null }) {
   async function run(action, payload, successMessage) {
     setError("");
     setNotice("");
+    setRefreshWarning("");
     setBusy(payload?.membership_id || action);
     try {
       const response = await base44.functions.invoke("manageAccountUsers", {
@@ -82,8 +85,16 @@ export default function AccountUsersPanel({ accountId = null }) {
         ...(accountId ? { account_id: accountId } : {}),
         ...payload,
       });
-      setData(response?.data || null);
-      setNotice(successMessage);
+      const result = response?.data;
+      if (result?.mutation_saved) {
+        // The membership change was saved, but the display refresh failed. Keep
+        // the existing rows and offer a Refresh action that only re-reads the
+        // list — no repeated mutation, no duplicate audit entry.
+        setRefreshWarning(result.refresh_warning || "Change saved. Refresh the user list.");
+      } else {
+        setData(result || null);
+        setNotice(successMessage);
+      }
       return true;
     } catch (err) {
       setError(apiMessage(err, "The change could not be completed."));
@@ -225,6 +236,22 @@ export default function AccountUsersPanel({ accountId = null }) {
         )}
         {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {notice && <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{notice}</div>}
+        {refreshWarning && (
+          <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="flex items-center justify-between gap-3">
+              <span>{refreshWarning}</span>
+              <button
+                type="button"
+                onClick={load}
+                disabled={busy === "load"}
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${busy === "load" ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-xl border border-[#DCDBD6] bg-white">

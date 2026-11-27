@@ -10,6 +10,7 @@ import {
 } from '../../shared/accountAccessAuthority.js';
 
 import { runUnderActivationLock } from '../../shared/projectCreationLock.js';
+import { buildMutationDisplayResponse } from '../../shared/accountUserDisplayRefresh.js';
 
 const OCCUPIED_STATUSES = new Set(['pending', 'active']);
 const ADMIN_ROLES = new Set(['dealer_admin', 'distributor_admin', 'internal_admin']);
@@ -671,7 +672,23 @@ export default async function(req) {
     return errorResponse('UNKNOWN_ACTION', 'Unsupported account-user action.', 400);
     }, { busy: () => errorResponse('ACCOUNT_OPERATION_BUSY', 'Another account operation is in progress. Please retry.', 409) });
     if (lockResult instanceof Response) return lockResult;
-    return Response.json(await loadAccountUsers(service, account), { status: lockResult.displayStatus });
+    // The protected mutation succeeded (lockResult.displayStatus). Refresh the
+    // displayed user list; a refresh failure is reported as a confirmed save
+    // with a refresh warning, never as a mutation failure. The dealer keeps
+    // the existing rows and can retry the read without repeating the mutation.
+    let refreshResult;
+    let refreshError;
+    try {
+      refreshResult = await loadAccountUsers(service, account);
+    } catch (err) {
+      refreshError = err;
+    }
+    return buildMutationDisplayResponse({
+      displayStatus: lockResult.displayStatus,
+      account,
+      refreshResult,
+      refreshError,
+    });
   } catch (error) {
     return Response.json({
       error: 'ACCOUNT_USER_MANAGEMENT_FAILED',
