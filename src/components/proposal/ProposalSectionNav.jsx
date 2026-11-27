@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
 import { getSectionDef, getSectionLabel } from '@/components/proposal/proposalSections';
+import { orderPublicationSections } from '@/components/proposal/publicationOrder';
 import {
   APPROVAL_STATUS,
   approvalLabel,
@@ -24,7 +25,10 @@ import {
  *   no state at all.
  */
 export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, onReorderCommit, readOnly = false, proposalType = null, approvalByType = null }) {
-  const sorted = [...sections].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  // The sidebar reads the SAME ordering authority as the editor document and
+  // the exported PDF, so the list the dealer reorders is the list the document
+  // prints. The cover is pinned first and a WITHDRAWN section never appears.
+  const sorted = orderPublicationSections({ sections, proposalType });
   const [dragIndex, setDragIndex] = useState(null);
   // Whether the current drag actually moved a section. The visible order updates
   // live during the drag (onReorder); the SAVE happens once, when the drag
