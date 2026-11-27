@@ -21,6 +21,8 @@ import {
   STAGE1_REFINEMENT_SIDE_WALL_SUB_CAP,
 } from "./stage1Constants";
 import { generateStage1Candidates, generateFineCandidates } from "./stage1CandidateGenerator";
+import { verifiedFinalist } from "./stage1FinalistEvidence";
+import { computeStage1Fingerprint } from "./stage1Fingerprint";
 import { compareScreeningResults } from "./stage1Screening";
 import { FAMILY_IDS } from "./stage1FamilyRegistry";
 import { isThreeSubFamily, threeSubFamilyBestParam } from "./stage1ThreeSubFamilies.js";
@@ -377,7 +379,7 @@ export async function runStage1SearchForQuantity({
 
   // Build compact result (no heavy transfer data — just screening + coordinates
   // + the compact 20–80 Hz response evidence shared by graph and metrics).
-  const compactFinalists = finalists.map((f) => ({
+  const compact = (f) => ({
     id: f.id,
     familyId: f.familyId,
     sources: f.sources.map((s) => ({
@@ -406,9 +408,18 @@ export async function runStage1SearchForQuantity({
     searchTier: f.searchTier,
     symmetryState: f.symmetryState,
     seedDisplacement: f.seedDisplacement,
-  }));
-
+  });
+  const compactFinalists = finalists.map(compact);
+  // Keep the downstream optimisation shortlist intact. The recommendation
+  // separately records the best practical candidate from completed refinements.
+  const fingerprint = computeStage1Fingerprint({roomDims, rspPosition, seatingPositions, physicsOptions});
+  const practical = refinementResults.filter(f => isFrontRearArrangement(f) &&
+    verifiedFinalist(f, quantity, fingerprint, seatingPositions)).sort(compareScreeningResults);
+  const target = practical[0] || refinementPool.find(isFrontRearArrangement);
+  const retained = finalists.some(f => f.id === target?.id);
   return {
+    recommendationId: target?.id ?? null,
+    recommendationFinalist: target && !retained ? compact(target) : null,
     quantity,
     status: "complete",
     candidateCount: deduped.length,

@@ -133,8 +133,8 @@ export function screenCandidate({ transferResult, seatingPositions, candidate })
 
   // Deepest primary-seat depression for display (same metric, no threshold).
   let deepestPrimaryDepression = null;
-  for (const sc of primaryCurvesFull) {
-    const dep = findDeepestDepressionInBand(sc.curveFull);
+  for (const curve of primaryCurvesFull) {
+    const dep = findDeepestDepressionInBand(curve);
     if (dep && (!deepestPrimaryDepression || dep.depthDb > deepestPrimaryDepression.depthDb)) {
       deepestPrimaryDepression = dep;
     }

@@ -24,6 +24,8 @@ import {
   STAGE1_POINTS_PER_OCTAVE,
   STAGE1_FALLBACK_SOURCE_HEIGHT_M,
 } from "./stage1Constants";
+import { computeStage1Fingerprint } from "./stage1Fingerprint";
+import { finalistKey } from "./stage1FinalistEvidence";
 import { screenCandidate } from "./stage1Screening";
 
 /**
@@ -53,7 +55,8 @@ export function buildStage1EngineOptions(physicsOptions, pointsPerOctave = STAGE
 export function prepareStage1Context({ roomDims, rspPosition, seatingPositions, physicsOptions }) {
   const engineOptions = buildStage1EngineOptions(physicsOptions);
   const preparedModes = prepareModeBank(roomDims, engineOptions);
-  return { roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes };
+  const fingerprint = computeStage1Fingerprint({ roomDims, rspPosition, seatingPositions, physicsOptions });
+  return { roomDims, rspPosition, seatingPositions, physicsOptions, preparedModes, fingerprint };
 }
 
 function filterToDisplayBand(curve) {
@@ -125,7 +128,9 @@ export function evaluateCandidate(candidate, context, options = {}) {
   const screening = screenCandidate({ transferResult: transfer, seatingPositions, candidate });
   const result = { ...candidate, screening, transfer };
   if (options.returnResponseEvidence) {
-    result.responseEvidence = buildResponseEvidence(transfer);
+    const key = finalistKey(candidate, sources.length, context.fingerprint);
+    result.screening = { ...screening, key };
+    result.responseEvidence = { ...buildResponseEvidence(transfer), key, ppo: pointsPerOctave };
   }
   return result;
 }
