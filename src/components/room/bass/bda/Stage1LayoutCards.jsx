@@ -163,7 +163,7 @@ function screeningRows(screening) {
   }
 
   const smoothness = screening.primaryResponseSmoothness;
-  if (Number.isFinite(smoothness)) {
+  if (screening.primarySeatCount > 0 && Number.isFinite(smoothness)) {
     rows.push(
       <MetricRow
         key="smooth"
@@ -175,7 +175,7 @@ function screeningRows(screening) {
   }
 
   const varDb = screening.worstPrimarySpatialVariation;
-  if (Number.isFinite(varDb)) {
+  if (screening.primarySeatCount > 0 && Number.isFinite(varDb)) {
     rows.push(
       <MetricRow
         key="pvar"

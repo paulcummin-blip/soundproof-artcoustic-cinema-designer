@@ -321,7 +321,7 @@ export function useEvaluatedPlacementRecommendations({
     if (!inputs.geometryReady) return "waiting";
     if (stage1State?.status === "error") return "error";
     if (!stage1EvidenceMatches) return "discovering";
-    return "complete";
+    return stage1Options.length === 3 && stage1Options.every(option => option?.ready) ? "complete" : "incomplete";
   })();
 
   // ── Stage 1 preview curves (from refined response evidence) ───────

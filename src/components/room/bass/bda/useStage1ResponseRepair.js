@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { refineMissingResponse, replaceRecommendation, resultField } from "./repairStage1Recommendation";
 import { getStage1State, updateRecoveredBucket } from "../stage1/stage1PlacementStore";
 import { saveRepairedResponse } from "../stage1/stage1PlacementPersistence";
@@ -44,6 +44,7 @@ export function useStage1ResponseRepair(option, projectId, versionId, context) {
     }).finally(() => clearTimeout(timeout));
     return () => { clearTimeout(timeout); controller.abort(); };
   }, [key, attempt, projectId, versionId]);
-  if (!key || status?.key !== key) return null;
-  return { ...status, retry: () => setAttempt(n => n + 1) };
+  return useMemo(() => key && status?.key === key
+    ? { ...status, retry: () => setAttempt(n => n + 1) }
+    : null, [key, status]);
 }

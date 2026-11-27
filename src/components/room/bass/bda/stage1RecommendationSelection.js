@@ -38,7 +38,7 @@ const QUANTITY_BUCKETS = [
  * @private
  */
 function isFrontRearWallSource(source) {
-  const y = Number(source?.yNorm);
+  const y = source?.yNorm;
   return Number.isFinite(y) && (y <= 0 || y >= 1);
 }
 
@@ -48,8 +48,8 @@ function isFrontRearWallSource(source) {
  * @private
  */
 function isSideWallOnlySource(source) {
-  const x = Number(source?.xNorm);
-  const y = Number(source?.yNorm);
+  const x = source?.xNorm;
+  const y = source?.yNorm;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
   const onSide = x <= 0 || x >= 1;
   const onFrontRear = y <= 0 || y >= 1;
@@ -83,7 +83,7 @@ function isSideWallArrangement(finalist) {
  * @private
  */
 function placementForSource(source) {
-  const y = Number(source?.yNorm);
+  const y = source?.yNorm;
   if (!Number.isFinite(y)) return "front";
   return y >= 1 ? "rear" : "front";
 }

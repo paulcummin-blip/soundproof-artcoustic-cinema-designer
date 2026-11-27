@@ -67,6 +67,28 @@ test("primary depression retains 9.5 dB at 40 Hz, genuine zero and missing input
   assert.equal(formatDepression(primary([])), "NOT CALCULATED");
 });
 
+test("a silent or failed worker settles and retires; the graph offers an explicit retry", async () => {
+  for (const outcome of ["silent", "error"]) {
+    let terminated = 0;
+    const listeners = {};
+    const pool = createStage1EvaluationPool({size:1, context:{}, timeoutMs:20, workerFactory: () => ({
+      addEventListener: (name,cb) => { listeners[name] = cb; },
+      postMessage: () => { if (outcome === "error") queueMicrotask(() => listeners.error({message:"fixture worker failed"})); },
+      terminate: () => { terminated++; },
+    })});
+    await assert.rejects(pool.evaluate({}), outcome === "silent" ? /timed out/ : /fixture worker failed/);
+    assert.equal(terminated,1);
+    assert.equal(pool.size,0);
+  }
+  let retries = 0;
+  const graph = Renderer.create(React.createElement(Graph,{repair:{active:false,error:"Response recovery timed out.",retry:()=>retries++}}));
+  assert.ok(JSON.stringify(graph.toJSON()).includes("Response recovery timed out."));
+  assert.ok(!JSON.stringify(graph.toJSON()).includes("Recovering"));
+  act(()=>graph.root.findByType("button").props.onClick());
+  assert.equal(retries,1);
+  graph.unmount();
+});
+
 for (const [widthM,lengthM,heightM,rows,columns] of [[3.6,5.2,2.35,1,2],[4.5,6,2.4,2,3],[6.2,9.3,3.1,3,4]]) {
   test(`${widthM} × ${lengthM} × ${heightM} m, ${rows} rows: selection, disk reopen and each missing response`, async t => {
     const dir = mkdtempSync(join(tmpdir(),"adi01-")); t.after(() => rmSync(dir,{ recursive:true,force:true }));

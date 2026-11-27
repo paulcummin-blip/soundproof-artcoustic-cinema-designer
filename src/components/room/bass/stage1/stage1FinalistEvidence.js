@@ -1,10 +1,14 @@
+import { buildFrequencyAxis } from "@/bass/core/rewCorePrimitives";
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { STAGE1_REFINEMENT_POINTS_PER_OCTAVE as PPO } from "./stage1Constants";
+
+const displayGrid = buildFrequencyAxis(15, 200, PPO).filter(hz => hz >= 20 && hz <= 80);
 
 export function finalistKey(candidate, quantity, fingerprint) {
   const sources = candidate?.sources;
   if (!candidate?.id || !fingerprint || !Array.isArray(sources) || sources.length !== quantity ||
-      !sources.every(s => Number.isFinite(s?.xNorm) && Number.isFinite(s?.yNorm))) return null;
+      !sources.every(s => Number.isFinite(s?.xNorm) && Number.isFinite(s?.yNorm) &&
+        s.xNorm >= 0 && s.xNorm <= 1 && s.yNorm >= 0 && s.yNorm <= 1)) return null;
   return JSON.stringify([fingerprint.split("|")[0], quantity, candidate.id, sources.map(s => [s.xNorm, s.yNorm])]);
 }
 
@@ -15,10 +19,8 @@ export function verifiedFinalist(candidate, quantity, fingerprint, seats) {
   if (!key || response?.key !== key || metrics?.key !== key || response.ppo !== PPO ||
       metrics.sourceCount !== quantity || !metrics.rspAvailable) return false;
   const frequencies = response.frequencies;
-  // Two octaves at the validated resolution. End-point inclusion depends on the frequency grid.
-  if (!Array.isArray(frequencies) || frequencies.length < 2 * PPO || frequencies.length > 2 * PPO + 1 ||
-      !frequencies.every((f,i) => Number.isFinite(f) && f >= 20 && f <= 80 &&
-        (!i || Math.abs(Math.log2(f / frequencies[i-1]) * PPO - 1) < 0.02))) return false;
+  if (!Array.isArray(frequencies) || frequencies.length !== displayGrid.length ||
+      !frequencies.every((f,i) => Number.isFinite(f) && Math.abs(f - displayGrid[i]) < 1e-8)) return false;
   const validCurve = curve => Array.isArray(curve) && curve.length === frequencies.length &&
     curve.every((p,i) => p?.frequency === frequencies[i] && Number.isFinite(p.spl));
   const validDepth = d => Number.isFinite(d?.depthDb) && d.depthDb >= 0 && Number.isFinite(d.centreHz);
