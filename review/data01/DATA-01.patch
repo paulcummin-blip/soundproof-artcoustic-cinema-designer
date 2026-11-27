@@ -1,0 +1,1242 @@
+diff --git a/base44/entities/ProjectAnalysisCache.jsonc b/base44/entities/ProjectAnalysisCache.jsonc
+index 150dfd3..d2f67b4 100644
+--- a/base44/entities/ProjectAnalysisCache.jsonc
++++ b/base44/entities/ProjectAnalysisCache.jsonc
+@@ -3,6 +3,8 @@
+   "type": "object",
+   "description": "Persistent completed bass-analysis authority for a project version, keyed by exact result fingerprint. Also stores immutable Published Engineering publications keyed by engineering fingerprint \u2014 the database-backed Published Engineering Authority.",
+   "properties": {
++    "engineering_publications_revision": {"type": "string", "nullable": true},
++
+     "project_id": {
+       "type": "string",
+       "description": "Project identifier owning this analysis authority."
+diff --git a/base44/entities/ProjectVersion.jsonc b/base44/entities/ProjectVersion.jsonc
+index 1688ca0..2b42f5f 100644
+--- a/base44/entities/ProjectVersion.jsonc
++++ b/base44/entities/ProjectVersion.jsonc
+@@ -3,6 +3,9 @@
+   "type": "object",
+   "description": "A complete, independent design state for a single physical room. Every calculation, report, optimisation, AI summary and cached result is version-specific, while project metadata remains shared on the parent Project. The design_state field is the authoritative serialisation of the Room Designer state \u2014 it contains every field required to completely reconstruct a design version. No per-version design field should remain on the Project entity. Future per-version fields automatically belong inside design_state without requiring schema changes. The UI slot limit is 5; the data model allows any number internally for future flexibility.",
+   "properties": {
++    "published_cache_record_id": {"type": "string", "nullable": true},
++    "pending_publication": {"type": "object", "nullable": true},
++
+     "project_id": {
+       "type": "string",
+       "description": "ID of the parent Project this version belongs to."
+diff --git a/base44/functions/generateProposal/entry.ts b/base44/functions/generateProposal/entry.ts
+index b8cf6d7..03467c5 100644
+--- a/base44/functions/generateProposal/entry.ts
++++ b/base44/functions/generateProposal/entry.ts
+@@ -31,6 +31,7 @@ import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shar
+ import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
+ import { normaliseClarificationAnswers } from '../../shared/proposalClarification/clarificationAnswers.js';
+ import { recordedIntentFromContext } from '../../shared/designContext/designContextModel.js';
++import { verifiedPublicationRow, comparisonPublications } from '../../shared/publicationRow.js';
+ import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
+ // The proposal-specific reuse verdict, shared with the report-evidence reader:
+ // wording-only publication moves are safe, but a changed client-facing Display
+@@ -340,13 +341,13 @@ export default async function(req) {
+       // Read through the service role, exactly as the version's own
+       // published-engineering read reads it: the verdict below is then taken from
+       // the same two publications the readiness card compares.
+-      const cacheRecord = await loadCacheRecord(base44.asServiceRole, project_id, versionId);
++      const cacheRecord = pointer ? await verifiedPublicationRow(base44.asServiceRole, versionRecord, project) : await loadCacheRecord(base44.asServiceRole, project_id, versionId);
+       if (cacheRecord) cacheRecordByVersionId.set(versionId, cacheRecord);
+       const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
+       if (publication) versionPublicationById.set(versionId, publication);
+     }
+ 
+-    const readinessRows = resolvedVersionIds.map((versionId) => {
++    const readinessRows = await Promise.all(resolvedVersionIds.map(async (versionId) => {
+       const versionRecord = (projectVersions || []).find((version) => version.id === versionId) || null;
+       const publication = versionPublicationById.get(versionId) || null;
+       // THE canonical saved Project Report — the only report source a proposal
+@@ -365,7 +366,7 @@ export default async function(req) {
+       // never state two verdicts about one saved report. A bass or seating change
+       // is never excused, and an absent comparison leaves the strict verdict.
+       const presentationOnlyMove = proposalEvidenceMoveIsSafe(
+-        cacheRecordByVersionId.get(versionId) || null,
++        await comparisonPublications(base44.asServiceRole, versionRecord, cacheRecordByVersionId.get(versionId), savedProjectReport),
+         {
+           frozenFingerprint: savedProjectReport?.source_fingerprints?.engineeringFingerprint || null,
+           currentFingerprint: publication?.engineering_fingerprint || null,
+@@ -387,7 +388,7 @@ export default async function(req) {
+           seatPriorityFingerprint: publication?.engineering_summary?.seatPriorityFingerprint || null,
+         },
+       });
+-    });
++    }));
+ 
+     const readinessGate = resolveProposalReadinessGate({ rows: readinessRows, minVersions: 1 });
+     // Saved-report reader above is the gate. A lagging publication pointer
+diff --git a/base44/functions/publishEngineering/entry.ts b/base44/functions/publishEngineering/entry.ts
+index 1aa33a9..c0cdcf6 100644
+--- a/base44/functions/publishEngineering/entry.ts
++++ b/base44/functions/publishEngineering/entry.ts
+@@ -1,4 +1,6 @@
+-import { PUBLICATION_CONTRACT_VERSION, buildAtomicParameterIndex, auditPublicationContract } from '../../shared/engineeringPublicationContract.js';
++import { PublicationConflict, publicationRow } from '../../shared/publicationRow.js';
++import { stableStringify } from '../../shared/designIdentityComparison.js';
++import { buildAtomicParameterIndex, auditPublicationContract } from '../../shared/engineeringPublicationContract.js';
+ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+ import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
+ import {
+@@ -12,7 +14,6 @@ import {
+   PUBLICATION_RETENTION_RECENT,
+   cleanPublicationForResponse,
+   cleanCacheRecordForResponse,
+-  completeMissingBassResults,
+ } from '../../shared/publishedEngineeringAuthority.js';
+ import {
+   auditEngineeringPublication,
+@@ -36,32 +37,9 @@ import { resolveBassEvidenceForPublication } from '../../shared/bassEvidencePubl
+  * point at the fingerprint (this is the only mutable part — the pointer, not the
+  * publication itself).
+  *
+- * ATOMICITY (Phase 1A.5):
+- *   True database transactions are unavailable on the Base44 platform. To
+- *   eliminate orphaned publications (publication exists but no pointer
+- *   references it), the write order is POINTER-FIRST:
+- *
+- *     Step 1: Write the ProjectVersion publication pointer.
+- *     Step 2: Write the publication to the cache map.
+- *
+- *   Failure modes:
+- *     - Step 1 fails → nothing was written. Clean state. The next publish
+- *       call retries from scratch.
+- *     - Step 2 fails → the pointer references a publication that does not
+- *       yet exist in the cache map. readPublishedEngineering returns
+- *       status='stale' (safe, recoverable). The next publish call with the
+- *       same fingerprint will create the publication and the pointer is
+- *       already correct.
+- *
+- *   This is the safe failure mode: a "stale pointer" is always recoverable
+- *   on the next publish, whereas an "orphaned publication" is permanently
+- *   unreachable. Pointer-first makes the orphan case impossible.
+- *
+- *   Additionally, a reconciliation step runs before each publish: if the
+- *   current version pointer references a publication that does not exist
+- *   in the cache (a stale pointer from a previous failed Step 2), the new
+- *   publish naturally overwrites it. No explicit cleanup is needed — the
+- *   pointer is always replaced.
++ * Reserve the version while its previous pointer remains readable. Stage and
++ * verify an immutable entry with a fresh map revision, then atomically commit
++ * both pointer fields under the original design and the reservation token.
+  *
+  * Input:
+  *   { project_id, version_id, engineering_summary, engineering_fingerprint,
+@@ -141,227 +119,204 @@ export default async function(req) {
+     }
+ 
+     // Read only until the strict producer contract passes. No defaults/backfill.
+-    let cacheRecord = await loadCacheRecord(service, projectId, versionId);
+-
+-    // The completed bass results a SAVED report still reads must survive the
+-    // bounded retention below, so they are read here and protected explicitly:
+-    // the fingerprint each saved report states, and the bass contract every stored
+-    // publication in this row is backed by.
+-    const reportCalculationFingerprints = await loadReportCalculationFingerprints(
+-      service, projectId, versionId,
+-    );
+-    const protectedBassFingerprints = [
+-      ...reportCalculationFingerprints,
+-      ...collectPublicationBassFingerprints(cacheRecord),
+-    ];
++    const expectedDesign = body.expected_design_state;
++    if (!expectedDesign || typeof expectedDesign !== 'object' ||
++        stableStringify(expectedDesign) !== stableStringify(version.design_state))
++      throw new PublicationConflict('The saved design has changed or its calculation is still being saved.');
++    const originalPointer = version.published_fingerprint ?? null;
++    const originalCacheId = version.published_cache_record_id ?? null;
++    const stateDigest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',
++      new TextEncoder().encode(stableStringify(expectedDesign)))), byte => byte.toString(16).padStart(2, '0')).join('');
++    const token = crypto.randomUUID();
++    for (let attempt = 0; attempt < 3; attempt++) {
++      if (attempt) version = await service.entities.ProjectVersion.get(versionId);
++      if (version.project_id !== projectId || (version.account_id && version.account_id !== projectAccountId) ||
++          stableStringify(version.design_state) !== stableStringify(expectedDesign) ||
++          (version.published_fingerprint ?? null) !== originalPointer ||
++          (version.published_cache_record_id ?? null) !== originalCacheId)
++        throw new PublicationConflict('A newer engineering state has been saved.');
++      const pending = version.pending_publication;
++      if (pending && pending.token !== token && pending.fingerprint !== fingerprint &&
++          pending.design === stateDigest && Date.now() - pending.started_at < 30000)
++        throw new PublicationConflict('Another engineering publication is in progress.');
++      let cacheRecord = originalPointer
++        ? await publicationRow(service, version)
++        : pending?.cache_id ? await service.entities.ProjectAnalysisCache.get(pending.cache_id)
++        : await loadCacheRecord(service, projectId, versionId);
++      if (cacheRecord && (cacheRecord.project_id !== projectId || cacheRecord.version_id !== versionId ||
++          (cacheRecord.account_id && cacheRecord.account_id !== projectAccountId)))
++        throw new PublicationConflict('The engineering cache belongs to a different version.');
+ 
++      // The completed bass results a SAVED report still reads must survive the
++      // bounded retention below, so they are read here and protected explicitly:
++      // the fingerprint each saved report states, and the bass contract every stored
++      // publication in this row is backed by.
++      const reportCalculationFingerprints = await loadReportCalculationFingerprints(
++        service, projectId, versionId,
++      );
++      const protectedBassFingerprints = [
++        ...reportCalculationFingerprints,
++        ...collectPublicationBassFingerprints(cacheRecord),
++      ];
+ 
+-    // Idempotency check — if the fingerprint already exists, no duplicate.
+-    const existing = findPublication(cacheRecord, fingerprint);
+-
+-    // The immutable publication entry for a new fingerprint.
+-    const incomingPublication = {
+-      engineering_summary: engineeringSummary,
+-      ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
+-      engineering_fingerprint: fingerprint,
+-      published_at: new Date().toISOString(),
+-      engine_version: String(body?.engine_version ?? 'unknown'),
+-      rp22_version: String(body?.rp22_version ?? 'unknown'),
+-      algorithm_version: String(body?.algorithm_version ?? 'unknown'),
+-      publication_reason: String(body?.publication_reason ?? 'auto-settled'),
+-      provenance: (body?.provenance && typeof body.provenance === 'object') ? body.provenance : null,
+-      schema_version: PUBLICATION_SCHEMA_VERSION,
+-      publication_contract_version: body?.publication_contract_version,
+-    };
+-
+-    // ── RETAIN BASS GRAPH PAYLOAD WITH THE PUBLICATION ─────────────────────
+-    // The immutable publication must be self-contained for frozen report
+-    // rendering: copy the authoritative bass graphPayload (the SAME payload the
+-    // live bass result uses) into the publication at publish time. The bounded
+-    // completed_by_fingerprint map can later evict the matching contract; the
+-    // retained copy keeps the frozen report's P19 graph alive without
+-    // recalculation. Only attached when the contract's result fingerprint
+-    // matches the publication's own bass fingerprint — never an unrelated graph.
+-    // Attached to NEW publications only: an existing (idempotent) publication is
+-    // immutable and never enriched, so legacy publications keep no embedded graph.
+-    const bassFingerprintForEvidence = incomingPublication.provenance?.bass_fingerprint || null;
+-    if (bassFingerprintForEvidence) {
+-      const bassEvidence = resolveBassEvidenceForPublication(cacheRecord, bassFingerprintForEvidence);
+-      if (bassEvidence) incomingPublication.bass_evidence = bassEvidence;
+-    }
+-
+-    incomingPublication.parameter_index = buildAtomicParameterIndex(incomingPublication);
+-    const contract = auditPublicationContract(incomingPublication);
+-    if (reportSnapshot?.report_project?.project_id !== projectId || reportSnapshot?.report_project?.version_id !== versionId || reportSnapshot?.report_project?.version_name !== version.version_name) contract.missing.push('report_project version identity conflicts with selected version');
+-    if (cacheRecord?.current_fingerprint && incomingPublication.provenance?.bass_fingerprint !== cacheRecord.current_fingerprint) contract.missing.push('bass fingerprint conflicts with current selected-version authority');
+-    const existingAudit = existing ? auditPublicationContract(existing) : null;
+-    if (contract.missing.length || (existingAudit && !existingAudit.allowed)) {
+-      const missing = contract.missing.length ? contract.missing : existingAudit.missing;
+-      return Response.json({ error:'PUBLICATION_CONTRACT_FAILED', missing, message:missing.join('; ') }, { status:422 });
+-    }
+-    if (!cacheRecord) cacheRecord = await createCacheRecord(service, projectId, versionId, projectAccountId);
+-    let publication = existing || incomingPublication;
+-    let created = false;
+ 
+-    // ── ATOMICITY: Pointer-first write order ──────────────────────────
+-    //
+-    // Step 1: Write the ProjectVersion publication pointer FIRST.
+-    // If this fails, nothing was written — clean state, safe retry.
+-    // If it succeeds but Step 2 fails, the pointer references a
+-    // non-existent publication → readPublishedEngineering returns 'stale'
+-    // (recoverable on next publish). No orphan is possible.
+-    const versionPatch = {
+-      published_fingerprint: fingerprint,
+-      published_at: publication.published_at,
+-      published_engine_version: publication.engine_version,
+-      published_rp22_version: publication.rp22_version,
+-      published_algorithm_version: publication.algorithm_version,
+-      publication_reason: publication.publication_reason,
+-    };
+-    let updatedVersion = await service.entities.ProjectVersion.update(version.id, versionPatch);
++      // Idempotency check — if the fingerprint already exists, no duplicate.
++      const existing = findPublication(cacheRecord, fingerprint);
+ 
+-    // Step 2: Write the publication to the cache map (only if new).
+-    // If this fails, the pointer already references this fingerprint —
+-    // readPublishedEngineering returns 'stale' until the next publish
+-    // creates the publication. The next publish with the same fingerprint
+-    // will find no existing publication (Step 2 never completed) and
+-    // create it, at which point the pointer is already correct.
+-    if (created === false && !existing) {
+-      // We entered the else branch above but `created` was initialized to
+-      // false — this means we're about to create a new publication.
+-      created = true;
+-    }
++      // The immutable publication entry for a new fingerprint.
++      const incomingPublication = {
++        source_design_digest: stateDigest,
++        engineering_summary: engineeringSummary,
++        ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
++        engineering_fingerprint: fingerprint,
++        published_at: new Date().toISOString(),
++        engine_version: String(body?.engine_version ?? 'unknown'),
++        rp22_version: String(body?.rp22_version ?? 'unknown'),
++        algorithm_version: String(body?.algorithm_version ?? 'unknown'),
++        publication_reason: String(body?.publication_reason ?? 'auto-settled'),
++        provenance: (body?.provenance && typeof body.provenance === 'object') ? body.provenance : null,
++        schema_version: PUBLICATION_SCHEMA_VERSION,
++        publication_contract_version: body?.publication_contract_version,
++      };
+ 
+-    // ── BOUNDED RETENTION ──────────────────────────────────────────────
+-    // This map is rewritten, read back and returned on every publish. Left
+-    // unbounded it grew by a full publication (~0.5 MB) on every publish, so once
+-    // a version had published many times the request moved tens of megabytes and
+-    // the platform refused it — which the designer saw as a failed, unsaved
+-    // assessment. The map is therefore kept bounded: the publication this pointer
+-    // references is ALWAYS retained (it is the authority every report reads) plus
+-    // the most recent few. Anything removed is reported in the response as
+-    // `retention.pruned` and logged — never dropped silently.
+-    let retentionPruned: string[] = [];
+-    let completedPruned: string[] = [];
++      // ── RETAIN BASS GRAPH PAYLOAD WITH THE PUBLICATION ─────────────────────
++      // The immutable publication must be self-contained for frozen report
++      // rendering: copy the authoritative bass graphPayload (the SAME payload the
++      // live bass result uses) into the publication at publish time. The bounded
++      // completed_by_fingerprint map can later evict the matching contract; the
++      // retained copy keeps the frozen report's P19 graph alive without
++      // recalculation. Only attached when the contract's result fingerprint
++      // matches the publication's own bass fingerprint — never an unrelated graph.
++      // Attached to NEW publications only: an existing (idempotent) publication is
++      // immutable and never enriched, so legacy publications keep no embedded graph.
++      const bassFingerprintForEvidence = incomingPublication.provenance?.bass_fingerprint || null;
++      if (bassFingerprintForEvidence) {
++        const bassEvidence = resolveBassEvidenceForPublication(cacheRecord, bassFingerprintForEvidence);
++        if (bassEvidence) incomingPublication.bass_evidence = bassEvidence;
++      }
+ 
+-    if (existing) {
+-      // Immutable valid new-contract idempotency hit. Never enrich old authority.
+-      // The map is still bounded here, so a record bloated by earlier publishes
+-      // heals on the next publish instead of staying too large to write.
+-      const { publications: retained, pruned } = retainPublications(cacheRecord, fingerprint);
+-      // Superseded completed results are bounded in the SAME write, so a record
+-      // bloated by earlier publishes heals instead of staying too large to write.
+-      const completed = retainCompletedResults(cacheRecord, {
+-        keepFingerprint: cacheRecord.current_fingerprint,
+-        protectedFingerprints: protectedBassFingerprints,
+-      });
+-      if (pruned.length || completed.changed) {
+-        cacheRecord = await service.entities.ProjectAnalysisCache.update(
+-          cacheRecord.id,
+-          {
+-            engineering_publications: retained,
+-            ...(completed.changed ? { completed_by_fingerprint: completed.completed } : {}),
+-          },
+-        );
+-        retentionPruned = pruned;
+-        completedPruned = completed.pruned;
++      incomingPublication.parameter_index = buildAtomicParameterIndex(incomingPublication);
++      const contract = auditPublicationContract(incomingPublication);
++      if (reportSnapshot?.report_project?.project_id !== projectId || reportSnapshot?.report_project?.version_id !== versionId || reportSnapshot?.report_project?.version_name !== version.version_name) contract.missing.push('report_project version identity conflicts with selected version');
++      if (cacheRecord?.current_fingerprint && incomingPublication.provenance?.bass_fingerprint !== cacheRecord.current_fingerprint) contract.missing.push('bass fingerprint conflicts with current selected-version authority');
++      if (body.publication_reason === 'restore-previous-design' &&
++          (!existing?.source_design_digest || existing.source_design_digest !== stateDigest))
++        throw new PublicationConflict('The restored design requires a fresh settled assessment.');
++      const existingAudit = existing ? auditPublicationContract(existing) : null;
++      if (contract.missing.length || (existingAudit && !existingAudit.allowed)) {
++        const missing = contract.missing.length ? contract.missing : existingAudit.missing;
++        return Response.json({ error:'PUBLICATION_CONTRACT_FAILED', missing, message:missing.join('; ') }, { status:422 });
+       }
+-    } else {
+-      const { publications } = upsertPublication(cacheRecord, fingerprint, publication);
+-      const { publications: retained, pruned } = retainPublications(
+-        { engineering_publications: publications }, fingerprint,
+-      );
+-      const updatePayload = {
+-        engineering_publications: retained,
++      if (!cacheRecord) cacheRecord = await createCacheRecord(service, projectId, versionId, projectAccountId);
++      const publication = existing || incomingPublication;
++
++      const versionPatch = {
++        published_fingerprint: fingerprint,
++        published_at: publication.published_at,
++        published_engine_version: publication.engine_version,
++        published_rp22_version: publication.rp22_version,
++        published_algorithm_version: publication.algorithm_version,
++        publication_reason: publication.publication_reason,
+       };
+-      // The completed results are bounded in this same write. This is the row that
+-      // grows past the entity write limit, and a publish that cannot write the row
+-      // is a publish whose pointer ends up referencing a publication that was
+-      // never stored — an unsaved assessment the designer cannot explain.
++      const reservation = {token, fingerprint, cache_id:cacheRecord.id, design:stateDigest, started_at:Date.now()};
++      const versionGuard = {id:versionId, project_id:projectId, account_id:version.account_id ?? null,
++        design_state:version.design_state, version_name:version.version_name,
++        published_fingerprint:originalPointer, published_cache_record_id:originalCacheId};
++      const claim = await service.entities.ProjectVersion.updateMany(
++        {...versionGuard, updated_date:version.updated_date, pending_publication:pending ?? null},
++        {$set:{pending_publication:reservation}});
++      if (claim.updated !== 1) continue;
++      const merged = upsertPublication(cacheRecord, fingerprint, publication);
++      const retained = retainPublications({engineering_publications:merged.publications}, fingerprint);
++      if (originalPointer && merged.publications[originalPointer]) {
++        retained.publications[originalPointer] = merged.publications[originalPointer];
++      }
++      const retentionPruned = retained.pruned.filter(key => key !== originalPointer);
+       const completed = retainCompletedResults(cacheRecord, {
+-        keepFingerprint: cacheRecord.current_fingerprint,
+-        protectedFingerprints: protectedBassFingerprints,
++        keepFingerprint:cacheRecord.current_fingerprint,
++        protectedFingerprints:[...protectedBassFingerprints, publication.provenance?.bass_fingerprint].filter(Boolean),
+       });
+-      if (completed.changed) {
+-        updatePayload.completed_by_fingerprint = completed.completed;
+-        completedPruned = completed.pruned;
++      const completedPruned = completed.pruned;
++      const staged = await service.entities.ProjectAnalysisCache.updateMany({
++        id:cacheRecord.id, project_id:projectId, version_id:versionId, updated_date:cacheRecord.updated_date,
++        engineering_publications_revision:cacheRecord.engineering_publications_revision ?? null,
++      }, {$set:{engineering_publications:retained.publications, engineering_publications_revision:crypto.randomUUID(),
++        ...(!cacheRecord.account_id && projectAccountId ? {account_id:projectAccountId} : {}),
++        ...(completed.changed ? {completed_by_fingerprint:completed.completed} : {})}});
++      if (staged.updated !== 1) continue;
++
++      if (retentionPruned.length) {
++        console.warn(
++          `[publishEngineering] pruned ${retentionPruned.length} superseded publication(s) to keep the stored publication map bounded.`,
++        );
+       }
+-      // Stamp account_id if missing (legacy records)
+-      if (!cacheRecord.account_id && projectAccountId) {
+-        updatePayload.account_id = projectAccountId;
++      if (completedPruned.length) {
++        console.warn(
++          `[publishEngineering] pruned ${completedPruned.length} superseded completed bass result(s) to keep the stored row writable. The current result and every result a saved report reads are retained.`,
++        );
+       }
+-      cacheRecord = await service.entities.ProjectAnalysisCache.update(
+-        cacheRecord.id, updatePayload,
+-      );
+-      retentionPruned = pruned;
+-    }
+-    if (retentionPruned.length) {
+-      console.warn(
+-        `[publishEngineering] pruned ${retentionPruned.length} superseded publication(s) to keep the stored publication map bounded.`,
+-      );
+-    }
+-    if (completedPruned.length) {
+-      console.warn(
+-        `[publishEngineering] pruned ${completedPruned.length} superseded completed bass result(s) to keep the stored row writable. The current result and every result a saved report reads are retained.`,
+-      );
+-    }
+-
+-    // ── EXPLICIT ACKNOWLEDGEMENT ───────────────────────────────────────────
+-    // The caller confirms the durable write from the audit of the STORED
+-    // publication (read back by fingerprint) plus the version pointer — never
+-    // from the fact that this request returned. A report is only allowed to be
+-    // generated when this acknowledgement says durably_published.
+-    // Audit fresh database reads, never the submitted object or update response.
+-    const [storedVersion, storedCache] = await Promise.all([
+-      service.entities.ProjectVersion.get(versionId),
+-      service.entities.ProjectAnalysisCache.get(cacheRecord.id),
+-    ]);
+-    updatedVersion = storedVersion;
+-    cacheRecord = storedCache;
+-    const storedPublication = findPublication(storedCache, fingerprint);
+-    const audit = auditEngineeringPublication(storedPublication, {
+-      expectedFingerprint: fingerprint,
+-      project,
+-      bassAuthorityAvailable: Object.keys(cacheRecord?.completed_by_fingerprint || {}).length > 0,
+-    });
+ 
+-    return Response.json({
+-      publication: cleanPublicationForResponse(publication),
+-      created,
+-      version: {
+-        id: updatedVersion.id,
+-        version_name: version.version_name || null,
+-        published_fingerprint: updatedVersion.published_fingerprint,
+-        published_at: updatedVersion.published_at,
+-        published_engine_version: updatedVersion.published_engine_version,
+-        published_rp22_version: updatedVersion.published_rp22_version,
+-        published_algorithm_version: updatedVersion.published_algorithm_version,
+-        publication_reason: updatedVersion.publication_reason,
+-      },
+-      cache: cleanCacheRecordForResponse(cacheRecord),
+-      // Superseded publications removed to keep the stored map bounded. Reported
+-      // rather than silent: a version holds its current publication plus the most
+-      // recent few.
+-      retention: {
+-        recent_kept: PUBLICATION_RETENTION_RECENT,
+-        pruned: retentionPruned,
+-        pruned_count: retentionPruned.length,
+-        // Superseded completed bass results removed from the row, reported rather
+-        // than dropped silently. The current result and every result a saved
+-        // report still reads are always retained.
+-        pruned_completed: completedPruned,
+-        pruned_completed_count: completedPruned.length,
+-      },
+-      acknowledgement: {
+-        status: audit.status,
+-        durably_published: audit.durablyPublished === true && storedVersion?.published_fingerprint === fingerprint && !!storedVersion?.published_at,
+-        complete: audit.complete === true,
+-        fingerprint_matches: audit.fingerprintMatches === true,
+-        missing: audit.missing,
+-        publication_key: fingerprint,
+-      },
+-    });
++      // ── EXPLICIT ACKNOWLEDGEMENT ───────────────────────────────────────────
++      // The caller confirms the durable write from the audit of the STORED
++      // publication (read back by fingerprint) plus the version pointer — never
++      // from the fact that this request returned. A report is only allowed to be
++      // generated when this acknowledgement says durably_published.
++      // Audit fresh database reads, never the submitted object or update response.
++      const storedCache = await service.entities.ProjectAnalysisCache.get(cacheRecord.id);
++      const storedPublication = findPublication(storedCache, fingerprint);
++      const audit = auditEngineeringPublication(storedPublication, { expectedFingerprint:fingerprint, project,
++        bassAuthorityAvailable:Object.keys(storedCache?.completed_by_fingerprint || {}).length > 0 });
++      if (!audit.durablyPublished || storedCache.project_id !== projectId || storedCache.version_id !== versionId)
++        throw new PublicationConflict('Staged engineering evidence could not be verified.');
++      const commit = await service.entities.ProjectVersion.updateMany(
++        {...versionGuard, 'pending_publication.token':token},
++        {$set:{...versionPatch, published_cache_record_id:cacheRecord.id, pending_publication:null}});
++      if (commit.updated !== 1) continue;
++      const storedVersion = await service.entities.ProjectVersion.get(versionId);
++      if (storedVersion.published_cache_record_id !== cacheRecord.id || storedVersion.published_fingerprint !== fingerprint)
++        throw new PublicationConflict('A competing publication completed.');
++      cacheRecord = storedCache;
++      return Response.json({
++        publication: cleanPublicationForResponse(publication),
++        created: merged.created,
++        version: {
++          id: storedVersion.id,
++          version_name: version.version_name || null,
++          published_fingerprint: storedVersion.published_fingerprint,
++          published_cache_record_id: storedVersion.published_cache_record_id,
++          published_at: storedVersion.published_at,
++          published_engine_version: storedVersion.published_engine_version,
++          published_rp22_version: storedVersion.published_rp22_version,
++          published_algorithm_version: storedVersion.published_algorithm_version,
++          publication_reason: storedVersion.publication_reason,
++        },
++        cache: cleanCacheRecordForResponse(cacheRecord),
++        // Superseded publications removed to keep the stored map bounded. Reported
++        // rather than silent: a version holds its current publication plus the most
++        // recent few.
++        retention: {
++          recent_kept: PUBLICATION_RETENTION_RECENT,
++          pruned: retentionPruned,
++          pruned_count: retentionPruned.length,
++          // Superseded completed bass results removed from the row, reported rather
++          // than dropped silently. The current result and every result a saved
++          // report still reads are always retained.
++          pruned_completed: completedPruned,
++          pruned_completed_count: completedPruned.length,
++        },
++        acknowledgement: {
++          status: audit.status,
++          durably_published: audit.durablyPublished === true && storedVersion?.published_fingerprint === fingerprint && !!storedVersion?.published_at,
++          complete: audit.complete === true,
++          fingerprint_matches: audit.fingerprintMatches === true,
++          missing: audit.missing,
++          publication_key: fingerprint,
++        },
++      });
++    }
++    throw new PublicationConflict('Publication changed during three attempts. Retry from the saved design.');
+   } catch (error) {
++    if (error instanceof PublicationConflict) return Response.json({error:'PUBLICATION_CONFLICT',message:error.message},{status:409});
+     return Response.json({
+       error: 'PUBLISH_ENGINEERING_FAILED',
+       message: error?.message || 'Unable to publish engineering result.',
+diff --git a/base44/functions/readPublishedEngineering/entry.ts b/base44/functions/readPublishedEngineering/entry.ts
+index 98db1b5..f0552ce 100644
+--- a/base44/functions/readPublishedEngineering/entry.ts
++++ b/base44/functions/readPublishedEngineering/entry.ts
+@@ -1,9 +1,9 @@
++import { publicationRow, PublicationConflict } from "../../shared/publicationRow.js";
+ import { restorePublicationBassGraphEvidence } from '../../shared/bassEvidencePublication.js';
+ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+ import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
+ import {
+   loadOwnedProjectVersion,
+-  loadCacheRecord,
+   findPublication,
+   cleanPublicationForResponse,
+ } from '../../shared/publishedEngineeringAuthority.js';
+@@ -106,7 +106,7 @@ export default async function(req) {
+     }
+ 
+     // Load the cache record and find the publication
+-    const cacheRecord = await loadCacheRecord(service, projectId, versionId);
++    const cacheRecord = await publicationRow(service, version, fingerprint);
+     const publication = findPublication(cacheRecord, fingerprint);
+ 
+     if (!publication) {
+@@ -145,6 +145,7 @@ export default async function(req) {
+         version_name: version.version_name || null,
+         published_fingerprint: version.published_fingerprint || null,
+         published_at: version.published_at || null,
++        published_cache_record_id: version.published_cache_record_id ?? null,
+         published_engine_version: version.published_engine_version || null,
+         published_rp22_version: version.published_rp22_version || null,
+         published_algorithm_version: version.published_algorithm_version || null,
+@@ -153,6 +154,7 @@ export default async function(req) {
+       acknowledgement: acknowledgementFor(audit),
+     });
+   } catch (error) {
++    if (error instanceof PublicationConflict) return Response.json({status:'verification_unavailable', publication:null, message:error.message, acknowledgement:{durably_published:false}});
+     return Response.json({
+       error: 'READ_PUBLISHED_ENGINEERING_FAILED',
+       message: error?.message || 'Unable to read published engineering result.',
+diff --git a/base44/functions/recordReportReadinessIncident/entry.ts b/base44/functions/recordReportReadinessIncident/entry.ts
+index 2949ccf..dcf2446 100644
+--- a/base44/functions/recordReportReadinessIncident/entry.ts
++++ b/base44/functions/recordReportReadinessIncident/entry.ts
+@@ -1,5 +1,6 @@
+ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+ import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
++import { publicationRow } from '../../shared/publicationRow.js';
+ import { loadOwnedProjectVersion, loadCacheRecord, findPublication } from '../../shared/publishedEngineeringRead.js';
+ import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
+ 
+@@ -27,7 +28,7 @@ export default async function(req) {
+     let owned;
+     try { owned = await loadOwnedProjectVersion(base44.asServiceRole, projectId, versionId, access); }
+     catch (error) { return Response.json({ error: error.code || 'FORBIDDEN' }, { status: error.code === 'FORBIDDEN' ? 403 : 404 }); }
+-    const cache = await loadCacheRecord(base44.asServiceRole, projectId, versionId).catch(() => null);
++    const cache = await (owned.version.published_fingerprint ? publicationRow(base44.asServiceRole, owned.version) : loadCacheRecord(base44.asServiceRole, projectId, versionId)).catch(() => null);
+     const engineeringFingerprint = owned.version.published_fingerprint || null;
+     const publication = engineeringFingerprint ? findPublication(cache, engineeringFingerprint) : null;
+     if (code === 'REPORT_SAVED_EVIDENCE_REJECTED' && !engineeringFingerprint && !cache?.current_fingerprint) {
+diff --git a/base44/shared/proposalReportEvidenceReader.js b/base44/shared/proposalReportEvidenceReader.js
+index ec5b337..dd3cd81 100644
+--- a/base44/shared/proposalReportEvidenceReader.js
++++ b/base44/shared/proposalReportEvidenceReader.js
+@@ -30,7 +30,7 @@ import { readCapabilityFields } from './parameterCapabilityFields.js';
+ import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
+ import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
+ import { proposalEvidenceMoveIsSafe } from './designIdentityComparison.js';
+-import { loadCacheRecord } from './publishedEngineeringRead.js';
++import { verifiedPublicationRow, comparisonPublications } from './publicationRow.js';
+ 
+ /** The parameters a proposal must be able to state from a Technical Report. */
+ const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
+@@ -503,21 +503,6 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence,
+  * record states either publication is missing, or cannot read it at all: an
+  * absent comparison never excuses a report.
+  */
+-async function versionMoveIsPresentationOnly(authority, projectId, version, row) {
+-  const frozenFingerprint = row?.source_fingerprints?.engineeringFingerprint || null;
+-  const currentFingerprint = version?.published_fingerprint || null;
+-  if (!frozenFingerprint || !currentFingerprint || frozenFingerprint === currentFingerprint) return false;
+-  // Read through the SAME door the version's own published-engineering read uses
+-  // (readPublishedEngineering: loadCacheRecord + findPublication), so the two
+-  // publications compared here are the two the readiness card compares. Read as
+-  // the caller instead, the record was invisible whenever the row's own access
+-  // scope did not cover it — the comparison then answered "false" for a design
+-  // that had not changed at all, and this reader called the report stale while the
+-  // card above it read Current.
+-  const record = await loadCacheRecord(authority, projectId, version.id);
+-  if (!record) return false;
+-  return proposalEvidenceMoveIsSafe(record, { frozenFingerprint, currentFingerprint });
+-}
+ 
+ /**
+  * Every selected version's report evidence.
+@@ -535,6 +520,7 @@ export async function readProposalReportEvidence(entities, projectId, versions,
+   return Promise.all(versions.map(async (version) => {
+     if (!version?.id) throw new Error('A selected version could not be read. Reopen the project and try again.');
+ 
++    const currentRow = version.published_fingerprint ? await verifiedPublicationRow(authority, version) : null;
+     const reports = await entities.ReportSnapshot.filter(
+       { project_id: projectId, version_id: version.id, report_type: 'project' },
+       { sort: '-generated_at', limit: 50 },
+@@ -559,7 +545,10 @@ export async function readProposalReportEvidence(entities, projectId, versions,
+     // version that states no cache record, or whose publications cannot be
+     // compared, answers false and the strict verdict stands.
+     const presentationOnlyMove = reportSourceMovedPastVersion(projectRow, version)
+-      ? await versionMoveIsPresentationOnly(authority, projectId, version, projectRow)
++      ? proposalEvidenceMoveIsSafe(await comparisonPublications(authority, version, currentRow, projectRow), {
++          frozenFingerprint: projectRow?.source_fingerprints?.engineeringFingerprint,
++          currentFingerprint: version.published_fingerprint,
++        })
+       : false;
+ 
+     // Evidence only: each report's own machine-readable snapshot, or a block
+diff --git a/base44/shared/publicationRow.js b/base44/shared/publicationRow.js
+new file mode 100644
+index 0000000..e0ea324
+--- /dev/null
++++ b/base44/shared/publicationRow.js
+@@ -0,0 +1,69 @@
++import { auditEngineeringPublication } from './publicationGateAuthority.js';
++
++export class PublicationConflict extends Error {
++  constructor(message) { super(message); this.name = 'PublicationConflict'; }
++}
++
++export async function publicationRow(service, version, fingerprint = version.published_fingerprint) {
++  const entity = service.entities.ProjectAnalysisCache;
++  const scope = { project_id: version.project_id, version_id: version.id };
++  // Legacy cache rows may predate tenant stamping. Project ownership is checked
++  // by the caller and both project and version must match, including for get().
++  const owned = row => row && row.project_id === scope.project_id && row.version_id === scope.version_id &&
++    (!row.account_id || row.account_id === version.account_id);
++  const explicit = fingerprint === version.published_fingerprint && version.published_cache_record_id != null;
++  let row;
++  if (explicit) {
++    try {
++      row = await entity.get(version.published_cache_record_id);
++    } catch (error) {
++      if ((error?.status ?? error?.response?.status) !== 404) throw error;
++      throw new PublicationConflict('The committed engineering cache record is missing.');
++    }
++    if (!owned(row) || row.id !== version.published_cache_record_id)
++      throw new PublicationConflict('The committed engineering cache record could not be verified.');
++  } else {
++    for (let skip = 0;; skip += 25) {
++      const page = await entity.filter(scope, 'id', 25, skip);
++      const items = Array.isArray(page) ? page : page?.items;
++      if (!Array.isArray(items)) throw new PublicationConflict('Engineering cache lookup was incomplete.');
++      for (const item of items) {
++        if (!owned(item) || !Object.hasOwn(item.engineering_publications || {}, fingerprint)) continue;
++        if (row) throw new PublicationConflict('Multiple cache records claim this engineering fingerprint.');
++        row = item;
++      }
++      if (items.length < 25) break;
++    }
++  }
++  const entry = row?.engineering_publications?.[fingerprint];
++  if (!row || entry?.engineering_fingerprint !== fingerprint)
++    throw new PublicationConflict('Matching saved engineering evidence could not be verified.');
++  return row;
++}
++
++export async function verifiedPublicationRow(service, version, project) {
++  const row = await publicationRow(service, version);
++  const fp = version.published_fingerprint;
++  const audit = auditEngineeringPublication(row.engineering_publications[fp], {
++    expectedFingerprint: fp, project, bassAuthorityAvailable: Object.keys(row.completed_by_fingerprint || {}).length > 0,
++  });
++  if (!audit.durablyPublished) throw new PublicationConflict('The saved engineering evidence failed verification.');
++  return row;
++}
++
++// A frozen report can name an older publication in a different cache record.
++export async function comparisonPublications(service, version, currentRow, savedReport) {
++  const current = version?.published_fingerprint;
++  const frozen = savedReport?.source_fingerprints?.engineeringFingerprint;
++  if (!currentRow || !frozen || current === frozen) return currentRow;
++  try {
++    const row = await publicationRow(service, version, frozen);
++    return { engineering_publications: {
++      [current]: currentRow.engineering_publications[current],
++      [frozen]: row.engineering_publications[frozen],
++    }};
++  } catch (error) {
++    if (!(error instanceof PublicationConflict)) throw error;
++    return null;
++  }
++}
+diff --git a/base44/shared/publishedEngineeringRead.js b/base44/shared/publishedEngineeringRead.js
+index 2b5bd2d..669beff 100644
+--- a/base44/shared/publishedEngineeringRead.js
++++ b/base44/shared/publishedEngineeringRead.js
+@@ -211,6 +211,7 @@ export function cleanPublicationForResponse(publication) {
+   if (!publication) return null;
+   return {
+     publication_contract_version: publication.publication_contract_version ?? null,
++    source_design_digest: publication.source_design_digest ?? null,
+     parameter_index: publication.parameter_index ?? null,
+     engineering_summary: publication.engineering_summary ?? null,
+     // Optional presentation payload (rating envelope, seats, speakers,
+diff --git a/src/components/documentWorkflow/useDocumentWorkflowStatus.js b/src/components/documentWorkflow/useDocumentWorkflowStatus.js
+index 4947993..fe6c551 100644
+--- a/src/components/documentWorkflow/useDocumentWorkflowStatus.js
++++ b/src/components/documentWorkflow/useDocumentWorkflowStatus.js
+@@ -1,3 +1,4 @@
++import { readVerifiedPublicationMap } from "@/components/engineering/versionedEngineeringAuthority";
+ /**
+  * useDocumentWorkflowStatus
+  * --------------------------
+@@ -136,13 +137,11 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
+         // from the actual design rather than the fingerprint mismatch alone.
+         if (version?.id && fingerprint) {
+           try {
+-            const cachePage = await base44.entities.ProjectAnalysisCache.filter(
+-              { project_id: projectId, version_id: version.id },
+-              { sort: '-updated_date', limit: 1, fields: ['engineering_publications'] },
+-            );
+-            if (!cancelled) setAnalysisCache(asItems(cachePage)[0] || null);
++            const publications = await readVerifiedPublicationMap(projectId, version, asItems(exportPage));
++            if (!cancelled) setAnalysisCache({engineering_publications:publications});
+           } catch (error) {
+             if (!cancelled) {
++              setEngineeringFingerprint(null);
+               setAnalysisCache(null);
+               const httpStatus = Number(error?.response?.status || error?.status || 0);
+               setVerificationError(httpStatus
+diff --git a/src/components/engineering/versionedEngineeringAuthority.js b/src/components/engineering/versionedEngineeringAuthority.js
+index 862dc33..171eda2 100644
+--- a/src/components/engineering/versionedEngineeringAuthority.js
++++ b/src/components/engineering/versionedEngineeringAuthority.js
+@@ -112,7 +112,7 @@ export function fetchDurablePublication(
+         ...(engineeringFingerprint ? { engineering_fingerprint: engineeringFingerprint } : {}),
+       });
+       const data = response?.data || response || null;
+-      if (!data || data.error) {
++      if (!data || data.error || data.status === 'verification_unavailable') {
+         throw new Error(data?.message || data?.error || 'Saved engineering results could not be read.');
+       }
+       return {
+@@ -139,6 +139,9 @@ export function fetchDurablePublication(
+   })();
+ 
+   durablePublicationReads.set(key, read);
++  read.finally(() => {
++    if (durablePublicationReads.get(key) === read) durablePublicationReads.delete(key);
++  });
+   return read;
+ }
+ 
+@@ -330,4 +333,23 @@ export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot, final
+ /** Read the local handoff for a version (browser fast path). */
+ export function readLocalHandoff(projectId, versionId, options) {
+   return readDesignReviewHandoff(projectId, versionId, options);
+-}
+\ No newline at end of file
++}
++
++export async function readVerifiedPublicationMap(projectId, version, snapshots = []) {
++  const fingerprint = version.published_fingerprint;
++  if (!fingerprint) return {};
++  const current = await fetchDurablePublication(projectId, version.id, {force:true});
++  if (current?.acknowledgement?.durably_published !== true ||
++      current.publication?.engineering_fingerprint !== fingerprint ||
++      (version.published_cache_record_id != null && current.version?.published_cache_record_id !== version.published_cache_record_id))
++    throw new Error('Saved engineering evidence could not be verified.');
++  const publications = {[fingerprint]:current.publication};
++  const historical = new Set(snapshots.filter(item => item.version_id === version.id)
++    .map(item => item.source_fingerprints?.engineeringFingerprint).filter(key => key && key !== fingerprint));
++  await Promise.all(Array.from(historical, async key => {
++    const saved = await fetchDurablePublication(projectId, version.id, {engineeringFingerprint:key});
++    if (saved?.acknowledgement?.durably_published && saved.publication?.engineering_fingerprint === key)
++      publications[key] = saved.publication;
++  }));
++  return publications;
++}
+diff --git a/src/components/hooks/useP17SavedVersionComparison.jsx b/src/components/hooks/useP17SavedVersionComparison.jsx
+index 5c01f7a..f3c9e5c 100644
+--- a/src/components/hooks/useP17SavedVersionComparison.jsx
++++ b/src/components/hooks/useP17SavedVersionComparison.jsx
+@@ -1,3 +1,4 @@
++import { readVerifiedPublicationMap } from "@/components/engineering/versionedEngineeringAuthority";
+ /**
+  * useP17SavedVersionComparison.js
+  * -------------------------------
+@@ -53,21 +54,18 @@ export default function useP17SavedVersionComparison({ projectId, enabled = true
+         { project_id: projectId },
+         { sort: "version_number", limit: 5 },
+       );
+-      const savedVersions = versionResponse?.items || [];
++      const savedVersions = (Array.isArray(versionResponse) ? versionResponse : versionResponse?.items) || [];
+ 
+-      const cacheResponse = await base44.entities.ProjectAnalysisCache.filter(
+-        { project_id: projectId },
+-        { limit: 10 },
+-      );
+-      const cacheByVersionId = new Map((cacheResponse?.items || []).map((row) => [row.version_id, row]));
++      const cacheByVersionId = new Map(await Promise.all(savedVersions.map(async version =>
++        [version.id, await readVerifiedPublicationMap(projectId, version).catch(() => ({}))])));
+ 
+       const versions = P17_COMPARISON_VERSION_NAMES.map(({ key, fallbackLabel }) => {
+         const version = savedVersions.find((item) => String(item.version_name || "").toLowerCase().includes(key)) || null;
+         if (!version) return { label: fallbackLabel, status: "no_version", rows: [] };
+ 
+-        const publications = cacheByVersionId.get(version.id)?.engineering_publications || {};
++        const publications = cacheByVersionId.get(version.id) || {};
+         const fingerprint = version.published_fingerprint;
+-        const publication = (fingerprint && publications[fingerprint]) || latestPublication(publications);
++        const publication = (fingerprint && publications[fingerprint]) || null;
+         const summary = publication?.engineering_summary || null;
+ 
+         if (!summary) {
+diff --git a/src/components/hooks/useProjectLoader.jsx b/src/components/hooks/useProjectLoader.jsx
+index baaf4a8..0a61213 100644
+--- a/src/components/hooks/useProjectLoader.jsx
++++ b/src/components/hooks/useProjectLoader.jsx
+@@ -1481,6 +1481,7 @@ appState, // Pass appState directly for setters
+     projectName: projectNameState,
+     loadState,
+     autosaveStatus,
++    buildSharedProjectPayload,
+     handleSaveProject: manualSaveProject,
+     reloadProject
+   };
+diff --git a/src/components/proposal/engineeringAuthority/useEngineeringPublicationEffect.js b/src/components/proposal/engineeringAuthority/useEngineeringPublicationEffect.js
+index 1054767..d39e83d 100644
+--- a/src/components/proposal/engineeringAuthority/useEngineeringPublicationEffect.js
++++ b/src/components/proposal/engineeringAuthority/useEngineeringPublicationEffect.js
+@@ -111,6 +111,7 @@ export function useEngineeringPublicationEffect({
+   bassFingerprint,
+   ready,
+   minimumSystemMet,
++  expectedDesignState, saveStatus,
+   designState: assessmentDesignState,
+   bassReadiness,
+   retainedFromRefresh,
+@@ -202,6 +203,7 @@ export function useEngineeringPublicationEffect({
+       debounceTimerRef.current = null;
+     }
+ 
++    if (['dirty', 'saving', 'conflict', 'error', 'hydrating'].includes(saveStatus)) return;
+     if (!preflight.ready) {
+       recordPublicationAttempt(projectId, versionId, {
+         status: PUBLICATION_ATTEMPT.NOT_READY, fingerprint: engineeringFingerprint,
+@@ -282,6 +284,7 @@ export function useEngineeringPublicationEffect({
+         const response = await base44.functions.invoke('publishEngineering', {
+           project_id: projectId,
+           version_id: versionId,
++          expected_design_state: expectedDesignState,
+           engineering_summary: engineeringSummary,
+           engineering_fingerprint: engineeringFingerprint,
+           publication_contract_version: PUBLICATION_CONTRACT_VERSION,
+@@ -370,7 +373,7 @@ export function useEngineeringPublicationEffect({
+       // / FAILED if the backend responded. Either way the attempt never stays
+       // stranded in PUBLISHING.
+     };
+-  }, [projectId, versionId, ready, isPublishable, summaryKey, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence]);
++  }, [projectId, versionId, ready, isPublishable, summaryKey, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence, saveStatus, expectedDesignState]);
+ 
+   // The manual publish action, and the SAME action other surfaces ask for when a
+   // completed result is not yet published (the bass result band's "Publish
+@@ -380,6 +383,7 @@ export function useEngineeringPublicationEffect({
+   const publish = useCallback(() => {
+     // The same preflight as auto-publication: a manual click must explain a
+     // refused assessment immediately, never bypass it or silently do nothing.
++    if (['dirty', 'saving', 'conflict', 'error', 'hydrating'].includes(saveStatus)) return;
+     if (!preflight.ready) {
+       recordPublicationAttempt(projectId, versionId, {
+         status: PUBLICATION_ATTEMPT.NOT_READY, fingerprint: engineeringFingerprint,
+diff --git a/src/components/proposal/sourceAuthority/useProposalReadiness.js b/src/components/proposal/sourceAuthority/useProposalReadiness.js
+index 8be1b37..64d72a6 100644
+--- a/src/components/proposal/sourceAuthority/useProposalReadiness.js
++++ b/src/components/proposal/sourceAuthority/useProposalReadiness.js
+@@ -201,7 +201,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
+           )),
+           // The durable published-engineering read, one per selected version,
+           // shared with every other consumer of the authority (session-cached).
+-          Promise.all(ids.map((versionId) => runReadinessRead('published engineering', () => fetchDurablePublication(projectId, versionId)))),
++          Promise.all(ids.map((versionId) => runReadinessRead('published engineering', () => fetchDurablePublication(projectId, versionId, {force:true})))),
+           // The version's completed calculation authority — the calculated
+           // engineering result a Technical Report is generated from. Read
+           // through the same session-cached project read the report path uses.
+@@ -302,6 +302,10 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
+         const nextRows = ids.map((versionId, index) => {
+           const version = versionsById.get(versionId) || null;
+           const durable = durableReads[index] || null;
++          if (version?.published_fingerprint && (!durable?.acknowledgement?.durably_published ||
++              durable.publication?.engineering_fingerprint !== version.published_fingerprint ||
++              (version.published_cache_record_id != null && durable.version?.published_cache_record_id !== version.published_cache_record_id)))
++            throw new Error('The saved engineering evidence could not be verified.');
+           // THE canonical saved Project Report — the only report source a
+           // proposal is gated on. The legacy Visual and Technical Reports are
+           // never consulted here.
+diff --git a/src/components/room/bass/bda/bdaCheckpointAuthority.js b/src/components/room/bass/bda/bdaCheckpointAuthority.js
+index 5d40761..83019c3 100644
+--- a/src/components/room/bass/bda/bdaCheckpointAuthority.js
++++ b/src/components/room/bass/bda/bdaCheckpointAuthority.js
+@@ -358,9 +358,12 @@ async function repointEngineeringPublication(projectId, versionId, engineeringFi
+     // 2. Repoint via the idempotent publishEngineering path.
+     //    Pass the existing engineering_summary so the backend idempotent hit
+     //    ignores it and only updates the pointer.
+-    await base44.functions.invoke("publishEngineering", {
++    const response = await base44.functions.invoke("publishEngineering", {
+       project_id: projectId,
+       version_id: versionId,
++      expected_design_state: (await base44.entities.ProjectVersion.get(versionId)).design_state,
++      report_snapshot: readData.publication.report_snapshot,
++      publication_contract_version: readData.publication.publication_contract_version,
+       engineering_summary: readData.publication.engineering_summary,
+       engineering_fingerprint: engineeringFingerprint,
+       engine_version: readData.publication.engine_version || ENGINEERING_AUTHORITY_VERSION,
+@@ -372,9 +375,13 @@ async function repointEngineeringPublication(projectId, versionId, engineeringFi
+         instance_authority_version: INSTANCE_AUTHORITY_VERSION,
+         summary_schema_version: ENGINEERING_SUMMARY_SCHEMA_VERSION,
+         bass_fingerprint: bassFingerprint || null,
++        ...readData.publication.provenance,
+         restore: true,
+       },
+     });
++    const result = response?.data || response;
++    if (!result?.acknowledgement?.durably_published || result.version?.published_fingerprint !== engineeringFingerprint)
++      return { ok:false, reason:"publication-not-verified" };
+     return { ok: true };
+   } catch (err) {
+     return { ok: false, reason: "publish-failed", error: err?.message || String(err) };
+diff --git a/src/components/versions/useVersionDocumentStatus.js b/src/components/versions/useVersionDocumentStatus.js
+index d3dcaa8..d66e6eb 100644
+--- a/src/components/versions/useVersionDocumentStatus.js
++++ b/src/components/versions/useVersionDocumentStatus.js
+@@ -1,3 +1,4 @@
++import { readVerifiedPublicationMap } from "@/components/engineering/versionedEngineeringAuthority";
+ /**
+  * useVersionDocumentStatus
+  * ------------------------
+@@ -55,14 +56,9 @@ export function useVersionDocumentStatus({ projectId, enabled = false, versions
+           const cacheEntries = await Promise.all(
+             versionList.map(async (version) => {
+               try {
+-                const cachePage = await base44.entities.ProjectAnalysisCache.filter(
+-                  { project_id: projectId, version_id: version.id },
+-                  { limit: 1 },
+-                );
+-                const cache = asItems(cachePage)[0] || null;
+-                return [version.id, cache?.engineering_publications || null];
++                return [version.id, await readVerifiedPublicationMap(projectId, version, asItems(snapshotPage))];
+               } catch {
+-                return [version.id, null];
++                return [version.id, {}];
+               }
+             }),
+           );
+diff --git a/src/components/versions/versionDocumentStatus.js b/src/components/versions/versionDocumentStatus.js
+index 881eba7..88a27e6 100644
+--- a/src/components/versions/versionDocumentStatus.js
++++ b/src/components/versions/versionDocumentStatus.js
+@@ -141,7 +141,7 @@ export function deriveVersionDocumentStatus({
+       // from a confirmed design change — so the badge never reads "needs
+       // updating" for a document whose validity simply could not be checked.
+       let presentationOnlyMove = false;
+-      let verificationUnavailable = false;
++      let verificationUnavailable = !!currentFingerprint && !!publicationsFor(versionId) && !publicationsFor(versionId)[currentFingerprint];
+       if (currentFingerprint && savedFingerprint && savedFingerprint !== currentFingerprint) {
+         // Only upgrade to the canonical design-fact comparison when the
+         // version's engineering_publications are available. When they are not
+diff --git a/src/pages/RoomDesigner.jsx b/src/pages/RoomDesigner.jsx
+index ecbf2f5..29d340b 100644
+--- a/src/pages/RoomDesigner.jsx
++++ b/src/pages/RoomDesigner.jsx
+@@ -53,6 +53,7 @@ import { _isNum, _degToRad, _wrap180, _projectHalfExtent, _getDimsM } from "@/co
+ import { useFrontWideZones } from "@/components/hooks/useFrontWideZones";
+ import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
+ import { useAllSeatSplMetrics } from "@/components/hooks/useAllSeatSplMetrics";
++import { buildDesignState as buildPublicationSavedState } from "@/lib/versionAuthority";
+ import { useProjectLoader } from "@/components/hooks/useProjectLoader";
+ import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore";
+ import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
+@@ -1165,6 +1166,7 @@ function RoomDesignerWithState() {
+     projectName,
+     loadState,
+     autosaveStatus,
++    buildSharedProjectPayload,
+     handleSaveProject: triggerSaveProject,
+     reloadProject
+   } = useProjectLoader(    appState, // Pass appState here
+@@ -1958,6 +1960,8 @@ function RoomDesignerWithState() {
+     ready: loadState?.phase === "loaded"
+       && appState?.isProjectHydrationReady === true
+       && minimumSystemMet,
++    expectedDesignState: React.useMemo(() => buildPublicationSavedState(buildSharedProjectPayload()), [buildSharedProjectPayload]),
++    saveStatus: autosaveStatus,
+     designState: engineeringPublicationDesignState,
+     // Legacy P17 auto-refresh: the saved publication for this version, read by
+     // the same durable authority the report reads. When it still holds the
+diff --git a/test/data01-publication-reservation.test.mjs b/test/data01-publication-reservation.test.mjs
+new file mode 100644
+index 0000000..9202f20
+--- /dev/null
++++ b/test/data01-publication-reservation.test.mjs
+@@ -0,0 +1,201 @@
++import test, { after } from 'node:test';
++import assert from 'node:assert/strict';
++import { isDeepStrictEqual } from 'node:util';
++import { DatabaseSync } from 'node:sqlite';
++import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { build } from 'esbuild';
++
++const dir = mkdtempSync(join(tmpdir(), 'publication-acceptance-'));
++after(() => rmSync(dir, {recursive:true, force:true}));
++const producer = readFileSync('test/engineering-publication-producer-contract.test.mjs','utf8');
++const sample = JSON.parse(producer.match(/^const fixture=(.*);$/m)[1]);
++const projectId = 'fixture-project';
++const versionId = 'fixture-version';
++const accountId = 'fixture-account';
++const design = {layout:'original'};
++
++async function handler(name) {
++  const outfile = join(dir,name+'.mjs');
++  await build({entryPoints:['base44/functions/'+name+'/entry.ts'],outfile,bundle:true,format:'esm',platform:'node',
++    plugins:[{name:'test-boundaries',setup(plugin) {
++      plugin.onResolve({filter:/^npm:@base44\/sdk/},()=>({path:'sdk',namespace:'fixture'}));
++      plugin.onResolve({filter:/\/accountAccessAuthority.js$/},()=>({path:'access',namespace:'fixture'}));
++      plugin.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path === 'sdk'
++        ? 'export const createClientFromRequest=()=>globalThis.data01Client;'
++        : 'export const resolveAccountAccess=async (client,user)=>({user}); export const assertCapability=()=>{};'}));
++    }}]});
++  return (await import(outfile)).default;
++}
++const publish = await handler('publishEngineering');
++const read = await handler('readPublishedEngineering');
++const proposal = await handler('readProposalReportEvidence');
++
++function recordStore(t) {
++  const db = new DatabaseSync(join(dir,crypto.randomUUID()+'.sqlite'));
++  t.after(()=>db.close());
++  db.exec('CREATE TABLE records(kind TEXT,id TEXT,body TEXT,PRIMARY KEY(kind,id))');
++  const put = (kind,row)=>db.prepare('INSERT OR REPLACE INTO records VALUES(?,?,?)').run(kind,row.id,JSON.stringify(row));
++  const rows = kind=>db.prepare('SELECT body FROM records WHERE kind=? ORDER BY id').all(kind).map(r=>JSON.parse(r.body));
++  const matches = (row,query)=>Object.entries(query).every(([key,value])=>{
++    const actual=key.split('.').reduce((item,part)=>item?.[part],row) ?? null;
++    return value?.$in ? value.$in.includes(actual) : isDeepStrictEqual(actual,value ?? null);
++  });
++  const state = {put,rows,intercept:async()=>{},attempts:[]};
++  const entities = Object.fromEntries(['Project','ProjectVersion','ProjectAnalysisCache','ReportSnapshot'].map(kind=>[kind,{
++    filter: async (q,sort,limit=50,skip=0)=>{
++      const result=rows(kind).filter(row=>matches(row,q));
++      return sort && typeof sort==='object' ? {items:result.slice(0,sort.limit)} : result.slice(skip,skip+limit);
++    },
++    get:async id=>rows(kind).find(row=>row.id===id),
++    create:async fields=>{const row={...fields,id:crypto.randomUUID(),updated_date:'equal-time'};put(kind,row);return row;},
++    updateMany:async (q,patch)=>{
++      const phase = kind==='ProjectAnalysisCache'?'stage':patch.$set.pending_publication?'claim':'commit';
++      state.attempts.push(phase);
++      if (await state.intercept(phase,q,patch) === false) return {updated:0};
++      const matched=rows(kind).filter(row=>matches(row,q));
++      for (const row of matched) put(kind,{...row,...patch.$set});
++      return {updated:matched.length};
++    },
++  }]));
++  put('Project',{id:projectId,account_id:accountId});
++  put('ProjectVersion',{id:versionId,version_name:'Test',project_id:projectId,account_id:accountId,design_state:design,updated_date:'equal-time'});
++  put('ProjectAnalysisCache',{id:'row-a',project_id:projectId,version_id:versionId,account_id:accountId,updated_date:'equal-time',engineering_publications:{}});
++  globalThis.data01Client={entities,auth:{me:async()=>({account_id:accountId})},asServiceRole:{entities}};
++  return Object.assign(state,{entities,version:()=>rows('ProjectVersion')[0],cache:()=>rows('ProjectAnalysisCache')[0]});
++}
++function payload(fingerprint) {
++  const data=structuredClone(sample);
++  Object.assign(data.report_snapshot.report_project,{project_id:projectId,version_id:versionId,version_name:'Test'});
++  return {...data,engineering_fingerprint:fingerprint,project_id:projectId,version_id:versionId,expected_design_state:design};
++}
++async function call(fn,body) {
++  const res=await fn(new Request('https://fixture.invalid',{method:'POST',body:JSON.stringify(body)}));
++  return {status:res.status,data:await res.json()};
++}
++const current=()=>call(read,{project_id:projectId,version_id:versionId});
++async function save(fp) {
++  const r=await call(publish,payload(fp));
++  assert.equal(r.status,200,JSON.stringify(r.data).slice(0,600));
++  assert.equal(r.data.acknowledgement.durably_published,true);
++}
++function pauseAt(store,stage) {
++  const paused=Promise.withResolvers(),resume=Promise.withResolvers();
++  store.intercept=async phase=>{
++    if (phase===stage) {store.intercept=async()=>{};paused.resolve();await resume.promise;}
++  };
++  return {paused:paused.promise,resume:resume.resolve};
++}
++
++test('ordinary publication commits identity, initializes legacy revision and cold reads the pinned evidence',async t=>{
++  const s=recordStore(t);
++  await save('first');
++  assert.equal(s.version().published_cache_record_id,'row-a');
++  assert.equal(s.cache().engineering_publications.first.engineering_fingerprint,'first');
++  assert.ok(s.cache().engineering_publications_revision);
++  s.put('ProjectAnalysisCache',{...s.cache(),id:'row-b',updated_date:'later',engineering_publications:{}});
++  assert.equal((await current()).data.acknowledgement.durably_published,true);
++  s.put('ProjectVersion',{...s.version(),published_cache_record_id:'row-b'});
++  assert.equal((await current()).data.acknowledgement.durably_published,false);
++  s.put('ProjectVersion',{...s.version(),published_cache_record_id:null});
++  assert.equal((await current()).data.acknowledgement.durably_published,true);
++});
++test('equal-time competing publishers and retention retain current and staged evidence during commit',async t=>{
++  const s=recordStore(t);
++  await save('previous');
++  const map=s.cache().engineering_publications;
++  for(let i=0;i<6;i++) map['old'+i]={published_at:'2099-01-01'};
++  s.put('ProjectAnalysisCache',{...s.cache(),engineering_publications:map});
++  const gate=pauseAt(s,'commit');
++  const writing=call(publish,payload('incoming'));
++  await gate.paused;
++  const other=await call(publish,payload('competing'));
++  assert.equal(other.status,409);
++  assert.equal(s.version().published_fingerprint,'previous');
++  assert.ok(s.cache().engineering_publications.previous);
++  assert.ok(s.cache().engineering_publications.incoming);
++  gate.resume();assert.equal((await writing).status,200);
++  assert.equal((await current()).data.publication.engineering_fingerprint,'incoming');
++});
++test('design save between stage and commit rejects superseded calculation',async t=>{
++  const s=recordStore(t);await save('previous');
++  const gate=pauseAt(s,'commit');
++  const writing=call(publish,payload('older'));await gate.paused;
++  s.put('ProjectVersion',{...s.version(),design_state:{layout:'revised'}});
++  gate.resume();assert.equal((await writing).status,409);
++  assert.equal((await current()).data.publication.engineering_fingerprint,'previous');
++  const subsequent=payload('revised');subsequent.expected_design_state={layout:'revised'};
++  assert.equal((await call(publish,subsequent)).status,200);
++});
++for (const phase of ['stage','commit']) test('interruption before '+phase+' preserves current and permits recovery',async t=>{
++  const s=recordStore(t);await save('previous');
++  s.intercept=async point=>{if(point===phase)throw Error('interrupted');};
++  assert.equal((await call(publish,payload('next'))).status,500);
++  assert.equal((await current()).data.publication.engineering_fingerprint,'previous');
++  assert.equal(Boolean(s.cache().engineering_publications.next),phase==='commit');
++  s.intercept=async()=>{};await save('next');
++  assert.equal(s.version().pending_publication,null);
++});
++test('expired reservation permits another calculation; resumed stale stage cannot erase its commit',async t=>{
++  const s=recordStore(t);await save('original');
++  const gate=pauseAt(s,'stage');const late=call(publish,payload('abandoned'));await gate.paused;
++  const v=s.version();v.pending_publication.started_at-=60000;s.put('ProjectVersion',v);
++  await save('replacement');gate.resume();assert.equal((await late).status,409);
++  assert.equal((await current()).data.publication.engineering_fingerprint,'replacement');
++});
++test('map nonce guards equal timestamps, conflicts remerge, retry budget ends at three',async t=>{
++  const s=recordStore(t);
++  s.intercept=async phase=>{
++    if(phase!=='stage')return;
++    s.intercept=async()=>{};
++    const row=s.cache();row.engineering_publications.guarded={published_at:'2025-01-01'};
++    row.engineering_publications_revision=crypto.randomUUID();s.put('ProjectAnalysisCache',row);
++  };
++  await save('first');assert.ok(s.cache().engineering_publications.guarded);
++  assert.equal(s.attempts.filter(x=>x==='stage').length,2);
++  s.attempts.length=0;s.intercept=async phase=>phase!=='stage';
++  assert.equal((await call(publish,payload('never'))).status,409);
++  assert.equal(s.attempts.filter(x=>x==='stage').length,3);
++  assert.equal((await current()).data.publication.engineering_fingerprint,'first');
++});
++test('a shared physical room edit at commit must also supersede the captured calculation',async t=>{
++  const s=recordStore(t);
++  const room=sample.report_snapshot.report_project;
++  const project={...s.rows('Project')[0],roomDims:room.roomDims,room_width:room.room_width,room_length:room.room_length,room_height:room.room_height};
++  s.put('Project',project);
++  await save('previous');
++  const gate=pauseAt(s,'commit');
++  const writing=call(publish,payload('older-room'));await gate.paused;
++  const width=project.room_width+1;
++  s.put('Project',{...project,room_width:width,roomDims:JSON.stringify({...JSON.parse(project.roomDims),widthM:width})});
++  gate.resume();
++  const response=await writing;
++  assert.deepEqual({status:response.status,pointer:s.version().published_fingerprint},{status:409,pointer:'previous'});
++});
++
++test('proposal evidence verifies the same committed row as the report and refuses an invalid explicit reference',async t=>{
++  const s=recordStore(t);
++  const {projectEvidence,savedProjectReport,ENGINEERING_FP} = await import('./fixtures/proposalReadinessFixtures.mjs');
++  await save(ENGINEERING_FP);
++  const evidence=projectEvidence({versionId});
++  evidence.identity.project_id=projectId;
++  for(const number of [12,13,18,19,20]) {
++    const source=evidence.parameter_index[number<18?'P4':'P14'];
++    const key='P'+number;
++    const entry={...source,key,parameter_id:number};
++    evidence.parameter_index[key]=entry;
++    evidence.parameters.push(entry);
++  }
++  const snapshot=savedProjectReport({versionId,evidence});
++  s.put('ReportSnapshot',{...snapshot,id:'report',project_id:projectId});
++  s.put('ProjectAnalysisCache',{...s.cache(),id:'row-b',engineering_publications:{}});
++  const request={project_id:projectId,version_ids:[versionId]};
++  const good=await call(proposal,request);
++  assert.equal(good.status,200,JSON.stringify(good.data).slice(0,500));
++  assert.equal(good.data.snapshots[0].engineeringState,'current');
++  assert.equal((await current()).data.publication.engineering_fingerprint,ENGINEERING_FP);
++  s.put('ProjectVersion',{...s.version(),published_cache_record_id:'row-b'});
++  assert.equal((await call(proposal,request)).status,409);
++  assert.equal((await current()).data.acknowledgement.durably_published,false);
++});
