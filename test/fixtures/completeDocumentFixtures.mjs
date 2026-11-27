@@ -38,13 +38,21 @@ export function completeFixture({ alternatives = true, historical = false } = {}
     created_at: '2026-10-11T12:00:00Z', status: 'valid_generated', record_fingerprint: 'fixture-record',
     evidence_pack: pack, evidence_pack_fingerprint: pack.pack_fingerprint, gpt_input: input, gpt_output: output,
     validation_result: historical ? { valid: true } : validateWriterOutput({ input, output }) };
-  // The section records a GENERATION creates. Real generation (generateProposal)
-  // writes order_index as the canonical position of each section type, so a
-  // freshly generated proposal opens in canonical order. The fixture mirrors
-  // that: the writer's own compose order is the body order, but the stored
-  // order_index is the canonical rank, exactly as generation writes it. A
-  // shuffled database read therefore still resolves to canonical publication
-  // order, and a dealer who later reorders has their saved order_index honoured.
+  return buildFixtureRecords({ output, alternatives, historical, guidance, generation, pack });
+}
+
+/**
+ * The section records a GENERATION creates. Real generation (generateProposal)
+ * writes order_index as the canonical position of each section type — it creates
+ * the section records from the report type's own section definitions, in their
+ * canonical order, so a freshly generated proposal opens in canonical order
+ * however a later database read returns the rows. The current fixture mirrors
+ * that exactly: the writer's own compose order is the body order, but the stored
+ * order_index is the canonical rank. A shuffled database read therefore still
+ * resolves to canonical publication order, and a dealer who later reorders has
+ * their saved order_index honoured.
+ */
+function buildFixtureRecords({ output, alternatives, historical, guidance, generation, pack }) {
   const canonicalRank = new Map(
     canonicalSectionTypes('comparison').map((type, i) => [type, i]),
   );
@@ -53,6 +61,56 @@ export function completeFixture({ alternatives = true, historical = false } = {}
     section_type: body.section_type, section_key: body.section_type, title: body.section_type,
     body: body.html, is_enabled: true, order_index: rankOf(body.section_type, i), dealer_notes: '', metadata: {} }));
   if (!alternatives || historical) sections.push({ id: 'empty-options', section_type: 'presented_options', body: '', is_enabled: false, order_index: rankOf('presented_options', 9) });
+  const proposal = { id: 'fixture-proposal', project_id: 'project', status: 'generated', proposal_type: 'comparison',
+    selected_version_ids: ['a', 'b'], engineering_snapshot: { available: true, identity: { projectId: 'project', versionId: 'a' }, system: {} } };
+  return { proposal, sections, generationRecords: [generation], editRecords: [], optionGuidance: guidance };
+}
+
+/**
+ * The LEGACY fixture, retained as a compatibility test. The original fixture
+ * wrote order_index as the writer's own compose order (the index the writer
+ * emitted each body in), not the canonical rank real generation writes. No
+ * production proposal is generated that way today; this fixture is kept so the
+ * ordering authority is proven to honour a deliberately-saved non-canonical
+ * order rather than silently re-imposing the canonical sequence — the same
+ * behaviour a dealer's own reorder relies on. It is the unchanged original
+ * fixture, exposed under its own name so the current fixture can represent
+ * current generation instead.
+ */
+export function legacyCompleteFixture({ alternatives = true, historical = false } = {}) {
+  const pack = buildProposalEvidence({ versions: twoOptions(), generatedAt: '2026-10-11T12:00:00Z' });
+  const guidance = alternatives ? { groups: [{ group: 'Seating style', options: ['Lounge seating', 'Cinema recliners'], note: PRIVATE_NOTE }] } : null;
+  const input = buildWriterInput({ pack, optionGuidance: guidance });
+  const output = validDraft(input);
+  const seen = new Set();
+  output.sections.forEach((row, index) => {
+    const sentences = row.text.split(/(?<=[.!?])\s+/).filter(sentence => {
+      if (sentence.trim().split(/\s+/).length < 10) return true;
+      if (seen.has(sentence)) return false;
+      seen.add(sentence);
+      return true;
+    });
+    row.text = sentences.join(' ') || `The accompanying report records this design area (${index + 1}).`;
+  });
+  output.sections.find(row => row.section === 'appendix_notes').text = 'See the accompanying Project Report for detailed source evidence.';
+  output.sections.find(row => row.section === 'presented_options').text = alternatives ? OPTIONS_COPY : '';
+  if (historical) {
+    input.contract_version = 1;
+    input.section_requirements = input.section_requirements.filter(row => row.section !== 'presented_options');
+    output.contract_version = 1;
+    output.sections = output.sections.filter(row => row.section !== 'presented_options');
+    input.option_guidance = { groups: [] };
+  }
+  const generation = { generation_id: 'fixture-generation-legacy', generation_number: 1, proposal_id: 'fixture-proposal', project_id: 'project',
+    created_at: '2026-10-11T12:00:00Z', status: 'valid_generated', record_fingerprint: 'fixture-record-legacy',
+    evidence_pack: pack, evidence_pack_fingerprint: pack.pack_fingerprint, gpt_input: input, gpt_output: output,
+    validation_result: historical ? { valid: true } : validateWriterOutput({ input, output }) };
+  // The original order_index: the writer's own compose position, exactly as the
+  // first version of this fixture wrote it. Deliberately NOT the canonical rank.
+  const sections = composeWriterSectionBodies({ output, mode: 'comparison' }).bodies.map((body, i) => ({ id: `legacy-section-${i}`, proposal_id: 'fixture-proposal',
+    section_type: body.section_type, section_key: body.section_type, title: body.section_type,
+    body: body.html, is_enabled: true, order_index: i, dealer_notes: '', metadata: {} }));
+  if (!alternatives || historical) sections.push({ id: 'legacy-empty-options', section_type: 'presented_options', body: '', is_enabled: false, order_index: 9 });
   const proposal = { id: 'fixture-proposal', project_id: 'project', status: 'generated', proposal_type: 'comparison',
     selected_version_ids: ['a', 'b'], engineering_snapshot: { available: true, identity: { projectId: 'project', versionId: 'a' }, system: {} } };
   return { proposal, sections, generationRecords: [generation], editRecords: [], optionGuidance: guidance };

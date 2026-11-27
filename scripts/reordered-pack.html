@@ -1,0 +1,1349 @@
+<div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:802:4" data-dynamic-content="true" class="proposal-print-portal" data-selected-images="[&quot;https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/704681f3e_Image21.png&quot;,&quot;https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/0f8e408f5_Image.png&quot;,&quot;https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/ce1af49e2_Image3.png&quot;,&quot;https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/1bb41c1d9_Image6.png&quot;,&quot;https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/f2d9994aa_Image9.png&quot;]" data-collection-id="blocks"><style data-source-location="src/components/proposal/print/ProposalPackStyles.jsx:23:4" data-dynamic-content="true">
+      .proposal-print-portal {
+        --pp-ink: #1B1A1A;
+        --pp-paper: #FFFFFF;
+        --pp-surface: #F8F8F7;
+        --pp-surface-2: #F1F0EE;
+        --pp-rule: #DCDBD6;
+        --pp-stone: #C1B6AD;
+        --pp-warm: #625143;
+        --pp-brown: #4A230F;
+        --pp-green: #213428;
+        --pp-slate: #3E4349;
+        --pp-heading: var(--report-font-heading, &quot;Futura PT Light&quot;, &quot;Century Gothic&quot;, sans-serif);
+        --pp-body: var(--report-font-body, &quot;Didact Gothic&quot;, &quot;Century Gothic&quot;, sans-serif);
+
+        /* ── ONE SECTION SPACING RHYTHM ─────────────────────────────────────
+           Every sheet of the pack is composed to these four steps, so the space
+           around a section is one deliberate decision rather than a value tuned
+           per section:
+
+             --pp-gap-section   a paragraph → the next major section&#x27;s eyebrow
+             --pp-gap-eyebrow   the eyebrow (&quot;The Sound Experience&quot;) → the heading
+             --pp-gap-rule      the heading → the rule that closes it
+             --pp-gap-divider   that rule → the content it introduces
+
+           Each step is applied as PADDING on the block that FOLLOWS it, so the
+           gap is part of that block&#x27;s own measured height: a sheet allocation
+           can never close it up, and copy that runs a line longer, wraps
+           differently, or a photograph taller than expected simply pushes what
+           follows further down the sheet. Nothing here is positioned absolutely
+           and no gap is ever compressed to keep a composition on one sheet: a
+           composition that no longer fits continues on the next sheet instead. */
+        --pp-gap-section: 14mm;
+        --pp-gap-eyebrow: 6mm;
+        --pp-gap-rule: 4mm;
+        --pp-gap-divider: 10mm;
+      }
+
+      /* ── Page header: number, kicker, tracked title, lead, rule. The rule is
+         followed by a generous gap, so the body of every page sits placed rather
+         than pushed up under the heading. ── */
+      .proposal-print-portal .pp-header {
+        margin: 0 0 14mm;
+      }
+      .proposal-print-portal .pp-header__meta {
+        display: flex;
+        align-items: baseline;
+        gap: 4mm;
+        margin-bottom: 5mm;
+      }
+      .proposal-print-portal .pp-header__number {
+        font-family: var(--pp-heading) !important;
+        font-size: 9pt !important;
+        letter-spacing: 0.18em !important;
+        color: var(--pp-warm) !important;
+      }
+      .proposal-print-portal .pp-header__kicker {
+        font-family: var(--pp-heading) !important;
+        font-size: 8pt !important;
+        letter-spacing: 0.22em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-stone) !important;
+      }
+      .proposal-print-portal .pp-header__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 20pt !important;
+        font-weight: 300 !important;
+        letter-spacing: 0.08em !important;
+        line-height: 1.2 !important;
+        text-transform: uppercase !important;
+        color: var(--pp-ink) !important;
+        margin: 0 !important;
+      }
+      .proposal-print-portal .pp-header__lead {
+        font-family: var(--pp-body) !important;
+        font-size: 11pt !important;
+        line-height: 1.55 !important;
+        color: var(--pp-slate) !important;
+        margin: 4mm 0 0 !important;
+        max-width: 150mm;
+      }
+      .proposal-print-portal .pp-header__rule {
+        height: 1px;
+        background: var(--pp-rule);
+        margin-top: 7mm;
+      }
+
+      /* ── Fact cards ── */
+      .proposal-print-portal .pp-cards {
+        display: grid;
+        gap: 4mm;
+      }
+      .proposal-print-portal .pp-cards--3 { grid-template-columns: repeat(3, 1fr); }
+      .proposal-print-portal .pp-cards--2 { grid-template-columns: repeat(2, 1fr); }
+      .proposal-print-portal .pp-card {
+        background: var(--pp-surface);
+        border: 1px solid var(--pp-rule);
+        padding: 4.5mm 5mm;
+        min-width: 0;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-card--wide { grid-column: 1 / -1; }
+      .proposal-print-portal .pp-card__label {
+        font-family: var(--pp-heading) !important;
+        font-size: 7.5pt !important;
+        letter-spacing: 0.2em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+      }
+      .proposal-print-portal .pp-card__value {
+        font-family: var(--pp-body) !important;
+        font-size: 11pt !important;
+        line-height: 1.3 !important;
+        color: var(--pp-ink) !important;
+        margin-top: 2.5mm;
+        /* A value that states several facts (the speaker families) keeps its
+           own line breaks; every other value stays on one line. */
+        white-space: pre-line;
+        overflow-wrap: normal;
+      }
+      .proposal-print-portal .pp-card__hint {
+        font-family: var(--pp-body) !important;
+        font-size: 8.5pt !important;
+        line-height: 1.4 !important;
+        color: var(--pp-slate) !important;
+        margin-top: 1.8mm;
+      }
+
+      /* ── At a glance: the fact groups and their headings ── */
+      .proposal-print-portal .pp-facts-group {
+        margin-top: 7mm;
+      }
+      .proposal-print-portal .pp-facts-group__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 8.5pt !important;
+        letter-spacing: 0.2em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-green) !important;
+        margin: 0 0 3mm !important;
+      }
+      /* A card stating two labelled figures (the screen) holds both on one line
+         rather than wrapping mid-phrase. */
+      .proposal-print-portal .pp-card--span2 { grid-column: span 2; }
+
+      /* Reading flow: nothing that introduces content is left alone at the foot
+         of a page, a table header never prints without its rows, and a paragraph
+         never splits into a stranded line. A section too long for its page is
+         shortened in its copy, not allowed to overflow. */
+      .proposal-print-portal .pp-header,
+      .proposal-print-portal .pp-block__title,
+      .proposal-print-portal .pp-facts-group__title,
+      .proposal-print-portal .pp-decision__title,
+      .proposal-print-portal .pp-body &gt; h1,
+      .proposal-print-portal .pp-body &gt; h2,
+      .proposal-print-portal .pp-body &gt; h3 { break-after: avoid; page-break-after: avoid; }
+      .proposal-print-portal .pp-body { orphans: 3; widows: 3; }
+      /* The evidence table continues between whole rows when it needs a second
+         sheet — never as a heading with no rows under it. The table&#x27;s own header
+         repeats on the continuation, and no row is ever cut. */
+      .proposal-print-portal .kph-table thead { break-after: avoid; page-break-after: avoid; }
+      .proposal-print-portal .kph-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .proposal-print-portal .pp-highlights__intro { break-after: avoid; page-break-after: avoid; }
+      .proposal-print-portal .pp-decision { break-inside: avoid; page-break-inside: avoid; }
+      .proposal-print-portal .pp-decision__title { font-family: var(--pp-heading); font-size: 9pt; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-warm); margin: 0 0 2mm; }
+      .proposal-print-portal .pp-decision__choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; break-inside: avoid; }
+      .proposal-print-portal .pp-decision__choice-item { border-top: 2px solid var(--pp-green); padding-top: 3mm; break-inside: avoid; }
+      .proposal-print-portal .pp-decision__choice-item dt { font-family: var(--pp-heading); font-size: 8pt; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-warm); margin: 0; }
+      .proposal-print-portal .pp-decision__choice-item dd { margin: 1.5mm 0 0; font-family: var(--pp-body); font-size: 10pt; line-height: 1.35; color: var(--pp-ink); }
+      .proposal-print-portal .pp-decision__same { margin-top: 6mm; }
+      .proposal-print-portal .pp-comparison-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; break-inside: avoid; }
+      .proposal-print-portal .pp-comparison-option { border-top: 2px solid var(--pp-green); padding-top: 4mm; }
+      .proposal-print-portal .pp-comparison-option__row { padding: 1.8mm 0; border-bottom: 1px solid var(--pp-rule); }
+      .proposal-print-portal .pp-comparison-option__row dt { font-family: var(--pp-heading); font-size: 7.5pt; color: var(--pp-warm); }
+      .proposal-print-portal .pp-comparison-option__row dd { margin: 1mm 0 0; font-family: var(--pp-body); font-size: 10pt; line-height: 1.25; color: var(--pp-ink); }
+
+      /* ── Metric (evidence) cards ── */
+      .proposal-print-portal .pp-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4mm;
+        margin-top: 7mm;
+      }
+      .proposal-print-portal .pp-metric {
+        background: var(--pp-paper);
+        border: 1px solid var(--pp-rule);
+        border-left: 3px solid var(--pp-green);
+        padding: 5mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-metric__parameter {
+        font-family: var(--pp-heading) !important;
+        font-size: 8pt !important;
+        letter-spacing: 0.16em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+      }
+      .proposal-print-portal .pp-metric__result {
+        font-family: var(--pp-heading) !important;
+        font-size: 17pt !important;
+        font-weight: 300 !important;
+        letter-spacing: 0.04em !important;
+        color: var(--pp-ink) !important;
+        margin-top: 2.5mm;
+      }
+      .proposal-print-portal .pp-metric__gain {
+        font-family: var(--pp-body) !important;
+        font-size: 9pt !important;
+        line-height: 1.45 !important;
+        color: var(--pp-slate) !important;
+        margin-top: 3mm;
+      }
+
+      /* ── Tables ── */
+      .proposal-print-portal .pp-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 4mm;
+      }
+      .proposal-print-portal .pp-table th {
+        text-align: left;
+        font-family: var(--pp-heading) !important;
+        font-size: 8pt !important;
+        letter-spacing: 0.16em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+        background: var(--pp-surface) !important;
+        padding: 3mm !important;
+        border-bottom: 1px solid var(--pp-rule);
+      }
+      .proposal-print-portal .pp-table td {
+        font-family: var(--pp-body) !important;
+        font-size: 10pt !important;
+        color: var(--pp-slate) !important;
+        padding: 3mm !important;
+        border-bottom: 1px solid var(--pp-surface-2);
+        vertical-align: top;
+      }
+      .proposal-print-portal .pp-table__strong { color: var(--pp-ink) !important; }
+      .proposal-print-portal .pp-table tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-table thead { display: table-header-group; }
+      /* The At a Glance package table: the same table, set compactly, so the
+         system package shares the glance page with the fact cards instead of
+         pushing the page over and leaving a sheet half empty. */
+      .proposal-print-portal .pp-table--compact {
+        table-layout: fixed;
+        margin-top: 3mm;
+      }
+      .proposal-print-portal .pp-table--compact th {
+        padding: 1.8mm 3mm !important;
+        font-size: 7.5pt !important;
+      }
+      .proposal-print-portal .pp-table--compact td {
+        padding: 1.8mm 3mm !important;
+        font-size: 9pt !important;
+        line-height: 1.35 !important;
+      }
+      .proposal-print-portal .pp-table--compact tr:last-child td { border-bottom: none; }
+
+      /* ── Blocks, notes, chips ── */
+      .proposal-print-portal .pp-block {
+        margin-top: 8mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-block__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 10pt !important;
+        letter-spacing: 0.16em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-green) !important;
+        margin: 0 0 2mm !important;
+      }
+      .proposal-print-portal .pp-notes { margin-top: 7mm; }
+      .proposal-print-portal .pp-note {
+        margin: 4mm 0 0 !important;
+        padding: 4mm 5mm !important;
+        background: var(--pp-surface-2) !important;
+        border-left: 3px solid var(--pp-warm);
+        font-family: var(--pp-body) !important;
+        font-size: 9.5pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-slate) !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-note__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 8.5pt !important;
+        letter-spacing: 0.14em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-green) !important;
+        margin-bottom: 2mm;
+      }
+      .proposal-print-portal .pp-note__text {
+        margin: 0 !important;
+        font-family: var(--pp-body) !important;
+        font-size: 9.5pt !important;
+        color: var(--pp-slate) !important;
+      }
+      .proposal-print-portal .pp-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2mm;
+      }
+      .proposal-print-portal .pp-chip {
+        border: 1px solid var(--pp-rule);
+        background: var(--pp-paper);
+        padding: 1.8mm 3mm;
+        font-family: var(--pp-body) !important;
+        font-size: 8.5pt !important;
+        color: var(--pp-slate) !important;
+      }
+
+      /* ── Method: what makes great cinema sound ──
+         An editorial grid rather than three narrow columns. Every row states one
+         quality: its heading and opening sentence in the left column, the
+         explanation beside it in the right, on one alignment for the whole page
+         so the eye reads down the labels and across the prose. Generous space
+         between rows and a clear three-level hierarchy: heading, opening
+         sentence, explanation. Green is spent twice only, on the row headings
+         and on the closing rule, and nothing is decorative. ── */
+      .proposal-print-portal .pp-page--method .pp-header {
+        margin-bottom: 5mm;
+      }
+      .proposal-print-portal .pp-page--method .pp-header__rule {
+        margin-top: 6mm;
+      }
+      .proposal-print-portal .pp-method__intro {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6mm;
+        margin-bottom: 5mm;
+      }
+      .proposal-print-portal .pp-method__intro p {
+        font-family: var(--pp-body) !important;
+        font-size: 11pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-slate) !important;
+        margin: 0 !important;
+      }
+      .proposal-print-portal .pp-method__row {
+        display: grid;
+        grid-template-columns: 50mm 1fr;
+        gap: 6mm;
+        border-top: 1px solid var(--pp-rule);
+        padding-top: 3mm;
+        margin-top: 3.5mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-method__row:first-child {
+        margin-top: 0;
+      }
+      .proposal-print-portal .pp-method__heading {
+        font-family: var(--pp-heading) !important;
+        font-size: 9.5pt !important;
+        font-weight: 300 !important;
+        letter-spacing: 0.12em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-green) !important;
+        margin: 0 !important;
+      }
+      .proposal-print-portal .pp-method__lede {
+        font-family: var(--pp-heading) !important;
+        font-size: 11pt !important;
+        line-height: 1.3 !important;
+        color: var(--pp-ink) !important;
+        margin: 2.5mm 0 0 !important;
+      }
+      .proposal-print-portal .pp-method__body {
+        min-width: 0;
+        font-family: var(--pp-body) !important;
+        font-size: 9pt !important;
+        line-height: 1.42 !important;
+        color: var(--pp-slate) !important;
+      }
+      .proposal-print-portal .pp-method__body p {
+        margin: 0 0 2.2mm !important;
+      }
+      .proposal-print-portal .pp-method__body p:last-child {
+        margin-bottom: 0 !important;
+      }
+      /* The closing statement is the page&#x27;s own conclusion rather than a fourth
+         quality: a heavier green rule separates it, and it is set a size larger
+         than the explanations, in the page&#x27;s own ink colour. */
+      .proposal-print-portal .pp-method__row--closing {
+        border-top: 2px solid var(--pp-green);
+        padding-top: 4.5mm;
+        margin-top: 3mm;
+      }
+      .proposal-print-portal .pp-method__row--closing .pp-method__body {
+        font-size: 10pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-ink) !important;
+      }
+      .proposal-print-portal .pp-method__row--closing .pp-method__body p {
+        margin-bottom: 3mm !important;
+      }
+
+      /* ── Image pages: the hero image leads, with deliberate space above and
+         below it, and the supporting images sit under it rather than beside it.
+         ── */
+      .proposal-print-portal .pp-gallery {
+        margin-top: 6mm;
+      }
+      /* A gallery of the designer&#x27;s own photographs reads as one full-width
+         column, and the gap between photographs is the only spacing in it. That
+         keeps the measured sheet and the printed sheet identical whatever the
+         sheet carries: one photograph, or two that genuinely fit together. */
+      .proposal-print-portal .pp-gallery--natural {
+        display: flex;
+        flex-direction: column;
+        gap: 8mm;
+      }
+      .proposal-print-portal .pp-gallery__hero {
+        margin: 0 0 8mm;
+      }
+      .proposal-print-portal .pp-gallery__support {
+        margin-bottom: 2mm;
+      }
+
+      /* ── A sheet of the designer&#x27;s supporting images ──────────────────────
+         The images the designer marked Detail or Cropped Detail are supporting
+         evidence, never the page hero. The sheet composes them at the supporting
+         share of the content column, side by side, each shown whole at its own
+         proportions and each keeping its own caption. A detail is never promoted
+         to the full content width, and a sheet that genuinely cannot hold its
+         details is continued rather than resized against the choice. */
+      .proposal-print-portal .pp-gallery--supporting {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6mm;
+        margin-top: 6mm;
+      }
+      .proposal-print-portal .pp-gallery--supporting .pp-gallery__figure--supporting {
+        width: 40%;
+        flex: 0 0 40%;
+        margin: 0;
+      }
+      .proposal-print-portal .pp-page--images .pp-header {
+        margin-bottom: 6mm;
+      }
+
+      /* ── Editorial image ── */
+      .proposal-print-portal .pp-editorial {
+        margin: 8mm 0 0;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-editorial img {
+        display: block;
+        width: 100%;
+        height: 88mm;
+        object-fit: cover;
+        background: var(--pp-surface);
+      }
+
+      /* ── Prose column: never a full-width wall of text. One type scale for
+         every narrative page, so no section reads narrower, larger or tighter
+         than its neighbour. ── */
+      .proposal-print-portal {
+        --pp-body-size: 11pt;
+        --pp-body-leading: 1.55;
+        --pp-paragraph-gap: 4.2mm;
+      }
+      .proposal-print-portal .pp-body {
+        max-width: 148mm;
+        font-family: var(--pp-body) !important;
+        font-size: var(--pp-body-size) !important;
+        line-height: var(--pp-body-leading) !important;
+        color: var(--pp-slate) !important;
+      }
+      .proposal-print-portal .pp-body &gt; *:first-child { margin-top: 0; }
+      .proposal-print-portal .pp-body p {
+        margin: 0 0 var(--pp-paragraph-gap) !important;
+      }
+      .proposal-print-portal .pp-body p:last-child { margin-bottom: 0 !important; }
+      .proposal-print-portal .pp-body h2,
+      .proposal-print-portal .pp-body h3 {
+        margin: 0 0 3mm !important;
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+
+      /* ── The Design Overview / Why This Specification page ──
+         The System Design Summary continues on its second sheet with Design
+         Overview and Why This Specification, and at the pack&#x27;s default paragraph
+         gap those paragraphs grouped too tightly: each block&#x27;s own heading sat
+         directly against the last line of the block above it. On THIS page the
+         paragraph rhythm is 6mm — the leading inside a paragraph, the type size
+         and the wording are untouched — and the step between the two blocks is
+         one deliberate 10mm, the same step the pack already uses between two
+         compositions, so the second heading is never crowded by the first
+         block&#x27;s last paragraph.
+         Scoped to this page&#x27;s own copy: every other sheet keeps the pack&#x27;s single
+         paragraph rhythm, so nothing else is re-paginated. Both sections stay on
+         one A4 sheet, which measurement at the pack&#x27;s own type metrics confirms
+         with room to spare. */
+      .proposal-print-portal .pp-page--system_design_summary [data-editorial-composition=&quot;continuing&quot;] .pp-body p {
+        margin: 0 0 6mm !important;
+      }
+      .proposal-print-portal .pp-page--system_design_summary [data-editorial-composition=&quot;continuing&quot;] .pp-body p:last-child {
+        margin-bottom: 0 !important;
+      }
+      .proposal-print-portal .pp-page--system_design_summary [data-editorial-composition=&quot;continuing&quot;] .pp-body + .pp-body {
+        margin-top: 10mm;
+      }
+
+      /* ── Editorial flow: sections that share a sheet ──
+         Consecutive narrative sections are composed into one sheet frame, so a
+         short structure section continues under the section before it instead of
+         taking a sheet of its own. The section that opens the sheet carries the
+         page number; a section continuing on it keeps its own heading and
+         hierarchy without stating a second number on the same sheet. */
+      .proposal-print-portal .pp-page--flow .pp-header {
+        margin-bottom: 10mm;
+      }
+      /* A section continuing on a sheet the section before it opened is still a
+         NEW major section, so it takes the full section step above it. The step
+         is padding, not a margin: the gap is then part of the block that is
+         measured, so a sheet allocation can never place the heading against the
+         copy above it, and a longer paragraph above pushes it further down
+         instead of crowding it. */
+      .proposal-print-portal .pp-header--continued {
+        margin-top: 0;
+        padding-top: var(--pp-gap-section);
+      }
+      .proposal-print-portal .pp-header--continued .pp-header__title {
+        font-size: 15pt !important;
+      }
+      .proposal-print-portal .pp-header--continued .pp-header__rule {
+        margin-top: 5mm;
+      }
+
+      /* ── Editorial compositions ──
+         A section&#x27;s copy is composed in the blocks the document reads it in: the
+         opening composition carries the section&#x27;s own heading, the photograph that
+         leads it and its first block, and the rest of the copy continues in one
+         further composition. They are measured as one unit each, so a sheet break
+         can only fall between them — never midway through a paragraph — and the
+         space between two compositions that do share a sheet reads as one
+         deliberate step. */
+      .proposal-print-portal .pp-composition {
+        display: flow-root;
+      }
+      .proposal-print-portal .pp-composition + .pp-composition {
+        margin-top: 10mm;
+      }
+
+      /* ── The three design structures: ONE connected editorial section ──
+         Spatial Resolution, Dynamic Range and Timbre Matching are read as one
+         account under one shared heading. One hierarchy and one rhythm: the shared
+         heading, then each structure&#x27;s own heading and its complete explanation,
+         then the photograph that supports it. The structures are the same editorial
+         weight as each other, so none of them reads as an unrelated page. */
+      /* The group opens a major section of the sheet, so it takes the full
+         section step above it — wherever it follows something on the sheet it
+         shares. The step is padding on the group itself, so it is measured with
+         the group and can never be closed up by an allocation; where the group
+         opens a sheet of its own, the sheet&#x27;s own top margin is the space above
+         it and no second gap is added. */
+      .proposal-print-portal .pp-pillars:not(:first-child) {
+        padding-top: var(--pp-gap-section);
+      }
+      /* The eyebrow that names the group, and the controlled step down to the
+         heading it introduces. */
+      .proposal-print-portal .pp-pillars__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 9pt !important;
+        font-weight: 300 !important;
+        letter-spacing: 0.24em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+        margin: 0 0 var(--pp-gap-eyebrow) !important;
+        padding-bottom: 3mm;
+        border-bottom: 1px solid var(--pp-rule);
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+      /* A structure&#x27;s own heading inside the group: the step above it is the one
+         the boundary already carries, and the heading keeps the group&#x27;s own
+         step down to its rule and then to the copy the rule introduces — the
+         same three steps as every other section of the pack. */
+      .proposal-print-portal .pp-pillar .pp-header--continued {
+        margin-top: 0;
+        padding-top: 0;
+      }
+      .proposal-print-portal .pp-pillar .pp-header {
+        margin-bottom: var(--pp-gap-divider);
+      }
+      .proposal-print-portal .pp-pillar .pp-header__title {
+        font-size: 14pt !important;
+      }
+      .proposal-print-portal .pp-pillar .pp-header__rule {
+        margin-top: 4mm;
+      }
+      /* Structures after the first are separated by space alone. The structure
+         above has already finished a complete explanation and the next one opens
+         with its own heading, so a hairline across the boundary drew a line under
+         the copy rather than dividing anything. The gap is padding, never a
+         margin: it is part of the measured height of the structure it introduces,
+         so the allocation can never place a structure against the space above it,
+         and it is the same on every boundary so the group keeps one rhythm. */
+      .proposal-print-portal .pp-pillar + .pp-pillar {
+        margin-top: 0;
+        padding-top: 11mm;
+      }
+      .proposal-print-portal .pp-pillar .pp-body {
+        max-width: 148mm;
+      }
+      /* The photograph that supports a structure&#x27;s explanation follows it, at a
+         deliberate distance. Padding, not a margin and never a negative offset:
+         the gap is measured with the photograph, so a sheet break can neither
+         close it up nor let the two touch. */
+      .proposal-print-portal .pp-pillar .pp-media {
+        margin-top: 0;
+        padding-top: 10mm;
+      }
+      /* The accent that stands BESIDE the first paragraph is not a photograph
+         following an explanation, so the distance above is not its to take: it
+         shares the copy&#x27;s own vertical start and the two columns begin on the
+         same line. The row is top-aligned (flex-start), the copy column&#x27;s first
+         child carries no top margin, and this accent carries no margin or
+         padding of its own — so the top of the photograph and the top of the
+         first paragraph are one and the same line. Nothing about the frame is
+         touched: width, height, flex share and the focal crop are unchanged, so
+         no source is stretched or distorted. */
+      .proposal-print-portal .pp-pillar .pp-media-row .pp-media {
+        margin-top: 0;
+        padding-top: 0;
+      }
+
+      /* ── Closing note ──
+         A short factual source note closes the page it belongs to instead of
+         taking a sheet of its own for a few sentences. */
+      .proposal-print-portal .pp-endnote {
+        margin-top: 9mm;
+        padding-top: 5mm;
+        border-top: 1px solid var(--pp-rule);
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-endnote__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 7.5pt !important;
+        letter-spacing: 0.2em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+        margin: 0 0 2mm !important;
+      }
+      .proposal-print-portal .pp-endnote__body {
+        max-width: 148mm;
+        font-family: var(--pp-body) !important;
+        font-size: 9.5pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-slate) !important;
+      }
+      .proposal-print-portal .pp-endnote__body p {
+        margin: 0 0 2.5mm !important;
+      }
+      .proposal-print-portal .pp-endnote__body p:last-child {
+        margin-bottom: 0 !important;
+      }
+
+      /* ── Print page behaviour ──
+         One authority for every print page break (proposalPageBreakRules.js): a
+         heading always keeps the first block that belongs to it, a designed block
+         or table is never split, a fact group stays with its own heading, a table
+         never starts a page away from the heading it belongs to, and each
+         one-page section — At a Glance, Key Performance Highlights, an imagery
+         page — is read as one thing. Nothing is left carrying a heading alone and
+         no page is stranded by a block pushed onto the next. */
+      @media print {
+        /* Each designed page begins on a new sheet. */
+        body.proposal-export-mode .proposal-print-portal .pp-page {
+          break-before: page;
+          page-break-before: always;
+        }
+
+        /* The first content page follows the cover, which breaks the page itself. */
+        body.proposal-export-mode .proposal-print-portal .proposal-print-cover + .pp-page {
+          break-before: auto;
+          page-break-before: auto;
+        }
+
+        /* No orphaned headings: a title always keeps the block that follows it. */
+        body.proposal-export-mode .proposal-print-portal .pp-header,
+        body.proposal-export-mode .proposal-print-portal .pp-header__title,
+        body.proposal-export-mode .proposal-print-portal .pp-header__lead,
+        body.proposal-export-mode .proposal-print-portal .pp-block__title,
+        body.proposal-export-mode .proposal-print-portal .pp-facts-group__title,
+        body.proposal-export-mode .proposal-print-portal .pp-decision__title,
+        body.proposal-export-mode .proposal-print-portal .pp-method__heading,
+        body.proposal-export-mode .proposal-print-portal .pp-pillars__title,
+        body.proposal-export-mode .proposal-print-portal .pp-body &gt; h1,
+        body.proposal-export-mode .proposal-print-portal .pp-body &gt; h2,
+        body.proposal-export-mode .proposal-print-portal .pp-body &gt; h3 {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* Oversized paragraphs retain three lines on either side of an unavoidable break. */
+        body.proposal-export-mode .proposal-print-portal .pp-body,
+        body.proposal-export-mode .proposal-print-portal .pp-body p {
+          orphans: 3;
+          widows: 3;
+        }
+
+        /* Move a complete paragraph to the next sheet; fragment only when it exceeds an entire printable sheet. */
+        body.proposal-export-mode .proposal-print-portal .pp-body p,
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section__body p {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* An image between a section heading and its opening paragraph must not break that reading chain. */
+        body.proposal-export-mode .proposal-print-portal .pp-header + .pp-media {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* The complete closing note stays together, attached to the final table row. */
+        body.proposal-export-mode .proposal-print-portal .kph-table__note {
+          break-before: avoid;
+          page-break-before: avoid;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* Move the final row with its note instead of creating a note-only continuation sheet. */
+        body.proposal-export-mode .proposal-print-portal .kph-table tbody:last-of-type &gt; tr:last-child {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* A fact group, card grid or structure row is never split from its heading. */
+        body.proposal-export-mode .proposal-print-portal .pp-facts-group,
+        body.proposal-export-mode .proposal-print-portal .pp-cards,
+        body.proposal-export-mode .proposal-print-portal .pp-metrics,
+        body.proposal-export-mode .proposal-print-portal .pp-decision__choice,
+        body.proposal-export-mode .proposal-print-portal .pp-comparison-options {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* A designed block is never split down the middle of a page. */
+        body.proposal-export-mode .proposal-print-portal .pp-block,
+        body.proposal-export-mode .proposal-print-portal .pp-table,
+        body.proposal-export-mode .proposal-print-portal .pp-editorial,
+        body.proposal-export-mode .proposal-print-portal .pp-card,
+        body.proposal-export-mode .proposal-print-portal .pp-metric,
+        body.proposal-export-mode .proposal-print-portal .pp-note,
+        body.proposal-export-mode .proposal-print-portal .pp-method__row,
+        body.proposal-export-mode .proposal-print-portal .pp-decision,
+        body.proposal-export-mode .proposal-print-portal .pp-endnote {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* A table header never prints without the rows it belongs to. */
+        body.proposal-export-mode .proposal-print-portal .pp-table thead,
+        body.proposal-export-mode .proposal-print-portal .kph-table thead {
+          break-after: avoid;
+          page-break-after: avoid;
+          display: table-header-group;
+        }
+
+        /* A row is one statement and is never cut in half. */
+        body.proposal-export-mode .proposal-print-portal .pp-table tr,
+        body.proposal-export-mode .proposal-print-portal .kph-table tr {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* The evidence summary starts with the heading it belongs to and is never divided across two sheets. */
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section--highlights .pp-header,
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section--highlights .pp-highlights__intro,
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section--highlights .kph-table,
+        body.proposal-export-mode .proposal-print-portal .pp-body + .pp-table {
+          break-before: avoid;
+          page-break-before: avoid;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* At a Glance and an imagery page are each kept whole. */
+        body.proposal-export-mode .proposal-print-portal .pp-page--glance,
+        body.proposal-export-mode .proposal-print-portal .pp-page--glance .pp-facts-group,
+        body.proposal-export-mode .proposal-print-portal .pp-page--glance .pp-table,
+        body.proposal-export-mode .proposal-print-portal .pp-table--compact,
+        body.proposal-export-mode .proposal-print-portal .pp-page--images,
+        body.proposal-export-mode .proposal-print-portal .pp-gallery,
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__figure,
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__support,
+        body.proposal-export-mode .proposal-print-portal .pp-page--highlights,
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section--highlights,
+        body.proposal-export-mode .proposal-print-portal .proposal-print-section--highlights .kph-table {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* A narrative sheet filled by consecutive sections, and the evidence page whose rows continue, may run onto a further sheet — always whole blocks on it, never a heading left holding a sheet of its own. */
+        body.proposal-export-mode .proposal-print-portal .pp-page--flow {
+          break-inside: auto;
+          page-break-inside: auto;
+        }
+
+        /* A section continuing on a sheet another section opened keeps its heading with the copy that follows it. */
+        body.proposal-export-mode .proposal-print-portal .pp-header--continued {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* The At a Glance package table is set compactly, so its page is never pushed over. */
+        body.proposal-export-mode .proposal-print-portal .pp-page--glance .pp-table--compact {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* ── Project Images — image-led, one dominant image per page ── */
+        body.proposal-export-mode .proposal-print-portal .pp-page--images {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__figure {
+          margin: 0;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__figure img {
+          display: block;
+          width: 100%;
+          object-fit: cover;
+          background: var(--pp-surface-2);
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__caption {
+          margin: 1.5mm 0 0 !important;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__support {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6mm;
+        }
+        /* The supporting images keep their own proportions on the sheet: they are
+           shown whole at the supporting share of the content width, never cropped
+           to a fixed frame and never promoted to the full width. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--supporting {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--supporting .pp-gallery__figure--supporting {
+          width: 40%;
+          flex: 0 0 40%;
+          margin: 0;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--supporting .pp-gallery__figure--supporting img {
+          width: 100%;
+          height: auto;
+          max-height: 74mm;
+          object-fit: contain;
+          background: transparent;
+        }
+        /* The image heights are a page budget, not a preference: the page frame
+           is 297mm with 12mm above and 14mm below, the heading takes about 30mm,
+           and what is left is shared out so the hero image is 55 to 65 per cent
+           of the image area and nothing is ever pushed onto a second page. */
+        /* Three images: a full-width hero image with two supporting images below
+           it. The hero is the subject of the page and keeps deliberate space
+           under it; the two supporting images sit beneath it without competing. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__hero img {
+          height: 132mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__support img {
+          height: 84mm;
+        }
+        /* Four images: the hero image full width, with three supporting images
+           in one row beneath it. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--4 .pp-gallery__hero img {
+          height: 128mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--4 .pp-gallery__support {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--4 .pp-gallery__support img {
+          height: 68mm;
+        }
+        /* Two images: a dominant image with one supporting image below it. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__hero img {
+          height: 150mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__support {
+          grid-template-columns: 1fr;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__support img {
+          height: 56mm;
+        }
+        /* One image: it is the page. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--1 .pp-gallery__hero img {
+          height: 200mm;
+        }
+        /* The natural gallery keeps that gap whatever it carries, so a sheet that
+           carries a single photograph is composed to the same measurement the
+           compositor allocated it by. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--natural {
+          gap: 8mm;
+        }
+      }
+    </style><style data-source-location="src/components/proposal/print/ProposalImagePlacementStyles.jsx:24:4" data-dynamic-content="false">
+      /* ── Shared treatment ───────────────────────────────────────────────
+         The image fills its frame and the crop follows the focal point, so a
+         landscape source never has to be re-exported to sit in a portrait
+         accent. ── */
+      .pp-media {
+        margin: 0 0 6mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .pp-media img {
+        display: block;
+        width: 100%;
+        object-fit: cover;
+        background: #F1F0EE;
+      }
+      .pp-media__caption {
+        margin: 2mm 0 0;
+        font-family: var(--pp-body, &quot;Didact Gothic&quot;, &quot;Century Gothic&quot;, sans-serif);
+        font-size: 9pt;
+        line-height: 1.45;
+        color: #625143;
+      }
+      /* ── The portrait editorial accent, beside the copy ── */
+      .pp-media-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 6mm;
+      }
+      .pp-media-row__copy {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .pp-media--portrait {
+        flex: 0 0 38%;
+        max-width: 38%;
+        margin: 0;
+      }
+      .pp-media--portrait img { height: 62mm; }
+
+      /* ── An inline detail image beside the copy ──────────────────────────
+         The same copy-and-image row the portrait accent uses, so an inline
+         detail sits with the paragraphs it supports rather than in a card beside
+         them. The frame follows the image&#x27;s own proportions and nothing is
+         cropped, so a dimensioned drawing keeps every dimension, label and
+         annotation it carries. The row keeps its established keep-together
+         rule.
+
+         The image takes the SUPPORTING share of the content column — the same
+         share the portrait accent takes, about 38 per cent, and never the whole
+         column — so a detail reads as supporting evidence rather than as a
+         second hero beside the copy. The selector carries the class twice so it
+         outranks the standalone detail treatment&#x27;s own width wherever the two
+         disagree. ── */
+      .pp-media-row .pp-media.pp-media--presentation-detail,
+      .pp-media-row .pp-media.pp-media--presentation-cropped-detail {
+        flex: 0 0 38%;
+        max-width: 38%;
+        width: 38%;
+      }
+      /* ── No card around an inline detail image ───────────────────────────
+         A detail beside the copy sits on the page as an editorial image: no
+         frame, no border, no background box and no padding around it. Its label
+         stays beneath it, as the quiet caption it already is.
+
+         The frame follows the image&#x27;s own proportions — height: auto — so the
+         top of the frame and the top of the photograph are one and the same
+         line, and that line is the first line of the copy beside it: the two
+         columns begin together and the picture is never letterboxed down away
+         from the text. Nothing is stretched: object-fit keeps the image whole.
+
+         The selector carries the class twice so it outranks the fixed accent
+         height a detail may inherit from the role it landed on, and the hairline
+         frame the standalone treatment draws, whatever the order of the sheet. */
+      .pp-pillar .pp-media-row .pp-media.pp-media--presentation-detail img {
+        height: auto;
+        border: 0;
+        background: transparent;
+      }
+      .pp-media-row .pp-media--presentation-detail img {
+        height: auto;
+        max-height: 84mm;
+      }
+      .pp-media-row .pp-media--presentation-cropped-detail img { height: 52mm; }
+
+      /* ── The Spatial Resolution accent carries more vertical presence ──
+         The right-hand photograph beside the Spatial Resolution copy is about
+         20% taller than the standard portrait accent (74mm → 89mm on the sheet),
+         so it reads with the copy it supports instead of sitting beside it as a
+         small card. ONLY the height changes: the frame&#x27;s width, the focal crop
+         and object-fit: cover are untouched, so the source keeps its proportions,
+         nothing is stretched, and the taller window shows more of the photograph
+         rather than cropping it further. The other structures&#x27; portraits and the
+         Timbre Matching feature are unchanged. */
+      .pp-pillar[data-editorial-section=&quot;spatial_resolution&quot;] .pp-media--portrait img { height: 62mm; }
+
+      /* ── The seating-style page ── */
+      .pp-seating {
+        margin-top: 6mm;
+      }
+      .pp-seating .pp-media { margin: 0 0 6mm; }
+      .pp-media--seating img { height: 56mm; }
+      .pp-seating__lead { margin: 0 0 4mm !important; }
+
+      /* ── The comparison page ────────────────────────────────────────────
+         Two options read together: both at the full width of the content
+         column and at one visual scale, so the client compares them directly
+         rather than reading two small boxes. ── */
+      .pp-comparison { margin-top: 6mm; }
+      .pp-comparison .pp-media { margin: 0 0 6mm; }
+      .pp-comparison .pp-media:last-child { margin-bottom: 0; }
+      .pp-comparison__lead { margin: 0 0 5mm !important; }
+      .pp-media--comparison img { height: 56mm; }
+
+      /* ── The designer&#x27;s presentation choice ──────────────────────────────
+         Three modes, and the difference between them is the permission to
+         crop, not a style. The selectors carry two classes so they outrank the
+         role treatments above whatever the order: an image the designer has
+         marked as a detail is never cropped, even on a role that normally
+         crops to a fixed frame height.
+
+         FULL WIDTH   the prominent editorial image: the full content width and
+                      the existing landscape weight, unchanged.
+         DETAIL       smaller and whole. The frame takes the image&#x27;s own aspect
+                      ratio (height: auto, object-fit: contain), so nothing is
+                      cropped, nothing is stretched and a dimensioned drawing
+                      keeps every dimension, label and annotation it carries.
+                      The caption stays attached beneath it.
+         CROPPED DETAIL  smaller and cropped, framed on the image&#x27;s own focal
+                      point, which is the one mode where the focal controls
+                      apply. ── */
+      .pp-media.pp-media--presentation-full-width { width: 100%; }
+      /* The supporting share of the content column: about 40 per cent, so a
+         detail reads as supporting evidence beside the copy rather than as a
+         second hero. It is never the full content width. */
+      .pp-media.pp-media--presentation-detail,
+      .pp-media.pp-media--presentation-cropped-detail {
+        width: 40%;
+        max-width: 40%;
+        margin-bottom: 6mm;
+      }
+      .pp-media.pp-media--presentation-detail img {
+        height: auto;
+        max-height: 82mm;
+        object-fit: contain;
+        background: #FFFFFF;
+        border: 0.2mm solid #E7E3DA;
+      }
+      .pp-media.pp-media--presentation-cropped-detail img {
+        height: 52mm;
+        object-fit: cover;
+      }
+
+      /* ── Print: the sheet is the authority ───────────────────────────────
+         Usable page height is 297mm less the 22mm / 20mm content margins, so a
+         landscape feature at 118mm is about half of it: dominant, with room for
+         the copy above or below and never shrunk into a card. ── */
+      @media print {
+        .pp-media--landscape img { height: 118mm; }
+        .pp-media--landscape { margin-bottom: 8mm; }
+        /* A closing feature has more visual weight: 144mm is 22% taller than
+           the standard landscape frame. Width, focal crop and typography stay
+           unchanged; object-fit: cover preserves the source proportions. */
+        .pp-media--closing-feature img { height: 144mm; }
+        /* The pair that closes the design: two full-width photographs at ONE
+           visual scale, each with its own caption, sharing the sheet with the
+           conclusion above them. 78mm is the page budget the comparison page
+           already gives two full-width images, and it is what keeps the pair, the
+           copy and the heading together on one sheet. A dimensioned drawing keeps
+           its own uncropped treatment: it is never cropped to suit this scale. */
+        .pp-closing { margin-top: 6mm; }
+        .pp-closing .pp-media img { height: 78mm; }
+        /* One concluding photograph is the page&#x27;s editorial hero, not half of a
+           pair. It receives the standard full-width feature depth while leaving
+           room for the conclusion above it. */
+        .pp-closing--1 .pp-media img { height: 118mm; }
+        .pp-closing .pp-media { margin-bottom: 6mm; }
+        .pp-closing .pp-media:last-child { margin-bottom: 0; }
+        .pp-closing .pp-media.pp-media--presentation-detail img,
+        .pp-closing .pp-media.pp-media--presentation-detail { height: auto; }
+        .pp-media--portrait img { height: 74mm; }
+        .pp-media--seating img { height: 74mm; }
+        /* The Spatial Resolution accent on the printed sheet: 89mm is about 20%
+           taller than the standard 74mm accent, on the same width. */
+        .pp-pillar[data-editorial-section=&quot;spatial_resolution&quot;] .pp-media--portrait img { height: 89mm; }
+        /* A detail drawing on the sheet: about 58 to 60 per cent of the content
+           column, with the frame following the drawing&#x27;s own proportions and
+           room for a tall plan, and never cropped. The height is bounded rather
+           than fixed, so a dimensioned plan is reduced only as far as it stays
+           readable. */
+        .pp-media.pp-media--presentation-detail { width: 40%; max-width: 40%; }
+        .pp-media.pp-media--presentation-detail img { max-height: 88mm; }
+        /* The cropped detail on the sheet: a compact editorial crop, framed on
+           the focal point the designer chose. */
+        .pp-media.pp-media--presentation-cropped-detail { width: 40%; max-width: 40%; }
+        /* A DIMENSIONED DRAWING keeps the legible share rather than the supporting
+           share: at 40 per cent its dimensions, symbols and annotations stop
+           being readable. It is still shown whole and still never leads a page —
+           this is legibility, not prominence. A Full Width choice is untouched. */
+        .pp-media.pp-media--presentation-detail[data-purpose=&quot;layout_drawing&quot;],
+        .pp-media.pp-media--presentation-cropped-detail[data-purpose=&quot;layout_drawing&quot;] {
+          width: 58%;
+          max-width: 58%;
+        }
+        .pp-media.pp-media--presentation-cropped-detail img { height: 62mm; }
+        .pp-media.pp-media--presentation-full-width { width: 100%; }
+        /* The comparison page: two full-width options and their captions share
+           the sheet with the title, the message and — on the page that closes
+           the document — the closing note. The image height is therefore a page
+           budget rather than a preference: at 78mm both options, their captions
+           and the copy above them fit one sheet, and where a closing note shares
+           that sheet the options give back the height it needs (66mm), so the
+           explanation and both photographs are always presented together. */
+        .pp-media--comparison img { height: 78mm; }
+        body.proposal-export-mode .proposal-print-section.pp-page--with-endnote .pp-media--comparison img {
+          height: 66mm;
+        }
+        .pp-media-row { gap: 8mm; }
+        /* An inline detail drawing on the sheet: the frame follows the drawing&#x27;s
+           own proportions and its height is bounded rather than fixed, so the
+           drawing is reduced only as far as it stays readable and is never
+           cropped. */
+        .pp-media-row .pp-media--presentation-detail img { max-height: 96mm; }
+        .pp-media-row,
+        .pp-seating,
+        .pp-seating .pp-media,
+        .pp-comparison,
+        .pp-comparison .pp-media {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* An image-led page gives part of its top margin to the image it leads
+           with, so the dominant treatment still fits beside the copy and the
+           evidence cards that share the same sheet. */
+        body.proposal-export-mode .proposal-print-section.pp-page--imaged {
+          padding-top: 14mm;
+        }
+        body.proposal-export-mode .proposal-print-section.pp-page--imaged .pp-header {
+          margin-bottom: 8mm;
+        }
+        body.proposal-export-mode .proposal-print-section.pp-page--seating {
+          padding-top: 16mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-section.pp-page--comparison {
+          padding-top: 16mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* ── Photographs integrated into the narrative: on the sheet, the layout
+             the plan chose is the layout the page carries. These rules carry the
+             export mode&#x27;s own prefix so they outrank the image-page gallery
+             treatment above, and an image marked Full Width or Detail still takes
+             its own mode&#x27;s treatment unchanged. ── */
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow .pp-gallery {
+          display: flex;
+          flex-direction: column;
+          gap: 8mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow .pp-media {
+          margin: 0;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--side_by_side .pp-gallery {
+          flex-direction: row;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--side_by_side .pp-gallery &gt; .pp-media,
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow__support .pp-media {
+          width: 40%;
+          max-width: 40%;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow__support {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--feature_and_support .pp-image-flow__support {
+          margin-top: 6mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow .pp-media[data-presentation=&quot;unstated&quot;] img {
+          width: 100%;
+          height: auto;
+          max-height: none;
+          object-fit: contain;
+          background: transparent;
+        }
+      }
+
+      /* ── PHOTOGRAPHS INTEGRATED INTO THE NARRATIVE ────────────────────────
+         A project photograph that would otherwise have had a gallery page of
+         its own is composed INSIDE the section it supports, below that
+         section&#x27;s copy, so the document reads as one brochure rather than a
+         narrative with a gallery bolted onto the end of it. One photograph
+         follows the copy; two that share a page are composed by the layout the
+         plan chose from the designer&#x27;s own presentation metadata:
+
+           stacked              two Full Width photographs — or two with nothing
+                                recorded — each at the full content width and in
+                                its own proportions, one under the other;
+           side_by_side         two supporting photographs, each at the
+                                supporting share of the content width;
+           feature_and_support  the prominent photograph at the full content
+                                width, the supporting one beneath it smaller.
+
+         The block is one composition, so the measured compositor keeps a pair
+         together on its sheet where the sheet can hold both and continues the
+         second photograph onto the section&#x27;s own next sheet where it cannot.
+         Nothing is cropped to make a pair fit, nothing is promoted, and nothing
+         is reduced below the share its presentation reserves. ── */
+      .pp-image-flow {
+        margin: 8mm 0 0;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .pp-image-flow__lead { margin: 0 0 6mm; }
+      .pp-image-flow .pp-gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 8mm;
+      }
+      .pp-image-flow .pp-media { margin: 0; }
+      .pp-image-flow--side_by_side .pp-gallery {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 6mm;
+      }
+      .pp-image-flow--side_by_side .pp-gallery &gt; .pp-media,
+      .pp-image-flow__support .pp-media {
+        width: 40%;
+        max-width: 40%;
+      }
+      .pp-image-flow__support {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6mm;
+      }
+      .pp-image-flow--feature_and_support .pp-image-flow__support { margin-top: 6mm; }
+      /* A photograph with no presentation recorded is composed here at its own
+         proportions. The established role frame crops to a fixed height, which
+         belongs on a page the photograph has to itself; on a page it shares with
+         the copy it supports, the photograph is shown as it was uploaded. A
+         recorded choice is untouched: Full Width and Detail keep their own rules
+         exactly as they are. */
+      .pp-image-flow .pp-media[data-presentation=&quot;unstated&quot;] img {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        object-fit: contain;
+        background: transparent;
+      }
+
+      /* ── FULL WIDTH: THE UPLOADED IMAGE IS THE COMPOSITION ────────────────
+         A FULL WIDTH image is shown exactly as it was uploaded: the full content
+         width, its own height and its own proportions. No fixed height, no
+         template ratio, no crop and no object-fit: cover — the uploaded
+         composition is intentional, so a taller source stays taller and a
+         shorter source stays shorter. The height is never derived from the page
+         template; the page is composed around the image instead.
+
+         The selector carries the class twice (and the export mode&#x27;s own prefix
+         on the sheet) so it outranks every role treatment above whatever the
+         order: the presentation is the designer&#x27;s instruction, not a style, so
+         an image marked Full Width never takes a role&#x27;s fixed frame.
+
+         Where the copy and the image cannot share a sheet, the measured
+         compositor moves the copy and the image keeps its area; an image too
+         tall for the printable area is scaled as a whole to fit it, which is a
+         scale and never a crop. An image with no presentation recorded keeps the
+         established treatment exactly as it was. ── */
+      .pp-media.pp-media--presentation-full-width img {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        object-fit: contain;
+        background: transparent;
+      }
+
+      /* ── FULL WIDTH OUTRANKS THE CONTAINER IT LANDED IN ───────────────────
+         FULL WIDTH is a composition instruction, not a suggestion. Wherever such
+         a photograph is composed it keeps the WHOLE content width: the supporting
+         column, the side-by-side pair, the copy row and the closing pair may each
+         narrow a supporting image, and none of them may narrow this one, reduce
+         it to a supporting share, hold it in a portrait frame or turn it into the
+         smaller half of a large-and-small pair. Where the container and the
+         presentation disagree, the PRESENTATION WINS and the container adapts.
+
+         The selector names the container AND the frame AND the presentation, so
+         it outranks every container rule above however the two are ordered. The
+         image&#x27;s own height stays derived from its uploaded proportions by the
+         rule above: no fixed frame, no ratio, no crop. ── */
+      .pp-image-flow__support .pp-media.pp-media--presentation-full-width,
+      .pp-image-flow--side_by_side .pp-gallery &gt; .pp-media.pp-media--presentation-full-width,
+      .pp-media-row .pp-media.pp-media--presentation-full-width,
+      .pp-closing .pp-media.pp-media--presentation-full-width,
+      .pp-media.pp-media--presentation-full-width.pp-media--portrait {
+        width: 100%;
+        max-width: 100%;
+        flex: 1 1 100%;
+      }
+
+      @media print {
+        body.proposal-export-mode .proposal-print-portal .pp-media.pp-media--presentation-full-width img {
+          width: 100%;
+          height: auto;
+          max-height: none;
+          object-fit: contain;
+          background: transparent;
+        }
+        /* The same authority on the exported sheet: the container an exported
+           photograph landed in never narrows the Full Width presentation. */
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow__support .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-image-flow--side_by_side .pp-gallery &gt; .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-media-row .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-closing .pp-media.pp-media--presentation-full-width,
+        body.proposal-export-mode .proposal-print-portal .pp-media.pp-media--presentation-full-width.pp-media--portrait {
+          width: 100%;
+          max-width: 100%;
+          flex: 1 1 100%;
+        }
+      }
+    </style><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:806:6" data-dynamic-content="true" class="proposal-print-cover"><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:154:4" data-dynamic-content="true" class="relative w-full h-full overflow-hidden" style="background-color:#1B1A1A;font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif"><img data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:159:6" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/704681f3e_Image21.png" alt="" aria-hidden="true" class="absolute inset-0 w-full h-full" style="object-fit:cover;object-position:50% 50%;filter:brightness(0.94)"/><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:174:6" data-dynamic-content="true" class="absolute inset-0" style="background:rgba(0,0,0,0.42)"></div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:176:6" data-dynamic-content="true" class="absolute inset-0" style="background:linear-gradient(to bottom, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.34) 40%, rgba(0,0,0,0.26) 64%, rgba(0,0,0,0.84) 100%)"></div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:184:6" data-dynamic-content="true" class="relative h-full flex flex-col"><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:186:8" data-dynamic-content="true" style="flex:1 1 0;display:flex;align-items:center;justify-content:center;padding:32px 32px 0"><div data-source-location="src/components/ui/BrandLockup.jsx:92:4" data-dynamic-content="true" style="font-family:Didact Gothic, Century Gothic, sans-serif;display:flex;flex-direction:column;align-items:center;gap:16px"><span data-source-location="src/components/ui/BrandLockup.jsx:102:6" data-dynamic-content="true" aria-hidden="true" style="position:absolute;visibility:hidden;font-size:40px;letter-spacing:0.15em;font-family:Didact Gothic, Century Gothic, sans-serif;font-weight:300;line-height:1;white-space:nowrap;pointer-events:none;left:-9999px" data-collection-item-field="SP_WORDMARK">SOUND PROOF</span><span data-source-location="src/components/ui/BrandLockup.jsx:122:6" data-dynamic-content="true" style="font-size:34px;font-weight:300;letter-spacing:0.15em;line-height:1;color:#FFFFFF;white-space:nowrap" data-collection-item-field="SP_WORDMARK">SOUND PROOF</span><span data-source-location="src/components/ui/BrandLockup.jsx:136:6" data-dynamic-content="true" style="font-size:14px;font-weight:300;line-height:1;color:rgba(255,255,255,0.50);user-select:none">×</span><img data-source-location="src/components/ui/BrandLockup.jsx:151:8" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/f7c3e802f_Artcoustic-logo_white_TRANSPARENT_BACKGROUND.png" alt="Artcoustic" style="max-width:230.38400000000001px;max-height:49.742000000000004px;width:auto;height:auto;object-fit:contain"/></div></div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:199:8" data-dynamic-content="true" style="flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 32px"><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:212:12" data-dynamic-content="true" class="proposal-cover-type" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:10px;font-weight:400;letter-spacing:0.24em;text-transform:uppercase;color:#FFFFFF;opacity:0.85;margin-bottom:18px" data-collection-item-field="reportTypeLabel">System Design Summary</div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:229:10" data-dynamic-content="true" style="width:100%"><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:76:4" data-dynamic-content="true"><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:77:6" data-dynamic-content="true" class="proposal-cover-label" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:8px;font-weight:600;letter-spacing:0.26em;text-transform:uppercase;color:#FFFFFF" data-collection-item-field="label">Project</div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:90:6" data-dynamic-content="true" class="proposal-cover-name" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:26px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase;color:#FFFFFF;margin-top:8px" data-collection-item-field="value">Genesis AV</div></div></div></div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:285:8" data-dynamic-content="true" class="px-8 py-4 flex items-center justify-between gap-6" style="margin-top:26px;background-color:rgba(0,0,0,0.42);border-top:1px solid rgba(255,255,255,0.16)"><span data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:293:10" data-dynamic-content="true" class="proposal-cover-meta" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:12px;letter-spacing:0.08em;color:#FFFFFF;white-space:nowrap"></span><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:305:10" data-dynamic-content="true" style="text-align:right;min-width:0"><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:306:12" data-dynamic-content="true" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:11px;font-weight:300;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;line-height:1.3" data-collection-item-field="heading">PROFESSIONAL HOME CINEMA ENGINEERING</div><div data-source-location="src/components/proposal/cover/ProposalCoverPage.jsx:319:12" data-dynamic-content="true" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:9px;font-weight:300;letter-spacing:0.04em;text-transform:uppercase;color:#FFFFFF;line-height:1.3;margin-top:3px" data-collection-item-field="subheading">POWERED BY ARTCOUSTIC DESIGN INTELLIGENCE (ADI)</div></div></div></div></div></div><section data-source-location="src/components/proposal/print/AtAGlancePage.jsx:74:4" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--glance"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">02</span><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:33:20" data-dynamic-content="true" class="pp-header__kicker" data-collection-item-field="kicker">System design</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">At a glance</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/AtAGlancePage.jsx:82:8" data-dynamic-content="true" class="pp-facts-group"><h3 data-source-location="src/components/proposal/print/AtAGlancePage.jsx:83:10" data-dynamic-content="false" class="pp-facts-group__title">Project</h3><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:19:4" data-dynamic-content="true" class="pp-cards pp-cards--3"><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:21:8" data-dynamic-content="true" class="pp-card"><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:25:10" data-dynamic-content="true" class="pp-card__label" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:12px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="label">Project</div><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:28:10" data-dynamic-content="true" class="pp-card__value" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="value">Genesis AV</div></div></div></div><div data-source-location="src/components/proposal/print/AtAGlancePage.jsx:89:8" data-dynamic-content="true" class="pp-facts-group"><h3 data-source-location="src/components/proposal/print/AtAGlancePage.jsx:90:10" data-dynamic-content="false" class="pp-facts-group__title">Room and display</h3><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:19:4" data-dynamic-content="true" class="pp-cards pp-cards--3"><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:21:8" data-dynamic-content="true" class="pp-card"><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:25:10" data-dynamic-content="true" class="pp-card__label" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:12px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="label">Room size</div><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:28:10" data-dynamic-content="true" class="pp-card__value" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="value">5.09 × 4.64 × 2.6 m</div></div></div></div><div data-source-location="src/components/proposal/print/AtAGlancePage.jsx:109:8" data-dynamic-content="true" class="pp-facts-group"><h3 data-source-location="src/components/proposal/print/AtAGlancePage.jsx:110:10" data-dynamic-content="false" class="pp-facts-group__title">System</h3><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:19:4" data-dynamic-content="true" class="pp-cards pp-cards--3"><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:21:8" data-dynamic-content="true" class="pp-card"><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:25:10" data-dynamic-content="true" class="pp-card__label" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:12px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="label">System layout</div><div data-source-location="src/components/proposal/print/ProposalFactCards.jsx:28:10" data-dynamic-content="true" class="pp-card__value" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="value">9.1.6</div></div></div></div></section><section data-source-location="src/components/proposal/print/MethodPage.jsx:22:4" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--method"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">03</span><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:33:20" data-dynamic-content="true" class="pp-header__kicker" data-collection-item-field="kicker">Method</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">What makes great cinema sound?</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/MethodPage.jsx:29:6" data-dynamic-content="true" class="pp-method__intro" data-collection-item-field="intro"><p data-source-location="src/components/proposal/print/MethodPage.jsx:31:10" data-dynamic-content="true" data-collection-item-field="paragraph">A great cinema should place sounds where they belong, preserve the contrast between quiet detail and powerful moments, and maintain a consistent tonal character throughout the room.</p><p data-source-location="src/components/proposal/print/MethodPage.jsx:31:10" data-dynamic-content="true" data-collection-item-field="paragraph">Our approach is to balance these three qualities around the room, the seating and the client&#x27;s priorities.</p></div><div data-source-location="src/components/proposal/print/MethodPage.jsx:35:6" data-dynamic-content="true" class="pp-method__rows" data-collection-item-field="sections"><div data-source-location="src/components/proposal/print/MethodRow.jsx:18:4" data-dynamic-content="true" class="pp-method__row"><div data-source-location="src/components/proposal/print/MethodRow.jsx:19:6" data-dynamic-content="true" class="pp-method__label"><h3 data-source-location="src/components/proposal/print/MethodRow.jsx:20:8" data-dynamic-content="true" class="pp-method__heading" data-collection-item-field="heading">Spatial Resolution</h3><p data-source-location="src/components/proposal/print/MethodRow.jsx:21:16" data-dynamic-content="true" class="pp-method__lede" data-collection-item-field="lede">Sound should come from where the filmmaker intended.</p></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:23:6" data-dynamic-content="true" class="pp-method__body"><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">With a single loudspeaker, every sound comes from the same place. Stereo allows sounds to move from left to right. Surround sound adds movement beside and behind you, while immersive systems introduce height, allowing sounds to travel overhead.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">The number of loudspeakers creates opportunities, but their positions are equally important.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">The aim is for sounds to occupy convincing positions around the audience and move naturally between them.</p></div></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:18:4" data-dynamic-content="true" class="pp-method__row"><div data-source-location="src/components/proposal/print/MethodRow.jsx:19:6" data-dynamic-content="true" class="pp-method__label"><h3 data-source-location="src/components/proposal/print/MethodRow.jsx:20:8" data-dynamic-content="true" class="pp-method__heading" data-collection-item-field="heading">Dynamic Range</h3><p data-source-location="src/components/proposal/print/MethodRow.jsx:21:16" data-dynamic-content="true" class="pp-method__lede" data-collection-item-field="lede">The difference between quiet detail and loud impact.</p></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:23:6" data-dynamic-content="true" class="pp-method__body"><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">Think about a great picture. Deep blacks retain their shadow detail, while bright highlights remain clear without losing information.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">Sound works in much the same way.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">A quiet conversation should retain its subtle details, while an explosion or powerful musical passage should arrive with real impact, without strain or distortion.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">That contrast is where much of the excitement of cinema lives.</p></div></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:18:4" data-dynamic-content="true" class="pp-method__row"><div data-source-location="src/components/proposal/print/MethodRow.jsx:19:6" data-dynamic-content="true" class="pp-method__label"><h3 data-source-location="src/components/proposal/print/MethodRow.jsx:20:8" data-dynamic-content="true" class="pp-method__heading" data-collection-item-field="heading">Timbre Matching</h3><p data-source-location="src/components/proposal/print/MethodRow.jsx:21:16" data-dynamic-content="true" class="pp-method__lede" data-collection-item-field="lede">A sound should retain its character wherever it comes from.</p></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:23:6" data-dynamic-content="true" class="pp-method__body"><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">Imagine a blue snooker ball moving across a television screen. Its colour should remain the same wherever it appears.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">The same principle applies to sound.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">As a voice, instrument or effect moves between loudspeakers, we want its tonal character to remain consistent.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">We also want listeners in different seats to experience a similarly balanced soundtrack, with particular attention to the priority listening positions.</p></div></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:18:4" data-dynamic-content="true" class="pp-method__row pp-method__row--closing"><div data-source-location="src/components/proposal/print/MethodRow.jsx:19:6" data-dynamic-content="true" class="pp-method__label"><h3 data-source-location="src/components/proposal/print/MethodRow.jsx:20:8" data-dynamic-content="true" class="pp-method__heading" data-collection-item-field="heading">A considered approach</h3></div><div data-source-location="src/components/proposal/print/MethodRow.jsx:23:6" data-dynamic-content="true" class="pp-method__body"><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">Every room presents different opportunities and constraints. The right design balances Spatial Resolution, Dynamic Range and Timbre Matching to deliver the best overall experience for the room and its intended use.</p><p data-source-location="src/components/proposal/print/MethodRow.jsx:25:10" data-dynamic-content="true" data-collection-item-field="paragraph">Achieving the highest possible score in every parameter is not always the most appropriate solution.</p></div></div></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:828:8" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--system_design_summary pp-page--flow pp-page--imaged" data-arr-index="2" data-arr-variable-name="pages" data-arr-field="children"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:685:8" data-dynamic-content="true" data-editorial-section="system_design_summary" data-editorial-block="section" style="display:flow-root" data-collection-item-id="genesis-section-1"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:695:10" data-dynamic-content="true" class="pp-composition" data-editorial-composition="opening" data-editorial-section="system_design_summary" data-collection-item-field="header"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">04</span><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:33:20" data-dynamic-content="true" class="pp-header__kicker" data-collection-item-field="kicker">Design</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">System Design Summary</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><figure data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:65:4" data-dynamic-content="true" class="pp-media pp-media--landscape" data-collection-item-field="source_file_url"><img data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:66:6" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/0f8e408f5_Image.png" alt="" style="object-position:50% 50%" data-presentation="unstated" data-selected-presentation="unstated" data-purpose="unstated" data-crops="yes"/></figure><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:0"><h2>Design Summary</h2><p>Voices and effects retain their tonal character as they travel from the screen to the surrounds and overhead, helping the soundtrack feel coherent as it moves around the room. The 115" TV and 9.1.6 layout bring that sound into a dedicated cinema setting, with four subwoofers specified for physical low-frequency impact.</p></div></div><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:729:12" data-dynamic-content="true" class="pp-composition" data-editorial-composition="continuing" data-editorial-section="system_design_summary"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:1"><h2>Design Overview</h2><p>The room is arranged around a 115" TV and a 9.1.6 sound system, with six overhead speakers and four subwoofers supporting effects above and around the audience. At the front, Q6-3 speakers serve left and right, while two C4-1 cabinets reproduce the single centre channel.</p></div><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:2"><h2>Why This Specification</h2><p>Sound can move above and around the audience rather than remaining at the picture; this movement is supported by the 9.1.6 layout, including six overhead speakers and four subwoofers. Voices and effects also keep a consistent tonal character as they cross between screen, surround and overhead channels, across all 8 assessed seating positions.</p></div></div></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:828:8" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--dynamic_range pp-page--imaged" data-arr-index="3" data-arr-variable-name="pages" data-arr-field="children"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:685:8" data-dynamic-content="true" class="pp-pillar" data-editorial-section="dynamic_range" data-editorial-block="pillar" style="display:flow-root" data-collection-item-id="genesis-section-3"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:695:10" data-dynamic-content="true" class="pp-composition" data-editorial-composition="opening" data-editorial-section="dynamic_range" data-collection-item-field="header"><h2 data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:700:32" data-dynamic-content="true" class="pp-pillars__title" data-collection-item-field="PILLAR_GROUP_HEADING">The Sound Experience</h2><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">05</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">Dynamic Range</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:0"><p>Low-frequency effects can carry physical weight in demanding scenes, giving major impacts and musical passages a strong bass foundation. The four-subwoofer system is specified to deliver 115 dBC of low-frequency output at the reference seating position.</p></div><figure data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:65:4" data-dynamic-content="true" class="pp-media pp-media--landscape" data-collection-item-field="source_file_url"><img data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:66:6" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/ce1af49e2_Image3.png" alt="" style="object-position:50% 50%" data-presentation="unstated" data-selected-presentation="unstated" data-purpose="unstated" data-crops="yes"/></figure></div></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:828:8" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--spatial_resolution pp-page--imaged" data-arr-index="4" data-arr-variable-name="pages" data-arr-field="children"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:685:8" data-dynamic-content="true" class="pp-pillar" data-editorial-section="spatial_resolution" data-editorial-block="pillar" style="display:flow-root" data-collection-item-id="genesis-section-2"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:695:10" data-dynamic-content="true" class="pp-composition" data-editorial-composition="opening" data-editorial-section="spatial_resolution" data-collection-item-field="header"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">06</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">Spatial Resolution</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:0"><p>The front row is positioned to make the most of the 115" TV, with a 57.3° viewing angle for an immersive picture. Around the room, the screen-wall speakers sit within their recommended zones, and the wide and surround speakers are positioned within their recommended limits.</p></div></div><div data-source-location="src/components/proposal/print/ImageFlowBlock.jsx:36:4" data-dynamic-content="true" class="pp-image-flow pp-image-flow--single" data-editorial-composition="image_flow" data-flow-layout="single"><div data-source-location="src/components/proposal/print/ImageFlowBlock.jsx:47:6" data-dynamic-content="true" class="pp-gallery pp-gallery--flow pp-gallery--flow-single"><figure data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:65:4" data-dynamic-content="true" class="pp-media pp-media--landscape" data-collection-item-id="flow_image:genesis-cover:6" data-collection-item-field="source_file_url"><img data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:66:6" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/704681f3e_Image21.png" alt="" style="object-position:50% 50%" data-presentation="unstated" data-selected-presentation="unstated" data-purpose="unstated" data-crops="yes"/></figure></div></div></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:828:8" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--timbre_matching" data-arr-index="5" data-arr-variable-name="pages" data-arr-field="children"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:685:8" data-dynamic-content="true" class="pp-pillar" data-editorial-section="timbre_matching" data-editorial-block="pillar" style="display:flow-root" data-collection-item-id="genesis-section-4"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:695:10" data-dynamic-content="true" class="pp-composition" data-editorial-composition="opening" data-editorial-section="timbre_matching" data-collection-item-field="header"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">07</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">Timbre Matching</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:0"><p>Voices and effects keep a consistent tonal character as they move from the screen channels to the surrounds and overhead channels. That tonal consistency holds across all 8 assessed seating positions, helping a sound that moves through the cinema retain its character.</p></div></div></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:510:10" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--highlights proposal-print-section--highlights" data-collection-item-id="genesis-section-5"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">08</span><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:33:20" data-dynamic-content="true" class="pp-header__kicker" data-collection-item-field="kicker">Evidence</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">Key Performance Highlights</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:520:14" data-dynamic-content="true" class="pp-body pp-highlights__intro"><p>Voices and effects retain their tonal character as they pass between the screen, surround and overhead channels. The immersive layout gives filmmakers room to place sound above and around the audience, while the subwoofer system is specified to give low-frequency effects physical weight.</p></div><div data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:171:4" data-dynamic-content="true" class=""><table data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:172:6" data-dynamic-content="true" class="kph-table kph-table--summary w-full border-collapse"><thead data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:173:8" data-dynamic-content="true"><tr data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:174:10" data-dynamic-content="true"><th data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:176:14" data-dynamic-content="true" class="px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:12px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase;width:23%" data-arr-index="0" data-arr-variable-name="SUMMARY_COLUMNS" data-arr-field="label">Area</th><th data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:176:14" data-dynamic-content="true" class="px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:12px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase;width:31%" data-arr-index="1" data-arr-variable-name="SUMMARY_COLUMNS" data-arr-field="label">Result</th><th data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:176:14" data-dynamic-content="true" class="px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:12px;font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase;width:46%" data-arr-index="2" data-arr-variable-name="SUMMARY_COLUMNS" data-arr-field="label">What it means</th></tr></thead><tbody data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:186:8" data-dynamic-content="true"><tr data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:191:12" data-dynamic-content="true" data-row-key="rp23_viewing" data-row-area="Viewing Geometry"><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:192:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="area">Viewing Geometry</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:197:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A] whitespace-pre-line" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="result">Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 34° to 57°.</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:198:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#625143]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="gain">Shows how the screen scale works with the seating distance in this room.</td></tr><tr data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:191:12" data-dynamic-content="true" data-row-key="system_layout" data-row-area="Spatial Resolution"><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:192:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="area">Spatial Resolution</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:197:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A] whitespace-pre-line" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="result">9.1.6 Dolby Atmos configuration (9 bed channels, 1 subwoofer, 6 overhead channels)</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:198:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#625143]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="gain">More speaker positions around and above the seats.</td></tr><tr data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:191:12" data-dynamic-content="true" data-row-key="p16" data-row-area="Timbre Matching"><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:192:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="area">Timbre Matching</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:197:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A] whitespace-pre-line" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="result">L4 · ±1 dB</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:198:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#625143]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="gain">Voices and effects keep a consistent tonal character across the screen channels.</td></tr><tr data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:191:12" data-dynamic-content="true" data-row-key="p18" data-row-area="Bass Performance"><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:192:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="area">Bass Performance</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:197:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#1B1A1A] whitespace-pre-line" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="result">L2 · 24 Hz</td><td data-source-location="src/components/proposal/KeyPerformanceHighlightsTable.jsx:198:14" data-dynamic-content="true" class="px-3 py-2 align-top border-b border-[#EAE8E3] text-[#625143]" style="font-family:&#x27;Didact Gothic&#x27;, &#x27;Century Gothic&#x27;, sans-serif;font-size:14px;font-weight:400;letter-spacing:0.05em;line-height:1.4;text-transform:none" data-collection-item-field="gain">Deep bass that adds body and atmosphere to films and music.</td></tr></tbody></table></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:828:8" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--overall_design pp-page--flow" data-arr-index="7" data-arr-variable-name="pages" data-arr-field="children"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:685:8" data-dynamic-content="true" data-editorial-section="overall_design" data-editorial-block="section" style="display:flow-root" data-collection-item-id="genesis-section-6"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:695:10" data-dynamic-content="true" class="pp-composition" data-editorial-composition="opening" data-editorial-section="overall_design" data-collection-item-field="header"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">09</span><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:33:20" data-dynamic-content="true" class="pp-header__kicker" data-collection-item-field="kicker">Design</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">Overall Design</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:0"><p>The front row’s view of the 115" TV is paired with sound that can travel around and above the audience, while voices and effects retain their tonal character across the seating positions. Four subwoofers provide the specified low-frequency authority for the weight and impact of demanding film soundtracks.</p></div></div></div></section><section data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:828:8" data-dynamic-content="true" class="proposal-print-section pp-page pp-page--presented_options" data-arr-index="8" data-arr-variable-name="pages" data-arr-field="children"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:685:8" data-dynamic-content="true" data-editorial-section="presented_options" data-editorial-block="section" style="display:flow-root" data-collection-item-id="genesis-section-8"><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:695:10" data-dynamic-content="true" class="pp-composition" data-editorial-composition="opening" data-editorial-section="presented_options" data-collection-item-field="header"><header data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:24:4" data-dynamic-content="true" class="pp-header"><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:31:8" data-dynamic-content="true" class="pp-header__meta"><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:32:20" data-dynamic-content="true" class="pp-header__number" data-collection-item-field="number">10</span><span data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:33:20" data-dynamic-content="true" class="pp-header__kicker" data-collection-item-field="kicker">Design</span></div><h2 data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:36:6" data-dynamic-content="true" class="pp-header__title" style="font-family:&#x27;Futura PT Light&#x27;, &#x27;Futura PT&#x27;, &#x27;Century Gothic&#x27;, &#x27;Didact Gothic&#x27;, sans-serif;font-size:clamp(22px, 2.4vw, 40px);font-weight:300;letter-spacing:0.1em;line-height:1.2;text-transform:uppercase" data-collection-item-field="title">Presented Options</h2><div data-source-location="src/components/proposal/print/ProposalPageHeader.jsx:44:6" data-dynamic-content="false" class="pp-header__rule"></div></header><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:643:8" data-dynamic-content="true" class="pp-body" data-editorial-block="copy" data-collection-item-id="block:0"><p>Formal cinema seating brings motorised reclining seats and cupholders, while relaxed sofas create an informal arrangement that lets the seating be reconfigured to suit the room. Either option works within the seating positions specified for this design, so the choice comes down to comfort, style and personal preference.</p></div><div data-source-location="src/components/proposal/print/ProposalPackDocument.jsx:668:10" data-dynamic-content="true" class="pp-comparison pp-comparison--2"><figure data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:65:4" data-dynamic-content="true" class="pp-media pp-media--comparison" data-collection-item-id="comparison_option:genesis-image-formal-seating:4" data-collection-item-field="source_file_url"><img data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:66:6" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/1bb41c1d9_Image6.png" alt="Formal Cinema Seating" style="object-position:50% 50%" data-presentation="unstated" data-selected-presentation="unstated" data-purpose="unstated" data-crops="yes"/><figcaption data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:84:21" data-dynamic-content="true" class="pp-media__caption" data-collection-item-field="captionText" data-collection-item-id="comparison_option:genesis-image-formal-seating:4">Formal Cinema Seating</figcaption></figure><figure data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:65:4" data-dynamic-content="true" class="pp-media pp-media--comparison" data-collection-item-id="comparison_option:genesis-image-relaxed-sofas:5" data-collection-item-field="source_file_url"><img data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:66:6" data-dynamic-content="true" src="https://base44.app/api/apps/6a1166c68ddc81e5ea2cdf6b/files/mp/public/6a1166c68ddc81e5ea2cdf6b/f2d9994aa_Image9.png" alt="Relaxed Sofas" style="object-position:50% 50%" data-presentation="unstated" data-selected-presentation="unstated" data-purpose="unstated" data-crops="yes"/><figcaption data-source-location="src/components/proposal/print/ProposalImagePlacement.jsx:84:21" data-dynamic-content="true" class="pp-media__caption" data-collection-item-field="captionText" data-collection-item-id="comparison_option:genesis-image-relaxed-sofas:5">Relaxed Sofas</figcaption></figure></div></div></div></section></div>

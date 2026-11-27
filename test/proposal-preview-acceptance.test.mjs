@@ -264,11 +264,17 @@ describe('H. document order', () => {
     paragraphsOf(appendix.body).forEach((paragraph) => {
       expect(words(html)).not.toContain(words(paragraph));
     });
-    // No section page is printed above the cover.
-    expect(html.indexOf('pp-page--system_design_summary')).toBeGreaterThan(cover);
+    // No section page is printed above the cover. The print stylesheet names the
+    // section page classes in its own break rules, so the page order is read from
+    // the document body with the styles set aside — the same way the highlights
+    // order above is read.
+    const body = html.replace(/<style[\s\S]*?<\/style>/g, '');
+    const coverBody = body.indexOf('proposal-print-cover');
+    expect(coverBody).toBeGreaterThan(-1);
+    expect(body.indexOf('pp-page--system_design_summary')).toBeGreaterThan(coverBody);
     // The alternatives belong to the copy that explains them, and that page is
     // part of the document's own order.
-    expect(html.indexOf('pp-page--presented_options')).toBeGreaterThan(cover);
+    expect(body.indexOf('pp-page--presented_options')).toBeGreaterThan(coverBody);
   });
 
   it('orders stored rows canonically however the database returned them', () => {

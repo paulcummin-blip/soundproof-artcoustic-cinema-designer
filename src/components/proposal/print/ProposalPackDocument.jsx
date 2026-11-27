@@ -57,7 +57,7 @@ import {
   statementValue,
 } from '@/components/proposal/print/proposalPackAuthority';
 import { getSectionsForProposalType, resolveSectionTitle } from '@/components/proposal/proposalSections';
-import { alternativesCarrier, orderPublicationSections } from '@/components/proposal/publicationOrder';
+import { alternativesCarrier, isFixedSectionType, orderPublicationSections } from '@/components/proposal/publicationOrder';
 import { bandOpeningTypes, isFlowSection } from '@/components/proposal/print/narrativeFlowComposition';
 import {
   PILLAR_GROUP_HEADING,
@@ -123,6 +123,24 @@ export default function ProposalPackDocument({
     });
 
   const canonical = getSectionsForProposalType(reportType);
+  const defByType = new Map(canonical.map((def) => [def.type, def]));
+  // The document's section types in the dealer's saved order: enabled,
+  // non-cover, canonical types, deduped by type. The pack reads this one
+  // sequence, so the printed PDF follows the same order the sidebar, the
+  // editor and the preview show — a saved order survives to the exported page.
+  const orderedTypes = [];
+  const seenOrderType = new Set();
+  orderedSections
+    .filter((section) => section.is_enabled !== false
+      && defByType.has(section.section_type)
+      && !isFixedSectionType(section.section_type))
+    .forEach((section) => {
+      const type = section.section_type;
+      if (!seenOrderType.has(type)) {
+        seenOrderType.add(type);
+        orderedTypes.push(type);
+      }
+    });
   // A comparison covers several versions, so its at-a-glance page is built from
   // the same calculated comparison rows the Key Differences table prints: one
   // block per selected version, never one version standing in for them all.
@@ -149,7 +167,7 @@ export default function ProposalPackDocument({
     assets: projectImages,
     sectionSlots: composeSectionSlots({
       sections,
-      sectionTypes: canonical.map((def) => def.type),
+      sectionTypes: orderedTypes,
     }),
     coverAssetId: resolveCoverAssetId({ assets: projectImages, coverImageUrl }),
   });
@@ -283,10 +301,7 @@ export default function ProposalPackDocument({
   // in the order this document prints them. A designed page breaks the flow, and
   // a section a designed page interrupted opens a sheet of its own again.
   const flowOpenings = bandOpeningTypes(
-    canonical
-      .filter((def) => def.type !== 'cover')
-      .map((def) => def.type)
-      .filter((type) => byType.has(type)),
+    orderedTypes.filter((type) => byType.has(type)),
   );
 
   // Page order, with the numbers assigned as the sheets are composed: a sheet is
@@ -417,12 +432,12 @@ export default function ProposalPackDocument({
     );
   }
 
-  canonical
-    .filter((def) => def.type !== 'cover')
-    .forEach((def) => {
+  orderedTypes
+    .forEach((sectionType) => {
+      const def = defByType.get(sectionType) || { type: sectionType, title: '' };
       // The seating-style page and each comparison page sit immediately before
       // the section the planner anchors them to.
-      if (def.type === imagePlan.seatingPageAnchorType) {
+      if (sectionType === imagePlan.seatingPageAnchorType) {
         if (!seatingPagesPlaced && seatingChunks.length > 0) pushSeatingPages();
         if (!comparisonPagesPlaced && comparisonGroups.length > 0) pushComparisonPages();
       }
