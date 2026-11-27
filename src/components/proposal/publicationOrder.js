@@ -22,6 +22,20 @@
 
 import { getSectionsForProposalType, isRetiredSectionType } from './proposalSections';
 
+/** Keep the validated content and visibility. Only the dealer's order is editable here. */
+export function sectionsWithEditorOrder(preparedSections, editorSections) {
+  if (!Array.isArray(preparedSections)) {
+    return editorSections.filter(section => section.section_type !== 'presented_options');
+  }
+  const orderById = new Map(editorSections.filter(section => section.id)
+    .map(section => [section.id, section.order_index]));
+  return preparedSections.map(section => {
+    if (!orderById.has(section.id)) return section;
+    const order_index = orderById.get(section.id);
+    return section.order_index === order_index ? section : { ...section, order_index };
+  });
+}
+
 /** The canonical section types of a report type, in published order. */
 export function canonicalSectionTypes(proposalType) {
   return getSectionsForProposalType(proposalType).map((def) => def.type);

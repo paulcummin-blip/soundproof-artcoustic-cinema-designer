@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   orderPublicationSections as orderClient,
+  sectionsWithEditorOrder,
   canonicalSectionTypes,
   isFixedSectionType,
   FIXED_SECTION_TYPES,
@@ -175,6 +176,21 @@ describe('1. the ordering authority', () => {
     // It is NOT the canonical sequence (which has Spatial Resolution second).
     expect(ordered[1]).not.toBe('spatial_resolution');
   });
+});
+
+it('immediately composes a cached validation layer in the current editor order, by row ID', () => {
+  const prepared = genesisSections().map((row, i) => ({ ...row, id: 'section-' + i }));
+  const editor = prepared.map(row => ({ ...row, body: 'unreviewed editor text' }));
+  const dynamic = editor.find(row => row.section_type === 'dynamic_range');
+  const spatial = editor.find(row => row.section_type === 'spatial_resolution');
+  [dynamic.order_index, spatial.order_index] = [spatial.order_index, dynamic.order_index];
+  const before = JSON.stringify(prepared);
+  const rows = orderClient({ sections: sectionsWithEditorOrder(prepared, editor.reverse()), proposalType: 'system_summary' });
+  expect(rows.map(row => row.id)).toEqual(orderClient({ sections: editor, proposalType: 'system_summary' }).map(row => row.id));
+  expect(rows.map(row => row.body)).not.toContain('unreviewed editor text');
+  expect(JSON.stringify(prepared)).toBe(before);
+  const pages = pageOrder(render({ ...genesisPackProps(), sections: rows }));
+  expect(pages.indexOf('dynamic_range')).toBeLessThan(pages.indexOf('spatial_resolution'));
 });
 
 // ── 2. The reorder save queue ───────────────────────────────────────────────

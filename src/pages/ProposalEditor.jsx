@@ -34,7 +34,7 @@ import {
 } from '@/components/proposal/images/proposalImagePlanner';
 import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
-import { alternativesCarrier, orderPublicationSections } from '@/components/proposal/publicationOrder';
+import { alternativesCarrier, orderPublicationSections, sectionsWithEditorOrder } from '@/components/proposal/publicationOrder';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
@@ -120,14 +120,13 @@ export default function ProposalEditor() {
     approvingSectionId,
     refreshSignal: layerRefreshSignal,
   } = useProposalApproval({ proposal, layer: currentDocumentLayer });
-  // The publication assembly: the server's ordered, prepared sections. The local
-  // fallback is ordered by the SAME authority, so the continuous Editor and the
-  // printed PDF always read one document sequence.
-  const documentSections = orderPublicationSections({
-    sections: currentDocumentLayer?.document_validation?.document_sections
-      || sections.filter(section => section.section_type !== 'presented_options'),
+  // Validation owns the publishable rows and their content. Their order comes
+  // from the same section records the dealer reorders in the sidebar.
+  const preparedSections = currentDocumentLayer?.document_validation?.document_sections;
+  const documentSections = useMemo(() => orderPublicationSections({
+    sections: sectionsWithEditorOrder(preparedSections, sections),
     proposalType: proposal?.proposal_type,
-  });
+  }), [preparedSections, sections, proposal?.proposal_type]);
   const optionsImageCopy = documentSections.some(
     (section) => section.section_type === 'presented_options'
       && section.is_enabled !== false
@@ -152,7 +151,7 @@ export default function ProposalEditor() {
   // retains the dealer's intended order and offers Retry. The export is blocked
   // while the order remains unsaved.
   const [reorderStatus, setReorderStatus] = useState(SAVE_STATUS.IDLE);
-  const latestOrderRef = useRef([]);
+  const latestOrderRef = useRef(null);
   const savedReorderTimersRef = useRef(null);
   const reorderQueueRef = useRef(null);
   if (!reorderQueueRef.current) {
@@ -162,6 +161,8 @@ export default function ProposalEditor() {
         await base44.entities.ProposalSection.bulkUpdate(
           order.map((s, i) => ({ id: s.id, order_index: i }))
         );
+        // An earlier acknowledgement cannot release a newer drag for export.
+        if (latestOrderRef.current === order) latestOrderRef.current = null;
       },
       onStatus: (next) => {
         setReorderStatus(next);
@@ -682,8 +683,9 @@ export default function ProposalEditor() {
   // completed order is committed once when the drag finishes.
   const handleReorder = useCallback((reorderedSections) => {
     if (archivedRef.current) return;
-    setSections(reorderedSections);
     latestOrderRef.current = reorderedSections;
+    setReorderStatus(SAVE_STATUS.SAVING);
+    setSections(reorderedSections);
   }, []);
 
   // Persist the completed order: serialized and coalesced so an earlier request
@@ -868,7 +870,8 @@ export default function ProposalEditor() {
   // The section order must be saved before a PDF can be issued, so the exported
   // document can never reflect an order that was never persisted.
   const orderUnsaved =
-    reorderStatus === SAVE_STATUS.SAVING || reorderStatus === SAVE_STATUS.FAILED;
+    latestOrderRef.current?.[0]?.proposal_id === proposal?.id && Boolean(proposal?.id)
+    || reorderStatus === SAVE_STATUS.SAVING || reorderStatus === SAVE_STATUS.FAILED;
   const orderBlockReason = orderUnsaved ? 'Save the section order before exporting.' : null;
   const {
     exporting,
@@ -1029,7 +1032,7 @@ export default function ProposalEditor() {
         onToggleVisibility={handleToggleVisibility}
         onReorder={handleReorder}
         onReorderCommit={handleReorderCommit}
-        readOnly={archived}
+        readOnly={archived || exporting}
         proposalType={proposal?.proposal_type}
         approvalByType={approvalByType}
       />
@@ -1047,7 +1050,8 @@ export default function ProposalEditor() {
           readOnly={archived}
           onBlockedReasonChange={setEditLayerBlockReason}
           onLayerChange={setDocumentLayer}
-          documentRevision={JSON.stringify(sections.map(section => [section.id, section.body, section.is_enabled, section.order_index, section.dealer_notes]))}
+          documentRevision={JSON.stringify(sections.map(section => [section.id, section.body, section.is_enabled, section.dealer_notes])
+            .sort(([a], [b]) => String(a).localeCompare(String(b))))}
           refreshSignal={layerRefreshSignal}
         />
         {/* Proposal typography scope — cover, section headings and body copy
