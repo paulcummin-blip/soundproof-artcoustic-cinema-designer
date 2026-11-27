@@ -9,7 +9,7 @@ import {
   resolveAccountAccess,
 } from '../../shared/accountAccessAuthority.js';
 
-import { acquireCreationLock, releaseCreationLock } from '../../shared/projectCreationLock.js';
+import { runUnderActivationLock } from '../../shared/projectCreationLock.js';
 
 const OCCUPIED_STATUSES = new Set(['pending', 'active']);
 const ADMIN_ROLES = new Set(['dealer_admin', 'distributor_admin', 'internal_admin']);
@@ -246,16 +246,10 @@ export default async function(req) {
 
     // Serialise every membership mutation with Portal activation and project
     // creation; never reclaim a still-held lock merely because time has passed.
-    const lock = await acquireCreationLock(service, account.id);
-    if (!lock.acquired) return errorResponse('ACCOUNT_OPERATION_BUSY', 'Another account operation is in progress. Please retry.', 409);
-    let release = true;
-    // Set to true immediately before the first protected membership/user
-    // write in each action. A failure before any write is a read or
-    // validation failure that never started a write, so the lock is safe to
-    // release. A failure after a write was attempted may have committed
-    // without a confirmed outcome, so the lock is retained for review.
-    let writeAttempted = false;
-    try {
+    // runUnderActivationLock acquires the per-account lock, tracks uncertain
+    // write outcomes, and releases on a confirmed outcome or a failed read.
+    // The final membership display read runs after the lock is released.
+    const lockResult = await runUnderActivationLock(service, account.id, async (ctx) => {
       // Recheck authority after acquiring the lock, not only before waiting.
       const fresh = await resolveAccountAccess(base44, sessionUser);
       if (!fresh.allowed || (!fresh.isMasterAdmin
@@ -335,7 +329,7 @@ export default async function(req) {
       // Reserve the seat before delivery. A timeout may mean an email was sent;
       // subsequent invite requests see this seat and cannot send another email.
       // Claiming and linking the user belongs to verified login, not invitation.
-      writeAttempted = true;
+      ctx.markWriteUncertain();
       const membership = await service.entities.AccountMembership.create({
         user_id: null, email, full_name: linkedUser?.full_name || null,
         account_id: account.id, membership_role: membershipRole(accessLevel, makeAccountAdmin),
@@ -371,8 +365,9 @@ export default async function(req) {
           invitation_error: invitationError,
         },
       });
+      ctx.clearWriteUncertain();
 
-      return Response.json(await loadAccountUsers(service, account), { status: 201 });
+      return { displayStatus: 201 };
     }
 
     const membershipId = String(body.membership_id || '').trim();
@@ -393,7 +388,7 @@ export default async function(req) {
         return errorResponse('INVALID_ACCESS_LEVEL', 'Choose a valid access level.');
       }
       const before = normaliseAccessLevel(target.access_level, ACCESS_LEVELS.FULL_ACCESS);
-      writeAttempted = true;
+      ctx.markWriteUncertain();
       await service.entities.AccountMembership.update(target.id, {
         access_level: accessLevel,
         membership_role: membershipRole(accessLevel, false),
@@ -412,7 +407,8 @@ export default async function(req) {
         beforeAccessLevel: before,
         afterAccessLevel: accessLevel,
       });
-      return Response.json(await loadAccountUsers(service, account));
+      ctx.clearWriteUncertain();
+      return { displayStatus: 200 };
     }
 
     if (action === 'resend') {
@@ -424,7 +420,7 @@ export default async function(req) {
         return errorResponse('INVITATION_RECENTLY_SENT', 'An invitation was recently attempted. Please wait before an explicit resend.', 409);
       }
       // Reserve the delivery attempt before contacting the external service.
-      writeAttempted = true;
+      ctx.markWriteUncertain();
       await service.entities.AccountMembership.update(target.id, {
         invited_at: new Date().toISOString(),
         invited_by_user_id: context.user.id,
@@ -453,7 +449,8 @@ export default async function(req) {
         target,
         afterAccessLevel: target.access_level || ACCESS_LEVELS.FULL_ACCESS,
       });
-      return Response.json(await loadAccountUsers(service, account));
+      ctx.clearWriteUncertain();
+      return { displayStatus: 200 };
     }
 
     if (action === 'remove') {
@@ -464,7 +461,7 @@ export default async function(req) {
         return errorResponse('CANNOT_REMOVE_SELF', 'You cannot remove your own login.', 409);
       }
       const now = new Date().toISOString();
-      writeAttempted = true;
+      ctx.markWriteUncertain();
       await service.entities.AccountMembership.update(target.id, {
         status: 'removed',
         removed_at: now,
@@ -485,7 +482,8 @@ export default async function(req) {
         beforeAccessLevel: normaliseAccessLevel(target.access_level, ACCESS_LEVELS.FULL_ACCESS),
         details: { membership_id: target.id },
       });
-      return Response.json(await loadAccountUsers(service, account));
+      ctx.clearWriteUncertain();
+      return { displayStatus: 200 };
     }
 
     if (action === 'change_email') {
@@ -548,7 +546,7 @@ export default async function(req) {
       // unclaimed. A concurrent acceptance or cancellation that changed the
       // status or linked a user updates 0 rows, so the correction fails closed
       // instead of racing the claim.
-      writeAttempted = true;
+      ctx.markWriteUncertain();
       const corrected = await service.entities.AccountMembership.updateMany(
         { id: target.id, status: 'pending', user_id: null },
         {
@@ -605,6 +603,7 @@ export default async function(req) {
           invitation_error: invitationError,
         },
       });
+      ctx.clearWriteUncertain();
 
       if (!invitationSent) {
         return Response.json({
@@ -614,7 +613,7 @@ export default async function(req) {
           corrected_email: newEmail,
         }, { status: 502 });
       }
-      return Response.json(await loadAccountUsers(service, account));
+      return { displayStatus: 200 };
     }
 
     if (action === 'cancel_invitation') {
@@ -630,7 +629,7 @@ export default async function(req) {
       const now = new Date().toISOString();
       // Conditional update — only if still pending and unclaimed. A concurrent
       // acceptance updates 0 rows, so cancellation never overrides a claim.
-      writeAttempted = true;
+      ctx.markWriteUncertain();
       const cancelled = await service.entities.AccountMembership.updateMany(
         { id: target.id, status: 'pending', user_id: null },
         {
@@ -665,19 +664,14 @@ export default async function(req) {
           cancelled_email: normaliseEmail(target.email),
         },
       });
-      return Response.json(await loadAccountUsers(service, account));
+      ctx.clearWriteUncertain();
+      return { displayStatus: 200 };
     }
 
     return errorResponse('UNKNOWN_ACTION', 'Unsupported account-user action.', 400);
-    } catch (error) {
-      // Retain the lock only when a protected write was attempted and may
-      // have committed without a confirmed outcome. A failed read or pre-write
-      // validation never started a write, so the lock is safe to release.
-      if (writeAttempted) release = false;
-      throw error;
-    } finally {
-      if (release) await releaseCreationLock(service, account.id, lock.token);
-    }
+    }, { busy: () => errorResponse('ACCOUNT_OPERATION_BUSY', 'Another account operation is in progress. Please retry.', 409) });
+    if (lockResult instanceof Response) return lockResult;
+    return Response.json(await loadAccountUsers(service, account), { status: lockResult.displayStatus });
   } catch (error) {
     return Response.json({
       error: 'ACCOUNT_USER_MANAGEMENT_FAILED',
