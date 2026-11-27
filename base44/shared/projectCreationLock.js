@@ -110,3 +110,39 @@ export async function readCreationLockState(service, accountId) {
     return { held: false, holder: null, heldAt: null };
   }
 }
+
+/**
+ * runUnderActivationLock — the shared per-account lock runner with uncertain
+ * write-outcome tracking. Used by both Portal activation/renewal/term-start and
+ * account-user management, so the release decision is identical everywhere.
+ *
+ * The runner acquires the per-account lock, runs `work(ctx)`, and releases the
+ * lock unless a protected write was left uncertain. `ctx` exposes:
+ *   - markWriteUncertain(): call immediately before a protected write.
+ *   - clearWriteUncertain(): call once the write's outcome is definitively
+ *     known — a successful return, or a confirmed zero-row conditional update.
+ * A throw between mark and clear leaves the write uncertain, so the lock is
+ * retained for reconciliation. A read or validation failure before any mark,
+ * or after a clear, releases the lock. Exact owner-token matching is
+ * preserved on release. `options.busy()` is returned when the lock is held.
+ */
+export async function runUnderActivationLock(service, accountId, work, options = {}) {
+  const lock = await acquireCreationLock(service, accountId);
+  if (!lock.acquired) {
+    return options.busy ? options.busy() : { ok: false, error: 'ACCOUNT_OPERATION_BUSY' };
+  }
+  let release = true;
+  let writeUncertain = false;
+  const ctx = {
+    markWriteUncertain: () => { writeUncertain = true; },
+    clearWriteUncertain: () => { writeUncertain = false; },
+  };
+  try {
+    return await work(ctx);
+  } catch (error) {
+    if (writeUncertain) release = false;
+    throw error;
+  } finally {
+    if (release) await releaseCreationLock(service, accountId, lock.token);
+  }
+}

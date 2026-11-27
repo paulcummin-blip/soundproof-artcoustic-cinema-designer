@@ -35,7 +35,7 @@ import {
   normaliseEmail,
 } from './accountAccessRules.js';
 import { PORTAL_SOURCE, PORTAL_TARGET } from './pilotPortalConstants.js';
-import { acquireCreationLock, releaseCreationLock } from './projectCreationLock.js';
+import { runUnderActivationLock } from './projectCreationLock.js';
 
 const MAX_GRANT_LIFETIME_MS = 5 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -193,26 +193,14 @@ export async function resolveDealerAccountFromGrant(service, grant) {
  * A write with an unknown outcome deliberately retains the lock for review.
  */
 async function withActivationLock(service, accountId, work) {
-  const lock = await acquireCreationLock(service, accountId);
-  if (!lock.acquired) return { ok: false, error: 'ACCOUNT_OPERATION_BUSY' };
-  let release = true;
-  // Marked by the protected callback immediately before its first write. A
-  // failure before any write is a read or validation failure that never
-  // started a write, so the lock is safe to release. A failure after a write
-  // was attempted may have committed without a confirmed outcome, so the
-  // lock is retained for review.
-  let writeStarted = false;
-  const ctx = { markWriteStarted: () => { writeStarted = true; } };
-  try {
+  // Delegates to the shared uncertain-outcome lock runner. The account read
+  // runs inside the work callback; a read failure or not-found returns before
+  // any write is marked, so the lock is released.
+  return runUnderActivationLock(service, accountId, async (ctx) => {
     const rows = await service.entities.Account.filter({ id: accountId });
     if (!Array.isArray(rows) || rows.length !== 1) return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
-    return await work(rows[0], ctx);
-  } catch (error) {
-    if (writeStarted) release = false;
-    throw error;
-  } finally {
-    if (release) await releaseCreationLock(service, accountId, lock.token);
-  }
+    return work(rows[0], ctx);
+  }, { busy: () => ({ ok: false, error: 'ACCOUNT_OPERATION_BUSY' }) });
 }
 
 async function grantAudits(service, jti) {
@@ -317,7 +305,9 @@ export async function createPortalActivation(service, base44, { grant, account }
     }
 
     // Durable reservation precedes all side effects, including native email.
-    ctx.markWriteStarted();
+    // mark before the first protected write; clear once the final grant write
+    // is confirmed so a later read failure cannot retain the lock.
+    ctx.markWriteUncertain();
     await recordGrant(service, current, grant, { phase: 'reserved' });
     const membership = await service.entities.AccountMembership.create({
       email: grant.admin_email, full_name: grant.admin_full_name || null,
@@ -341,6 +331,7 @@ export async function createPortalActivation(service, base44, { grant, account }
       phase: 'completed', membership_id: membership.id, invitation_sent: invitationSent,
       invitation_error: invitationError,
     });
+    ctx.clearWriteUncertain();
     return { ok: true, status: 'invitation_pending', membership,
       invitation_sent: invitationSent, invitation_error: invitationError };
   });
@@ -367,17 +358,25 @@ export async function renewPortalAccess(service, { grant, account }) {
     const expiryMs = Date.parse(previousExpiry);
     if (!Number.isFinite(expiryMs)) return { ok: false, error: 'ACCOUNT_EXPIRY_INVALID' };
     const expiresAt = new Date(Math.max(expiryMs, Date.now()) + NINETY_DAYS_MS).toISOString();
-    ctx.markWriteStarted();
+    ctx.markWriteUncertain();
     await recordGrant(service, current, grant, { phase: 'reserved',
       previous_expires_at: previousExpiry, new_expires_at: expiresAt });
+    ctx.clearWriteUncertain();
+    // The renewal update is conditional; a confirmed zero-row result is a
+    // definite outcome (not uncertainty), so the lock is released and the
+    // reservation remains as the reconciliation marker.
+    ctx.markWriteUncertain();
     const updated = await service.entities.Account.updateMany({
       id: current.id, status: current.status, soundproof_access_expires_at: previousExpiry,
     }, { $set: { soundproof_access_expires_at: expiresAt, status: 'active' } });
+    ctx.clearWriteUncertain();
     if (updated?.updated !== 1) throw new Error('RENEWAL_REQUIRES_REVIEW');
     // Access flags are projected by the membership authority on next authorised
     // access. Never re-enable removed/suspended or price-list-only users here.
+    ctx.markWriteUncertain();
     await recordGrant(service, current, grant, { phase: 'completed',
       previous_expires_at: previousExpiry, new_expires_at: expiresAt });
+    ctx.clearWriteUncertain();
     return { ok: true, status: 'renewed', expires_at: expiresAt };
   });
 }
@@ -540,18 +539,23 @@ export async function startSoundProofTermOnFirstClaim(service, { accountId, user
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.parse(now) + NINETY_DAYS_MS).toISOString();
     // Term, status and first timestamp change together, once, on the account.
-    ctx.markWriteStarted();
+    // The term-start update is conditional; a confirmed zero-row result is a
+    // definite no-op (nothing written), so the lock is released on the throw.
+    ctx.markWriteUncertain();
     const updated = await service.entities.Account.updateMany({
       id: accountId, status: 'inactive', soundproof_eligible: true,
       first_activated_at: null, soundproof_access_expires_at: null,
     }, { $set: { status: 'active', first_activated_at: now, soundproof_access_expires_at: expiresAt } });
+    ctx.clearWriteUncertain();
     if (updated?.updated !== 1) throw new Error('ACTIVATION_STATE_CONFLICT');
+    ctx.markWriteUncertain();
     await service.entities.AccountUserAudit.create({
       account_id: accountId, actor_user_id: claimant.id, actor_email: normaliseEmail(claimant.email),
       action: 'SOUNDPROOF_TERM_STARTED', target_email: normaliseEmail(claimant.email), occurred_at: now,
       details: { portal_activation_request_id: seat.portal_activation_request_id,
         membership_id: seat.id, expires_at: expiresAt },
     });
+    ctx.clearWriteUncertain();
     return { ok: true, expires_at: expiresAt };
   });
   if (!result.ok) throw new Error(result.error);
