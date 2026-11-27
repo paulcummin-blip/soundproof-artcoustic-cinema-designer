@@ -1,7 +1,7 @@
 {
   "name": "EducationDocument",
   "type": "object",
-  "description": "A shared technical education PDF in the Sound Proof Education Library. Visible to all authorised Sound Proof users when published; managed (upload, replace, edit, publish, unpublish, delete) by administrators only. Not associated with any individual cinema project. The PDF is stored as a private file_uri; authorised readers mint a short-lived signed URL to preview or download. new_content_at drives the per-user 'New' sidebar notification: it is set to now when a document is first published or re-published, and when an administrator announces a replacement PDF as new content. Ordinary title/description edits and unpublishing never change new_content_at.",
+  "description": "A shared technical education PDF in the Sound Proof Education Library, presented as a visual bookshelf. Visible to all authorised Sound Proof users when published; managed (upload, replace, edit, publish, unpublish, delete) by administrators only. Not associated with any individual cinema project. The PDF itself is stored as a private file_uri; authorised readers mint a short-lived signed URL to preview or download. A persisted first-page thumbnail (thumbnail_file_uri, private storage) lets the library render covers quickly without re-rendering every full PDF on each page open; readers mint a short-lived signed URL to display each thumbnail. page_count holds the PDF page count. new_content_at drives the per-user 'New' sidebar notification and the per-document 'New' indicator: it is set to now when a document is first published or re-published, and when an administrator announces a replacement PDF as new content. Ordinary title/description edits and unpublishing never change new_content_at.",
   "properties": {
     "title": {
       "type": "string",
@@ -10,7 +10,7 @@
     "description": {
       "type": "string",
       "nullable": true,
-      "description": "Optional short description shown on the document card."
+      "description": "Optional short description shown beneath the document on the shelf."
     },
     "file_uri": {
       "type": "string",
@@ -30,6 +30,16 @@
       "default": "application/pdf",
       "description": "Stored content type. Always application/pdf for this library."
     },
+    "thumbnail_file_uri": {
+      "type": "string",
+      "nullable": true,
+      "description": "Private storage URI of the persisted first-page thumbnail image (a low-res JPEG render of page 1), generated client-side at upload/replace time and stored privately. Readers mint a short-lived signed URL to display it, so the shelf loads quickly without re-rendering every full PDF on each page open. Null when thumbnail generation failed; the shelf shows a branded placeholder and the administrator can regenerate it. Never the full PDF."
+    },
+    "page_count": {
+      "type": "number",
+      "nullable": true,
+      "description": "Number of pages in the PDF, captured at upload/replace time. Null when the count could not be read. Shown beneath each document as 'PDF \u00b7 N pages'."
+    },
     "published": {
       "type": "boolean",
       "default": false,
@@ -45,7 +55,7 @@
       "type": "string",
       "format": "date-time",
       "nullable": true,
-      "description": "Timestamp that drives the per-user Education 'New' sidebar notification. Set to now when a document is first published or re-published, and when an administrator announces a replacement PDF as new content. Null while the document has never been published. Each authenticated user's education_last_visited_at is compared against the maximum new_content_at among published documents to decide whether the 'New' badge shows."
+      "description": "Timestamp that drives the per-user Education 'New' sidebar notification and per-document 'New' indicator. Set to now when a document is first published or re-published, and when an administrator announces a replacement PDF as new content. Null while the document has never been published. Each authenticated user's education_last_visited_at is compared against the maximum new_content_at among published documents to decide whether the 'New' badge shows."
     },
     "created_by_name": {
       "type": "string",

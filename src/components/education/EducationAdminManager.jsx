@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import { base44 } from '@/api/base44Client';
+import { generatePdfThumbnail } from './pdfThumbnail';
+import { attachSignedThumbnails } from './educationThumbnailSigning';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +25,7 @@ import {
   Check,
   X,
   FileText,
+  FileImage,
 } from 'lucide-react';
 
 const BRAND_GREEN = '#213428';
@@ -76,7 +79,8 @@ export default function EducationAdminManager() {
       const page = await base44.entities.EducationDocument.list(
         { sort: '-created_date', limit: 200 },
       );
-      setDocs(page?.items || []);
+      const items = await attachSignedThumbnails(page?.items || []);
+      setDocs(items);
       setError(null);
     } catch (e) {
       setError(e?.message || 'Failed to load documents');
@@ -111,6 +115,18 @@ export default function EducationAdminManager() {
     }
     setBusy(true);
     setError(null);
+    // Generate the first-page thumbnail + page count in the browser, then
+    // persist the thumbnail to public storage so the shelf loads quickly.
+    let thumbnailUrl = null;
+    let pageCount = null;
+    try {
+      const result = await generatePdfThumbnail(file, (imgFile) =>
+        base44.integrations.Core.UploadPrivateFile({ file: imgFile }));
+      thumbnailUrl = result.thumbnailFileUri;
+      pageCount = result.pageCount;
+    } catch (err) {
+      // Thumbnail generation failed — continue; admin can regenerate later.
+    }
     try {
       const up = await base44.integrations.Core.UploadPrivateFile({ file });
       const fileUri = up?.file_uri;
@@ -122,11 +138,41 @@ export default function EducationAdminManager() {
         file_size: file.size,
         title: file.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').trim(),
         published: false,
+        thumbnail_file_uri: thumbnailUrl,
+        page_count: pageCount,
       });
-      flash('Document uploaded as a draft.');
+      flash(thumbnailUrl ? 'Document uploaded as a draft.' : 'Document uploaded (thumbnail will be regenerated).');
       await refresh();
     } catch (err) {
       setError(err?.message || 'Upload failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRegenerateThumbnail = async (doc) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const signed = await base44.integrations.Core.CreateFileSignedUrl({ file_uri: doc.file_uri });
+      const signedUrl = signed?.signed_url;
+      if (!signedUrl) throw new Error('Could not open the PDF for rendering.');
+      const resp = await fetch(signedUrl);
+      if (!resp.ok) throw new Error('Could not download the PDF for rendering.');
+      const blob = await resp.blob();
+      const file = new File([blob], doc.file_name || 'document.pdf', { type: 'application/pdf' });
+      const result = await generatePdfThumbnail(file, (imgFile) =>
+        base44.integrations.Core.UploadPrivateFile({ file: imgFile }));
+      await invoke({
+        action: 'update',
+        id: doc.id,
+        thumbnail_file_uri: result.thumbnailFileUri,
+        page_count: result.pageCount,
+      });
+      flash(result.thumbnailFileUri ? 'Thumbnail regenerated.' : 'Thumbnail could not be generated.');
+      await refresh();
+    } catch (err) {
+      setError(err?.message || 'Thumbnail regeneration failed.');
     } finally {
       setBusy(false);
     }
@@ -188,6 +234,17 @@ export default function EducationAdminManager() {
       return;
     }
     setBusy(true);
+    // Regenerate the first-page thumbnail + page count for the replacement.
+    let thumbnailUrl = null;
+    let pageCount = null;
+    try {
+      const result = await generatePdfThumbnail(replaceFile, (imgFile) =>
+        base44.integrations.Core.UploadPrivateFile({ file: imgFile }));
+      thumbnailUrl = result.thumbnailFileUri;
+      pageCount = result.pageCount;
+    } catch (err) {
+      // keep the previous/null thumbnail
+    }
     try {
       const up = await base44.integrations.Core.UploadPrivateFile({ file: replaceFile });
       const fileUri = up?.file_uri;
@@ -199,6 +256,8 @@ export default function EducationAdminManager() {
         file_name: replaceFile.name,
         file_size: replaceFile.size,
         announce_as_new: announceNew,
+        thumbnail_file_uri: thumbnailUrl,
+        page_count: pageCount,
       });
       setReplaceDoc(null);
       flash(announceNew && replaceDoc.published ? 'PDF replaced and announced as new content.' : 'PDF replaced.');
@@ -309,13 +368,30 @@ export default function EducationAdminManager() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 260px', minWidth: 260 }}>
-                <FileText size={22} strokeWidth={1.6} style={{ color: BRAND_GREEN, flexShrink: 0 }} />
+                {doc.thumbnailSignedUrl ? (
+                  <img
+                    src={doc.thumbnailSignedUrl}
+                    alt=""
+                    style={{ width: 40, height: 52, objectFit: 'cover', borderRadius: 2, flexShrink: 0, border: '1px solid #E2DDD6' }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 40, height: 52, borderRadius: 2, flexShrink: 0,
+                      background: '#F3EFEA', border: '1px solid #E2DDD6',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <FileText size={18} strokeWidth={1.6} style={{ color: BRAND_GREEN }} />
+                  </div>
+                )}
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A1A', wordBreak: 'break-word' }}>
                     {doc.title}
                   </div>
                   <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
                     {doc.file_name}{formatBytes(doc.file_size) ? ` · ${formatBytes(doc.file_size)}` : ''}
+                    {doc.page_count ? ` · ${doc.page_count} page${doc.page_count === 1 ? '' : 's'}` : ''}
                     {' · '}{moment(doc.created_date).format('D MMM YYYY')}
                   </div>
                   {doc.description ? (
@@ -345,6 +421,9 @@ export default function EducationAdminManager() {
                 </IconAction>
                 <IconAction title="Download" onClick={() => handleDownload(doc)} disabled={busy}>
                   <Download size={15} />
+                </IconAction>
+                <IconAction title="Regenerate thumbnail" onClick={() => handleRegenerateThumbnail(doc)} disabled={busy}>
+                  <FileImage size={15} />
                 </IconAction>
                 <IconAction title="Replace PDF" onClick={() => openReplace(doc)} disabled={busy}>
                   <RefreshCw size={15} />

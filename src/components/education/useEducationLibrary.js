@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { attachSignedThumbnails } from './educationThumbnailSigning';
 
 /**
  * useEducationLibrary — loads published Education documents for authorised
- * users, newest published first. Also provides signed-URL helpers to preview
- * and download a document's private PDF.
+ * users, newest published first, and mints short-lived signed URLs for each
+ * persisted first-page thumbnail so the bookshelf renders the actual PDF
+ * covers quickly without re-rendering the full PDFs.
  */
 export function useEducationLibrary() {
   const [docs, setDocs] = useState([]);
@@ -18,7 +20,8 @@ export function useEducationLibrary() {
         { published: true },
         { sort: '-published_at', limit: 100 },
       );
-      setDocs(page?.items || []);
+      const items = await attachSignedThumbnails(page?.items || []);
+      setDocs(items);
       setError(null);
     } catch (e) {
       setError(e?.message || 'Failed to load documents');

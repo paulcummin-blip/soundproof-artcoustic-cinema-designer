@@ -36,13 +36,25 @@ function toFileSize(value) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+function toPageCount(value) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Persisted thumbnail storage URI (private). Any non-empty string is accepted;
+// it is a private file_uri minted by UploadPrivateFile, not a public URL.
+function toThumbnailFileUri(value) {
+  const s = String(value == null ? '' : value).trim();
+  return s ? s.slice(0, 2048) : null;
+}
+
 /**
  * Admin-only management for the Sound Proof Education Library.
  *
  * Actions:
  *   create        — upload a new PDF (file_uri from UploadPrivateFile), create a draft or published document.
- *   update        — edit title and/or description only (never touches new_content_at).
- *   replace       — replace the PDF file, optionally announcing it as new content.
+ *   update        — edit title and/or description, and/or refresh the persisted thumbnail + page count. Never touches new_content_at.
+ *   replace       — replace the PDF file and its thumbnail/page count, optionally announcing it as new content.
  *   set_published — publish or unpublish a document. Publishing sets published_at and new_content_at to now.
  *   delete        — remove a document.
  *
@@ -73,7 +85,7 @@ export default async function(req) {
     const getExisting = async (id) => svc.get(id).catch((e) => (e.status === 404 ? null : Promise.reject(e)));
 
     if (action === 'create') {
-      const { file_uri, file_name, file_size, title, description, published } = body;
+      const { file_uri, file_name, file_size, title, description, published, thumbnail_file_uri, page_count } = body;
       if (!file_uri || typeof file_uri !== 'string') {
         return Response.json({ error: 'file_uri is required.' }, { status: 400 });
       }
@@ -88,6 +100,8 @@ export default async function(req) {
         file_name: sanitizeFileName(file_name),
         file_size: toFileSize(file_size),
         file_content_type: 'application/pdf',
+        thumbnail_file_uri: toThumbnailFileUri(thumbnail_file_uri),
+        page_count: toPageCount(page_count),
         published: willPublish,
         published_at: willPublish ? now : null,
         new_content_at: willPublish ? now : null,
@@ -97,7 +111,7 @@ export default async function(req) {
     }
 
     if (action === 'update') {
-      const { id, title, description } = body;
+      const { id, title, description, thumbnail_file_uri, page_count } = body;
       if (!id) return Response.json({ error: 'id is required.' }, { status: 400 });
       const existing = await getExisting(id);
       if (!existing) return Response.json({ error: 'Document not found.' }, { status: 404 });
@@ -110,12 +124,18 @@ export default async function(req) {
       if (typeof description !== 'undefined') {
         patch.description = sanitizeDescription(description);
       }
+      if (typeof thumbnail_file_uri !== 'undefined') {
+        patch.thumbnail_file_uri = toThumbnailFileUri(thumbnail_file_uri);
+      }
+      if (typeof page_count !== 'undefined') {
+        patch.page_count = toPageCount(page_count);
+      }
       const updated = await svc.update(id, patch);
       return Response.json({ ok: true, document: updated });
     }
 
     if (action === 'replace') {
-      const { id, file_uri, file_name, file_size, announce_as_new } = body;
+      const { id, file_uri, file_name, file_size, announce_as_new, thumbnail_file_uri, page_count } = body;
       if (!id) return Response.json({ error: 'id is required.' }, { status: 400 });
       if (!file_uri || typeof file_uri !== 'string') {
         return Response.json({ error: 'file_uri is required.' }, { status: 400 });
@@ -130,6 +150,8 @@ export default async function(req) {
         file_name: sanitizeFileName(file_name),
         file_size: toFileSize(file_size),
         file_content_type: 'application/pdf',
+        thumbnail_file_uri: toThumbnailFileUri(thumbnail_file_uri),
+        page_count: toPageCount(page_count),
       };
       // Announce as new content: refresh the notification timestamp. Only
       // published documents drive the notification, so for a draft this is a
