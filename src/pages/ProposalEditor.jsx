@@ -870,7 +870,7 @@ export default function ProposalEditor() {
   // The section order must be saved before a PDF can be issued, so the exported
   // document can never reflect an order that was never persisted.
   const orderUnsaved =
-    latestOrderRef.current?.[0]?.proposal_id === proposal?.id && Boolean(proposal?.id)
+    (Boolean(proposal?.id) && latestOrderRef.current?.[0]?.proposal_id === proposal.id)
     || reorderStatus === SAVE_STATUS.SAVING || reorderStatus === SAVE_STATUS.FAILED;
   const orderBlockReason = orderUnsaved ? 'Save the section order before exporting.' : null;
   const {

@@ -189,7 +189,8 @@ it('immediately composes a cached validation layer in the current editor order, 
   expect(rows.map(row => row.id)).toEqual(orderClient({ sections: editor, proposalType: 'system_summary' }).map(row => row.id));
   expect(rows.map(row => row.body)).not.toContain('unreviewed editor text');
   expect(JSON.stringify(prepared)).toBe(before);
-  const pages = pageOrder(render({ ...genesisPackProps(), sections: rows }));
+  const pack = React.createElement(ProposalPackDocument, { ...genesisPackProps(), sections: rows });
+  const pages = pageOrder(renderToStaticMarkup(pack));
   expect(pages.indexOf('dynamic_range')).toBeLessThan(pages.indexOf('spatial_resolution'));
 });
 
