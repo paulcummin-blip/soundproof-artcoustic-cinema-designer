@@ -25,7 +25,7 @@ const bundle=(await build({stdin:{resolveDir:process.cwd(),contents:`
   export {useEvaluatedPlacementRecommendations as useRec} from "@/components/room/bass/bda/useEvaluatedPlacementRecommendations";
   export {stage1PlacementController as controller} from "@/components/room/bass/stage1/stage1PlacementStore";`},
   alias:{"@":process.cwd()+"/src"}, platform:"node",format:"cjs",bundle:true,write:false,
-  external:["react"],logLevel:"silent",loader:{".js":"jsx"},define:{"import.meta.env":"{}"},
+  external:["react"],logLevel:"silent",loader:{".js":"jsx"},define:{"import.meta.env":"{}","import.meta.url":JSON.stringify(import.meta.url)},
   plugins:[{name:"fixture-boundaries",setup(b){
     b.onResolve({filter:/.*/},a=>stubs[a.path]?{path:a.path,namespace:"fixture"}:undefined);
     b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:stubs[a.path]}));
