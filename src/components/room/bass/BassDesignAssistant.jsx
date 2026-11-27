@@ -317,6 +317,8 @@ export default function BassDesignAssistant({
           canonical evaluation. Apply uses the existing quantity-aware,
           fingerprint-protected authority. */}
       <Stage1LayoutCards
+        seatingPositions={seatingPositions}
+        rspPosition={rspPosition}
         options={evaluatedRecommendations.stage1Options}
         status={evaluatedRecommendations.stage1Status}
         waitingReason={evaluatedRecommendations.waitingReason}

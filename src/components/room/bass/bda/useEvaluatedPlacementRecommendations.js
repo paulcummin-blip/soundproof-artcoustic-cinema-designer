@@ -42,7 +42,8 @@
 // identity behaviour — they do not pass through this hook.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useStage1ResponseRepair } from "./useStage1ResponseRepair";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useStage1PlacementOptimiser } from "../stage1/useStage1PlacementOptimiser";
 import { useStage2PlacementOptimiser } from "../stage2/useStage2PlacementOptimiser";
 import {
@@ -306,8 +307,8 @@ export function useEvaluatedPlacementRecommendations({
   // complete, regardless of whether a subwoofer model, P14 target or
   // Stage 2 evaluation exists.
   const stage1Options = useMemo(
-    () => stage1EvidenceMatches ? buildStage1Recommendations(stage1State, { roomDims }) : [],
-    [stage1EvidenceMatches, stage1State, roomDims],
+    () => stage1EvidenceMatches ? buildStage1Recommendations(stage1State, { roomDims, seatingPositions }) : [],
+    [stage1EvidenceMatches, stage1State, roomDims, seatingPositions],
   );
 
   const stage1CandidateCount = useMemo(() => {
@@ -320,7 +321,7 @@ export function useEvaluatedPlacementRecommendations({
     if (!inputs.geometryReady) return "waiting";
     if (stage1State?.status === "error") return "error";
     if (!stage1EvidenceMatches) return "discovering";
-    return "complete";
+    return stage1Options.length === 3 && stage1Options.every(option => option?.ready) ? "complete" : "incomplete";
   })();
 
   // ── Stage 1 preview curves (from refined response evidence) ───────
@@ -329,29 +330,15 @@ export function useEvaluatedPlacementRecommendations({
   // describe the SAME response. No engine call and no recomputation when the
   // designer changes product selection, P14 target, zoom or workspace
   // settings — the evidence is read directly from the recommendation option.
-  const [stage1Previews, setStage1Previews] = useState(null);
-  useEffect(() => {
-    if (!stage1EvidenceMatches || !stage1Options.length) {
-      setStage1Previews(null);
-      return;
-    }
-    const validOptions = stage1Options.filter(Boolean);
-    if (validOptions.length === 0) {
-      setStage1Previews(null);
-      return;
-    }
-    let cancelled = false;
-    try {
-      const rawPreviews = validOptions.map((option) =>
-        buildStage1PreviewFromEvidence(option, seatingPositions));
-      if (cancelled) return;
-      const { previews, yMin, yMax } = normalisePreviewsForDisplay(rawPreviews);
-      setStage1Previews({ previews, yMin, yMax });
-    } catch {
-      if (!cancelled) setStage1Previews(null);
-    }
-    return () => { cancelled = true; };
-  }, [stage1EvidenceMatches, stage1Options, seatingPositions]);
+  const context = { roomDims, rspPosition, seatingPositions,
+    physicsOptions: physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS };
+  const one = useStage1ResponseRepair(stage1Options[0], projectId, versionId, context);
+  const two = useStage1ResponseRepair(stage1Options[1], projectId, versionId, context);
+  const four = useStage1ResponseRepair(stage1Options[2], projectId, versionId, context);
+  const stage1Previews = useMemo(() => {
+    const raw = stage1Options.map(option => buildStage1PreviewFromEvidence(option, seatingPositions));
+    return { ...normalisePreviewsForDisplay(raw), repairs: { 1: one, 2: two, 4: four } };
+  }, [stage1Options, seatingPositions, one, two, four]);
 
   // Stage 2 evidence matches only when the store holds a COMPLETED result
   // whose fingerprint equals the fingerprint the current inputs would

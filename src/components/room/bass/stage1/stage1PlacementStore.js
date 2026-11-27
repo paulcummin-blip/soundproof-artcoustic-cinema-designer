@@ -47,6 +47,13 @@ export function getStage1State(projectId, versionId) {
   return getMemory(projectId, versionId);
 }
 
+export function updateRecoveredBucket(projectId, versionId, fingerprint, field, previous, bucket) {
+  const state = getMemory(projectId, versionId);
+  if (state.status === "complete" && state.fingerprint === fingerprint && state[field] === previous) {
+    setMemory(projectId, versionId, { [field]: bucket });
+  }
+}
+
 export function subscribeStage1(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);

@@ -12,7 +12,7 @@ import {
   publishHydratedStage1,
   markStage1Idle,
 } from "./stage1PlacementStore";
-import { hydrateStage1PlacementCache, isStage1CacheValid } from "./stage1PlacementPersistence";
+import { hydrateStage1PlacementCache, isStage1CacheValid, restoreRecommendationBuckets } from "./stage1PlacementPersistence";
 import { DEFAULT_BEST_SUB_LAYOUT_PHYSICS } from "../best-layout/bestSubLayoutPhysicsSnapshot";
 import { STAGE1_START_DELAY_MS } from "./stage1Constants";
 import { useIsDragActive } from "@/components/state/userInteractionStore";
@@ -92,12 +92,7 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
   // request) and for the dependency array, but is NOT the published identity.
   useEffect(() => {
     if (!hydrationDone || !isStage1CacheValid(hydratedCache, fingerprint)) return;
-    publishHydratedStage1(projectId, versionId, fingerprint, {
-      one_sub_result: hydratedCache.one_sub_result,
-      two_sub_result: hydratedCache.two_sub_result,
-      three_sub_result: hydratedCache.three_sub_result,
-      four_sub_result: hydratedCache.four_sub_result,
-    });
+    publishHydratedStage1(projectId, versionId, fingerprint, restoreRecommendationBuckets(hydratedCache, fingerprint, seatingPositions));
   }, [hydrationDone, hydratedCache, fingerprint, baseFingerprint, projectId, versionId]);
 
   // ── Schedule / cancel search on fingerprint change ───────────────────
@@ -164,12 +159,9 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     // carries the same Stage 1 identity a fresh completed search would, and
     // Stage 2 derives an identical downstream fingerprint from either path.
     if (isStage1CacheValid(hydratedCache, fingerprint)) {
-      publishHydratedStage1(projectId, versionId, fingerprint, {
-        one_sub_result: hydratedCache.one_sub_result,
-        two_sub_result: hydratedCache.two_sub_result,
-        three_sub_result: hydratedCache.three_sub_result,
-        four_sub_result: hydratedCache.four_sub_result,
-      });
+      const live = getStage1State(projectId, versionId);
+      if (live.status === "complete" && live.fingerprint === fingerprint) return;
+      publishHydratedStage1(projectId, versionId, fingerprint, restoreRecommendationBuckets(hydratedCache, fingerprint, seatingPositions));
       return;
     }
 

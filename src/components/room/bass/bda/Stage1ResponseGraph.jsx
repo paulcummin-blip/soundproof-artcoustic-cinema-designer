@@ -61,13 +61,14 @@ function buildBandPath(minCurve, maxCurve, yMin, yMax, width, height) {
   return `${top} ${bottom} Z`;
 }
 
-export default function Stage1ResponseGraph({ preview, yMin, yMax, width = 240 }) {
+export default function Stage1ResponseGraph({ preview, yMin, yMax, repair, width = 240 }) {
   const height = GRAPH_HEIGHT;
   if (!preview || !Number.isFinite(yMin) || !Number.isFinite(yMax)) {
     return (
       <div className="rounded border border-[#E7E4DF] bg-[#F8F7F4]" style={{ height }}>
-        <div className="flex items-center justify-center h-full text-[9px] text-[#8A7B6A]">
-          Response preview recovering…
+        <div className="flex flex-col items-center justify-center gap-1 h-full text-[9px] text-[#8A7B6A]">
+          <span role="status">{repair?.active ? "Recovering this response…" : repair?.error || "Response unavailable."}</span>
+          {repair && !repair.active && <button type="button" className="underline" onClick={repair.retry}>Retry response</button>}
         </div>
       </div>
     );
