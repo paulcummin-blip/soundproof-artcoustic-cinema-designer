@@ -418,10 +418,10 @@ index 67837d5..925ef54 100644
  test("loaded and acknowledged snapshots cannot be changed by mutable UI objects",async()=>{
 diff --git a/test/data01-publication-reservation.test.mjs b/test/data01-publication-reservation.test.mjs
 new file mode 100644
-index 0000000..c5908dd
+index 0000000..eeb18ab
 --- /dev/null
 +++ b/test/data01-publication-reservation.test.mjs
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,332 @@
 +import test, { after } from 'node:test';
 +import assert from 'node:assert/strict';
 +import { isDeepStrictEqual } from 'node:util';
@@ -731,6 +731,28 @@ index 0000000..c5908dd
 +  await saveProjectEdit(client,projectId,{room_length:start.room_length+1});
 +  assert.equal(JSON.parse(s.rows('Project')[0].roomDims).lengthM,start.room_length+1);
 +  assert.equal(guarded,2);
++});
++
++test('width-front versions compare physical axes and a saved screen wall participates in publication', async t=>{
++  const s=recordStore(t),base=s.rows('Project')[0];
++  const rotated={...design,room_orientation:'width_front'};
++  s.put('ProjectVersion',{...s.version(),design_state:rotated});
++  function rotatedPayload(fp,wall) {
++    const body=payload(fp);body.expected_design_state=rotated;body.expected_screen_wall=wall;
++    const facts=body.report_snapshot.report_project;
++    Object.assign(facts,{room_width:base.room_length,room_length:base.room_width,roomDims:
++      JSON.stringify({widthM:base.room_length,lengthM:base.room_width,heightM:base.room_height})});
++    return body;
++  }
++  assert.equal((await call(publish,rotatedPayload('rotated','front'))).status,200);
++  const previous=s.version().published_cache_record_id;
++  const gate=pauseAt(s,'commit');
++  const old=call(publish,rotatedPayload('old-wall','front'));await gate.paused;
++  assert.equal((await editRoom(s,{screen_wall:'left'})).status,200);
++  gate.resume();assert.equal((await old).status,409);
++  assert.equal(s.version().published_cache_record_id,previous);
++  assert.equal((await current()).data.status,'stale');
++  assert.equal((await call(publish,rotatedPayload('new-wall','left'))).status,200);
 +});
 diff --git a/test/proposal-generate-readiness-agreement.test.mjs b/test/proposal-generate-readiness-agreement.test.mjs
 index 2233383..33cccf6 100644
