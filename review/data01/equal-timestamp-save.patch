@@ -1,0 +1,50 @@
+--- a/src/components/state/conditionalDesignSave.js
++++ b/src/components/state/conditionalDesignSave.js
+@@ -81,6 +81,8 @@
+       for (const key of Object.keys(changes)) query[key] = row[key] ?? null;
+       result = await entity.updateMany(query, { $set: changes });
+     } else {
++      // Distinct design saves can share the same database timestamp.
++      query.design_state = row.design_state ?? null;
+       result = await entity.updateMany(query, { $set: patch });
+     }
+   } catch (error) { failure = error; }
+--- a/test/concurrent-design-save.test.mjs
++++ b/test/concurrent-design-save.test.mjs
+@@ -1,6 +1,7 @@
+ import test from "node:test";
+ import assert from "node:assert/strict";
+ import fs from "node:fs/promises";
++import { isDeepStrictEqual } from "node:util";
+ let source = await fs.readFile(new URL("../src/components/state/conditionalDesignSave.js", import.meta.url), "utf8");
+ source = source.replace("'./sharedRoomSave.js'", JSON.stringify(new URL("../src/components/state/sharedRoomSave.js",import.meta.url).href));
+ const fingerprintSource = await fs.readFile(new URL("../src/components/proposal/engineeringAuthority/engineeringFingerprint.js", import.meta.url), "utf8");
+@@ -22,7 +23,7 @@
+       calls++;
+       if(beforeWrite){const fn=beforeWrite;beforeWrite=null;await fn(rows[kind]);}
+       if(failed){failed=false;throw new Error("offline");}
+-      if(Object.entries(query).some(([k,v])=>rows[kind][k]!==v)) return {updated:0};
++      if(Object.entries(query).some(([k,v])=>!isDeepStrictEqual(rows[kind][k] ?? null, v))) return {updated:0};
+       rows[kind]={...rows[kind],...copy(update.$set),updated_date:String(++seq)};
+       if(lost){lost=false;throw new Error("lost reply");}
+       return {updated:1};
+@@ -123,3 +124,19 @@
+  for(let i=0;i<3;i++)await assert.rejects(saveDesignConditionally(b,{seats:4,screen:65},()=>{},f.client),{code:DESIGN_CONFLICT});
+  assert.equal(f.calls,0);
+ });
++
++test("a screen edit cannot undo a six-seat save with the same timestamp", async () => {
++  const f = fixture();
++  const baseline = f.baseline();
++  const draft = {seats: 4, screen: 65};
++  f.race(row => { row.design_state = {seats: 6, screen: 55}; });
++
++  await assert.rejects(saveDesignConditionally(baseline, draft, () => {}, f.client), {
++    code: DESIGN_CONFLICT,
++    message: /Your unsaved edits are kept in this tab/,
++  });
++  assert.deepEqual(f.rows.ProjectVersion.design_state, {seats: 6, screen: 55});
++  assert.deepEqual(draft, {seats: 4, screen: 65});
++  await assert.rejects(saveDesignConditionally(baseline, draft, () => {}, f.client), {code: DESIGN_CONFLICT});
++  assert.equal(f.calls, 1);
++});
