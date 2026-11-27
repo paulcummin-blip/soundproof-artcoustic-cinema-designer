@@ -52,7 +52,7 @@ export function isZeroSizePageFailure(error) {
  * @param {Object} input
  * @param {Array} input.pages — the page elements, in document order
  * @param {(page: any, index: number) => Promise<{dataUrl: string, width: number, height: number}>} input.rasterPage
- * @param {() => Promise<Array<{dataUrl: string, width: number, height: number}|null>>} [input.rasterAll]
+ * @param {(unresolvedIndices: number[]) => Promise<Array<{dataUrl: string, width: number, height: number}|null>>} [input.rasterAll]
  *   — one pass over the whole composition, one entry per page, in the same order
  * @returns {Promise<{rasters: Array, diagnostics: Object}>} one entry per page —
  *   the raster, or null where that page has none. `diagnostics.previewStatus`
@@ -117,7 +117,7 @@ export async function collectPageRasters({ pages, rasterPage, rasterAll = null, 
     diagnostics.fallback = RESILIENCE_OPERATION.FALLBACK;
     let all = null;
     try {
-      all = await rasterAll();
+      all = await rasterAll(unresolved.map(({ index }) => index));
     } catch (error) {
       diagnostics.fallbackFailed = String(error?.message || error).slice(0, 240);
     }

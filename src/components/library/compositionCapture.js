@@ -536,7 +536,8 @@ async function captureComposition({ nodeHtml, pageSelector, bodyClass = '', page
         telemetry?.recordPage(index + 1, pageEnd - pageStart);
         return raster;
       },
-      rasterAll: () => rasteriseCompositionPages(pageContainer, pages, {
+      rasterAll: (unresolvedIndices) => rasteriseCompositionPages(pageContainer, pages, {
+        unresolvedIndices,
         scale: scaleOf(pageContainer || pages[0]),
         windowWidth: viewport.width,
         windowHeight: viewport.height,

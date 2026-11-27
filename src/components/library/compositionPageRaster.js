@@ -115,22 +115,10 @@ export function rasterisePage(element, { pageNumber, scale, windowWidth, windowH
   });
 }
 
-/**
- * EVERY page of the composition rasterised in ONE pass and cut out of that single
- * canvas, page by page.
- *
- * This is the recovery path for a page whose own capture returned no PNG data: a
- * page that measures nothing when cloned on its own still rasterises correctly as
- * part of the composition it sits in. Each page is cut at its own measured
- * rectangle, so the recovered page IS that page — nothing is reflowed,
- * re-paginated or re-measured.
- *
- * @returns {Promise<Array<{dataUrl: string, width: number, height: number}|null>>}
- *   one entry per page, in order; null where even this pass produced no PNG data.
- */
-export async function rasteriseCompositionPages(container, pages, { scale, windowWidth, windowHeight }) {
-  const list = Array.isArray(pages) ? pages : [];
-  if (!container || list.length === 0) return list.map(() => null);
+/** Paint the original composition and recover only the requested page rectangles. */
+export async function rasteriseCompositionPages(container, pages, { unresolvedIndices, scale, windowWidth, windowHeight }) {
+  const recovered = new Array(pages.length).fill(null);
+  if (!container || unresolvedIndices.length === 0) return recovered;
 
   const { canvas } = await capturePagePng(container, 1, {
     backgroundColor: '#FFFFFF',
@@ -141,29 +129,39 @@ export async function rasteriseCompositionPages(container, pages, { scale, windo
     windowHeight,
     scrollX: 0,
     scrollY: 0,
-  });
+  }, { encodePng: false });
 
-  const containerRect = container.getBoundingClientRect();
-  const ratio = canvas.width / Math.max(Number(containerRect.width) || 0, 1);
-  const scope = container.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  try {
+    const containerRect = container.getBoundingClientRect();
+    const ratio = canvas.width / Math.max(Number(containerRect.width) || 0, 1);
+    const scope = container.ownerDocument || document;
 
-  return list.map((page) => {
-    const rect = page?.getBoundingClientRect?.();
-    if (!rect || !scope?.createElement) return null;
-    const width = Math.round(rect.width * ratio);
-    const height = Math.round(rect.height * ratio);
-    if (width <= 0 || height <= 0) return null;
-    const x = Math.round((rect.left - containerRect.left) * ratio);
-    const y = Math.round((rect.top - containerRect.top) * ratio);
-    const slice = scope.createElement('canvas');
-    slice.width = width;
-    slice.height = height;
-    const context = slice.getContext?.('2d');
-    if (!context) return null;
-    context.drawImage(canvas, x, y, width, height, 0, 0, width, height);
-    const dataUrl = slice.toDataURL('image/png');
-    return inspectCanvasPng(dataUrl).valid ? { dataUrl, width, height } : null;
-  });
+    for (const index of unresolvedIndices) {
+      const rect = pages[index].getBoundingClientRect();
+      const width = Math.round(rect.width * ratio);
+      const height = Math.round(rect.height * ratio);
+      if (width <= 0 || height <= 0) continue;
+      const x = Math.round((rect.left - containerRect.left) * ratio);
+      const y = Math.round((rect.top - containerRect.top) * ratio);
+      const slice = scope.createElement('canvas');
+      try {
+        slice.width = width;
+        slice.height = height;
+        const context = slice.getContext('2d');
+        if (!context) continue;
+        context.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+        const dataUrl = slice.toDataURL('image/png');
+        if (inspectCanvasPng(dataUrl).valid) recovered[index] = { dataUrl, width, height };
+      } finally {
+        slice.width = 0;
+        slice.height = 0;
+      }
+    }
+    return recovered;
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 export default rasterisePage;

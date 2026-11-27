@@ -49,7 +49,7 @@ export function pageCaptureFailure(error, diagnostics) {
   return failure;
 }
 
-export default async function capturePagePng(element, pageNumber, options) {
+export default async function capturePagePng(element, pageNumber, options, { encodePng = true } = {}) {
   const diagnostics = {
     pageNumber,
     heading: element.querySelector('.pp-header__title')?.textContent?.trim() || null,
@@ -98,6 +98,8 @@ export default async function capturePagePng(element, pageNumber, options) {
       diagnostics.zeroSize = true;
       throw new Error(`The page raster came back as a ${canvas.width} × ${canvas.height} canvas.`);
     }
+    // Composition recovery uses the validated canvas directly as its crop source.
+    if (!encodePng) return { canvas, diagnostics };
     diagnostics.operation = 'png_encoding';
     const encodeStarted = performance.now();
     dataUrl = canvas.toDataURL('image/png');
@@ -115,6 +117,10 @@ export default async function capturePagePng(element, pageNumber, options) {
       throw new Error(diagnostics.png.reason);
     }
   } catch (error) {
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
     throw pageCaptureFailure(error, diagnostics);
   }
   return { canvas, dataUrl, diagnostics };
