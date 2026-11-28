@@ -1,9 +1,9 @@
+import { publicationRow, PublicationConflict } from "../../shared/publicationRow.js";
 import { restorePublicationBassGraphEvidence } from '../../shared/bassEvidencePublication.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import {
   loadOwnedProjectVersion,
-  loadCacheRecord,
   findPublication,
   cleanPublicationForResponse,
 } from '../../shared/publishedEngineeringAuthority.js';
@@ -106,24 +106,8 @@ export default async function(req) {
     }
 
     // Load the cache record and find the publication
-    const cacheRecord = await loadCacheRecord(service, projectId, versionId);
+    const cacheRecord = await publicationRow(service, version, fingerprint);
     const publication = findPublication(cacheRecord, fingerprint);
-
-    if (!publication) {
-      // Fingerprint is set on the version but no matching publication exists
-      // in the cache — the publication is stale or the cache was cleared.
-      return Response.json({
-        publication: null,
-        status: 'stale',
-        version: {
-          id: version.id,
-          version_name: version.version_name || null,
-          published_fingerprint: version.published_fingerprint || null,
-          published_at: version.published_at || null,
-        },
-        acknowledgement: acknowledgementFor(notPublished),
-      });
-    }
 
     const audit = auditEngineeringPublication(publication, {
       // The fingerprint THIS read resolved is the authority the publication must
@@ -137,6 +121,10 @@ export default async function(req) {
       bassAuthorityAvailable: Object.keys(cacheRecord?.completed_by_fingerprint || {}).length > 0,
     });
 
+    if (!audit.durablyPublished) {
+      throw new PublicationConflict('The saved engineering evidence failed verification.');
+    }
+
     return Response.json({
       publication: cleanPublicationForResponse(restorePublicationBassGraphEvidence(publication, cacheRecord)),
       status: 'published',
@@ -145,6 +133,7 @@ export default async function(req) {
         version_name: version.version_name || null,
         published_fingerprint: version.published_fingerprint || null,
         published_at: version.published_at || null,
+        published_cache_record_id: version.published_cache_record_id ?? null,
         published_engine_version: version.published_engine_version || null,
         published_rp22_version: version.published_rp22_version || null,
         published_algorithm_version: version.published_algorithm_version || null,
@@ -153,6 +142,7 @@ export default async function(req) {
       acknowledgement: acknowledgementFor(audit),
     });
   } catch (error) {
+    if (error instanceof PublicationConflict) return Response.json({status:'verification_unavailable', publication:null, message:error.message, acknowledgement:{durably_published:false}});
     return Response.json({
       error: 'READ_PUBLISHED_ENGINEERING_FAILED',
       message: error?.message || 'Unable to read published engineering result.',

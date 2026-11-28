@@ -1,3 +1,4 @@
+import { readVerifiedPublicationMap } from "@/components/engineering/versionedEngineeringAuthority";
 /**
  * useP17SavedVersionComparison.js
  * -------------------------------
@@ -53,21 +54,18 @@ export default function useP17SavedVersionComparison({ projectId, enabled = true
         { project_id: projectId },
         { sort: "version_number", limit: 5 },
       );
-      const savedVersions = versionResponse?.items || [];
+      const savedVersions = (Array.isArray(versionResponse) ? versionResponse : versionResponse?.items) || [];
 
-      const cacheResponse = await base44.entities.ProjectAnalysisCache.filter(
-        { project_id: projectId },
-        { limit: 10 },
-      );
-      const cacheByVersionId = new Map((cacheResponse?.items || []).map((row) => [row.version_id, row]));
+      const cacheByVersionId = new Map(await Promise.all(savedVersions.map(async version =>
+        [version.id, await readVerifiedPublicationMap(projectId, version).catch(() => ({}))])));
 
       const versions = P17_COMPARISON_VERSION_NAMES.map(({ key, fallbackLabel }) => {
         const version = savedVersions.find((item) => String(item.version_name || "").toLowerCase().includes(key)) || null;
         if (!version) return { label: fallbackLabel, status: "no_version", rows: [] };
 
-        const publications = cacheByVersionId.get(version.id)?.engineering_publications || {};
+        const publications = cacheByVersionId.get(version.id) || {};
         const fingerprint = version.published_fingerprint;
-        const publication = (fingerprint && publications[fingerprint]) || latestPublication(publications);
+        const publication = (fingerprint && publications[fingerprint]) || null;
         const summary = publication?.engineering_summary || null;
 
         if (!summary) {

@@ -31,6 +31,7 @@ import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shar
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { normaliseClarificationAnswers } from '../../shared/proposalClarification/clarificationAnswers.js';
 import { recordedIntentFromContext } from '../../shared/designContext/designContextModel.js';
+import { verifiedPublicationRow, comparisonPublications, PublicationConflict } from '../../shared/publicationRow.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
 // The proposal-specific reuse verdict, shared with the report-evidence reader:
 // wording-only publication moves are safe, but a changed client-facing Display
@@ -340,13 +341,24 @@ export default async function(req) {
       // Read through the service role, exactly as the version's own
       // published-engineering read reads it: the verdict below is then taken from
       // the same two publications the readiness card compares.
-      const cacheRecord = await loadCacheRecord(base44.asServiceRole, project_id, versionId);
+      let cacheRecord;
+      try {
+        cacheRecord = pointer
+          ? await verifiedPublicationRow(base44.asServiceRole, versionRecord, project)
+          : await loadCacheRecord(base44.asServiceRole, project_id, versionId);
+      } catch (error) {
+        if (!(error instanceof PublicationConflict)) throw error;
+        return Response.json({
+          error: 'ENGINEERING_VERIFICATION_UNAVAILABLE',
+          message: error.message,
+        }, { status: 409 });
+      }
       if (cacheRecord) cacheRecordByVersionId.set(versionId, cacheRecord);
       const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
       if (publication) versionPublicationById.set(versionId, publication);
     }
 
-    const readinessRows = resolvedVersionIds.map((versionId) => {
+    const readinessRows = await Promise.all(resolvedVersionIds.map(async (versionId) => {
       const versionRecord = (projectVersions || []).find((version) => version.id === versionId) || null;
       const publication = versionPublicationById.get(versionId) || null;
       // THE canonical saved Project Report — the only report source a proposal
@@ -365,7 +377,7 @@ export default async function(req) {
       // never state two verdicts about one saved report. A bass or seating change
       // is never excused, and an absent comparison leaves the strict verdict.
       const presentationOnlyMove = proposalEvidenceMoveIsSafe(
-        cacheRecordByVersionId.get(versionId) || null,
+        await comparisonPublications(base44.asServiceRole, versionRecord, cacheRecordByVersionId.get(versionId), savedProjectReport),
         {
           frozenFingerprint: savedProjectReport?.source_fingerprints?.engineeringFingerprint || null,
           currentFingerprint: publication?.engineering_fingerprint || null,
@@ -387,7 +399,7 @@ export default async function(req) {
           seatPriorityFingerprint: publication?.engineering_summary?.seatPriorityFingerprint || null,
         },
       });
-    });
+    }));
 
     const readinessGate = resolveProposalReadinessGate({ rows: readinessRows, minVersions: 1 });
     // Saved-report reader above is the gate. A lagging publication pointer

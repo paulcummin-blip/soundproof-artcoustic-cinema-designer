@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
+import { publicationRow } from '../../shared/publicationRow.js';
 import { loadOwnedProjectVersion, loadCacheRecord, findPublication } from '../../shared/publishedEngineeringRead.js';
 import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
 
@@ -27,7 +28,7 @@ export default async function(req) {
     let owned;
     try { owned = await loadOwnedProjectVersion(base44.asServiceRole, projectId, versionId, access); }
     catch (error) { return Response.json({ error: error.code || 'FORBIDDEN' }, { status: error.code === 'FORBIDDEN' ? 403 : 404 }); }
-    const cache = await loadCacheRecord(base44.asServiceRole, projectId, versionId).catch(() => null);
+    const cache = await (owned.version.published_fingerprint ? publicationRow(base44.asServiceRole, owned.version) : loadCacheRecord(base44.asServiceRole, projectId, versionId)).catch(() => null);
     const engineeringFingerprint = owned.version.published_fingerprint || null;
     const publication = engineeringFingerprint ? findPublication(cache, engineeringFingerprint) : null;
     if (code === 'REPORT_SAVED_EVIDENCE_REJECTED' && !engineeringFingerprint && !cache?.current_fingerprint) {

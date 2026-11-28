@@ -201,7 +201,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           )),
           // The durable published-engineering read, one per selected version,
           // shared with every other consumer of the authority (session-cached).
-          Promise.all(ids.map((versionId) => runReadinessRead('published engineering', () => fetchDurablePublication(projectId, versionId)))),
+          Promise.all(ids.map((versionId) => runReadinessRead('published engineering', () => fetchDurablePublication(projectId, versionId, {force:true})))),
           // The version's completed calculation authority — the calculated
           // engineering result a Technical Report is generated from. Read
           // through the same session-cached project read the report path uses.
@@ -302,6 +302,10 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         const nextRows = ids.map((versionId, index) => {
           const version = versionsById.get(versionId) || null;
           const durable = durableReads[index] || null;
+          if (version?.published_fingerprint && (!durable?.acknowledgement?.durably_published ||
+              durable.publication?.engineering_fingerprint !== version.published_fingerprint ||
+              (version.published_cache_record_id != null && durable.version?.published_cache_record_id !== version.published_cache_record_id)))
+            throw new Error('The saved engineering evidence could not be verified.');
           // THE canonical saved Project Report — the only report source a
           // proposal is gated on. The legacy Visual and Technical Reports are
           // never consulted here.

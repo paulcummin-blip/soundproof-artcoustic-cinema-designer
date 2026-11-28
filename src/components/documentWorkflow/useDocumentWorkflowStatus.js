@@ -1,3 +1,4 @@
+import { readVerifiedPublicationMap } from "@/components/engineering/versionedEngineeringAuthority";
 /**
  * useDocumentWorkflowStatus
  * --------------------------
@@ -136,13 +137,11 @@ export function useDocumentWorkflowStatus({ projectId = null, versionId = null }
         // from the actual design rather than the fingerprint mismatch alone.
         if (version?.id && fingerprint) {
           try {
-            const cachePage = await base44.entities.ProjectAnalysisCache.filter(
-              { project_id: projectId, version_id: version.id },
-              { sort: '-updated_date', limit: 1, fields: ['engineering_publications'] },
-            );
-            if (!cancelled) setAnalysisCache(asItems(cachePage)[0] || null);
+            const publications = await readVerifiedPublicationMap(projectId, version, asItems(exportPage));
+            if (!cancelled) setAnalysisCache({engineering_publications:publications});
           } catch (error) {
             if (!cancelled) {
+              setEngineeringFingerprint(null);
               setAnalysisCache(null);
               const httpStatus = Number(error?.response?.status || error?.status || 0);
               setVerificationError(httpStatus
