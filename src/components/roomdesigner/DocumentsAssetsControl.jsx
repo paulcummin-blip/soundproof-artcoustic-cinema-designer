@@ -22,7 +22,7 @@
  * underlying workflow logic — it only changes how those existing components
  * are arranged in the header.
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import DocumentWorkflowPanel from "@/components/documentWorkflow/DocumentWorkflowPanel";
 import ProjectAssetsSection from "@/components/projectAssets/ProjectAssetsSection";
@@ -71,6 +71,17 @@ export default function DocumentsAssetsControl({
 }) {
   const summary = buildSummary(workflowStatus);
   const hasDocuments = summary.readyCount > 0;
+
+  // The expanded panel's ProjectAssetsSection (alwaysLoad) fetches full image
+  // records and derives the count. Reuse that count for DocumentWorkflowPanel's
+  // "Uploaded Images" row so a separate ProposalAsset.count request is not
+  // issued alongside the full record read.
+  const [imageCount, setImageCount] = useState(null);
+  const [imageCountLoading, setImageCountLoading] = useState(true);
+  const handleImageCountChange = useCallback(({ count, loading }) => {
+    setImageCount(count);
+    setImageCountLoading(loading);
+  }, []);
 
   // Default expanded when no documents exist; remember the user's choice.
   const storageKey = projectId ? `${STORAGE_PREFIX}${projectId}` : null;
@@ -133,6 +144,8 @@ export default function DocumentsAssetsControl({
                 onRetryVerification={onRetryVerification}
                 disabled={disabled}
                 onOpenReport={onOpenReport}
+                imageCount={imageCount}
+                imageCountLoading={imageCountLoading}
               />
               <ProjectAssetsSection
                 projectId={projectId}
@@ -141,6 +154,7 @@ export default function DocumentsAssetsControl({
                 alwaysLoad
                 defaultOpen
                 project={{ name: projectName, client_name: clientName, project_reference: projectReference }}
+                onImageCountChange={handleImageCountChange}
               />
             </div>
           </div>

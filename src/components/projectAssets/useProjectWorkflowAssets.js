@@ -180,13 +180,15 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
     setLoading(true);
   }, [projectId]);
 
-  // Read on project switch or when the section is expanded. The full record
-  // read only runs when enabled; counts always run.
+  // Read on project switch or when the section is expanded. When enabled, the
+  // full record read derives exact export and image counts, so separate count
+  // requests are not needed. When collapsed (!enabled), only the lightweight
+  // counts run — the full records are not fetched.
   useEffect(() => {
-    refreshCounts();
     if (enabled) {
       load();
     } else {
+      refreshCounts();
       setLoading(false);
     }
   }, [projectId, enabled, load, refreshCounts]);

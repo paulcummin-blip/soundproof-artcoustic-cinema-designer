@@ -405,7 +405,12 @@ export function recordIssuedExportInBackground({ identity, snapshot }) {
 
 /** Tell an open Project Library the row has landed, and say so. */
 function announceStored(issued, record) {
-  notifyIssuedExportStored(record?.project_id || issued?.projectId);
+  // The stored-notification is emitted by the caller, not here. This function
+  // only shows the library notice. See storeIssuedDocumentOnce (which notifies
+  // after persist) and retryHeld (which notifies before calling here) for the
+  // single notifyIssuedExportStored call each storage path emits — the previous
+  // duplicate notify here caused both asset and status hooks to re-read twice
+  // after one successful background store.
   const label = `${issuedDocumentLabel(record?.document_type || issued?.documentType)} · ${record?.filename || ''}`;
   // THE DOCUMENT IS STORED EITHER WAY — that is what this notice reports. What
   // can be missing is its page preview, and a missing preview is stated as
@@ -529,6 +534,7 @@ async function retryHeld(pendingKey, onProgress) {
   try {
     const record = await persistHeldPdf(pendingKey, onProgress);
     clearPendingExport(pendingKey);
+    notifyIssuedExportStored(record?.project_id || entry.issued?.projectId);
     announceStored(entry.issued, record);
     return { ok: true, record, filename: record.filename };
   } catch (error) {

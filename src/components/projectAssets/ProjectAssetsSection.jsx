@@ -204,13 +204,23 @@ function renderSortedAssetRows({ exportRecords, imageRecords, versionNameById, p
   });
 }
 
-export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false, defaultOpen = false, project = null }) {
+export default function ProjectAssetsSection({ projectId, projectName, compact = false, alwaysLoad = false, defaultOpen = false, project = null, onImageCountChange = null }) {
   const [open, setOpen] = useState(defaultOpen);
   const [zipping, setZipping] = useState(false);
   const [requested, setRequested] = useState(false);
   const [downloadPending, setDownloadPending] = useState(false);
   // Cards must not fan out three requests for every project on page load.
-  const { exports, images, versions, loading, loaded, error, refresh, totalCount, countLoaded } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested || alwaysLoad });
+  const { exports, images, versions, loading, loaded, error, refresh, totalCount, countLoaded, imageCount } = useProjectWorkflowAssets({ projectId, enabled: !compact || requested || alwaysLoad });
+
+  // Lift the derived image count to the parent (Documents & Assets control) so
+  // the DocumentWorkflowPanel's "Uploaded Images" row can reuse it instead of
+  // issuing a separate ProposalAsset.count request alongside the full record
+  // read. Only fires when the parent opts in; collapsed cards on the Projects
+  // page pass no callback and are unaffected.
+  useEffect(() => {
+    if (!onImageCountChange) return;
+    onImageCountChange({ count: imageCount, loading: !countLoaded });
+  }, [imageCount, countLoaded, onImageCountChange]);
 
   const versionNameById = new Map();
   for (const v of versions) {
