@@ -249,14 +249,14 @@ export default function ProjectAssetsSection({ projectId, projectName, compact =
 
   const totalAssets = exports.filter((e) => e?.file_uri || e?.file_url).length
     + images.filter((i) => i?.file_url).length;
-  // Heading count is always visible (collapsed or expanded). Use the
-  // authoritative count from the count API (totalCount) — the record collection
-  // may be truncated by the 200-export limit, so totalAssets can under-report.
-  // When the count API has not responded (or failed), show "(…)" rather than an
-  // inaccurate total.
-  const headingCount = countLoaded && !error
-    ? totalCount
-    : null;
+  // Heading count is always visible (collapsed or expanded). Prefer the exact
+  // total once full records are loaded; otherwise use the lightweight totals
+  // fetched eagerly by the hook. While counts are still loading show "(…)".
+  const headingCount = loaded && !error
+    ? totalAssets
+    : countLoaded && !error
+      ? totalCount
+      : null;
 
   const handleDownloadAll = async () => {
     if (!loaded || error) { setDownloadPending(true); setRequested(true); setOpen(true); if (error) refresh(); return; }
