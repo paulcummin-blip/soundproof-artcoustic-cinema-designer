@@ -9,6 +9,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import AccessPill from "@/components/admin/access/AccessPill";
+import RsApprovalControl from "@/components/admin/access/RsApprovalControl";
 import AccountDrawerAccessSection from "@/components/admin/access/AccountDrawerAccessSection";
 import PendingInvitationCard from "@/components/admin/access/PendingInvitationCard";
 import AccountDrawerCredits from "@/components/admin/access/AccountDrawerCredits";
@@ -108,6 +109,13 @@ export default function AccountDetailDrawer({
             onReinstate={onReinstate}
             onAccessChanged={onAccessChanged}
           />
+
+          {/* RS-01 Richer Sounds internal approval — shown only for ordinary
+              Richer Sounds stores. 93 (central administrator) and non-RS groups
+              carry no RS approval dimension. */}
+          {row.account?.dealer_group === "RICHER_SOUNDS" && !row.isRsCentralAdmin && (
+            <RsApprovalControl row={row} onChanged={onAccessChanged} />
+          )}
 
           {/* Pending activation invitation — resend, correct email, cancel */}
           <PendingInvitationCard row={row} onAccessChanged={onAccessChanged} />

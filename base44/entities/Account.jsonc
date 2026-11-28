@@ -22,6 +22,27 @@
       "default": false,
       "description": "Sound Proof activation eligibility. Set to true by Sound Proof Admin to make a dealer eligible for Portal-first activation. Does NOT start the 90-day term, set account status to active, or enable any user. The 90-day term starts only on successful first-user account claim from the Partner Portal. Separate from status (active/inactive/suspended) and from soundproof_access_expires_at. Only the manageSoundProofAccess backend function may change this."
     },
+    "rs_approval_status": {
+      "type": "string",
+      "enum": [
+        "awaiting_approval",
+        "approved",
+        "suspended"
+      ],
+      "default": "awaiting_approval",
+      "description": "RS-01 Richer Sounds internal approval. A SECOND, separate approval dimension from soundproof_eligible: soundproof_eligible remains the sole Sound Proof Master Admin approval; rs_approval_status is the internal RS approval set by a Master Admin or an authorised Custom Install - 93 administrator on ordinary Richer Sounds stores. awaiting_approval = not yet RS approved (the honest default for the 52 ordinary RS accounts that predate this field; never silently promoted). approved = RS approved. suspended = RS approval withdrawn. Only ordinary RICHER_SOUNDS accounts (NOT Custom Install - 93) carry this field; 93 is exempt and the dual-approval gate skips it. An ordinary Richer Sounds store can activate and use Sound Proof only when soundproof_eligible is true AND rs_approval_status is approved. Only the manageRicherSoundsApproval backend function may change this. Defaults to awaiting_approval; existing records are NOT bulk-rewritten \u2014 a missing value reads as awaiting_approval."
+    },
+    "rs_approval_set_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When rs_approval_status was most recently set (approved, suspended, or restored to approved). Null while the field has never been set (the account is still in its default awaiting_approval state). Set by manageRicherSoundsApproval on every transition."
+    },
+    "rs_approval_set_by": {
+      "type": "string",
+      "nullable": true,
+      "description": "Name or email of the administrator who most recently set rs_approval_status. Null while never set. Set by manageRicherSoundsApproval."
+    },
     "contact_email": {
       "type": "string",
       "description": "Primary contact email"

@@ -1,7 +1,7 @@
 {
   "name": "AccountUserAudit",
   "type": "object",
-  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance, Partner Portal identity claims, Portal-first activation, term starts, renewals, eligibility changes, per-user successful login tracking, welcome-email delivery and pending-invitation management (email correction, cancellation). Written only by trusted backend functions.",
+  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance, Partner Portal identity claims, Portal-first activation, term starts, renewals, eligibility changes, per-user successful login tracking, welcome-email delivery, pending-invitation management (email correction, cancellation), and RS-01 Richer Sounds internal approval / central token allocation / reclamation. Written only by trusted backend functions.",
   "properties": {
     "account_id": {
       "type": "string"
@@ -33,7 +33,12 @@
         "WELCOME_EMAIL_SENT",
         "WELCOME_EMAIL_FAILED",
         "INVITATION_EMAIL_CORRECTED",
-        "INVITATION_CANCELLED"
+        "INVITATION_CANCELLED",
+        "RS_APPROVAL_SET",
+        "RS_APPROVAL_SUSPENDED",
+        "RS_APPROVAL_RESTORED",
+        "RS_ALLOCATION_MADE",
+        "RS_ALLOCATION_RECLAIMED"
       ]
     },
     "target_user_id": {
@@ -45,11 +50,13 @@
     },
     "before_access_level": {
       "type": "string",
-      "nullable": true
+      "nullable": true,
+      "description": "For RS approval actions this carries the previous rs_approval_status; for allocation/reclaim it may carry the previous capacity context."
     },
     "after_access_level": {
       "type": "string",
-      "nullable": true
+      "nullable": true,
+      "description": "For RS approval actions this carries the new rs_approval_status; for allocation/reclaim it may carry the new capacity context."
     },
     "occurred_at": {
       "type": "string",
@@ -57,7 +64,8 @@
     },
     "details": {
       "type": "object",
-      "nullable": true
+      "nullable": true,
+      "description": "For RS-01 actions: actor_is_master_admin (bool), actor_is_rs_delegated_admin (bool), master_account_id, previous_rs_approval_status, new_rs_approval_status, amount, transfer_id, reclaim_of, note."
     }
   },
   "required": [

@@ -17,6 +17,11 @@ import {
   countPromoProjectsForAccount,
   countProjectsCreatedTotal,
 } from "./promotionEntitlementOverview";
+import {
+  resolveRicherSoundsMasterAccountId,
+  rsApprovalState,
+  isRicherSoundsCentralAdministrator,
+} from "./rsApproval";
 
 // Occupied seats — the same rule the account-user authority applies.
 export const OCCUPIED_STATUSES = ["pending", "active"];
@@ -477,6 +482,11 @@ export function buildAccessRows({
   promotionsByAccount,
   promoUsageByAccountAndPromo,
 }) {
+  // RS-01: resolve the Custom Install - 93 master account once from the
+  // fetched accounts + active Partner Portal links, so every row's RS
+  // approval state and central-administrator exemption share one identity.
+  const rsMasterAccountId = resolveRicherSoundsMasterAccountId(accounts, linksByAccount);
+
   const rows = [];
   for (const account of Array.isArray(accounts) ? accounts : []) {
     const members = membersByAccount?.get(account.id) || [];
@@ -538,6 +548,9 @@ export function buildAccessRows({
       eligibilityState: soundproofEligibilityState(account),
       activationState: soundproofActivationState(account, members),
       activationPill: buildActivationPill(account, members, auditsByAccount?.get(account.id) || []),
+      rsMasterAccountId,
+      isRsCentralAdmin: isRicherSoundsCentralAdministrator(account.id, rsMasterAccountId),
+      rsApprovalState: rsApprovalState(account, rsMasterAccountId),
       daysRemaining: daysUntilExpiry(account),
       credits: buildCreditDetail(ledgerEntries),
       projectCount: projects.length,

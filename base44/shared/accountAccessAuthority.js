@@ -437,9 +437,16 @@ export async function resolveAccountAccess(base44, sessionUser, {
   // portal_dealer_account_id) gains a scoped capability. The check runs only
   // for RICHER_SOUNDS accounts and fails open: any read error leaves the flag
   // false and login is unaffected.
+  // RS-01: the richerSoundsAdmin delegated capability is restricted to an
+  // active ACCOUNT ADMINISTRATOR (dealer-admin / account-admin) of the Custom
+  // Install - 93 master account. Ordinary members of 93 no longer receive
+  // delegated-admin access; they keep their normal dealer access. Master
+  // admins are admitted independently above. The check runs only for
+  // RICHER_SOUNDS accounts and fails open: any read error leaves the flag
+  // false and login is unaffected.
   let richerSoundsAdmin = false;
   try {
-    if (account?.dealer_group === 'RICHER_SOUNDS') {
+    if (account?.dealer_group === 'RICHER_SOUNDS' && isAccountAdmin) {
       const rsLinks = await service.entities.ExternalAccountLink.filter({ account_id: accountId });
       richerSoundsAdmin = (Array.isArray(rsLinks) ? rsLinks : []).some((link) =>
         link?.active !== false

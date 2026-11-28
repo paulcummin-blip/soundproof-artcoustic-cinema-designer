@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 import AccessPill from "@/components/admin/access/AccessPill";
+import RsAccessBadges from "@/components/admin/access/RsAccessBadges";
 import PromotionPill from "@/components/admin/access/PromotionPill";
 import {
   accountTypeLabel,
@@ -122,19 +123,10 @@ export default function AccountAccessTable({ rows, onOpen, onAddCredits, emptyMe
                 </div>
               </div>
 
-              {/* Access — eligibility over activation, stacked compactly. */}
-              <div className="flex flex-col items-start gap-1">
-                <AccessPill
-                  label={eligibility.label}
-                  tone={eligibility.tone}
-                  title="Sound Proof eligibility — approved by admin"
-                />
-                <AccessPill
-                  label={activationPill.label}
-                  tone={activationPill.tone}
-                  title="Activation state with countdown — account status, membership and audit history"
-                />
-              </div>
+              {/* Access — Richer Sounds rows show three statuses (Sound Proof
+                  eligibility, RS internal approval, activation); every other
+                  group keeps the existing two-pill stack via RsAccessBadges. */}
+              <RsAccessBadges row={row} />
 
               {/* 2026 Turnover */}
               <div className="text-right tabular-nums text-[#3E4349]">

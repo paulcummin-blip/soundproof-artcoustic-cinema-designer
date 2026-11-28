@@ -6,6 +6,12 @@ import {
   createPortalActivation,
   renewPortalAccess,
 } from '../../shared/portalActivationAuthority.js';
+import { resolveRicherSoundsMasterAccount } from '../../shared/richerSoundsAdminAuthority.js';
+import {
+  isOrdinaryRicherSoundsStore,
+  isRsDualApprovalSatisfied,
+  rsDualApprovalDenialReason,
+} from '../../shared/rsApprovalAuthority.js';
 
 /**
  * Secure server-to-server endpoint for Portal-first Sound Proof activation
@@ -76,6 +82,38 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const { account, link } = resolution;
+
+    // RS-01 dual-approval gate for Portal-first activation. An ordinary Richer
+    // Sounds store cannot be activated from the Portal unless BOTH Sound Proof
+    // eligibility (Master Admin approval) AND RS internal approval are present.
+    // Custom Install - 93 is exempt; non-RS groups are unaffected. A failed
+    // master-account resolution fails closed for RS stores.
+    if (account.dealer_group === 'RICHER_SOUNDS') {
+      let rsMasterAccountId = null;
+      try {
+        const rsMaster = await resolveRicherSoundsMasterAccount(service);
+        rsMasterAccountId = rsMaster?.accountId || null;
+      } catch (_rsErr) {
+        rsMasterAccountId = null;
+      }
+      if (isOrdinaryRicherSoundsStore(account, rsMasterAccountId)
+        && !isRsDualApprovalSatisfied(account, rsMasterAccountId)) {
+        const reason = rsDualApprovalDenialReason(account, rsMasterAccountId);
+        return json(403, {
+          ok: false,
+          error: reason === 'SOUNDPROOF_NOT_APPROVED'
+            ? 'ACCOUNT_NOT_ELIGIBLE'
+            : reason === 'RS_APPROVAL_SUSPENDED'
+              ? 'ACCOUNT_SUSPENDED'
+              : 'RS_APPROVAL_AWAITING',
+          message: reason === 'SOUNDPROOF_NOT_APPROVED'
+            ? 'Sound Proof approval is required before activation.'
+            : reason === 'RS_APPROVAL_SUSPENDED'
+              ? 'RS internal approval is suspended.'
+              : 'RS internal approval is required before activation.',
+        });
+      }
+    }
 
     if (grant.purpose === 'activate') {
       const result = await createPortalActivation(service, base44, { grant, account, link });

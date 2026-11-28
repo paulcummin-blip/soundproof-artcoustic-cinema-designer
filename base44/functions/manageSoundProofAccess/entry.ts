@@ -3,6 +3,12 @@ import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { desiredAccessFlag } from '../../shared/soundProofAccessFlagAuthority.js';
 import { recordSystemIncident } from '../../shared/systemHealth/incidentRecorder.js';
 import { setFirstActivatedAtIfUnset } from '../../shared/accountActivationAuthority.js';
+import { resolveRicherSoundsMasterAccount } from '../../shared/richerSoundsAdminAuthority.js';
+import {
+  isOrdinaryRicherSoundsStore,
+  isRsDualApprovalSatisfied,
+  rsDualApprovalDenialReason,
+} from '../../shared/rsApprovalAuthority.js';
 
 /**
  * Master-admin-only backend authority for managing Sound Proof access on
@@ -220,6 +226,44 @@ async function processAccount(base44, { action, accountId, actor, now, eligible 
     } else {
       // No expiry set: re-enable (account was active before the expiry system).
       accountAllowsAccess = true;
+    }
+  }
+
+  // RS-01 dual-approval gate. An ordinary Richer Sounds store can activate and
+  // use Sound Proof only when BOTH Sound Proof eligibility (Master Admin
+  // approval) AND RS internal approval are present. Custom Install - 93 is
+  // exempt; every other dealer group is unaffected. For enable/restore this
+  // BLOCKS activation (the account is not set active without RS approval);
+  // for reconcile it clears the access flag so a store that lost RS approval
+  // cannot use Sound Proof even if its account status is active.
+  if (account.dealer_group === 'RICHER_SOUNDS') {
+    let rsMasterAccountId = null;
+    try {
+      const rsMaster = await resolveRicherSoundsMasterAccount(service);
+      rsMasterAccountId = rsMaster?.accountId || null;
+    } catch (_rsErr) {
+      rsMasterAccountId = null;
+    }
+    if (isOrdinaryRicherSoundsStore(account, rsMasterAccountId)) {
+      const dualApproved = isRsDualApprovalSatisfied(account, rsMasterAccountId);
+      if (!dualApproved && (action === 'enable' || action === 'restore')) {
+        const reason = rsDualApprovalDenialReason(account, rsMasterAccountId);
+        return {
+          account_id: accountId,
+          account_name: account.name,
+          ok: false,
+          action,
+          error: reason === 'SOUNDPROOF_NOT_APPROVED'
+            ? 'Sound Proof approval is required before activation.'
+            : reason === 'RS_APPROVAL_SUSPENDED'
+              ? 'RS internal approval is suspended. Restore RS approval before activating.'
+              : 'RS internal approval is required before activating this Richer Sounds store.',
+          reason: reason || 'RS_APPROVAL_REQUIRED',
+        };
+      }
+      if (!dualApproved && (action === 'reconcile' || action === 'reconcile_expired')) {
+        accountAllowsAccess = false;
+      }
     }
   }
 

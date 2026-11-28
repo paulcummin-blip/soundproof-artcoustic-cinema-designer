@@ -19,6 +19,11 @@
  */
 
 import { resolveAccountAccess } from './accountAccessAuthority.js';
+import {
+  rsApprovalState,
+  isRicherSoundsCentralAdministrator,
+  isOrdinaryRicherSoundsStore,
+} from './rsApprovalAuthority.js';
 
 export const RICHER_SOUNDS_DEALER_GROUP = 'RICHER_SOUNDS';
 export const RICHER_SOUNDS_MASTER_TRADING_NUMBER = '93';
@@ -347,6 +352,8 @@ export async function assembleRicherSoundsAdminData(service, masterAccountId) {
     rows.push({
       account,
       isMaster,
+      isRsCentralAdmin: isMaster,
+      rsApprovalState: isMaster ? null : rsApprovalState(account, masterAccountId),
       tradingNumber: tradingNumberForAccount(links, isMaster),
       portalDealerAccountId: links.find((l) => l?.active !== false && l?.portal_dealer_account_id)?.portal_dealer_account_id || null,
       portalUserId: links.find((l) => l?.active !== false && l?.partner_user_id)?.partner_user_id || null,
@@ -467,6 +474,11 @@ function auditActionLabel(action) {
     ACCESS_CHANGED: 'access changed',
     PORTAL_IDENTITY_CLAIMED: 'portal identity claimed',
     SOUNDPROOF_TERM_STARTED: 'access term started',
+    RS_APPROVAL_SET: 'RS approval granted',
+    RS_APPROVAL_SUSPENDED: 'RS approval suspended',
+    RS_APPROVAL_RESTORED: 'RS approval restored',
+    RS_ALLOCATION_MADE: 'tokens allocated',
+    RS_ALLOCATION_RECLAIMED: 'tokens reclaimed',
   };
   return map[action] || action || 'event';
 }

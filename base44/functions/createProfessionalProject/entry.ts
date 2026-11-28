@@ -12,6 +12,12 @@ import {
   updateReceiptStage,
 } from '../../shared/projectCreationIdempotency.js';
 import { reconcilePendingReceipt } from '../../shared/projectCreationRecovery.js';
+import { resolveRicherSoundsMasterAccount } from '../../shared/richerSoundsAdminAuthority.js';
+import {
+  isOrdinaryRicherSoundsStore,
+  isRsDualApprovalSatisfied,
+  rsDualApprovalDenialReason,
+} from '../../shared/rsApprovalAuthority.js';
 
 /**
  * Trusted backend authority for Professional Project creation.
@@ -171,6 +177,35 @@ export default async function(req) {
       return Response.json({
         status: 'ELIGIBILITY_CHECK_FAILED',
         message: 'Account not found.'
+      }, { status: 403 });
+    }
+
+    // RS-01 dual-approval gate. An ordinary Richer Sounds store can create and
+    // use Sound Proof projects only when BOTH Sound Proof eligibility (Master
+    // Admin approval) AND RS internal approval are present. Custom Install - 93
+    // is exempt from RS approval; every other dealer group is unaffected. The
+    // gate runs BEFORE the promotion and capacity paths, so an unlimited
+    // promotion cannot bypass it. A failed master-account resolution fails
+    // closed for RS stores (denied) and open for every other group (the store
+    // is not an ordinary RS store when no master is resolved).
+    let rsMasterAccountId = null;
+    try {
+      const rsMaster = await resolveRicherSoundsMasterAccount(base44.asServiceRole);
+      rsMasterAccountId = rsMaster?.accountId || null;
+    } catch (_rsErr) {
+      rsMasterAccountId = null;
+    }
+    if (isOrdinaryRicherSoundsStore(account, rsMasterAccountId)
+      && !isRsDualApprovalSatisfied(account, rsMasterAccountId)) {
+      const reason = rsDualApprovalDenialReason(account, rsMasterAccountId);
+      return Response.json({
+        status: 'FORBIDDEN',
+        reason: reason || 'RS_APPROVAL_REQUIRED',
+        message: reason === 'RS_APPROVAL_SUSPENDED'
+          ? 'RS internal approval is suspended. Contact your Richer Sounds administrator.'
+          : reason === 'SOUNDPROOF_NOT_APPROVED'
+            ? 'Sound Proof approval is required before creating projects.'
+            : 'This Richer Sounds store requires both Sound Proof and RS internal approval before creating projects.',
       }, { status: 403 });
     }
 
