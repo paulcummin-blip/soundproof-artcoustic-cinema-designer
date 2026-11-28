@@ -52,7 +52,26 @@ export default async function readDealerDirectory(req) {
 
     let directory;
     try {
-      directory = await fetchDealerDirectory({ turnoverUrl, key: directoryKey, limit });
+      const diagnostic = body?.directory_metadata_diagnostic === true;
+      const metadata = [];
+      directory = await fetchDealerDirectory({
+        turnoverUrl, key: directoryKey, limit,
+        observePage: diagnostic ? (page) => metadata.push({
+          source_count: Number.isInteger(page.directory_total) ? page.directory_total : null,
+          snapshot: typeof page.directory_snapshot === "string" && /^[a-f0-9]{64}$/.test(page.directory_snapshot)
+            ? page.directory_snapshot : null,
+        }) : undefined,
+      });
+      if (diagnostic) {
+        const refs = directory.records.map((record) => record.raw?.trading_account_number);
+        return Response.json({
+          records: refs.length,
+          populated: refs.filter((value) => typeof value === "string" && value.trim()).length,
+          null_references: refs.filter((value) => value === null).length,
+          metadata,
+          validation_passed: validateDealerDirectory({ records: directory.records }).passed,
+        });
+      }
     } catch (error) {
       return Response.json({
         status: "DIRECTORY_FETCH_FAILED",

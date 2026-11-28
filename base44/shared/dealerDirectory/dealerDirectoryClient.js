@@ -175,7 +175,7 @@ async function fetchPage({ url, key, limit, cursor }) {
  * @param {string} params.key - Dedicated PARTNER_PORTAL_DIRECTORY_KEY secret.
  * @param {number} [params.limit=200]
  */
-export async function fetchDealerDirectory({ turnoverUrl, key, limit = 200 }) {
+export async function fetchDealerDirectory({ turnoverUrl, key, limit = 200, observePage }) {
   const url = deriveDirectoryUrl(turnoverUrl);
   const records = [];
   let cursor = "";
@@ -187,6 +187,7 @@ export async function fetchDealerDirectory({ turnoverUrl, key, limit = 200 }) {
   while (pages < maxPages) {
     pages += 1;
     const page = await fetchPage({ url, key, limit, cursor });
+    observePage?.(page);
     if (pages === 1) {
       rawContractVersion = page.contract_version;
       contractStatus = hasText(page.status) ? page.status : null;
