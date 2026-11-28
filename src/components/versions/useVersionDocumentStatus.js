@@ -1,4 +1,3 @@
-import { readVerifiedPublicationMap } from "@/components/engineering/versionedEngineeringAuthority";
 /**
  * useVersionDocumentStatus
  * ------------------------
@@ -56,9 +55,14 @@ export function useVersionDocumentStatus({ projectId, enabled = false, versions 
           const cacheEntries = await Promise.all(
             versionList.map(async (version) => {
               try {
-                return [version.id, await readVerifiedPublicationMap(projectId, version, asItems(snapshotPage))];
+                const cachePage = await base44.entities.ProjectAnalysisCache.filter(
+                  { project_id: projectId, version_id: version.id },
+                  { limit: 1 },
+                );
+                const cache = asItems(cachePage)[0] || null;
+                return [version.id, cache?.engineering_publications || null];
               } catch {
-                return [version.id, {}];
+                return [version.id, null];
               }
             }),
           );

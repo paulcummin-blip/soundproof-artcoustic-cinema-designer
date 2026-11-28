@@ -28,7 +28,6 @@
  * ---------------------------------------------------------------------------
  */
 import { test } from 'vitest';
-import { buildAtomicParameterIndex } from '../shared/engineeringPublicationContract.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -145,32 +144,17 @@ const frozenProject = (displayType, roomWidthM) => ({
 });
 const publication = (facts) => ({ report_snapshot: { report_project: facts } });
 
-const contractFixture = JSON.parse(read('test/engineering-publication-producer-contract.test.mjs').match(/^const fixture=(.*);$/m)[1]);
-function savedPublication(fingerprint, displayType, width) {
-  const entry = structuredClone(contractFixture);
-  entry.engineering_fingerprint = fingerprint;
-  const project = entry.report_snapshot.report_project;
-  project.project_id = PROJECT_ID;
-  project.version_id = LEVEL_4_VERSION.id;
-  project.room_width = width;
-  project.roomDims = JSON.stringify({ ...JSON.parse(project.roomDims), widthM: width });
-  project.report_screen = { ...project.report_screen, displayType };
-  entry.parameter_index = buildAtomicParameterIndex(entry);
-  return entry;
-}
-
 /** The version's analysis cache: the report's frozen publication, and the moved one. */
 const cacheRecord = ({ designChanged = false, displayChanged = false } = {}) => ({
   project_id: PROJECT_ID,
   version_id: LEVEL_4_VERSION.id,
   engineering_publications: {
-    [ENGINEERING_FP]: savedPublication(ENGINEERING_FP, 'projector_screen', 4.6),
-    [MOVED_FP]: savedPublication(MOVED_FP, displayChanged ? 'tv' : 'projector_screen', designChanged ? 5.4 : 4.6),
+    [ENGINEERING_FP]: publication(frozenProject('projector_screen', 4.6)),
+    [MOVED_FP]: publication(frozenProject(displayChanged ? 'tv' : 'projector_screen', designChanged ? 5.4 : 4.6)),
   },
 });
 
 const entities = (record) => ({
-  Project: { get: async () => record?.engineering_publications?.[MOVED_FP]?.report_snapshot?.report_project },
   ReportSnapshot: { filter: async () => ({ items: [saved] }) },
   ProjectAnalysisCache: { filter: async () => (record ? [record] : []) },
 });
@@ -211,7 +195,7 @@ test('TEST 3 — a real physical change is still refused, in the same sentence',
 test('TEST 3 — no comparison, no exemption', async () => {
   await assert.rejects(
     () => readProposalReportEvidence(entities(null), PROJECT_ID, [VERSION]),
-    /saved engineering evidence could not be verified/i,
+    /stale Project Report/,
     'a version with no publication history keeps the strict verdict',
   );
   assert.equal(
@@ -299,7 +283,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
     ReportSnapshot: { filter: async () => ({ items: [saved] }) },
     ProjectAnalysisCache: { filter: async () => [] },
   };
-  const authority = entities(cacheRecord());
+  const authority = { ProjectAnalysisCache: { filter: async () => [cacheRecord()] } };
 
   const snapshots = await readProposalReportEvidence(callerEntities, PROJECT_ID, [VERSION], {
     authorityEntities: authority,
@@ -311,7 +295,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
   // never excuses a report.
   await assert.rejects(
     () => readProposalReportEvidence(callerEntities, PROJECT_ID, [VERSION]),
-    /saved engineering evidence could not be verified/i,
+    /stale Project Report/,
   );
 
   // Both callers pass the authority door, and the reader uses the one shared cache
@@ -319,7 +303,7 @@ test('TEST 7 — the two publications are read exactly as the readiness card rea
   assert.match(READ_EVIDENCE_FUNCTION, /authorityEntities: client\.asServiceRole\.entities/);
   assert.match(SERVER_GATE, /authorityEntities: base44\.asServiceRole\.entities/);
   assert.match(SERVER_GATE, /loadCacheRecord\(base44\.asServiceRole, project_id, versionId\)/);
-  assert.match(READER, /verifiedPublicationRow\(authority, version\)/);
+  assert.match(READER, /loadCacheRecord\(authority, projectId, version\.id\)/);
 });
 
 // ── TEST 6 — no second status path is left on the screen ─────────────────────
@@ -341,25 +325,8 @@ test('TEST 6 — the wizard states one readiness verdict and clears the refused 
   );
 
   // The evidence gate asks the one rule, and the server gate applies it too.
-  assert.match(READER, /proposalEvidenceMoveIsSafe\(await comparisonPublications\(/);
+  assert.match(READER, /proposalEvidenceMoveIsSafe\(record, \{ frozenFingerprint, currentFingerprint \}\)/);
   assert.match(READER, /presentationOnlyMove = reportSourceMovedPastVersion\(projectRow, version\)/);
   assert.match(SERVER_GATE, /proposalEvidenceMoveIsSafe\(/);
   assert.match(SERVER_GATE, /presentationOnlyMove,/);
-});
-test('a bound publication wins over a conflicting sibling, and both readers reject a wrong owner', async () => {
-  const { publicationRow } = await import('../base44/shared/publicationRow.js');
-  const a = { ...cacheRecord(), id: 'row-a' };
-  const sibling = { ...cacheRecord({ designChanged: true }), id: 'row-b' };
-  delete sibling.engineering_publications[ENGINEERING_FP];
-  const fixture = entities(a);
-  fixture.ProjectAnalysisCache.get = async id => id === a.id ? a : sibling;
-  fixture.ProjectAnalysisCache.filter = async () => [sibling, a];
-  const bound = { ...VERSION, published_cache_record_id: a.id };
-  assert.equal(await publicationRow({ entities: fixture }, bound), a);
-  assert.equal((await readProposalReportEvidence(fixture, PROJECT_ID, [bound])).length, 1);
-  await assert.rejects(() => publicationRow({ entities: fixture }, VERSION), /Multiple cache records/);
-  await assert.rejects(() => readProposalReportEvidence(fixture, PROJECT_ID, [VERSION]), /Multiple cache records/);
-  fixture.ProjectAnalysisCache.get = async () => ({ ...a, version_id: 'other-version' });
-  await assert.rejects(() => publicationRow({ entities: fixture }, bound), /could not be verified/);
-  await assert.rejects(() => readProposalReportEvidence(fixture, PROJECT_ID, [bound]), /could not be verified/);
 });

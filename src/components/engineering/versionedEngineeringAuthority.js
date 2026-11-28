@@ -112,7 +112,7 @@ export function fetchDurablePublication(
         ...(engineeringFingerprint ? { engineering_fingerprint: engineeringFingerprint } : {}),
       });
       const data = response?.data || response || null;
-      if (!data || data.error || data.status === 'verification_unavailable') {
+      if (!data || data.error) {
         throw new Error(data?.message || data?.error || 'Saved engineering results could not be read.');
       }
       return {
@@ -330,23 +330,4 @@ export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot, final
 /** Read the local handoff for a version (browser fast path). */
 export function readLocalHandoff(projectId, versionId, options) {
   return readDesignReviewHandoff(projectId, versionId, options);
-}
-
-export async function readVerifiedPublicationMap(projectId, version, snapshots = []) {
-  const fingerprint = version.published_fingerprint;
-  if (!fingerprint) return {};
-  const current = await fetchDurablePublication(projectId, version.id, {force:true});
-  if (current?.acknowledgement?.durably_published !== true ||
-      current.publication?.engineering_fingerprint !== fingerprint ||
-      (version.published_cache_record_id != null && current.version?.published_cache_record_id !== version.published_cache_record_id))
-    throw new Error('Saved engineering evidence could not be verified.');
-  const publications = {[fingerprint]:current.publication};
-  const historical = new Set(snapshots.filter(item => item.version_id === version.id)
-    .map(item => item.source_fingerprints?.engineeringFingerprint).filter(key => key && key !== fingerprint));
-  await Promise.all(Array.from(historical, async key => {
-    const saved = await fetchDurablePublication(projectId, version.id, {engineeringFingerprint:key});
-    if (saved?.acknowledgement?.durably_published && saved.publication?.engineering_fingerprint === key)
-      publications[key] = saved.publication;
-  }));
-  return publications;
 }

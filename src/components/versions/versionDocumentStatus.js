@@ -141,7 +141,7 @@ export function deriveVersionDocumentStatus({
       // from a confirmed design change — so the badge never reads "needs
       // updating" for a document whose validity simply could not be checked.
       let presentationOnlyMove = false;
-      let verificationUnavailable = !!currentFingerprint && !!publicationsFor(versionId) && !publicationsFor(versionId)[currentFingerprint];
+      let verificationUnavailable = false;
       if (currentFingerprint && savedFingerprint && savedFingerprint !== currentFingerprint) {
         // Only upgrade to the canonical design-fact comparison when the
         // version's engineering_publications are available. When they are not
