@@ -50,13 +50,18 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
   const linksByPortalUserId = new Map();
   const linksByPortalDealerId = new Map();
   const linksByDealerId = new Map();
+  function indexLink(index, key, link) {
+    if (!key) return;
+    const matches = index.get(key) ?? [];
+    matches.push(link);
+    index.set(key, matches);
+  }
   for (const link of linkList) {
     const partnerUser = normaliseUuid(link?.partner_user_id);
     const portalDealerId = normaliseUuid(link?.portal_dealer_account_id);
-    const extNum = normaliseUuid(link?.external_account_number);
-    if (partnerUser) linksByPortalUserId.set(partnerUser, link);
-    if (portalDealerId) linksByPortalDealerId.set(portalDealerId, link);
-    if (extNum) linksByDealerId.set(extNum, link);
+    indexLink(linksByPortalUserId, partnerUser, link);
+    indexLink(linksByPortalDealerId, portalDealerId, link);
+    if (!portalDealerId) indexLink(linksByDealerId, normaliseUuid(link?.external_account_number), link);
   }
 
   const accountsById = new Map();
@@ -79,12 +84,27 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
     const dealerId = normaliseUuid(record.dealer_account_id);
     const portalUserId = normaliseUuid(record.portal_user_id);
 
-    const linkByPortalUser = linksByPortalUserId.get(portalUserId);
-    const linkByPortalDealerId = linksByPortalDealerId.get(dealerId);
-    const linkByDealerId = linksByDealerId.get(dealerId);
-    const matchedLink = linkByPortalUser || linkByPortalDealerId || linkByDealerId || null;
-    const matchedAccountId = matchedLink ? String(matchedLink.account_id || "") : "";
-    const matchedAccount = matchedAccountId ? accountsById.get(matchedAccountId) : null;
+    const byUser = linksByPortalUserId.get(portalUserId) ?? [];
+    const byDealer = linksByPortalDealerId.get(dealerId) ?? [];
+    const byLegacyDealer = linksByDealerId.get(dealerId) ?? [];
+    const candidates = [...new Set([...byUser, ...byDealer, ...byLegacyDealer])];
+    const matchedLink = candidates[0];
+    const matchedAccount = accountsById.get(String(matchedLink?.account_id ?? ""));
+    const linkedUserId = normaliseUuid(matchedLink?.partner_user_id);
+    const linkedDealerId = normaliseUuid(matchedLink?.portal_dealer_account_id)
+      || normaliseUuid(matchedLink?.external_account_number);
+    if (candidates.length > 1 || (matchedLink && (!matchedAccount
+      || (linkedUserId && linkedUserId !== portalUserId)
+      || (linkedDealerId && linkedDealerId !== dealerId)))) {
+      ambiguous.push({
+        dealer_account_id: record.dealer_account_id,
+        portal_user_id: record.portal_user_id,
+        account_name: record.account_name,
+        sector: record.sector,
+        reason: "Existing Portal link identities conflict or the linked account is missing.",
+      });
+      continue;
+    }
 
     const nameMatches = accountsByNormalisedName.get(
       String(record.account_name || "").trim().toLowerCase(),
@@ -99,7 +119,7 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
         sound_proof_account_id: matchedAccount.id,
         sound_proof_account_name: matchedAccount.name,
         sound_proof_account_status: matchedAccount.status,
-        linked_via: linkByPortalUser ? "portal_user_id" : linkByPortalDealerId ? "portal_dealer_account_id" : "dealer_account_id",
+        linked_via: byUser.length ? "portal_user_id" : byDealer.length ? "portal_dealer_account_id" : "dealer_account_id",
       });
     } else if (nameMatches.length === 1) {
       accountsNeedingLinking.push({
@@ -125,6 +145,7 @@ export function classifyDirectoryMatches({ directoryRecords, accounts, externalL
       newAccounts.push({
         dealer_account_id: record.dealer_account_id,
         portal_user_id: record.portal_user_id,
+        trading_account_number: record.trading_account_number ?? null,
         account_name: record.account_name,
         sector: record.sector,
         status: record.status,

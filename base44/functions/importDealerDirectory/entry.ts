@@ -142,7 +142,7 @@ export default async function importDealerDirectory(req) {
       }, { status: 502 });
     }
 
-    const validation = validateDealerDirectory({ records: directory.records });
+    const validation = validateDealerDirectory({ records: directory.records, sourceTotal: directory.pagination.sourceTotal });
     if (!validation.passed) {
       await finishRun(service, runRecordId, {
         status: "FAILED",
@@ -256,7 +256,7 @@ export default async function importDealerDirectory(req) {
           source_system: DIRECTORY_SOURCE_SYSTEM,
           partner_user_id: record.portal_user_id,
           portal_dealer_account_id: record.dealer_account_id,
-          external_account_number: record.dealer_account_id,
+          external_account_number: record.trading_account_number ?? record.dealer_account_id,
           external_account_name: record.account_name,
           active: true,
         });

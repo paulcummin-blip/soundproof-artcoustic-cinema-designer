@@ -4,8 +4,6 @@ import {
   fetchDealerDirectory,
   validateDealerDirectory,
   EXPECTED_CONTRACT_VERSION,
-  EXPECTED_TOTAL,
-  SECTOR_TOTALS,
 } from "../../shared/dealerDirectory/dealerDirectoryClient.js";
 
 const SOURCE_SYSTEM = "ARTCOUSTIC_PARTNER_PORTAL";
@@ -60,7 +58,7 @@ export default async function readDealerDirectory(req) {
       }, { status: 502 });
     }
 
-    const validation = validateDealerDirectory({ records: directory.records });
+    const validation = validateDealerDirectory({ records: directory.records, sourceTotal: directory.pagination.sourceTotal });
 
     if (!validation.passed) {
       // Still return the audit if records were retrieved, but mark connection FAIL.
@@ -248,7 +246,7 @@ export default async function readDealerDirectory(req) {
         expected_version: EXPECTED_CONTRACT_VERSION,
         status: directory.contractStatus,
         total_dealers: directory.records.length,
-        expected_total: EXPECTED_TOTAL,
+        expected_total: directory.pagination.sourceTotal,
         pagination_pages: directory.pagination.pages,
       },
       sector_totals: validation.sectors,

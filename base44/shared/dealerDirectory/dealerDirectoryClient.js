@@ -15,14 +15,6 @@
 
 const DIRECTORY_PATH = "/functions/v1/soundproof-dealer-directory";
 const EXPECTED_CONTRACT_VERSION = 1;
-const EXPECTED_TOTAL = 242;
-
-const SECTOR_TOTALS = Object.freeze({
-  premium_partner: 26,
-  trade_account: 163,
-  richer_sounds: 53,
-});
-
 // Accept a small set of sector field names so a reasonable Lovable payload
 // shape is validated without being over-fitted to one spelling.
 const SECTOR_ALIASES = Object.freeze({
@@ -88,6 +80,7 @@ function normaliseDealerRecord(record) {
   return {
     dealer_account_id: dealerAccountId,
     portal_user_id: portalUserId,
+    trading_account_number: readString(record, "trading_account_number") || null,
     account_name: accountName,
     sector,
     status,
@@ -180,63 +173,67 @@ export async function fetchDealerDirectory({ turnoverUrl, key, limit = 200 }) {
   const records = [];
   let cursor = "";
   let pages = 0;
-  let rawContractVersion = null;
   let contractStatus = null;
+  let total = null;
+  let snapshot = null;
+  const seenCursors = new Set();
   const maxPages = 50;
 
   while (pages < maxPages) {
     pages += 1;
     const page = await fetchPage({ url, key, limit, cursor });
+    if (Number(page.contract_version) !== EXPECTED_CONTRACT_VERSION) {
+      throw new Error("DIRECTORY_CONTRACT_VERSION_MISMATCH");
+    }
+    if (!Number.isSafeInteger(page.directory_total) || page.directory_total < 1
+      || typeof page.directory_snapshot !== "string" || !/^[a-f0-9]{64}$/.test(page.directory_snapshot)) {
+      throw new Error("DIRECTORY_MANIFEST_INVALID");
+    }
     if (pages === 1) {
-      rawContractVersion = page.contract_version;
+      total = page.directory_total;
+      snapshot = page.directory_snapshot;
       contractStatus = hasText(page.status) ? page.status : null;
-      if (Number(rawContractVersion) !== EXPECTED_CONTRACT_VERSION) {
-        throw new Error(
-          `DIRECTORY_CONTRACT_VERSION_MISMATCH:expected ${EXPECTED_CONTRACT_VERSION}, got ${rawContractVersion}`,
-        );
-      }
+    } else if (page.directory_total !== total || page.directory_snapshot !== snapshot) {
+      throw new Error("DIRECTORY_SNAPSHOT_CHANGED");
     }
-    const pageRecords = Array.isArray(page.dealers) ? page.dealers
-      : Array.isArray(page.accounts) ? page.accounts
-      : Array.isArray(page.records) ? page.records
-      : [];
-    for (const raw of pageRecords) {
-      if (!isPlainObject(raw)) continue;
-      records.push(normaliseDealerRecord(raw));
+    if (!Array.isArray(page.dealers) || page.dealers.length === 0
+      || !page.dealers.every(isPlainObject)) {
+      throw new Error("DIRECTORY_PAGE_RECORDS_INVALID");
     }
-    const nextCursor = hasText(page.next_cursor) ? String(page.next_cursor) : "";
-    if (!nextCursor || page.has_more === false) {
+    for (const raw of page.dealers) records.push(normaliseDealerRecord(raw));
+    if (records.length > total) throw new Error("DIRECTORY_COUNT_MISMATCH");
+    if (page.next_cursor === null) {
+      if (records.length !== total || page.has_more === true) throw new Error("DIRECTORY_COUNT_MISMATCH");
       cursor = "";
       break;
     }
-    cursor = nextCursor;
+    if (!hasText(page.next_cursor) || seenCursors.has(page.next_cursor)
+      || records.length >= total || page.has_more === false) {
+      throw new Error("DIRECTORY_CURSOR_INVALID");
+    }
+    cursor = page.next_cursor;
+    seenCursors.add(cursor);
   }
 
-  if (cursor) {
-    throw new Error("DIRECTORY_PAGINATION_EXHAUSTED:cursor remained after max pages.");
-  }
+  if (cursor) throw new Error("DIRECTORY_PAGINATION_EXHAUSTED:cursor remained after max pages.");
 
   return {
     records,
-    contractVersion: rawContractVersion,
+    contractVersion: EXPECTED_CONTRACT_VERSION,
     contractStatus,
-    pagination: { pages, limit },
+    pagination: { pages, limit, sourceTotal: total },
   };
 }
 
 /**
- * Validate the full retrieved directory against the Stage 2B contract:
- * contract_version 1, 242 unique dealers, sector totals, no duplicate
- * Dealer Account IDs, no missing IDs or incomplete records.
+ * Validate identities and record shape after the full source snapshot was read.
  */
-export function validateDealerDirectory({ records }) {
+export function validateDealerDirectory({ records, sourceTotal }) {
   const errors = [];
   const warnings = [];
 
-  if (Number(records.length) !== EXPECTED_TOTAL) {
-    errors.push(
-      `TOTAL_MISMATCH:expected ${EXPECTED_TOTAL}, got ${records.length}.`,
-    );
+  if (!Number.isSafeInteger(sourceTotal) || sourceTotal < 1 || records.length !== sourceTotal) {
+    errors.push("DIRECTORY_COUNT_MISMATCH");
   }
 
   const seenDealerIds = new Set();
@@ -244,18 +241,20 @@ export function validateDealerDirectory({ records }) {
   const duplicateDealerIds = [];
   const duplicatePortalUserIds = [];
   for (const record of records) {
-    if (record.dealer_account_id) {
-      if (seenDealerIds.has(record.dealer_account_id)) {
+    const dealerId = record.dealer_account_id?.toLowerCase();
+    const portalUserId = record.portal_user_id?.toLowerCase();
+    if (dealerId) {
+      if (seenDealerIds.has(dealerId)) {
         duplicateDealerIds.push(record.dealer_account_id);
       } else {
-        seenDealerIds.add(record.dealer_account_id);
+        seenDealerIds.add(dealerId);
       }
     }
-    if (record.portal_user_id) {
-      if (seenPortalUserIds.has(record.portal_user_id)) {
+    if (portalUserId) {
+      if (seenPortalUserIds.has(portalUserId)) {
         duplicatePortalUserIds.push(record.portal_user_id);
       } else {
-        seenPortalUserIds.add(record.portal_user_id);
+        seenPortalUserIds.add(portalUserId);
       }
     }
   }
@@ -286,15 +285,8 @@ export function validateDealerDirectory({ records }) {
     if (sectorCounts[sector] === undefined) sectorCounts[sector] = 0;
     sectorCounts[sector] += 1;
   }
-  for (const [sector, expected] of Object.entries(SECTOR_TOTALS)) {
-    if (Number(sectorCounts[sector]) !== expected) {
-      errors.push(
-        `SECTOR_MISMATCH:${sector}:expected ${expected}, got ${sectorCounts[sector]}`,
-      );
-    }
-  }
   if (sectorCounts.unknown > 0) {
-    warnings.push(`UNKNOWN_SECTORS:${sectorCounts.unknown}`);
+    errors.push(`UNKNOWN_SECTORS:${sectorCounts.unknown}`);
   }
 
   const duplicateDealerIdSamples = duplicateDealerIds.slice(0, 5);
@@ -307,7 +299,7 @@ export function validateDealerDirectory({ records }) {
     warnings,
     totals: {
       total: records.length,
-      expected_total: EXPECTED_TOTAL,
+      expected_total: sourceTotal,
       contract_version_expected: EXPECTED_CONTRACT_VERSION,
     },
     sectors: sectorCounts,
@@ -321,6 +313,4 @@ export function validateDealerDirectory({ records }) {
 
 export {
   EXPECTED_CONTRACT_VERSION,
-  EXPECTED_TOTAL,
-  SECTOR_TOTALS,
 };
