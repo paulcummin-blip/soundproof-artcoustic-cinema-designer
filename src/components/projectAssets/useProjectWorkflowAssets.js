@@ -106,11 +106,9 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
         setExports(expItems);
         setImages(imgItems);
         setVersions(asItems(resultData.versionPage));
-        // Derive counts from the loaded records so the heading total always
-        // matches exactly what the expanded list shows.
-        setExportCount(expItems.filter((e) => e?.file_uri || e?.file_url).length);
-        setImageCount(imgItems.filter((i) => i?.file_url).length);
-        setCountLoaded(true);
+        // Counts are owned by refreshCounts (authoritative count API), not
+        // derived from the record collection — the collection may be truncated
+        // by the 200-export limit, so a record-derived count would under-report.
         setLoaded(true);
       } else {
         console.warn('[useProjectWorkflowAssets] read failed:', caughtError);
@@ -180,30 +178,29 @@ export function useProjectWorkflowAssets({ projectId = null, enabled = true } = 
     setLoading(true);
   }, [projectId]);
 
-  // Read on project switch or when the section is expanded. When enabled, the
-  // full record read derives exact export and image counts, so separate count
-  // requests are not needed. When collapsed (!enabled), only the lightweight
-  // counts run — the full records are not fetched.
+  // Read on project switch or when the section is expanded. The full record
+  // read only runs when enabled; counts always run so the heading shows the
+  // authoritative total even when the record collection is truncated by the
+  // 200-export limit.
   useEffect(() => {
+    refreshCounts();
     if (enabled) {
       load();
     } else {
-      refreshCounts();
       setLoading(false);
     }
   }, [projectId, enabled, load, refreshCounts]);
 
   // A document or image stored while this section is open is listed as soon
-  // as it exists. When the full records are loaded (enabled), the coalesced
-  // read derives the counts on completion — a separate count request is
-  // redundant and would fire once per notification gap during a slow read.
-  // When collapsed (not enabled), only the coalesced count runs.
+  // as it exists. The authoritative count is always refreshed so the heading
+  // total stays accurate even when the record collection is truncated. When
+  // enabled, the full records are also refreshed so the list shows the new
+  // asset. When collapsed, only the count refreshes.
   useEffect(() => subscribeIssuedExportStored((storedProjectId) => {
     if (!projectIdRef.current || storedProjectId !== projectIdRef.current) return;
+    refreshCounts();
     if (enabled) {
       load({ silent: true });
-    } else {
-      refreshCounts();
     }
   }), [enabled, load, refreshCounts]);
 

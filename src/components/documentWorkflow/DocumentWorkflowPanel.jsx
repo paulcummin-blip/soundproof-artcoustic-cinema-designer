@@ -33,6 +33,7 @@ import { REPORT_AUTOPRINT_PARAM, REPORT_UPDATE_PARAM, REPORT_AUTOSTORE_PARAM, RE
 import { useDesignContextReview } from '@/components/adi/designContext/useDesignContextReview';
 import { useAuth } from '@/lib/AuthContext';
 import { WORKFLOW_STATE, WORKFLOW_STEP, resolveStepDisplayLabel, NOT_AVAILABLE_LABEL } from './documentWorkflowStatus';
+import { useProjectImageCount } from './useProjectImageCount';
 import { useDocumentDownloadStatus } from './useDocumentDownloadStatus';
 import DocumentCard from './DocumentCard';
 
@@ -82,14 +83,9 @@ export default function DocumentWorkflowPanel({
   onRetryVerification = null,
   disabled = false,
   onOpenReport,
-  imageCount = null,
-  imageCountLoading = true,
 }) {
   const { technicalReport, speakerDesign, clientProposal, proposalAvailable, loading, verificationError } = workflowStatus;
-  // Image count is provided by the parent (DocumentsAssetsControl), reused
-  // from ProjectAssetsSection's full record read so a separate
-  // ProposalAsset.count request is not issued alongside it. Defaults keep the
-  // component usable standalone (shows "Loading…" until a count arrives).
+  const { count: imageCount, loading: imageCountLoading } = useProjectImageCount(projectId);
 
   // Per-user, per-issued-document download tracking. Each issued document has
   // a unique record id; the store persists across navigation, refresh and
