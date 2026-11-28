@@ -134,10 +134,23 @@ export default function AdminRicherSounds() {
         </div>
       )}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-4">
+      {/* Central capacity summary — collective turnover is awarded exclusively to
+          Custom Install - 93, which then allocates tokens to ordinary branches. */}
+      <div className="mb-4 rounded-xl border border-[#213428] bg-[#F4F7F5] p-4">
+        <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#213428]">
+          <Coins className="h-3.5 w-3.5" /> Central capacity — Custom Install - 93
+        </div>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <SummaryStat label="Collective earned" value={masterAccount?.credits?.rewarded ?? 0} hint="£10k / 5-token milestones" />
+          <SummaryStat label="93 available" value={masterAccount?.credits?.available ?? 0} hint="Ready to allocate" />
+          <SummaryStat label="Allocated to branches" value={accounts.filter((a) => !a.isMaster).reduce((n, a) => n + (a.credits?.rsTransferred || 0), 0)} hint="Distributed by 93" />
+          <SummaryStat label="Used by branches" value={accounts.filter((a) => !a.isMaster).reduce((n, a) => n + (a.credits?.used || 0), 0)} hint="Project activations" />
+        </div>
+      </div>
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <SummaryStat label="Branches" value={accounts.length} hint="All Richer Sounds" />
         <SummaryStat label="Active" value={accounts.filter((a) => a.activationState?.label === "Active").length} />
-        <SummaryStat label="93 credits" value={masterAccount?.credits?.available ?? 0} hint="Available to transfer" />
         <SummaryStat label="Projects" value={accounts.reduce((n, a) => n + (a.projectCount || 0), 0)} />
       </div>
 

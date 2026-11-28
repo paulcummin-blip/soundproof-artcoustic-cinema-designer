@@ -42,9 +42,9 @@ export default async function(req) {
     const now = new Date().toISOString();
 
     if (action === 'reverse') {
-      if (!ctx.isMasterAdmin) {
-        return Response.json({ error: 'REVERSE_MASTER_ADMIN_ONLY', message: 'Only a Sound Proof master admin can reverse a transfer.' }, { status: 403 });
-      }
+      // Reclaim is a shared RS administration control: the Custom Install - 93
+      // administrator (an active 93 member) and Sound Proof master admins can
+      // reverse a prior forward transfer to reclaim unused allocated tokens.
       return await reverseTransfer(service, base44, ctx, body, now);
     }
 
@@ -152,6 +152,32 @@ export default async function(req) {
       state: partial ? 'partial' : 'completed',
       completed_at: partial ? null : now,
     });
+
+    // Record the allocation in the append-only audit trail. The CreditTransfer
+    // + CapacityLedger legs are the commercial authority; this audit entry is
+    // best-effort and never blocks a successful transfer.
+    if (!partial) {
+      try {
+        await service.entities.AccountUserAudit.create({
+          account_id: destinationAccountId,
+          actor_user_id: ctx.actorUser?.id || 'system',
+          actor_email: ctx.actorUser?.email || 'system',
+          action: 'RS_ALLOCATION_MADE',
+          target_email: destAccount.contact_email || null,
+          before_access_level: null,
+          after_access_level: null,
+          occurred_at: now,
+          details: {
+            actor_is_master_admin: ctx.isMasterAdmin === true,
+            actor_is_rs_delegated_admin: ctx.isMasterAdmin !== true,
+            master_account_id: master.accountId,
+            amount,
+            transfer_id: transferId,
+            note,
+          },
+        });
+      } catch { /* audit is best-effort */ }
+    }
 
     return Response.json({
       transfer_id: transferId,
@@ -264,6 +290,31 @@ async function reverseTransfer(service, base44, ctx, body, now) {
 
   if (!partial) {
     await service.entities.CreditTransfer.update(original.id, { state: 'reversed' });
+  }
+
+  // Record the reclamation in the append-only audit trail.
+  if (!partial) {
+    try {
+      await service.entities.AccountUserAudit.create({
+        account_id: original.destination_account_id,
+        actor_user_id: ctx.actorUser?.id || 'system',
+        actor_email: ctx.actorUser?.email || 'system',
+        action: 'RS_ALLOCATION_RECLAIMED',
+        target_email: branchAccount.contact_email || null,
+        before_access_level: null,
+        after_access_level: null,
+        occurred_at: now,
+        details: {
+          actor_is_master_admin: ctx.isMasterAdmin === true,
+          actor_is_rs_delegated_admin: ctx.isMasterAdmin !== true,
+          master_account_id: original.source_account_id,
+          amount: original.amount,
+          transfer_id: reverseId,
+          reclaim_of: originalTransferId,
+          note,
+        },
+      });
+    } catch { /* audit is best-effort */ }
   }
 
   return Response.json({

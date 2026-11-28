@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, Mail, ArrowRightLeft, ExternalLink, ChevronRight } from "lucide-react";
 import AccessPill from "@/components/admin/access/AccessPill";
+import RsApprovalControl from "@/components/admin/access/RsApprovalControl";
 import { formatDate, formatDateTime } from "@/lib/commercial/accountAccessOverview";
 
 function SummaryStat({ label, value, hint }) {
@@ -30,9 +31,18 @@ export default function RsBranchDrawer({ row, open, onOpenChange, onTransfer, on
         <div className="space-y-4 p-5">
           <div className="flex flex-wrap gap-2">
             <AccessPill label={row.eligibilityState?.label} tone={row.eligibilityState?.tone} title="Sound Proof eligibility — set by master admin" />
+            {row.isMaster
+              ? <AccessPill label="Central admin" tone="muted" title="Custom Install - 93 — exempt from RS approval" />
+              : <AccessPill label={row.rsApprovalState?.label} tone={row.rsApprovalState?.tone} title="RS internal approval — set by 93 or a master admin" />}
             <AccessPill label={row.activationPill?.label || row.activationState?.label} tone={row.activationPill?.tone || row.activationState?.tone} />
             <AccessPill label={row.mappingStatus === "verified" ? `Trading ${row.tradingNumber}` : "Mapping unresolved"} tone={row.mappingStatus === "verified" ? "ok" : "warn"} />
           </div>
+
+          {/* RS-01 internal approval control — shared control for ordinary RS
+              stores. 93 (central administrator) is exempt and shows no control. */}
+          {!row.isMaster && (
+            <RsApprovalControl row={row} onChanged={() => { /* drawer is read-only; parent reloads on close */ }} />
+          )}
 
           {row.mappingStatus !== "verified" && (
             <div className="flex items-start gap-2 rounded-lg border border-[#E4D6BE] bg-[#FAF5EC] px-3 py-2.5 text-[12px] text-[#7A5B22]">
@@ -114,7 +124,7 @@ export default function RsBranchDrawer({ row, open, onOpenChange, onTransfer, on
                 <Mail className="h-4 w-4" /> Resend invitation
               </button>
             )}
-            {!row.isMaster && row.eligibilityState?.label === "Approved" && (
+            {!row.isMaster && row.eligibilityState?.label === "Approved" && row.rsApprovalState?.status === "approved" && (
               <button type="button" onClick={() => onTransfer(row)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#213428] bg-[#213428] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#2A4434]">
                 <ArrowRightLeft className="h-4 w-4" /> Transfer credits
               </button>

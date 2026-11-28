@@ -5,10 +5,13 @@ import { secrets } from "base44:runtime";
 import {
   buildThresholdReconciliationPlan,
   validateEntitlementContract,
+  TURNOVER_REWARD_RULE,
 } from "../../shared/turnoverRewardReconciliationAuthority.js";
+import { resolveRicherSoundsMasterAccount } from "../../shared/richerSoundsAdminAuthority.js";
 
 const SOURCE_SYSTEM = "ARTCOUSTIC_PARTNER_PORTAL";
 const CONTRACT_VERSION = 1;
+const RICHER_SOUNDS_DEALER_GROUP = "RICHER_SOUNDS";
 function summarizeError(error) {
   return String(error?.message || error || "Unknown error").slice(0, 500);
 }
@@ -190,6 +193,25 @@ export default async function syncUkTurnoverRewards(req) {
       if (accountId) linksByAccountId.set(accountId, dealerId);
     }
 
+    // RS-01 collective turnover: Richer Sounds accounts are rewarded collectively
+    // at the Custom Install - 93 master account, never individually. Resolve 93
+    // and the set of RS account ids here so the per-dealer loop can short-circuit
+    // RS stores into a collective sum. A failed master resolution yields an empty
+    // set, so RS stores are simply skipped (no reward) rather than rewarded
+    // individually — fail closed for the collective programme.
+    const rsMaster = await resolveRicherSoundsMasterAccount(base44.asServiceRole);
+    const rsMasterAccountId = rsMaster?.accountId || null;
+    const rsAccountIds = new Set();
+    if (rsMasterAccountId) {
+      const rsAccounts = await base44.asServiceRole.entities.Account.filter(
+        { dealer_group: RICHER_SOUNDS_DEALER_GROUP }, "name", 200,
+      );
+      for (const a of Array.isArray(rsAccounts) ? rsAccounts : []) {
+        if (a?.id) rsAccountIds.add(a.id);
+      }
+    }
+    const collectiveTurnoverByDealer = []; // { dealerId, accountId, turnover, ts, linkId }
+
     const milestonesByAccount = new Map();
     for (const milestone of Array.isArray(allMilestones) ? allMilestones : []) {
       if (!milestonesByAccount.has(milestone.account_id)) {
@@ -245,6 +267,51 @@ export default async function syncUkTurnoverRewards(req) {
 
       dealersMatched += 1;
       const accountId = link.account_id;
+
+      // RS-01: Richer Sounds accounts are rewarded collectively at 93, never
+      // individually. Record this store's turnover for the collective sum, append
+      // a display-only TurnoverRecord snapshot, and skip per-store reconciliation.
+      if (rsAccountIds.has(accountId)) {
+        collectiveTurnoverByDealer.push({
+          dealerId,
+          accountId,
+          turnover: dealerEntitlement.current_turnover_gbp ?? 0,
+          ts: dealerEntitlement.turnover_source_updated_at ?? null,
+          linkId: link.id,
+        });
+        if (!dryRun && dealerEntitlement.current_turnover_gbp !== undefined) {
+          const turnoverKey = `${accountId}|${normaliseTsKey(dealerEntitlement.turnover_source_updated_at)}`;
+          if (!existingTurnoverKeys.has(turnoverKey)) {
+            const currentSnapshots = await base44.asServiceRole.entities.TurnoverRecord.filter({
+              account_id: accountId, calendar_year: calendarYear,
+              source_last_updated: dealerEntitlement.turnover_source_updated_at ?? null,
+            }, "-created_date", 1);
+            if (!currentSnapshots?.length) {
+              await base44.asServiceRole.entities.TurnoverRecord.create({
+                account_id: accountId,
+                external_account_link_id: link.id,
+                calendar_year: calendarYear,
+                eligible_turnover_gbp: dealerEntitlement.current_turnover_gbp,
+                source_currency: "GBP",
+                source_turnover: dealerEntitlement.current_turnover_gbp,
+                source_system: SOURCE_SYSTEM,
+                source_last_updated: dealerEntitlement.turnover_source_updated_at,
+                sync_date: new Date().toISOString(),
+              });
+              existingTurnoverKeys.add(turnoverKey);
+              turnoverSnapshotsAppended += 1;
+            }
+          }
+        }
+        dealerResults.push({
+          dealer_account_id: dealerId,
+          sound_proof_account_id: accountId,
+          match_status: "COLLECTIVE_RS",
+          planned_actions: 0,
+        });
+        continue;
+      }
+
       // Query per account so app-wide ledger growth cannot truncate old threshold
       // events and accidentally make a previously credited threshold look missing.
       const service = base44.asServiceRole;
@@ -433,6 +500,150 @@ export default async function syncUkTurnoverRewards(req) {
       });
       } finally {
         if (lock?.acquired && safeToRelease) await releaseCreationLock(service, accountId, lock.token);
+      }
+    }
+
+    // RS-01 collective turnover reconciliation: award the collective Richer Sounds
+    // turnover reward to Custom Install - 93 only. No individual RS store
+    // receives a UK_TURNOVER_REWARD entry. The collective sum of all RS stores'
+    // turnover (including 93 itself) is mapped to contiguous £10,000 milestones
+    // and reconciled against 93's ledger with collective idempotency keys.
+    if (rsMasterAccountId && collectiveTurnoverByDealer.length > 0) {
+      const collectiveSum = collectiveTurnoverByDealer.reduce(
+        (n, d) => n + (Number(d.turnover) || 0), 0);
+      const step = TURNOVER_REWARD_RULE.thresholdStepGbp;
+      const earnedThresholds = [];
+      for (let t = step; t <= Math.floor(collectiveSum / step) * step; t += step) {
+        earnedThresholds.push(t);
+      }
+      const collectiveService = base44.asServiceRole;
+      const collectiveLock = dryRun ? null : await acquireCreationLock(collectiveService, rsMasterAccountId);
+      if (!dryRun && !collectiveLock?.acquired) {
+        errorCount += 1;
+        errors.push(`Account ${rsMasterAccountId}: COLLECTIVE_REWARD_BUSY`);
+      } else {
+        let collectiveSafeToRelease = true;
+        try {
+          const masterLedger = await getCapacityLedgerEntries(collectiveService, rsMasterAccountId);
+          const latestCollectiveTime = masterLedger.reduce((latest, entry) =>
+            entry?.source_ref?.reward_program === "UK_TURNOVER_REWARD_COLLECTIVE_RS"
+              ? Math.max(latest, Date.parse(entry?.source_ref?.entitlement_calculated_at || "") || 0)
+              : latest, 0);
+          if (Date.parse(contract.calculated_at) < latestCollectiveTime) {
+            errorCount += 1;
+            errors.push(`Account ${rsMasterAccountId}: STALE_COLLECTIVE_ENTITLEMENT`);
+          } else {
+            let collectiveActions;
+            try {
+              collectiveActions = buildThresholdReconciliationPlan({
+                accountId: rsMasterAccountId,
+                calendarYear,
+                earnedThresholds,
+                ledgerEntries: masterLedger,
+              });
+            } catch (planErr) {
+              errorCount += 1;
+              errors.push(`Account ${rsMasterAccountId}: ${summarizeError(planErr)}`);
+              collectiveActions = [];
+            }
+            const collectiveMilestoneMap = new Map();
+            const existingCollectiveMilestones = await collectiveService.entities.TurnoverMilestone.filter(
+              { account_id: rsMasterAccountId, calendar_year: calendarYear }, "-created_date", 5000,
+            );
+            for (const m of Array.isArray(existingCollectiveMilestones) ? existingCollectiveMilestones : []) {
+              collectiveMilestoneMap.set(Number(m.milestone_value_gbp), m);
+            }
+            for (const action of collectiveActions) {
+              if (dryRun) continue;
+              const duplicate = await collectiveService.entities.CapacityLedger.filter({
+                idempotency_key: action.idempotency_key,
+              });
+              if (Array.isArray(duplicate) && duplicate.length > 0) continue;
+              collectiveSafeToRelease = false;
+              const collectiveLedgerPayload = {
+                account_id: rsMasterAccountId,
+                transaction_type: action.kind === "REVERSE" ? "REVERSAL" : "UK_TURNOVER_REWARD",
+                delta: action.delta,
+                idempotency_key: action.idempotency_key,
+                source_system: SOURCE_SYSTEM,
+                source_ref: {
+                  reward_program: "UK_TURNOVER_REWARD_COLLECTIVE_RS",
+                  collective_rs: true,
+                  contributing_accounts: collectiveTurnoverByDealer.length,
+                  collective_turnover_gbp: collectiveSum,
+                  calendar_year: calendarYear,
+                  milestone_value_gbp: action.threshold,
+                  contract_version: contract.contract_version,
+                  entitlement_calculated_at: contract.calculated_at,
+                  previous_event_id: action.previous_event_id,
+                },
+                reason: `Richer Sounds collective turnover reward £${action.threshold.toLocaleString()} milestone (${calendarYear})`,
+                reversal_of: action.reversal_of,
+              };
+              let ledgerEntry;
+              try {
+                ledgerEntry = await collectiveService.entities.CapacityLedger.create(collectiveLedgerPayload);
+              } catch (writeError) {
+                const confirmed = await collectiveService.entities.CapacityLedger.filter({
+                  idempotency_key: action.idempotency_key,
+                });
+                if (!Array.isArray(confirmed) || confirmed.length !== 1
+                  || confirmed[0].account_id !== rsMasterAccountId
+                  || confirmed[0].delta !== action.delta
+                  || confirmed[0].transaction_type !== collectiveLedgerPayload.transaction_type) throw writeError;
+                ledgerEntry = confirmed[0];
+              }
+              if (!ledgerEntry?.id) throw new Error("COLLECTIVE_REWARD_WRITE_UNCONFIRMED");
+              collectiveSafeToRelease = true;
+              masterLedger.push(ledgerEntry);
+
+              const nowIso = new Date().toISOString();
+              const existingMilestone = collectiveMilestoneMap.get(action.threshold);
+              const milestoneFields = {
+                account_id: rsMasterAccountId,
+                calendar_year: calendarYear,
+                milestone_value_gbp: action.threshold,
+                reward_projects: Math.abs(action.delta),
+                status: action.kind === "REVERSE" ? "REVERSED" : "ACTIVE",
+                latest_ledger_entry_id: ledgerEntry.id,
+                last_reconciled_at: nowIso,
+                source_calculated_at: contract.calculated_at,
+              };
+              if (existingMilestone) {
+                await collectiveService.entities.TurnoverMilestone.update(existingMilestone.id, {
+                  ...milestoneFields,
+                  reward_ledger_entry_id:
+                    existingMilestone.reward_ledger_entry_id || (action.delta > 0 ? ledgerEntry.id : null),
+                  reversal_ledger_entry_id:
+                    action.kind === "REVERSE" ? ledgerEntry.id : existingMilestone.reversal_ledger_entry_id || null,
+                  reinstatement_count:
+                    Number(existingMilestone.reinstatement_count || 0) + (action.kind === "REINSTATE" ? 1 : 0),
+                  reversal_count:
+                    Number(existingMilestone.reversal_count || 0) + (action.kind === "REVERSE" ? 1 : 0),
+                });
+              } else {
+                const milestone = await collectiveService.entities.TurnoverMilestone.create({
+                  ...milestoneFields,
+                  reward_ledger_entry_id: action.delta > 0 ? ledgerEntry.id : null,
+                  reversal_ledger_entry_id: action.kind === "REVERSE" ? ledgerEntry.id : null,
+                  reinstatement_count: action.kind === "REINSTATE" ? 1 : 0,
+                  reversal_count: action.kind === "REVERSE" ? 1 : 0,
+                });
+                collectiveMilestoneMap.set(action.threshold, milestone);
+              }
+
+              if (action.kind === "AWARD") { milestonesAwarded += 1; projectsAwarded += action.delta; }
+              else if (action.kind === "REVERSE") { milestonesReversed += 1; projectsReversed += Math.abs(action.delta); }
+              else if (action.kind === "REINSTATE") { milestonesReinstated += 1; projectsReinstated += action.delta; }
+            }
+            dealersReconciled += 1;
+            dealersUpdated += collectiveActions.length > 0 ? 1 : 0;
+          }
+        } finally {
+          if (collectiveLock?.acquired && collectiveSafeToRelease) {
+            await releaseCreationLock(collectiveService, rsMasterAccountId, collectiveLock.token);
+          }
+        }
       }
     }
 

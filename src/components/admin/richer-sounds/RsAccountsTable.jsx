@@ -3,15 +3,16 @@ import { Mail, ChevronRight, ArrowRightLeft } from "lucide-react";
 import AccessPill from "@/components/admin/access/AccessPill";
 import { formatDate } from "@/lib/commercial/accountAccessOverview";
 
-const GRID = "1.6fr 0.8fr 1fr 1fr 0.5fr 0.5fr 0.5fr 110px 1.1fr";
+const GRID = "1.5fr 0.7fr 0.9fr 0.9fr 0.9fr 0.5fr 0.5fr 0.5fr 110px 1.1fr";
 
 const HEADERS = [
   { label: "Branch", align: "left" },
   { label: "Trading no.", align: "left" },
   { label: "Eligibility", align: "left" },
+  { label: "RS approval", align: "left" },
   { label: "Activation", align: "left" },
   { label: "Users", align: "right" },
-  { label: "Credits", align: "right" },
+  { label: "Allocated", align: "right" },
   { label: "Projects", align: "right" },
   { label: "Last activity", align: "right" },
   { label: "Action", align: "right" },
@@ -28,7 +29,7 @@ export default function RsAccountsTable({ accounts, onOpen, onTransfer, onResend
   }
   return (
     <div className="overflow-x-auto rounded-lg border border-[#DCDBD6] bg-white">
-      <div className="min-w-[1180px]">
+      <div className="min-w-[1280px]">
         <div
           style={{ gridTemplateColumns: GRID }}
           className="grid items-center gap-2 border-b border-[#E7E5E1] bg-[#F4F3F1] px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-[#625143]"
@@ -42,7 +43,11 @@ export default function RsAccountsTable({ accounts, onOpen, onTransfer, onResend
             ? { label: row.tradingNumber || "—", tone: "ok" }
             : { label: "Unresolved", tone: "warn" };
           const canResend = row.activationState?.label === "Invitation Pending" && !row.isMaster;
-          const canTransfer = !row.isMaster && row.eligibilityState?.label === "Approved";
+          // Allocations require both Sound Proof eligibility and RS internal
+          // approval, so tokens are only sent to branches that can actually use them.
+          const canTransfer = !row.isMaster
+            && row.eligibilityState?.label === "Approved"
+            && row.rsApprovalState?.status === "approved";
           return (
             <div
               key={row.account.id}
@@ -63,10 +68,17 @@ export default function RsAccountsTable({ accounts, onOpen, onTransfer, onResend
                   title={row.mappingStatus === "verified" ? "Portal mapping verified" : "Branch trading number not yet verified against Portal crosswalk"}
                 />
               </div>
-              <div><AccessPill label={row.eligibilityState?.label || "—"} tone={row.eligibilityState?.tone} /></div>
+              <div><AccessPill label={row.eligibilityState?.label || "—"} tone={row.eligibilityState?.tone} title="Sound Proof eligibility — set by master admin" /></div>
+              <div>
+                {row.isMaster
+                  ? <AccessPill label="Central admin" tone="muted" title="Custom Install - 93 — exempt from RS approval" />
+                  : <AccessPill label={row.rsApprovalState?.label || "—"} tone={row.rsApprovalState?.tone} title="RS internal approval — set by 93 or a master admin" />}
+              </div>
               <div><AccessPill label={row.activationPill?.label || row.activationState?.label || "—"} tone={row.activationPill?.tone || row.activationState?.tone} /></div>
               <div className="text-right tabular-nums text-[#3E4349]">{row.seatsUsed}/{row.seatsMaximum}</div>
-              <div className="text-right tabular-nums font-bold text-[#1B1A1A]">{row.credits.available ?? 0}</div>
+              <div className="text-right tabular-nums font-bold text-[#1B1A1A]" title={row.isMaster ? "93 central pool (available)" : "Total tokens allocated in from 93"}>
+                {row.isMaster ? (row.credits.available ?? 0) : (row.credits.rsTransferred ?? 0)}
+              </div>
               <div className="text-right tabular-nums text-[#3E4349]">{row.projectCount}</div>
               <div className="whitespace-nowrap text-right tabular-nums text-[#625143]">
                 {row.lastActivity ? formatDate(new Date(row.lastActivity).toISOString()) : "—"}
